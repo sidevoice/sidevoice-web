@@ -1137,6 +1137,7 @@ export const messages = {
   "wizard.mic.allow": "Allow microphone",
   "wizard.mic.allowed": "Microphone allowed",
   "wizard.mic.continueWithout": "Continue without microphone",
+  "wizard.mic.continueWaiting": "Allow the microphone to continue, or go on without it.",
   "wizard.turn.noMicrophone": "Trying this needs a microphone, and you continued without one.",
   "wizard.mic.checkAgain": "Check again",
   "wizard.mic.openSettings": "Open System Settings",

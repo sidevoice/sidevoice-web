@@ -5,7 +5,7 @@
 
 /** What an avatar draws: a conversation's bicho, the person's own, or — only when asked for by name — the Sidevoice
  *  mascot. A seed is never read as a mascot's name. */
-export type AvatarSpec = { kind: "bicho"; seed: string } | { kind: "person" } | { kind: "mascot"; mascot: "sidevoice" };
+export type AvatarSpec = { kind: "bicho"; seed: string } | { kind: "person"; hold?: "microphone" } | { kind: "mascot"; mascot: "sidevoice" };
 
 /** The state an avatar acts out. An agent's, by priority: offline > speaking > listening > working > idle
  *  (features/call/conversation-state.ts derives them). `present` is the person in a call, not speaking. */
@@ -24,7 +24,7 @@ export const SIDEVOICE_MASCOT: AvatarSpec = { kind: "mascot", mascot: "sidevoice
 
 /** One key per drawing: two specs with the same key draw the same figure. */
 export function avatarKey(spec: AvatarSpec): string {
-  return spec.kind === "bicho" ? "bicho:" + spec.seed : spec.kind === "mascot" ? "mascot:" + spec.mascot : "person";
+  return spec.kind === "bicho" ? "bicho:" + spec.seed : spec.kind === "mascot" ? "mascot:" + spec.mascot : spec.hold ? "person:" + spec.hold : "person";
 }
 
 /** The CSS variables an avatar (and the stage and the picture-in-picture behind it) is tinted with: its figure's main

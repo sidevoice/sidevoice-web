@@ -1,10 +1,11 @@
 import { useEffect, useRef } from "react";
 import { Button } from "../../components/ui/Button";
-import { PERSON_AVATAR } from "../avatar/avatar-spec";
+import { PERSON_AVATAR, type AvatarSpec } from "../avatar/avatar-spec";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
-import { MicrophoneIcon, MicrophoneOffIcon, RefreshIcon } from "../../components/ui/Icons";
+import { MicrophoneIcon, MicrophoneOffIcon } from "../../components/ui/Icons";
+import { Tooltip } from "../../components/ui/Tooltip";
 import { Group, Row } from "../../components/ui/Card";
-import { announcement, MicrophoneBadge, MicrophoneHowTo, microphoneAction, MIC_HELP_ID, microphoneView, useMicrophoneAccess, type MicrophoneView, type Platform } from "../permissions/permission-view";
+import { announcement, MicrophoneBadge, MicrophoneHowTo, microphoneAction, MIC_HELP_ID, microphoneView, type MicrophoneView, type Platform } from "../permissions/permission-view";
 import { devicePlatform, type MicrophoneSnapshot } from "../../services/microphone-access";
 import type { Translate } from "../../i18n/translator";
 
@@ -58,18 +59,18 @@ function MicrophoneRow({ microphone, view, onRequest, openSettings, t }: {
   </>;
 }
 
+/** The person's bicho with the microphone in its hand, once it is allowed (operator, 2026-10-16). */
+const PERSON_WITH_MIC: AvatarSpec = { kind: "person", hold: "microphone" };
+
 export function PermissionsStep({ microphone, openSettings, onRequest = () => {}, t, platform = devicePlatform() }: {
   microphone: MicrophoneSnapshot; openSettings: (() => Promise<void>) | null; onRequest?(): void; t: Translate; platform?: Platform;
 }) {
   const view = microphoneView(microphone, platform);
-  const { access } = useMicrophoneAccess();
   return <section className="wizard-mic wizard-perm" data-state={view.state}>
-    <span className="perm-hero-figure" data-state={view.state} aria-hidden><CharacterAvatar spec={PERSON_AVATAR} mood="present" size="pip" /></span>
+    <span className="perm-hero-figure" data-state={view.state} aria-hidden><CharacterAvatar spec={view.state === "granted" ? PERSON_WITH_MIC : PERSON_AVATAR} mood="present" size="pip" /></span>
     <Group>
       <MicrophoneRow microphone={microphone} view={view} onRequest={onRequest} openSettings={openSettings} t={t} />
     </Group>
-    <Button size="sm" variant="ghost" tone="neutral" className="perm-refresh" disabled={!access || view.busy} onClick={() => void access?.check()}>
-      <RefreshIcon size={14} />{t("perm.refresh")}</Button>
     {/* Each change said once, as it happens; the title, focused on arrival, says the step. */}
     <p className="sr-only" role="status" aria-live="polite">{announcement(microphone, t)}</p>
   </section>;
@@ -83,7 +84,11 @@ export function MicrophoneContinue({ microphone, onContinue, t }: { microphone: 
   // Continue, the primary, in the brand's colour but waiting until the microphone is allowed.
   return <>
     {!done && <Button type="button" variant="secondary" id="wizard-mic-skip" onClick={onContinue}>{t("wizard.mic.continueWithout")}</Button>}
-    <Button type="button" variant="primary" id="wizard-mic-continue" className={done ? undefined : "wizard-continue-waiting"} disabled={!done} onClick={onContinue}>
-      {t("wizard.continue")}</Button>
+    {/* Waiting, it says why on hover and focus: aria-disabled (blockedBy), so it stays focusable and its tooltip shows. */}
+    <Tooltip content={done ? null : t("wizard.mic.continueWaiting")}>
+      <Button type="button" variant="primary" id="wizard-mic-continue" className={done ? undefined : "wizard-continue-waiting"}
+        disabled={!done} blockedBy={done ? undefined : "wizard-mic-continue-why"} onClick={onContinue}>{t("wizard.continue")}</Button>
+    </Tooltip>
+    {!done && <span id="wizard-mic-continue-why" className="sr-only">{t("wizard.mic.continueWaiting")}</span>}
   </>;
 }

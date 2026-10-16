@@ -1108,6 +1108,7 @@ export const messages: Messages = {
   "wizard.mic.allow": "Autoriser le micro",
   "wizard.mic.allowed": "Micro autorisé",
   "wizard.mic.continueWithout": "Continuer sans microphone",
+  "wizard.mic.continueWaiting": "Autorisez le micro pour continuer, ou continuez sans lui.",
   "wizard.turn.noMicrophone": "L’essai demande un microphone, et vous avez continué sans.",
   "wizard.mic.checkAgain": "Vérifier à nouveau",
   "wizard.mic.openSettings": "Ouvrir Réglages Système",

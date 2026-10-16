@@ -1109,6 +1109,7 @@ export const messages: Messages = {
   "wizard.mic.allow": "マイクを許可",
   "wizard.mic.allowed": "マイクを許可済み",
   "wizard.mic.continueWithout": "マイクなしで続ける",
+  "wizard.mic.continueWaiting": "続けるにはマイクを許可してください。マイクなしで進むこともできます。",
   "wizard.turn.noMicrophone": "試すにはマイクが必要ですが、マイクなしで続けています。",
   "wizard.mic.checkAgain": "もう一度確認",
   "wizard.mic.openSettings": "システム設定を開く",
