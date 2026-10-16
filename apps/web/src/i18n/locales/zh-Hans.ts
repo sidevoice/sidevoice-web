@@ -1105,6 +1105,8 @@ export const messages: Messages = {
   "wizard.mic.allow": "允许麦克风",
   "voiceSetup.title": "你的语音尚未就绪",
   "voiceSetup.body": "通话需要这些。可在此下载，或添加服务商的密钥。",
+  "micSetup.title": "允许使用麦克风",
+  "micSetup.body": "你的智能体需要它才能听到你。",
   "wizard.skip.microphone": "不使用麦克风继续",
   "wizard.skip.machine": "不连接机器继续",
   "wizard.skip.later": "暂时跳过",

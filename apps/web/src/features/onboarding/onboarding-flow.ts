@@ -27,7 +27,7 @@ export interface FlowRules {
   mandatory: boolean;
   /** The steps offer "Continue without …", kept in the record; Ready completes the setup on arrival and always enters. */
   skips: boolean;
-  /** The call area waits on what is missing (no machine, then the voice's models), not on the setup itself. */
+  /** The call area waits on what is missing (no machine, the microphone, then the voice's models), not on the setup itself. */
   readiness: boolean;
   /** The call area's waiting cards offer "Continue setup" while the setup is not done. */
   continueLink: boolean;
@@ -50,23 +50,24 @@ export function useOnboardingFlow(): { flow: OnboardingFlow; rules: FlowRules } 
 /** The voice's models as the call needs them: unknown until the catalogue is read (nothing is claimed, nothing flashes). */
 export type VoiceReadiness = "ready" | "missing" | "unknown";
 
-/** What the call area shows: the setup put off (c), no machine, the voice's models, nothing yet (not known), or the stage. */
-export type CallWaiting = "pending" | "machine" | "voice" | "unknown" | null;
+/** What the call area shows: the setup put off (c), no machine, the microphone, the voice's models, nothing yet (not
+ *  known), or the stage. */
+export type CallWaiting = "pending" | "machine" | "microphone" | "voice" | "unknown" | null;
 
 /** The room's frame for the setup as it stands: whether the room is kept behind the setup, what the call's own space
  *  waits on, and whether the conversations (and New) are held back. */
-export function callArea(rules: FlowRules, facts: { ready: boolean; open: boolean; done: boolean; noMachine: boolean; voice: VoiceReadiness }) {
-  const { ready, open, done, noMachine, voice } = facts;
+export function callArea(rules: FlowRules, facts: { ready: boolean; open: boolean; done: boolean; noMachine: boolean; microphone: boolean; voice: VoiceReadiness }) {
+  const { ready, open, done, noMachine, microphone, voice } = facts;
   if (rules.mandatory && !rules.readiness) return { roomHidden: !ready || !done, waiting: (noMachine ? "machine" : null) as CallWaiting, blocked: noMachine };
   if (rules.pendingCard) {
     const pending = !ready || !done;
     const waiting: CallWaiting = pending && ready ? "pending" : noMachine ? "machine" : null;
     return { roomHidden: !ready || (pending && open), waiting, blocked: (pending && ready) || noMachine };
   }
-  // Readiness: no machine, then the voice's models, one at a time; the conversations whenever a machine is there.
+  // Readiness: no machine, then the microphone (required to call; `microphone`: the call has it), then the voice's models, one at a time; the conversations whenever a machine is there.
   // Not known yet, nothing is claimed: before the setup is done the space stays empty rather than flash the stage then the
   // card; once it is done the stage stays (its models were ready), and a card replaces it only once one is known missing.
-  const waiting: CallWaiting = noMachine ? "machine" : voice === "missing" ? "voice" : voice === "unknown" && !done ? "unknown" : null;
+  const waiting: CallWaiting = noMachine ? "machine" : !microphone ? "microphone" : voice === "missing" ? "voice" : voice === "unknown" && !done ? "unknown" : null;
   const roomHidden = !ready || (rules.mandatory ? !done : !done && open);
   return { roomHidden, waiting, blocked: noMachine };
 }

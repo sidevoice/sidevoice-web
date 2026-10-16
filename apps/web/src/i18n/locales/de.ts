@@ -1108,6 +1108,8 @@ export const messages: Messages = {
   "wizard.mic.allow": "Mikrofon erlauben",
   "voiceSetup.title": "Deine Stimme ist noch nicht bereit",
   "voiceSetup.body": "Für einen Anruf brauchst du diese Modelle. Lade sie hier herunter oder füge den Schlüssel eines Anbieters hinzu.",
+  "micSetup.title": "Erlaube das Mikrofon",
+  "micSetup.body": "Deine Agenten brauchen es, um dich zu hören.",
   "wizard.skip.microphone": "Ohne Mikrofon fortfahren",
   "wizard.skip.machine": "Ohne Maschine fortfahren",
   "wizard.skip.later": "Vorerst überspringen",

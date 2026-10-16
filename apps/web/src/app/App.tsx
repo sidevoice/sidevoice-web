@@ -22,6 +22,7 @@ import { OnboardingProvider, useOnboarding } from "../features/onboarding/onboar
 import { SetupPending, Wizard } from "../features/onboarding/Wizard";
 import { callArea } from "../features/onboarding/onboarding-flow";
 import { VoiceSetupCard } from "../features/call/VoiceSetupCard";
+import { MicrophoneSetupCard } from "../features/call/MicrophoneSetupCard";
 import { useRoomStore } from "../state/room-store";
 import type { OnboardingRepository, OnboardingStep } from "../services/onboarding-state";
 import { useUiLanguage } from "../i18n/use-ui-language";
@@ -39,7 +40,7 @@ function RoomContent() {
   const onboarding = useOnboarding();
   // What the room shows of the setup is the flow's (onboarding-flow.ts): whether the room waits behind it, and what the
   // call's own space says is missing — one thing at a time.
-  const { roomHidden, waiting, blocked } = callArea(onboarding.rules, { ready: onboarding.ready, open: onboarding.open, done: onboarding.done, noMachine: !!noMachine, voice: onboarding.voice.state });
+  const { roomHidden, waiting, blocked } = callArea(onboarding.rules, { ready: onboarding.ready, open: onboarding.open, done: onboarding.done, noMachine: !!noMachine, microphone: onboarding.microphone.ready || onboarding.microphone.state === "checking", voice: onboarding.voice.state });
   const callBlocked = waiting !== null;
   // "Continue setup" on a waiting card, where the flow offers it and the setup is not done.
   const continueSetup = onboarding.rules.continueLink && !onboarding.done ? () => onboarding.openWizard() : undefined;
@@ -84,6 +85,7 @@ function RoomContent() {
           {callBlocked && <div className="call-column call-column--waiting" data-waiting={waiting}>
             {waiting === "pending" ? <SetupPending />
               : waiting === "machine" ? <NoMachineScreen source="no-machine" onContinueSetup={continueSetup} />
+              : waiting === "microphone" ? <MicrophoneSetupCard microphone={onboarding.microphone} openSettings={onboarding.openMicrophoneSettings} onRequest={() => void onboarding.requestMicrophone()} onContinueSetup={continueSetup} />
               : waiting === "voice" ? <VoiceSetupCard rows={onboarding.voice.rows} onContinueSetup={continueSetup} />
               : null}
           </div>}
