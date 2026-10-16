@@ -48,10 +48,10 @@ test("Delete's confirmation is one sentence, its limits folded under a disclosur
   expect(dialog).toHaveTextContent(/restarts at setup; the app itself stays/);
   const disclosure = screen.getByRole("button", { name: "What isn’t deleted?" });
   expect(disclosure).toHaveAttribute("aria-expanded", "false");
-  expect(screen.getByText(/Other machines and devices (revoke this device there)/)).not.toBeVisible();
+  expect(screen.getByText(/Other machines and devices \(revoke this device there\)/)).not.toBeVisible();
   fireEvent.click(disclosure);
   expect(disclosure).toHaveAttribute("aria-expanded", "true");
-  expect(screen.getByText(/Other machines and devices (revoke this device there)/)).toBeVisible();
+  expect(screen.getByText(/Other machines and devices \(revoke this device there\)/)).toBeVisible();
 });
 
 test("Uninstall's confirmation says the app quits and moves itself to the Trash; Cancel calls nothing", () => {
