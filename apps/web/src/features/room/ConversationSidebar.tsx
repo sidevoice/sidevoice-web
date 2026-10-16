@@ -1,5 +1,4 @@
 import { useContext, useEffect, useLayoutEffect, useRef } from "react";
-import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { DropdownMenu, DropdownMenuItem } from "../../components/ui/DropdownMenu";
 import { ContextMenu, ContextMenuItem } from "../../components/ui/ContextMenu";
@@ -12,7 +11,7 @@ import { useSettingsAttention } from "../settings/settings-attention";
 import type { ParticipantView } from "../../state/room-types";
 import { translator } from "../../i18n/translator";
 import { ConversationAvatar } from "../call/ConversationAvatar";
-import { conversationState, isCallRow, machineGroups, stateText } from "../call/conversation-state";
+import { conversationState, hasUnread, machineGroups, stateText } from "../call/conversation-state";
 import { selectInCall, useStageConversation } from "../call/stage-view";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { ConversationRows } from "./ConversationRows";
@@ -113,9 +112,7 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
     if (collapsed) toggleSidebar();
     if (crowded) closeTranscript();
   };
-  // The unread count is the row's badge, so the line under the title says the state alone; the tooltip says both. The
-  // call's own conversation has none: what it says is heard.
-  const unread = (row: ParticipantView) => row.unread > 0 && !isCallRow(row, inCall);
+  const unread = (row: ParticipantView) => hasUnread(row, onStage);
 
   return (
     <>
@@ -148,16 +145,15 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
                   onSelect={select}
                   lead={(row) => <ConversationAvatar row={row} />}
                   tooltip={(row) => [row.title + " · " + stateText(row, inCall, t), harnessLine(row), row.detail, row.activityNote].filter(Boolean).join("\n\n")}
-                  label={(row) => [row.title, stateText(row, inCall, t), (row.unheard ?? 0) > 0 ? t("state.unheard", { n: row.unheard ?? 0 }) : null].filter(Boolean).join(" · ")}
+                  label={(row) => [row.title, stateText(row, inCall, t), unread(row) ? t("state.unread") : null].filter(Boolean).join(" · ")}
                   sub={(row) => (
                     <span className="sidebar-state" data-state={conversationState(row, inCall)}>
                       {row.harness && <HarnessIcon harness={row.harness} size={12} />}
-                      <span className="sidebar-state-text">{stateText({ ...row, unread: 0 }, inCall, t)}</span>
+                      <span className="sidebar-state-text">{stateText(row, inCall, t)}</span>
                     </span>
                   )}
                   end={(row) => <>
-                    {(row.unheard ?? 0) > 0 && <Badge tone="accent" className="sidebar-unread">{t("state.unheard", { n: row.unheard ?? 0 })}</Badge>}
-                    {unread(row) && <Badge tone="accent" className="sidebar-unread">{t("state.unread", { n: row.unread })}</Badge>}
+                    {unread(row) && <span className="sidebar-unread" aria-hidden="true" />}
                   </>}
                   // The same options on the secondary click anywhere on the row (operator, 2026-10-16): Close conversation, for now.
                   wrap={(row, node) => <ContextMenu label={t("sidebar.options", { title: row.title })}

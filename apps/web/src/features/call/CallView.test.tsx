@@ -319,7 +319,7 @@ test("a conversation that is holding does not react to the person talking", () =
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "idle");
 });
 
-test("replies this browser has not seen put the unread cue on that conversation's avatar", () => {
+test("replies that arrived after leaving put the unread cue on that conversation's avatar, never the one in view", () => {
   room({ history: [
     { segment: "h-2", thread: "fp-1|t-login", role: "assistant", text: REPLY, name: "Fix the slow login", time: 1, session: "s1", audio: "playing" },
     { segment: "p-1", thread: "fp-2|t-backup", role: "assistant", text: "The backups ran.", name: "Review the nightly backups", time: 2, session: "s1", seq: 4 },

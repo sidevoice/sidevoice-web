@@ -10,6 +10,7 @@
  * below the controls and close by themselves. */
 import { ChevronIcon, HangupIcon, HarnessIcon, MachinesIcon, MicrophoneIcon, MicrophoneOffIcon, OpenAppIcon, SkipIcon } from "../components/ui/Icons";
 import { ConversationPicker, DevicePicker, duration, useCardShell, useHostState, useNow, useWave } from "./card-shell";
+import { hasUnread } from "../features/call/conversation-state";
 import type { CallControlsHost, CallControlsState } from "./host";
 import type { Translate } from "../i18n/translator";
 
@@ -67,7 +68,7 @@ function TodayCard({ host, state, t }: { host: CallControlsHost; state: CallCont
   const selected = call.participants.find((participant) => participant.selected);
   const agent = reconnecting ? "reconnecting" : call.agent;
   const muteLabel = muted ? t("card.unmute") : t("card.mute");
-  const unreadElsewhere = call.participants.reduce((n, row) => n + (row.selected ? 0 : row.unread || 0), 0);
+  const unreadElsewhere = call.participants.some((row) => hasUnread(row, null));
 
   return (
     <div ref={shell.card} className="call-card" data-expanded={expanded || undefined} {...shell.handlers}>
@@ -80,7 +81,7 @@ function TodayCard({ host, state, t }: { host: CallControlsHost; state: CallCont
             onClick={() => setPanel(panel === "conversations" ? null : "conversations")}>
             <span className="card-title-text">{call.title}</span>
             <span className="card-title-chevron" aria-hidden="true"><ChevronIcon size={13} /></span>
-            {unreadElsewhere > 0 && <span className="card-unread" aria-label={t("card.unread", { n: unreadElsewhere })} />}
+            {unreadElsewhere && <span className="card-unread" aria-label={t("state.unread")} />}
           </button>
           {reconnecting
             ? <span className="card-sub reconnecting">{t("card.reconnecting")}</span>
