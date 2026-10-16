@@ -35,8 +35,8 @@ test("transcribing bars keep 3:1 contrast at the pulse minimum and with reduced 
   const paint = async (reduced) => {
     await page.emulateMedia({ reducedMotion: reduced ? "reduce" : "no-preference" });
     return page.evaluate((reduced) => {
-      const canvas = document.querySelector(".voice-wave canvas");
-      const bar = document.querySelector(".voice-bars i");
+      const canvas = document.querySelector(".person-bubble .voice-wave canvas");
+      const bar = document.querySelector(".person-bubble .voice-bars i");
       const wave = canvas.parentElement, bars = bar.parentElement;
       if (canvas.getAnimations().length) {
         const animation = canvas.getAnimations()[0];

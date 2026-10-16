@@ -33,7 +33,7 @@ for (const [name, viewport, phone] of [["a laptop", { width: 1280, height: 800 }
     test.use({ viewport, hasTouch: phone, isMobile: phone });
 
     test("Connect opens the key's dialog whole: its field, Cancel and Connect in sight", async ({ page }) => {
-      await installHarness(page);
+      await installHarness(page, { voiceReady: false });
       await page.goto("/voice/");
       await page.waitForFunction(() => !!window.sidevoiceActions && !!window.sidevoiceUI?.store);
       const seed = () => page.evaluate((catalogs) => window.sidevoiceUI.store.patch({
