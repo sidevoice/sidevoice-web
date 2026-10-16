@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.3.0](https://github.com/sidevoice/sidevoice-web/compare/v0.2.1...v0.3.0) (2026-10-16)
+## [0.7.0](https://github.com/sidevoice/sidevoice-web/compare/v0.2.1...v0.7.0) (2026-10-16)
 
 
 ### Features
