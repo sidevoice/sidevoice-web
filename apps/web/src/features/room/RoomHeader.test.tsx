@@ -59,30 +59,30 @@ test("while the list is down the header stays above it, and an avatar there swit
   expect(header()).not.toHaveAttribute("data-list-down");
 });
 
-test("a row says its state in words beside its dot, and what is unread as a badge of its own", () => {
+test("a row says its state in words beside its dot, and what is unread as one quiet mark without a count", () => {
   const store = room();
   const reply = (segment: string, seq: number) => ({ segment, thread: "fp-1|t-backup", role: "assistant" as const, text: segment, name: "x", time: seq, session: "s1", seq });
   act(() => store.patch({ history: [reply("r-1", 1), reply("r-2", 2)], roomSeen: {} }));
   const row = [...document.querySelectorAll(".conversation-sidebar .person")].find((button) => button.textContent?.includes("Review the nightly backups"))!;
   expect(row.querySelector(".state-dot")).toHaveAttribute("data-state", "waiting");
   expect(row.querySelector(".sidebar-state-text")).toHaveTextContent(/^Waiting for you$/);
-  expect(row.querySelector(".sidebar-unread")).toHaveTextContent("2 new");
-  // The tooltip still says both.
-  expect(row.getAttribute("title")).toMatch(/^Review the nightly backups · Waiting for you · 2 new/);
+  expect(row.querySelectorAll(".sidebar-unread")).toHaveLength(1);
+  expect(row.querySelector(".sidebar-unread")).toBeEmptyDOMElement();
+  expect(row).toHaveAccessibleName(/Unread message/);
+  expect(row).not.toHaveAccessibleName(/\d/);
+  // Focusing the conversation clears it.
+  act(() => store.patch({ roomSeen: { "fp-1|t-backup": 2 } }));
+  expect(row.querySelector(".sidebar-unread")).toBeNull();
+  expect(row).not.toHaveAccessibleName(/Unread/);
 });
-test("T06 a read but unheard conversation names its audio attention on phone and rail, then clears it", () => {
+test("T06 audio that went unheard marks nothing: only what arrived after leaving does", () => {
   phone(360);
-  const store=room([person("t-login","Fix the slow login"),person("t-backup","Review the nightly backups",{unheard:{count:2}})]);
+  room([person("t-login","Fix the slow login"),person("t-backup","Review the nightly backups",{unheard:{count:2}})]);
   const phoneButton=avatars().find(button=>button.getAttribute("data-thread")==="fp-1|t-backup")!;
   const railButton=[...document.querySelectorAll<HTMLButtonElement>(".conversation-sidebar .person")].find(button=>button.textContent?.includes("Review the nightly backups"))!;
-  expect(phoneButton).toHaveAccessibleName(/2 unheard/);
-  expect(railButton).toHaveAccessibleName(/2 unheard/);
-  act(()=>fireEvent.click(document.querySelector(".sidebar-collapse")!));
-  expect(document.querySelector("#conversations")).toHaveAttribute("data-collapsed");
-  expect(railButton).toHaveAccessibleName(/2 unheard/);
-  act(()=>store.patch({people:[person("t-login","Fix the slow login"),person("t-backup","Review the nightly backups",{unheard:{count:0}})]}));
-  expect(phoneButton).not.toHaveAccessibleName(/unheard/);
-  expect(railButton).not.toHaveAccessibleName(/unheard/);
+  expect(phoneButton).not.toHaveAccessibleName(/unheard|unread/i);
+  expect(railButton).not.toHaveAccessibleName(/unheard|unread/i);
+  expect(document.querySelector(".sidebar-unread")).toBeNull();
 });
 
 test("Settings sits at the conversations' foot: it opens Settings through the header's own button, and a new conversation follows the list", () => {

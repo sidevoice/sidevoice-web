@@ -9,7 +9,7 @@ import { useSettingsAttention } from "../settings/settings-attention";
 import type { ParticipantView } from "../../state/room-types";
 import { translator, type Translate } from "../../i18n/translator";
 import { ConversationAvatar } from "../call/ConversationAvatar";
-import { stateText } from "../call/conversation-state";
+import { hasUnread, stateText } from "../call/conversation-state";
 import { selectInCall, useStageConversation } from "../call/stage-view";
 import { headerRow, rowCapacity, UNMEASURED_ROW } from "./header-row";
 import { NewConversation } from "./NewConversation";
@@ -44,7 +44,8 @@ function ConversationsToggle({ t, hidden }: { t: Translate; hidden: ParticipantV
   const openConversations = useCallLayout((state) => state.openConversations);
   const closeConversations = useCallLayout((state) => state.closeConversations);
   // The chevron wears a dot when a conversation behind it has something unread, and says how many in words too.
-  const news = hidden.filter((row) => row.unread > 0 || (row.unheard ?? 0) > 0).length;
+  const focused = useStageConversation().threadId;
+  const news = hidden.filter((row) => hasUnread(row, focused)).length;
   const label = news ? t(news === 1 ? "header.allConversationsNews.one" : "header.allConversationsNews.other", { n: count, k: news }) : t("header.allConversations", { n: count });
   return (
     <Tooltip action content={label}>
@@ -110,7 +111,7 @@ function HeaderConversations({ t, blocked }: { t: Translate; blocked: boolean })
   const [shown, hold] = useHeldWhilePressed(placed.row.map((id) => order.find((row) => row.threadId === id)!), participants);
   const hidden = order.filter((row) => !placed.row.includes(row.threadId));
   const label = (row: ParticipantView) => [t("header.otherConversation", { title: row.title, state: stateText(row, inCall, t) }),
-    (row.unheard ?? 0) > 0 ? t("state.unheard", { n: row.unheard ?? 0 }) : null].filter(Boolean).join(" · ");
+    hasUnread(row, stage.threadId) ? t("state.unread") : null].filter(Boolean).join(" · ");
   const pick = (row: ParticipantView) => {
     // The one on the stage, or the call switching: nothing — focus and the tooltip stay.
     if (row.threadId === stage.threadId || row.switching) return;

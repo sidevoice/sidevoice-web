@@ -20,8 +20,8 @@ export interface StageConversation {
   canHear: boolean;
   speaking: boolean;
   working: boolean;
-  /** Its replies this browser has not seen yet (ParticipantView.unread); 0 when it is not listed. */
-  unread: number;
+  /** Only the playground's preview sets it: the stage is the focused conversation, which never wears the unread mark. */
+  unread: boolean;
   mood: AvatarMood;
 }
 
@@ -40,7 +40,7 @@ export function stageConversation({ participants, title, viewed, selected, inCal
   const busy = isTarget && working;
   const personSpeaking = pendingPhase === "listening" || pendingPhase === "transcribing";
   const mood = stageMood({ inCall, isTarget, canHear: hears, reach: row?.reach ?? null, speaking, personSpeaking, working: busy });
-  return { threadId: viewed, row, title: row?.title || title, isTarget, inCall, canHear: hears, speaking, working: busy, unread: Math.max(row?.unread ?? 0, row?.unheard ?? 0), mood };
+  return { threadId: viewed, row, title: row?.title || title, isTarget, inCall, canHear: hears, speaking, working: busy, unread: false, mood };
 }
 
 export function useStageConversation(): StageConversation {
@@ -55,5 +55,5 @@ export function useStageConversation(): StageConversation {
   const preview = useRoomStore((state) => state.facts.avatarPreview);
   const stage = stageConversation({ participants, title, viewed, selected, inCall, botLive, working, pendingPhase });
   // The preview holding the avatar in a mood (the playground's card): that mood, and something unheard when it says.
-  return preview ? { ...stage, mood: preview.mood, unread: preview.unread ? Math.max(1, stage.unread) : 0 } : stage;
+  return preview ? { ...stage, mood: preview.mood, unread: !!preview.unread } : stage;
 }

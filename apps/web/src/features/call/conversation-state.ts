@@ -48,12 +48,18 @@ export function personMood({ inCall, speaking }: { inCall: boolean; speaking: bo
   return speaking ? "speaking" : "present";
 }
 
-/** The words for a conversation's state, with what is waiting to be read when it is not the call's. */
+/** The one quiet unread mark: the agent said something after the person left this conversation (the room's seen mark
+ *  follows the conversation they view, so what arrived while they were in it never counts) and they are not in it now:
+ *  not the focused one (`focused`, the stage's) nor the call's own. No count, anywhere. */
+export function hasUnread(row: Pick<ParticipantView, "threadId" | "unread" | "selected">, focused: string | null): boolean {
+  return row.unread > 0 && !row.selected && row.threadId !== focused;
+}
+
+/** The words for a conversation's state. */
 export function stateText(row: ParticipantView, inCall: boolean, t: Translate): string {
   const state = conversationState(row, inCall);
-  const words = state === "in-call" ? t("state.inCall") : state === "working" ? t("state.working")
+  return state === "in-call" ? t("state.inCall") : state === "working" ? t("state.working")
     : state === "waiting" ? t("state.waiting") : row.reach === "holding" && row.available ? t("state.holding") : t("state.offline");
-  return row.unread && !isCallRow(row, inCall) ? t("state.withUnread", { state: words, unread: t("state.unread", { n: row.unread }) }) : words;
 }
 
 /** The words for what an agent's avatar is acting out: the stage says them with its name. */

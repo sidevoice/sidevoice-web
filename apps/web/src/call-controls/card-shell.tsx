@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { ChevronIcon, HarnessIcon, MachinesIcon, MicrophoneIcon, SpeakerIcon } from "../components/ui/Icons";
 import { ConversationRows } from "../features/room/ConversationRows";
+import { hasUnread } from "../features/call/conversation-state";
 import type { ParticipantView } from "../state/room-types";
 import type { AudioDeviceOption, CallCommand, CallControlsHost, CallControlsState, CallSnapshot } from "./host";
 import type { Translate } from "../i18n/translator";
@@ -264,7 +265,7 @@ export function ConversationPicker({ call, disabled, onSelect, t }: { call: Call
         disabled={disabled}
         onSelect={onSelect}
         sub={(row) => conversationSub(row, t)}
-        aside={(row) => (row.unread && !row.selected ? <span className="card-badge" aria-label={t("card.unread", { n: row.unread })}>{row.unread}</span> : null)}
+        aside={(row) => (hasUnread(row, null) ? <span className="card-unread" role="img" aria-label={t("state.unread")} /> : null)}
       />
     </div>
   );

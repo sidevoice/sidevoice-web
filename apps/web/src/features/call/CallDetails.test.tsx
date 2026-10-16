@@ -14,7 +14,7 @@ afterEach(() => cleanup());
 
 const row = { threadId: "t-1", title: "Fix the slow login", machine: "Laptop", harness: "claude", model: "claude-opus-5-5", effort: "xhigh",
   available: true, reach: { state: "listening" }, unread: 0 } as unknown as ParticipantView;
-const stage = { threadId: "t-1", row, title: "Fix the slow login", isTarget: true, inCall: true, canHear: true, speaking: false, working: false, unread: 0, mood: "idle" } as StageConversation;
+const stage = { threadId: "t-1", row, title: "Fix the slow login", isTarget: true, inCall: true, canHear: true, speaking: false, working: false, unread: false, mood: "idle" } as StageConversation;
 const slot = (task: "stt" | "tts", attention: boolean) => ({ slot: { id: task === "stt" ? "whisper-base" : "eleven_flash_v2_5", where: "on this device", state: attention ? "needs a key" : "ready",
   attention, task, status: attention ? "needsKey" : "ready", catalog: "local" }, label: task === "stt" ? "Speech to text" : "Text to speech", icon: null }) as VoiceModelRow;
 

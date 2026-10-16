@@ -34,14 +34,13 @@ test.each([...locales.keys()])("the %s catalogue: exactly English's keys, the sa
     expect(placeholders(text), key).toEqual(placeholders(english[key]));
   }
 });
-test("unheard and partial labels agree at 1, 2, 5 and 21 in French, Italian and Polish", () => {
-  for(const [language,unheard,partial] of [
-    ["fr","À écouter : ","Caractères entendus : 1/1"],
-    ["it","Da ascoltare: ","Caratteri ascoltati: 1/1"],
-    ["pl","Nieodsłuchane: ","Usłyszane znaki: 1/1"],
+test("partial labels agree in French, Italian and Polish", () => {
+  for(const [language,partial] of [
+    ["fr","Caractères entendus : 1/1"],
+    ["it","Caratteri ascoltati: 1/1"],
+    ["pl","Usłyszane znaki: 1/1"],
   ] as const){
     const t=translator(language);
-    for(const n of [1,2,5,21])expect(t("state.unheard",{n})).toBe(unheard+n);
     expect(t("messages.audio.partial",{heard:1,total:1})).toBe(partial);
   }
 });
