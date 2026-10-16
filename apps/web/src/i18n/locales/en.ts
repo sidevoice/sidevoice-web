@@ -1141,7 +1141,7 @@ export const messages = {
   "wizard.mic.checkAgain": "Check again",
   "wizard.mic.openSettings": "Open System Settings",
   // The permissions screen (PermissionsStep, Settings › Permissions).
-  "perm.mic.why": "So your agent can hear you",
+  "perm.mic.why": "Needed so your agent can hear you",
   "perm.refresh": "Refresh status",
   "perm.state.none": "Nothing to allow here",
   "wizard.turnIntro": "How Sidevoice knows you have finished speaking. You can change it in Settings → Call.",
