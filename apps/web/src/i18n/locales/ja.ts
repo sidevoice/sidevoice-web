@@ -1115,7 +1115,7 @@ export const messages: Messages = {
   "wizard.skip.sttReason": "エージェントに声を届けるには文字起こしが必要です。通話エリアから用意できます。",
   "wizard.skip.ttsReason": "エージェントの返答を聞くには音声が必要です。通話エリアから用意できます。",
   "wizard.skip.turnReason": "スマートなターン終了の準備ができるまで、無音でターンが終わります。",
-  "wizard.title.readyPartial": "紹介が完了しました",
+  "wizard.title.readyPartial": "使い方の案内が完了しました",
   "wizard.recap.notConnected": "まだ接続されていません",
   "wizard.recap.notDownloaded": "まだダウンロードされていません",
   "wizard.recap.later": "通話エリアから設定できます",

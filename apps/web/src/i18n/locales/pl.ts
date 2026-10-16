@@ -1131,7 +1131,7 @@ export const messages: Messages = {
   "wizard.skip.machineReason": "Do rozmów z agentami potrzebna będzie maszyna. Możesz ją połączyć w obszarze rozmowy.",
   "wizard.skip.sttReason": "Aby agenci cię słyszeli, potrzebna będzie transkrypcja. Możesz ją przygotować w obszarze rozmowy.",
   "wizard.skip.ttsReason": "Aby słyszeć odpowiedzi agentów, potrzebny będzie głos. Możesz go przygotować w obszarze rozmowy.",
-  "wizard.skip.turnReason": "Do czasu, aż inteligentne wykrywanie końca wypowiedzi będzie gotowe, twoją turę kończy cisza.",
+  "wizard.skip.turnReason": "Do czasu, aż inteligentne wykrywanie końca wypowiedzi będzie gotowe, twoją wypowiedź kończy cisza.",
   "wizard.title.readyPartial": "Wprowadzenie zakończone",
   "wizard.recap.notConnected": "Jeszcze nie połączono",
   "wizard.recap.notDownloaded": "Jeszcze nie pobrano",
