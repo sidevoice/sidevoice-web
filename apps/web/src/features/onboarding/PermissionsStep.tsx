@@ -58,7 +58,7 @@ function MicrophoneBlock({ microphone, view, openSettings, onRequest, t }: {
   return <PermissionBlock id="microphone" state={view.state}
     figure={<CharacterAvatar spec={PERSON_AVATAR} mood="present" size="pip" />}
     action={<MicrophoneControl microphone={microphone} view={view} onRequest={onRequest} t={t} />}
-    line={view.line && view.state !== "granted" ? <span className="perm-line" id={LINE_ID}>{t(view.line)}</span> : null}
+    line={view.line ? <span className={view.state === "granted" ? "sr-only" : "perm-line"} id={LINE_ID}>{t(view.line)}</span> : null}
     recovery={<MicrophoneHowTo view={view} openSettings={openSettings} t={t} />} />;
 }
 

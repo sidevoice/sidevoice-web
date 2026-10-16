@@ -35,7 +35,7 @@
 /* The block's one button (decided look: full width under the bicho, one size in every state). Allowed, it wears the
  * positive green of an allowed permission, a check before its words, and cannot be pressed. */
 .perm-control { width: 100%; max-width: 18rem; min-width: 12rem; margin-top: var(--sv-space-2); gap: var(--sv-space-2); }
-.perm-control[data-state="granted"], .perm-control[data-state="granted"]:disabled { opacity: 1; border-color: transparent; background: var(--sv-positive-soft); color: var(--sv-positive); cursor: default; }
+.ui-button.perm-control[data-state="granted"], .ui-button.perm-control[data-state="granted"]:is(:disabled, [aria-disabled="true"]):not([data-loading]) { opacity: 1; border-color: transparent; background: var(--sv-positive-soft); color: var(--sv-positive); cursor: default; }
 .perm-hero-figure .sv-avatar { display: block; width: 100%; height: 100%; }
 .perm-hero .perm-name { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-regular); color: var(--sv-text-muted); }
 .perm-hero-state { display: inline-flex; align-items: center; gap: var(--sv-space-2); font-size: var(--sv-font-xl); line-height: 1.75rem; font-weight: var(--sv-weight-heavy);
