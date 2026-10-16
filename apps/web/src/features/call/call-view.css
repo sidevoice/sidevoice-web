@@ -468,4 +468,3 @@
 .voice-setup-card > p { max-width: 42ch; margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
 .voice-setup-card > .voice-models { justify-self: stretch; margin-top: var(--sv-space-3); text-align: start; }
 .voice-model-progress { grid-column: 1 / -1; width: 100%; height: 4px; accent-color: var(--sv-accent); }
-.waiting-continue-setup { margin-top: var(--sv-space-2); }
