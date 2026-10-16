@@ -104,7 +104,7 @@ function ConversationRow({ row, rail = false }: { row: (typeof ROWS)[number]; ra
           <span className="pt-row-title">{row.title}</span>
           <span className="pt-row-sub"><HarnessIcon harness={row.harness} size={12} />{stateLabel(row.state, t)}</span>
         </span>}
-        {!rail && row.unread && <Badge tone="accent">{t("state.unread", { n: row.unread })}</Badge>}
+        {!rail && row.unread && <span className="sidebar-unread" role="img" aria-label={t("state.unread")} />}
       </button>
       {!rail && <Button variant="ghost" tone="neutral" size="icon-sm" className="pt-row-more" aria-label={t("sidebar.options", { title: row.title })}><MoreIcon /></Button>}
     </div>

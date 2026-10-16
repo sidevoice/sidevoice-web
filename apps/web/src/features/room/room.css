@@ -73,6 +73,7 @@
 @media (hover: none), (pointer: coarse) { .sidebar-rows .participant-more { opacity: 1; } }
 
 /* The rail: the same avatars in a narrow column, the machines told apart by a line. */
+.sidebar-unread { width: 8px; height: 8px; margin-right: 4px; border-radius: 50%; background: var(--sv-accent); flex: none; }
 @media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
   .conversation-sidebar[data-collapsed] { width: 68px; padding-inline: 10px; }
   .conversation-sidebar[data-collapsed] .sidebar-head { justify-content: center; padding: 0; }

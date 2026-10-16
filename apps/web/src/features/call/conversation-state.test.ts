@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import type { ParticipantView } from "../../state/room-types";
 import { translator } from "../../i18n/translator";
-import { conversationState, machineGroups, moodText, personMood, smallAvatarMood, stageMood, stateText } from "./conversation-state";
+import { conversationState, machineGroups, moodText, personMood, smallAvatarMood, stageMood, hasUnread, stateText } from "./conversation-state";
 
 const row = (threadId: string, extra: Partial<ParticipantView> = {}): ParticipantView => ({
   threadId, title: threadId, selected: false, available: true, switching: false, unread: 0, reach: "listening",
@@ -28,11 +28,9 @@ test("the room's binding before a join or after a hang-up is not a call: no conv
   const bound = row("a", { selected: true, unread: 2 });
   expect(conversationState(bound, false)).toBe("waiting");
   expect(smallAvatarMood(bound)).toBe("idle");
-  expect(stateText(bound, false, en)).toBe("Waiting for you · 2 new");
+  expect(stateText(bound, false, en)).toBe("Waiting for you");
   expect(stateText(bound, true, en)).toBe("In call");
-  // Its unread count stays off the call's own row while it works, as while it is in call.
   expect(stateText({ ...bound, working: true }, true, en)).toBe("Working");
-  expect(stateText({ ...bound, working: true }, false, en)).toBe("Working · 2 new");
 });
 
 test("a small avatar is offline, working or idle: waiting for you is idle, and the dot says it hears you", () => {
@@ -79,10 +77,20 @@ test("the person in the picture-in-picture keeps their own moves; the stage says
     .toEqual(["Offline", "Speaking", "Listening to you", "Working", "Resting"]);
 });
 
-test("the state line says the state in words, with what is unread beside a conversation that is not in the call", () => {
+test("the unread mark: never on the focused or the call's conversation, one on another, gone once focused", () => {
+  const other = row("b", { unread: 2 });
+  expect(hasUnread(other, "a")).toBe(true);
+  expect(hasUnread(other, "b")).toBe(false);
+  expect(hasUnread(row("a", { selected: true, unread: 2 }), "b")).toBe(false);
+  expect(hasUnread(row("b"), "a")).toBe(false);
+  // Nothing about it is a count.
+  expect(stateText(other, true, en)).toBe("Waiting for you");
+});
+
+test("the state line says the state in words", () => {
   expect(stateText(row("a", { selected: true, unread: 2 }), true, en)).toBe("In call");
   expect(stateText(row("a", { working: true }), true, en)).toBe("Working");
-  expect(stateText(row("a", { unread: 2 }), true, en)).toBe("Waiting for you · 2 new");
+  expect(stateText(row("a", { unread: 2 }), true, en)).toBe("Waiting for you");
   expect(stateText(row("a", { reach: "holding" }), true, en)).toBe("Can't receive");
   expect(stateText(row("a", { available: false, reach: "offline" }), true, en)).toBe("Offline");
   expect(stateText(row("a", { working: true }), true, translator("es"))).toBe("Trabajando");

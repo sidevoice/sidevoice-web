@@ -162,7 +162,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
           <div className="stage-scene">
             <StageBackdrop seed={stage.threadId} tone={tone} />
             {stage.mood === "offline" && <WantedPoster spec={spec} seed={stage.threadId} words={posterWords(t)} language={uiLanguage()} />}
-            <CharacterAvatar className="stage-agent" spec={spec} mood={mood} size="stage" unread={stage.unread > 0} desk={mood === "working"} still={balloonUp} interaction={interaction}
+            <CharacterAvatar className="stage-agent" spec={spec} mood={mood} size="stage" unread={stage.unread} desk={mood === "working"} still={balloonUp} interaction={interaction}
               mouth="playback" playbackThreadId={stage.threadId} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
             <StageDesk seed={stage.threadId} />
           </div>
