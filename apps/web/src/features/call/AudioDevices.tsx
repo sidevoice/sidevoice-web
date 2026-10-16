@@ -4,6 +4,7 @@ import { Button } from "../../components/ui/Button";
 import { ErrorText } from "../../components/ui/ErrorText";
 import { Select } from "../../components/ui/Select";
 import { Group, Row } from "../../components/ui/Card";
+import { useOnboardingIfAny } from "../onboarding/onboarding-context";
 import { ChevronIcon, MicrophoneIcon, SpeakerIcon } from "../../components/ui/Icons";
 import { overlayContainer, useOverlayPortal } from "../../components/ui/Tooltip";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
@@ -122,15 +123,21 @@ function useDeviceChoices() {
  *  default (operator, 2026-10-16: where people look for them). */
 export function AudioDeviceRows() {
   const { t, devices, busy, error, choose, inputs, outputs } = useDeviceChoices();
+  // Both always there (operator, 2026-10-16): without the microphone allowed, or before the list is read, each stays on
+  // the system's device, held back, saying why.
+  const allowed = useOnboardingIfAny()?.microphone?.ready ?? true;
+  const usable = !!devices && allowed;
+  const fallback = [{ value: "", label: t("devices.default") }];
+  const why = !allowed ? t("devices.needsMic") : !devices ? t("devices.loading") : undefined;
   return <Group title={t("devices.toggle")}>
-    {!devices ? <p className="audio-devices-note" role="status">{t("devices.loading")}</p> : <>
-      <Row label={t("devices.mic")}>
-        <Select id="settings-audio-input" aria-label={t("devices.mic")} leading={<MicrophoneIcon />} value={devices.input ?? ""} disabled={busy} onValueChange={(input) => void choose({ input: input || null })} options={inputs} />
-      </Row>
-      <Row label={t("devices.speaker")} description={devices.outputSelectable ? undefined : t("devices.speakerFixed")}>
-        <Select id="settings-audio-output" aria-label={t("devices.speaker")} leading={<SpeakerIcon />} value={devices.outputSelectable ? devices.output ?? "" : ""} disabled={busy || !devices.outputSelectable} onValueChange={(output) => void choose({ output: output || null })} options={outputs} />
-      </Row>
-    </>}
+    <Row label={t("devices.mic")} description={why}>
+      <Select id="settings-audio-input" aria-label={t("devices.mic")} leading={<MicrophoneIcon />} value={usable ? devices.input ?? "" : ""} disabled={busy || !usable}
+        onValueChange={(input) => void choose({ input: input || null })} options={usable ? inputs : fallback} />
+    </Row>
+    <Row label={t("devices.speaker")} description={usable && !devices.outputSelectable ? t("devices.speakerFixed") : undefined}>
+      <Select id="settings-audio-output" aria-label={t("devices.speaker")} leading={<SpeakerIcon />} value={usable && devices.outputSelectable ? devices.output ?? "" : ""}
+        disabled={busy || !usable || !devices.outputSelectable} onValueChange={(output) => void choose({ output: output || null })} options={usable ? outputs : fallback} />
+    </Row>
     {error && <ErrorText className="audio-devices-error" role="alert" message={error} />}
   </Group>;
 }

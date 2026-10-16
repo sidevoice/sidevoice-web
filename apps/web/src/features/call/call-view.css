@@ -440,11 +440,15 @@
 
 /* The microphone gives no sound though the person has not muted it (another app holds it): said above it, and the
  * button wears the warning. */
-#call-controls .mic-control { position: relative; }
-.mic-silent-note { position: absolute; z-index: 4; left: 50%; bottom: calc(100% + var(--sv-space-2)); transform: translateX(-50%); display: inline-flex; align-items: center; gap: var(--sv-space-1-5);
+#call-controls :is(.mic-control, .call-held) { position: relative; }
+.call-held { display: contents; }
+.call-held:has(.call-held-note) { display: inline-flex; }
+:is(.mic-silent-note, .call-held-note) { position: absolute; z-index: 4; left: 50%; bottom: calc(100% + var(--sv-space-2)); transform: translateX(-50%); display: inline-flex; align-items: center; gap: var(--sv-space-1-5);
   width: max-content; max-width: min(320px, calc(100vw - 2 * var(--sv-space-4))); padding: var(--sv-space-1-5) var(--sv-space-3); border: 1px solid color-mix(in srgb, var(--sv-warning) 45%, transparent);
   border-radius: var(--sv-radius-lg); background: var(--sv-warning-soft); color: var(--sv-text); font-size: var(--sv-font-sm); line-height: 1.25rem; box-shadow: var(--sv-shadow-sm); }
-.mic-silent-note svg { flex: none; color: var(--sv-warning); }
+:is(.mic-silent-note, .call-held-note) svg { flex: none; color: var(--sv-warning); }
+/* The call held back while the microphone is not allowed: plainly disabled (it stays focusable, saying why). */
+#call-controls #connect[aria-disabled="true"], #call-controls #connect[aria-disabled="true"]:hover { background: var(--sv-bg-sunken); color: var(--sv-disabled-text); cursor: not-allowed; }
 #mic-control[data-silent] #mute { box-shadow: 0 0 0 2px var(--sv-warning); }
 
 /* What is said on the stage, a few lines at a time (PagedText): a window --paged-lines tall (three unless it says), as
@@ -467,6 +471,4 @@
 .voice-setup-card h1 { margin: var(--sv-space-2) 0 0; font-size: var(--sv-font-xl); line-height: 1.625rem; font-weight: var(--sv-weight-bold); letter-spacing: -.015em; color: var(--sv-text); }
 .voice-setup-card > p { max-width: 42ch; margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
 .voice-setup-card > .voice-models { justify-self: stretch; margin-top: var(--sv-space-3); text-align: start; }
-/* The microphone's card holds the shared permissions list: as wide as the card, its rows read left to right. */
-.voice-setup-card > .perm-list { justify-self: stretch; width: 100%; max-width: 32rem; margin-inline: auto; text-align: start; }
 .voice-model-progress { grid-column: 1 / -1; width: 100%; height: 4px; accent-color: var(--sv-accent); }

@@ -61,7 +61,7 @@ function escape() {
 }
 
 test("the call area: what waits, whether the room is behind the setup, whether the conversations show", () => {
-  const facts = { ready: true, done: false, noMachine: false, microphone: true, voice: "missing" as const };
+  const facts = { ready: true, done: false, noMachine: false, voice: "missing" as const };
   // Behind the setup until it is done, whatever is missing.
   expect(callArea(facts)).toEqual({ roomHidden: true, waiting: "voice", blocked: false });
   expect(callArea({ ...facts, ready: false }).roomHidden).toBe(true);
@@ -70,10 +70,6 @@ test("the call area: what waits, whether the room is behind the setup, whether t
   expect(callArea({ ...facts, voice: "unknown" }).waiting).toBe("unknown");
   expect(callArea({ ...facts, voice: "unknown", done: true }).waiting).toBeNull();
   expect(callArea({ ...facts, done: true, voice: "ready" }).waiting).toBeNull();
-  // The microphone (required to call): after the machine, before the voice's models; clears on grant.
-  expect(callArea({ ...facts, done: true, microphone: false })).toEqual({ roomHidden: false, waiting: "microphone", blocked: false });
-  expect(callArea({ ...facts, done: true, microphone: false, noMachine: true }).waiting).toBe("machine");
-  expect(callArea({ ...facts, done: true, microphone: true, voice: "ready" }).waiting).toBeNull();
 });
 
 test("Escape does nothing, the room waits behind the setup, and the app opened again resumes at the step it stood at", async () => {

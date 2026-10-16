@@ -22,7 +22,6 @@ import { OnboardingProvider, useOnboarding } from "../features/onboarding/onboar
 import { Wizard } from "../features/onboarding/Wizard";
 import { callArea } from "../features/onboarding/onboarding-flow";
 import { VoiceSetupCard } from "../features/call/VoiceSetupCard";
-import { MicrophoneSetupCard } from "../features/call/MicrophoneSetupCard";
 import { useRoomStore } from "../state/room-store";
 import type { OnboardingRepository, OnboardingStep } from "../services/onboarding-state";
 import { useUiLanguage } from "../i18n/use-ui-language";
@@ -40,7 +39,7 @@ function RoomContent() {
   const onboarding = useOnboarding();
   // What the room shows of the setup is decided in onboarding-flow.ts: whether the room waits behind it, and what the
   // call's own space says is missing — one thing at a time.
-  const { roomHidden, waiting, blocked } = callArea({ ready: onboarding.ready, done: onboarding.done, noMachine: !!noMachine, microphone: onboarding.microphone.ready || onboarding.microphone.state === "checking", voice: onboarding.voice.state });
+  const { roomHidden, waiting, blocked } = callArea({ ready: onboarding.ready, done: onboarding.done, noMachine: !!noMachine, voice: onboarding.voice.state });
   const callBlocked = waiting !== null;
 
   useEffect(() => {
@@ -82,7 +81,6 @@ function RoomContent() {
           <ErrorBoundary area="participants"><ConversationSidebar blocked={blocked} /></ErrorBoundary>
           {callBlocked && <div className="call-column call-column--waiting" data-waiting={waiting}>
             {waiting === "machine" ? <NoMachineScreen source="no-machine" />
-              : waiting === "microphone" ? <MicrophoneSetupCard microphone={onboarding.microphone} openSettings={onboarding.openMicrophoneSettings} onRequest={() => void onboarding.requestMicrophone()} />
               : waiting === "voice" ? <VoiceSetupCard rows={onboarding.voice.rows} />
               : null}
           </div>}

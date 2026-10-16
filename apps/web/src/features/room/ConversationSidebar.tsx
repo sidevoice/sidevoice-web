@@ -8,6 +8,7 @@ import { useSurface } from "../../lib/use-surface";
 import { COMPACT_QUERY, isNarrow, NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { GearNewMark, useHighlights } from "../highlights/highlights";
+import { useSettingsAttention } from "../settings/settings-attention";
 import type { ParticipantView } from "../../state/room-types";
 import { translator } from "../../i18n/translator";
 import { ConversationAvatar } from "../call/ConversationAvatar";
@@ -191,13 +192,14 @@ function SidebarSettings({ rail, onOpen }: { rail: boolean; onOpen: () => void }
   const t = translator();
   const store = useContext(RoomStoreContext);
   const news = useHighlights();
-  const label = news.length ? t("highlights.gear", { n: news.length }) : t("header.settings");
+  const attention = useSettingsAttention();
+  const label = attention ? t("settings.attention") : news.length ? t("highlights.gear", { n: news.length }) : t("header.settings");
   return (
     // Settings' own trigger (aria-controls): closed, Settings gives focus back here when what opened it has gone.
     <Button variant="ghost" tone="neutral" size={rail ? "icon" : "md"} block={!rail} className="sidebar-settings" aria-label={label} title={label}
       aria-haspopup="dialog" aria-controls="language-settings"
       onClick={() => { onOpen(); openSettings({}, store); }}>
-      <SettingsIcon size={20} />{!rail && <span>{t("header.settings")}</span>}<GearNewMark count={news.length} />
+      <SettingsIcon size={20} />{!rail && <span>{t("header.settings")}</span>}<GearNewMark count={news.length} attention={attention} />
     </Button>
   );
 }
