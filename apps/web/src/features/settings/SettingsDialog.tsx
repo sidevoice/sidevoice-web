@@ -55,8 +55,9 @@ const SECTIONS: { id: string; label: MessageKey; icon: (size?: number) => ReactN
   { id: "permissions", label: "settings.section.permissions", icon: (size) => <PermissionsIcon size={size} /> },
   // The keys for the microphone: in the desktop app, or wherever there is a keyboard (ShortcutsSettings).
   { id: "shortcuts", label: "settings.section.shortcuts", icon: (size) => <ShortcutsIcon size={size} /> },
-  { id: "this-computer", label: "settings.section.thisDevice", icon: (size = 18) => <ThisComputerIcon size={size} /> },
+  // The keys the voice's models use, right after them; this device and the other machines then side by side (2026-10-16).
   { id: "providers", label: "settings.section.providers", icon: (size) => <IntegrationsIcon size={size} /> },
+  { id: "this-computer", label: "settings.section.thisDevice", icon: (size = 18) => <ThisComputerIcon size={size} /> },
   { id: "machines", label: "settings.section.machines", icon: (size) => <MachinesIcon size={size} /> },
   // Everything that updates: in the desktop app, or wherever a machine is behind (UpdatesSettings).
   { id: "updates", label: "settings.section.updates", icon: (size) => <UpdateIcon size={size} /> },
