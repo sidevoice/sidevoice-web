@@ -380,7 +380,7 @@ export function Wizard() {
       {step === "W2r" && onboarding.remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo(voiceStart)}>{t("wizard.continue")}</Button>}
       <span ref={setFooterSlot} className="wizard-slot" />
       {step === "W3" && <Button type="button" variant="primary" onClick={() => void finishAgents()}>{t("wizard.continue")}</Button>}
-      {step === "W4m" && <MicrophoneAction microphone={onboarding.microphone} onRequest={() => void onboarding.requestMicrophone()} onContinue={() => onboarding.goTo("W4")} t={t} />}
+      {step === "W4m" && <MicrophoneAction microphone={onboarding.microphone} onRequest={() => void onboarding.requestMicrophone()} onContinue={() => void onboarding.markMicrophoneDone().then((done) => { if (done) onboarding.goTo("W4"); })} t={t} />}
       {stageTask && <ModelStepFooter reason={waitReason(model, stageTask, t)}
         tryReason={stageTask === "tts" && !sample.trim() ? t("wizard.wait.sentence") : undefined}
         running={trial.trial.phase === "running"} tried={onboarding.tried(stageTask)}

@@ -45,6 +45,8 @@ interface OnboardingValue {
   goTo(step: OnboardingStep): void;
   setPath(path: "agents" | "remote"): Promise<boolean>;
   markAgentsDone(): Promise<boolean>;
+  /** The microphone's step passed (Continue, allowed): kept, also for a browser that cannot say so without asking again. */
+  markMicrophoneDone(): Promise<boolean>;
   markBasicsDone(): Promise<boolean>;
   markTurnDone(): Promise<boolean>;
   /** Records that the person went on with the settings being edited for `task`, tried or not. */
@@ -116,7 +118,9 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
   const [microphoneAccess] = useState(() => createMicrophoneAccess());
   useEffect(() => () => microphoneAccess.dispose(), [microphoneAccess]);
   const microphone = useSyncExternalStore(microphoneAccess.subscribe, microphoneAccess.getSnapshot, microphoneAccess.getSnapshot);
-  const live = liveFacts(room, microphoneReady(microphone, record));
+  // Resume asks the microphone's step until it was passed with Continue (or there is nothing to ask): allowed already,
+  // it still shows, saying so (operator, 2026-10-16).
+  const live = liveFacts(room, microphoneReady(microphone, record) && (record.microphone_done || microphone.state === "none"));
   const resume = useCallback((current: OnboardingRecord, facts: ReturnType<typeof liveFacts>) =>
     resumeOnboarding({ record: current, canHostAgents, ...facts }), [canHostAgents]);
 
@@ -154,10 +158,6 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
     setOpen(true);
   }, [ready, record, room.facts.machinesReady, room.facts.voiceSettings, microphone.state, live, persist, resume, startAt]);
 
-  // Allowed during the setup: kept, for a browser that cannot say so without asking again.
-  useEffect(() => {
-    if (microphone.state === "granted" && !record.microphone_done && !record.completed_at) void persist({ microphone_done: true });
-  }, [microphone.state, record.microphone_done, record.completed_at, persist]);
 
   // The desktop's floating call card shows only once the first setup is finished and its wizard is closed: the room
   // says so in its facts, which the card's host passes on (FLOATING-CARD-SPEC FC1).
@@ -170,7 +170,7 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
     path: canHostAgents ? record.choice : "remote",
     localReady: live.localReady,
     remoteReady: live.remoteReady,
-    microphone: { ...microphone, ready: live.microphoneReady },
+    microphone: { ...microphone, ready: microphoneReady(microphone, record) },
     requestMicrophone: () => microphoneAccess.request(),
     openMicrophoneSettings: microphoneAccess.openSettings,
     tried: (task) => !!draft && record.trials[task] === trialKey(draft[task]),
@@ -182,6 +182,7 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
     goTo: (next) => { setError(null); setStep(next); },
     setPath: (path) => persist({ choice: path, deferred_at: null }),
     markAgentsDone: () => persist({ agents_done: true }),
+    markMicrophoneDone: () => persist({ microphone_done: true }),
     markBasicsDone: () => persist({ basics_done: true }),
     markTurnDone: () => persist({ turn_done: true }),
     markFeatures: (ids, state) => persist({ features: Object.fromEntries(ids.map((id) => [id, { state, at: Date.now() }])) }),
@@ -199,7 +200,7 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
     },
     // Entering needs every step done as things stand now, and the completion read back: never an optimistic flag.
     async complete() {
-      const now = resume(recordRef.current, liveFacts(roomStore.getState(), microphoneReady(microphoneAccess.getSnapshot(), recordRef.current)));
+      const now = resume(recordRef.current, liveFacts(roomStore.getState(), microphoneReady(microphoneAccess.getSnapshot(), recordRef.current) && (recordRef.current.microphone_done || microphoneAccess.getSnapshot().state === "none")));
       if (now !== "W6") { setStep(now); setError("onboarding.prerequisites"); return false; }
       // Set up on this release: what it already has is not news to the person.
       const saved = await persist({ completed_at: Math.floor(Date.now() / 1000), deferred_at: null, baseline_release: RELEASE });
