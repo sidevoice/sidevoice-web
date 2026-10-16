@@ -2,9 +2,9 @@ import { useEffect, useRef } from "react";
 import { Button } from "../../components/ui/Button";
 import { PERSON_AVATAR } from "../avatar/avatar-spec";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
-import { RefreshIcon } from "../../components/ui/Icons";
+import { MicrophoneIcon, MicrophoneOffIcon, RefreshIcon } from "../../components/ui/Icons";
 import { Group, Row } from "../../components/ui/Card";
-import { announcement, MicrophoneBadge, MicrophoneHowTo, MicrophoneMark, microphoneAction, MIC_HELP_ID, microphoneView, useMicrophoneAccess, type MicrophoneView, type Platform } from "../permissions/permission-view";
+import { announcement, MicrophoneBadge, MicrophoneHowTo, microphoneAction, MIC_HELP_ID, microphoneView, useMicrophoneAccess, type MicrophoneView, type Platform } from "../permissions/permission-view";
 import { devicePlatform, type MicrophoneSnapshot } from "../../services/microphone-access";
 import type { Translate } from "../../i18n/translator";
 
@@ -43,7 +43,7 @@ function MicrophoneRow({ microphone, view, onRequest, openSettings, t }: {
     hadFocus.current = false;
   }, [allowed]);
   return <>
-    <Row className="perm-settings-row" label={<span className="perm-label"><MicrophoneMark view={view} />{t("wizard.mic.label")}</span>}
+    <Row className="perm-settings-row perm-step-row" label={<span className="perm-label"><span className="perm-plain-icon" aria-hidden>{view.blocked ? <MicrophoneOffIcon size={18} /> : <MicrophoneIcon size={18} />}</span>{t("wizard.mic.label")}</span>}
       description={t("perm.mic.why")}>
       <span className="perm-settings-control">
         {allowed

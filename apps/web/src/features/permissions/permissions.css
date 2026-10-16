@@ -64,3 +64,11 @@
 .wizard-perm > .perm-refresh { justify-self: end; }
 .perm-badge-focus { display: inline-flex; border-radius: var(--sv-radius-pill); }
 .perm-badge-focus:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+
+/* The step's row: the permission's plain icon (its state is the badge's to say), and on a narrow screen its action or
+ * badge on a line of its own, at the end (operator, 2026-10-16). */
+.perm-plain-icon { display: inline-grid; place-items: center; flex: none; color: var(--sv-text-muted); }
+@media (max-width: 559px), (max-width: 899px) and (pointer: coarse) {
+  .perm-step-row { grid-template-columns: minmax(0, 1fr); }
+  .perm-step-row > .ui-row-control { justify-self: end; }
+}
