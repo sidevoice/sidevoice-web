@@ -1112,7 +1112,7 @@ export const messages: Messages = {
   "wizard.turn.noMicrophone": "試すにはマイクが必要ですが、マイクなしで続けています。",
   "wizard.mic.checkAgain": "もう一度確認",
   "wizard.mic.openSettings": "システム設定を開く",
-  "perm.mic.why": "通話中に音声がオンのとき、およびセットアップのテスト中にだけ使われます。",
+  "perm.mic.why": "エージェントがあなたの声を聞くため",
   "perm.refresh": "状態を更新",
   "perm.state.none": "ここで許可するものはありません",
   "wizard.turnIntro": "Sidevoice があなたが話し終えたと判断する方法です。「設定 → 通話」で変更できます。",

@@ -1111,7 +1111,7 @@ export const messages: Messages = {
   "wizard.turn.noMicrophone": "试用需要麦克风，而你选择了不使用麦克风继续。",
   "wizard.mic.checkAgain": "再检查一次",
   "wizard.mic.openSettings": "打开系统设置",
-  "perm.mic.why": "仅在通话中开启语音时，以及设置过程中的试用时使用。",
+  "perm.mic.why": "让你的智能体听到你",
   "perm.refresh": "刷新状态",
   "perm.state.none": "这里没有需要允许的内容",
   "wizard.turnIntro": "Sidevoice 如何判断你已说完。你可以在“设置 → 通话”中更改。",
