@@ -2,9 +2,9 @@ import { useEffect, useRef } from "react";
 import { Button } from "../../components/ui/Button";
 import { PERSON_AVATAR } from "../avatar/avatar-spec";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
-import { RefreshIcon } from "../../components/ui/Icons";
+import { MicrophoneIcon, MicrophoneOffIcon, RefreshIcon } from "../../components/ui/Icons";
 import { Group, Row } from "../../components/ui/Card";
-import { announcement, MicrophoneBadge, MicrophoneHowTo, MicrophoneMark, microphoneAction, MIC_HELP_ID, microphoneView, useMicrophoneAccess, type MicrophoneView, type Platform } from "../permissions/permission-view";
+import { announcement, MicrophoneBadge, MicrophoneHowTo, microphoneAction, MIC_HELP_ID, microphoneView, useMicrophoneAccess, type MicrophoneView, type Platform } from "../permissions/permission-view";
 import { devicePlatform, type MicrophoneSnapshot } from "../../services/microphone-access";
 import type { Translate } from "../../i18n/translator";
 
@@ -43,7 +43,7 @@ function MicrophoneRow({ microphone, view, onRequest, openSettings, t }: {
     hadFocus.current = false;
   }, [allowed]);
   return <>
-    <Row className="perm-settings-row" label={<span className="perm-label"><MicrophoneMark view={view} />{t("wizard.mic.label")}</span>}
+    <Row className="perm-settings-row perm-step-row" label={<span className="perm-label"><span className="perm-plain-icon" aria-hidden>{view.blocked ? <MicrophoneOffIcon size={18} /> : <MicrophoneIcon size={18} />}</span>{t("wizard.mic.label")}</span>}
       description={t("perm.mic.why")}>
       <span className="perm-settings-control">
         {allowed
@@ -79,7 +79,11 @@ export function PermissionsStep({ microphone, openSettings, onRequest = () => {}
  *  "Continue without microphone" until it is allowed, then the primary Continue. One element, so focus stays on it. */
 export function MicrophoneContinue({ microphone, onContinue, t }: { microphone: MicrophoneSnapshot; onContinue(): void; t: Translate }) {
   const { done } = microphoneAction(microphone);
-  return <Button type="button" variant={done ? "primary" : "secondary"} id="wizard-mic-continue" onClick={onContinue}>
-    {t(done ? "wizard.continue" : "wizard.mic.continueWithout")}
-  </Button>;
+  // Two ways on (operator, 2026-10-16): "Continue without microphone", secondary, at the left until it is allowed; and
+  // Continue, the primary, in the brand's colour but waiting until the microphone is allowed.
+  return <>
+    {!done && <Button type="button" variant="secondary" id="wizard-mic-skip" onClick={onContinue}>{t("wizard.mic.continueWithout")}</Button>}
+    <Button type="button" variant="primary" id="wizard-mic-continue" className={done ? undefined : "wizard-continue-waiting"} disabled={!done} onClick={onContinue}>
+      {t("wizard.continue")}</Button>
+  </>;
 }

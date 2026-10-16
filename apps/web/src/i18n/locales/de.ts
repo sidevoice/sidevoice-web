@@ -1114,7 +1114,7 @@ export const messages: Messages = {
   "wizard.turn.noMicrophone": "Zum Ausprobieren ist ein Mikrofon nötig, und du hast ohne eins weitergemacht.",
   "wizard.mic.checkAgain": "Erneut prüfen",
   "wizard.mic.openSettings": "Systemeinstellungen öffnen",
-  "perm.mic.why": "Wird genutzt, solange die Stimme in einem Anruf aktiv ist, und bei den Tests der Einrichtung – nur dann.",
+  "perm.mic.why": "Nötig, damit dein Agent dich hört",
   "perm.refresh": "Status aktualisieren",
   "perm.state.none": "Hier gibt es nichts zu erlauben",
   "wizard.turnIntro": "Wie Sidevoice erkennt, dass du fertig gesprochen hast. Du kannst es unter Einstellungen → Anruf ändern.",
