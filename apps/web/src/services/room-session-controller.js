@@ -23,6 +23,7 @@ import {playbackHearing,writtenReplyHearing} from './reply-hearing-policy.js';
 import {refusalError} from './refusals.js';
 import {followWorking} from './working-clock.ts';
 import {shortcut} from '../state/shortcuts.ts';
+import {watchAudioDeviceRefresh} from './audio-device-refresh.ts';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
 // What this browser speaks in a call: the language of its system, among those the voice handles.
@@ -1741,6 +1742,9 @@ async function refreshAudioDevices(){
  await watchAudioDevices();
  const host=await voiceHost();if(typeof host.audioDevices==='function')audioDevicesChanged(await host.audioDevices());
 }
+// The list stays fresh by itself: the permission changing and the window coming back read it again (the host tells of
+// devices plugged in or out), whatever Settings or the panel did or did not do at load.
+watchAudioDeviceRefresh({refresh:refreshAudioDevices});
 // Joining and leaving are the same button, and it belongs to React: this is what it calls.
 /* Which machine a join goes to: the one of the conversation being looked at (or the one this tab remembers) — and
  * then that one or none, so the call never lands somewhere the person did not pick —, else the first watched machine
