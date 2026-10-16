@@ -39,7 +39,8 @@ test("keeps local setup visible through native projection, and puts it away once
   act(() => store.patch({ machinesReady: true, inApp: true, localHostAvailable: true, localHostStatus: { state: "absent" } }));
   render(<App store={store} />);
 
-  expect(screen.getAllByText("This computer isn't prepared yet.")[0]).toBeInTheDocument();
+  // The call area offers the setup's two cards first; This computer opens its preparation.
+  await act(async () => { fireEvent.click(document.getElementById("machine-choice-agents")!); });
   expect(screen.getByRole("button", { name: "I’ll do it myself" })).toBeInTheDocument();
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Prepare this computer" })); });
   act(() => store.patch({ localHostStatus: { state: "installing", installed: false } }));
@@ -87,6 +88,8 @@ test("remote room controls stay available when remote pairing succeeds during lo
   act(() => store.patch({ machinesReady: true, inApp: true, localHostAvailable: true, localHostStatus: { state: "absent" } }));
   render(<App store={store} />);
 
+  // The call area offers the setup's two cards first; This computer opens its preparation.
+  await act(async () => { fireEvent.click(document.getElementById("machine-choice-agents")!); });
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Prepare this computer" })); });
   act(() => store.patch({ localHostStatus: { state: "installing", installed: false } }));
   expect(document.querySelector("#pane-this-computer .local-install-panel")).toHaveAttribute("data-phase", "installing");
@@ -119,6 +122,8 @@ test("a failed local host projected during setup returns to the normal room and 
   act(() => store.patch({ machinesReady: true, localHostAvailable: true, localHostStatus: { state: "absent" } }));
   render(<App store={store} />);
 
+  // The call area offers the setup's two cards first; This computer opens its preparation.
+  await act(async () => { fireEvent.click(document.getElementById("machine-choice-agents")!); });
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Prepare this computer" })); });
   act(() => store.patch({ localHostStatus: { state: "installing", installed: false } }));
   act(() => store.patch({

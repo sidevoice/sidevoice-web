@@ -2,15 +2,15 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { ChoiceCard } from "../../components/ui/Card";
 import { Dialog } from "../../components/ui/Dialog";
 import { Tooltip } from "../../components/ui/Tooltip";
-import { ArrowRightIcon, OtherMachineIcon, SidevoiceMark, ThisComputerIcon, BackIcon } from "../../components/ui/Icons";
+import { ArrowRightIcon, SidevoiceMark, BackIcon } from "../../components/ui/Icons";
 import { localHostInstallController } from "../../services/local-host-install";
 import { useDialogFocusReturn } from "../../lib/focus-return";
 import { LocalHostInstallEntry } from "../pairing/LocalHostInstallEntry";
 import { PrepareThisComputer } from "../pairing/PrepareThisComputer";
 import { PairMachine } from "../pairing/PairMachine";
+import { MachineChoices } from "../pairing/MachineChoices";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
 import { SpeechChoices, TranscriptionChoices, TurnChoices } from "../settings/VoiceSettings";
 import { useTurnTry, type TurnTryHandle } from "../settings/TurnTry";
@@ -382,14 +382,7 @@ export function Wizard() {
       {error && !ready && <Alert tone="danger" live title={error} />}
       {step === "W1" && <section>
         <p>{t("wizard.where.body")}</p>
-        <div className="wizard-choices" role="radiogroup" aria-label={t("wizard.title.where")}>
-          {onboarding.canHostAgents && <ChoiceCard selected={choice === "agents"} onSelect={() => choose("agents")}>
-            <ThisComputerIcon size={20} /><strong>{t("wizard.choice.local")}</strong><span className="wizard-choice-note">{t("wizard.choice.localNote")}</span>
-          </ChoiceCard>}
-          <ChoiceCard selected={choice === "remote"} onSelect={() => choose("remote")}>
-            <OtherMachineIcon size={20} /><strong>{t("wizard.choice.remote")}</strong><span className="wizard-choice-note">{t("wizard.choice.remoteNote")}</span>
-          </ChoiceCard>
-        </div>
+        <MachineChoices local={onboarding.canHostAgents} label={t("wizard.title.where")} chosen={choice} onChoose={choose} t={t} />
       </section>}
       {step === "W0" && <BasicsStep t={t} />}
       {step === "W2" && <PrepareStep ready={onboarding.localReady} t={t} />}

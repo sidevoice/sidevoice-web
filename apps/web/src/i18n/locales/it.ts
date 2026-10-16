@@ -733,7 +733,7 @@ export const messages: Messages = {
   "wizard.group.voice": "Voce",
   "wizard.group.ready": "Pronto",
   "wizard.where.body": "Sidevoice si connette al computer dove girano i tuoi agenti di programmazione.",
-  "wizard.choice.local": "Su questo computer",
+  "wizard.choice.local": "Questo computer",
   "wizard.choice.remote": "Un’altra macchina",
   "wizard.choice.localNote": "I tuoi agenti girano qui; Sidevoice installa il suo servizio su questo computer.",
   "wizard.choice.remoteNote": "I tuoi agenti girano su un altro computer o server; lo associ con un codice.",

@@ -723,7 +723,7 @@ export const messages: Messages = {
   "wizard.group.voice": "语音",
   "wizard.group.ready": "就绪",
   "wizard.where.body": "Sidevoice 会连接到运行你的编程智能体的计算机。",
-  "wizard.choice.local": "在本机上",
+  "wizard.choice.local": "本机",
   "wizard.choice.remote": "其他计算机",
   "wizard.choice.localNote": "你的智能体在这里运行；Sidevoice 会在本机上安装它的服务。",
   "wizard.choice.remoteNote": "你的智能体在另一台计算机或服务器上运行；你需要用代码与它配对。",

@@ -740,7 +740,7 @@ export const messages = {
   "wizard.group.voice": "Voice",
   "wizard.group.ready": "Ready",
   "wizard.where.body": "Sidevoice connects to the machine where your coding agents run.",
-  "wizard.choice.local": "On this computer",
+  "wizard.choice.local": "This computer",
   "wizard.choice.remote": "Another machine",
   "wizard.choice.localNote": "Your agents run here; Sidevoice installs its service on this computer.",
   "wizard.choice.remoteNote": "Your agents run on another computer or server; you pair with it using a code.",

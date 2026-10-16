@@ -56,7 +56,9 @@ test("NoMachine keeps remote pairing available while local preparation reports b
   act(() => store.patch({ machinesReady: true, localHostAvailable: true, localHostStatus: { state: "absent" } }));
   render(<RoomProvider store={store}><NoMachineScreen installController={controller} /></RoomProvider>);
 
-  expect(screen.getByText("This computer isn't prepared yet.")).toBeInTheDocument();
+  // The setup's two cards first; This computer opens its preparation.
+  expect(screen.getByRole("button", { name: /Another machine/ })).toBeInTheDocument();
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: /This computer/ })); });
   expect(screen.getByRole("button", { name: "I’ll do it myself" })).toBeInTheDocument();
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Prepare this computer" })); });
   expect(install).toHaveBeenCalledOnce();
@@ -64,7 +66,7 @@ test("NoMachine keeps remote pairing available while local preparation reports b
   expect(screen.getByRole("progressbar", { name: "Download progress" })).toHaveAttribute("aria-valuenow", "50");
   expect(screen.getByText("1.5 of 3 MB")).toBeInTheDocument();
 
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Connect to a machine" })); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Connect to another machine" })); });
   expect(openPairing).toHaveBeenCalledOnce();
   expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
 

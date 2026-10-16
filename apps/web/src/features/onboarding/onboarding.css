@@ -59,14 +59,7 @@
 /* The pairing form's Connect lands here, laid out as one of the footer's own buttons. */
 .wizard-slot { display: contents; }
 
-/* ----- where you work: two choice cards, each with a line on what it means */
-.wizard-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: var(--sv-space-3); }
-.wizard-choices .ui-card { display: grid; align-content: start; justify-items: start; gap: var(--sv-space-2); }
-.wizard-choices .ui-card > svg { color: var(--sv-accent-text); }
-.wizard-choices .ui-card > strong { padding-inline-end: var(--sv-space-6); font-weight: var(--sv-weight-semibold); line-height: 1.375rem; }
 .wizard-chips { display: flex; flex-wrap: wrap; gap: var(--sv-space-2); margin: 0; padding: 0; list-style: none; }
-.wizard-choice-note { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); text-align: start; }
-.wizard-choices .ui-card > .wizard-choice-note { padding-inline-end: var(--sv-space-2); }
 
 /* ----- transcription and voice: the choices (Settings' own), the try in the model's block; the sentence to hear is
    edited there too, or beside it while the try has its own dialog */
@@ -123,20 +116,22 @@
 /* The stepper's last bar mustard, drawn in; the mark in a halo; recap as four tiles, then the phrase under a rule. */
 [data-ready] .wizard-steps li:last-child { background: var(--sv-voice); transform-origin: left; animation: wizard-ready-draw 400ms var(--sv-ease) 300ms both; }
 @keyframes wizard-ready-draw { from { transform: scaleX(0); } }
-.wizard-ready .wizard-ready-mark { width: 96px; height: 96px; border-radius: 50%; background: radial-gradient(closest-side, var(--sv-accent-soft), transparent); animation: wizard-ready-halo 400ms var(--sv-ease) both; }
+/* Six recap rows and the connect block fit above the footer unscrolled (2026-10-16): a smaller halo, tighter rows. */
+.wizard-ready .wizard-ready-mark { width: 64px; height: 64px; border-radius: 50%; background: radial-gradient(closest-side, var(--sv-accent-soft), transparent); animation: wizard-ready-halo 400ms var(--sv-ease) both; }
+.wizard-ready .wizard-ready-mark svg { width: 48px; height: 48px; }
 [data-theme="dark"] .wizard-ready .wizard-ready-mark { background: radial-gradient(closest-side, color-mix(in srgb, var(--sv-accent) 18%, transparent), transparent); }
 @keyframes wizard-ready-halo { from { transform: scale(.85); opacity: 0; } }
 .wizard-ready .wizard-recap-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.wizard-ready .wizard-recap-row { padding: var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
+.wizard-ready .wizard-recap-row { padding: var(--sv-space-2) var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
 [data-theme="dark"] .wizard-ready .wizard-recap-row { background: var(--sv-surface); }
 .wizard-ready .wizard-ready-connect { padding-top: var(--sv-space-5); border-top: 1px solid var(--sv-border); }
 
 @media (max-width: 599px), (max-height: 520px) {
   .wizard-ready .wizard-ready-title { font-size: var(--sv-font-xl); line-height: 1.625rem; }
-  .wizard-ready .wizard-ready-mark { width: 72px; height: 72px; }
-  .wizard-ready .wizard-ready-mark svg { width: 48px; height: 48px; }
+  .wizard-ready .wizard-ready-mark { width: 56px; height: 56px; }
+  .wizard-ready .wizard-ready-mark svg { width: 40px; height: 40px; }
   .wizard-ready .wizard-recap-list { grid-template-columns: 1fr; gap: 0; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); }
-  .wizard-ready .wizard-recap-row { min-height: 48px; border: 0; border-radius: 0; background: none; }
+  .wizard-ready .wizard-recap-row { min-height: 48px; padding-block: var(--sv-space-1); border: 0; border-radius: 0; background: none; }
   [data-theme="dark"] .wizard-ready .wizard-recap-row { background: none; }
   .wizard-ready .wizard-recap-row + .wizard-recap-row { border-top: 1px solid var(--sv-border); }
 }
