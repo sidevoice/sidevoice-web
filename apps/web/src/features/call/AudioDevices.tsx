@@ -11,6 +11,7 @@ import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { MicWave } from "./CallIndicators";
 import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 import { errorMessage, failureParts, type ErrorMessage } from "../settings/error-message";
+import { useSectionShown } from "../settings/settings-levels";
 
 /* The microphone and the speaker, as Meet has them: the chevron joined to the microphone's button opens a small panel
  * right above it, clear of the call's tray (below only where there is no room above) with a Microphone select and a Speaker select. The voice
@@ -102,12 +103,13 @@ function devicesError(error: unknown, t: Translate): ErrorMessage {
 
 /** The devices to choose and what choosing does: the list read again where it is drawn, busy while a choice is made,
  *  why a choice failed. The call's panel and Settings › Call share it. */
-function useDeviceChoices() {
+function useDeviceChoices(shown = true) {
   const t = translator();
   const devices = useRoomStore((state) => state.facts.audioDevices);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ErrorMessage | null>(null);
-  useEffect(() => { void window.sidevoiceActions?.refreshAudioDevices?.(); }, []);
+  // Read again each time it is shown; while it is, the runtime keeps it fresh (audio-device-refresh.ts).
+  useEffect(() => { if (shown) void window.sidevoiceActions?.refreshAudioDevices?.(); }, [shown]);
   const choose = async (choice: { input?: string | null; output?: string | null }) => {
     setBusy(true); setError(null);
     try { await window.sidevoiceActions?.setAudioDevices?.(choice); }
@@ -122,7 +124,7 @@ function useDeviceChoices() {
 /** Settings › Call: the microphone and the speaker as rows, the same choices as the call's panel, the system's by
  *  default (operator, 2026-10-16: where people look for them). */
 export function AudioDeviceRows() {
-  const { t, devices, busy, error, choose, inputs, outputs } = useDeviceChoices();
+  const { t, devices, busy, error, choose, inputs, outputs } = useDeviceChoices(useSectionShown("call"));
   // Both always there (operator, 2026-10-16): without the microphone allowed, or before the list is read, each stays on
   // the system's device, held back, saying why.
   const allowed = useOnboardingIfAny()?.microphone?.ready ?? true;

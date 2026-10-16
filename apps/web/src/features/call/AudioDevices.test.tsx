@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import type { SidevoiceActions } from "../../state/room-types";
-import { AudioDevices } from "./AudioDevices";
+import { AudioDeviceRows, AudioDevices } from "./AudioDevices";
 import { chooseOption, listOptions, selectedValue } from "../../test/select";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
@@ -69,4 +69,41 @@ test("a speaker this platform cannot choose is disabled, saying why; a lost devi
   expect(screen.getByText("The chosen microphone is gone: the system's default is in use.")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Got it" }));
   expect(store.getState().facts.audioLost).toBeNull();
+});
+
+/* Settings › Call and the panel only read the store: the runtime keeps `audioDevices` fresh (services/audio-device-refresh.ts). */
+
+test("Settings' rows fill when the list arrives after mount (permission granted, a device plugged in), without a remount", () => {
+  const actions = { setAudioDevices: vi.fn(async () => undefined), refreshAudioDevices: vi.fn(async () => undefined) };
+  window.sidevoiceActions = actions as unknown as SidevoiceActions;
+  const store = createRoomStore();
+  store.patch({ settingsSection: "call" } as never);
+  render(<RoomProvider store={store} runtime={false}><AudioDeviceRows /></RoomProvider>);
+  expect(screen.getByText("Looking for devices…")).toBeInTheDocument();
+  expect(screen.getByLabelText("Microphone")).toBeDisabled();
+  act(() => store.patch({ audioDevices: devices() } as never));
+  expect(screen.queryByText("Looking for devices…")).toBeNull();
+  expect(screen.getByLabelText("Microphone")).not.toBeDisabled();
+  expect(listOptions("settings-audio-input").map((option) => option.label)).toEqual(["System default", "Built-in", "Microphone 2"]);
+  // A device plugged in: the runtime patches the list, the rows follow.
+  act(() => store.patch({ audioDevices: devices({ inputs: [{ id: "mic-a", label: "Built-in" }, { id: "mic-c", label: "USB" }] }) } as never));
+  expect(listOptions("settings-audio-input").map((option) => option.label)).toEqual(["System default", "Built-in", "USB"]);
+});
+
+test("the list is read again each time the section is shown, and a hidden section reads nothing", () => {
+  const actions = { setAudioDevices: vi.fn(async () => undefined), refreshAudioDevices: vi.fn(async () => undefined) };
+  window.sidevoiceActions = actions as unknown as SidevoiceActions;
+  const store = createRoomStore();
+  store.patch({ settingsSection: "general" } as never);
+  const view = render(<RoomProvider store={store} runtime={false}><AudioDeviceRows /></RoomProvider>);
+  expect(actions.refreshAudioDevices).not.toHaveBeenCalled();
+  act(() => store.patch({ settingsSection: "call" } as never));
+  expect(actions.refreshAudioDevices).toHaveBeenCalledTimes(1);
+  act(() => store.patch({ settingsSection: "general" } as never));
+  act(() => store.patch({ settingsSection: "call" } as never));
+  expect(actions.refreshAudioDevices).toHaveBeenCalledTimes(2);
+  view.unmount();
+  act(() => store.patch({ settingsSection: "general" } as never));
+  act(() => store.patch({ settingsSection: "call" } as never));
+  expect(actions.refreshAudioDevices).toHaveBeenCalledTimes(2);
 });
