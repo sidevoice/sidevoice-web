@@ -17,8 +17,7 @@ import "./pairing.css";
 export function NoMachineScreen({
   installController = localHostInstallController,
   source = "no-machine",
-  onContinueSetup,
-}: { installController?: LocalHostInstallController; source?: LocalHostInstallSource; onContinueSetup?: () => void } = {}) {
+}: { installController?: LocalHostInstallController; source?: LocalHostInstallSource } = {}) {
   const t = translator();
   // This computer chosen from the cards; an install that shows its run (started here or in the setup) is chosen already.
   const [here, setHere] = useState(false);
@@ -62,7 +61,6 @@ export function NoMachineScreen({
       {!twoWays && installHere && offer.offered && <p className="no-machine-hint">{t("localInstall.description")}</p>}
       {!twoWays && <LocalHostInstallEntry showCta={false} controller={installController} source={source} holdSuccess />}
       {/* Back into the setup where it stands, where the flow offers it: a quiet link, never the main action. */}
-      {onContinueSetup && <Button variant="ghost" tone="neutral" size="sm" className="waiting-continue-setup" onClick={onContinueSetup}>{t("noMachine.continue")}</Button>}
     </section>
   );
 }

@@ -8,7 +8,7 @@ import { installHarness } from "./harness.mjs";
 
 // The setup's record at its first step, the basics.
 const AT_BASICS = {
-  version: 1, basics_done: false, choice: null, agents_done: false, turn_done: false, deferred_at: null, completed_at: null, trials: {},
+  version: 1, basics_done: false, choice: null, agents_done: false, turn_done: false, completed_at: null, trials: {},
   chosen: {}, baseline_release: 0, features: {},
 };
 

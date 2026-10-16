@@ -8,7 +8,7 @@ import { installHarness } from "./harness.mjs";
 // The setup's record at its End of turn step: the basics done, another machine paired, transcription and voice chosen
 // (the default settings' keys), the end of turn not yet.
 const AT_END_OF_TURN = {
-  version: 1, basics_done: true, microphone_done: true, choice: "remote", agents_done: false, turn_done: false, deferred_at: null, completed_at: null, trials: {},
+  version: 1, basics_done: true, microphone_done: true, choice: "remote", agents_done: false, turn_done: false, completed_at: null, trials: {},
   chosen: { stt: '{"catalog":"local","language":null,"model":"whisper-base"}', tts: '{"catalog":"local","model":"kokoro-82m-v1.0","speed":1,"voice":null}' },
   baseline_release: 0, features: {},
 };

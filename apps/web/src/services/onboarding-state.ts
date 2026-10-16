@@ -1,6 +1,6 @@
 /* The first-run setup's progress on this device: the basics (appearance, languages) seen, which way it went (agents
  * here, or another machine), whether the agents step was answered, the transcription and voice chosen (and, apart, the
- * ones the person tried: trying is optional), the end of turn chosen, and when it was put off or finished. It lives on
+ * ones the person tried: trying is optional), the end of turn chosen, and when it was finished. It lives on
  * the device, like the voice settings it tries; the machine, its agents and its pairing keep their own state, and the
  * setup only reads them, as it reads whether the microphone may be used. Completion is written fail-closed: it counts
  * only once it reads back. */
@@ -19,13 +19,12 @@ export interface OnboardingRecord {
   microphone_done: boolean;
   /** The end of turn step was answered. */
   turn_done: boolean;
-  /** Steps passed with their "Continue without …" (onboardingFlow d): the microphone, the machine, transcription, the voice. Resume goes
+  /** Steps passed with their "Continue without …": the microphone, the machine, transcription, the voice. Resume goes
    *  past them; Back still reaches them, and doing the step clears its mark. */
   microphone_skipped: boolean;
   machine_skipped: boolean;
   stt_skipped: boolean;
   tts_skipped: boolean;
-  deferred_at: number | null;
   completed_at: number | null;
   /** Per voice slot, the key of the settings the person tried (`trialKey`): a changed setting is an untried one. */
   trials: Partial<Record<OnboardingTask, string>>;
@@ -46,7 +45,7 @@ export type OnboardingPatch = Partial<Omit<OnboardingRecord, "version" | "trials
 export const ONBOARDING_STORAGE_KEY = "sidevoice.onboarding";
 
 export const emptyOnboardingRecord = (): OnboardingRecord => ({
-  version: 1, basics_done: false, choice: null, agents_done: false, microphone_done: false, turn_done: false, microphone_skipped: false, machine_skipped: false, stt_skipped: false, tts_skipped: false, deferred_at: null, completed_at: null, trials: {}, chosen: {}, baseline_release: 0, features: {},
+  version: 1, basics_done: false, choice: null, agents_done: false, microphone_done: false, turn_done: false, microphone_skipped: false, machine_skipped: false, stt_skipped: false, tts_skipped: false, completed_at: null, trials: {}, chosen: {}, baseline_release: 0, features: {},
 });
 
 export class OnboardingStorageError extends Error {
@@ -90,7 +89,6 @@ export function normalizeOnboardingRecord(value: unknown): OnboardingRecord {
     machine_skipped: input.machine_skipped === true,
     stt_skipped: input.stt_skipped === true,
     tts_skipped: input.tts_skipped === true,
-    deferred_at: timestamp(input.deferred_at),
     completed_at: timestamp(input.completed_at),
     trials,
     chosen: keys(input.chosen),
@@ -139,11 +137,6 @@ export interface ResumeFacts {
   /** The keys of this device's transcription and voice settings now (`trialKey`). */
   sttKey: string | null;
   ttsKey: string | null;
-  /** What was done outside the setup counts (onboardingFlow b): any machine answering passes the machine's step, and a
-   *  model ready (on disk, or a provider's with its key) passes its step. Absent: only what the setup recorded. */
-  live?: { sttReady: boolean; ttsReady: boolean };
-  /** Steps passed with "Continue without …" are passed (onboardingFlow d). */
-  skips?: boolean;
 }
 
 /** The first step not yet done, from the record and the live facts: a step already achieved (an install, a pairing)
@@ -154,19 +147,16 @@ export function resumeOnboarding(facts: ResumeFacts): OnboardingStep {
   // The permissions right after the basics (operator, 2026-10-16): nothing after them, a machine's install included,
   // then fails for a permission nobody asked for.
   if (!facts.microphonePassed) return "W4m";
-  let path: OnboardingPath | null = !facts.canHostAgents ? "remote" : record.choice ?? (facts.localReady ? "agents" : null);
-  // A machine connected anywhere (Settings, the call area) is the machine's step done, whichever way was chosen.
-  if (facts.live && (facts.localReady || facts.remoteReady) && !(path === "agents" ? facts.localReady : path === "remote" && facts.remoteReady)) path = facts.localReady ? "agents" : "remote";
-  const machineSkipped = !!facts.skips && record.machine_skipped;
-  // Skipped from where you work (d), no way was chosen: on to the voice.
+  const path: OnboardingPath | null = !facts.canHostAgents ? "remote" : record.choice ?? (facts.localReady ? "agents" : null);
+  const machineSkipped = record.machine_skipped;
+  // Skipped from where you work, no way was chosen: on to the voice.
   if (!path && !machineSkipped) return "W1";
   if (path === "agents" && !facts.localReady && !machineSkipped) return "W2";
   if (path === "remote" && !facts.remoteReady && !machineSkipped) return "W2r";
   if (path === "agents" && facts.localReady && !record.agents_done) return "W3";
   // Chosen, tried or not: trying is the setup's suggestion, not a condition.
   const settled = (task: OnboardingTask, key: string | null) => (!!key && (record.chosen[task] === key || record.trials[task] === key))
-    || (!!facts.live && (task === "stt" ? facts.live.sttReady : facts.live.ttsReady))
-    || (!!facts.skips && (task === "stt" ? record.stt_skipped : record.tts_skipped));
+    || (task === "stt" ? record.stt_skipped : record.tts_skipped);
   if (!settled("stt", facts.sttKey)) return "W4";
   if (!settled("tts", facts.ttsKey)) return "W4v";
   if (!record.turn_done) return "W5";

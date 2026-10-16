@@ -29,7 +29,7 @@ export function PermissionsStep({ microphone, openSettings, onRequest = () => {}
 }
 
 /** The footer's forward action: Continue, waiting until the microphone is allowed. The microphone is required to call in
- *  this release (operator, 2026-10-16); one element, so focus stays on it. `onSkip` (onboardingFlow d, operator
+ *  this release (operator, 2026-10-16); one element, so focus stays on it. `onSkip` (operator
  *  2026-10-16): while it is not allowed, the quiet "Continue without microphone" left of it, alone — the row above already
  *  says what the microphone is for; the call area asks for it afterwards. */
 export function MicrophoneContinue({ microphone, onContinue, onSkip, t }: { microphone: MicrophoneSnapshot; onContinue(): void; onSkip?: () => void; t: Translate }) {

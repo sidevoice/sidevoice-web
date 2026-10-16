@@ -6,11 +6,10 @@ import { openSettings } from "../settings/open-settings";
 import { translator } from "../../i18n/translator";
 import { VoiceModels, type VoiceModelRow } from "./VoiceModels";
 
-/* The call's own space while a machine answers but the voice's models are not ready (onboardingFlow b and d): the rows
+/* The call's own space while a machine answers but the voice's models are not ready: the rows
  * of the models the call needs, as the call's details have them, each with what it needs done (Download, Try again, Add
- * the key) and its download's progress; a polite live region says how each stands as it changes. `onContinueSetup`:
- * the way back into the setup where it stands, a quiet link, where the flow offers it. */
-export function VoiceSetupCard({ rows, onContinueSetup }: { rows: VoiceModelRow[]; onContinueSetup?: () => void }) {
+ * the key) and its download's progress; a polite live region says how each stands as it changes. */
+export function VoiceSetupCard({ rows }: { rows: VoiceModelRow[] }) {
   const t = translator();
   const store = useContext(RoomStoreContext);
   const language = document.documentElement.lang || "en";
@@ -26,6 +25,5 @@ export function VoiceSetupCard({ rows, onContinueSetup }: { rows: VoiceModelRow[
     {rows.length > 0 ? <VoiceModels rows={rows} states={states} />
       : <Button variant="primary" onClick={() => openSettings({ section: "voice" }, store)}>{t("voiceModels.openSettings")}</Button>}
     <p className="sr-only" role="status" aria-live="polite">{said}</p>
-    {onContinueSetup && <Button variant="ghost" tone="neutral" size="sm" className="waiting-continue-setup" onClick={onContinueSetup}>{t("noMachine.continue")}</Button>}
   </section>;
 }

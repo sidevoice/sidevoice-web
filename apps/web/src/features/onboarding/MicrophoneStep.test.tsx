@@ -124,22 +124,16 @@ test("blocked: how to allow it for the site, Check again (still blocked, said so
   expect(title()).toHaveTextContent("Set up transcription");
 }, WHOLE_APP_MS);
 
-test("required in this release, in a, b and c: no way past the step without the microphone, reloaded or not", async () => {
+test("required in this release: no way past the step without the microphone allowed (only Continue without passes it), reloaded or not", async () => {
   const { media } = browser("denied", () => Promise.reject(refused("NotAllowedError")));
-  for (const flow of ["a", "b", "c"]) {
-    localStorage.setItem("sidevoice.variants", JSON.stringify({ onboardingFlow: flow }));
-    await setup();
-    expect(title()).toHaveTextContent("Permissions");
-    expect(document.getElementById("wizard-mic-skip")).toBeNull();
-    expect(wizard().queryByRole("button", { name: /Continue without/ })).toBeNull();
-    // Continue waits, focusable, saying why; pressed, it goes nowhere.
-    expect(proceed()).toHaveAttribute("aria-disabled", "true");
-    await act(async () => { fireEvent.click(proceed()); });
-    expect(title()).toHaveTextContent("Permissions");
-    expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).microphone_done ?? false).toBe(false);
-    cleanup();
-  }
-  localStorage.removeItem("sidevoice.variants");
+  await setup();
+  expect(title()).toHaveTextContent("Permissions");
+  // Continue waits, focusable, saying why; pressed, it goes nowhere.
+  expect(proceed()).toHaveAttribute("aria-disabled", "true");
+  await act(async () => { fireEvent.click(proceed()); });
+  expect(title()).toHaveTextContent("Permissions");
+  expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).microphone_done ?? false).toBe(false);
+  cleanup();
   await setup();
   expect(title()).toHaveTextContent("Permissions");
   // Allowed: Continue, and on to transcription.
@@ -150,9 +144,8 @@ test("required in this release, in a, b and c: no way past the step without the 
   expect(title()).toHaveTextContent("Set up transcription");
 }, WHOLE_APP_MS);
 
-test("d: Continue without microphone is kept, a reload goes on from there, and allowed it is gone", async () => {
+test("Continue without microphone is kept, a reload goes on from there, and allowed it is gone", async () => {
   browser("denied", () => Promise.reject(refused("NotAllowedError")));
-  localStorage.setItem("sidevoice.variants", JSON.stringify({ onboardingFlow: "d" }));
   await setup();
   expect(title()).toHaveTextContent("Permissions");
   expect(proceed()).toHaveAttribute("aria-disabled", "true");
@@ -162,7 +155,6 @@ test("d: Continue without microphone is kept, a reload goes on from there, and a
   cleanup();
   await setup();
   expect(title()).not.toHaveTextContent("Permissions");
-  localStorage.removeItem("sidevoice.variants");
 }, WHOLE_APP_MS);
 
 test("the request closed without an answer is not a block: Allow microphone again", async () => {

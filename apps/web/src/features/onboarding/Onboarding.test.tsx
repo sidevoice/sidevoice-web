@@ -29,8 +29,6 @@ const NUC = { fp: "fp-nuc", device_id: "d-1", urls: ["https://nuc.example"], rv:
 
 let actions: Record<string, ReturnType<typeof vi.fn>>;
 beforeEach(() => {
-  // The wizard's steps as today's flow (onboardingFlow c) has them; each flow's own behaviour is OnboardingFlow.test.tsx's.
-  localStorage.setItem("sidevoice.variants", JSON.stringify({ onboardingFlow: "c" }));
   // Past the basics, unless a test is about them.
   localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true }));
   actions = {
@@ -41,7 +39,7 @@ beforeEach(() => {
   window.sidevoiceActions = actions as unknown as SidevoiceActions;
 });
 // A desktop app a test stood in for goes with it: the next test is in a browser unless it says otherwise.
-afterEach(() => { delete window.sidevoiceActions; delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; vi.restoreAllMocks(); localStorage.removeItem("sidevoice.variants"); });
+afterEach(() => { delete window.sidevoiceActions; delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; vi.restoreAllMocks(); });
 
 function room() {
   const store = createRoomStore();
@@ -161,7 +159,7 @@ test("transcription and voice are this device's: trying them is recommended, and
   expect(document.querySelector(".room-shell")).not.toHaveAttribute("hidden");
 }, WHOLE_APP_MS);
 
-test("a failed try says why and keeps the step; a completion that is not stored keeps Ready, with Retry", async () => {
+test("a failed try says why and keeps the step; a completion that is not stored still enters", async () => {
   const store = room();
   paired(store);
   actions.tryVoiceSettings.mockRejectedValueOnce(Object.assign(new Error("Nothing was heard in time."), { code: "trial-silence" }));
@@ -175,12 +173,9 @@ test("a failed try says why and keeps the step; a completion that is not stored 
 
   const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation((key) => { if (key === ONBOARDING_STORAGE_KEY) throw new DOMException("blocked", "SecurityError"); });
   await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Enter Sidevoice" })); });
-  expect(title()).toHaveTextContent("You’re all set — talk to your agents");
-  expect(wizard().getByRole("alert")).toHaveTextContent("Setup progress was not saved");
-  expect(document.querySelector(".room-shell")).toHaveAttribute("hidden");
-  setItem.mockRestore();
-  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Retry" })); });
+  // Ready always enters: the completion could not be stored, the setup is done for this session all the same.
   expect(document.querySelector(".room-shell")).not.toHaveAttribute("hidden");
+  setItem.mockRestore();
 }, WHOLE_APP_MS);
 
 /** A try that runs until the test ends it, and what the page asked it to tell as it goes. */
@@ -231,18 +226,6 @@ test("the voice's try is all in its block — its sentence shown and editable be
 });
 
 
-test("put off, the setup leaves one action that resumes it where it stands", async () => {
-  const store = room();
-  paired(store);
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Do this later" })); });
-  expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).deferred_at).toBeGreaterThan(0);
-  // Flow c leaves its "setup pending" card (a region, not a heading) in the call area.
-  expect(screen.getByRole("region", { name: "Setup is not finished" })).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Continue setup" }));
-  // Paired already: it does not ask for the machine again (and jsdom has no microphone to ask for).
-  expect(title()).toHaveTextContent("Set up transcription");
-});
-
 test("a model not on this device is downloaded first, in its block as in Settings; the try and Continue wait for it, saying why", async () => {
   const store = room();
   const absent = CATALOGS.map((catalog) => ({ ...catalog, models: catalog.models.map((model) => model.id === "whisper-base"
@@ -254,8 +237,8 @@ test("a model not on this device is downloaded first, in its block as in Setting
   expect(tryButton()).toHaveAttribute("aria-disabled", "true");
   // Waiting for its model: only Try it, blocked, with why in the footer's row; no Continue without trying yet.
   expect(document.getElementById("wizard-stage-action")).toBeNull();
-  expect(tryButton()).toHaveAccessibleDescription("The transcription model isn't ready yet.");
-  expect(document.getElementById("wizard-stage-reason")).toHaveTextContent("The transcription model isn't ready yet.");
+  expect(tryButton()).toHaveAccessibleDescription("You’ll need transcription for your agents to hear you. You can get it from the call area.");
+  expect(document.getElementById("wizard-stage-reason")).toHaveTextContent("You’ll need transcription for your agents to hear you. You can get it from the call area.");
   expect(document.getElementById("stt-language")).toBeNull();
   fireEvent.click(document.getElementById("stt-model-download")!);
   expect(actions.installVoiceModel).toHaveBeenCalledWith("stt");
@@ -405,7 +388,6 @@ test("a provider chosen without its key asks for it in the setup as Settings doe
   paired(store);
   expect(title()).toHaveTextContent("Set up transcription");
   const wizard = document.getElementById("wizard")!;
-  const deferred = () => JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).deferred_at ?? null;
   // A small dialog, above the setup's (not inside it).
   fireEvent.click(screen.getByRole("button", { name: "Connect OpenAI" }));
   const entry = screen.getByRole("dialog", { name: "Connect OpenAI" });
@@ -413,7 +395,6 @@ test("a provider chosen without its key asks for it in the setup as Settings doe
   await act(async () => { fireEvent(entry, new Event("cancel", { cancelable: true })); });
   expect(screen.queryByRole("dialog", { name: "Connect OpenAI" })).toBeNull();
   expect(document.querySelector("#wizard[open]")).toBe(wizard);
-  expect(deferred()).toBeNull();
 }, WHOLE_APP_MS);
 
 /** Back pressed from wherever the setup stands to its first step: each step it lands on, read again once everything
@@ -480,9 +461,9 @@ for (const step of MODEL_STEPS) {
     const turn = step.task === "end-of-turn";
     const card = () => document.querySelector<HTMLButtonElement>(turn ? "#wizard #turn-try" : "#wizard #wizard-card-try")!;
     const footerReason = document.getElementById("wizard-stage-reason")!.textContent!;
-    expect(footerReason).toMatch(/isn't ready yet\.$/);
+    expect(footerReason).toMatch(/call area\.$|until the smart end of turn is ready\.$/);
     expect(card()).toHaveAttribute("aria-disabled", "true");
-    expect(card()).toHaveAccessibleDescription(footerReason);
+    expect(card()).toHaveAccessibleDescription(/isn't ready yet\.$/);
     // Its block laid out as once ready: the button and the level (the voice's sentence) on the first row.
     expect(card().closest(".stt-try-head")!.querySelector(step.task === "tts" ? ".tts-try-sentence" : ".voice-wave")).toBeInTheDocument();
     act(() => store.patch({ voiceCatalogue: { state: "ready", catalogs: withTurn(() => true), error: "" } }));

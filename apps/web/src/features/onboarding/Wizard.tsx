@@ -190,7 +190,7 @@ function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t
  *  and its actions — Try it the main one, running the step's try block (Continue without trying beside it once the
  *  model is ready; Stop while it runs; Continue once tried). `reason`: the step's model is not ready (said in the row, cut short with its whole text kept);
  *  `tryReason`: only the try can't run yet (no sentence to say, no transcription to hear a turn). Blocked actions stay focusable, saying why (`blockedBy`). */
-/** `skip` (onboardingFlow d): while the model is not ready, the quiet "Continue without …" left of the main action. */
+/** `skip`: while the model is not ready, the quiet "Continue without …" left of the main action. */
 function ModelStepFooter({ reason, tryReason, running, tried, onTry, onStop, onContinue, skip, t }: {
   reason: string; tryReason?: string; running: boolean; tried: boolean;
   onTry(): void; onStop(): void; onContinue(): void; skip?: { label: string; onSkip(): void }; t: Translate;
@@ -210,12 +210,10 @@ function ModelStepFooter({ reason, tryReason, running, tried, onTry, onStop, onC
   </>;
 }
 
-/** Why a step's model holds its footer, in the step's own words; nothing once it is ready. */
-const WAIT_KEY = { stt: "settings.save.waitTranscription", tts: "settings.save.waitVoice", turn: "settings.save.waitTurn" } as const;
-/** Where the step can be passed without its model (onboardingFlow d), the reason line says the consequence instead, once. */
+/** Why a step's model holds its footer: the step can be passed without it, so the line says the consequence; nothing once it is ready. */
 const SKIP_REASON = { stt: "wizard.skip.sttReason", tts: "wizard.skip.ttsReason", turn: "wizard.skip.turnReason" } as const;
-function waitReason(model: ModelState, slot: keyof typeof WAIT_KEY, t: Translate, skips = false) {
-  return model.model && model.ready ? "" : t(skips ? SKIP_REASON[slot] : WAIT_KEY[slot]);
+function waitReason(model: ModelState, slot: keyof typeof SKIP_REASON, t: Translate) {
+  return model.model && model.ready ? "" : t(SKIP_REASON[slot]);
 }
 
 export function Wizard() {
@@ -312,7 +310,7 @@ export function Wizard() {
     if (await onboarding.markChosen(task)) onboarding.goTo(task === "stt" ? "W4v" : "W5");
   }
 
-  // "Continue without …" (d): kept in the record, so a reload does not send the person back; Back still reaches the step.
+  // "Continue without …": kept in the record, so a reload does not send the person back; Back still reaches the step.
   async function skipMicrophone() {
     if (await onboarding.skip("microphone")) onboarding.goTo(permissionsNext);
   }
@@ -323,10 +321,9 @@ export function Wizard() {
     trial.finish();
     if (await onboarding.skip(task)) onboarding.goTo(task === "stt" ? "W4v" : "W5");
   }
-  const skips = onboarding.rules.skips;
-  const stageSkip = skips && stageTask ? { label: t(stageTask === "stt" ? "wizard.skip.stt" : "wizard.skip.tts"), onSkip: () => void skipStage(stageTask) } : undefined;
-  const turnSkip = skips && turnWaits ? { label: t("wizard.skip.turn"), onSkip: () => void finishTurn() } : undefined;
-  const machineWaits = skips && ((step === "W2" && !onboarding.localReady) || (step === "W2r" && !onboarding.remoteReady));
+  const stageSkip = stageTask ? { label: t(stageTask === "stt" ? "wizard.skip.stt" : "wizard.skip.tts"), onSkip: () => void skipStage(stageTask) } : undefined;
+  const turnSkip = turnWaits ? { label: t("wizard.skip.turn"), onSkip: () => void finishTurn() } : undefined;
+  const machineWaits = ((step === "W2" && !onboarding.localReady) || (step === "W2r" && !onboarding.remoteReady));
 
   async function finishTurn() {
     if (await onboarding.markTurnDone()) onboarding.goTo("W6");
@@ -362,16 +359,13 @@ export function Wizard() {
 
   const ready = step === "W6";
   return <dialog ref={dialog} id="wizard" className="wizard-dialog" aria-labelledby="wizard-title" data-step={step} data-ready={ready || undefined}
-    // Escape puts the setup off where the flow allows it, except once it is done: Ready only goes on. Where it does not
-    // (a, d), Escape does nothing on any step.
-    onCancel={(event) => { event.preventDefault(); if (!ready && onboarding.rules.canDefer) void onboarding.defer(); }}
-    // Where Escape does nothing it is stopped at the key: a browser closes a modal anyway after a few cancelled Escapes.
-    // Closed without the setup asking for it, it is opened again.
-    onKeyDown={(event) => { if ((ready || !onboarding.rules.canDefer) && event.key === "Escape") event.preventDefault(); }}
+    // Escape does nothing on any step; it is stopped at the key too: a browser closes a modal anyway after a few
+    // cancelled Escapes. Closed without the setup asking for it, it is opened again.
+    onCancel={(event) => event.preventDefault()}
+    onKeyDown={(event) => { if (event.key === "Escape") event.preventDefault(); }}
     onClose={() => { const element = dialog.current; if (onboarding.open && element && !element.open) element.showModal?.(); }}>
     <header className="wizard-head">
       <span className="wizard-brand"><SidevoiceMark size={18} />{t("wizard.eyebrow")}</span>
-      {step !== "W6" && onboarding.rules.canDefer && <Button type="button" variant="ghost" tone="neutral" size="sm" className="wizard-later" onClick={() => void onboarding.defer()}>{t("wizard.later")}</Button>}
     </header>
     <Stepper current={current} t={t} />
     {!ready && <h2 id="wizard-title" className="wizard-title" ref={title} tabIndex={-1}>{t(TITLES[step])}</h2>}
@@ -393,14 +387,13 @@ export function Wizard() {
       {step === "W4m" && <PermissionsStep microphone={onboarding.microphone} openSettings={onboarding.openMicrophoneSettings} onRequest={() => void onboarding.requestMicrophone()} t={t} />}
       {stageTask && <StageStep key={step} task={stageTask} stage={stage} t={t} />}
       {step === "W5" && <TurnStep turnTry={turnTry} t={t} />}
-      {ready && <ReadyStep path={onboarding.path} machineName={remoteName} title={title} t={t} live={skips ? { machine: onboarding.machineAnswers, microphone: onboarding.microphone.ready } : undefined}
+      {ready && <ReadyStep path={onboarding.path} machineName={remoteName} title={title} t={t} live={{ machine: onboarding.machineAnswers, microphone: onboarding.microphone.ready }}
         microphoneNone={onboarding.microphone.state === "none"} />}
-      {ready && error && !skips && <Alert tone="danger" live className="wizard-ready-error" title={error} />}
-    </div>
+          </div>
     <footer className="wizard-actions" data-model-step={stageTask || step === "W5" || step === "W4m" ? "" : undefined}>
       {back && <Button type="button" variant="ghost" tone="neutral" className="wizard-back" onClick={() => onboarding.goTo(back)}><BackIcon /><span className="wizard-back-label">{t("wizard.back")}</span></Button>}
       {step === "W0" && <Button type="button" variant="primary" onClick={() => void finishBasics()}>{t("wizard.continue")}</Button>}
-      {step === "W1" && skips && <SkipMachine onSkip={() => void skipMachine()} t={t} />}
+      {step === "W1" && <SkipMachine onSkip={() => void skipMachine()} t={t} />}
       {step === "W1" && <Button type="button" variant="primary" disabled={!choice} onClick={() => choice && void choosePath(choice)}>{t("wizard.continue")}</Button>}
       {/* Skip for now, secondary, always left of the step's forward action (operator, 2026-10-16). */}
       {machineWaits && <SkipMachine onSkip={() => void skipMachine()} t={t} />}
@@ -416,21 +409,21 @@ export function Wizard() {
       <span ref={setFooterSlot} className="wizard-slot" />
       {step === "W3" && <Button type="button" variant="primary" onClick={() => void finishAgents()}>{t("wizard.continue")}</Button>}
       {step === "W4m" && <MicrophoneContinue microphone={onboarding.microphone} onContinue={() => void onboarding.markMicrophoneDone().then((done) => { if (done) onboarding.goTo(permissionsNext); })}
-        onSkip={skips ? () => void skipMicrophone() : undefined} t={t} />}
-      {stageTask && <ModelStepFooter reason={waitReason(model, stageTask, t, skips)} skip={stageSkip}
+        onSkip={() => void skipMicrophone()} t={t} />}
+      {stageTask && <ModelStepFooter reason={waitReason(model, stageTask, t)} skip={stageSkip}
         tryReason={stageTask === "tts" && !sample.trim() ? t("wizard.wait.sentence") : undefined}
         running={trial.trial.phase === "running"} tried={onboarding.tried(stageTask)}
         onTry={tryAgain} onStop={trial.finish} onContinue={() => void finishStage(stageTask)} t={t} />}
-      {step === "W5" && <ModelStepFooter reason={turnWaits ? waitReason(turnModel, "turn", t, skips) : ""} skip={turnSkip} tryReason={sttModel.ready ? undefined : t("settings.save.waitTranscription")}
+      {step === "W5" && <ModelStepFooter reason={turnWaits ? waitReason(turnModel, "turn", t) : ""} skip={turnSkip} tryReason={sttModel.ready ? undefined : t("settings.save.waitTranscription")}
         running={turnTry.running} tried={turnTried} onTry={turnTry.start} onStop={turnTry.stop} onContinue={() => void finishTurn()} t={t} />}
       {ready && <Button type="button" variant="primary" size="lg" className="wizard-enter" loading={completing} onClick={() => void complete()}>
-        {error && !skips ? t("wizard.retryCompletion") : t("wizard.enter")}<ArrowRightIcon />
+        {t("wizard.enter")}<ArrowRightIcon />
       </Button>}
     </footer>
   </dialog>;
 }
 
-/** "Skip for now" on the machine (onboardingFlow d, operator 2026-10-16): beside where you work and while this computer is
+/** "Skip for now" on the machine (operator 2026-10-16): beside where you work and while this computer is
  *  prepared or a machine paired, a quiet button that first says what it means — no calls until a machine is connected,
  *  and where to connect one later — with Go back (focused) and Got it — an acknowledgement, short enough for a phone (operator, 2026-10-16). */
 function SkipMachine({ onSkip, t }: { onSkip(): void; t: Translate }) {
@@ -447,19 +440,4 @@ function SkipMachine({ onSkip, t }: { onSkip(): void; t: Translate }) {
       <p>{t("wizard.skip.machineReason")}</p>
     </Dialog>, document.body)}
   </>;
-}
-
-/** What a put-off setup leaves in the call's own space (the rest of the room as ever, Settings included): one action back
- *  into the setup where it stands. */
-export function SetupPending() {
-  const t = translator();
-  const onboarding = useOnboarding();
-  return <section className="setup-pending" aria-labelledby="setup-pending-title">
-    <span className="setup-pending-mark"><SidevoiceMark size={28} /></span>
-    <span className="setup-pending-copy">
-      <strong id="setup-pending-title">{t("wizard.pendingTitle")}</strong>
-      <span>{t("wizard.pendingBody")}</span>
-    </span>
-    <Button type="button" variant="primary" onClick={() => onboarding.openWizard()}>{t("wizard.continueSetup")}</Button>
-  </section>;
 }

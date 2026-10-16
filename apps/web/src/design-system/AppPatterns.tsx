@@ -285,7 +285,6 @@ function WizardFrame({ step, title, children, footer }: { step: number; title: s
     <div className="pt-wizard">
       <header className="pt-wizard-head">
         <span className="pt-wizard-brand"><SidevoiceMark size={18} />{t("wizard.eyebrow")}</span>
-        <Button variant="ghost" tone="neutral" size="sm">{t("wizard.later")}</Button>
       </header>
       <Stepper current={step} />
       <h3 className="pt-wizard-title">{title}</h3>
@@ -345,11 +344,6 @@ function WizardTranscription() {
         </>} />
     </WizardFrame>
   );
-}
-
-function SetupPending() {
-  const t = translator();
-  return <div className="pt-empty pt-card-empty"><SidevoiceMark size={28} /><h3>{t("wizard.pendingTitle")}</h3><p>{t("wizard.pendingBody")}</p><Button variant="primary">{t("wizard.continueSetup")}</Button></div>;
 }
 
 // ---------------------------------------------------------------- Settings
@@ -583,7 +577,6 @@ export function AppPatterns() {
         <Frame className="pt-frame--dialog"><WizardWhere /></Frame>
         <Frame className="pt-frame--dialog"><WizardPair /></Frame>
         <Frame className="pt-frame--dialog"><WizardTranscription /></Frame>
-        <SetupPending />
       </Pattern>
       <Pattern title="Pairing dialog" note="Prepare the other machine with two commands, then its address and the code it gives.">
         <Frame className="pt-frame--dialog">

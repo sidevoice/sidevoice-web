@@ -7,12 +7,12 @@ import { ONBOARDING_STORAGE_KEY } from "../../services/onboarding-state";
 import type { SidevoiceActions } from "../../state/room-types";
 import type { CatalogView } from "../../services/model-catalogs.js";
 import { RELEASE } from "../whats-new/catalogue";
-import { callArea, FLOW_RULES } from "./onboarding-flow";
+import { callArea } from "./onboarding-flow";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
-/* The onboardingFlow variant, value by value (onboarding-flow.ts): a mandatory, b readiness-driven (the default), c
- * today's, d mandatory but skippable. The wizard's steps themselves are Onboarding.test.tsx's. */
+/* The first-run setup as the app has it: mandatory but skippable (onboarding-flow.ts). The wizard's steps themselves are
+ * Onboarding.test.tsx's. */
 
 const WHOLE_APP_MS = 15_000;
 
@@ -31,9 +31,8 @@ beforeEach(() => {
   };
   window.sidevoiceActions = actions as unknown as SidevoiceActions;
 });
-afterEach(() => { delete window.sidevoiceActions; vi.restoreAllMocks(); localStorage.removeItem("sidevoice.variants"); localStorage.removeItem(ONBOARDING_STORAGE_KEY); });
+afterEach(() => { delete window.sidevoiceActions; vi.restoreAllMocks(); localStorage.removeItem(ONBOARDING_STORAGE_KEY); });
 
-const flow = (value: string) => localStorage.setItem("sidevoice.variants", JSON.stringify({ onboardingFlow: value }));
 function room({ installed = true, catalogue = "ready", pairedFirst = false }: { installed?: boolean; catalogue?: "ready" | "loading"; pairedFirst?: boolean } = {}) {
   const store = createRoomStore();
   act(() => store.patch({ machinesReady: true, speechLanguage: "es", voiceSettings: defaultVoiceSettings(),
@@ -53,6 +52,7 @@ const title = () => wizard().getByRole("heading", { level: 2 });
 const waiting = () => document.querySelector(".call-column--waiting")?.getAttribute("data-waiting") ?? null;
 const stage = () => document.querySelector(".call-column:not(.call-column--waiting)") as HTMLElement;
 const newConversation = () => document.querySelector(".sidebar-new");
+const finished = { basics_done: true, choice: "remote", completed_at: 1, baseline_release: RELEASE };
 /** Escape on the setup: the key, then the dialog's cancel. Whether either went through. */
 function escape() {
   const key = fireEvent.keyDown(dialog(), { key: "Escape" });
@@ -60,37 +60,28 @@ function escape() {
   return key || cancel;
 }
 
-test("the call area, flow by flow: what waits, whether the room is behind the setup, whether the conversations show", () => {
-  const facts = { ready: true, open: false, done: false, noMachine: false, microphone: true, voice: "missing" as const };
-  expect(callArea(FLOW_RULES.b, facts)).toEqual({ roomHidden: false, waiting: "voice", blocked: false });
-  expect(callArea(FLOW_RULES.b, { ...facts, noMachine: true })).toEqual({ roomHidden: false, waiting: "machine", blocked: true });
-  expect(callArea(FLOW_RULES.b, { ...facts, voice: "unknown" }).waiting).toBe("unknown");
-  expect(callArea(FLOW_RULES.b, { ...facts, voice: "unknown", done: true }).waiting).toBeNull();
-  expect(callArea(FLOW_RULES.b, { ...facts, voice: "ready" }).waiting).toBeNull();
-  expect(callArea(FLOW_RULES.b, { ...facts, open: true }).roomHidden).toBe(true);
-  expect(callArea(FLOW_RULES.a, facts)).toEqual({ roomHidden: true, waiting: null, blocked: false });
-  expect(callArea(FLOW_RULES.c, facts)).toEqual({ roomHidden: false, waiting: "pending", blocked: true });
-  expect(callArea(FLOW_RULES.c, { ...facts, done: true, noMachine: true }).waiting).toBe("machine");
-  expect(callArea(FLOW_RULES.d, facts).roomHidden).toBe(true);
-  expect(callArea(FLOW_RULES.d, { ...facts, done: true })).toEqual({ roomHidden: false, waiting: "voice", blocked: false });
-  // The microphone (required to call): after the machine, before the voice's models; clears on grant; a and c unaffected.
-  for (const rules of [FLOW_RULES.b, FLOW_RULES.d]) {
-    expect(callArea(rules, { ...facts, done: true, microphone: false })).toEqual({ roomHidden: false, waiting: "microphone", blocked: false });
-    expect(callArea(rules, { ...facts, done: true, microphone: false, noMachine: true }).waiting).toBe("machine");
-    expect(callArea(rules, { ...facts, done: true, microphone: true, voice: "ready" }).waiting).toBeNull();
-  }
-  expect(callArea(FLOW_RULES.a, { ...facts, microphone: false })).toEqual(callArea(FLOW_RULES.a, facts));
-  expect(callArea(FLOW_RULES.c, { ...facts, microphone: false })).toEqual(callArea(FLOW_RULES.c, facts));
+test("the call area: what waits, whether the room is behind the setup, whether the conversations show", () => {
+  const facts = { ready: true, done: false, noMachine: false, microphone: true, voice: "missing" as const };
+  // Behind the setup until it is done, whatever is missing.
+  expect(callArea(facts)).toEqual({ roomHidden: true, waiting: "voice", blocked: false });
+  expect(callArea({ ...facts, ready: false }).roomHidden).toBe(true);
+  expect(callArea({ ...facts, done: true })).toEqual({ roomHidden: false, waiting: "voice", blocked: false });
+  expect(callArea({ ...facts, done: true, noMachine: true })).toEqual({ roomHidden: false, waiting: "machine", blocked: true });
+  expect(callArea({ ...facts, voice: "unknown" }).waiting).toBe("unknown");
+  expect(callArea({ ...facts, voice: "unknown", done: true }).waiting).toBeNull();
+  expect(callArea({ ...facts, done: true, voice: "ready" }).waiting).toBeNull();
+  // The microphone (required to call): after the machine, before the voice's models; clears on grant.
+  expect(callArea({ ...facts, done: true, microphone: false })).toEqual({ roomHidden: false, waiting: "microphone", blocked: false });
+  expect(callArea({ ...facts, done: true, microphone: false, noMachine: true }).waiting).toBe("machine");
+  expect(callArea({ ...facts, done: true, microphone: true, voice: "ready" }).waiting).toBeNull();
 });
 
-test("a: no Later, Escape does nothing, and the app opened again resumes at the step it stood at", async () => {
-  flow("a");
+test("Escape does nothing, the room waits behind the setup, and the app opened again resumes at the step it stood at", async () => {
   const store = room();
   expect(title()).toHaveTextContent("Connect to your machine");
   expect(wizard().queryByRole("button", { name: "Do this later" })).toBeNull();
   expect(escape()).toBe(false);
   expect(wizardOpen()).toBe(true);
-  expect(record().deferred_at ?? null).toBeNull();
   expect(document.querySelector(".room-shell")).toHaveAttribute("hidden");
   paired(store);
   expect(title()).toHaveTextContent("Set up transcription");
@@ -102,31 +93,12 @@ test("a: no Later, Escape does nothing, and the app opened again resumes at the 
   expect(document.querySelector(".room-shell")).toHaveAttribute("hidden");
 }, WHOLE_APP_MS);
 
-test("b: Later closes the setup for good, as set up on this release; no machine says so, with Continue setup", async () => {
-  room();
-  expect(title()).toHaveTextContent("Connect to your machine");
-  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Do this later" })); });
-  expect(wizardOpen()).toBe(false);
-  expect(record().deferred_at).toBeGreaterThan(0);
-  expect(record().baseline_release).toBe(RELEASE);
-  expect(record().completed_at ?? null).toBeNull();
-  expect(document.querySelector(".room-shell")).not.toHaveAttribute("hidden");
-  // No setup-pending card: no machine, then the voice, then the stage. Without a machine, no conversations or New.
-  expect(waiting()).toBe("machine");
-  expect(screen.queryByText("Setup is not finished")).toBeNull();
-  expect(newConversation()).toBeNull();
-  cleanup();
-  room();
-  expect(wizardOpen()).toBe(false);
-  fireEvent.click(screen.getByRole("button", { name: "Continue setup" }));
-  expect(wizardOpen()).toBe(true);
-  expect(title()).toHaveTextContent("Connect to your machine");
-}, WHOLE_APP_MS);
-
-test("b: a machine with models not ready shows the voice card; set up in Settings, the setup is done by itself", async () => {
-  localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, deferred_at: 5 }));
+test("a finished setup with models not ready shows the voice card until they are", async () => {
+  localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(finished));
   const store = room({ installed: false });
+  expect(wizardOpen()).toBe(false);
   expect(waiting()).toBe("machine");
+  expect(newConversation()).toBeNull();
   paired(store);
   expect(waiting()).toBe("voice");
   expect(screen.getByRole("heading", { name: "Your voice isn’t ready yet" })).toBeInTheDocument();
@@ -134,23 +106,17 @@ test("b: a machine with models not ready shows the voice card; set up in Setting
   expect(card.getAllByRole("button", { name: "Download" })).toHaveLength(2);
   expect(card.getAllByText("Not downloaded yet")).toHaveLength(2);
   expect(card.getByRole("status")).toHaveTextContent("Speech to text: Not downloaded yet. Text to speech: Not downloaded yet");
-  expect(card.getByRole("button", { name: "Continue setup" })).toBeInTheDocument();
+  expect(card.queryByRole("button", { name: "Continue setup" })).toBeNull();
   // A machine answers: the conversations and New are there, whatever the voice.
   expect(newConversation()).toBeInTheDocument();
   expect(stage()).toHaveAttribute("hidden");
-  expect(record().completed_at ?? null).toBeNull();
-  // Downloaded from Settings: the stage, and the setup done — written once, with the release it was set up on.
   act(() => store.patch({ voiceCatalogue: { state: "ready", catalogs: models(true), error: "" } }));
-  await settle();
   expect(waiting()).toBeNull();
   expect(stage()).not.toHaveAttribute("hidden");
-  expect(record().completed_at).toBeGreaterThan(0);
-  expect(record().baseline_release).toBe(RELEASE);
-  expect(wizardOpen()).toBe(false);
 });
 
-test("b: while the catalogue is not read the call area shows nothing — no card flashing in, no stage", () => {
-  localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, deferred_at: 5 }));
+test("while the catalogue is not read the call area shows nothing — no card flashing in, no stage", () => {
+  localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ ...finished, completed_at: null }));
   const store = room({ catalogue: "loading", pairedFirst: true });
   expect(waiting()).toBe("unknown");
   expect(document.querySelector(".voice-setup-card")).toBeNull();
@@ -159,30 +125,7 @@ test("b: while the catalogue is not read the call area shows nothing — no card
   expect(waiting()).toBeNull();
 });
 
-test("b: an open setup is never closed under the person once it is done, and resumes past what is ready", async () => {
-  const store = room();
-  expect(title()).toHaveTextContent("Connect to your machine");
-  paired(store);
-  await settle();
-  expect(record().completed_at).toBeGreaterThan(0);
-  expect(wizardOpen()).toBe(true);
-  // The models are on this device already: transcription and voice count as done.
-  expect(title()).toHaveTextContent("When your turn ends");
-});
-
-test("c: Later leaves the setup-pending card in the call area, without conversations, until the setup is finished", async () => {
-  flow("c");
-  room({ pairedFirst: true });
-  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Do this later" })); });
-  expect(wizardOpen()).toBe(false);
-  expect(waiting()).toBe("pending");
-  expect(screen.getByText("Setup is not finished")).toBeInTheDocument();
-  expect(newConversation()).toBeNull();
-  expect(record().baseline_release).toBe(0);
-}, WHOLE_APP_MS);
-
-test("d: each step passed without is kept, a reload goes on from there, and Ready says calmly what is not there yet", async () => {
-  flow("d");
+test("each step passed without is kept, a reload goes on from there, and Ready says calmly what is not there yet", async () => {
   room({ installed: false });
   expect(title()).toHaveTextContent("Connect to your machine");
   expect(wizard().queryByRole("button", { name: "Do this later" })).toBeNull();
@@ -237,8 +180,7 @@ test("d: each step passed without is kept, a reload goes on from there, and Read
   expect(wizardOpen()).toBe(false);
 }, WHOLE_APP_MS);
 
-test("d: with nothing passed without, Ready keeps its celebration and every row its check", async () => {
-  flow("d");
+test("with nothing passed without, Ready keeps its celebration and every row its check", async () => {
   localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "remote", turn_done: true,
     chosen: { stt: JSON.stringify({ catalog: "local", language: null, model: "whisper-base" }) } }));
   room({ pairedFirst: true });

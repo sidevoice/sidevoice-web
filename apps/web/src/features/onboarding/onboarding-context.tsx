@@ -15,7 +15,7 @@ import {
 import { RoomStoreContext, useRoomStore, type RoomViewState } from "../../state/room-store";
 import { RELEASE } from "../whats-new/catalogue";
 import { useVoiceReadiness, type VoiceModelRow } from "../call/VoiceModels";
-import { useOnboardingFlow, type FlowRules, type OnboardingFlow, type VoiceReadiness } from "./onboarding-flow";
+import type { VoiceReadiness } from "./onboarding-flow";
 
 /* The first-run setup over the real room: the basics (W0: appearance, languages), where the agents run (W1), this
  * computer prepared (W2) and its agents connected (W3), or another machine paired (W2r), the microphone allowed (W4m),
@@ -28,18 +28,14 @@ type ErrorKey = OnboardingStorageError["key"] | "onboarding.prerequisites";
 interface OnboardingValue {
   ready: boolean;
   record: OnboardingRecord;
-  /** How the setup behaves (onboarding-flow.ts): read by the wizard and the room, decided there alone. */
-  flow: OnboardingFlow;
-  rules: FlowRules;
   /** The first setup is done: the one fact every reader of its completion uses (the room, the floating card, the new
-   *  highlights, What's new). Per flow: its completion stored; in b also a machine answering with the voice ready; in d
-   *  also entered this session though the completion could not be stored. */
+   *  highlights, What's new): its completion stored, or entered this session though it could not be stored. */
   done: boolean;
   /** A paired machine answers this device now, here or elsewhere. */
   machineAnswers: boolean;
   /** The call's voice as it stands (transcription and voice), with the rows of the models it needs. */
   voice: { state: VoiceReadiness; rows: VoiceModelRow[]; sttReady: boolean; ttsReady: boolean };
-  /** "Continue without …" (d): the step passed and kept as such. */
+  /** "Continue without …": the step passed and kept as such. */
   skip(step: "microphone" | "machine" | "stt" | "tts"): Promise<boolean>;
   error: ErrorKey | null;
   open: boolean;
@@ -71,7 +67,6 @@ interface OnboardingValue {
   markFeatures(ids: string[], state: "seen" | "done" | "later"): Promise<boolean>;
   /** Records that the settings being edited for `task` worked. */
   markTried(task: "stt" | "tts"): Promise<boolean>;
-  defer(): Promise<void>;
   complete(): Promise<boolean>;
 }
 
@@ -99,10 +94,10 @@ function microphoneReady(microphone: MicrophoneSnapshot, record: OnboardingRecor
 }
 
 /** What resume reads of the microphone: whether the permissions step was passed with it allowed, and it still is (or there
- *  is nothing to ask). Required to call in this release (operator, 2026-10-16); in the setup, only d lets it be passed
- *  without (`skips`), and the call area then asks for it. */
-function microphoneFacts(microphone: MicrophoneSnapshot, record: OnboardingRecord, skips: boolean) {
-  return { passed: microphone.state === "none" || (record.microphone_done && microphoneReady(microphone, record)) || (skips && record.microphone_skipped) };
+ *  is nothing to ask). Required to call in this release (operator, 2026-10-16); the setup lets it be passed without
+ *  ("Continue without …"), and the call area then asks for it. */
+function microphoneFacts(microphone: MicrophoneSnapshot, record: OnboardingRecord) {
+  return { passed: microphone.state === "none" || (record.microphone_done && microphoneReady(microphone, record)) || record.microphone_skipped };
 }
 
 /** What resume reads of the room: which machines answer, and the device's kept voice settings; and the microphone. */
@@ -141,22 +136,16 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
   const [microphoneAccess] = useState(() => createMicrophoneAccess());
   useEffect(() => () => microphoneAccess.dispose(), [microphoneAccess]);
   const microphone = useSyncExternalStore(microphoneAccess.subscribe, microphoneAccess.getSnapshot, microphoneAccess.getSnapshot);
-  const { flow, rules } = useOnboardingFlow();
   const voice = useVoiceReadiness();
   const machineAnswers = !!answering(room, true) || !!answering(room, false);
-  const readinessMet = machineAnswers && voice.state === "ready";
-  const readiness = useRef({ met: readinessMet, stt: voice.sttReady, tts: voice.ttsReady });
-  readiness.current = { met: readinessMet, stt: voice.sttReady, tts: voice.ttsReady };
-  // Entered from Ready though its completion could not be stored (d): entered for this session all the same.
+  // Entered from Ready though its completion could not be stored: entered for this session all the same.
   const [entered, setEntered] = useState(false);
-  const done = !!record.completed_at || (rules.autoComplete && readinessMet) || (rules.skips && entered);
+  const done = !!record.completed_at || entered;
   // Resume asks the microphone's step until it was passed with Continue (or there is nothing to ask): allowed already,
   // it still shows, saying so (operator, 2026-10-16).
-  const live = liveFacts(room, microphoneFacts(microphone, record, rules.skips));
+  const live = liveFacts(room, microphoneFacts(microphone, record));
   const resume = useCallback((current: OnboardingRecord, facts: ReturnType<typeof liveFacts>) =>
-    resumeOnboarding({ record: current, canHostAgents, ...facts,
-      ...(rules.liveResume ? { live: { sttReady: readiness.current.stt, ttsReady: readiness.current.tts } } : {}),
-      skips: rules.skips }), [canHostAgents, rules]);
+    resumeOnboarding({ record: current, canHostAgents, ...facts }), [canHostAgents]);
 
   /** One write at a time, each from the record the last one left. */
   const persist = useCallback((update: OnboardingPatch) => {
@@ -176,48 +165,28 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
     return operation;
   }, [repository]);
 
-  // Set up by hand counts (operator, 2026-10-16): voice settings saved in Settings while the setup is put off are the
-  // transcription, voice and end of turn chosen, so resuming skips what was already done there.
-  const savedAt = room.facts.settingsSavedAt;
-  useEffect(() => {
-    const kept = room.facts.voiceSettings;
-    if (!rules.pendingCard || !ready || open || record.completed_at || !record.deferred_at || !savedAt || !kept) return;
-    const stt = trialKey(kept.stt), tts = trialKey(kept.tts);
-    if (record.chosen.stt === stt && record.chosen.tts === tts && record.turn_done) return;
-    void persist({ chosen: { ...(stt ? { stt } : {}), ...(tts ? { tts } : {}) }, turn_done: true });
-  }, [savedAt]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Once the record and the machines are known: an unfinished setup opens where it stands, unless it was put off. Where
-  // the setup is mandatory it opens again whenever it is found closed unfinished (a flow switched to it, too).
+  // Once the record and the machines are known: an unfinished setup opens where it stands, and opens again whenever it
+  // is found closed unfinished.
   useEffect(() => {
     // Where it resumes depends on this device's voice settings too (what was chosen): it waits for them as well as the
     // machines, which the runtime may know first.
     if (!ready || !room.facts.machinesReady || !room.facts.voiceSettings || microphone.state === "checking") return;
-    if (decided.current && !(rules.mandatory && !done && !open && !startAt)) return;
+    if (decided.current && (done || open || startAt)) return;
     // A step asked for (the storyboard's) opens there, whatever the record says.
     if (startAt) { decided.current = true; setStep(startAt); setOpen(true); return; }
     if (done) return;
     decided.current = true;
-    if (record.deferred_at && rules.canDefer) return;
     // A machine already running here (an \`npx\` install) is the agents path, chosen.
     if (live.localReady && !record.choice) void persist({ choice: "agents" });
     setStep(resume(live.localReady && !record.choice ? { ...record, choice: "agents" } : record, live));
     setOpen(true);
-  }, [ready, record, room.facts.machinesReady, room.facts.voiceSettings, microphone.state, live, persist, resume, startAt, rules, done, open]);
+  }, [ready, record, room.facts.machinesReady, room.facts.voiceSettings, microphone.state, live, persist, resume, startAt, done, open]);
 
-  // b: done by any route — the completion (and the release it was set up on) written once, the moment a machine answers
-  // with the voice ready. An open setup is never closed under the person.
+  // Arriving at Ready completes the setup, whatever was passed without.
   useEffect(() => {
-    if (!rules.autoComplete || !readinessMet || record.completed_at || startAt) return;
+    if (!open || step !== "W6" || record.completed_at || startAt) return;
     void persist({ completed_at: Math.floor(Date.now() / 1000), baseline_release: RELEASE });
-  }, [rules.autoComplete, readinessMet, record.completed_at, startAt, persist]);
-
-  // d: arriving at Ready completes the setup, whatever was passed without.
-  useEffect(() => {
-    if (!rules.skips || !open || step !== "W6" || record.completed_at || startAt) return;
-    void persist({ completed_at: Math.floor(Date.now() / 1000), deferred_at: null, baseline_release: RELEASE });
-  }, [rules.skips, open, step, record.completed_at, startAt, persist]);
-
+  }, [open, step, record.completed_at, startAt, persist]);
 
   // The desktop's floating call card shows only once the first setup is finished and its wizard is closed: the room
   // says so in its facts, which the card's host passes on (FLOATING-CARD-SPEC FC1).
@@ -226,7 +195,7 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
 
   const draft = room.facts.voiceDraft ?? room.facts.voiceSettings;
   const value: OnboardingValue = {
-    ready, record, error, open, step, canHostAgents, flow, rules, done, machineAnswers,
+    ready, record, error, open, step, canHostAgents, done, machineAnswers,
     voice,
     skip: (what) => persist(what === "microphone" ? { microphone_skipped: true } : what === "machine" ? { machine_skipped: true } : what === "stt" ? { stt_skipped: true } : { tts_skipped: true }),
     path: canHostAgents ? record.choice : "remote",
@@ -242,8 +211,7 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
       setOpen(true);
     },
     goTo: (next) => { setError(null); setStep(next); },
-    // Taken up again after "Later": c opens it by itself again from then on; b never does.
-    setPath: (path) => persist({ choice: path, ...(rules.pendingCard ? { deferred_at: null } : {}) }),
+    setPath: (path) => persist({ choice: path }),
     markAgentsDone: () => persist({ agents_done: true }),
     markMicrophoneDone: () => persist({ microphone_done: true, microphone_skipped: false }),
     markBasicsDone: () => persist({ basics_done: true }),
@@ -257,31 +225,10 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
       const key = draft ? trialKey(draft[task]) : null;
       return key ? persist({ trials: { [task]: key } }) : Promise.resolve(false);
     },
-    async defer() {
-      window.sidevoiceActions?.cancelVoiceTry?.();
-      if (!rules.canDefer) return;
-      // b: put off is set up as far as What's new goes — it lists what comes after this release, not everything.
-      if (await persist({ deferred_at: Math.floor(Date.now() / 1000), ...(rules.deferBaseline ? { baseline_release: RELEASE } : {}) })) setOpen(false);
-    },
-    // Entering needs every step done as things stand now, and the completion read back: never an optimistic flag.
+    // Ready always enters — stored if it can be, for this session if not.
     async complete() {
-      // d: Ready always enters — stored if it can be, for this session if not.
-      if (rules.skips) {
-        const saved = recordRef.current.completed_at ? true : await persist({ completed_at: Math.floor(Date.now() / 1000), deferred_at: null, baseline_release: RELEASE });
-        setEntered(true); setError(null); setOpen(false);
-        return saved;
-      }
-      // Done already (b: a machine answering with the voice ready; written once): it only closes.
-      if (recordRef.current.completed_at || (rules.autoComplete && readiness.current.met)) {
-        const saved = recordRef.current.completed_at ? true : await persist({ completed_at: Math.floor(Date.now() / 1000), baseline_release: RELEASE });
-        if (saved) setOpen(false);
-        return saved;
-      }
-      const now = resume(recordRef.current, liveFacts(roomStore.getState(), microphoneFacts(microphoneAccess.getSnapshot(), recordRef.current, rules.skips)));
-      if (now !== "W6") { setStep(now); setError("onboarding.prerequisites"); return false; }
-      // Set up on this release: what it already has is not news to the person.
-      const saved = await persist({ completed_at: Math.floor(Date.now() / 1000), deferred_at: null, baseline_release: RELEASE });
-      if (saved) setOpen(false);
+      const saved = recordRef.current.completed_at ? true : await persist({ completed_at: Math.floor(Date.now() / 1000), baseline_release: RELEASE });
+      setEntered(true); setError(null); setOpen(false);
       return saved;
     },
   };

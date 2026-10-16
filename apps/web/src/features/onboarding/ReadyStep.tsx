@@ -12,7 +12,7 @@ import type { Translate } from "../../i18n/translator";
  * agent to connect, and Enter Sidevoice in the footer — in the setup's own frame, its stepper's last bar turning
  * mustard. Under reduced motion it shows its final state at once. */
 
-/** A row as things stand (onboardingFlow d): done (its check), downloading (its percentage, no mark) or not there yet (a
+/** A row as things stand done (its check), downloading (its percentage, no mark) or not there yet (a
  *  neutral dash, never red, never a check). */
 type RowState = "done" | "progress" | "missing";
 
@@ -27,10 +27,10 @@ function RecapRow({ icon, label, value, detail, state = "done" }: { icon: ReactN
   </div>;
 }
 
-/** `live` (onboardingFlow d): the rows read as things stand now — what was passed without shows as not there yet, a
+/** The rows read as things stand now — what was passed without shows as not there yet, a
  *  download under way with its percentage — and with anything missing the title is a calmer one. */
 export function ReadyStep({ path, machineName, title, t, live, microphoneNone = false }: {
-  path: "agents" | "remote" | null; machineName: string; title: Ref<HTMLHeadingElement>; t: Translate; live?: { machine: boolean; microphone: boolean }; microphoneNone?: boolean;
+  path: "agents" | "remote" | null; machineName: string; title: Ref<HTMLHeadingElement>; t: Translate; live: { machine: boolean; microphone: boolean }; microphoneNone?: boolean;
 }) {
   const models = useVoiceModels().rows;
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
@@ -46,17 +46,16 @@ export function ReadyStep({ path, machineName, title, t, live, microphoneNone = 
   const language = document.documentElement.lang || "en";
   // What a voice row says live: ready, its name; downloading, how far; else not there yet, and that the call area offers it.
   const voiceRow = (task: "stt" | "tts", value: string, detail?: string): { value: string; detail?: string; state: RowState } => {
-    if (!live) return { value, detail, state: "done" };
     const slot = models.find((row) => row.slot.task === task)?.slot;
     if (slot?.status === "ready") return { value, detail, state: "done" };
     if (slot?.fraction != null) return { value, detail: t("wizard.recap.downloading", { percent: new Intl.NumberFormat(language, { style: "percent" }).format(slot.fraction) }), state: "progress" };
     return { value: slot?.status === "needsKey" ? t("voiceModels.state.needsKey") : t("wizard.recap.notDownloaded"), detail: t("wizard.recap.later"), state: "missing" };
   };
-  const machine = !live || live.machine
+  const machine = live.machine
     ? { value: here ? t("wizard.recap.here") : machineName || t("wizard.choice.remote"), state: "done" as RowState }
     : { value: t("wizard.recap.notConnected"), detail: t("wizard.recap.later"), state: "missing" as RowState };
-  // The microphone, passed without (d): not allowed yet, and the call area asks for it.
-  const micRow = !live || live.microphone ? { value: t(microphoneNone ? "perm.state.none" : "wizard.mic.state.granted"), state: "done" as RowState }
+  // The microphone, passed without: not allowed yet, and the call area asks for it.
+  const micRow = live.microphone ? { value: t(microphoneNone ? "perm.state.none" : "wizard.mic.state.granted"), state: "done" as RowState }
     : { value: t("wizard.mic.state.prompt"), detail: t("wizard.recap.micLater"), state: "missing" as RowState };
   const sttRow = voiceRow("stt", draft?.stt.model ?? "", stt.local ? undefined : catalogName("stt"));
   const ttsRow = voiceRow("tts", draft?.tts.model ?? "", tts.local ? undefined : catalogName("tts"));

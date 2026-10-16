@@ -73,28 +73,19 @@ test("resume: the permissions right after the basics, before the machine, until 
   expect(normalizeOnboardingRecord({ microphone_done: true }).microphone_done).toBe(true);
 });
 
-test("resume, live (onboardingFlow b): a machine connected anywhere and models ready count as done", () => {
-  const agents = { ...basics(), choice: "agents" as const };
-  // This computer was chosen, another machine was paired in Settings: on past the machine.
-  expect(resumeOnboarding(facts({ record: agents, remoteReady: true }))).toBe("W2");
-  expect(resumeOnboarding(facts({ record: agents, remoteReady: true, live: { sttReady: true, ttsReady: true } }))).toBe("W5");
-  expect(resumeOnboarding(facts({ record: agents, remoteReady: true, live: { sttReady: true, ttsReady: false } }))).toBe("W4v");
-});
-
-test("resume, with skips (onboardingFlow d): what was passed without is passed; done, its mark no longer matters", () => {
+test("resume: what was passed without is passed", () => {
   const remote = { ...basics(), choice: "remote" as const, machine_skipped: true };
-  expect(resumeOnboarding(facts({ record: remote }))).toBe("W2r");
-  expect(resumeOnboarding(facts({ record: remote, skips: true }))).toBe("W4");
-  expect(resumeOnboarding(facts({ record: { ...remote, stt_skipped: true }, skips: true }))).toBe("W4v");
-  expect(resumeOnboarding(facts({ record: { ...remote, stt_skipped: true, tts_skipped: true }, skips: true }))).toBe("W5");
-  const agents = { ...basics(), choice: "agents" as const, machine_skipped: true };
+  expect(resumeOnboarding(facts({ record: remote }))).toBe("W4");
+  expect(resumeOnboarding(facts({ record: { ...remote, stt_skipped: true } }))).toBe("W4v");
+  expect(resumeOnboarding(facts({ record: { ...remote, stt_skipped: true, tts_skipped: true } }))).toBe("W5");
   // This computer passed without: no agents to connect either.
-  expect(resumeOnboarding(facts({ record: agents, skips: true }))).toBe("W4");
-  // Skipped from where you work, no way chosen: on to the voice; without skips, where you work again.
-  const unchosen = { ...basics(), machine_skipped: true };
-  expect(resumeOnboarding(facts({ record: unchosen, canHostAgents: true, skips: true }))).toBe("W4");
-  expect(resumeOnboarding(facts({ record: unchosen, canHostAgents: true }))).toBe("W1");
+  expect(resumeOnboarding(facts({ record: { ...basics(), choice: "agents" as const, machine_skipped: true } }))).toBe("W4");
+  // Skipped from where you work, no way chosen: on to the voice.
+  expect(resumeOnboarding(facts({ record: { ...basics(), machine_skipped: true }, canHostAgents: true }))).toBe("W4");
+  expect(resumeOnboarding(facts({ record: { ...basics() }, canHostAgents: true }))).toBe("W1");
   expect(normalizeOnboardingRecord({ microphone_skipped: true, machine_skipped: true, stt_skipped: true, tts_skipped: true })).toMatchObject({ microphone_skipped: true, machine_skipped: true, stt_skipped: true, tts_skipped: true });
+  // A record from before the fields went is read all the same, the old keys dropped.
+  expect(normalizeOnboardingRecord({ completed_at: 5, deferred_at: 4 })).toEqual({ ...emptyOnboardingRecord(), completed_at: 5 });
 });
 
 test("the record is kept in this device's storage, and a write counts only once it reads back", async () => {
