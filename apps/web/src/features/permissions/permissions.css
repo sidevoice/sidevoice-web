@@ -35,12 +35,10 @@
 /* The block's one button (decided look: full width under the bicho, one size in every state). Allowed, it wears the
  * positive green of an allowed permission, a check before its words, and cannot be pressed. */
 .perm-control { width: 100%; max-width: 18rem; min-width: 12rem; margin-top: var(--sv-space-2); gap: var(--sv-space-2); }
-/* Allowed, it stays as if pressed: the brand's soft tint, its ink, the microphone with its check — never the grey of a
- * button that cannot be used. */
-.ui-button.perm-control[data-state="granted"], .ui-button.perm-control[data-state="granted"]:is(:disabled, [aria-disabled="true"]):not([data-loading]) { opacity: 1; border-color: transparent; background: var(--sv-accent-soft); color: var(--sv-accent-text); box-shadow: none; cursor: default; }
-.perm-control-icon { position: relative; display: inline-grid; place-items: center; flex: none; }
-.perm-control-check { position: absolute; inset-block-end: -3px; inset-inline-end: -4px; display: grid; place-items: center; width: 12px; height: 12px;
-  border-radius: 50%; background: var(--sv-accent); color: var(--sv-on-accent); box-shadow: 0 0 0 2px var(--sv-accent-soft); animation: wizard-ready-pop 220ms var(--sv-ease) both; }
+/* Allowed, the button gives way to the permission's mark and its words in green: no button ground, nothing grey. */
+.ui-button.perm-control[data-state="granted"], .ui-button.perm-control[data-state="granted"]:is(:disabled, [aria-disabled="true"]):not([data-loading]) {
+  height: auto; min-height: var(--sv-control-md, 40px); opacity: 1; border-color: transparent; background: transparent; box-shadow: none;
+  color: var(--sv-positive); font-weight: var(--sv-weight-semibold); cursor: default; }
 .perm-hero-figure .sv-avatar { display: block; width: 100%; height: 100%; }
 .perm-hero .perm-name { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-regular); color: var(--sv-text-muted); }
 .perm-hero-state { display: inline-flex; align-items: center; gap: var(--sv-space-2); font-size: var(--sv-font-xl); line-height: 1.75rem; font-weight: var(--sv-weight-heavy);

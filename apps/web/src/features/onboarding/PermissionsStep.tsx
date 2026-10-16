@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import { Button } from "../../components/ui/Button";
 import { PERSON_AVATAR } from "../avatar/avatar-spec";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
-import { CheckIcon, MicrophoneIcon, MicrophoneOffIcon } from "../../components/ui/Icons";
-import { announcement, MicrophoneHowTo, microphoneAction, MIC_HELP_ID, microphoneView, type MicrophoneView, type Platform } from "../permissions/permission-view";
+import { MicrophoneIcon, MicrophoneOffIcon } from "../../components/ui/Icons";
+import { announcement, MicrophoneHowTo, MicrophoneMark, microphoneAction, MIC_HELP_ID, microphoneView, type MicrophoneView, type Platform } from "../permissions/permission-view";
 import { devicePlatform, type MicrophoneSnapshot } from "../../services/microphone-access";
 import type { Translate } from "../../i18n/translator";
 
@@ -36,11 +36,10 @@ function MicrophoneControl({ microphone, view, onRequest, t }: { microphone: Mic
   return <Button type="button" variant="primary" id="wizard-mic-action" className="perm-control" data-state={allowed ? "granted" : view.state}
     loading={busy} disabled={allowed} blockedBy={allowed ? LINE_ID : undefined} block
     aria-describedby={microphone.state === "denied" ? MIC_HELP_ID : undefined} onClick={onRequest}>
-    {/* The microphone's own icon, in the button's ink: crossed out while blocked, with a small check once allowed. */}
-    <span className="perm-control-icon" data-state={allowed ? "granted" : view.state} aria-hidden>
-      {view.blocked ? <MicrophoneOffIcon size={18} /> : <MicrophoneIcon size={18} />}
-      {allowed && <span className="perm-control-check"><CheckIcon size={9} /></span>}
-    </span>{label}
+    {/* Before: the microphone's own icon in the button's ink (crossed out while blocked). Allowed: the button gives way to
+        the permission's mark as it first was — the round green tile with the microphone and its check — and its words in
+        green (operator, 2026-10-16). */}
+    {allowed ? <MicrophoneMark view={view} /> : view.blocked ? <MicrophoneOffIcon size={18} /> : <MicrophoneIcon size={18} />}{label}
   </Button>;
 }
 
