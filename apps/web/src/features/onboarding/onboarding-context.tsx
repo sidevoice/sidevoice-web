@@ -152,6 +152,17 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
     return operation;
   }, [repository]);
 
+  // Set up by hand counts (operator, 2026-10-16): voice settings saved in Settings while the setup is put off are the
+  // transcription, voice and end of turn chosen, so resuming skips what was already done there.
+  const savedAt = room.facts.settingsSavedAt;
+  useEffect(() => {
+    const kept = room.facts.voiceSettings;
+    if (!ready || open || record.completed_at || !record.deferred_at || !savedAt || !kept) return;
+    const stt = trialKey(kept.stt), tts = trialKey(kept.tts);
+    if (record.chosen.stt === stt && record.chosen.tts === tts && record.turn_done) return;
+    void persist({ chosen: { ...(stt ? { stt } : {}), ...(tts ? { tts } : {}) }, turn_done: true });
+  }, [savedAt]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Once the record and the machines are known: an unfinished setup opens where it stands, unless it was put off.
   useEffect(() => {
     // Where it resumes depends on this device's voice settings too (what was chosen): it waits for them as well as the

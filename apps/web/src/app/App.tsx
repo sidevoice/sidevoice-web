@@ -39,6 +39,7 @@ function RoomContent() {
   // Settings with it, and a banner offers to continue the setup; calls need a machine as ever.
   const setupPending = !onboarding.ready || !onboarding.record.completed_at;
   const roomHidden = !onboarding.ready || (setupPending && onboarding.open);
+  const callBlocked = (setupPending && onboarding.ready) || noMachine;
 
   useEffect(() => {
     if (install.phase === "installing") {
@@ -69,14 +70,17 @@ function RoomContent() {
     <>
       <StorageBlockedBanner />
       <ResetReportNotice />
-      <div className="room-shell" data-no-machine={noMachine || undefined} hidden={roomHidden} aria-hidden={roomHidden || undefined}>
+      <div className="room-shell" hidden={roomHidden} aria-hidden={roomHidden || undefined}>
         <RoomHeader />
         <LocalHostBanner />
-        {setupPending && onboarding.ready && !onboarding.open && <SetupPending />}
-        {/* The call: the conversations, the stage over its bar, and the transcript when it is open (2026-10-10). */}
-        <main className={noMachine ? undefined : "call-layout"}>
-          {noMachine ? <NoMachineScreen source="no-machine" /> : <>
-            <ErrorBoundary area="participants"><ConversationSidebar /></ErrorBoundary>
+        {/* The call: the conversations, the stage over its bar, and the transcript when it is open (2026-10-10). One layout
+            whatever is set up (operator, 2026-10-16): the conversations' column and Settings always; only the call's own
+            space says what is missing — first the setup put off, then no machine — one at a time. */}
+        <main className="call-layout">
+          <ErrorBoundary area="participants"><ConversationSidebar /></ErrorBoundary>
+          {callBlocked ? <div className="call-column call-column--waiting">
+            {setupPending ? <SetupPending /> : <NoMachineScreen source="no-machine" />}
+          </div> : <>
             {/* The stage and its call bar share a column, so the bar centres under the stage and the conversations and
                 the transcript run the screen's whole height beside them. */}
             <div className="call-column">
@@ -87,7 +91,7 @@ function RoomContent() {
             <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>
           </>}
         </main>
-        {!noMachine && <PresenceSound />}
+        {!callBlocked && <PresenceSound />}
         <ConnectionStatsDialog />
         <SettingsDialog />
       </div>

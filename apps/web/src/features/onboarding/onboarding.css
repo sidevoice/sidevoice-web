@@ -140,13 +140,17 @@
 @media (prefers-reduced-motion: reduce) {
   [data-ready] *, [data-ready] *::before, [data-ready] *::after, [data-ready] .wizard-steps li { animation: none !important; }
 }
-/* ----- what a put-off setup leaves: a banner over the room, the room usable under it */
-.setup-pending { display: flex; align-items: center; gap: var(--sv-space-3); margin: var(--sv-space-2) var(--sv-space-3) 0; padding: var(--sv-space-2) var(--sv-space-3);
-  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-accent-soft); }
-.setup-pending-mark { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: var(--sv-radius-md); background: var(--sv-surface); color: var(--sv-accent-text); }
-.setup-pending-copy { display: grid; flex: 1 1 auto; min-width: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
-.setup-pending-copy strong { color: var(--sv-text); font-weight: var(--sv-weight-semibold); }
-.setup-pending > .ui-button { flex: none; }
+/* ----- what a put-off setup leaves: in the call's own space, a card with one action back into the setup */
+.call-column--waiting { display: grid; place-items: center; padding: var(--sv-space-6); overflow: auto; }
+.setup-pending {
+  display: grid; justify-items: center; gap: var(--sv-space-2); width: min(34rem, 100%); padding: var(--sv-space-10) var(--sv-space-6);
+  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-2xl); background: var(--sv-stage-bg); text-align: center;
+}
+.setup-pending-mark { display: grid; place-items: center; width: 56px; height: 56px; border-radius: var(--sv-radius-xl); background: var(--sv-accent-soft); color: var(--sv-accent-text); }
+.setup-pending-copy { display: grid; gap: var(--sv-space-2); }
+.setup-pending-copy strong { margin-top: var(--sv-space-2); font-size: var(--sv-font-xl); line-height: 1.625rem; font-weight: var(--sv-weight-bold); letter-spacing: -.015em; color: var(--sv-text); }
+.setup-pending-copy span { max-width: 40ch; line-height: 1.5rem; color: var(--sv-text-muted); }
+.setup-pending > .ui-button { margin-top: var(--sv-space-3); }
 
 /* ----- a phone, or a screen too short for the dialog: the whole screen, the footer pinned at the bottom */
 @media (max-width: 599px), (max-height: 520px) {
