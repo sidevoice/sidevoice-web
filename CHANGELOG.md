@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.1](https://github.com/sidevoice/sidevoice-web/compare/v0.7.0...v0.7.1) (2026-10-16)
+
+
+### Bug Fixes
+
+* **copy:** name the connector's commands with npx ([#155](https://github.com/sidevoice/sidevoice-web/issues/155)) ([f7081c7](https://github.com/sidevoice/sidevoice-web/commit/f7081c7de53a18322848b466bc519ab2eda6831e))
+* **room:** one quiet unread mark, only for a conversation you're not in ([#162](https://github.com/sidevoice/sidevoice-web/issues/162)) ([4533b43](https://github.com/sidevoice/sidevoice-web/commit/4533b43bfb63969f36f0d7050ce66a4d3b42873c))
+* **transcript:** the person's live voice uses the stage's balloon ([#159](https://github.com/sidevoice/sidevoice-web/issues/159)) ([827391b](https://github.com/sidevoice/sidevoice-web/commit/827391bc45bf306cf7c01f4e9da07ae93e487e0b))
+* **voice:** losing the chosen speaker no longer leaves agents muted ([#161](https://github.com/sidevoice/sidevoice-web/issues/161)) ([5eccffc](https://github.com/sidevoice/sidevoice-web/commit/5eccffcdd39e087cb703dbef2f2264d1adb23e03))
+
 ## [0.7.0](https://github.com/sidevoice/sidevoice-web/compare/v0.2.1...v0.7.0) (2026-10-16)
 
 
