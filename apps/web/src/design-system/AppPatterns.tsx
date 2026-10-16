@@ -178,8 +178,8 @@ function StageTile({ mood, compact = false, phone = false }: { mood: "speaking" 
   );
 }
 
-/** The microphone and the speaker's bar, as the call shows it (features/call/AudioDevices). */
-function DevicesBar({ fixed = false, lost = false }: { fixed?: boolean; lost?: boolean }) {
+/** The microphone and the speaker's panel, as the call shows it above the chevron (features/call/AudioDevices). */
+function DevicesPanel({ fixed = false, lost = false }: { fixed?: boolean; lost?: boolean }) {
   const t = translator();
   return (
     <div className="pt-devices">
@@ -187,8 +187,6 @@ function DevicesBar({ fixed = false, lost = false }: { fixed?: boolean; lost?: b
       <Field label={t("devices.speaker")} hint={fixed ? t("devices.speakerFixed") : undefined}>
         <Select defaultValue="" disabled={fixed} options={[{ value: "", label: t("devices.default") }, { value: "headset", label: "AirPods Pro" }, { value: "built-in", label: "MacBook Pro Speakers" }]} />
       </Field>
-      <span className="pt-devices-actions"><Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("devices.refresh")}><RefreshIcon size={16} /></Button>
-        <Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("devices.close")}><CloseIcon size={16} /></Button></span>
       {lost && <p className="pt-devices-lost">{t("devices.lostInput")} <Button variant="ghost" tone="neutral" size="sm">{t("devices.gotIt")}</Button></p>}
     </div>
   );
@@ -287,7 +285,6 @@ function WizardFrame({ step, title, children, footer }: { step: number; title: s
     <div className="pt-wizard">
       <header className="pt-wizard-head">
         <span className="pt-wizard-brand"><SidevoiceMark size={18} />{t("wizard.eyebrow")}</span>
-        <Button variant="ghost" tone="neutral" size="sm">{t("wizard.later")}</Button>
       </header>
       <Stepper current={step} />
       <h3 className="pt-wizard-title">{title}</h3>
@@ -347,11 +344,6 @@ function WizardTranscription() {
         </>} />
     </WizardFrame>
   );
-}
-
-function SetupPending() {
-  const t = translator();
-  return <div className="pt-empty pt-card-empty"><SidevoiceMark size={28} /><h3>{t("wizard.pendingTitle")}</h3><p>{t("wizard.pendingBody")}</p><Button variant="primary">{t("wizard.continueSetup")}</Button></div>;
 }
 
 // ---------------------------------------------------------------- Settings
@@ -574,9 +566,9 @@ export function AppPatterns() {
         <Frame className="pt-frame--tall"><CallBar joined muted menu /></Frame>
         <Phone label="Phone"><CallBar joined phone /></Phone>
       </Pattern>
-      <Pattern title="Call · microphone and speaker" note="The chevron joined to the microphone opens a bar above the call's controls: the microphone, the speaker and a refresh. Where the speaker cannot be chosen (a browser that lacks it), it is disabled and says why; a chosen device that went away is said once.">
-        <Frame><DevicesBar /></Frame>
-        <Frame><DevicesBar fixed lost /></Frame>
+      <Pattern title="Call · microphone and speaker" note="The chevron joined to the microphone opens a small panel right above it, its left edge on the pill's: the microphone and the speaker, one under the other. With a mouse, resting on the chevron opens it and leaving both closes it; a click, a key or a tap holds it open until a click outside or Escape. Where the speaker cannot be chosen (a browser that lacks it), it is disabled and says why; a chosen device that went away is said once.">
+        <Frame><DevicesPanel /></Frame>
+        <Frame><DevicesPanel fixed lost /></Frame>
       </Pattern>
       <Pattern title="Transcript" note="Docked beside the call on a desktop, a sheet on a phone. The agent in lila, you in crema; time, read marks and listen again. The text box is a rounded field pinned at the foot, Send an arrow inside it; it grows with what you write and is never resized by hand.">
         <Frame className="pt-frame--transcript"><Transcript /></Frame>
@@ -585,7 +577,6 @@ export function AppPatterns() {
         <Frame className="pt-frame--dialog"><WizardWhere /></Frame>
         <Frame className="pt-frame--dialog"><WizardPair /></Frame>
         <Frame className="pt-frame--dialog"><WizardTranscription /></Frame>
-        <SetupPending />
       </Pattern>
       <Pattern title="Pairing dialog" note="Prepare the other machine with two commands, then its address and the code it gives.">
         <Frame className="pt-frame--dialog">

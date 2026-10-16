@@ -1,6 +1,8 @@
-import { afterEach, expect, test, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, expect, onTestFinished, test, vi } from "vitest";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { withMicrophone } from "./with-microphone.test-util";
 import { SettingsDialog } from "./SettingsDialog";
+import { KEYBOARD_QUERY } from "./ShortcutsSettings";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import { defaultVoiceSettings, editVoiceSettings } from "../../services/voice-settings.js";
@@ -31,9 +33,10 @@ function open(draftModel: string) {
   return store;
 }
 
-test("the sections are General, Transcription, Voice, Call, Providers, Machines and Advanced, one showing at a time", () => {
+test("the sections are General, Transcription, Voice, Call, Permissions, Providers, Machines and Advanced, one showing at a time", () => {
+  withMicrophone();
   open("whisper-base");
-  expect([...document.querySelectorAll(".settings-nav > button")].map((button) => button.textContent)).toEqual(["General", "Transcription", "Voice", "Call", "Providers", "Machines", "Advanced"]);
+  expect([...document.querySelectorAll(".settings-nav > button")].map((button) => button.textContent)).toEqual(["General", "Transcription", "Voice", "Call", "Permissions", "Providers", "Machines", "Advanced"]);
   expect(document.getElementById("pane-general")).not.toHaveAttribute("hidden");
   fireEvent.click(document.getElementById("settings-advanced")!);
   expect(document.getElementById("pane-general")).toHaveAttribute("hidden");
@@ -44,6 +47,75 @@ test("the sections are General, Transcription, Voice, Call, Providers, Machines 
   fireEvent.click(document.getElementById("settings-call")!);
   expect(document.getElementById("voice-end-of-turn")).toBeInTheDocument();
   expect(screen.getByRole("radiogroup", { name: "Thinking sound" })).toBeInTheDocument();
+});
+
+/** A device with a mouse or a trackpad, where a keyboard is all but certain (jsdom's media queries match nothing). */
+function withKeyboard() {
+  const matchMedia = window.matchMedia;
+  window.matchMedia = ((media: string) => ({ ...matchMedia(media), matches: media === KEYBOARD_QUERY })) as typeof window.matchMedia;
+  onTestFinished(() => { window.matchMedia = matchMedia; });
+}
+
+/** The desktop app, as its bridge shows it: the global mute shortcut and the call controls' setting. */
+function inDesktopApp() {
+  const shortcut = { accelerator: "Cmd+Shift+M", label: "⇧⌘M", state: "on", alternatives: [], voiceOver: false };
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: {
+    muteShortcut: { get: vi.fn(async () => shortcut), set: vi.fn(async () => shortcut) },
+    callControls: { settings: vi.fn(async () => ({ alwaysShown: false })), setAlwaysShown: vi.fn(async (alwaysShown: boolean) => ({ alwaysShown })) },
+  } } });
+  onTestFinished(() => { delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; });
+}
+
+const navLabels = () => [...document.querySelectorAll(".settings-nav > button")].map((button) => button.textContent);
+
+test("Shortcuts is hidden for now (sidevoice-web#148): not with a keyboard, not in the desktop app, and a place asked in it opens General", async () => {
+  withKeyboard();
+  withMicrophone();
+  const store = open("whisper-base");
+  expect(navLabels()).toEqual(["General", "Transcription", "Voice", "Call", "Permissions", "Providers", "Machines", "Advanced"]);
+  expect(document.getElementById("pane-shortcuts")).toBeNull();
+  act(() => store.patch({ settingsSection: "shortcuts" }));
+  expect(store.getState().facts.settingsSection).toBe("general");
+  expect(document.getElementById("pane-general")).not.toHaveAttribute("hidden");
+});
+
+test("in the desktop app Shortcuts is hidden too, and Call keeps only the call controls' setting", async () => {
+  inDesktopApp();
+  open("whisper-base");
+  expect(navLabels()).not.toContain("Shortcuts");
+  fireEvent.click(document.getElementById("settings-call")!);
+  const call = document.getElementById("pane-call")!;
+  expect(await within(call).findByRole("switch", { name: "Always show the call controls" })).toBeInTheDocument();
+  expect(call).not.toHaveTextContent("Mute shortcut");
+});
+
+/** The desktop app that can reset its machine (macOS): `host.data` with deleteAll, and uninstall where it has it. */
+function withReset({ uninstall }: { uninstall: boolean }) {
+  const data = { pairings: { read: vi.fn(async () => ({ pairings: [] })), write: vi.fn(async () => {}) },
+    deleteAll: vi.fn(), resetReport: vi.fn(async () => null), ...(uninstall ? { uninstall: vi.fn() } : {}) };
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { data } } });
+  onTestFinished(() => { delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; });
+}
+
+test("a browser has no Danger zone, and no section of its own anywhere", () => {
+  withMicrophone();
+  open("whisper-base");
+  expect(navLabels()).not.toContain("Danger zone");
+  expect(document.querySelector(".danger-zone")).toBeNull();
+  expect(document.getElementById("delete-all-sidevoice-data")).toBeNull();
+});
+
+test.each([false, true])("the desktop app's Danger zone is the last group of Advanced, in red, not a section (uninstall: %s)", (uninstall) => {
+  withMicrophone();
+  withReset({ uninstall });
+  open("whisper-base");
+  expect(navLabels()).not.toContain("Danger zone");
+  const groups = [...document.querySelectorAll("#pane-advanced .ui-group")];
+  const last = groups.at(-1)!;
+  expect(last).toHaveClass("danger-group");
+  expect(last.querySelector(".ui-group-title")).toHaveTextContent("Danger zone");
+  expect(last.querySelector("#delete-all-sidevoice-data")).toBeInTheDocument();
+  expect(!!last.querySelector("#uninstall-sidevoice")).toBe(uninstall);
 });
 
 test("General: appearance, this device's name, then the interface's language", () => {
@@ -172,7 +244,7 @@ test("a delete that fails says why in words: a model still downloading, or one t
   expect(error.textContent!.replace(error.querySelector("details")!.textContent!, "")).not.toContain("EBUSY");
 });
 
-test("the voice detector comes first, is never deletable, and says why after its tags; a row's tags are its purpose then In use", () => {
+test("the voice detector comes first, is never deletable, and says why right by its name; a row's tags are its purpose then In use", () => {
   const vad = { ...model("silero-vad", "silero-vad", "vad") };
   const withVad = [{ ...withUnused[0], models: [...(withUnused[0] as { models: unknown[] }).models, vad] }] as unknown as CatalogView[];
   const store = open("whisper-base");
@@ -183,7 +255,7 @@ test("the voice detector comes first, is never deletable, and says why after its
   expect(screen.queryByRole("button", { name: "Delete silero-vad from this device" })).toBeNull();
   expect(list?.querySelector('[data-model="silero-vad"] .ui-infotip')).not.toBeNull();
   const tags = (id: string) => [...list!.querySelector(`[data-model="${id}"] .downloaded-model-title`)!.children].map((tag) => tag.matches(".ui-infotip") ? "ui-infotip" : tag.className.split(" ")[0]);
-  expect(tags("silero-vad")).toEqual(["downloaded-model-name", "model-purpose", "ui-badge", "ui-infotip"]);
+  expect(tags("silero-vad")).toEqual(["downloaded-model-name", "ui-infotip", "model-purpose", "ui-badge"]);
   expect(tags("whisper-base")).toEqual(["downloaded-model-name", "model-purpose", "ui-badge"]);
 });
 
@@ -234,4 +306,41 @@ test("a model of another family chosen in the first-run setup, with Settings dra
   fireEvent.click(document.getElementById("settings-voice")!);
   expect(document.getElementById("tts-family")).toHaveAttribute("data-value", "supertonic");
   expect(document.getElementById("tts-model")).toHaveAttribute("data-value", "supertonic-3");
+});
+
+test("Permissions is hidden where there is nothing to ask (no microphone API), and a place asked in it opens General", async () => {
+  const store = open("whisper-base");
+  expect(navLabels()).not.toContain("Permissions");
+  expect(document.getElementById("pane-permissions")).toBeNull();
+  act(() => store.patch({ settingsSection: "permissions" }));
+  expect(store.getState().facts.settingsSection).toBe("general");
+});
+
+test("Call links to Permissions while the microphone is not allowed, and not once it is", async () => {
+  withMicrophone("denied");
+  const store = open("whisper-base");
+  act(() => store.patch({ settingsSection: "call" }));
+  const pane = document.getElementById("pane-call")!;
+  const link = await within(pane).findByRole("button", { name: "Open Permissions" });
+  fireEvent.click(link);
+  expect(store.getState().facts.settingsSection).toBe("permissions");
+  cleanup();
+  withMicrophone("granted");
+  const again = open("whisper-base");
+  act(() => again.patch({ settingsSection: "call" }));
+  await within(document.getElementById("pane-call")!).findByText("Thinking sound");
+  expect(within(document.getElementById("pane-call")!).queryByRole("button", { name: "Open Permissions" })).toBeNull();
+});
+
+test("Permissions wears the warning dot while the microphone is not allowed, said in words; none once it is", async () => {
+  withMicrophone("denied");
+  open("whisper-base");
+  const dot = await waitFor(() => { const found = document.querySelector("#settings-permissions .settings-attention"); expect(found).not.toBeNull(); return found!; });
+  expect(dot).toHaveAttribute("role", "img");
+  expect(dot.getAttribute("aria-label")).toBeTruthy();
+  cleanup();
+  withMicrophone("granted");
+  open("whisper-base");
+  await waitFor(() => expect(document.getElementById("settings-permissions")).toBeInTheDocument());
+  expect(document.querySelector("#settings-permissions .settings-attention")).toBeNull();
 });

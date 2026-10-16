@@ -46,47 +46,24 @@ function staysThenGoes(shown: number, bubble: () => HTMLElement | null = sentBub
   expect(bubble()).toBeNull();
 }
 
-/* What was sent is three lines at a time (PagedText): it reads its window's height (three lines, fewer when the text
- * is shorter) and the run's. jsdom lays nothing out: each text is as many lines tall as `laidOut` says, LINE px a line. */
-const LINE = 20;
-function laidOut(lines: Record<string, number>) {
-  const of = (element: HTMLElement) => lines[element.textContent!] ?? 1;
-  vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(function (this: HTMLElement) {
-    return this.classList.contains("paged-text-run") ? of(this) * LINE : 0;
-  });
-  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(function (this: HTMLElement) {
-    return this.classList.contains("paged-text") ? Math.min(3, of(this)) * LINE : 0;
-  });
-}
-const run = (bubble: HTMLElement | null = sentBubble()) => bubble!.querySelector<HTMLElement>(".paged-text-run")!;
-/** Which page of three lines its window shows. */
-const pageOf = (bubble: HTMLElement | null = sentBubble()) => {
-  const shift = /translateY\((-?[\d.]+)px\)/.exec(run(bubble).style.transform);
-  return shift ? -Number(shift[1]) / (3 * LINE) || 0 : NaN;
-};
-const paged = () => words().querySelector<HTMLElement>(".paged-text")!;
-
 beforeEach(() => { localStorage.clear(); vi.useFakeTimers(); });
 afterEach(() => { localStorage.clear(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
-test("what was sent shows whole, in its window of three lines, with no check, cut or smaller type", () => {
-  laidOut({ [LONG]: 7 });
+test("what was sent shows its words in one clamped box: no paging, no check, cut or smaller type", () => {
   turn();
-  expect(words()).toHaveTextContent(LONG);
   expect(words().textContent).toBe(LONG);
-  expect(paged()).toBeInTheDocument();
-  for (const decided of ["data-lines", "data-small", "data-faded"]) expect(words()).not.toHaveAttribute(decided);
-  expect(sentBubble()!.querySelector(".person-sent-check, svg")).toBeNull();
+  expect(sentBubble()!.querySelector(".paged-text, .paged-text-run")).toBeNull();
+  for (const decided of ["data-lines", "data-small", "data-faded", "data-more"]) expect(words()).not.toHaveAttribute(decided);
+  // Its balloon's tail is the only drawing on it.
+  expect(sentBubble()!.querySelector(".person-sent-check, svg:not(.balloon-tail)")).toBeNull();
 });
 
 test("a choice the preview's panel stored for sent-text or sent-repeat changes nothing", () => {
   for (const stored of [{ "sent-text": "tail" }, { "sent-text": "clamp" }, { "sent-text": "shrink" }, { "sent-text": "line" },
     { "sent-repeat": "replace" }, { "sent-repeat": "stack" }]) {
     localStorage.setItem(VARIANTS_KEY, JSON.stringify(stored));
-    laidOut({ [LONG]: 7 });
     const { to, first, unmount } = turn();
     expect(words().textContent).toBe(LONG);
-    expect(paged()).toHaveAttribute("data-more");
     expect(words()).not.toHaveAttribute("data-lines");
     // Speaking again, it lifts away at once, under the bars.
     to(listening(first));
@@ -94,7 +71,6 @@ test("a choice the preview's panel stored for sent-text or sent-repeat changes n
     expect(sentBubble()).toHaveAttribute("data-under");
     expect(bubbles()).toHaveLength(2);
     unmount();
-    vi.restoreAllMocks();
   }
 });
 
@@ -106,97 +82,17 @@ test("a short sent turn stays a page's time, then lifts away and is gone", () =>
   expect(document.querySelector(".person-turns")).toBeNull();
 });
 
-test("a long one that fits its three lines stays one page's time too: never on its length", () => {
-  const text = "go on ".repeat(40).trim();
-  laidOut({ [text]: 3 });
-  turn(text);
-  staysThenGoes(PAGE_MS);
-});
+/* However long, it stays PAGE_MS: no paging, no length in it. */
 
-/* Its pages. */
-
-test("pages: three lines at a time, the next three scrolling up every PAGE_MS; three pages stay three pages' time", () => {
-  laidOut({ [LONG]: 7 });
+test("a long one stays PAGE_MS too, whatever its length, and never turns a page", () => {
   turn();
-  expect(words()).toHaveTextContent(LONG);
-  expect(pageOf()).toBe(0);
-  expect(paged()).toHaveAttribute("data-more");
   tick(PAGE_MS - 1);
-  expect(pageOf()).toBe(0);
-  tick(1);
-  expect(run().style.transform).toBe(`translateY(-${3 * LINE}px)`);
-  expect(paged()).toHaveAttribute("data-more");
-  tick(PAGE_MS);
-  expect(pageOf()).toBe(2);
-  expect(paged()).not.toHaveAttribute("data-more");
-  // The last page is read its own time, without turning further, and then it leaves as usual.
-  staysThenGoes(PAGE_MS);
-});
-
-test.each([[1, 1], [3, 1], [4, 2], [6, 2], [7, 3], [12, 4]])("pages: %i lines are %i pages, and stay that many pages' time", (lines, pages) => {
-  laidOut({ [LONG]: lines });
-  turn();
-  for (let page = 1; page < pages; page++) {
-    tick(PAGE_MS);
-    expect(pageOf()).toBe(page);
-  }
-  staysThenGoes(PAGE_MS);
-});
-
-test("pages: no cap — ten pages stay thirty seconds, turning every PAGE_MS", () => {
-  laidOut({ [LONG]: 30 });
-  turn();
-  // Each page sets the next one's clock as it turns: time goes by here a page at a time, as it does on the stage.
-  for (let page = 1; page < 10; page++) {
-    tick(PAGE_MS - 1);
-    expect(pageOf()).toBe(page - 1);
-    tick(1);
-    expect(pageOf()).toBe(page);
-    expect(sentBubble()).not.toHaveAttribute("data-leaving");
-  }
-  staysThenGoes(PAGE_MS);
-  expect(10 * PAGE_MS).toBe(30_000);
-});
-
-test("a live recount after the first page keeps the original sent-turn deadline", () => {
-  let notify: () => void = () => {};
-  class Observer {
-    constructor(callback: () => void) { notify = callback; }
-    observe() {}
-    disconnect() {}
-  }
-  vi.stubGlobal("ResizeObserver", Observer);
-  let lines = 6;
-  vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(function (this: HTMLElement) {
-    return this.classList.contains("paged-text-run") ? lines * LINE : 0;
-  });
-  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(function (this: HTMLElement) {
-    return this.classList.contains("paged-text") ? 3 * LINE : 0;
-  });
-  turn();
-  tick(PAGE_MS + 500);
-  expect(pageOf()).toBe(1);
-  lines = 9;
-  act(() => notify());
-  expect(sentBubble()).not.toHaveAttribute("data-leaving");
-  tick(PAGE_MS - 501);
-  expect(sentBubble()).not.toHaveAttribute("data-leaving");
-  tick(1);
-  expect(sentBubble()).toHaveAttribute("data-leaving");
-  vi.unstubAllGlobals();
-});
-
-test("pages: one that fits is a single page, which never turns", () => {
-  laidOut({ [SHORT]: 1 });
-  turn(SHORT);
-  expect(paged()).not.toHaveAttribute("data-more");
-  tick(PAGE_MS - 1);
-  expect(pageOf()).toBe(0);
+  expect(words().textContent).toBe(LONG);
+  expect(sentBubble()!.querySelector(".paged-text-run")).toBeNull();
   staysThenGoes(1);
 });
 
 test("every clock stops with the turn: nothing left running once it is gone, nor once the stage is", () => {
-  laidOut({ [LONG]: 7 });
   // The clocks the turn sets (window.setTimeout), neither run nor cleared yet; the renderer's own are not among them.
   const running = new Set<unknown>();
   const set = window.setTimeout, clear = window.clearTimeout;
@@ -207,14 +103,38 @@ test("every clock stops with the turn: nothing left running once it is gone, nor
   }) as typeof window.setTimeout);
   vi.spyOn(window, "clearTimeout").mockImplementation((id) => { running.delete(id); clear(id); });
   const shown = turn();
-  expect(running.size).toBe(2); // its time and its next page
+  expect(running.size).toBe(1); // its time
   shown.unmount();
   expect(running.size).toBe(0);
   turn();
-  for (let page = 0; page < 3; page++) tick(PAGE_MS);
+  tick(PAGE_MS);
   tick(SENT_LEAVING_MS);
   expect(sentBubble()).toBeNull();
   expect(running.size).toBe(0);
+});
+
+/* Its delivery mark: the transcript's, when the message's delivery is known. */
+
+const withDelivery = (delivery?: string): ChatMessage => ({ ...said("u-1", LONG), delivery } as unknown as ChatMessage);
+const receipt = () => sentBubble()!.querySelector<HTMLElement>(".person-receipt");
+function sentWith(delivery?: string) {
+  const t = translator();
+  const view = render(<PersonTurn conversation={listening()} t={t} />);
+  view.rerender(<PersonTurn conversation={settled([withDelivery(delivery)])} t={t} />);
+}
+
+test.each(["delivered", "read", "not_sent"])("a %s message shows its delivery mark, labelled as the transcript's", (state) => {
+  sentWith(state);
+  expect(receipt()).not.toBeNull();
+  expect(receipt()).toHaveAttribute("role", "status");
+  expect(receipt()).toHaveAttribute("data-state", state);
+  expect(receipt()!.getAttribute("aria-label")).toBeTruthy();
+});
+
+test("no known delivery, no mark", () => {
+  sentWith(undefined);
+  expect(sentBubble()).not.toBeNull();
+  expect(receipt()).toBeNull();
 });
 
 /* Speaking again during its moment: it lifts away at once from where the bars come in. */
@@ -240,11 +160,9 @@ test("speaking again, the sent turn lifts away at once from where the bars come 
   expect(document.querySelector(".person-turns")).toBeNull();
 });
 
-test("cut mid-page, it lifts away at once all the same", () => {
-  laidOut({ [LONG]: 7 });
+test("cut late in its time, it lifts away at once all the same", () => {
   const { to, first } = turn();
-  tick(PAGE_MS + 100);
-  expect(pageOf()).toBe(1);
+  tick(PAGE_MS - 100);
   to(listening(first));
   expect(sentBubble()).toHaveAttribute("data-leaving");
   tick(SENT_LEAVING_MS);
@@ -252,9 +170,8 @@ test("cut mid-page, it lifts away at once all the same", () => {
 });
 
 test("the next one sent shows alone, from the start of its own moment, on its own clock", () => {
-  laidOut({ [LONG]: 7, [SHORT]: 1 });
   const { to, first } = turn();
-  tick(PAGE_MS + 200);
+  tick(PAGE_MS - 200);
   to(listening(first));
   tick(SENT_LEAVING_MS);
   expect(sentBubble()).toBeNull();
@@ -263,13 +180,12 @@ test("the next one sent shows alone, from the start of its own moment, on its ow
   expect(saying(SHORT)).not.toBeNull();
   expect(saying(SHORT)).not.toHaveAttribute("data-leaving");
   staysThenGoes(PAGE_MS, () => saying(SHORT));
-  // The first one's pages would have run until now and past: it never comes back.
+  // The first one's time would have run until now and past: it never comes back.
   tick(3 * PAGE_MS);
   expect(document.querySelector(".person-turns")).toBeNull();
 });
 
 test("sent while the one before still leaves: the new one shows at once on its own clock, the other goes on leaving", () => {
-  laidOut({ [LONG]: 7, [SHORT]: 1 });
   const { to, first } = turn();
   to(listening(first));
   tick(200);

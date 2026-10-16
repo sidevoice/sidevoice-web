@@ -1,0 +1,44 @@
+/* What Sidevoice needs allowed (permission-view.tsx): the setup's permissions step (PermissionsStep, the person's bicho) and Settings › Permissions. On the app's surfaces and tokens; the colours follow the
+ * state — the accent's until answered, positive once allowed, the warning's blocked or none found — and only ever
+ * repeat what the words say. */
+
+.perm-badge { flex: none; gap: var(--sv-space-1); white-space: nowrap; }
+.perm-badge svg { width: 12px; height: 12px; }
+.perm-help { margin-top: var(--sv-space-1); }
+.wizard-body > section > p.perm-also, .perm-also { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+
+.perm-hero-figure { position: relative; display: block; width: 112px; height: 112px; margin-bottom: var(--sv-space-2); transform-origin: 50% 90%;
+  transition: transform var(--sv-dur-slow, 320ms) var(--sv-ease), filter var(--sv-dur-slow, 320ms) var(--sv-ease); }
+/* A little life by state, on a wrapper (the engine has no expressions): a hop once allowed, a droop held while blocked
+ * or none found, a small attentive lean while the answer is awaited. */
+.perm-hero-figure[data-state="granted"] { animation: perm-hop 620ms var(--sv-ease) 1 both; }
+.perm-hero-figure:is([data-state="denied"], [data-state="missing"]) { transform: translateY(5px) rotate(-4deg) scale(.97); filter: saturate(.55); }
+.perm-hero-figure[data-state="requesting"] { transform: rotate(3deg) translateX(2px); }
+@keyframes perm-hop { 0% { transform: none; } 30% { transform: translateY(-10px) scale(1.03, .98); } 55% { transform: translateY(0) scale(1.04, .94); } 75% { transform: translateY(-3px); } 100% { transform: none; } }
+.perm-hero-figure .sv-avatar { display: block; width: 100%; height: 100%; }
+
+/* The list's row: the name with its icon, and the action (or badge) at its end. */
+.perm-label { display: inline-flex; align-items: center; gap: var(--sv-space-2-5, 10px); }
+.perm-settings-control { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sv-space-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .perm-hero-figure { transition: none; }
+  .perm-hero-figure[data-state] { animation: none; }
+  .perm-hero-figure:is([data-state="denied"], [data-state="missing"], [data-state="requesting"]) { transform: none; }
+}
+
+/* The setup's step: the person's bicho centred on top, the list of permissions under it (rows as in Settings). */
+.wizard-perm { display: grid; gap: var(--sv-space-3); }
+.wizard-perm > .perm-hero-figure { justify-self: center; }
+.perm-badge-focus { display: inline-flex; border-radius: var(--sv-radius-pill); }
+.perm-badge-focus:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+
+/* The step's row: the permission's plain icon (its state is the badge's to say). Laid out by the row's own width (no jump
+ * between the window's breakpoints): one line at every size — the action, and once allowed the badge, always at the right;
+ * only the why wraps if it must (operator, 2026-10-16). The why is a few words. */
+.perm-plain-icon { display: inline-grid; place-items: center; flex: none; color: var(--sv-text-muted); }
+.wizard-perm .ui-row.perm-step-row { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.wizard-perm .ui-row.perm-step-row .ui-row-control { width: auto; justify-content: flex-end; }
+
+/* The setup's Continue while the microphone is not allowed yet: the primary's own colour, faded — waiting, not broken. */
+.ui-button.wizard-continue-waiting:is(:disabled, [aria-disabled="true"]):not([data-loading]) { background: var(--sv-accent); border-color: var(--sv-accent); color: var(--sv-on-accent); opacity: .45; }

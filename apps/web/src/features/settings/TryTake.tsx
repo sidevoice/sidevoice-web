@@ -1,5 +1,6 @@
 import { Fragment, memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { Button } from "../../components/ui/Button";
+import { Tooltip } from "../../components/ui/Tooltip";
 import { PauseRecordingIcon, PlayRecordingIcon } from "../../components/ui/Icons";
 import type { VoiceTake } from "@sidevoice/voice";
 import { takeMs } from "./take-audio";
@@ -40,8 +41,10 @@ const Bars = memo(function Bars({ columns }: { columns: number[] }) {
 
 type Mark = { kind: "speech" | "pause" | "end"; text: string };
 
-/** `turns`: whether the voice's turns are marked in it (the end of turn's try); without them, only its ends are. */
-export function TryTake({ take, id, turns = true, t }: { take: VoiceTake; id: string; turns?: boolean; t: Translate }) {
+/** `turns`: whether the voice's turns are marked in it (the end of turn's try); without them, only its ends are.
+ *  `inline`: drawn in the try's first row, where the live level was (Play, the waveform and the clock): no title, its
+ *  marks in words only for assistive tech, each mark naming itself on hover (TakeKey says what the colours are). */
+export function TryTake({ take, id, turns = true, inline = false, t }: { take: VoiceTake; id: string; turns?: boolean; inline?: boolean; t: Translate }) {
   const length = takeMs(take);
   const marked = turns ? take.turns : [];
   const player = useMemo(() => createTakePlayer(take), [take]);
@@ -66,7 +69,8 @@ export function TryTake({ take, id, turns = true, t }: { take: VoiceTake; id: st
   useEffect(() => {
     const node = wave.current;
     if (!node) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(Math.round(entry.contentRect.width)));
+    // Recounted only when the width changes by a whole column: a pixel or two (the row reflowing) keeps the bars still.
+    const observer = new ResizeObserver(([entry]) => { const next = Math.round(entry.contentRect.width); setWidth((now) => (Math.abs(next - now) >= CELL ? next : now)); });
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
@@ -143,8 +147,8 @@ export function TryTake({ take, id, turns = true, t }: { take: VoiceTake; id: st
   ]);
   const described = useId();
 
-  return <figure className="try-take" id={id}>
-    <figcaption className="try-take-title">{t("take.title")}</figcaption>
+  return <figure className="try-take" id={id} data-inline={inline || undefined}>
+    <figcaption className={inline ? "sr-only" : "try-take-title"}>{t("take.title")}</figcaption>
     <div className="try-take-player">
       <Button variant="secondary" size="icon-sm" className="try-take-play" id={id + "-play"} aria-label={t("take.play")} aria-pressed={playing} onClick={toggle}>
         {playing ? <PauseRecordingIcon /> : <PlayRecordingIcon />}
@@ -155,19 +159,30 @@ export function TryTake({ take, id, turns = true, t }: { take: VoiceTake; id: st
         <Bars columns={columns} />
         <span ref={played} className="try-take-played" aria-hidden><Bars columns={columns} /></span>
         {marked.map((turn) => <Fragment key={turn.turn_id}>
-          {turn.pauses.map((pause) => <span key={pause.from_ms} className="try-take-pause" data-kind="pause" aria-hidden
-            style={{ left: percent(pause.from_ms), width: `${(share(pause.to_ms) - share(pause.from_ms)) * 100}%` }} />)}
-          <span className="try-take-mark" data-kind="speech" aria-hidden style={{ left: percent(turn.speech_ms) }} />
-          {turn.end_ms != null && <span className="try-take-mark" data-kind="end" aria-hidden style={{ left: percent(turn.end_ms) }} />}
+          {turn.pauses.map((pause) => <Tooltip key={pause.from_ms} content={t("take.pause", { from: seconds(pause.from_ms), to: seconds(pause.to_ms) })}><span className="try-take-pause" data-kind="pause" aria-hidden
+            style={{ left: percent(pause.from_ms), width: `${(share(pause.to_ms) - share(pause.from_ms)) * 100}%` }} /></Tooltip>)}
+          <Tooltip content={t("take.speech", { s: seconds(turn.speech_ms) })}><span className="try-take-mark" data-kind="speech" aria-hidden style={{ left: percent(turn.speech_ms) }} /></Tooltip>
+          {turn.end_ms != null && <Tooltip content={t("take.end", { s: seconds(turn.end_ms) })}><span className="try-take-mark" data-kind="end" aria-hidden style={{ left: percent(turn.end_ms) }} /></Tooltip>}
         </Fragment>)}
         <span ref={head} className="try-take-head" aria-hidden />
       </div>
       <span className="try-take-clock" aria-hidden><span ref={clock} /> / {seconds(length)} s</span>
     </div>
-    <p className="try-take-marks" id={described}>
+    {/* Inline with turns: what the colours mean, as the recording's own caption (TakeKey). */}
+    {inline && turns && <TakeKey t={t} />}
+    <p className={inline ? "sr-only" : "try-take-marks"} id={described}>
       <span>{t("take.length", { s: seconds(length) })}</span>
       {marks.length ? marks.map((mark, index) => <span key={index} data-kind={mark.kind}><i className="try-take-key" aria-hidden />{mark.text}</span>)
         : turns && <span>{t("take.noSpeech")}</span>}
     </p>
   </figure>;
+}
+
+/** What the take's mark colours mean, in one quiet line: the inline take's caption, under its capsule. */
+function TakeKey({ t }: { t: Translate }) {
+  return <p className="try-take-key-line" aria-hidden>
+    <span data-kind="speech"><i className="try-take-key" />{t("take.keySpeech")}</span>
+    <span data-kind="pause"><i className="try-take-key" />{t("take.keyPause")}</span>
+    <span data-kind="end"><i className="try-take-key" />{t("take.keyEnd")}</span>
+  </p>;
 }

@@ -1,8 +1,14 @@
-import { useRoomStore } from "../../state/room-store";
+import { useContext } from "react";
+import { RoomStoreContext, useRoomStore } from "../../state/room-store";
+import { openSettings } from "../settings/open-settings";
 import { Button } from "../../components/ui/Button";
 import { CallIcon, HangupIcon, MicrophoneIcon, MicrophoneOffIcon, SkipIcon, WarningIcon } from "../../components/ui/Icons";
 import { translator, type MessageKey } from "../../i18n/translator";
+import { Tooltip } from "../../components/ui/Tooltip";
+import { shortcutTip } from "../../components/ui/Keycaps";
+import { ariaKeyShortcuts } from "../../state/shortcuts";
 import { cn } from "../../lib/cn";
+import { useOnboardingIfAny } from "../onboarding/onboarding-context";
 
 /* The lights and notes of the call bar. Each one is a projection of the session store and nothing else
  * writes them: the runtime records the fact, React paints it. The microphone level is the one
@@ -26,10 +32,12 @@ export function SkipButton() {
   const t = translator();
   const playing = useRoomStore((state) => state.facts.botLive);
   return (
-    <Button id="skip-reply" variant="ghost" className="call-button" disabled={!playing} aria-label={t("toolbar.skip")} title={t("toolbar.skip")}
-      onClick={() => window.sidevoiceActions?.skipReply()}>
-      <SkipIcon size={22} />
-    </Button>
+    <Tooltip action content={shortcutTip(t("toolbar.skip"), "skip")}>
+      <Button id="skip-reply" variant="ghost" className="call-button" disabled={!playing} aria-label={t("toolbar.skip")} aria-keyshortcuts={ariaKeyShortcuts("skip")}
+        onClick={() => window.sidevoiceActions?.skipReply()}>
+        <SkipIcon size={22} />
+      </Button>
+    </Tooltip>
   );
 }
 
@@ -52,23 +60,35 @@ export function MuteButton() {
   const mic = useRoomStore((state) => state.mic);
   const silent = useMicSilent();
   return (
-    <Button id="mute" variant="ghost" className={cn("call-button", mic.holding && "holding")} aria-label={mic.label} title={silent ?? mic.title}
-      aria-description={silent ?? undefined} data-silent={silent ? true : undefined}
-      aria-pressed={mic.pressed} disabled={mic.disabled} aria-keyshortcuts="Meta+D Control+D"
-      onClick={() => window.sidevoiceActions?.toggleMic()}>
-      {mic.pressed ? <MicrophoneOffIcon size={22} /> : <MicrophoneIcon size={22} />}
-    </Button>
+    <Tooltip action content={shortcutTip(silent ?? mic.title, "mute")}>
+      <Button id="mute" variant="ghost" className={cn("call-button", mic.holding && "holding")} aria-label={mic.label}
+        aria-description={silent ?? undefined} data-silent={silent ? true : undefined}
+        aria-pressed={mic.pressed} disabled={mic.disabled} aria-keyshortcuts={ariaKeyShortcuts("mute")}
+        onClick={() => window.sidevoiceActions?.toggleMic()}>
+        {mic.pressed ? <MicrophoneOffIcon size={22} /> : <MicrophoneIcon size={22} />}
+      </Button>
+    </Tooltip>
   );
 }
 
 export function CallButton() {
+  const t = translator();
   const call = useRoomStore((state) => state.call);
-  return (
-    <Button id="connect" variant="primary" className={cn("call-button", call.joined && "joined", call.busy && "reconnecting")}
-      aria-label={call.label} title={call.label} onClick={() => void window.sidevoiceActions?.toggleCall()}>
-      {call.joined ? <HangupIcon /> : <CallIcon />}
-    </Button>
-  );
+  const store = useContext(RoomStoreContext);
+  // The microphone not allowed: the call waits, held back and saying why on hover and focus (operator, 2026-10-16);
+  // pressed, it opens Settings › Permissions. A call already joined can always be left.
+  const held = !call.joined && !(useOnboardingIfAny()?.microphone?.ready ?? true);
+  return (<span className="call-held">
+    {/* Held: said above it, as the microphone that gives no sound is (operator, 2026-10-16). */}
+    {held && <span className="call-held-note" role="status"><WarningIcon size={14} />{t("wizard.mic.denied.title")}</span>}
+    <Tooltip action content={held ? t("call.needsMic") : call.label}>
+      <Button id="connect" variant="primary" className={cn("call-button", call.joined && "joined", call.busy && "reconnecting")}
+        aria-label={call.label} disabled={held} blockedBy={held ? "connect-why" : undefined} onBlocked={() => openSettings({ section: "permissions" }, store)} onClick={() => void window.sidevoiceActions?.toggleCall()}>
+        {call.joined ? <HangupIcon /> : <CallIcon />}
+      </Button>
+    </Tooltip>
+    {held && <span id="connect-why" className="sr-only">{t("call.needsMic")}</span>}
+  </span>);
 }
 
 export function MicControl({ children }: { children: React.ReactNode }) {

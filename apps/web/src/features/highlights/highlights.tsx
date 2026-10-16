@@ -96,7 +96,7 @@ export function useHighlights() {
   // Until the first-run setup is finished nothing is new — everything is, there — and what is there then is taken as
   // seen: only what appears after the setup is ever marked new. While the setup's record is not read yet, nothing shows
   // and nothing is taken as seen.
-  const settingUp = !!onboarding && onboarding.ready && !onboarding.record.completed_at;
+  const settingUp = !!onboarding && onboarding.ready && !onboarding.done;
   const unknown = !!onboarding && !onboarding.ready;
   const unseen = settingUp ? candidates.filter((item) => !seen[item.id]?.seenAt).map((item) => item.id).join(" ") : "";
   useEffect(() => {
@@ -151,7 +151,9 @@ export function NewAtEnd({ isNew, spoken }: { isNew: boolean | number; spoken?: 
 
 /** The Settings gear's mark, with `count` things new under it: how many, on its corner — never a dot, which beside the
  *  conversations' avatars would read as a state. The gear's own name says it in words. */
-export function GearNewMark({ count }: { count: number }) {
+export function GearNewMark({ count, attention = false }: { count: number; attention?: boolean }) {
+  // Something needing the person outranks what is new: the warning dot in the count's place.
+  if (attention) return <span className="settings-notice settings-attention" data-mark="attention" aria-hidden="true" />;
   if (count <= 0) return null;
   return <span className="settings-notice" data-mark="count" aria-hidden="true">{count}</span>;
 }

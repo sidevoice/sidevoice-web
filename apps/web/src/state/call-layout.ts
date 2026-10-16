@@ -3,13 +3,22 @@ import { useStore } from "zustand";
 import { createStore, type StoreApi } from "zustand/vanilla";
 
 /* How the call view is laid out on this device, apart from what the session says: whether the transcript is open,
- * whether the desktop sidebar is collapsed (kept across reloads), and whether a phone's conversations panel is down.
- * Only the collapsed sidebar is remembered, and only its own toggle changes it; the rest starts closed. On a phone the
- * panel and the transcript are both dialogs over the call, and one opening puts the other away. */
+ * whether the desktop sidebar is collapsed (kept across reloads), and whether the conversations' list is open over the
+ * call (a phone's panel, a compact desktop's list over the stage). Only the collapsed sidebar is remembered, and only its
+ * own toggle changes it; the rest starts closed. On a phone and on a compact desktop the list and the transcript are
+ * both dialogs over the call, and one opening puts the other away. */
 
 export const SIDEBAR_COLLAPSED_KEY = "sidevoice.sidebar-collapsed";
-/** Below this width the conversations live in the header, and the transcript is a sheet. Matches styles/call.css. */
-export const NARROW_QUERY = "(max-width: 899px)";
+/** A phone (or a window too small for anything beside the call): the conversations live in the header, and the
+ *  transcript is a sheet. A touch screen under 900px, or any window under 560px; a narrower desktop window is still a
+ *  desktop, compact (COMPACT_QUERY) — decided 2026-10-15. Matches the stylesheets' media queries. */
+export const NARROW_QUERY = "(max-width: 559px), (max-width: 899px) and (pointer: coarse)";
+/** A desktop window under 900px (a fine pointer, 560px or wider): still a desktop, compact (2026-10-15). Its
+ *  conversations are their rail, whose toggle opens the whole list over the stage; the transcript has no room to dock
+ *  (the rail, its 380px and a call that fits its bar need 900px), so it opens over the call from the right. Both are
+ *  dialogs, one at a time. The stylesheets' compact rules say the same; their desktop rules,
+ *  `(min-width: 900px), (min-width: 560px) and (pointer: fine)`, are this and the wide desktop together. */
+export const COMPACT_QUERY = "(min-width: 560px) and (max-width: 899px) and (pointer: fine)";
 /** Below this width a desktop has no room for the open sidebar beside the docked transcript: the sidebar is its rail. */
 export const RAIL_WITH_TRANSCRIPT_QUERY = "(max-width: 1199px)";
 
@@ -47,14 +56,14 @@ export function createCallLayoutStore(storage: LayoutStorage | null = localStora
     sidebarCollapsed: collapsed,
     conversationsOpen: false,
     toggleTranscript: () => set(get().transcriptOpen ? { transcriptOpen: false }
-      : isNarrow() ? { transcriptOpen: true, conversationsOpen: false } : { transcriptOpen: true }),
+      : overlaid() ? { transcriptOpen: true, conversationsOpen: false } : { transcriptOpen: true }),
     closeTranscript: () => set({ transcriptOpen: false }),
     toggleSidebar: () => {
       const next = !get().sidebarCollapsed;
       set({ sidebarCollapsed: next });
       try { storage?.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0"); } catch { /* Remembered for this page only. */ }
     },
-    openConversations: () => set(isNarrow() ? { conversationsOpen: true, transcriptOpen: false } : { conversationsOpen: true }),
+    openConversations: () => set(overlaid() ? { conversationsOpen: true, transcriptOpen: false } : { conversationsOpen: true }),
     closeConversations: () => set({ conversationsOpen: false }),
     showConversations: () => {
       if (isNarrow()) get().openConversations();
@@ -78,6 +87,11 @@ function matches(query: string) {
 /** The page is laid out for a phone: conversations in the header, the transcript as a sheet. */
 export function isNarrow() {
   return matches(NARROW_QUERY);
+}
+
+/** The conversations' list and the transcript open over the call, one at a time: a phone's, and a compact desktop's. */
+function overlaid() {
+  return isNarrow() || matches(COMPACT_QUERY);
 }
 
 /** Whether `query` matches now, re-rendering when that changes. */

@@ -16,14 +16,51 @@ import { CharacterAvatar } from "./CharacterAvatar";
 /** The height of the lab's stage, in its pixels. */
 export const SCENE_HEIGHT = 440;
 
-/** A ref for the stage's tile: it keeps `--k`, the tile's height over the lab's, on the tile, as it resizes. */
+/** The box of a canvas `ratio` wide for each unit tall, as large as fits a tile `width` × `height`: the tile's whole
+ *  width with bands above and below where the tile is taller than the ratio, its whole height with bands at the sides
+ *  where it is wider. */
+export function fitCanvas(width: number, height: number, ratio: number): { width: number; height: number } {
+  return width / height > ratio ? { width: height * ratio, height } : { width, height: width / ratio };
+}
+
+/** A ratio as CSS writes it: "16 / 9", "3/2" or "1". */
+function parseRatio(value: string): number {
+  const [over, under = "1"] = value.split("/");
+  return Number(over) / Number(under);
+}
+
+/** A ref for the stage's tile: it keeps `--k`, the scene's height over the lab's, on the tile, as it resizes. Where the
+ *  tile holds a canvas (`.stage-canvas`) and says its shape (`--stage-ratio`, the form factor's: call-view.css), the
+ *  canvas is fitted to the tile at that shape and the scene scaled to the canvas; else the scene fills the tile. */
 export function useSceneScale() {
   const observer = useRef<ResizeObserver | null>(null);
   return useCallback((node: HTMLElement | null) => {
     observer.current?.disconnect();
     observer.current = null;
     if (!node) return;
-    const apply = () => { if (node.clientHeight > 0) node.style.setProperty("--k", String(node.clientHeight / SCENE_HEIGHT)); };
+    const apply = () => {
+      const { clientWidth: width, clientHeight: height } = node;
+      if (!(width > 0 && height > 0)) return;
+      // A slot holding the tile: the tile itself takes its shape, as large as the slot allows (a slide in its window).
+      const tile = node.querySelector<HTMLElement>(":scope > .stage-tile");
+      if (tile) {
+        const shape = parseRatio(getComputedStyle(tile).getPropertyValue("--stage-ratio"));
+        if (shape > 0) {
+          const fitted = fitCanvas(width, height, shape);
+          tile.style.width = fitted.width + "px";
+          tile.style.height = fitted.height + "px";
+          tile.style.setProperty("--k", String(fitted.height / SCENE_HEIGHT));
+          return;
+        }
+      }
+      const canvas = node.querySelector<HTMLElement>(":scope > .stage-canvas");
+      const ratio = canvas ? parseRatio(getComputedStyle(node).getPropertyValue("--stage-ratio")) : NaN;
+      if (!canvas || !(ratio > 0)) { node.style.setProperty("--k", String(height / SCENE_HEIGHT)); return; }
+      const box = fitCanvas(width, height, ratio);
+      canvas.style.width = box.width + "px";
+      canvas.style.height = box.height + "px";
+      node.style.setProperty("--k", String(box.height / SCENE_HEIGHT));
+    };
     apply();
     observer.current = new ResizeObserver(apply);
     observer.current.observe(node);

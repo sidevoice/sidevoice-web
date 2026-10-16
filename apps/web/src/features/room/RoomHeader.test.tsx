@@ -139,17 +139,18 @@ test("the chevron after the header's avatars drops the conversations and puts th
 
 
 /* A phone's header (PHONE-SETTINGS-SPEC part 2): as many avatars as fit, the one on the stage marked in place, "+", and
- * the chevron when some are not in the row. */
+ * the chevron, always (2026-10-15), with how many are not in the row when some are not. */
 
-test("a phone's row: the room's order with the one on the stage marked where it is, \"+\", and no chevron while all of them fit", () => {
+test("a phone's row: the room's order with the one on the stage marked where it is, \"+\", and the chevron with no count while all of them fit", () => {
   phone(284);
   room();
   expect(titles()).toEqual(["Fix the slow login", "Review the nightly backups", "Migrate the payments API", "Plan the week"]);
   expect(avatars().map((avatar) => avatar.getAttribute("aria-pressed"))).toEqual(["true", "false", "false", "false"]);
   expect(plus()).toHaveAccessibleName("New conversation");
   expect(plus()).toHaveAttribute("title", "New conversation");
-  // Every conversation in the row: no chevron (the operator's decision; CHEVRON_ALWAYS flips it).
-  expect(chevron()).toBeNull();
+  // Every conversation in the row: the chevron still there (the operator's decision; CHEVRON_ALWAYS), with no "+N".
+  expect(chevron()).toHaveAccessibleName("All conversations (4)");
+  expect(chevron()!.querySelector(".conversations-rest")).toBeNull();
 });
 
 test("the chevron when more exist than fit, with how many are behind it; one with something new there marks it, said in words", () => {

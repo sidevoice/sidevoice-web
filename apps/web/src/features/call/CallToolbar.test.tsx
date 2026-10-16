@@ -44,7 +44,7 @@ test("a microphone the system or another app holds is said where the microphone 
   const silent = "Your microphone isn't sending sound — another app may be using it";
   act(() => store.patch({ ws: {}, sessionId: "s", micEnabled: true, voiceState: { listening: "listening", recognising: 0, playback: "idle", microphone: "muted" } } as never));
   expect(screen.getByRole("status")).toHaveTextContent(silent);
-  expect(document.getElementById("mute")).toHaveAttribute("title", silent);
+  expect(document.getElementById("mute")).toHaveAttribute("aria-description", silent);
   // Muted by the person: their own mute, nothing more to say.
   act(() => store.patch({ micEnabled: false } as never));
   expect(screen.queryByText(silent)).toBeNull();

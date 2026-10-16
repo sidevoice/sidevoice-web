@@ -1,9 +1,11 @@
+import { Tooltip } from "../../components/ui/Tooltip";
 import { Button } from "../../components/ui/Button";
 import { ChevronIcon, SettingsIcon, SidevoiceMark } from "../../components/ui/Icons";
 import { useCallLayout } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
 import { useLayoutEffect, useReducer, useRef, useState, type RefObject } from "react";
 import { GearNewMark, useHighlights } from "../highlights/highlights";
+import { useSettingsAttention } from "../settings/settings-attention";
 import type { ParticipantView } from "../../state/room-types";
 import { translator, type Translate } from "../../i18n/translator";
 import { ConversationAvatar } from "../call/ConversationAvatar";
@@ -17,7 +19,8 @@ import "./room.css";
  * conversations have no column, they sit in the header as a row of avatars (header-row.ts): as many as fit, the one on
  * the stage marked in place, then "+" for a new one, then the chevron when some are not in the row. A tap moves the call
  * to one; the whole list comes down from the chevron, and the header stays lit above the dimmed call while it is down. */
-export function RoomHeader() {
+/** `blocked`: nothing set up to talk to yet: no New conversation here either (as the sidebar). */
+export function RoomHeader({ blocked = false }: { blocked?: boolean } = {}) {
   const t = translator();
   const listDown = useCallLayout((state) => state.conversationsOpen);
   // No updates entry on a phone (decided): the page there picks up a new version the next time it is opened.
@@ -25,7 +28,7 @@ export function RoomHeader() {
     <>
       <header className="room-header" data-list-down={listDown || undefined}>
         <h1 className="brand"><SidevoiceMark size={22} /> <span className="brand-name">Sidevoice</span></h1>
-        <HeaderConversations t={t} />
+        <HeaderConversations t={t} blocked={blocked} />
         <SettingsButton t={t} />
       </header>
     </>
@@ -44,11 +47,13 @@ function ConversationsToggle({ t, hidden }: { t: Translate; hidden: ParticipantV
   const news = hidden.filter((row) => row.unread > 0 || (row.unheard ?? 0) > 0).length;
   const label = news ? t(news === 1 ? "header.allConversationsNews.one" : "header.allConversationsNews.other", { n: count, k: news }) : t("header.allConversations", { n: count });
   return (
-    <Button variant="ghost" tone="neutral" size="sm" className="conversations-toggle" aria-label={label} title={label}
-      aria-haspopup="dialog" aria-expanded={open} aria-controls="conversations" onClick={open ? closeConversations : openConversations}>
-      {hidden.length > 0 && <span className="conversations-rest" aria-hidden="true">+{Math.min(hidden.length, 99)}</span>}<ChevronIcon size={18} />
-      {news > 0 && <span className="conversations-cue" data-cue="unread" aria-hidden="true" />}
-    </Button>
+    <Tooltip action content={label}>
+      <Button variant="ghost" tone="neutral" size="sm" className="conversations-toggle" aria-label={label}
+        aria-haspopup="dialog" aria-expanded={open} aria-controls="conversations" onClick={open ? closeConversations : openConversations}>
+        {hidden.length > 0 && <span className="conversations-rest" aria-hidden="true">+{Math.min(hidden.length, 99)}</span>}<ChevronIcon size={18} />
+        {news > 0 && <span className="conversations-cue" data-cue="unread" aria-hidden="true" />}
+      </Button>
+    </Tooltip>
   );
 }
 
@@ -91,7 +96,7 @@ function useRowWidth(row: RefObject<HTMLElement | null>) {
 
 /* A tap on one moves the call there and the row stays as it is: the one tapped is marked where it is, and keeps the
  * focus. With the list down (the header stays above it) it also puts the list away, as choosing in the list does. */
-function HeaderConversations({ t }: { t: Translate }) {
+function HeaderConversations({ t, blocked }: { t: Translate; blocked: boolean }) {
   const participants = useRoomStore((state) => state.participants);
   const inCall = useRoomStore(selectInCall);
   const stage = useStageConversation();
@@ -132,7 +137,7 @@ function HeaderConversations({ t }: { t: Translate }) {
           <ConversationAvatar row={row} />
         </button>
       ))}
-      <NewConversation header />
+      {!blocked && <NewConversation header />}
       {chevron && <ConversationsToggle t={t} hidden={hidden} />}
     </div>
   );
@@ -144,12 +149,13 @@ function HeaderConversations({ t }: { t: Translate }) {
  * then opens at theirs. */
 function SettingsButton({ t }: { t: Translate }) {
   const news = useHighlights();
-  const label = news.length ? t("highlights.gear", { n: news.length }) : t("header.settings");
+  const attention = useSettingsAttention();
+  const label = attention ? t("settings.attention") : news.length ? t("highlights.gear", { n: news.length }) : t("header.settings");
   return (
     <span className="header-settings">
       {/* Settings' own trigger (aria-controls) on a phone: focus comes back here when what opened Settings has gone. */}
       <Button id="settings-open" variant="ghost" tone="neutral" size="icon" aria-label={label} title={label} aria-haspopup="dialog" aria-controls="language-settings">
-        <SettingsIcon size={20} /><GearNewMark count={news.length} />
+        <SettingsIcon size={20} /><GearNewMark count={news.length} attention={attention} />
       </Button>
     </span>
   );

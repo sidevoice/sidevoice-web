@@ -8,13 +8,16 @@ import "./transcript.css";
  * microphone's level comes from instead, 0 to 1, read the same way each frame. */
 
 const COLUMN_MS = 55; // one column of history per ~55 ms, so the scroll follows time and not the frame rate
+/** Below this level the microphone hears silence: the waveform waits instead of scrolling it in. */
+const SILENCE = 0.04;
 const CELL = 5; // column pitch in CSS pixels
 const BAR = 3;
 const FLOOR = 2; // a silent column is still a line, never a gap
 
-/** The call's bubbles draw wider, rounder bars on their pill (the soft cards, 2026-10-14); a settings try keeps the
- *  fine ones its row is sized for. */
+/** The person's balloon on the stage draws long rows of fine bars, as a voice note (2026-10-15); the transcript's open
+ *  turn wider, rounder bars on its pill (the soft cards, 2026-10-14); a settings try the fine ones its row is sized for. */
 export function waveformBrush(node: HTMLElement): { pitch: number; width: number } {
+  if (node.closest(".person-turns")) return { pitch: 6, width: 3 };
   return node.closest(".call-layout") ? { pitch: 8, width: 5 } : { pitch: CELL, width: BAR };
 }
 
@@ -73,9 +76,10 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
 
     const size = () => {
       const ratio = window.devicePixelRatio || 1;
+      // Its layout size, not its box on screen: a balloon popping in (scaled) must not make the bars smaller for good.
       const box = node.getBoundingClientRect();
-      width = Math.max(1, Math.round(box.width || node.clientWidth || 0));
-      height = Math.max(1, Math.round(box.height || node.clientHeight || 0));
+      width = Math.max(1, Math.round(node.clientWidth || box.width || 0));
+      height = Math.max(1, Math.round(node.clientHeight || box.height || 0));
       node.width = Math.round(width * ratio);
       node.height = Math.round(height * ratio);
       context.setTransform?.(ratio, 0, 0, ratio, 0, 0);
@@ -116,11 +120,16 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
     if (reduced || phase !== "listening") return () => { observer.disconnect(); mutation.disconnect(); };
 
     const tick = () => {
-      const own = ownLevel.current;
+      // The level now, as the meter measures it (0 to 1): the call's, or the try's own. Only a host without it falls back to
+      // the analyser's history, which, averaged, barely moves.
+      const own = ownLevel.current ?? window.sidevoiceAudio?.level?.bind(window.sidevoiceAudio);
       const samples = own ? null : window.sidevoiceAudio?.readWaveform() ?? null;
       const value = own ? Math.max(0, Math.min(1, own() || 0)) : samples ? waveColumn(samples) : 0;
       const values = columns.current;
       const now = performance.now();
+      // Silence adds no column: what was said holds its shape through the pauses and the wait for the end of turn, so
+      // the turn closes on the voice's own shape, frozen there while it is transcribed (operator, 2026-10-15).
+      if (value < SILENCE && values.length) { lastColumn = now; frame = requestAnimationFrame(tick); return; }
       if (!values.length || now - lastColumn >= COLUMN_MS) { values.push(value); lastColumn = now; }
       // Between columns the newest one keeps the loudest instant it covers, so a peak is never skipped.
       else values[values.length - 1] = Math.max(values[values.length - 1], value);

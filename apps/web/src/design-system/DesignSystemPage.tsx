@@ -11,7 +11,7 @@ import { Select, type SelectItems } from "../components/ui/Select";
 import { Segmented, Tabs } from "../components/ui/Tabs";
 import { Quote, Snippet, type CopyFeedback } from "../components/ui/Snippet";
 import { Switch } from "../components/ui/Switch";
-import { AddIcon, AdvancedIcon, CloseIcon, CopyIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ProviderLogo, SettingsIcon, SidevoiceMark, TranscriptionIcon, VoicesIcon } from "../components/ui/Icons";
+import { AddIcon, AdvancedIcon, CallSettingsIcon, CloseIcon, CopyIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ProviderLogo, SettingsIcon, ShortcutsIcon, SidevoiceMark, TranscriptionIcon, VoicesIcon } from "../components/ui/Icons";
 import { translator } from "../i18n/translator";
 import { GearNewMark, NewAtEnd, NewBadge, NewOnIcon } from "../features/highlights/highlights";
 import { CONNECTOR_INSTALL } from "../features/pairing/connector-commands";
@@ -300,7 +300,9 @@ function Showcase({ onOpen }: { onOpen: (layout: "dialog" | "page") => void }) {
 
 const NAV = [
   { value: "general", label: "General", icon: <GeneralIcon /> }, { value: "transcription", label: "Transcription", icon: <TranscriptionIcon /> },
-  { value: "voice", label: "Voice", icon: <VoicesIcon /> }, { value: "providers", label: "Providers", icon: <IntegrationsIcon /> },
+  { value: "voice", label: "Voice", icon: <VoicesIcon /> }, { value: "call", label: "Call", icon: <CallSettingsIcon /> },
+  // Shortcuts beside Call: in the desktop app, or wherever there is a keyboard; never on a phone.
+  { value: "shortcuts", label: "Shortcuts", icon: <ShortcutsIcon /> }, { value: "providers", label: "Providers", icon: <IntegrationsIcon /> },
   { value: "machines", label: "Machines", icon: <MachinesIcon /> }, { value: "advanced", label: "Advanced", icon: <AdvancedIcon /> },
 ];
 

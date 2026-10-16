@@ -6,11 +6,11 @@
  * The exceptions are below: a product's own mark and the logos of other people's products are not
  * generic icons and are drawn here. */
 import {
-  Download, Check, CheckCheck, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, ExternalLink, Keyboard, KeyRound,
+  Download, Trash2, Activity, Check, CheckCheck, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, ExternalLink, Keyboard, KeyRound,
   MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
   PanelLeftOpen, Pause, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
   Box, AudioWaveform, ArrowUp, ArrowLeft, ArrowRight, RefreshCcwDot, Pencil, Laptop, Server,
-  Timer, ScrollText, Link, Unlink, Search, ChevronLeft, ChevronRight, Eye, EyeOff, Square, Sparkle,
+  Timer, ScrollText, Link, Unlink, Search, ChevronLeft, ChevronRight, Eye, EyeOff, Square, Sparkle, ShieldCheck,
 } from "lucide-react";
 import type { ComponentType } from "react";
 // Other products' own marks, from their brand kits (assets/logos/README.md: where each comes from and its rules).
@@ -44,6 +44,9 @@ export function OtherMachineIcon({ className, size = 18 }: IconProps) {
 }
 /** Renames what it sits beside. */
 export const EditIcon = mark(Pencil, 14);
+export const DeleteIcon = mark(Trash2, 16);
+/** The voice detector (Silero VAD): it hears when someone speaks. */
+export const VoiceDetectionIcon = mark(Activity, 16);
 export const ConnectorIcon = mark(Plug, 12);
 export const ChevronIcon = mark(ChevronDown, 16);
 /** Puts away what dropped from above: a phone's conversations panel. */
@@ -124,6 +127,10 @@ export const ArrowLeftIcon = mark(ArrowLeft, 20);
 export const UpdateIcon = mark(RefreshCcwDot, 18);
 /** The call's own behaviour: your turn, the sound while the agent works, the screen. */
 export const CallSettingsIcon = mark(Phone, 16);
+/** The keys for the microphone: the desktop app's global one, and those the room answers while it is in front. */
+export const ShortcutsIcon = mark(Keyboard, 16);
+/** What this device lets Sidevoice use (Settings › Permissions). */
+export const PermissionsIcon = mark(ShieldCheck, 16);
 export const IntegrationsIcon = mark(KeyRound, 16);
 export const AdvancedIcon = mark(Wrench, 16);
 

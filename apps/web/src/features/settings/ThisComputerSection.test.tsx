@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { waitFor } from "@testing-library/react";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { withMicrophone } from "./with-microphone.test-util";
 import { SettingsDialog } from "./SettingsDialog";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
@@ -44,9 +45,10 @@ const addSays = (whole: string) => { expect(add()).toHaveAccessibleName(whole); 
 
 const navIcon = (id: string) => document.getElementById("settings-" + id)!.querySelector("svg")!;
 
-test("in the desktop app: This device right before Providers, Remote machines after, each with its own icon", () => {
+test("in the desktop app: Providers, then This device and Remote machines side by side, each with its own icon", () => {
+  withMicrophone();
   open([local, paired()]);
-  expect(sections()).toEqual(["General", "Transcription", "Voice", "Call", "This device", "Providers", "Remote machines", "Advanced"]);
+  expect(sections()).toEqual(["General", "Transcription", "Voice", "Call", "Permissions", "Providers", "This device", "Remote machines", "Advanced"]);
   // A laptop for this device, a server for the others: the wizard's This computer and Another machine.
   expect(navIcon("this-computer")).toHaveClass("lucide-laptop");
   expect(navIcon("machines")).toHaveClass("lucide-server");
@@ -56,12 +58,13 @@ test("in the desktop app: This device right before Providers, Remote machines af
   addSays("Add a remote machine");
 });
 
-test("in the desktop app, in Spanish: Este dispositivo before Proveedores, then Máquinas remotas", () => {
+test("in the desktop app, in Spanish: Proveedores, then Este dispositivo and Máquinas remotas side by side", () => {
+  withMicrophone();
   localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
   open([local, paired()]);
   const names = sections();
-  expect(names.indexOf("Este dispositivo")).toBe(names.indexOf("Proveedores") - 1);
-  expect(names.indexOf("Máquinas remotas")).toBe(names.indexOf("Proveedores") + 1);
+  expect(names.indexOf("Este dispositivo")).toBe(names.indexOf("Proveedores") + 1);
+  expect(names.indexOf("Máquinas remotas")).toBe(names.indexOf("Este dispositivo") + 1);
   expect(names).not.toContain("Máquinas");
   expect(machinesPane().querySelector(".ui-section-title")).toHaveTextContent(/^Máquinas remotas$/);
   expect(machinesNav()).toEqual([expect.stringMatching(/^NUC/), "Añadir"]);
@@ -69,8 +72,9 @@ test("in the desktop app, in Spanish: Este dispositivo before Proveedores, then 
 });
 
 test("in a browser: no This device, and plain Machines with its own icon, in English and in Spanish", () => {
+  withMicrophone();
   open([paired()]);
-  expect(sections()).toEqual(["General", "Transcription", "Voice", "Call", "Providers", "Machines", "Advanced"]);
+  expect(sections()).toEqual(["General", "Transcription", "Voice", "Call", "Permissions", "Providers", "Machines", "Advanced"]);
   expect(document.getElementById("pane-this-computer")).toBeNull();
   expect(navIcon("machines")).toHaveClass("lucide-monitor");
   expect(machinesPane().querySelector(".ui-section-title")).toHaveTextContent(/^Machines$/);

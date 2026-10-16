@@ -29,18 +29,25 @@ async function show(page, { width, height, language = "en", preset }) {
   await expect(cursor).toBeVisible();
   await expect(codex.locator(".host-agent-readiness")).toHaveCount(0);
   const panel = cursor.locator(".host-agent-readiness");
-  await expect(panel).toBeVisible();
+  // Ready says nothing: no chip, no panel. Anything else is a chip in the status line that opens its reasons below.
+  const toggle = cursor.locator(".host-agent-readiness-toggle");
   if (preset === "ready") {
-    await expect(panel).toContainText("Ready");
-    await expect(panel.locator("button")).toHaveCount(0);
-  } else if (preset === "unsupported") {
-    await expect(panel).toContainText(language === "en" ? "Not supported" : "");
-    await panel.locator(".host-agent-readiness-toggle").click();
-    await expect(panel.locator(".host-agent-readiness-body p")).toHaveCount(1);
+    await expect(toggle).toHaveCount(0);
+    await expect(panel).toHaveCount(0);
+    return { cursor, codex, panel };
+  }
+  await expect(toggle).toBeVisible();
+  await expect(panel).toHaveCount(0);
+  if (preset === "unsupported") {
+    await expect(toggle).toContainText(language === "en" ? "Not supported" : "");
+    await toggle.click();
+    await expect(panel).toBeVisible();
+    await expect(panel.locator("p")).toHaveCount(1);
     await expect(panel).toContainText("Cursor voice requires a Mac");
   } else {
-    await panel.locator(".host-agent-readiness-toggle").click();
-    await expect(panel.locator(".host-agent-readiness-body p")).toHaveCount(1);
+    await toggle.click();
+    await expect(panel).toBeVisible();
+    await expect(panel.locator("p")).toHaveCount(1);
     if (preset === "needs_attention") await expect(panel).toContainText(language === "en" ? "Settings › Beta" : "Settings → Beta");
     else if (preset === "unknown_code") await expect(panel).toContainText("Check the new Cursor setup.");
     else {
@@ -54,9 +61,9 @@ async function show(page, { width, height, language = "en", preset }) {
 for (const preset of ["ready", "needs_attention", "unsupported", "unknown_code", "unknown_no_message"]) {
   for (const [view, width, height] of [["desktop", 1280, 900], ["phone", 390, 844]]) {
     test(`agent readiness ${preset} on ${view}`, async ({ page }) => {
-      const { cursor, codex, panel } = await show(page, { width, height, preset });
-      await expect(panel).not.toContainText("sqlite3");
-      await expect(panel).not.toContainText("Join the Sidevoice");
+      const { cursor, codex } = await show(page, { width, height, preset });
+      await expect(cursor).not.toContainText("sqlite3");
+      await expect(cursor).not.toContainText("Join the Sidevoice");
       if (process.env.WEB98_SCREENSHOTS) {
         for (const theme of ["light", "dark"]) {
           await page.evaluate((value) => { document.documentElement.dataset.theme = value; document.documentElement.style.colorScheme = value; }, theme);
@@ -71,7 +78,7 @@ for (const preset of ["ready", "needs_attention", "unsupported", "unknown_code",
 for (const language of ["de", "fr"]) {
   test(`readiness explanation fits a 320px ${language} phone`, async ({ page }) => {
     const { cursor } = await show(page, { width: 320, height: 700, language, preset: "needs_attention" });
-    for (const selector of [".host-agent-readiness-state", ".host-agent-readiness-body p"]) {
+    for (const selector of [".host-agent-readiness-state", ".host-agent-readiness p"]) {
       const element = cursor.locator(selector);
       expect(await element.evaluate((node) => {
         const box = node.getBoundingClientRect();

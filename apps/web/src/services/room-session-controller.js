@@ -22,6 +22,7 @@ import {replyEligibility} from './reply-eligibility.js';
 import {playbackHearing,writtenReplyHearing} from './reply-hearing-policy.js';
 import {refusalError} from './refusals.js';
 import {followWorking} from './working-clock.ts';
+import {shortcut} from '../state/shortcuts.ts';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
 // What this browser speaks in a call: the language of its system, among those the voice handles.
@@ -1588,7 +1589,8 @@ function voicePlaybackLevel(level,entry){
  window.sidevoiceUI?.playbackLevel?.publish?.(level,entry.key);
 }
 // The bubble of the turn being recorded draws the level the voice reports, as a waveform of the last moments.
-window.sidevoiceAudio={readWaveform(){return voice?waveLevels.map((value,index)=>value*(index%2?1:-1)):null}};
+// `level`: the microphone's level now, 0 to 1, as the meter shows it (the bubble's bars follow it frame by frame).
+window.sidevoiceAudio={readWaveform(){return voice?waveLevels.map((value,index)=>value*(index%2?1:-1)):null},level(){return voice?waveLevels[waveLevels.length-1]:0}};
 // A reply to say: written in the conversation, and said after what is being said. Which replies are stale is the
 // room's to say (`voice-reply-withdrawn`); one this page already says is not said twice.
 function receiveReply(d){
@@ -2337,17 +2339,19 @@ function applyLockScreen(on){
 }
 function toggleMic(){holding=false;setMic(!state.micEnabled)}
 function typing(e){return e.target instanceof Element&&!!e.target.closest('input,textarea,select,[contenteditable=true],[role=menu],[role=menuitem],[data-radix-popper-content-wrapper]')}
+// The room's other keys (mute, skip, cancel, the call, the panels) are the key handler's, in React (use-room-shortcuts.ts):
+// only the held one is here, for its release. Its key is the table's (state/shortcuts.ts).
+const HOLD_KEY=shortcut('holdToTalk').code;
 window.addEventListener('keydown',e=>{personSignal();
  if(typing(e)||e.altKey)return;
- if(e.code==='KeyD'&&(e.metaKey||e.ctrlKey)&&!e.shiftKey){e.preventDefault();if(!e.repeat)toggleMic();return}
- if(voice&&e.code==='Space'&&!e.ctrlKey&&!e.metaKey&&!e.target.closest('summary')){
+ if(voice&&e.code===HOLD_KEY&&!e.ctrlKey&&!e.metaKey&&!e.target.closest('summary')){
   e.preventDefault();
   if(spaceDown)return;
   spaceDown=true;
   if(!state.micEnabled){holding=true;setMic(true);state.holding=true}
  }
 },true);
-window.addEventListener('keyup',e=>{if(e.code==='Space'&&spaceDown){e.preventDefault();releaseHold()}},true);
+window.addEventListener('keyup',e=>{if(e.code===HOLD_KEY&&spaceDown){e.preventDefault();releaseHold()}},true);
 window.addEventListener('blur',releaseHold);document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseHold()});
 // A page going away is not a hang-up: its call is parked, and the ticket kept here lets the next load take it back.
 window.addEventListener('pagehide',()=>keepTicket(true));

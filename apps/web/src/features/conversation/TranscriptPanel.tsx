@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { useRoomStore } from "../../state/room-store";
-import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
+import { COMPACT_QUERY, NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { useSurface } from "../../lib/use-surface";
 import { Button } from "../../components/ui/Button";
 import { CloseIcon } from "../../components/ui/Icons";
@@ -12,7 +12,8 @@ import "./transcript.css";
 
 /* The whole conversation, out of the call's way behind the call bar's button (2026-10-10): docked at the call's
  * right on a desktop, the call narrowing to make room; a sheet from the bottom on a phone, a dialog over the dimmed
- * call that holds focus until it closes. It opens on the latest message, with the text box always under it. It stays
+ * call that holds focus until it closes; a compact desktop window, with no room to dock it, opens it over the call from
+ * the right, a dialog too (2026-10-15). It opens on the latest message, with the text box always under it. It stays
  * mounted while closed — the runtime binds the text box by its ids — and is inert then. */
 export function TranscriptPanel() {
   const t = translator();
@@ -21,7 +22,8 @@ export function TranscriptPanel() {
   const open = useCallLayout((state) => state.transcriptOpen);
   const close = useCallLayout((state) => state.closeTranscript);
   const narrow = useMedia(NARROW_QUERY);
-  const modal = narrow && open;
+  const compact = useMedia(COMPACT_QUERY);
+  const modal = (narrow || compact) && open;
   const panel = useRef<HTMLElement>(null);
   useMarkTranscriptSeen();
   useSurface({

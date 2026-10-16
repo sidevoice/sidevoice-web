@@ -11,7 +11,7 @@ import { CallToolbar } from "../features/call/CallToolbar";
 import { PresenceSound } from "../features/call/PresenceSound";
 import { ConnectionStatsDialog } from "../features/diagnostics/ConnectionStatsDialog";
 import { SettingsDialog } from "../features/settings/SettingsDialog";
-import { ResetReportNotice } from "../features/settings/DeleteAllData";
+import { ResetReportNotice } from "../features/settings/DangerZone";
 import { PairingDialog } from "../features/pairing/PairingDialog";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { NoMachineScreen } from "../features/pairing/NoMachineScreen";
@@ -19,7 +19,9 @@ import { LocalHostBanner } from "../features/settings/LocalHostBanner";
 import { UpdateNotice } from "../features/updates/UpdateNotice";
 import { StorageBlockedBanner } from "../features/settings/StorageBlockedBanner";
 import { OnboardingProvider, useOnboarding } from "../features/onboarding/onboarding-context";
-import { SetupPending, Wizard } from "../features/onboarding/Wizard";
+import { Wizard } from "../features/onboarding/Wizard";
+import { callArea } from "../features/onboarding/onboarding-flow";
+import { VoiceSetupCard } from "../features/call/VoiceSetupCard";
 import { useRoomStore } from "../state/room-store";
 import type { OnboardingRepository, OnboardingStep } from "../services/onboarding-state";
 import { useUiLanguage } from "../i18n/use-ui-language";
@@ -35,8 +37,10 @@ function RoomContent() {
   const preparingWithoutPairing = projectedLocalOnly && install.phase !== "idle" && install.source === "no-machine";
   const noMachine = ready && (machines.length === 0 || preparingWithoutPairing);
   const onboarding = useOnboarding();
-  // Until the first setup is finished the room stays out of reach: no header, call bar or settings behind the wizard.
-  const setupPending = !onboarding.ready || !onboarding.record.completed_at;
+  // What the room shows of the setup is decided in onboarding-flow.ts: whether the room waits behind it, and what the
+  // call's own space says is missing — one thing at a time.
+  const { roomHidden, waiting, blocked } = callArea({ ready: onboarding.ready, done: onboarding.done, noMachine: !!noMachine, voice: onboarding.voice.state });
+  const callBlocked = waiting !== null;
 
   useEffect(() => {
     if (install.phase === "installing") {
@@ -67,28 +71,33 @@ function RoomContent() {
     <>
       <StorageBlockedBanner />
       <ResetReportNotice />
-      <div className="room-shell" hidden={setupPending} aria-hidden={setupPending || undefined}>
-        <RoomHeader />
+      <div className="room-shell" hidden={roomHidden} aria-hidden={roomHidden || undefined}>
+        <RoomHeader blocked={blocked} />
         <LocalHostBanner />
-        {/* The call: the conversations, the stage over its bar, and the transcript when it is open (2026-10-10). */}
-        <main className={noMachine ? undefined : "call-layout"}>
-          {noMachine ? <NoMachineScreen source="no-machine" /> : <>
-            <ErrorBoundary area="participants"><ConversationSidebar /></ErrorBoundary>
-            {/* The stage and its call bar share a column, so the bar centres under the stage and the conversations and
-                the transcript run the screen's whole height beside them. */}
-            <div className="call-column">
-              {/* An update waiting, said over the stage: a pill at its top, a desktop's only, never moving it. */}
-              <ErrorBoundary area="stage"><CallStage notice={<UpdateNotice />} /></ErrorBoundary>
-              <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>
-            </div>
-            <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>
-          </>}
+        {/* The call: the conversations, the stage over its bar, and the transcript when it is open (2026-10-10). One layout
+            whatever is set up (operator, 2026-10-16): the conversations' column and Settings always; only the call's own
+            space says what is missing — what is missing — one at a time. */}
+        <main className="call-layout">
+          <ErrorBoundary area="participants"><ConversationSidebar blocked={blocked} /></ErrorBoundary>
+          {callBlocked && <div className="call-column call-column--waiting" data-waiting={waiting}>
+            {waiting === "machine" ? <NoMachineScreen source="no-machine" />
+              : waiting === "voice" ? <VoiceSetupCard rows={onboarding.voice.rows} />
+              : null}
+          </div>}
+          {/* The stage and its call bar share a column, so the bar centres under the stage and the conversations and
+              the transcript run the screen's whole height beside them. Kept in the page while the call's space waits (only
+              hidden): the runtime binds their controls as it starts. */}
+          <div className="call-column" hidden={callBlocked}>
+            {/* An update waiting, said over the stage: a pill at its top, a desktop's only, never moving it. */}
+            <ErrorBoundary area="stage"><CallStage notice={<UpdateNotice />} /></ErrorBoundary>
+            <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>
+          </div>
+          <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>
         </main>
-        {!noMachine && <PresenceSound />}
+        {!callBlocked && <PresenceSound />}
         <ConnectionStatsDialog />
         <SettingsDialog />
       </div>
-      {setupPending && onboarding.ready && !onboarding.open && <main className="setup-main"><SetupPending /></main>}
       {onboarding.ready && <Wizard />}
       <PairingDialog />
     </>

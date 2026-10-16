@@ -291,12 +291,14 @@ test("the model's load is said after the try's time only when it had to load (fr
   expect(document.querySelector("#stt-timing .ui-infotip")).toBeNull();
 });
 
-test("the voice's try is laid out as the transcription's: the button and the level first, the sentence shown and editable before any try", () => {
+test("the voice's try: the button and the sentence on its first row, the sentence shown and editable before any try", () => {
   renderPane();
   const block = document.getElementById("tts-try-block")!;
   const head = block.querySelector(".stt-try-head")!;
   expect(head).toContainElement(document.getElementById("tts-try"));
-  expect(head.querySelector(".voice-wave canvas")).toBeInTheDocument();
+  // The sentence takes the level's place: no waveform.
+  expect(head.querySelector(".voice-wave canvas")).toBeNull();
+  expect(head).toContainElement(block.querySelector("button.tts-try-said") as HTMLElement);
   expect(block.querySelector(".turn-try-main")).toBeNull();
   expect(block.querySelector(".stt-try-area.tts-try-area .model-try-live")).toHaveAttribute("aria-live", "polite");
   // The sentence, before any try: a quote; a click on it, or its pencil, makes it a box to edit.
@@ -309,9 +311,13 @@ test("the voice's try is laid out as the transcription's: the button and the lev
   expect(block.querySelector("#tts-sentence")).toBeNull();
   fireEvent.click(block.querySelector(".tts-try-sentence > button.ui-button")!);
   expect(block.querySelector("#tts-sentence")).toBeInTheDocument();
+  // Editing: a check says it is done, and the quote comes back.
+  fireEvent.click(within(block).getByRole("button", { name: "Done" }));
+  expect(block.querySelector("#tts-sentence")).toBeNull();
+  expect(block.querySelector("button.tts-try-said")).toBeInTheDocument();
 });
 
-test("the voice's try: Play says the sentence edited, lit while it speaks; then how quick under it, the bars still there, and Play again", async () => {
+test("the voice's try: Play says the sentence edited, lit while it speaks; then how quick under it, and Play again", async () => {
   const { actions } = renderPane();
   const block = document.getElementById("tts-try-block")!;
   const head = () => block.querySelector(".stt-try-head")!;
@@ -321,23 +327,21 @@ test("the voice's try: Play says the sentence edited, lit while it speaks; then 
   const running = pendingTry(actions);
   await act(async () => { fireEvent.click(document.getElementById("tts-try")!); });
   expect(actions.tryVoiceSettings).toHaveBeenLastCalledWith("tts", expect.objectContaining({ text: "Otra frase." }));
-  // Getting ready, under the sentence; the button is Stop, beside the bars.
+  // Getting ready, under the sentence; the button is Stop, beside the sentence.
   expect(area().querySelector(".model-try-live")).toHaveTextContent("Getting ready…");
   expect(document.getElementById("tts-try")).toHaveTextContent("Stop");
   expect(head()).toContainElement(document.getElementById("tts-try"));
-  expect(head().querySelector(".voice-wave canvas")).toBeInTheDocument();
+  expect(head().querySelector(".voice-wave canvas")).toBeNull();
   // Speaking: the sentence lit as heard, not editable.
   act(() => { running.told.onProgress!({ from: 0, to: 0 }); running.told.onProgress!({ from: 4, to: 4 }); });
-  expect(area().querySelector(".model-try-said")).toHaveTextContent(/^Otra$/);
+  expect(head().querySelector(".tts-try-sentence .model-try-said")).toHaveTextContent(/^Otra$/);
   expect(block.querySelector("#tts-sentence, button.tts-try-said")).toBeNull();
   expect(within(block).queryByRole("button", { name: "Edit the sentence" })).toBeNull();
-  expect(head().querySelector(".voice-wave canvas")).toBeInTheDocument();
   expect(area()).not.toHaveTextContent("Getting ready…");
   await act(async () => { running.finish({ timings: { ready_ms: 300, first_sound_ms: 250 } }); });
-  // Done: the sentence in full, how quick under it; the bars and the button where they were, now Play again.
-  expect(area().querySelector(".tts-try-sentence")).toHaveTextContent(/^Otra frase\.$/);
-  expect(area().querySelector(".tts-try-sentence + .model-try-live #tts-timing")).toHaveTextContent(/^First sound in 0\.3 s$/);
-  expect(head().querySelector(".voice-wave canvas")).toBeInTheDocument();
+  // Done: the sentence in full on the first row, how quick under it; the button where it was, now Play again.
+  expect(head().querySelector(".tts-try-sentence")).toHaveTextContent(/^Otra frase\.$/);
+  expect(area().querySelector("#tts-timing")).toHaveTextContent(/^First sound in 0\.3 s$/);
   expect(head()).toContainElement(document.getElementById("tts-try"));
   expect(document.getElementById("tts-try")).toHaveTextContent(/^Play again$/);
   // Stop, while it speaks, stops it.
@@ -356,7 +360,7 @@ test("a try that failed says why in its block, and offers it again", async () =>
 });
 
 
-test("a transcription try that stopped shows its take in its try block, after the result and outside what is read out as it comes, with no turn marked in it; stopped by the person, it goes", async () => {
+test("a transcription try that stopped shows its take in its try block, in the level's place and outside what is read out as it comes, with no turn marked in it; stopped by the person, it goes", async () => {
   const { actions } = renderPane();
   const block = document.getElementById("stt-try-block")!;
   const take = { sampleRate: 16000, samples: new Float32Array(32000), started_at: 0, ended_at: 2000, turns: [{ turn_id: "t1", speech_ms: 300, pauses: [], end_ms: 1700 }] };
@@ -373,8 +377,9 @@ test("a transcription try that stopped shows its take in its try block, after th
   expect(shown).not.toHaveTextContent("turn ends");
   expect(shown.querySelector(".try-take-mark, .try-take-pause")).toBeNull();
   expect(shown.closest("[aria-live]")).toBeNull();
-  // After what was heard, and not in the model's card (the try moved out of it, into the try block).
-  expect(block.querySelector("#stt-heard")!.compareDocumentPosition(shown) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // Inline on the button's row, where the level was, and not in the model's card (the try moved out of it, into the try block).
+  expect(block.querySelector(".stt-try-head")).toContainElement(shown as HTMLElement);
+  expect(block.querySelector(".stt-try-area")).not.toContainElement(shown as HTMLElement);
   expect(document.getElementById("stt-model-card")!.querySelector("#stt-take")).toBeNull();
   // The voice's own try records no one: no take.
   expect(document.getElementById("tts-take")).toBeNull();

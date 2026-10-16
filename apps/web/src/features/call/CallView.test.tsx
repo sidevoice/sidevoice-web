@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { App } from "../../app/App";
 import { createRoomStore, type RoomStore } from "../../state/room-store";
-import { NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, SIDEBAR_COLLAPSED_KEY } from "../../state/call-layout";
+import { COMPACT_QUERY, NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, SIDEBAR_COLLAPSED_KEY } from "../../state/call-layout";
 import { OPEN_CONVERSATIONS } from "../room/ConversationSidebar";
 import { WORKING_SHOWN_AFTER_MS, type SessionFacts } from "../../state/room-session-state.js";
 import { markSetUp } from "../../test/onboarding";
@@ -62,10 +62,12 @@ beforeEach(() => {
 });
 afterEach(() => { delete window.sidevoiceActions; localStorage.clear(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
-/** A window of a given kind: a phone, or a desktop too narrow for the open sidebar beside the docked transcript. */
-function viewport({ narrow = false, crowded = false }) {
+/** A window of a given kind: a phone, a compact desktop window, or a desktop too narrow for the open sidebar beside the
+ *  docked transcript. */
+function viewport({ narrow = false, compact = false, crowded = false }) {
   vi.spyOn(window, "matchMedia").mockImplementation((media: string) => ({
-    media, matches: (media === NARROW_QUERY && narrow) || (media === RAIL_WITH_TRANSCRIPT_QUERY && (narrow || crowded)), onchange: null,
+    media, matches: (media === NARROW_QUERY && narrow) || (media === COMPACT_QUERY && compact) || (media === RAIL_WITH_TRANSCRIPT_QUERY && (narrow || compact || crowded)),
+    onchange: null,
     addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false,
   }) as unknown as MediaQueryList);
 }
@@ -96,16 +98,25 @@ test("the stage plays what the agent says as a karaoke bubble, the whole reply i
   expect(stageAgent()).toHaveAccessibleName("Fix the slow login · Speaking");
 
   // Its last words said, it stays a moment, whole; what the agent is doing stands under it.
+  vi.useFakeTimers();
   patch(store, { botLive: false, karaokeState: null, harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login"),
     history: [{ ...store.getState().facts.history[0], audio: "played" }] } as Partial<SessionFacts>);
   expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe(REPLY);
   expect(document.querySelector(".stage-bubble")).not.toHaveAttribute("data-leaving");
+  // The balloon is the decided look: its place is the stored one (centre by default), always three lines.
+  expect(document.querySelector(".stage-bubble")).not.toHaveAttribute("data-lines");
   // Said to assistive tech only: no badge over the agent (the sidebar shows it).
   expect(workingLine()).toHaveClass("sr-only");
   expect(workingLine()).toHaveTextContent("Working…");
   expect(document.querySelector(".stage-activity")).toBeNull();
+  // Under its balloon the agent holds still and shows as speaking: the work waits for the balloon to go.
+  expect(stageAgent()).toHaveAttribute("data-avatar-state", "speaking");
+  expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "speaking");
+  expect(document.querySelector(".stage-desk svg.desk")).toBeInTheDocument();
+  // The balloon gone, it works at the desk that slid in, a tool in hand, the cogs turning.
+  tick(AGENT_LINGER_MS + SENT_LEAVING_MS);
+  expect(document.querySelector(".stage-bubble")).toBeNull();
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "working");
-  // It works at the desk that slid in, a tool in hand, the cogs turning.
   expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "working");
   expect(document.querySelector(".stage-desk svg.desk")).toBeInTheDocument();
   expect(stageAgent()).toHaveAttribute("data-desk");
@@ -229,7 +240,8 @@ test("the preview holds the stage avatar in a mood, with something unheard when 
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "speaking");
   for (const mood of ["idle", "listening", "working", "present", "offline"] as const) {
     patch(store, { avatarPreview: { mood } });
-    expect(stageAgent()).toHaveAttribute("data-avatar-state", mood);
+    // Its reply's balloon is up here, and under it a working agent shows as speaking.
+    expect(stageAgent()).toHaveAttribute("data-avatar-state", mood === "working" ? "speaking" : mood);
     expect(stageAgent()).not.toHaveAttribute("data-unread");
   }
   patch(store, { avatarPreview: { mood: "present", unread: true } });
@@ -582,6 +594,46 @@ test("a desktop too narrow for both shows the rail while the transcript is docke
   expect(localStorage.getItem(SIDEBAR_COLLAPSED_KEY)).toBeNull();
 });
 
+test("a compact desktop window keeps the rail, whose toggle opens the whole list over the stage as a dialog; the transcript opens over the call too", async () => {
+  viewport({ compact: true });
+  const store = room();
+  selectParticipant.mockImplementation((threadId: string) => store.patch({ viewedThread: threadId }));
+  const sidebar = document.getElementById("conversations")!;
+  const toggle = screen.getByRole("button", { name: "Expand conversations" });
+  expect(sidebar).toHaveAttribute("data-collapsed");
+  expect(sidebar).not.toHaveAttribute("role");
+  // A desktop's way into the transcript, at the bar's right end; a desktop's foot, Settings in the rail.
+  expect(document.getElementById("transcript-toggle")!.closest(".call-bar-end")).not.toBeNull();
+  expect(sidebar.querySelector(".sidebar-settings")).not.toBeNull();
+  toggle.focus();
+  await act(async () => { fireEvent.click(toggle); });
+  expect(sidebar).toHaveAttribute("data-open");
+  expect(sidebar).not.toHaveAttribute("data-collapsed");
+  expect(sidebar).toHaveAttribute("role", "dialog");
+  expect(sidebar).toHaveAttribute("aria-modal", "true");
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  expect(toggle).toHaveAccessibleName("Collapse conversations");
+  expect(document.activeElement).toBe(rowOf("Fix the slow login"));
+  escape();
+  expect(sidebar).toHaveAttribute("data-collapsed");
+  expect(sidebar).not.toHaveAttribute("role");
+  expect(document.activeElement).toBe(toggle);
+  // One chosen there: the list goes, and focus goes to its avatar in the rail.
+  await act(async () => { fireEvent.click(toggle); });
+  await act(async () => { fireEvent.click(rowOf("Review the nightly backups")); });
+  expect(selectParticipant).toHaveBeenCalledWith("fp-2|t-backup");
+  expect(sidebar).not.toHaveAttribute("data-open");
+  expect(document.activeElement).toBe(rowOf("Review the nightly backups"));
+  // The transcript is a dialog over the call as well, and opening it puts the list away.
+  await act(async () => { fireEvent.click(toggle); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: /^Show transcript/ })); });
+  expect(sidebar).not.toHaveAttribute("data-open");
+  expect(document.getElementById("transcript")).toHaveAttribute("role", "dialog");
+  expect(document.getElementById("transcript")).toHaveAttribute("aria-modal", "true");
+  // None of it touched the person's own choice for a wide window.
+  expect(localStorage.getItem(SIDEBAR_COLLAPSED_KEY)).toBeNull();
+});
+
 test("the phone sheet keeps Tab inside, and steps aside for a dialog opened over it", async () => {
   viewport({ narrow: true });
   // jsdom lays nothing out; here every control counts as on screen.
@@ -687,14 +739,18 @@ test("the transcript button wears a dot for what arrives while it is closed; ope
 test("the Working… line over the agent is an sr-only status, with no visible badge in its place", () => {
   const store = room();
   expect(workingLine()).toBeNull();
+  vi.useFakeTimers();
   patch(store, { harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login") });
-  expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "working");
+  // While the reply's balloon is up the stage shows speaking; the sr-only status still follows the real mood.
+  expect(document.querySelector(".stage-bubble")).not.toBeNull();
+  expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "speaking");
+  expect(stageAgent()).toHaveAttribute("data-mood", "speaking");
   expect(workingLine()).toHaveClass("sr-only");
   expect(workingLine()).toHaveTextContent("Working…");
   expect(workingLine()!.querySelector(".ui-spinner")).toHaveAttribute("aria-hidden", "true");
   expect(screen.getAllByRole("status")).toContain(workingLine());
   expect(document.querySelector(".stage-activity")).toBeNull();
-  // The desk still says it to the eye.
+  // The desk waits for the balloon to go (the first test follows it out).
   expect(document.querySelector(".stage-desk svg.desk")).toBeInTheDocument();
   // The work over, the line goes.
   patch(store, { harness: { "fp-1|t-login": false } });
@@ -707,4 +763,18 @@ test("a working-badge choice left in storage changes nothing: the line stays sr-
   patch(store, { harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login") });
   expect(workingLine()).toHaveClass("sr-only");
   expect(document.querySelector(".stage-activity")).toBeNull();
+}, WHOLE_APP_MS);
+
+test("the voice error lies over the stage's top as one alert, outside the tile; its close clears it", () => {
+  const store = room();
+  patch(store, { bootError: { text: "Algo falló con la voz.", details: "TypeError\nFailed to fetch" } });
+  expect(document.querySelectorAll("#error")).toHaveLength(1);
+  expect(document.querySelector(".stage-tile #error")).toBeNull();
+  const card = document.querySelector<HTMLElement>(".call-stage > #error")!;
+  expect(card).toHaveAttribute("role", "alert");
+  expect(card).toHaveTextContent("Algo falló con la voz.");
+  expect(card.querySelector("details, summary, button")).not.toBeNull();
+  fireEvent.click(within(card).getByRole("button", { name: "Close" }));
+  expect(store.getState().facts.bootError).toBeNull();
+  expect(document.querySelector("#error")).toBeEmptyDOMElement();
 }, WHOLE_APP_MS);

@@ -8,7 +8,7 @@ import { installHarness } from "./harness.mjs";
 
 // The setup's record at its first step, the basics.
 const AT_BASICS = {
-  version: 1, basics_done: false, choice: null, agents_done: false, turn_done: false, deferred_at: null, completed_at: null, trials: {},
+  version: 1, basics_done: false, choice: null, agents_done: false, turn_done: false, completed_at: null, trials: {},
   chosen: {}, baseline_release: 0, features: {},
 };
 
@@ -60,15 +60,16 @@ for (const [name, viewport, phone] of [["desktop", { width: 1280, height: 800 },
   test.describe(name, () => {
     test.use({ viewport, hasTouch: phone, isMobile: phone });
 
-    test("the setup's basics: a language picked from a list on top of the dialog, dropped from its box", async ({ page }) => {
+    test("the setup's basics: the interface language picked from a list on top of the dialog, dropped from its box", async ({ page }) => {
       await installHarness(page, { onboarding: AT_BASICS });
       await page.goto("/voice/");
       const wizard = page.locator("#wizard");
       await expect(wizard.locator("#wizard-title")).toHaveText("The basics");
       expect(await wizard.evaluate((element) => element.matches(":modal"))).toBe(true);
-      const speech = page.locator("#wizard-speech-language");
-      await pick(page, speech, "en", "English", phone);
-      if (!phone) await escapeKeepsDialog(page, speech, wizard);
+      // The interface's language is the basics' one list (the language spoken is the speech model's own setting).
+      const language = page.locator("#wizard-ui-language");
+      await pick(page, language, "de", "Deutsch", phone);
+      if (!phone) await escapeKeepsDialog(page, language, wizard);
     });
 
     test("Settings › Advanced: a list on top of Settings, anchored to its box, which goes up near the bottom edge", async ({ page }) => {

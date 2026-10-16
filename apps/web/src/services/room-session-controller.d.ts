@@ -26,7 +26,7 @@ declare global {
       playbackLevel?: import("../state/playback-level").PlaybackLevelChannel;
     };
     /** The meter's analyser, pulled per animation frame by the waveform bubble; null while no call captures. */
-    sidevoiceAudio?: { readWaveform(): Float32Array | null };
+    sidevoiceAudio?: { readWaveform(): Float32Array | null; level?(): number };
     /** One uncaught error in the interface, on its way to the room. Never any transcript text. */
     sidevoiceReportError?: (report: { kind: string; message: string; stack?: string; component?: string }) => void;
     /** Reports raised before the controller (and its socket) exist. */

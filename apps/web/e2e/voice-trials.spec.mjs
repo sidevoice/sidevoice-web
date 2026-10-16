@@ -116,7 +116,7 @@ test("the candidate browser host reports a heard reply with scalar progress and 
 
 test("a recorded settings try delivers the package take through the real trial action", async ({ page }) => {
   await installVoicePackageRoute(page);
-  await installHarness(page);
+  await installHarness(page, { voiceReady: false });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/voice/");
   await page.waitForFunction(() => !!window.sidevoiceActions && !!window.sidevoiceUI?.store);
@@ -195,7 +195,7 @@ test("a recorded settings try delivers the package take through the real trial a
 });
 
 test("a completed transcription take shows its waveform with only its start and stop, no turn marks, then releases replay audio", async ({ page }) => {
-  await installHarness(page);
+  await installHarness(page, { voiceReady: false });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/voice/");
   await page.waitForFunction(() => !!window.sidevoiceActions);
@@ -247,7 +247,7 @@ test("a completed transcription take shows its waveform with only its start and 
 });
 
 test("an ended turn shows its pause and end marks under the detected result", async ({ page }) => {
-  await installHarness(page);
+  await installHarness(page, { voiceReady: false });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/voice/");
   await page.waitForFunction(() => !!window.sidevoiceActions);
@@ -279,6 +279,11 @@ test("an ended turn shows its pause and end marks under the detected result", as
   await expect(page.locator("#turn-try-panel")).toContainText("Detected you finished");
   const take = page.locator("#turn-try-take");
   await expect(take).toBeVisible();
-  await expect(take.locator('.try-take-marks [data-kind="pause"]')).toHaveCount(1);
-  await expect(take.locator('.try-take-marks [data-kind="end"]')).toHaveCount(1);
+  // The inline take draws its marks on the wave, names what the colours mean under it, and says each in words to assistive tech.
+  await expect(take.locator('.try-take-wave [data-kind="pause"]')).toHaveCount(1);
+  await expect(take.locator('.try-take-wave [data-kind="end"]')).toHaveCount(1);
+  await expect(take.locator('.try-take-key-line [data-kind="pause"]')).toBeVisible();
+  await expect(take.locator('.try-take-key-line [data-kind="end"]')).toBeVisible();
+  await expect(take.locator('.sr-only [data-kind="pause"]')).toHaveCount(1);
+  await expect(take.locator('.sr-only [data-kind="end"]')).toHaveCount(1);
 });

@@ -5,13 +5,13 @@ import {
 
 /* B09 Gear I: head and face accessories (docs/catalogue.md §2.11, §5.2).
  *
- * Hats (party hat, top hat, beret, chef's hat, hard hat, bucket, straw, leaf, propeller cap) are rigid: drawn on the
- * reference body, they join `hat` and seat themselves like the core hats (the kit's `seatHat`): up to 3 units off the
- * head so the raised brows clear the brim, otherwise seated with a declared `brim` (the renderer leaves the brows out).
- * On top of that they never come down over the eyes (`clearEyes`): a three-eyed or big-eyed face lifts the hat. Each
- * hat's brim is measured from its own drawing (its lowest point across the forehead), so a tilted hat declares the
- * brim it really has. Like the core hats' `worn`, they draw an inner copy of the pieces that lie on the head, so they
- * cover a cat's inner ears and tabby stripes.
+ * Hats (party hat, top hat, beret, chef's hat, hard hat, bucket, the XX bucket in three colours, straw, leaf, propeller
+ * cap) are rigid: drawn on the reference body, they join `hat` and seat themselves like the core hats (the kit's
+ * `seatHat`): up to 3 units off the head so the raised brows clear the brim, otherwise seated with a declared `brim`
+ * (the renderer leaves the brows out). On top of that they never come down over the eyes (`clearEyes`): a three-eyed
+ * or big-eyed face lifts the hat. Each hat's brim is measured from its own drawing (its lowest point across the
+ * forehead), so a tilted hat declares the brim it really has. Like the core hats' `worn`, they draw an inner copy
+ * of the pieces that lie on the head, so they cover a cat's inner ears and tabby stripes.
  *
  * Clips (hair bow, daisy) join `crownR` and sit in the hair, in front of the brows: their fat outline is merged, and
  * their face is drawn again over the face (`over`), shaded the cast's way (`ctx.shade`), so a raised brow
@@ -179,6 +179,57 @@ function bucket(T: number): HatArt {
       { d: brim, c: "spot", ink: "inner", stroke: 2 },
     ],
     over: `<path class="b09-stitch" d="M35.5 ${T + 8.9}Q60 ${T + 11.6} 84.5 ${T + 8.9}M48 ${T - 7}Q60 ${T - 8.6} 72 ${T - 7}"/>`,
+  };
+}
+
+
+/* The XX bucket (the operator's own hat): a black bucket hat splattered with white paint and grey drips, and on its front
+ * a face in raised 3D-puff lines of one bright colour — two big X eyes on the crown, a stitched grin across the band (a
+ * line with short ticks across it) curving up the sides toward the eyes. The puff lines are drawn the cast's way, ink
+ * under the colour, thicker at the small sizes so the eyes and the grin still read in the sidebar; the splatter is
+ * a few big specks (gone at the rail) and drips down the crown (the stage only). One part per colour, so each can be
+ * asked for by name. It is big enough to cover the top of the head: it blocks the headphones' band, as the tall hats do. */
+const XX_BLACK: Paint = "#2c2832", XX_BAND: Paint = "#221e28", XX_SPECK: Paint = "#f4f1ea", XX_DRIP: Paint = "#8d8796";
+const XX_PUFF: Record<"purple" | "lime" | "orange", Paint> = { purple: "#9b5de5", lime: "#c6f36b", orange: "#ff6a2b" };
+
+function xxBucket(puff: Paint) {
+  return (T: number, ctx: Ctx): HatArt => {
+    const small = ctx.size !== "stage";
+    // A real bucket hat, bigger than the plain one: a tall rounded crown over the top of the head, and a wide brim that
+    // hangs down at both sides past the head. Only its front, between the brows, decides how high it sits.
+    const crown = `M31 ${T + 13}C29.5 ${T + 1} 33 ${T - 11.5} 60 ${T - 12.5}C87 ${T - 11.5} 90.5 ${T + 1} 89 ${T + 13}Z`;
+    const brim = `M24 ${T + 13}Q60 ${T + 7} 96 ${T + 13}Q103 ${T + 15.5} 104 ${T + 20.5}Q104.5 ${T + 23} 100 ${T + 22.5}Q60 ${T + 16} 20 ${T + 22.5}Q15.5 ${T + 23} 16 ${T + 20.5}Q17 ${T + 15.5} 24 ${T + 13}Z`;
+    // The face: two big X eyes on the crown's front, about a third of its width each; the grin along the band, its
+    // stitches crossing it onto the brim, its ends rising up the sides toward the eyes. At the small sizes the
+    // silhouette and the eyes come first: no stitches, thicker lines.
+    const x = (cx: number, cy: number, r: number) => `M${n(cx - r)} ${n(cy - r)}L${n(cx + r)} ${n(cy + r)}M${n(cx + r)} ${n(cy - r)}L${n(cx - r)} ${n(cy + r)}`;
+    const r = small ? 6.6 : 6;
+    const eyes = x(47.5, T - 1.5, r) + x(72.5, T - 1.5, r);
+    const gy = T + 10.5;
+    const smile = `M34 ${n(gy)}L86 ${n(gy)}M34 ${n(gy)}Q30.4 ${n(gy - 6)} 34.8 ${T - 3.5}M86 ${n(gy)}Q89.6 ${n(gy - 6)} 85.2 ${T - 3.5}`;
+    const stitches = small ? "" : [37.5, 41.5, 45.5, 49.5, 53.5, 57.5, 62.5, 66.5, 70.5, 74.5, 78.5, 82.5].map((tx) => `M${tx} ${n(gy - 2.6)}L${tx} ${n(gy + 2.6)}`).join("")
+      + `M30.4 ${n(gy - 3.4)}L34.4 ${n(gy - 3.9)}M31.2 ${T + 1.6}L35 ${T + 1.6}M89.6 ${n(gy - 3.4)}L85.6 ${n(gy - 3.9)}M88.8 ${T + 1.6}L85 ${T + 1.6}`;
+    const w = small ? 3.4 : 2.6, k = small ? 6 : 4.6;
+    const puffLines = (d: string): Piece[] => [
+      { d, c: "ink", w: k, ink: "inner", flat: true },
+      { d, c: puff, w, ink: "inner", flat: true },
+    ];
+    // Paint: a few big white specks (gone at the rail), and grey drips down the crown (the stage alone).
+    const specks = [[39, T - 5, 1.5], [60, T - 8.5, 1.2], [83, T + 4.5, 1.4], [27.5, T + 18.5, 1.3], [55, T + 16.8, 1.2], [92, T + 17.6, 1.5]]
+      .map(([sx, sy, sr]): Piece => ({ d: ellipse(sx, sy, sr, sr * 0.85), c: XX_SPECK, ink: "inner", flat: true, lod: 1 }));
+    const drips: Piece[] = [
+      { d: `M60 ${T - 11.6}L60 ${T - 7.4}`, c: XX_DRIP, w: 1.3, ink: "inner", flat: true, lod: 2 },
+      { d: `M36.5 ${T + 2}L36.5 ${T + 6.2}`, c: XX_DRIP, w: 1.2, ink: "inner", flat: true, lod: 2 },
+      { d: `M81.5 ${T - 6}L81.5 ${T - 2}`, c: XX_DRIP, w: 1.2, ink: "inner", flat: true, lod: 2 },
+    ];
+    return {
+      body: [{ d: crown, c: XX_BLACK }, { d: brim, c: XX_BLACK }],
+      front: [
+        { d: `M31.2 ${T + 7.6}L88.8 ${T + 7.6}L89 ${T + 13}L31 ${T + 13}Z`, c: XX_BAND, ink: "inner" },
+        { d: brim, c: XX_BLACK, ink: "inner", stroke: 2 },
+        ...drips, ...specks, ...puffLines(eyes), ...puffLines(smile + stitches),
+      ],
+    };
   };
 }
 
@@ -575,6 +626,11 @@ export default batch({
     { ...TALL, id: "chef-hat", label: "gorro de chef", draw: hat(chefHat) },
     { ...HAT, id: "hardhat", label: "casco de obra", draw: hat(hardHat) },
     { ...HAT, id: "bucket", label: "gorro de pescador", draw: hat(bucket) },
+    // The XX bucket, one part per puff colour, each at a modest weight (1 against a hat's usual 10): about a tenth of the
+    // bucket's showing, the three together. Their own ids let a seed ask for one colour by name.
+    { ...HAT, tags: ["blocks-band"], id: "xx-bucket-purple", label: "gorro XX morado", weight: 1, draw: hat(xxBucket(XX_PUFF.purple)) },
+    { ...HAT, tags: ["blocks-band"], id: "xx-bucket-lime", label: "gorro XX lima", weight: 1, draw: hat(xxBucket(XX_PUFF.lime)) },
+    { ...HAT, tags: ["blocks-band"], id: "xx-bucket-orange", label: "gorro XX naranja", weight: 1, draw: hat(xxBucket(XX_PUFF.orange)) },
     { ...HAT, id: "straw", label: "sombrero de paja", draw: hat(straw) },
     { ...HAT, id: "leaf-hat", label: "hoja", group: "sprout", draw: hat(leafHat) },
     { ...HAT, id: "propeller-cap", label: "gorra con hélice", noise: 3, tags: ["blocks-band"], draw: hat(propellerCap) },
@@ -605,6 +661,9 @@ export default batch({
     "bicho:furry/bear:b09-chef?headgear=chef-hat&eyewear=mustache",
     "bicho:bots/robot:b09-obra?headgear=hardhat&earwear=none",
     "bicho:pond/frog:b09-pescador?headgear=bucket",
+    "bicho:furry/cat:b09-xx-morado?headgear=xx-bucket-purple",
+    "bicho:monsters/monster:b09-xx-lima?headgear=xx-bucket-lime&eyes=two",
+    "bicho:furry/bear:b09-xx-naranja?headgear=xx-bucket-orange",
     "bicho:furry/bunny:b09-paja?headgear=straw",
     "bicho:monsters/monster:b09-hoja?headgear=leaf-hat&top=none&eyes=two",
     "bicho:monsters/monster:b09-helice?headgear=propeller-cap&eyes=cyclops",

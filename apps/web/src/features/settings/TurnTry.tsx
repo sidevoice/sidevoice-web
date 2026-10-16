@@ -189,7 +189,8 @@ export function TurnTry({ draft, smart, smartReady, setup = false, active = true
     {!setup && <p className="model-try-hint">{t("turnTry.draft")}</p>}
   </div>;
   const failure = trial.phase === "failed" && trial.error ? <ErrorText className="stage-try-error" role="alert" message={trial.error} /> : null;
-  const take = !running && trial.take ? <TryTake key={trial.attempt} take={trial.take} id="turn-try-take" t={t} /> : null;
+  // Once the try is over, its take takes the level's place on the first row.
+  const take = !running && trial.take ? <TryTake key={trial.attempt} take={trial.take} id="turn-try-take" inline t={t} /> : null;
   // While it runs, the label it was pressed with (a first try is still one).
   const label = t(trial.attempt > (running ? 1 : 0) ? "turnTry.again" : "turnTry.try");
   // In the setup its footer is the one Stop: here a try running is only said (busy).
@@ -209,7 +210,7 @@ export function TurnTry({ draft, smart, smartReady, setup = false, active = true
     <div ref={root} className="turn-try turn-try-card stt-try" id="turn-try-panel" data-variant="card" data-phase={trial.phase}>
       <div className="stt-try-head">
         {button}
-        <span className="model-try-wave" aria-hidden><VoiceWaveform phase="listening" level={wave} /></span>
+        {take ?? <span className="model-try-wave" aria-hidden><VoiceWaveform phase="listening" level={wave} /></span>}
       </div>
       <div className="stt-try-area">
         {!trial.attempt && !running && hint}
@@ -217,7 +218,6 @@ export function TurnTry({ draft, smart, smartReady, setup = false, active = true
         {failure}
       </div>
       {why}
-      {take}
       {status}
     </div>
   </Row>;

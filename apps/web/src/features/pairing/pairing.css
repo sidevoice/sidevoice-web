@@ -96,6 +96,13 @@
 .local-install-progress { display: grid; gap: var(--sv-space-1-5); margin-top: var(--sv-space-1); }
 .local-install-progress p { font-variant-numeric: tabular-nums; }
 .local-install-panel .local-install-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); margin-top: var(--sv-space-2); }
+/* ----- where the agents run: two choice cards, each with a line on what it means (MachineChoices) */
+.machine-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: var(--sv-space-3); }
+.machine-choices .ui-card { display: grid; align-content: start; justify-items: start; gap: var(--sv-space-2); }
+.machine-choices .ui-card > svg { color: var(--sv-accent-text); }
+.machine-choices .ui-card > strong { padding-inline-end: var(--sv-space-6); font-weight: var(--sv-weight-semibold); line-height: 1.375rem; }
+.machine-choice-note { padding-inline-end: var(--sv-space-2); font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); text-align: start; }
+
 /* ----- the screen with no machine yet: an empty state on the stage's ground */
 .no-machine-screen {
   display: grid; justify-items: center; align-content: start; gap: var(--sv-space-2); width: min(40rem, calc(100% - 2 * var(--sv-space-4))); max-height: calc(100% - 2 * var(--sv-space-4));
@@ -110,6 +117,8 @@
 .no-machine-screen > .prepare-here { justify-self: stretch; justify-items: center; margin-top: var(--sv-space-2); }
 .no-machine-screen > .prepare-here .prepare-here-manual { text-align: start; }
 .no-machine-screen > .local-install-entry { justify-self: stretch; margin-top: var(--sv-space-4); }
+.no-machine-screen > .machine-choices { justify-self: stretch; margin-top: var(--sv-space-4); }
+.no-machine-screen > .no-machine-back { justify-self: start; }
 @media (max-width: 599px) {
   .no-machine-screen { padding: var(--sv-space-8) var(--sv-space-4); }
   .no-machine-actions { display: grid; justify-self: stretch; justify-content: stretch; }

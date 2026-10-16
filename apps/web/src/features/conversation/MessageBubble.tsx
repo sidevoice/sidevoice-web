@@ -1,3 +1,4 @@
+import { Tooltip } from "../../components/ui/Tooltip";
 import { Button } from "../../components/ui/Button";
 import { ListenAgainIcon, PendingIcon, ReadIcon, SentIcon, UncertainIcon } from "../../components/ui/Icons";
 import type { ChatMessage } from "../../state/room-types";
@@ -9,7 +10,7 @@ import { uiLocale } from "../../i18n/locale";
 
 /** The delivery mark as a drawing, not a glyph: a text check sat below the time's line and at its own size. The
  *  warning only for a message that failed or is in doubt: a status this version does not know has no mark at all. */
-function DeliveryMark({ state }: { state: string }) {
+export function DeliveryMark({ state }: { state: string }) {
   if (state === "read") return <ReadIcon size={14} />;
   if (state === "delivered" || state === "unconfirmed") return <SentIcon size={14} />;
   if (state === "pending" || state === "sending") return <PendingIcon size={12} />;
@@ -36,7 +37,9 @@ export function MessageBubble({ message, position }: { message: ChatMessage; pos
     <article className="chat-bubble" data-role={message.role} data-position={position} data-draft={message.draft || undefined}
       data-interrupted={message.interrupted && !message.globally_heard || undefined} aria-label={label}>
       <KaraokeText text={message.text} range={message.karaoke} playback={message.playback} />
-      {message.cancellable && <Button variant="ghost" tone="danger" size="sm" className="cancel-input" onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("messages.cancel")}</Button>}
+      {message.cancellable && <Tooltip action content={t("messages.cancel")}>
+        <Button variant="ghost" tone="danger" size="sm" className="cancel-input" onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("messages.cancel")}</Button>
+      </Tooltip>}
       {(!message.draft || replay || delivery) && <div className="chat-meta">
         {audioMark && <span className="audio-fate-mark" title={audioMark}>{audioMark}</span>}
         {!message.draft && <time dateTime={new Date(message.time).toISOString()} title={new Date(message.time).toLocaleString(uiLocale())}>{new Date(message.time).toLocaleTimeString(uiLocale(), { hour: "2-digit", minute: "2-digit" })}</time>}

@@ -33,7 +33,7 @@ beforeEach(() => {
   };
   window.sidevoiceActions = actions as unknown as SidevoiceActions;
 });
-afterEach(() => { delete window.sidevoiceActions; delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; vi.restoreAllMocks(); localStorage.removeItem("sidevoice.variants"); localStorage.removeItem(ONBOARDING_STORAGE_KEY); });
+afterEach(() => { delete window.sidevoiceActions; delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; vi.restoreAllMocks(); localStorage.removeItem(ONBOARDING_STORAGE_KEY); });
 
 /** The setup at its transcription step, its machine answering. */
 function transcriptionStep() {
@@ -46,13 +46,13 @@ function transcriptionStep() {
 // Settings is drawn under the setup with the same slots: the setup's are the ones in #wizard.
 const stops = () => within(document.getElementById("wizard")!).queryAllByRole("button", { name: "Stop" });
 
-test("the basics: appearance, this device's name, then the interface's language and the one spoken", () => {
+test("the basics: appearance, this device's name, then the interface's language", () => {
   localStorage.removeItem(ONBOARDING_STORAGE_KEY);
   const store = createRoomStore();
   act(() => store.patch({ machinesReady: true, voiceSettings: defaultVoiceSettings() }));
   render(<App store={store} />);
   expect([...document.querySelectorAll("#wizard .wizard-basics .ui-row-label")].map((label) => label.textContent))
-    .toEqual(["Appearance", "This device’s name", "Interface language", "The language you speak"]);
+    .toEqual(["Appearance", "This device’s name", "Interface language"]);
 });
 
 test("the first try starts from the block's own button or the footer's, and stops from the footer alone, never a second Stop in the step", async () => {

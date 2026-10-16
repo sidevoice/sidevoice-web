@@ -1,5 +1,6 @@
 import { useEffect, useRef, type PropsWithChildren } from "react";
 import { createRoomStore, installRoomBridge, RoomStoreContext, type RoomStore } from "../state/room-store";
+import { useRoomShortcuts } from "../state/use-room-shortcuts";
 import { CallLayoutContext, createCallLayoutStore, type CallLayoutStore } from "../state/call-layout";
 import { errorMessage } from "../features/settings/error-message";
 import { onUiLanguage, uiLanguage } from "../i18n/translator";
@@ -21,6 +22,7 @@ export function RoomProvider({ children, store: suppliedStore, runtime = true }:
   const layoutRef = useRef<CallLayoutStore | null>(null);
   // How the call view is laid out on this device (state/call-layout.ts).
   if (!layoutRef.current) layoutRef.current = createCallLayoutStore();
+  useRoomShortcuts();
 
   // The theme and the language the page wears (its root's data-theme, and the interface's language), in the facts: the
   // desktop card wears the room's (FLOATING-CARD-SPEC FC12), and a new language projects every word again, at once.

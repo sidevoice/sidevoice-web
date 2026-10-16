@@ -1,9 +1,8 @@
 import { Fragment, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { DialogSurface } from "../../components/ui/Dialog";
-import { OverlayPortalProvider } from "../../components/ui/Tooltip";
-import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon, UpdateIcon } from "../../components/ui/Icons";
+import { OverlayPortalProvider, Tooltip } from "../../components/ui/Tooltip";
+import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ShortcutsIcon, PermissionsIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon, UpdateIcon, WarningIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
-import { Badge } from "../../components/ui/Badge";
 import { Select } from "../../components/ui/Select";
 import { Group, Row, Section } from "../../components/ui/Card";
 import { Segmented } from "../../components/ui/Tabs";
@@ -15,9 +14,15 @@ import { ProviderKeys } from "./ProviderKeys";
 import { IdleUnloadChoice, SlotPane, TurnChoices, useVoiceReadiness } from "./VoiceSettings";
 import { catalogueShown } from "./ModelSetup";
 import { DeleteUnusedChoice, DownloadedModels } from "./DownloadedModels";
-import { DeleteAllData } from "./DeleteAllData";
+import { DangerZone } from "./DangerZone";
+import { AudioDeviceRows } from "../call/AudioDevices";
 import { DeviceNameField } from "./DeviceNameField";
 import { DesktopCallSettings } from "./DesktopCallSettings";
+import { desktopHost } from "../../services/desktop-host";
+import { PermissionsSettings } from "./PermissionsSettings";
+import { useMicrophoneAccess } from "../permissions/permission-view";
+import type { MicrophoneSnapshot } from "../../services/microphone-access";
+import { ShortcutsSettings, useShortcutsSection } from "./ShortcutsSettings";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
 import { machineStatus, type MachineStatus } from "./machine-status";
 import { MachineEntryCopy, MachineEntryState, StateOnIcon, machineEntryName } from "./MachineState";
@@ -46,8 +51,13 @@ const SECTIONS: { id: string; label: MessageKey; icon: (size?: number) => ReactN
   { id: "transcription", label: "settings.section.transcription", icon: (size) => <TranscriptionIcon size={size} /> },
   { id: "voice", label: "settings.section.voice", icon: (size) => <VoicesIcon size={size} /> },
   { id: "call", label: "settings.section.call", icon: (size) => <CallSettingsIcon size={size} /> },
-  { id: "this-computer", label: "settings.section.thisDevice", icon: (size = 18) => <ThisComputerIcon size={size} /> },
+  // What the call needs this device to allow (the microphone), next to where its devices are chosen.
+  { id: "permissions", label: "settings.section.permissions", icon: (size) => <PermissionsIcon size={size} /> },
+  // The keys for the microphone: in the desktop app, or wherever there is a keyboard (ShortcutsSettings).
+  { id: "shortcuts", label: "settings.section.shortcuts", icon: (size) => <ShortcutsIcon size={size} /> },
+  // The keys the voice's models use, right after them; this device and the other machines then side by side (2026-10-16).
   { id: "providers", label: "settings.section.providers", icon: (size) => <IntegrationsIcon size={size} /> },
+  { id: "this-computer", label: "settings.section.thisDevice", icon: (size = 18) => <ThisComputerIcon size={size} /> },
   { id: "machines", label: "settings.section.machines", icon: (size) => <MachinesIcon size={size} /> },
   // Everything that updates: in the desktop app, or wherever a machine is behind (UpdatesSettings).
   { id: "updates", label: "settings.section.updates", icon: (size) => <UpdateIcon size={size} /> },
@@ -89,7 +99,8 @@ function SlotSection({ id, t }: { id: "transcription" | "voice"; t: Translate })
 
 /** The call's own behaviour: when your turn ends (kept on Save), the sound while the agent works and the screen during
  *  a call (this device's, applied at once). */
-function CallSettings({ t }: { t: Translate }) {
+function CallSettings({ t, microphone }: { t: Translate; microphone: MicrophoneSnapshot | null }) {
+  const store = useContext(RoomStoreContext);
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const ready = useRoomStore((state) => catalogueShown(state.facts.voiceCatalogue));
   // Every section is drawn, one shown: another section shown (or, on a phone, the list of them, or Settings closed)
@@ -104,19 +115,25 @@ function CallSettings({ t }: { t: Translate }) {
   ];
   return <Section id="call" title={t("settings.section.call")} description={t("settings.call.description")}>
     <RestartNote t={t} />
+    {/* The microphone not allowed: a call can't hear you. The way to allow it is in Permissions. */}
+    {microphone && (microphone.state === "prompt" || microphone.state === "requesting" || microphone.state === "denied" || microphone.state === "missing") &&
+      <Alert tone="warning" title={t("settings.call.micNotAllowed")} action={<Button type="button" variant="secondary" size="sm" onClick={() => store?.patch({ settingsSection: "permissions", settingsLevel: "page" })}>{t("settings.call.openPermissions")}</Button>} />}
+    {/* The microphone and the speaker, as the call's own panel chooses them. */}
+    <AudioDeviceRows />
     {ready && draft ? <TurnChoices draft={draft} active={shown} /> : <p className="muted" role="status">{t("voice.loading")}</p>}
     <Group title={t("settings.call.working")}>
       <Row label={t("settings.call.presence")} description={t(prefs.presence === "off" ? "settings.call.presence.offHint" : prefs.presence === "hidden" ? "settings.call.presence.hiddenHint" : "settings.call.presence.alwaysHint")}>
         <Segmented size="sm" label={t("settings.call.presence")} value={prefs.presence} onChange={(value) => set({ presence: value })}
           items={presence.map((option) => ({ value: option.value, label: t(option.label) }))} />
       </Row>
+      <DesktopCallSettings t={t} />
     </Group>
-    <DesktopCallSettings t={t} />
-    <Group title={t("settings.call.device")}>
+    {/* The desktop app keeps its computer awake as any app does; holding the screen on is for a browser or a phone. */}
+    {!desktopHost() && <Group title={t("settings.call.device")}>
       <Row label={t("settings.call.keepAwake")} description={wakeLock ? t("settings.call.keepAwakeHint") : t("settings.call.keepAwakeUnsupported")}>
         <Switch checked={prefs.keepAwake && wakeLock} disabled={!wakeLock} onChange={(keepAwake) => set({ keepAwake })} aria-label={t("settings.call.keepAwake")} />
       </Row>
-    </Group>
+    </Group>}
   </Section>;
 }
 
@@ -127,7 +144,7 @@ function RestartNote({ t }: { t: Translate }) {
   return inCall ? <Alert tone="warning" title={t("settings.restart.title")}>{t("voice.restartNote")}</Alert> : null;
 }
 
-/** For diagnosis and recovery, and the engine's internals: models' memory, this device's settings, the build. */
+/** For diagnosis and the engine's internals: models' memory, this device's settings, the build. */
 function AdvancedSettings({ t }: { t: Translate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const build = (window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev";
@@ -139,7 +156,8 @@ function AdvancedSettings({ t }: { t: Translate }) {
       </Row>
       <Row label={t("settings.general.build")}><code id="build-id" className="settings-build">{build}</code></Row>
     </Group>
-    <DeleteAllData />
+    {/* Last, in red: deleting Sidevoice's data or Sidevoice itself. */}
+    <DangerZone />
   </Section>;
 }
 
@@ -241,9 +259,19 @@ export function SettingsDialog() {
   const show = (section: string) => store?.patch({ settingsSection: section });
   // Updates: in the desktop app, or wherever a machine is behind.
   const updatesShown = useUpdatesSection();
-  const sections = SECTIONS.filter((section) => (section.id !== "this-computer" || ownComputer) && (section.id !== "updates" || updatesShown));
-  // Updates shown as the last machine behind is updated (a browser, a phone): General.
-  useEffect(() => { if (current === "updates" && !updatesShown) show("general"); }, [current, updatesShown]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Shortcuts: in the desktop app, or wherever there is a keyboard; never on a phone.
+  const shortcutsShown = useShortcutsSection();
+  // The microphone's reader, one for Permissions and Call's link to it. Permissions is drawn only where there is
+  // something to ask (not in an app that asks for itself when its call opens, nor a page with no microphone).
+  const mic = useMicrophoneAccess();
+  const permissionsShown = mic.microphone?.state !== "none";
+  const sections = SECTIONS.filter((section) => (section.id !== "this-computer" || ownComputer) && (section.id !== "updates" || updatesShown)
+    && (section.id !== "shortcuts" || shortcutsShown) && (section.id !== "permissions" || permissionsShown));
+  // Updates shown as the last machine behind is updated (a browser, a phone), or Shortcuts as the mouse or trackpad
+  // goes (a tablet's keyboard taken off): General.
+  useEffect(() => {
+    if ((current === "updates" && !updatesShown) || (current === "shortcuts" && !shortcutsShown) || (current === "permissions" && !permissionsShown)) show("general");
+  }, [current, updatesShown, shortcutsShown, permissionsShown]); // eslint-disable-line react-hooks/exhaustive-deps
   const label = (id: string) => t(ownComputer && id === "machines" ? "settings.section.remoteMachines" : SECTIONS.find((section) => section.id === id)?.label ?? "settings.title");
   // This device's icon wears its connected dot, as a machine's does.
   const icon = (id: string, size?: number) => ownComputer && id === "machines" ? <OtherMachineIcon size={size ?? 18} />
@@ -251,8 +279,12 @@ export function SettingsDialog() {
       : SECTIONS.find((section) => section.id === id)!.icon(size);
   // How many new things are under a section (its mark, VARIANTS `section-new`).
   const isNew = (id: string) => news.filter((item) => item.section === id).length;
-  const notReady = (id: string) => (id === "transcription" && waits.stt) || (id === "voice" && waits.tts) || (id === "call" && waits.turn);
-  const badge = (id: string) => notReady(id) && <Badge tone="warning" className="ui-nav-badge" title={t("settings.section.waiting")}>{t("settings.section.notReady")}</Badge>;
+  // What needs attention wears the one warning dot the app uses (the stage's title has it too; operator, 2026-10-16):
+  // a model chosen but not ready, or the microphone not allowed; said in words on hover and to assistive tech.
+  const micBlocked = ["prompt", "requesting", "denied", "missing"].includes(mic.microphone?.state ?? "");
+  const attention = (id: string): MessageKey | null => (id === "transcription" && waits.stt) || (id === "voice" && waits.tts) || (id === "call" && waits.turn)
+    ? "settings.section.waiting" : id === "permissions" && micBlocked ? "settings.call.micNotAllowed" : null;
+  const badge = (id: string) => { const why = attention(id); return why && <Tooltip content={t(why)}><span className="ui-nav-badge settings-attention" role="img" aria-label={t(why)} /></Tooltip>; };
   // A phone's header says where the person is: Settings on the list, the section on its page, the machine on its own.
   const shownMachine = useRoomStore((state) => state.machines.find((entry) => entry.id === machine) ?? null);
   const title = !phone || level === 1 ? t("settings.title") : level === 3 && shownMachine ? machineName(shownMachine, t) : label(current);
@@ -312,7 +344,9 @@ export function SettingsDialog() {
                 <Pane id="general" current={current}><GeneralSettings t={t} /></Pane>
                 <Pane id="transcription" current={current}><SlotSection id="transcription" t={t} /></Pane>
                 <Pane id="voice" current={current}><SlotSection id="voice" t={t} /></Pane>
-                <Pane id="call" current={current}><CallSettings t={t} /></Pane>
+                <Pane id="call" current={current}><CallSettings t={t} microphone={mic.microphone} /></Pane>
+                {permissionsShown && <Pane id="permissions" current={current}><PermissionsSettings t={t} access={mic.access} microphone={mic.microphone} /></Pane>}
+                {shortcutsShown && <Pane id="shortcuts" current={current}><ShortcutsSettings t={t} /></Pane>}
                 <Pane id="providers" current={current}><ProviderKeys /></Pane>
                 {ownComputer && <Pane id="this-computer" current={current}><ThisComputerSettings /></Pane>}
                 <Pane id="machines" current={current}><MachineList /></Pane>

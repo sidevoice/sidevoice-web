@@ -3,12 +3,13 @@
  * the chevron to all of them. The conversation on the stage is marked where it is; chosen from the sheet while not in
  * the row, it takes the row's last slot (a guest) until another from outside is chosen, or it leaves. */
 
-/** Whether the chevron shows when every conversation already fits in the row. Off (the operator's decision, 2026-10-12)
- *  it shows only when some do not; and while it does not, a phone has no way to the conversations' sheet, which alone
+/** Whether the chevron shows when every conversation already fits in the row. On (the operator's decision, 2026-10-15,
+ *  reversing 2026-10-12's off): always there, its "+N" only when some are behind it. Off, it shows only when some do not fit;
+ *  and while it does not, a phone has no way to the conversations' sheet, which alone
  *  holds each conversation's ⋯ (Close conversation), its state in words, the connection statistics (#stats-open) and,
  *  where the updates live in the sheet, the updates. On is the ux spec's recommendation: always there, its "+N" only
  *  when some are behind it. */
-export const CHEVRON_ALWAYS = false;
+export const CHEVRON_ALWAYS = true;
 
 /** A slot: a 34px avatar and its 2px padding, or "+"; 4px between slots; the chevron with "+NN" takes 60px with its
  *  gap. Measured on the row itself (`.header-conversations`), which is the header less its padding, the gear and the

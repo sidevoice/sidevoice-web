@@ -93,8 +93,9 @@ for (const width of [1280, 390]) {
     await page.evaluate(() => window.__hostTest.uninstall());
     const empty = page.locator(".no-machine-screen");
     await expect(empty).toBeVisible();
-    await expect(empty.getByText("This computer isn't prepared yet.")).toBeVisible();
-    await expect(page.getByText("This computer isn't prepared yet.").filter({ visible: true })).toHaveCount(1);
+    // The setup's two cards first (operator, 2026-10-16); This computer opens its preparation.
+    await expect(empty.locator("#machine-choice-remote")).toBeVisible();
+    await empty.locator("#machine-choice-agents").click();
     await expect(empty.getByRole("button", { name: "I’ll do it myself" })).toBeVisible();
     await empty.getByRole("button", { name: "Prepare this computer" }).click();
     await page.waitForFunction(() => {
@@ -105,8 +106,7 @@ for (const width of [1280, 390]) {
     await expect(empty.locator(".local-install-panel")).toHaveAttribute("data-phase", "installing");
     await expect(empty.getByText("Installing the Sidevoice service…")).toBeVisible();
     await expect(page.getByText("Installing the Sidevoice service…").filter({ visible: true })).toHaveCount(1);
-    await expect(empty.getByRole("button", { name: "Connect to another machine" })).toHaveCount(0);
-    await expect(empty.getByRole("button", { name: "Connect to a machine" })).toBeVisible();
+    await expect(empty.getByRole("button", { name: "Connect to another machine" })).toBeVisible();
     await expect(page.locator(".local-host-banner, .room-shell > .local-install-entry")).toHaveCount(0);
     await page.evaluate(() => window.__hostTest.failInstall());
     await expect(empty.locator(".local-install-panel")).toHaveAttribute("data-phase", "failed");
@@ -125,6 +125,7 @@ test("manual recovery retires a failed install even with start-at-sign-in off", 
   await page.evaluate(() => window.__hostTest.uninstall());
   const empty = page.locator(".no-machine-screen");
   await expect(empty).toBeVisible();
+  await empty.locator("#machine-choice-agents").click();
   await empty.getByRole("button", { name: "Prepare this computer" }).click();
   await page.evaluate(() => window.__hostTest.failInstall());
   await expect(empty.locator('.local-install-panel[data-phase="failed"]')).toBeVisible();

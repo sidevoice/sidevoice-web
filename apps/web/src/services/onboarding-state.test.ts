@@ -10,7 +10,7 @@ const stt = { catalog: "local", model: "whisper-base", language: null };
 const tts = { catalog: "elevenlabs", model: "eleven_flash_v2_5", voice: "v1", speed: 1 };
 const basics = () => ({ ...emptyOnboardingRecord(), basics_done: true });
 const facts = (patch: Partial<ResumeFacts> = {}): ResumeFacts => ({
-  record: basics(), canHostAgents: true, localReady: false, remoteReady: false,
+  record: basics(), canHostAgents: true, localReady: false, remoteReady: false, microphonePassed: true,
   sttKey: trialKey(stt), ttsKey: trialKey(tts), ...patch,
 });
 function memory(fail: { set?: boolean; keep?: boolean } = {}) {
@@ -58,6 +58,34 @@ test("resume: the basics, where the agents run, then the machine, the agents, tr
   expect(resumeOnboarding(facts({ record: tried, remoteReady: true, ttsKey: trialKey({ ...tts, voice: "v2" }) }))).toBe("W4v");
   expect(resumeOnboarding(facts({ record: tried, remoteReady: true, sttKey: null }))).toBe("W4");
   expect(resumeOnboarding(facts({ record: tried, remoteReady: false }))).toBe("W2r");
+});
+
+test("resume: the permissions right after the basics, before the machine, until passed with the microphone allowed", () => {
+  const remote = { ...basics(), choice: "remote" as const };
+  expect(resumeOnboarding(facts({ record: remote, remoteReady: true, microphonePassed: false }))).toBe("W4m");
+  // Before the machine: no machine needed to be asked.
+  expect(resumeOnboarding(facts({ record: remote, microphonePassed: false }))).toBe("W4m");
+  expect(resumeOnboarding(facts({ record: { ...basics(), choice: null }, microphonePassed: false }))).toBe("W4m");
+  // Required in this release (operator, 2026-10-16): passed, transcription always comes after the machine.
+  expect(resumeOnboarding(facts({ record: remote, remoteReady: true }))).toBe("W4");
+  // The basics come first.
+  expect(resumeOnboarding(facts({ record: { ...basics(), basics_done: false }, microphonePassed: false }))).toBe("W0");
+  expect(normalizeOnboardingRecord({ microphone_done: true }).microphone_done).toBe(true);
+});
+
+test("resume: what was passed without is passed", () => {
+  const remote = { ...basics(), choice: "remote" as const, machine_skipped: true };
+  expect(resumeOnboarding(facts({ record: remote }))).toBe("W4");
+  expect(resumeOnboarding(facts({ record: { ...remote, stt_skipped: true } }))).toBe("W4v");
+  expect(resumeOnboarding(facts({ record: { ...remote, stt_skipped: true, tts_skipped: true } }))).toBe("W5");
+  // This computer passed without: no agents to connect either.
+  expect(resumeOnboarding(facts({ record: { ...basics(), choice: "agents" as const, machine_skipped: true } }))).toBe("W4");
+  // Skipped from where you work, no way chosen: on to the voice.
+  expect(resumeOnboarding(facts({ record: { ...basics(), machine_skipped: true }, canHostAgents: true }))).toBe("W4");
+  expect(resumeOnboarding(facts({ record: { ...basics() }, canHostAgents: true }))).toBe("W1");
+  expect(normalizeOnboardingRecord({ microphone_skipped: true, machine_skipped: true, stt_skipped: true, tts_skipped: true })).toMatchObject({ microphone_skipped: true, machine_skipped: true, stt_skipped: true, tts_skipped: true });
+  // A record from before the fields went is read all the same, the old keys dropped.
+  expect(normalizeOnboardingRecord({ completed_at: 5, deferred_at: 4 })).toEqual({ ...emptyOnboardingRecord(), completed_at: 5 });
 });
 
 test("the record is kept in this device's storage, and a write counts only once it reads back", async () => {

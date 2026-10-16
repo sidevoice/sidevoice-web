@@ -117,6 +117,9 @@ export function useAgentTurns(reply: ChatMessage | null, spokenTo: number | null
   // The one sounding is shown as it sounds, over the same reply lingering or leaving until the effect lets them go.
   const turns: AgentTurn[] = leaving.filter((turn) => turn.key !== key).map((turn) => ({ ...turn, spoken: turn.text.length, leaving: true }));
   if (linger && linger.key !== key && !leaving.some((turn) => turn.key === linger.key)) turns.push({ ...linger, spoken: linger.text.length, leaving: false });
+  // Its last words just said, before the effect has it linger: the same balloon stays, whole, never gone for a frame
+  // and popping in again.
+  else if (!current && last.current && !linger && !leaving.some((turn) => turn.key === last.current!.key)) turns.push({ ...last.current, spoken: last.current.text.length, leaving: false });
   if (current) turns.push({ ...current, leaving: false });
   return turns;
 }

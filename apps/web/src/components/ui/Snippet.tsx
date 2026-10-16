@@ -8,7 +8,8 @@ import { translator } from "../../i18n/translator";
  * a ✓ for about a second and a half, the same words said to a screen reader; nothing else appears, so nothing moves.
  * Where the clipboard API is not there (a page over plain http) the older way copies instead. If both fail, the text is
  * selected for the person to copy, and "Select and copy" shows by the button — in words, on a phone too — for about four
- * seconds. A tap or a click on the text selects all of it, too.
+ * seconds. A tap or a click on a one-line snippet's text selects all of it, too; in a snippet of several lines the
+ * person may select any part of it (a line, a value), as in any text.
  *
  * The button is faint until the pointer is over the snippet or the keyboard is in it, then solid. */
 
@@ -95,7 +96,7 @@ export function Snippet(props: CopyProps) {
   const text = useRef<HTMLElement>(null);
   return (
     <div className="ui-copy ui-snippet">
-      <pre className="ui-snippet-text"><code ref={text}>{props.text}</code></pre>
+      <pre className="ui-snippet-text" data-lines={props.text.includes("\n") ? "many" : undefined}><code ref={text}>{props.text}</code></pre>
       <CopyButton {...props} target={text} />
     </div>
   );

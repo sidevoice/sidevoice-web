@@ -40,17 +40,22 @@ export function bichoSpec(seed: string): Spec {
   return spec;
 }
 
-let person: Spec | undefined;
+const people = new Map<string, Spec>();
 /** The person's bicho: the old person avatar redrawn in the cast's style — a round body, two eyes, a smile and a
  *  beanie, in the blue no agent's old avatar wore. Pinned as a spec, so the roller never moves it. */
-export function personSpec(): Spec {
-  person ??= normalizeSpec({
+export function personSpec(hold?: "microphone"): Spec {
+  const key = hold ?? "";
+  const known = people.get(key);
+  if (known) return known;
+  // `hold`: something in its hand where a screen asks for it (the microphone, once it is allowed: the setup's step).
+  const person = normalizeSpec({
     body: "round",
-    parts: { eyes: "two", mouth: "smile", arms: "nubs", legs: "feet", headgear: "beanie" },
+    parts: { eyes: "two", mouth: "smile", arms: "nubs", legs: "feet", headgear: "beanie", ...(hold ? { held: hold } : {}) },
     color: { hue: 214, sat: 75, light: 75, spot: 160 },
     shape: "sidevoice-person",
     name: "person",
   });
+  people.set(key, person);
   return person;
 }
 
@@ -62,7 +67,7 @@ function drawFresh(spec: AvatarSpec, size: AvatarSize): Drawing {
     const drawn = renderMascot(spec.mascot, engineSize(size));
     return { html: drawn.html, tone: drawn.tone, works: [], idles: [] };
   }
-  const figure = spec.kind === "person" ? personSpec() : bichoSpec(spec.seed);
+  const figure = spec.kind === "person" ? personSpec(spec.hold) : bichoSpec(spec.seed);
   const drawn = renderSpec(figure, engineSize(size));
   return {
     html: drawn.html,

@@ -59,7 +59,7 @@ for (const [language, width] of [["en", 360], ["es", 360], ["de", 360], ["pl", 3
   test(`every Settings section fits a ${width}px phone (${language})`, async ({ page }) => {
     await page.setViewportSize({ width, height: 780 });
     await page.addInitScript((ui) => localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: ui })), language);
-    await installHarness(page);
+    await installHarness(page, { voiceReady: false });
     await page.goto("/voice/");
     await page.waitForFunction(() => !!window.sidevoiceActions && !!window.sidevoiceUI?.store);
     const seed = () => page.evaluate((catalogs) => {
