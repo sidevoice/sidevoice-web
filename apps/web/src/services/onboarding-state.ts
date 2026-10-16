@@ -17,6 +17,8 @@ export interface OnboardingRecord {
   agents_done: boolean;
   /** The microphone was allowed in the setup: what counts where the browser cannot say it without asking. */
   microphone_done: boolean;
+  /** The permissions step was passed with Continue without the microphone: transcription's step is left out (operator, 2026-10-16). */
+  microphone_skipped: boolean;
   /** The end of turn step was answered. */
   turn_done: boolean;
   deferred_at: number | null;
@@ -40,7 +42,7 @@ export type OnboardingPatch = Partial<Omit<OnboardingRecord, "version" | "trials
 export const ONBOARDING_STORAGE_KEY = "sidevoice.onboarding";
 
 export const emptyOnboardingRecord = (): OnboardingRecord => ({
-  version: 1, basics_done: false, choice: null, agents_done: false, microphone_done: false, turn_done: false, deferred_at: null, completed_at: null, trials: {}, chosen: {}, baseline_release: 0, features: {},
+  version: 1, basics_done: false, choice: null, agents_done: false, microphone_done: false, microphone_skipped: false, turn_done: false, deferred_at: null, completed_at: null, trials: {}, chosen: {}, baseline_release: 0, features: {},
 });
 
 export class OnboardingStorageError extends Error {
@@ -79,6 +81,7 @@ export function normalizeOnboardingRecord(value: unknown): OnboardingRecord {
     choice: input.choice === "agents" || input.choice === "remote" ? input.choice : null,
     agents_done: input.agents_done === true,
     microphone_done: input.microphone_done === true,
+    microphone_skipped: input.microphone_skipped === true,
     turn_done: input.turn_done === true,
     deferred_at: timestamp(input.deferred_at),
     completed_at: timestamp(input.completed_at),
@@ -123,6 +126,8 @@ export interface ResumeFacts {
   localReady: boolean;
   /** Another machine is paired, in use and answering. */
   remoteReady: boolean;
+  /** The permissions step was passed (Continue, with or without the microphone), or there is nothing to ask. */
+  microphonePassed: boolean;
   /** The microphone may be used here, or there is nothing to ask (microphone-access.ts), as things stand now. */
   microphoneReady: boolean;
   /** The keys of this device's transcription and voice settings now (`trialKey`). */
@@ -137,7 +142,7 @@ export function resumeOnboarding(facts: ResumeFacts): OnboardingStep {
   if (!record.basics_done) return "W0";
   // The permissions right after the basics (operator, 2026-10-16): nothing after them, a machine's install included,
   // then fails for a permission nobody asked for.
-  if (!facts.microphoneReady) return "W4m";
+  if (!facts.microphonePassed) return "W4m";
   const path = !facts.canHostAgents ? "remote" : record.choice ?? (facts.localReady ? "agents" : null);
   if (!path) return "W1";
   if (path === "agents" && !facts.localReady) return "W2";
@@ -145,7 +150,8 @@ export function resumeOnboarding(facts: ResumeFacts): OnboardingStep {
   if (path === "agents" && !record.agents_done) return "W3";
   // Chosen, tried or not: trying is the setup's suggestion, not a condition.
   const settled = (task: OnboardingTask, key: string | null) => !!key && (record.chosen[task] === key || record.trials[task] === key);
-  if (!settled("stt", facts.sttKey)) return "W4";
+  // Without the microphone there is nothing to transcribe: on to the voice, which needs none.
+  if (facts.microphoneReady && !settled("stt", facts.sttKey)) return "W4";
   if (!settled("tts", facts.ttsKey)) return "W4v";
   if (!record.turn_done) return "W5";
   return "W6";

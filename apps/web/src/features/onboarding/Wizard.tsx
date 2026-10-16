@@ -20,7 +20,7 @@ import { hostStatusText, localHostRecovery, runLocalHostAction, type LocalHostAc
 import { useOnboarding } from "./onboarding-context";
 import { DeviceNameField } from "../settings/DeviceNameField";
 import { ReadyStep } from "./ReadyStep";
-import { MicrophoneAction, PermissionsStep } from "./PermissionsStep";
+import { MicrophoneContinue, PermissionsStep } from "./PermissionsStep";
 import "./onboarding.css";
 import { useRoomStore } from "../../state/room-store";
 import type { OnboardingStep } from "../../services/onboarding-state";
@@ -54,14 +54,15 @@ const ORDER: OnboardingStep[] = ["W0", "W4m", "W1", "W2", "W2r", "W3", "W4", "W4
 
 /** The step Back goes to. `microphone`: whether there is a microphone to ask for here (else the permissions step is
  *  never shown). */
-function previous(step: OnboardingStep, path: "agents" | "remote" | null, canHostAgents: boolean, microphone: boolean): OnboardingStep | null {
+function previous(step: OnboardingStep, path: "agents" | "remote" | null, canHostAgents: boolean, microphone: boolean, transcription: boolean): OnboardingStep | null {
   const permissions: OnboardingStep = microphone ? "W4m" : "W0";
   if (step === "W4m") return "W0";
   if (step === "W1") return permissions;
   if (step === "W2" || step === "W3") return "W1";
   if (step === "W2r") return canHostAgents ? "W1" : permissions;
   if (step === "W4") return path === "agents" ? "W3" : "W2r";
-  if (step === "W4v") return "W4";
+  // Without the microphone transcription's step is left out: Back goes past it.
+  if (step === "W4v") return transcription ? "W4" : path === "agents" ? "W3" : "W2r";
   if (step === "W5") return "W4v";
   if (step === "W6") return "W5";
   return null;
@@ -282,17 +283,19 @@ export function Wizard() {
   }, [onboarding.open, step, onboarding.localReady, onboarding.remoteReady, onboarding.record.agents_done]); // eslint-disable-line react-hooks/exhaustive-deps
   // The permissions step comes after the basics whenever there is a microphone to ask for, allowed already or not: it
   // always shows, saying where each stands, and waits for Continue (operator, 2026-10-16). After it, where the agents are.
-  const permissionsNext: OnboardingStep = onboarding.canHostAgents ? "W1" : onboarding.remoteReady ? "W4" : "W2r";
+  // Without the microphone, transcription has nothing to hear: the setup goes on to the voice (operator, 2026-10-16).
+  const sttStep: OnboardingStep = onboarding.microphone.ready ? "W4" : "W4v";
+  const permissionsNext: OnboardingStep = onboarding.canHostAgents ? "W1" : onboarding.remoteReady ? sttStep : "W2r";
 
   async function choosePath(next: "agents" | "remote") {
     if (!await onboarding.setPath(next)) return;
     if (next === "agents") {
       onboarding.goTo(onboarding.localReady ? "W3" : "W2");
-    } else onboarding.goTo(onboarding.remoteReady ? "W4" : "W2r");
+    } else onboarding.goTo(onboarding.remoteReady ? sttStep : "W2r");
   }
 
   async function finishAgents() {
-    if (await onboarding.markAgentsDone()) onboarding.goTo("W4");
+    if (await onboarding.markAgentsDone()) onboarding.goTo(sttStep);
   }
 
   async function finishBasics() {
@@ -319,7 +322,7 @@ export function Wizard() {
   }
 
   const current = GROUPS.findIndex((group) => group.steps.includes(step));
-  const back = previous(step, onboarding.path, onboarding.canHostAgents, onboarding.microphone.state !== "none");
+  const back = previous(step, onboarding.path, onboarding.canHostAgents, onboarding.microphone.state !== "none", onboarding.microphone.ready);
   const error = onboarding.error ? t(`wizard.error.${onboarding.error.replace("onboarding.", "")}` as MessageKey) : "";
   const agents = agentsFp ? hostAgents[agentsFp] : undefined;
 
@@ -369,21 +372,21 @@ export function Wizard() {
         <PairMachine idPrefix="wizard-pairing" rows={2} submitIn={onboarding.remoteReady ? null : footerSlot} />
       </section>}
       {step === "W3" && <section>{agentsBlock}</section>}
-      {step === "W4m" && <PermissionsStep microphone={onboarding.microphone} openSettings={onboarding.openMicrophoneSettings} t={t} />}
+      {step === "W4m" && <PermissionsStep microphone={onboarding.microphone} openSettings={onboarding.openMicrophoneSettings} onRequest={() => void onboarding.requestMicrophone()} t={t} />}
       {stageTask && <StageStep key={step} task={stageTask} stage={stage} t={t} />}
       {step === "W5" && <TurnStep turnTry={turnTry} t={t} />}
       {ready && <ReadyStep path={onboarding.path} machineName={remoteName} title={title} t={t} />}
       {ready && error && <Alert tone="danger" live className="wizard-ready-error" title={error} />}
     </div>
-    <footer className="wizard-actions" data-model-step={stageTask || step === "W5" ? "" : undefined}>
+    <footer className="wizard-actions" data-model-step={stageTask || step === "W5" || step === "W4m" ? "" : undefined}>
       {back && <Button type="button" variant="ghost" tone="neutral" className="wizard-back" onClick={() => onboarding.goTo(back)}><BackIcon /><span className="wizard-back-label">{t("wizard.back")}</span></Button>}
       {step === "W0" && <Button type="button" variant="primary" onClick={() => void finishBasics()}>{t("wizard.continue")}</Button>}
       {step === "W1" && <Button type="button" variant="primary" disabled={!choice} onClick={() => choice && void choosePath(choice)}>{t("wizard.continue")}</Button>}
       {step === "W2" && onboarding.localReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W3")}>{t("wizard.continue")}</Button>}
-      {step === "W2r" && onboarding.remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W4")}>{t("wizard.continue")}</Button>}
+      {step === "W2r" && onboarding.remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo(sttStep)}>{t("wizard.continue")}</Button>}
       <span ref={setFooterSlot} className="wizard-slot" />
       {step === "W3" && <Button type="button" variant="primary" onClick={() => void finishAgents()}>{t("wizard.continue")}</Button>}
-      {step === "W4m" && <MicrophoneAction microphone={onboarding.microphone} onRequest={() => void onboarding.requestMicrophone()} onContinue={() => void onboarding.markMicrophoneDone().then((done) => { if (done) onboarding.goTo(permissionsNext); })} t={t} />}
+      {step === "W4m" && <MicrophoneContinue microphone={onboarding.microphone} onContinue={() => void (onboarding.microphone.state === "granted" || onboarding.microphone.state === "none" ? onboarding.markMicrophoneDone() : onboarding.markMicrophoneSkipped()).then((done) => { if (done) onboarding.goTo(permissionsNext); })} t={t} />}
       {stageTask && <ModelStepFooter reason={waitReason(model, stageTask, t)}
         tryReason={stageTask === "tts" && !sample.trim() ? t("wizard.wait.sentence") : undefined}
         running={trial.trial.phase === "running"} tried={onboarding.tried(stageTask)}

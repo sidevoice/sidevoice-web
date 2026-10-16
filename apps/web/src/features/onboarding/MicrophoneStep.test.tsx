@@ -52,6 +52,7 @@ afterEach(() => {
 const wizard = () => within(document.getElementById("wizard")!);
 const title = () => wizard().getByRole("heading", { level: 2 });
 const action = () => document.getElementById("wizard-mic-action")!;
+const proceed = () => document.getElementById("wizard-mic-continue")!;
 const said = () => document.querySelector("#wizard .wizard-mic [role=status]")!.textContent;
 const tile = () => document.querySelector("#wizard [data-permission=microphone]")!.textContent;
 
@@ -83,7 +84,7 @@ test("not asked yet: Allow microphone asks the browser, lets the microphone go a
   // Allowed, it says so and waits for Continue: it never moves on by itself.
   await waitFor(() => expect(tile()).toContain("Allowed"));
   expect(title()).toHaveTextContent("Permissions");
-  await act(async () => { fireEvent.click(action()); });
+  await act(async () => { fireEvent.click(proceed()); });
   expect(title()).toHaveTextContent("Set up transcription");
   // Kept for a browser that could not say so without asking again.
   expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).microphone_done).toBe(true);
@@ -97,8 +98,12 @@ test("blocked: how to allow it for the site, Check again (still blocked, said so
   expect(document.querySelector("#wizard .wizard-mic-help .ui-alert-title")).toHaveTextContent("Sidevoice can’t use the microphone");
   expect(wizard().getByText(/select the site settings icon beside the web address/)).toBeInTheDocument();
   expect(action()).toHaveTextContent("Check again");
-  // No way on but allowing it: no Continue.
-  expect(wizard().queryByRole("button", { name: "Continue" })).toBeNull();
+  // Not blocking: the footer goes on without it, quietly; the recovery is all in the microphone's own block.
+  expect(proceed()).toHaveTextContent("Continue without microphone");
+  expect(proceed()).not.toHaveAttribute("aria-disabled");
+  expect(proceed()).toHaveClass("ui-button--secondary");
+  expect(document.querySelector("#wizard .wizard-actions .wizard-mic-help, #wizard .wizard-actions .perm-also")).toBeNull();
+  expect(document.querySelector("#wizard [data-permission=microphone] .wizard-mic-help")).not.toBeNull();
   action().focus();
   await act(async () => { fireEvent.click(action()); });
   expect(media.getUserMedia).toHaveBeenCalledTimes(1);
@@ -113,7 +118,31 @@ test("blocked: how to allow it for the site, Check again (still blocked, said so
   // Allowed, it says so and waits for Continue: it never moves on by itself.
   await waitFor(() => expect(tile()).toContain("Allowed"));
   expect(title()).toHaveTextContent("Permissions");
+  await act(async () => { fireEvent.click(proceed()); });
+  expect(title()).toHaveTextContent("Set up transcription");
+}, WHOLE_APP_MS);
+
+test("continuing without the microphone skips transcription for the voice, Back goes past it, and the same footer element turns into Continue once allowed", async () => {
+  const { media } = browser("denied", () => Promise.reject(refused("NotAllowedError")));
+  await setup();
+  const forward = proceed();
+  forward.focus();
+  await act(async () => { fireEvent.click(forward); });
+  expect(title()).toHaveTextContent("Set up voice");
+  expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).microphone_skipped).toBe(true);
+  fireEvent.click(wizard().getByRole("button", { name: "Back" }));
+  expect(title()).not.toHaveTextContent("Set up transcription");
+  fireEvent.click(wizard().getByRole("button", { name: "Back" }));
+  expect(title()).toHaveTextContent("Permissions");
+  expect(media.getUserMedia).toHaveBeenCalledTimes(0);
+  const again = proceed();
+  again.focus();
+  media.getUserMedia.mockResolvedValue(stream());
   await act(async () => { fireEvent.click(action()); });
+  await waitFor(() => expect(proceed()).toHaveTextContent("Continue"));
+  expect(proceed()).toBe(again);
+  expect(document.activeElement).toBe(again);
+  await act(async () => { fireEvent.click(proceed()); });
   expect(title()).toHaveTextContent("Set up transcription");
 }, WHOLE_APP_MS);
 
@@ -131,7 +160,10 @@ test("already allowed: never asked again; the step still shows it allowed, with 
   await setup();
   expect(title()).toHaveTextContent("Permissions");
   expect(tile()).toContain("Allowed");
-  expect(action()).toHaveTextContent("Continue");
+  expect(action()).toHaveTextContent("Allowed");
+  expect(action()).toHaveAttribute("aria-disabled", "true");
+  expect(proceed()).toHaveTextContent("Continue");
+  expect(proceed()).toHaveClass("ui-button--primary");
   expect(media.getUserMedia).not.toHaveBeenCalled();
   // It stays until Continue.
   await new Promise((resolve) => setTimeout(resolve, 1200));
@@ -151,7 +183,7 @@ test("none connected: No microphone found, and Check again finds one", async () 
   // Allowed, it says so and waits for Continue: it never moves on by itself.
   await waitFor(() => expect(tile()).toContain("Allowed"));
   expect(title()).toHaveTextContent("Permissions");
-  await act(async () => { fireEvent.click(action()); });
+  await act(async () => { fireEvent.click(proceed()); });
   expect(title()).toHaveTextContent("Set up transcription");
 }, WHOLE_APP_MS);
 
@@ -170,7 +202,7 @@ test("in the desktop app on a Mac: the system's permission through the app, its 
   // Allowed, it says so and waits for Continue: it never moves on by itself.
   await waitFor(() => expect(tile()).toContain("Allowed"));
   expect(title()).toHaveTextContent("Permissions");
-  await act(async () => { fireEvent.click(action()); });
+  await act(async () => { fireEvent.click(proceed()); });
   expect(title()).toHaveTextContent("Set up transcription");
 }, WHOLE_APP_MS);
 

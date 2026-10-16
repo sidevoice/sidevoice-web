@@ -48,6 +48,8 @@ interface OnboardingValue {
   markAgentsDone(): Promise<boolean>;
   /** The microphone's step passed (Continue, allowed): kept, also for a browser that cannot say so without asking again. */
   markMicrophoneDone(): Promise<boolean>;
+  /** The permissions step passed without the microphone (Continue without microphone): transcription's step is left out. */
+  markMicrophoneSkipped(): Promise<boolean>;
   markBasicsDone(): Promise<boolean>;
   markTurnDone(): Promise<boolean>;
   /** Records that the person went on with the settings being edited for `task`, tried or not. */
@@ -83,11 +85,18 @@ function microphoneReady(microphone: MicrophoneSnapshot, record: OnboardingRecor
   return microphone.state === "granted" || microphone.state === "none" || (!microphone.known && microphone.state === "prompt" && record.microphone_done);
 }
 
+/** What resume reads of the microphone: whether it may be used, and whether the permissions step was passed (Continue, with
+ *  or without it; or there is nothing to ask). */
+function microphoneFacts(microphone: MicrophoneSnapshot, record: OnboardingRecord) {
+  return { ready: microphoneReady(microphone, record), passed: record.microphone_done || record.microphone_skipped || microphone.state === "none" };
+}
+
 /** What resume reads of the room: which machines answer, and the device's kept voice settings; and the microphone. */
-function liveFacts(room: RoomViewState, microphone: boolean) {
+function liveFacts(room: RoomViewState, microphone: { ready: boolean; passed: boolean }) {
   const kept = room.facts.voiceSettings;
   return {
-    microphoneReady: microphone,
+    microphoneReady: microphone.ready,
+    microphonePassed: microphone.passed,
     localReady: !!answering(room, true) && room.facts.localHostStatus.state === "running",
     remoteReady: !!answering(room, false),
     sttKey: kept ? trialKey(kept.stt) : null,
@@ -121,7 +130,7 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
   const microphone = useSyncExternalStore(microphoneAccess.subscribe, microphoneAccess.getSnapshot, microphoneAccess.getSnapshot);
   // Resume asks the microphone's step until it was passed with Continue (or there is nothing to ask): allowed already,
   // it still shows, saying so (operator, 2026-10-16).
-  const live = liveFacts(room, microphoneReady(microphone, record) && (record.microphone_done || microphone.state === "none"));
+  const live = liveFacts(room, microphoneFacts(microphone, record));
   const resume = useCallback((current: OnboardingRecord, facts: ReturnType<typeof liveFacts>) =>
     resumeOnboarding({ record: current, canHostAgents, ...facts }), [canHostAgents]);
 
@@ -183,7 +192,8 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
     goTo: (next) => { setError(null); setStep(next); },
     setPath: (path) => persist({ choice: path, deferred_at: null }),
     markAgentsDone: () => persist({ agents_done: true }),
-    markMicrophoneDone: () => persist({ microphone_done: true }),
+    markMicrophoneDone: () => persist({ microphone_done: true, microphone_skipped: false }),
+    markMicrophoneSkipped: () => persist({ microphone_skipped: true }),
     markBasicsDone: () => persist({ basics_done: true }),
     markTurnDone: () => persist({ turn_done: true }),
     markFeatures: (ids, state) => persist({ features: Object.fromEntries(ids.map((id) => [id, { state, at: Date.now() }])) }),
@@ -201,7 +211,7 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
     },
     // Entering needs every step done as things stand now, and the completion read back: never an optimistic flag.
     async complete() {
-      const now = resume(recordRef.current, liveFacts(roomStore.getState(), microphoneReady(microphoneAccess.getSnapshot(), recordRef.current) && (recordRef.current.microphone_done || microphoneAccess.getSnapshot().state === "none")));
+      const now = resume(recordRef.current, liveFacts(roomStore.getState(), microphoneFacts(microphoneAccess.getSnapshot(), recordRef.current)));
       if (now !== "W6") { setStep(now); setError("onboarding.prerequisites"); return false; }
       // Set up on this release: what it already has is not news to the person.
       const saved = await persist({ completed_at: Math.floor(Date.now() / 1000), deferred_at: null, baseline_release: RELEASE });

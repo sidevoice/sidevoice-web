@@ -10,7 +10,7 @@ const stt = { catalog: "local", model: "whisper-base", language: null };
 const tts = { catalog: "elevenlabs", model: "eleven_flash_v2_5", voice: "v1", speed: 1 };
 const basics = () => ({ ...emptyOnboardingRecord(), basics_done: true });
 const facts = (patch: Partial<ResumeFacts> = {}): ResumeFacts => ({
-  record: basics(), canHostAgents: true, localReady: false, remoteReady: false, microphoneReady: true,
+  record: basics(), canHostAgents: true, localReady: false, remoteReady: false, microphonePassed: true, microphoneReady: true,
   sttKey: trialKey(stt), ttsKey: trialKey(tts), ...patch,
 });
 function memory(fail: { set?: boolean; keep?: boolean } = {}) {
@@ -60,18 +60,20 @@ test("resume: the basics, where the agents run, then the machine, the agents, tr
   expect(resumeOnboarding(facts({ record: tried, remoteReady: false }))).toBe("W2r");
 });
 
-test("resume: the permissions right after the basics, before the machine, whenever the microphone may not be used now", () => {
+test("resume: the permissions right after the basics, before the machine, until passed; without the microphone, transcription is left out", () => {
   const remote = { ...basics(), choice: "remote" as const };
-  expect(resumeOnboarding(facts({ record: remote, remoteReady: true, microphoneReady: false }))).toBe("W4m");
+  expect(resumeOnboarding(facts({ record: remote, remoteReady: true, microphonePassed: false }))).toBe("W4m");
   // Before the machine: no machine needed to be asked.
-  expect(resumeOnboarding(facts({ record: remote, microphoneReady: false }))).toBe("W4m");
-  expect(resumeOnboarding(facts({ record: { ...basics(), choice: null }, microphoneReady: false }))).toBe("W4m");
-  // Allowed once and blocked since: asked again, even with everything else done.
-  const done = { ...remote, microphone_done: true, chosen: { stt: trialKey(stt)!, tts: trialKey(tts)! }, turn_done: true };
-  expect(resumeOnboarding(facts({ record: done, remoteReady: true, microphoneReady: false }))).toBe("W4m");
+  expect(resumeOnboarding(facts({ record: remote, microphonePassed: false }))).toBe("W4m");
+  expect(resumeOnboarding(facts({ record: { ...basics(), choice: null }, microphonePassed: false }))).toBe("W4m");
+  // The microphone is not a condition: passed without it, transcription is skipped and the voice is next, then the rest.
+  expect(resumeOnboarding(facts({ record: remote, remoteReady: true, microphoneReady: false }))).toBe("W4v");
+  const done = { ...remote, microphone_skipped: true, chosen: { stt: trialKey(stt)!, tts: trialKey(tts)! }, turn_done: true };
+  expect(resumeOnboarding(facts({ record: done, remoteReady: true, microphoneReady: false }))).toBe("W6");
   // The basics come first.
-  expect(resumeOnboarding(facts({ record: { ...basics(), basics_done: false }, microphoneReady: false }))).toBe("W0");
+  expect(resumeOnboarding(facts({ record: { ...basics(), basics_done: false }, microphonePassed: false }))).toBe("W0");
   expect(normalizeOnboardingRecord({ microphone_done: true }).microphone_done).toBe(true);
+  expect(normalizeOnboardingRecord({ microphone_skipped: true }).microphone_skipped).toBe(true);
 });
 
 test("the record is kept in this device's storage, and a write counts only once it reads back", async () => {
