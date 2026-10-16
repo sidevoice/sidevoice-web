@@ -7,7 +7,7 @@ import { translator, type Translate } from "../../i18n/translator";
 import { groupMessages } from "./group-messages";
 import { MessageGroup, Speaker } from "./MessageGroup";
 import { speakerName } from "./group-messages";
-import { VoiceWaveform } from "./VoiceWaveform";
+import { LiveVoiceBalloon } from "../call/LiveVoiceBalloon";
 import { uiLocale } from "../../i18n/locale";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -70,6 +70,10 @@ export function MessageList({ conversation, visible = true }: { conversation: Co
   const cancel = <Tooltip action content={t("messages.cancel")}>
     <Button variant="ghost" tone="danger" size="sm" className="cancel-input" onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("messages.cancel")}</Button>
   </Tooltip>;
+  // In the person's balloon it is as quiet as on the stage: its ink, not the danger colour of a draft's.
+  const cancelInBalloon = <Tooltip action content={t("messages.cancel")}>
+    <Button variant="ghost" tone="neutral" size="sm" className="cancel-input" onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("messages.cancel")}</Button>
+  </Tooltip>;
   return (
     <div className="message-viewport-wrap">
       <div id="messages" ref={viewport} role="log" aria-live="polite" onScroll={(event) => {
@@ -91,12 +95,17 @@ export function MessageList({ conversation, visible = true }: { conversation: Co
             </Fragment>
           );
         })}
-        {(conversation.pendingText || conversation.pendingPhase) && <div className="message-group live-draft" data-role="user"><div className="chat-message-row">
-          <article className="chat-bubble" data-role="user" data-position="only" data-draft="true" data-live={conversation.pendingText ? undefined : conversation.pendingPhase || undefined}>
-            {conversation.pendingText ? <span>{conversation.pendingText}</span> : <VoiceWaveform phase={conversation.pendingPhase === "transcribing" ? "transcribing" : "listening"} />}
+        {conversation.pendingText && <div className="message-group live-draft" data-role="user"><div className="chat-message-row">
+          <article className="chat-bubble" data-role="user" data-position="only" data-draft="true">
+            <span>{conversation.pendingText}</span>
             {conversation.pendingCancellable && cancel}
           </article>
         </div></div>}
+        {!conversation.pendingText && conversation.pendingPhase && <div className="message-group live-draft" data-role="user">
+          <div className="person-turns" data-inline="">
+            <LiveVoiceBalloon phase={conversation.pendingPhase === "transcribing" ? "transcribing" : "listening"}>{conversation.pendingCancellable && cancelInBalloon}</LiveVoiceBalloon>
+          </div>
+        </div>}
         {conversation.working && <div className="message-group live-draft" data-role="assistant"><div className="chat-message-row">
           <Speaker name={agent ? speakerName(agent, t) : ""} thread={agentThread} />
           <article className="chat-bubble thinking" data-role="assistant" data-position="only" aria-label={t("messages.thinking")}><span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span></article>

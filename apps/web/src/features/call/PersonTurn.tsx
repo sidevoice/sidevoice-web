@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { Button } from "../../components/ui/Button";
 import type { ConversationView } from "../../state/room-types";
-import { VoiceWaveform } from "../conversation/VoiceWaveform";
+import { LiveVoiceBalloon } from "./LiveVoiceBalloon";
 import type { Translate } from "../../i18n/translator";
 import { BalloonTail } from "./BalloonTail";
 import { DeliveryMark } from "../conversation/MessageBubble";
@@ -81,17 +81,12 @@ export function PersonTurn({ conversation, t }: { conversation: ConversationView
         delivery={conversation.messages.find((message) => message.role === "user" && (message.segment ?? String(message.time)) === turn.key)?.delivery}
         cut={pending} under={pending} from={!pending && turn.key === newest ? footprint.current : null} />)}
       {pending && (
-        <div key="live" ref={live} className="speech-bubble person-bubble" data-live="" translate="no">
-          <VoiceWaveform phase={conversation.pendingPhase === "transcribing" ? "transcribing" : "listening"} />
-          {/* Its row kept whether or not the turn can be taken back now, so the balloon never changes size. */}
-          <div className="person-live-actions">
-            {conversation.pendingCancellable && <Tooltip action content={t("stage.cancelTurn")}>
-              <Button variant="ghost" tone="neutral" size="sm" className="cancel-input"
-                onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("stage.cancelTurn")}</Button>
-            </Tooltip>}
-          </div>
-          <BalloonTail shape="person" />
-        </div>
+        <LiveVoiceBalloon key="live" balloonRef={live} phase={conversation.pendingPhase === "transcribing" ? "transcribing" : "listening"}>
+          {conversation.pendingCancellable && <Tooltip action content={t("stage.cancelTurn")}>
+            <Button variant="ghost" tone="neutral" size="sm" className="cancel-input"
+              onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("stage.cancelTurn")}</Button>
+          </Tooltip>}
+        </LiveVoiceBalloon>
       )}
     </div>
   );
