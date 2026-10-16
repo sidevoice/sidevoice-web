@@ -467,4 +467,6 @@
 .voice-setup-card h1 { margin: var(--sv-space-2) 0 0; font-size: var(--sv-font-xl); line-height: 1.625rem; font-weight: var(--sv-weight-bold); letter-spacing: -.015em; color: var(--sv-text); }
 .voice-setup-card > p { max-width: 42ch; margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
 .voice-setup-card > .voice-models { justify-self: stretch; margin-top: var(--sv-space-3); text-align: start; }
+/* The microphone's card holds the shared permissions list: as wide as the card, its rows read left to right. */
+.voice-setup-card > .perm-list { justify-self: stretch; width: 100%; max-width: 32rem; margin-inline: auto; text-align: start; }
 .voice-model-progress { grid-column: 1 / -1; width: 100%; height: 4px; accent-color: var(--sv-accent); }
