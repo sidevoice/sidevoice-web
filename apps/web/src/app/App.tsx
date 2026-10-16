@@ -35,8 +35,10 @@ function RoomContent() {
   const preparingWithoutPairing = projectedLocalOnly && install.phase !== "idle" && install.source === "no-machine";
   const noMachine = ready && (machines.length === 0 || preparingWithoutPairing);
   const onboarding = useOnboarding();
-  // Until the first setup is finished the room stays out of reach: no header, call bar or settings behind the wizard.
+  // Behind the open wizard the room stays out of reach. A setup put off is no wall (operator, 2026-10-16): the room is there,
+  // Settings with it, and a banner offers to continue the setup; calls need a machine as ever.
   const setupPending = !onboarding.ready || !onboarding.record.completed_at;
+  const roomHidden = !onboarding.ready || (setupPending && onboarding.open);
 
   useEffect(() => {
     if (install.phase === "installing") {
@@ -67,9 +69,10 @@ function RoomContent() {
     <>
       <StorageBlockedBanner />
       <ResetReportNotice />
-      <div className="room-shell" data-no-machine={noMachine || undefined} hidden={setupPending} aria-hidden={setupPending || undefined}>
+      <div className="room-shell" data-no-machine={noMachine || undefined} hidden={roomHidden} aria-hidden={roomHidden || undefined}>
         <RoomHeader />
         <LocalHostBanner />
+        {setupPending && onboarding.ready && !onboarding.open && <SetupPending />}
         {/* The call: the conversations, the stage over its bar, and the transcript when it is open (2026-10-10). */}
         <main className={noMachine ? undefined : "call-layout"}>
           {noMachine ? <NoMachineScreen source="no-machine" /> : <>
@@ -88,7 +91,6 @@ function RoomContent() {
         <ConnectionStatsDialog />
         <SettingsDialog />
       </div>
-      {setupPending && onboarding.ready && !onboarding.open && <main className="setup-main"><SetupPending /></main>}
       {onboarding.ready && <Wizard />}
       <PairingDialog />
     </>

@@ -404,14 +404,17 @@ export function Wizard() {
   </dialog>;
 }
 
-/** What a put-off setup leaves on screen: one action, back into it where it stands. */
+/** What a put-off setup leaves: a banner over the room, which stays usable — Settings included — with one action back
+ *  into the setup where it stands. */
 export function SetupPending() {
   const t = translator();
   const onboarding = useOnboarding();
   return <section className="setup-pending" aria-labelledby="setup-pending-title">
-    <span className="setup-pending-mark"><SidevoiceMark size={28} /></span>
-    <h1 id="setup-pending-title">{t("wizard.pendingTitle")}</h1>
-    <p>{t("wizard.pendingBody")}</p>
-    <Button type="button" variant="primary" onClick={() => onboarding.openWizard()}>{t("wizard.continueSetup")}</Button>
+    <span className="setup-pending-mark"><SidevoiceMark size={20} /></span>
+    <span className="setup-pending-copy">
+      <strong id="setup-pending-title">{t("wizard.pendingTitle")}</strong>
+      <span>{t("wizard.pendingBody")}</span>
+    </span>
+    <Button type="button" variant="primary" size="sm" onClick={() => onboarding.openWizard()}>{t("wizard.continueSetup")}</Button>
   </section>;
 }
