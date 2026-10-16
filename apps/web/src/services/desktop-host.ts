@@ -139,6 +139,18 @@ export function desktopResetBridge(): DesktopResetBridge | null {
   return data && typeof data.deleteAll === "function" && typeof data.resetReport === "function" ? data : null;
 }
 
+/** Uninstall: the reset, then the app itself moved to the Trash once it quits; not relaunched (sidevoice-desktop
+ *  `host.data.uninstall`, macOS). Resolves like `deleteAll()`, with `"app"` pending; refuses `reset.app-unremovable` for
+ *  a copy that cannot remove itself (a disk image), before anything is deleted. */
+export interface DesktopUninstallBridge extends DesktopResetBridge {
+  uninstall(): Promise<Omit<Awaited<ReturnType<DesktopResetBridge["deleteAll"]>>, "state"> & { state: "needs-quit" | "partial" }>;
+}
+
+export function desktopUninstallBridge(): DesktopUninstallBridge | null {
+  const data = desktopResetBridge() as DesktopUninstallBridge | null;
+  return data && typeof data.uninstall === "function" ? data : null;
+}
+
 /** The desktop app's own build (sidevoice-desktop #56, `host.build`): a release — the only one with an updater
  *  (`host.updater`) —, a nightly, or a development build; its version, and where the build came from. */
 export interface DesktopBuild {
