@@ -3,6 +3,7 @@ import {pageTarget,targetAnswers,routeUrl,callSocketUrl,isNodePath,askTarget,ask
 import {readPairingState,projectPairings,writePairings,withPairing,withoutPairing,revokedPairing,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {localHostBridge,desktopDataBridge,normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
 import {createHostAgentsController} from './host-agents.ts';
+import {withoutLost} from './audio-choice.ts';
 import {currentDeviceName} from '../state/device-name.ts';
 import {translator,setUiLanguage,onUiLanguage,UI_LANGUAGES} from '../i18n/translator.ts';
 import {voiceFailure,roomFailure,worded,errorLine} from '../features/settings/error-message.ts';
@@ -1723,8 +1724,7 @@ async function watchAudioDevices(){
  if(devices)audioDevicesChanged(devices);
 }
 function audioDevicesChanged(devices){
- if(devices.lost){const kept=storedAudio();if(devices.lost.input)delete kept.input;if(devices.lost.output)delete kept.output;keepAudio(kept)}
- if(devices.lost?.output)setSpeechOutput('agents_muted');
+ if(devices.lost)keepAudio(withoutLost(storedAudio(),devices.lost));
  roomStore.patch({audioDevices:{inputs:devices.inputs||[],outputs:devices.outputs||[],input:devices.input??null,output:devices.output??null,outputSelectable:!!devices.outputSelectable},
   ...(devices.lost?{audioLost:devices.lost}:{})});
 }
