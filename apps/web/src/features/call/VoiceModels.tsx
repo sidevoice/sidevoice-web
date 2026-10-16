@@ -3,7 +3,7 @@ import { EndOfTurnIcon, TranscriptionIcon, VoicesIcon } from "../../components/u
 import { Button } from "../../components/ui/Button";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { voiceSettingsHere } from "../../services/voice-settings.js";
-import { useModelState } from "../settings/ModelSetup";
+import { catalogueShown, useModelState } from "../settings/ModelSetup";
 import { openSettings } from "../settings/open-settings";
 import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 
@@ -14,7 +14,9 @@ import { translator, type Translate, type MessageKey } from "../../i18n/translat
  * voice is given (voiceSettingsHere); the voice reports no model of its own. */
 
 /** A model's slot as the details say it; `attention` when something must be done or waited for before it works. */
-export type Slot = { id: string; where: string; state: string; attention: boolean; task: "stt" | "tts" | "end-of-turn"; status: string; catalog: string };
+export type Slot = { id: string; where: string; state: string; attention: boolean; task: "stt" | "tts" | "end-of-turn"; status: string; catalog: string;
+  /** How much of its download is done (0–1) while it downloads; null otherwise. */
+  fraction: number | null };
 
 function useSlots(t: Translate): { stt: Slot | null; tts: Slot | null; turn: Slot | null } {
   const saved = useRoomStore((state) => state.facts.voiceSettings);
@@ -25,8 +27,9 @@ function useSlots(t: Translate): { stt: Slot | null; tts: Slot | null; turn: Slo
   // mounted (the controller loads on its own): asked again once they are, which the settings the controller hands over
   // say, so the smart end of turn shows before any call too (2026-10-15).
   const catalogueState = useRoomStore((state) => state.facts.voiceCatalogue.state);
-  useEffect(() => { if (catalogueState === "idle") void window.sidevoiceActions?.loadVoiceCatalogue(); }, [catalogueState, saved]);
-  const known = catalogueState === "ready";
+  useEffect(() => { if (catalogueState === "idle") void window.sidevoiceActions?.loadVoiceCatalogue?.(); }, [catalogueState, saved]);
+  // Read again with the last catalogues still there (after a download) is still known: nothing flickers to unknown.
+  const known = catalogueShown({ state: catalogueState, catalogs });
   const settings = saved ? voiceSettingsHere(saved, catalogs) : null;
   const stt = useModelState("stt", settings);
   const tts = useModelState("tts", settings);
@@ -38,7 +41,7 @@ function useSlots(t: Translate): { stt: Slot | null; tts: Slot | null; turn: Slo
     // A provider's model with no key is the key's to fix, whatever else its catalogue says.
     const status = !known ? "unknown" : chosen.catalog !== "local" && keys[chosen.catalog] === false ? "needsKey" : model.status ?? "unavailable";
     return {
-      task, status, catalog: chosen.catalog,
+      task, status, catalog: chosen.catalog, fraction: model.fraction,
       id: chosen.model,
       where: chosen.catalog === "local" ? t("voiceModels.here") : t("voiceModels.provider", { provider }),
       state: t(("voiceModels.state." + status) as MessageKey),
@@ -48,7 +51,7 @@ function useSlots(t: Translate): { stt: Slot | null; tts: Slot | null; turn: Slo
   // The smart end of turn has a model of its own; the silence one has none, and no row.
   const turnId = settings?.end_of_turn === "smart-turn" ? turn.model?.id ?? settings.turn_model ?? null : null;
   const turnStatus = !known ? "unknown" : turn.status ?? "unavailable";
-  const turnSlot: Slot | null = turnId ? { task: "end-of-turn", status: turnStatus, catalog: "local", id: turnId, where: t("voiceModels.here"), state: t(("voiceModels.state." + turnStatus) as MessageKey),
+  const turnSlot: Slot | null = turnId ? { task: "end-of-turn", status: turnStatus, catalog: "local", fraction: turn.fraction, id: turnId, where: t("voiceModels.here"), state: t(("voiceModels.state." + turnStatus) as MessageKey),
     attention: turnStatus !== "ready" && turnStatus !== "unknown" } : null;
   return { stt: slot("stt", stt), tts: slot("tts", tts), turn: turnSlot };
 }
@@ -80,10 +83,25 @@ export function useVoiceModels(): { rows: VoiceModelRow[]; attention: boolean } 
   return { rows, attention: rows.some((row) => row.slot.attention) };
 }
 
+/** Whether the call's voice can work: the transcription and the voice each ready — on this device, or a provider's with its key. Unknown until the catalogue and the settings are
+ *  read, so nothing is claimed before. `rows`: theirs, for a card that offers what each needs. */
+export function useVoiceReadiness(): { state: "ready" | "missing" | "unknown"; rows: VoiceModelRow[]; sttReady: boolean; ttsReady: boolean } {
+  const { rows } = useVoiceModels();
+  const saved = useRoomStore((state) => state.facts.voiceSettings);
+  const failed = useRoomStore((state) => state.facts.voiceCatalogue.state === "failed");
+  const of = (task: "stt" | "tts") => rows.find((row) => row.slot.task === task);
+  const stt = of("stt"), tts = of("tts");
+  const required = rows.filter((row) => row.slot.task === "tts" || row.slot.task === "stt");
+  const sttReady = stt?.slot.status === "ready", ttsReady = tts?.slot.status === "ready";
+  const unknown = !saved || (!failed && required.some((row) => row.slot.status === "unknown"));
+  const ready = ttsReady && sttReady;
+  return { state: ready ? "ready" : unknown ? "unknown" : "missing", rows: required, sttReady, ttsReady };
+}
+
 /** The models in the call's details (CallDetails): one row each — what it is for, its model's id, where it runs, its
  *  state in words, and, when it needs something, what can be done about it. Before the catalogue is read a row claims
  *  nothing of its state. */
-export function VoiceModels({ rows }: { rows: VoiceModelRow[] }) {
+export function VoiceModels({ rows, states }: { rows: VoiceModelRow[]; states?: Partial<Record<string, string>> }) {
   const t = translator();
   const stt = rows.find((row) => row.slot.task === "stt")?.slot.id, tts = rows.find((row) => row.slot.task === "tts")?.slot.id;
   return (
@@ -94,8 +112,9 @@ export function VoiceModels({ rows }: { rows: VoiceModelRow[] }) {
           <span className="voice-model-copy">
             <span className="voice-model-task">{label}</span>
             <span className="voice-model-id" translate="no">{slot.id}</span>
-            <span className="voice-model-where">{slot.where}{slot.status !== "unknown" && <span className="voice-model-state">{slot.state}</span>}</span>
+            <span className="voice-model-where">{slot.where}{slot.status !== "unknown" && <span className="voice-model-state">{states?.[slot.status] ?? slot.state}</span>}</span>
           </span>
+          {states && slot.fraction != null && <progress className="voice-model-progress" value={slot.fraction} max={1} aria-hidden="true" />}
           {slot.attention && <span className="voice-model-action"><SlotAction slot={slot} t={t} /></span>}
         </li>
       ))}

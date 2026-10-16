@@ -54,15 +54,14 @@ const ORDER: OnboardingStep[] = ["W0", "W4m", "W1", "W2", "W2r", "W3", "W4", "W4
 
 /** The step Back goes to. `microphone`: whether there is a microphone to ask for here (else the permissions step is
  *  never shown). */
-function previous(step: OnboardingStep, path: "agents" | "remote" | null, canHostAgents: boolean, microphone: boolean, transcription: boolean): OnboardingStep | null {
+function previous(step: OnboardingStep, path: "agents" | "remote" | null, canHostAgents: boolean, microphone: boolean): OnboardingStep | null {
   const permissions: OnboardingStep = microphone ? "W4m" : "W0";
   if (step === "W4m") return "W0";
   if (step === "W1") return permissions;
   if (step === "W2" || step === "W3") return "W1";
   if (step === "W2r") return canHostAgents ? "W1" : permissions;
   if (step === "W4") return path === "agents" ? "W3" : "W2r";
-  // Without the microphone transcription's step is left out: Back goes past it.
-  if (step === "W4v") return transcription ? "W4" : path === "agents" ? "W3" : "W2r";
+  if (step === "W4v") return "W4";
   if (step === "W5") return "W4v";
   if (step === "W6") return "W5";
   return null;
@@ -89,7 +88,7 @@ function BasicsStep({ t }: { t: Translate }) {
 
 /** When a turn ends, as Settings → Call has it: Smart preselected (where it runs here), Silence the other; patience;
  *  and its try, optional — Continue stays the step's action, and leaving the step (Continue, Back, Later) stops it. */
-function TurnStep({ turnTry, noMicrophone, t }: { turnTry: TurnTryHandle; noMicrophone: boolean; t: Translate }) {
+function TurnStep({ turnTry, t }: { turnTry: TurnTryHandle; t: Translate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
   useEffect(() => { if (catalogue.state === "idle") void window.sidevoiceActions?.loadVoiceCatalogue(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -97,7 +96,7 @@ function TurnStep({ turnTry, noMicrophone, t }: { turnTry: TurnTryHandle; noMicr
     <p>{t("wizard.turnIntro")}</p>
     {catalogue.state === "failed" ? <Alert tone="danger" live className="voice-catalogue-error" title={catalogue.error} details={catalogue.details} />
       : !catalogueShown(catalogue) || !draft ? <p className="wizard-loading" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("voice.loading")}</p>
-        : <TurnChoices draft={draft} setup turnTry={turnTry} noMicrophone={noMicrophone} />}
+        : <TurnChoices draft={draft} setup turnTry={turnTry} />}
   </section>;
 }
 
@@ -188,9 +187,10 @@ function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t
  *  and its actions — Try it the main one, running the step's try block (Continue without trying beside it once the
  *  model is ready; Stop while it runs; Continue once tried). `reason`: the step's model is not ready (said in the row, cut short with its whole text kept);
  *  `tryReason`: only the try can't run yet (no sentence to say, no transcription to hear a turn). Blocked actions stay focusable, saying why (`blockedBy`). */
-function ModelStepFooter({ reason, tryReason, running, tried, onTry, onStop, onContinue, t }: {
+/** `skip` (onboardingFlow d): while the model is not ready, the quiet "Continue without …" left of the main action. */
+function ModelStepFooter({ reason, tryReason, running, tried, onTry, onStop, onContinue, skip, t }: {
   reason: string; tryReason?: string; running: boolean; tried: boolean;
-  onTry(): void; onStop(): void; onContinue(): void; t: Translate;
+  onTry(): void; onStop(): void; onContinue(): void; skip?: { label: string; onSkip(): void }; t: Translate;
 }) {
   const waiting = !!reason && !running;
   const said = waiting ? reason : !running && tryReason ? tryReason : "";
@@ -201,6 +201,7 @@ function ModelStepFooter({ reason, tryReason, running, tried, onTry, onStop, onC
   return <>
     {line}
     {!waiting && <Button type="button" variant="secondary" id="wizard-stage-action" onClick={goOn}>{t("wizard.continueWithoutTrying")}</Button>}
+    {waiting && skip && <Button type="button" variant="secondary" id="wizard-step-skip" onClick={skip.onSkip}>{skip.label}</Button>}
     <Button type="button" variant="primary" id="wizard-try" {...blocked(waiting || (!running && !!tryReason))} onClick={running ? onStop : onTry}>
       {running ? t("try.stop") : t("try.tryIt")}</Button>
   </>;
@@ -208,8 +209,10 @@ function ModelStepFooter({ reason, tryReason, running, tried, onTry, onStop, onC
 
 /** Why a step's model holds its footer, in the step's own words; nothing once it is ready. */
 const WAIT_KEY = { stt: "settings.save.waitTranscription", tts: "settings.save.waitVoice", turn: "settings.save.waitTurn" } as const;
-function waitReason(model: ModelState, slot: keyof typeof WAIT_KEY, t: Translate) {
-  return model.model && model.ready ? "" : t(WAIT_KEY[slot]);
+/** Where the step can be passed without its model (onboardingFlow d), the reason line says the consequence instead, once. */
+const SKIP_REASON = { stt: "wizard.skip.sttReason", tts: "wizard.skip.ttsReason", turn: "wizard.skip.turnReason" } as const;
+function waitReason(model: ModelState, slot: keyof typeof WAIT_KEY, t: Translate, skips = false) {
+  return model.model && model.ready ? "" : t(skips ? SKIP_REASON[slot] : WAIT_KEY[slot]);
 }
 
 export function Wizard() {
@@ -283,8 +286,8 @@ export function Wizard() {
   }, [onboarding.open, step, onboarding.localReady, onboarding.remoteReady, onboarding.record.agents_done]); // eslint-disable-line react-hooks/exhaustive-deps
   // The permissions step comes after the basics whenever there is a microphone to ask for, allowed already or not: it
   // always shows, saying where each stands, and waits for Continue (operator, 2026-10-16). After it, where the agents are.
-  // Without the microphone, transcription has nothing to hear: the setup goes on to the voice (operator, 2026-10-16).
-  const sttStep: OnboardingStep = onboarding.microphone.ready ? "W4" : "W4v";
+  // The microphone is required in this release (operator, 2026-10-16): transcription always follows the machine.
+  const sttStep: OnboardingStep = "W4";
   const permissionsNext: OnboardingStep = onboarding.canHostAgents ? "W1" : onboarding.remoteReady ? sttStep : "W2r";
 
   async function choosePath(next: "agents" | "remote") {
@@ -306,6 +309,19 @@ export function Wizard() {
     if (await onboarding.markChosen(task)) onboarding.goTo(task === "stt" ? "W4v" : "W5");
   }
 
+  // "Continue without …" (d): kept in the record, so a reload does not send the person back; Back still reaches the step.
+  async function skipMachine() {
+    if (await onboarding.skip("machine")) onboarding.goTo(sttStep);
+  }
+  async function skipStage(task: "stt" | "tts") {
+    trial.finish();
+    if (await onboarding.skip(task)) onboarding.goTo(task === "stt" ? "W4v" : "W5");
+  }
+  const skips = onboarding.rules.skips;
+  const stageSkip = skips && stageTask ? { label: t(stageTask === "stt" ? "wizard.skip.stt" : "wizard.skip.tts"), onSkip: () => void skipStage(stageTask) } : undefined;
+  const turnSkip = skips && turnWaits ? { label: t("wizard.skip.turn"), onSkip: () => void finishTurn() } : undefined;
+  const machineWaits = skips && ((step === "W2" && !onboarding.localReady) || (step === "W2r" && !onboarding.remoteReady));
+
   async function finishTurn() {
     if (await onboarding.markTurnDone()) onboarding.goTo("W6");
   }
@@ -322,7 +338,9 @@ export function Wizard() {
   }
 
   const current = GROUPS.findIndex((group) => group.steps.includes(step));
-  const back = previous(step, onboarding.path, onboarding.canHostAgents, onboarding.microphone.state !== "none", onboarding.microphone.ready);
+  const before = previous(step, onboarding.path, onboarding.canHostAgents, onboarding.microphone.state !== "none");
+  // With this computer passed without (d), Back from the voice goes to preparing it, not to its agents.
+  const back = before === "W3" && !onboarding.localReady ? "W2" : before;
   const error = onboarding.error ? t(`wizard.error.${onboarding.error.replace("onboarding.", "")}` as MessageKey) : "";
   const agents = agentsFp ? hostAgents[agentsFp] : undefined;
 
@@ -338,15 +356,16 @@ export function Wizard() {
 
   const ready = step === "W6";
   return <dialog ref={dialog} id="wizard" className="wizard-dialog" aria-labelledby="wizard-title" data-step={step} data-ready={ready || undefined}
-    // Escape puts the setup off, except once it is done: Ready only goes on.
-    onCancel={(event) => { event.preventDefault(); if (!ready) void onboarding.defer(); }}
-    // On Ready, Escape is stopped at the key: a browser closes a modal anyway after a few cancelled Escapes. Closed
-    // without the setup asking for it, it is opened again.
-    onKeyDown={(event) => { if (ready && event.key === "Escape") event.preventDefault(); }}
+    // Escape puts the setup off where the flow allows it, except once it is done: Ready only goes on. Where it does not
+    // (a, d), Escape does nothing on any step.
+    onCancel={(event) => { event.preventDefault(); if (!ready && onboarding.rules.canDefer) void onboarding.defer(); }}
+    // Where Escape does nothing it is stopped at the key: a browser closes a modal anyway after a few cancelled Escapes.
+    // Closed without the setup asking for it, it is opened again.
+    onKeyDown={(event) => { if ((ready || !onboarding.rules.canDefer) && event.key === "Escape") event.preventDefault(); }}
     onClose={() => { const element = dialog.current; if (onboarding.open && element && !element.open) element.showModal?.(); }}>
     <header className="wizard-head">
       <span className="wizard-brand"><SidevoiceMark size={18} />{t("wizard.eyebrow")}</span>
-      {step !== "W6" && <Button type="button" variant="ghost" tone="neutral" size="sm" className="wizard-later" onClick={() => void onboarding.defer()}>{t("wizard.later")}</Button>}
+      {step !== "W6" && onboarding.rules.canDefer && <Button type="button" variant="ghost" tone="neutral" size="sm" className="wizard-later" onClick={() => void onboarding.defer()}>{t("wizard.later")}</Button>}
     </header>
     <Stepper current={current} t={t} />
     {!ready && <h2 id="wizard-title" className="wizard-title" ref={title} tabIndex={-1}>{t(TITLES[step])}</h2>}
@@ -374,9 +393,9 @@ export function Wizard() {
       {step === "W3" && <section>{agentsBlock}</section>}
       {step === "W4m" && <PermissionsStep microphone={onboarding.microphone} openSettings={onboarding.openMicrophoneSettings} onRequest={() => void onboarding.requestMicrophone()} t={t} />}
       {stageTask && <StageStep key={step} task={stageTask} stage={stage} t={t} />}
-      {step === "W5" && <TurnStep turnTry={turnTry} noMicrophone={!onboarding.microphone.ready} t={t} />}
-      {ready && <ReadyStep path={onboarding.path} machineName={remoteName} title={title} t={t} />}
-      {ready && error && <Alert tone="danger" live className="wizard-ready-error" title={error} />}
+      {step === "W5" && <TurnStep turnTry={turnTry} t={t} />}
+      {ready && <ReadyStep path={onboarding.path} machineName={remoteName} title={title} t={t} live={skips ? { machine: onboarding.machineAnswers } : undefined} />}
+      {ready && error && !skips && <Alert tone="danger" live className="wizard-ready-error" title={error} />}
     </div>
     <footer className="wizard-actions" data-model-step={stageTask || step === "W5" || step === "W4m" ? "" : undefined}>
       {back && <Button type="button" variant="ghost" tone="neutral" className="wizard-back" onClick={() => onboarding.goTo(back)}><BackIcon /><span className="wizard-back-label">{t("wizard.back")}</span></Button>}
@@ -384,21 +403,21 @@ export function Wizard() {
       {step === "W1" && <Button type="button" variant="primary" disabled={!choice} onClick={() => choice && void choosePath(choice)}>{t("wizard.continue")}</Button>}
       {step === "W2" && onboarding.localReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W3")}>{t("wizard.continue")}</Button>}
       {step === "W2r" && onboarding.remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo(sttStep)}>{t("wizard.continue")}</Button>}
+      {machineWaits && <>
+        <p className="wizard-reason" id="wizard-stage-reason" title={t("wizard.skip.machineReason")}>{t("wizard.skip.machineReason")}</p>
+        <Button type="button" variant="secondary" id="wizard-step-skip" onClick={() => void skipMachine()}>{t("wizard.skip.machine")}</Button>
+      </>}
       <span ref={setFooterSlot} className="wizard-slot" />
       {step === "W3" && <Button type="button" variant="primary" onClick={() => void finishAgents()}>{t("wizard.continue")}</Button>}
-      {step === "W4m" && <MicrophoneContinue microphone={onboarding.microphone} onContinue={() => void (onboarding.microphone.state === "granted" || onboarding.microphone.state === "none" ? onboarding.markMicrophoneDone() : onboarding.markMicrophoneSkipped()).then((done) => { if (done) onboarding.goTo(permissionsNext); })} t={t} />}
-      {stageTask && <ModelStepFooter reason={waitReason(model, stageTask, t)}
+      {step === "W4m" && <MicrophoneContinue microphone={onboarding.microphone} onContinue={() => void onboarding.markMicrophoneDone().then((done) => { if (done) onboarding.goTo(permissionsNext); })} t={t} />}
+      {stageTask && <ModelStepFooter reason={waitReason(model, stageTask, t, skips)} skip={stageSkip}
         tryReason={stageTask === "tts" && !sample.trim() ? t("wizard.wait.sentence") : undefined}
         running={trial.trial.phase === "running"} tried={onboarding.tried(stageTask)}
         onTry={tryAgain} onStop={trial.finish} onContinue={() => void finishStage(stageTask)} t={t} />}
-      {step === "W5" && !onboarding.microphone.ready && <>
-        {turnWaits && <p className="wizard-reason" id="wizard-stage-reason" title={waitReason(turnModel, "turn", t)}>{waitReason(turnModel, "turn", t)}</p>}
-        <Button type="button" variant="primary" id="wizard-stage-action" {...(turnWaits ? { disabled: true, blockedBy: "wizard-stage-reason" } : {})} onClick={() => void finishTurn()}>{t("wizard.continue")}</Button>
-      </>}
-      {step === "W5" && onboarding.microphone.ready && <ModelStepFooter reason={turnWaits ? waitReason(turnModel, "turn", t) : ""} tryReason={sttModel.ready ? undefined : t("settings.save.waitTranscription")}
+      {step === "W5" && <ModelStepFooter reason={turnWaits ? waitReason(turnModel, "turn", t, skips) : ""} skip={turnSkip} tryReason={sttModel.ready ? undefined : t("settings.save.waitTranscription")}
         running={turnTry.running} tried={turnTried} onTry={turnTry.start} onStop={turnTry.stop} onContinue={() => void finishTurn()} t={t} />}
       {ready && <Button type="button" variant="primary" size="lg" className="wizard-enter" loading={completing} onClick={() => void complete()}>
-        {error ? t("wizard.retryCompletion") : t("wizard.enter")}<ArrowRightIcon />
+        {error && !skips ? t("wizard.retryCompletion") : t("wizard.enter")}<ArrowRightIcon />
       </Button>}
     </footer>
   </dialog>;

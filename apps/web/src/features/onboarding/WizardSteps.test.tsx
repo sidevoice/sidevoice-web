@@ -24,6 +24,8 @@ const NUC = { fp: "fp-nuc", device_id: "d-1", urls: ["https://nuc.example"], rv:
 
 let actions: Record<string, ReturnType<typeof vi.fn>>;
 beforeEach(() => {
+  // The wizard's steps as today's flow (onboardingFlow c) has them; each flow's own behaviour is OnboardingFlow.test.tsx's.
+  localStorage.setItem("sidevoice.variants", JSON.stringify({ onboardingFlow: "c" }));
   localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true }));
   actions = {
     openPairing: vi.fn(), loadVoiceCatalogue: vi.fn().mockResolvedValue(undefined), editVoice: vi.fn(),

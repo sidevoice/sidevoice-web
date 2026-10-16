@@ -96,7 +96,7 @@ export function useHighlights() {
   // Until the first-run setup is finished nothing is new — everything is, there — and what is there then is taken as
   // seen: only what appears after the setup is ever marked new. While the setup's record is not read yet, nothing shows
   // and nothing is taken as seen.
-  const settingUp = !!onboarding && onboarding.ready && !onboarding.record.completed_at;
+  const settingUp = !!onboarding && onboarding.ready && !onboarding.done;
   const unknown = !!onboarding && !onboarding.ready;
   const unseen = settingUp ? candidates.filter((item) => !seen[item.id]?.seenAt).map((item) => item.id).join(" ") : "";
   useEffect(() => {

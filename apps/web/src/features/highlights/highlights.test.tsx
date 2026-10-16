@@ -15,7 +15,8 @@ const setup = vi.hoisted(() => ({ ready: true, completed_at: null as number | nu
 vi.mock("../onboarding/onboarding-context", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../onboarding/onboarding-context")>()),
   useOnboardingIfAny: () => ({
-    ready: setup.ready, open: false, markFeatures: async () => true,
+    ready: setup.ready, open: false, markFeatures: async () => true, done: !!setup.completed_at, rules: { canDefer: true, readiness: false },
+    voice: { sttMissing: false },
     record: { completed_at: setup.completed_at, deferred_at: null, baseline_release: 999, features: {} },
   }),
 }));

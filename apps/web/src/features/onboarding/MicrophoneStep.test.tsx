@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { act, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { App } from "../../app/App";
 import { createRoomStore } from "../../state/room-store";
 import { defaultVoiceSettings } from "../../services/voice-settings.js";
@@ -120,26 +120,28 @@ test("blocked: how to allow it for the site, Check again (still blocked, said so
   expect(title()).toHaveTextContent("Set up transcription");
 }, WHOLE_APP_MS);
 
-test("continuing without the microphone skips transcription for the voice, Back goes past it, and the same footer element turns into Continue once allowed", async () => {
+test("required in this release, in every flow: no way past the step without the microphone, reloaded or not", async () => {
   const { media } = browser("denied", () => Promise.reject(refused("NotAllowedError")));
+  for (const flow of ["a", "b", "c", "d"]) {
+    localStorage.setItem("sidevoice.variants", JSON.stringify({ onboardingFlow: flow }));
+    await setup();
+    expect(title()).toHaveTextContent("Permissions");
+    expect(document.getElementById("wizard-mic-skip")).toBeNull();
+    expect(wizard().queryByRole("button", { name: /Continue without/ })).toBeNull();
+    // Continue waits, focusable, saying why; pressed, it goes nowhere.
+    expect(proceed()).toHaveAttribute("aria-disabled", "true");
+    await act(async () => { fireEvent.click(proceed()); });
+    expect(title()).toHaveTextContent("Permissions");
+    expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).microphone_done ?? false).toBe(false);
+    cleanup();
+  }
+  localStorage.removeItem("sidevoice.variants");
   await setup();
-  const forward = proceed();
-  forward.focus();
-  await act(async () => { fireEvent.click(forward); });
-  expect(title()).toHaveTextContent("Set up voice");
-  expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).microphone_skipped).toBe(true);
-  fireEvent.click(wizard().getByRole("button", { name: "Back" }));
-  expect(title()).not.toHaveTextContent("Set up transcription");
-  fireEvent.click(wizard().getByRole("button", { name: "Back" }));
   expect(title()).toHaveTextContent("Permissions");
-  expect(media.getUserMedia).toHaveBeenCalledTimes(0);
-  const again = proceed();
-  again.focus();
+  // Allowed: Continue, and on to transcription.
   media.getUserMedia.mockResolvedValue(stream());
   await act(async () => { fireEvent.click(action()); });
-  await waitFor(() => expect(proceed()).toHaveTextContent("Continue"));
-  expect(proceed()).toBe(again);
-  expect(document.activeElement).toBe(again);
+  await waitFor(() => expect(proceed()).not.toHaveAttribute("aria-disabled", "true"));
   await act(async () => { fireEvent.click(proceed()); });
   expect(title()).toHaveTextContent("Set up transcription");
 }, WHOLE_APP_MS);
@@ -215,23 +217,3 @@ test("where its settings are: the platform the page runs on, a phone none", () =
   expect(devicePlatform(nav("Linux x86_64"))).toBe("linux");
   expect(devicePlatform(nav("Linux armv8l", "Mozilla/5.0 (Linux; Android 14)"))).toBe("other");
 });
-
-test("without a microphone, the end of turn's step offers no try: one line says why, the choice and Continue stay", async () => {
-  const kokoro = { id: "kokoro-82m-v1.0", family: "kokoro", capabilities: ["tts"], languages: ["es"], voices: [{ id: "ef_dora", languages: ["es"] }], speed: { min: 0.5, max: 2 }, parametersM: 1, license: "MIT", installed: true, builds: [{ id: "kokoro/int8", available: true, reasons: [] }] };
-  browser("denied", () => Promise.reject(refused("NotAllowedError")));
-  const store = createRoomStore();
-  act(() => store.patch({ machinesReady: true, speechLanguage: "es", voiceSettings: defaultVoiceSettings(), pairings: [NUC], machineLinks: { [NUC.fp]: { reach: "ok", via: "node" } },
-    voiceCatalogue: { state: "ready", catalogs: [{ id: "local", name: null, status: { stale: false }, models: [kokoro] }] as never, error: "" } }));
-  render(<App store={store} />);
-  await waitFor(() => expect(document.getElementById("wizard")).toHaveAttribute("open"));
-  await act(async () => { fireEvent.click(proceed()); });
-  expect(title()).toHaveTextContent("Set up voice");
-  await act(async () => { fireEvent.click(document.getElementById("wizard-stage-action")!); });
-  expect(title()).toHaveTextContent("When your turn ends");
-  expect(document.getElementById("voice-end-of-turn")).toBeInTheDocument();
-  expect(document.querySelector("#wizard #turn-try")).toBeNull();
-  expect(document.getElementById("wizard-try")).toBeNull();
-  expect(document.querySelector("#wizard #turn-try-nomic")).toHaveTextContent("needs a microphone");
-  expect(document.getElementById("wizard-stage-action")).toHaveTextContent("Continue");
-  expect(document.getElementById("wizard-stage-action")).not.toBeDisabled();
-}, WHOLE_APP_MS);

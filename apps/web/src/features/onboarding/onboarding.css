@@ -168,3 +168,6 @@
   .wizard-actions[data-model-step] .wizard-back-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .wizard-actions[data-model-step] > .ui-button:not(.wizard-back) { padding-inline: var(--sv-space-3); }
 }
+/* Ready, read live (onboardingFlow d): a row not there yet wears a neutral dash, never red; one downloading, nothing. */
+.wizard-recap-dash { grid-area: check; display: grid; place-items: center; width: 16px; height: 16px; color: var(--sv-text-muted); font-weight: var(--sv-weight-semibold); }
+.wizard-recap-row[data-state="missing"] dd { color: var(--sv-text-muted); }

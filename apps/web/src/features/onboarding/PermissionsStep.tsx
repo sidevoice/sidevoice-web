@@ -15,8 +15,8 @@ import type { Translate } from "../../i18n/translator";
  * blocked or none found) and, allowed, is Continue: the step always waits for it. A live region says each change.
  * One block per permission (PermissionBlock), each with its own action and, blocked, all its recovery inside it. The
  * action is in the block: one control that changes its label — Allow microphone, Check again once blocked or none
- * found, Allowed (a check, not pressable) — so focus stays on it; the footer's forward action is always there: "Continue without
- * microphone" (quiet) until allowed, then Continue. The bicho moves a little by state
+ * found, Allowed (a check, not pressable) — so focus stays on it; the footer's forward action is Continue, waiting until
+ * the microphone is allowed (required in this release, operator 2026-10-16). The bicho moves a little by state
  * (a hop once allowed, a droop while blocked, a lean while asked) on a wrapper: the engine has no expressions.
  *
  * Calm always: the permission check lets the microphone go at once, so nothing is heard here and the bicho never acts
@@ -28,14 +28,11 @@ export function PermissionsStep({ microphone, openSettings, onRequest = () => {}
   return <section className="wizard-mic"><PermissionsList microphone={microphone} openSettings={openSettings} onRequest={onRequest} t={t} platform={platform} /></section>;
 }
 
-/** The footer's forward action, always there and never waiting for the microphone (operator, 2026-10-16): quiet and saying
- *  "Continue without microphone" until it is allowed, then the primary Continue. One element, so focus stays on it. */
+/** The footer's forward action: Continue, waiting until the microphone is allowed. The microphone is required in this
+ *  release (operator, 2026-10-16): there is no way past the step without it. One element, so focus stays on it. */
 export function MicrophoneContinue({ microphone, onContinue, t }: { microphone: MicrophoneSnapshot; onContinue(): void; t: Translate }) {
   const { done } = microphoneAction(microphone);
-  // Two ways on (operator, 2026-10-16): "Continue without microphone", secondary, at the left until it is allowed; and
-  // Continue, the primary, in the brand's colour but waiting until the microphone is allowed.
   return <>
-    {!done && <Button type="button" variant="secondary" id="wizard-mic-skip" onClick={onContinue}>{t("wizard.mic.continueWithout")}</Button>}
     {/* Waiting, it says why on hover and focus: aria-disabled (blockedBy), so it stays focusable and its tooltip shows. */}
     <Tooltip content={done ? null : t("wizard.mic.continueWaiting")}>
       <Button type="button" variant="primary" id="wizard-mic-continue" className={done ? undefined : "wizard-continue-waiting"}

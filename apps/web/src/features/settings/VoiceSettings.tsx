@@ -242,8 +242,7 @@ export function SpeechChoices({ draft, setup = false, trial }: SlotProps) {
  *  smart model when it runs here (else why not); and a try of both together (TurnTry), in a card of its own after
  *  the choices. `setup`: the first-run setup's;
  *  `active`: in sight (Settings' section on show), a try that runs stopping when it is not. */
-export function TurnChoices({ draft, setup = false, active = true, turnTry, noMicrophone = false }: { draft: Settings; setup?: boolean; active?: boolean; turnTry?: TurnTryHandle;
-  /** The setup went on without a microphone: the try cannot work, so it is not offered (one line says why). */ noMicrophone?: boolean }) {
+export function TurnChoices({ draft, setup = false, active = true, turnTry }: { draft: Settings; setup?: boolean; active?: boolean; turnTry?: TurnTryHandle }) {
   const t = translator();
   const choices = useChoices(draft);
   const patience: { value: Settings["patience"]; label: MessageKey; hint: MessageKey }[] = [
@@ -286,7 +285,7 @@ export function TurnChoices({ draft, setup = false, active = true, turnTry, noMi
           </Field>}
           onDownload={() => downloadModel("end-of-turn")} onCancel={cancelDownload} onRetry={() => downloadModel("end-of-turn")} />
       </Row>}
-      {noMicrophone ? <p className="model-try-hint turn-try-nomic" id="turn-try-nomic">{t("wizard.turn.noMicrophone")}</p> : tryIt}
+      {tryIt}
     </Group>
   );
 }

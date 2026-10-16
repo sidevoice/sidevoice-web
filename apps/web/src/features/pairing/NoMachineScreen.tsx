@@ -14,7 +14,8 @@ import "./pairing.css";
 export function NoMachineScreen({
   installController = localHostInstallController,
   source = "no-machine",
-}: { installController?: LocalHostInstallController; source?: LocalHostInstallSource } = {}) {
+  onContinueSetup,
+}: { installController?: LocalHostInstallController; source?: LocalHostInstallSource; onContinueSetup?: () => void } = {}) {
   const t = translator();
   const ready = useRoomStore((state) => state.facts.machinesReady);
   const machines = useRoomStore((state) => state.machines);
@@ -50,6 +51,8 @@ export function NoMachineScreen({
       </div>
       {!twoWays && installHere && offer.offered && <p className="no-machine-hint">{t("localInstall.description")}</p>}
       {!twoWays && <LocalHostInstallEntry showCta={false} controller={installController} source={source} holdSuccess />}
+      {/* Back into the setup where it stands, where the flow offers it: a quiet link, never the main action. */}
+      {onContinueSetup && <Button variant="ghost" tone="neutral" size="sm" className="waiting-continue-setup" onClick={onContinueSetup}>{t("noMachine.continue")}</Button>}
     </section>
   );
 }

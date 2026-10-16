@@ -10,7 +10,7 @@ const stt = { catalog: "local", model: "whisper-base", language: null };
 const tts = { catalog: "elevenlabs", model: "eleven_flash_v2_5", voice: "v1", speed: 1 };
 const basics = () => ({ ...emptyOnboardingRecord(), basics_done: true });
 const facts = (patch: Partial<ResumeFacts> = {}): ResumeFacts => ({
-  record: basics(), canHostAgents: true, localReady: false, remoteReady: false, microphonePassed: true, microphoneReady: true,
+  record: basics(), canHostAgents: true, localReady: false, remoteReady: false, microphonePassed: true,
   sttKey: trialKey(stt), ttsKey: trialKey(tts), ...patch,
 });
 function memory(fail: { set?: boolean; keep?: boolean } = {}) {
@@ -60,20 +60,37 @@ test("resume: the basics, where the agents run, then the machine, the agents, tr
   expect(resumeOnboarding(facts({ record: tried, remoteReady: false }))).toBe("W2r");
 });
 
-test("resume: the permissions right after the basics, before the machine, until passed; without the microphone, transcription is left out", () => {
+test("resume: the permissions right after the basics, before the machine, until passed with the microphone allowed", () => {
   const remote = { ...basics(), choice: "remote" as const };
   expect(resumeOnboarding(facts({ record: remote, remoteReady: true, microphonePassed: false }))).toBe("W4m");
   // Before the machine: no machine needed to be asked.
   expect(resumeOnboarding(facts({ record: remote, microphonePassed: false }))).toBe("W4m");
   expect(resumeOnboarding(facts({ record: { ...basics(), choice: null }, microphonePassed: false }))).toBe("W4m");
-  // The microphone is not a condition: passed without it, transcription is skipped and the voice is next, then the rest.
-  expect(resumeOnboarding(facts({ record: remote, remoteReady: true, microphoneReady: false }))).toBe("W4v");
-  const done = { ...remote, microphone_skipped: true, chosen: { stt: trialKey(stt)!, tts: trialKey(tts)! }, turn_done: true };
-  expect(resumeOnboarding(facts({ record: done, remoteReady: true, microphoneReady: false }))).toBe("W6");
+  // Required in this release (operator, 2026-10-16): passed, transcription always comes after the machine.
+  expect(resumeOnboarding(facts({ record: remote, remoteReady: true }))).toBe("W4");
   // The basics come first.
   expect(resumeOnboarding(facts({ record: { ...basics(), basics_done: false }, microphonePassed: false }))).toBe("W0");
   expect(normalizeOnboardingRecord({ microphone_done: true }).microphone_done).toBe(true);
-  expect(normalizeOnboardingRecord({ microphone_skipped: true }).microphone_skipped).toBe(true);
+});
+
+test("resume, live (onboardingFlow b): a machine connected anywhere and models ready count as done", () => {
+  const agents = { ...basics(), choice: "agents" as const };
+  // This computer was chosen, another machine was paired in Settings: on past the machine.
+  expect(resumeOnboarding(facts({ record: agents, remoteReady: true }))).toBe("W2");
+  expect(resumeOnboarding(facts({ record: agents, remoteReady: true, live: { sttReady: true, ttsReady: true } }))).toBe("W5");
+  expect(resumeOnboarding(facts({ record: agents, remoteReady: true, live: { sttReady: true, ttsReady: false } }))).toBe("W4v");
+});
+
+test("resume, with skips (onboardingFlow d): what was passed without is passed; done, its mark no longer matters", () => {
+  const remote = { ...basics(), choice: "remote" as const, machine_skipped: true };
+  expect(resumeOnboarding(facts({ record: remote }))).toBe("W2r");
+  expect(resumeOnboarding(facts({ record: remote, skips: true }))).toBe("W4");
+  expect(resumeOnboarding(facts({ record: { ...remote, stt_skipped: true }, skips: true }))).toBe("W4v");
+  expect(resumeOnboarding(facts({ record: { ...remote, stt_skipped: true, tts_skipped: true }, skips: true }))).toBe("W5");
+  const agents = { ...basics(), choice: "agents" as const, machine_skipped: true };
+  // This computer passed without: no agents to connect either.
+  expect(resumeOnboarding(facts({ record: agents, skips: true }))).toBe("W4");
+  expect(normalizeOnboardingRecord({ machine_skipped: true, stt_skipped: true, tts_skipped: true })).toMatchObject({ machine_skipped: true, stt_skipped: true, tts_skipped: true });
 });
 
 test("the record is kept in this device's storage, and a write counts only once it reads back", async () => {

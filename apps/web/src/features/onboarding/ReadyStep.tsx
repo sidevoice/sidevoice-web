@@ -3,6 +3,7 @@ import { CheckIcon, EndOfTurnIcon, OtherMachineIcon, SidevoiceMark, ThisComputer
 import { useRoomStore } from "../../state/room-store";
 import { ConnectYourAgent } from "../room/ConnectYourAgent";
 import { useModelState } from "../settings/ModelSetup";
+import { useVoiceModels } from "../call/VoiceModels";
 import type { Translate } from "../../i18n/translator";
 
 /* The setup's last step, a small celebration to click through: the mark arriving, "You're all set — talk to your
@@ -10,19 +11,27 @@ import type { Translate } from "../../i18n/translator";
  * agent to connect, and Enter Sidevoice in the footer — in the setup's own frame, its stepper's last bar turning
  * mustard. Under reduced motion it shows its final state at once. */
 
-function RecapRow({ icon, label, value, detail }: { icon: ReactNode; label: string; value: string; detail?: string }) {
-  return <div className="wizard-recap-row">
+/** A row as things stand (onboardingFlow d): done (its check), downloading (its percentage, no mark) or not there yet (a
+ *  neutral dash, never red, never a check). */
+type RowState = "done" | "progress" | "missing";
+
+function RecapRow({ icon, label, value, detail, state = "done" }: { icon: ReactNode; label: string; value: string; detail?: string; state?: RowState }) {
+  return <div className="wizard-recap-row" data-state={state}>
     <span className="wizard-recap-icon" aria-hidden>{icon}</span>
     <dt>{label}</dt>
     {/* One line always: a long model name ends in an ellipsis, said whole on hover. */}
     <dd title={detail ? `${value} · ${detail}` : value}>{value}{detail && <span className="wizard-recap-detail"> · {detail}</span>}</dd>
-    <span className="wizard-recap-check" aria-hidden><CheckIcon size={12} /></span>
+    {state === "done" && <span className="wizard-recap-check" aria-hidden><CheckIcon size={12} /></span>}
+    {state === "missing" && <span className="wizard-recap-dash" aria-hidden>–</span>}
   </div>;
 }
 
-export function ReadyStep({ path, machineName, title, t }: {
-  path: "agents" | "remote" | null; machineName: string; title: Ref<HTMLHeadingElement>; t: Translate;
+/** `live` (onboardingFlow d): the rows read as things stand now — what was passed without shows as not there yet, a
+ *  download under way with its percentage — and with anything missing the title is a calmer one. */
+export function ReadyStep({ path, machineName, title, t, live }: {
+  path: "agents" | "remote" | null; machineName: string; title: Ref<HTMLHeadingElement>; t: Translate; live?: { machine: boolean };
 }) {
+  const models = useVoiceModels().rows;
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
   const stt = useModelState("stt", draft);
@@ -31,20 +40,34 @@ export function ReadyStep({ path, machineName, title, t }: {
   const turn = useModelState("end-of-turn", draft);
   const catalogName = (task: "stt" | "tts") => catalogs.find((catalog) => catalog.id === draft?.[task].catalog)?.name ?? undefined;
   const here = path !== "remote";
+  const language = document.documentElement.lang || "en";
+  // What a voice row says live: ready, its name; downloading, how far; else not there yet, and that the call area offers it.
+  const voiceRow = (task: "stt" | "tts", value: string, detail?: string): { value: string; detail?: string; state: RowState } => {
+    if (!live) return { value, detail, state: "done" };
+    const slot = models.find((row) => row.slot.task === task)?.slot;
+    if (slot?.status === "ready") return { value, detail, state: "done" };
+    if (slot?.fraction != null) return { value, detail: t("wizard.recap.downloading", { percent: new Intl.NumberFormat(language, { style: "percent" }).format(slot.fraction) }), state: "progress" };
+    return { value: slot?.status === "needsKey" ? t("voiceModels.state.needsKey") : t("wizard.recap.notDownloaded"), detail: t("wizard.recap.later"), state: "missing" };
+  };
+  const machine = !live || live.machine
+    ? { value: here ? t("wizard.recap.here") : machineName || t("wizard.choice.remote"), state: "done" as RowState }
+    : { value: t("wizard.recap.notConnected"), detail: t("wizard.recap.later"), state: "missing" as RowState };
+  const sttRow = voiceRow("stt", draft?.stt.model ?? "", stt.local ? undefined : catalogName("stt"));
+  const ttsRow = voiceRow("tts", draft?.tts.model ?? "", tts.local ? undefined : catalogName("tts"));
+  const partial = [machine, sttRow, ttsRow].some((row) => row.state !== "done");
   return <section className="wizard-ready">
     <div className="wizard-ready-hero">
       <span className="wizard-ready-mark" aria-hidden><SidevoiceMark size={64} /></span>
       <h2 id="wizard-title" className="wizard-title wizard-ready-title" ref={title} tabIndex={-1}>
-        {t("wizard.title.ready")}
+        {t(partial ? "wizard.title.readyPartial" : "wizard.title.ready")}
       </h2>
     </div>
     <div className="wizard-recap">
       <h3 className="sr-only">{t("wizard.recap.title")}</h3>
       <dl className="wizard-recap-list">
-        <RecapRow icon={here ? <ThisComputerIcon size={16} /> : <OtherMachineIcon size={16} />} label={t("wizard.group.where")}
-          value={here ? t("wizard.recap.here") : machineName || t("wizard.choice.remote")} />
-        <RecapRow icon={<TranscriptionIcon size={16} />} label={t("wizard.group.transcription")} value={draft?.stt.model ?? ""} detail={stt.local ? undefined : catalogName("stt")} />
-        <RecapRow icon={<VoicesIcon size={16} />} label={t("wizard.group.voice")} value={draft?.tts.model ?? ""} detail={tts.local ? undefined : catalogName("tts")} />
+        <RecapRow icon={here ? <ThisComputerIcon size={16} /> : <OtherMachineIcon size={16} />} label={t("wizard.group.where")} {...machine} />
+        <RecapRow icon={<TranscriptionIcon size={16} />} label={t("wizard.group.transcription")} {...sttRow} />
+        <RecapRow icon={<VoicesIcon size={16} />} label={t("wizard.group.voice")} {...ttsRow} />
         <RecapRow icon={<EndOfTurnIcon size={16} />} label={t("voice.endOfTurn")}
           // The model by its name when one ends turns, Silence otherwise: one word or one name, as the other rows.
           value={draft?.end_of_turn === "smart-turn" && turn.model ? turn.model.id : t("voice.endOfTurn.silence")} />

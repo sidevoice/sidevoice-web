@@ -20,6 +20,8 @@ import { UpdateNotice } from "../features/updates/UpdateNotice";
 import { StorageBlockedBanner } from "../features/settings/StorageBlockedBanner";
 import { OnboardingProvider, useOnboarding } from "../features/onboarding/onboarding-context";
 import { SetupPending, Wizard } from "../features/onboarding/Wizard";
+import { callArea } from "../features/onboarding/onboarding-flow";
+import { VoiceSetupCard } from "../features/call/VoiceSetupCard";
 import { useRoomStore } from "../state/room-store";
 import type { OnboardingRepository, OnboardingStep } from "../services/onboarding-state";
 import { useUiLanguage } from "../i18n/use-ui-language";
@@ -35,11 +37,12 @@ function RoomContent() {
   const preparingWithoutPairing = projectedLocalOnly && install.phase !== "idle" && install.source === "no-machine";
   const noMachine = ready && (machines.length === 0 || preparingWithoutPairing);
   const onboarding = useOnboarding();
-  // Behind the open wizard the room stays out of reach. A setup put off is no wall (operator, 2026-10-16): the room is there,
-  // Settings with it, and a banner offers to continue the setup; calls need a machine as ever.
-  const setupPending = !onboarding.ready || !onboarding.record.completed_at;
-  const roomHidden = !onboarding.ready || (setupPending && onboarding.open);
-  const callBlocked = (setupPending && onboarding.ready) || noMachine;
+  // What the room shows of the setup is the flow's (onboarding-flow.ts): whether the room waits behind it, and what the
+  // call's own space says is missing — one thing at a time.
+  const { roomHidden, waiting, blocked } = callArea(onboarding.rules, { ready: onboarding.ready, open: onboarding.open, done: onboarding.done, noMachine: !!noMachine, voice: onboarding.voice.state });
+  const callBlocked = waiting !== null;
+  // "Continue setup" on a waiting card, where the flow offers it and the setup is not done.
+  const continueSetup = onboarding.rules.continueLink && !onboarding.done ? () => onboarding.openWizard() : undefined;
 
   useEffect(() => {
     if (install.phase === "installing") {
@@ -71,15 +74,18 @@ function RoomContent() {
       <StorageBlockedBanner />
       <ResetReportNotice />
       <div className="room-shell" hidden={roomHidden} aria-hidden={roomHidden || undefined}>
-        <RoomHeader blocked={callBlocked} />
+        <RoomHeader blocked={blocked} />
         <LocalHostBanner />
         {/* The call: the conversations, the stage over its bar, and the transcript when it is open (2026-10-10). One layout
             whatever is set up (operator, 2026-10-16): the conversations' column and Settings always; only the call's own
-            space says what is missing — first the setup put off, then no machine — one at a time. */}
+            space says what is missing — what the flow says is missing (onboarding-flow.ts) — one at a time. */}
         <main className="call-layout">
-          <ErrorBoundary area="participants"><ConversationSidebar blocked={callBlocked} /></ErrorBoundary>
-          {callBlocked && <div className="call-column call-column--waiting">
-            {setupPending ? <SetupPending /> : <NoMachineScreen source="no-machine" />}
+          <ErrorBoundary area="participants"><ConversationSidebar blocked={blocked} /></ErrorBoundary>
+          {callBlocked && <div className="call-column call-column--waiting" data-waiting={waiting}>
+            {waiting === "pending" ? <SetupPending />
+              : waiting === "machine" ? <NoMachineScreen source="no-machine" onContinueSetup={continueSetup} />
+              : waiting === "voice" ? <VoiceSetupCard rows={onboarding.voice.rows} onContinueSetup={continueSetup} />
+              : null}
           </div>}
           {/* The stage and its call bar share a column, so the bar centres under the stage and the conversations and
               the transcript run the screen's whole height beside them. Kept in the page while the call's space waits (only
