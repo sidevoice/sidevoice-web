@@ -196,7 +196,7 @@ test("d: each step passed without is kept, a reload goes on from there, and Read
   expect(document.getElementById("wizard-skip-machine")).toBeNull();
   expect(record().machine_skipped ?? false).toBe(false);
   await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Skip for now" })); });
-  await act(async () => { fireEvent.click(within(document.getElementById("wizard-skip-machine")!).getByRole("button", { name: "Continue without a machine" })); });
+  await act(async () => { fireEvent.click(within(document.getElementById("wizard-skip-machine")!).getByRole("button", { name: "Got it" })); });
   expect(record().machine_skipped).toBe(true);
   expect(title()).toHaveTextContent("Set up transcription");
   // Opened again: on from where it stood, not back at the machine.
@@ -215,8 +215,8 @@ test("d: each step passed without is kept, a reload goes on from there, and Read
   expect(record().completed_at).toBeGreaterThan(0);
   expect(record().baseline_release).toBe(RELEASE);
   const rows = [...document.querySelectorAll(".wizard-recap-row")] as HTMLElement[];
-  const [mic, machine, stt, tts] = rows;
-  expect(mic).toHaveTextContent("Allowed");
+  const [, mic, machine, stt, tts] = rows;
+  expect(mic).toHaveTextContent("Nothing to allow here");
   expect(machine).toHaveTextContent("Not connected yet");
   expect(stt).toHaveTextContent("Not downloaded yet");
   expect(tts).toHaveTextContent("Not downloaded yet");

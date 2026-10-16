@@ -400,7 +400,8 @@ export function Wizard() {
       {step === "W4m" && <PermissionsStep microphone={onboarding.microphone} openSettings={onboarding.openMicrophoneSettings} onRequest={() => void onboarding.requestMicrophone()} t={t} />}
       {stageTask && <StageStep key={step} task={stageTask} stage={stage} t={t} />}
       {step === "W5" && <TurnStep turnTry={turnTry} t={t} />}
-      {ready && <ReadyStep path={onboarding.path} machineName={remoteName} title={title} t={t} live={skips ? { machine: onboarding.machineAnswers, microphone: onboarding.microphone.ready } : undefined} />}
+      {ready && <ReadyStep path={onboarding.path} machineName={remoteName} title={title} t={t} live={skips ? { machine: onboarding.machineAnswers, microphone: onboarding.microphone.ready } : undefined}
+        microphoneNone={onboarding.microphone.state === "none"} />}
       {ready && error && !skips && <Alert tone="danger" live className="wizard-ready-error" title={error} />}
     </div>
     <footer className="wizard-actions" data-model-step={stageTask || step === "W5" || step === "W4m" ? "" : undefined}>
@@ -438,7 +439,7 @@ export function Wizard() {
 
 /** "Skip for now" on the machine (onboardingFlow d, operator 2026-10-16): beside where you work and while this computer is
  *  prepared or a machine paired, a quiet button that first says what it means — no calls until a machine is connected,
- *  and where to connect one later — with Go back (focused) and Continue without a machine. */
+ *  and where to connect one later — with Go back (focused) and Got it — an acknowledgement, short enough for a phone (operator, 2026-10-16). */
 function SkipMachine({ onSkip, t }: { onSkip(): void; t: Translate }) {
   const [asking, setAsking] = useState(false);
   const back = useRef<HTMLButtonElement>(null);
@@ -448,7 +449,7 @@ function SkipMachine({ onSkip, t }: { onSkip(): void; t: Translate }) {
       initialFocus={back} onClose={() => setAsking(false)}
       footer={<>
         <Button ref={back} type="button" variant="ghost" tone="neutral" onClick={() => setAsking(false)}>{t("wizard.skip.goBack")}</Button>
-        <Button type="button" variant="primary" onClick={() => { setAsking(false); onSkip(); }}>{t("wizard.skip.machine")}</Button>
+        <Button type="button" variant="primary" onClick={() => { setAsking(false); onSkip(); }}>{t("wizard.skip.gotIt")}</Button>
       </>}>
       <p>{t("wizard.skip.machineReason")}</p>
     </Dialog>, document.body)}

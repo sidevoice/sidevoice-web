@@ -1,6 +1,7 @@
 import type { ReactNode, Ref } from "react";
-import { CheckIcon, EndOfTurnIcon, MicrophoneIcon, OtherMachineIcon, SidevoiceMark, ThisComputerIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
+import { CheckIcon, EndOfTurnIcon, MachinesIcon, MicrophoneIcon, OtherMachineIcon, SidevoiceMark, ThisComputerIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { useRoomStore } from "../../state/room-store";
+import { currentDeviceName } from "../../state/device-name";
 import { ConnectYourAgent } from "../room/ConnectYourAgent";
 import { useModelState } from "../settings/ModelSetup";
 import { useVoiceModels } from "../call/VoiceModels";
@@ -28,8 +29,8 @@ function RecapRow({ icon, label, value, detail, state = "done" }: { icon: ReactN
 
 /** `live` (onboardingFlow d): the rows read as things stand now — what was passed without shows as not there yet, a
  *  download under way with its percentage — and with anything missing the title is a calmer one. */
-export function ReadyStep({ path, machineName, title, t, live }: {
-  path: "agents" | "remote" | null; machineName: string; title: Ref<HTMLHeadingElement>; t: Translate; live?: { machine: boolean; microphone: boolean };
+export function ReadyStep({ path, machineName, title, t, live, microphoneNone = false }: {
+  path: "agents" | "remote" | null; machineName: string; title: Ref<HTMLHeadingElement>; t: Translate; live?: { machine: boolean; microphone: boolean }; microphoneNone?: boolean;
 }) {
   const models = useVoiceModels().rows;
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
@@ -40,6 +41,8 @@ export function ReadyStep({ path, machineName, title, t, live }: {
   const turn = useModelState("end-of-turn", draft);
   const catalogName = (task: "stt" | "tts") => catalogs.find((catalog) => catalog.id === draft?.[task].catalog)?.name ?? undefined;
   const here = path !== "remote";
+  // How the machines list this device, as the basics named it.
+  const deviceName = currentDeviceName((_, params) => t("pair.deviceNameBrowser", params));
   const language = document.documentElement.lang || "en";
   // What a voice row says live: ready, its name; downloading, how far; else not there yet, and that the call area offers it.
   const voiceRow = (task: "stt" | "tts", value: string, detail?: string): { value: string; detail?: string; state: RowState } => {
@@ -53,7 +56,7 @@ export function ReadyStep({ path, machineName, title, t, live }: {
     ? { value: here ? t("wizard.recap.here") : machineName || t("wizard.choice.remote"), state: "done" as RowState }
     : { value: t("wizard.recap.notConnected"), detail: t("wizard.recap.later"), state: "missing" as RowState };
   // The microphone, passed without (d): not allowed yet, and the call area asks for it.
-  const micRow = !live || live.microphone ? { value: t("wizard.mic.state.granted"), state: "done" as RowState }
+  const micRow = !live || live.microphone ? { value: t(microphoneNone ? "perm.state.none" : "wizard.mic.state.granted"), state: "done" as RowState }
     : { value: t("wizard.mic.state.prompt"), detail: t("wizard.recap.micLater"), state: "missing" as RowState };
   const sttRow = voiceRow("stt", draft?.stt.model ?? "", stt.local ? undefined : catalogName("stt"));
   const ttsRow = voiceRow("tts", draft?.tts.model ?? "", tts.local ? undefined : catalogName("tts"));
@@ -68,7 +71,10 @@ export function ReadyStep({ path, machineName, title, t, live }: {
     <div className="wizard-recap">
       <h3 className="sr-only">{t("wizard.recap.title")}</h3>
       <dl className="wizard-recap-list">
-        {live && <RecapRow icon={<MicrophoneIcon size={16} />} label={t("wizard.mic.label")} {...micRow} />}
+        {/* A row per step of the setup, as its stepper has them — this device (the basics), the microphone, the machine,
+            transcription, the voice, the end of turn: six, two by three (operator, 2026-10-16). */}
+        <RecapRow icon={<MachinesIcon size={16} />} label={t("settings.deviceName")} value={deviceName} />
+        <RecapRow icon={<MicrophoneIcon size={16} />} label={t("wizard.mic.label")} {...micRow} />
         <RecapRow icon={here ? <ThisComputerIcon size={16} /> : <OtherMachineIcon size={16} />} label={t("wizard.group.where")} {...machine} />
         <RecapRow icon={<TranscriptionIcon size={16} />} label={t("wizard.group.transcription")} {...sttRow} />
         <RecapRow icon={<VoicesIcon size={16} />} label={t("wizard.group.voice")} {...ttsRow} />

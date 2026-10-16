@@ -99,6 +99,8 @@
 .wizard-recap-row:nth-child(2) { animation-delay: 330ms; }
 .wizard-recap-row:nth-child(3) { animation-delay: 380ms; }
 .wizard-recap-row:nth-child(4) { animation-delay: 430ms; }
+.wizard-recap-row:nth-child(5) { animation-delay: 480ms; }
+.wizard-recap-row:nth-child(6) { animation-delay: 530ms; }
 .wizard-recap-icon { grid-area: icon; display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--sv-radius-md); background: var(--sv-accent-soft); color: var(--sv-accent-text); }
 .wizard-recap-row dt { grid-area: label; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 /* One line, whatever the model's name: what does not fit ends in an ellipsis (the whole name on hover). */
@@ -109,6 +111,8 @@
 .wizard-recap-row:nth-child(2) .wizard-recap-check { animation-delay: 470ms; }
 .wizard-recap-row:nth-child(3) .wizard-recap-check { animation-delay: 520ms; }
 .wizard-recap-row:nth-child(4) .wizard-recap-check { animation-delay: 570ms; }
+.wizard-recap-row:nth-child(5) .wizard-recap-check { animation-delay: 620ms; }
+.wizard-recap-row:nth-child(6) .wizard-recap-check { animation-delay: 670ms; }
 .wizard-recap-check svg { width: 12px; height: 12px; }
 .wizard-recap-note { margin: 0; font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
 .wizard-ready-connect { min-width: 0; }
