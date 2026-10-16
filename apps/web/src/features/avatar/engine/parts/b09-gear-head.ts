@@ -5,13 +5,13 @@ import {
 
 /* B09 Gear I: head and face accessories (docs/catalogue.md §2.11, §5.2).
  *
- * Hats (party hat, top hat, beret, chef's hat, hard hat, bucket, straw, leaf, propeller cap) are rigid: drawn on the
- * reference body, they join `hat` and seat themselves like the core hats (the kit's `seatHat`): up to 3 units off the
- * head so the raised brows clear the brim, otherwise seated with a declared `brim` (the renderer leaves the brows out).
- * On top of that they never come down over the eyes (`clearEyes`): a three-eyed or big-eyed face lifts the hat. Each
- * hat's brim is measured from its own drawing (its lowest point across the forehead), so a tilted hat declares the
- * brim it really has. Like the core hats' `worn`, they draw an inner copy of the pieces that lie on the head, so they
- * cover a cat's inner ears and tabby stripes.
+ * Hats (party hat, top hat, beret, chef's hat, hard hat, bucket, the XX bucket in three colours, straw, leaf, propeller
+ * cap) are rigid: drawn on the reference body, they join `hat` and seat themselves like the core hats (the kit's
+ * `seatHat`): up to 3 units off the head so the raised brows clear the brim, otherwise seated with a declared `brim`
+ * (the renderer leaves the brows out). On top of that they never come down over the eyes (`clearEyes`): a three-eyed
+ * or big-eyed face lifts the hat. Each hat's brim is measured from its own drawing (its lowest point across the
+ * forehead), so a tilted hat declares the brim it really has. Like the core hats' `worn`, they draw an inner copy
+ * of the pieces that lie on the head, so they cover a cat's inner ears and tabby stripes.
  *
  * Clips (hair bow, daisy) join `crownR` and sit in the hair, in front of the brows: their fat outline is merged, and
  * their face is drawn again over the face (`over`), shaded the cast's way (`ctx.shade`), so a raised brow
@@ -182,6 +182,52 @@ function bucket(T: number): HatArt {
   };
 }
 
+
+/* The XX bucket (the operator's own hat): a black bucket hat splattered with white paint and grey drips, and on its front
+ * a face in raised 3D-puff lines of one bright colour — two big X eyes on the crown, a stitched grin across the band (a
+ * line with short ticks across it) curving up the sides toward the eyes. The puff lines are drawn the cast's way, ink
+ * under the colour, thicker at the small sizes so the eyes and the grin still read in the sidebar; the splatter is
+ * a few specks (gone at the rail) and drips (the stage only). One part per colour, so each can be asked for by name. */
+const XX_BLACK: Paint = "#2c2832", XX_BAND: Paint = "#221e28", XX_SPECK: Paint = "#f4f1ea", XX_DRIP: Paint = "#8d8796";
+const XX_PUFF: Record<"purple" | "lime" | "orange", Paint> = { purple: "#9b5de5", lime: "#c6f36b", orange: "#ff6a2b" };
+
+function xxBucket(puff: Paint) {
+  return (T: number, ctx: Ctx): HatArt => {
+    const small = ctx.size !== "stage";
+    const brim = `M45 ${T + 1}L75 ${T + 1}Q81.5 ${T + 1.6} 88 ${T + 8}Q90 ${T + 11.2} 85.5 ${T + 11.4}Q60 ${T + 13.2} 34.5 ${T + 11.4}Q30 ${T + 11.2} 32 ${T + 8}Q38.5 ${T + 1.6} 45 ${T + 1}Z`;
+    // The face: two X eyes on the crown, the grin across the band with its stitches, and its ends rising up the sides.
+    const x = (cx: number, cy: number, r: number) => `M${n(cx - r)} ${n(cy - r)}L${n(cx + r)} ${n(cy + r)}M${n(cx + r)} ${n(cy - r)}L${n(cx - r)} ${n(cy + r)}`;
+    const eyes = x(53.4, T - 8.2, small ? 3.4 : 3) + x(66.6, T - 8.2, small ? 3.4 : 3);
+    const ticks = small ? [49, 53.5, 58, 62.5, 67, 71] : [47.8, 50.6, 53.4, 56.2, 59, 61.8, 64.6, 67.4, 70.2, 73];
+    const len = small ? 2.2 : 1.9;
+    const grin = `M46.2 ${T - 0.9}L73.8 ${T - 0.9}` + ticks.map((tx) => `M${n(tx)} ${n(T - 0.9 - len)}L${n(tx)} ${n(T - 0.9 + len)}`).join("")
+      + `M46.2 ${T - 0.9}Q45.4 ${T - 5} 47.4 ${T - 10}M73.8 ${T - 0.9}Q74.6 ${T - 5} 72.6 ${T - 10}`
+      + (small ? "" : `M44.9 ${T - 4.4}L47.4 ${T - 4.6}M75.1 ${T - 4.4}L72.6 ${T - 4.6}M45.9 ${T - 7.6}L48.2 ${T - 7.4}M74.1 ${T - 7.6}L71.8 ${T - 7.4}`);
+    const w = small ? 2.6 : 1.7, k = small ? 4.4 : 3.3;
+    const puffLines = (d: string): Piece[] => [
+      { d, c: "ink", w: k, ink: "inner", flat: true },
+      { d, c: puff, w, ink: "inner", flat: true },
+    ];
+    const specks = [[49.5, T - 12], [62, T - 12.4], [71.2, T - 6.4], [57.8, T - 4.6], [40, T + 7.4], [52, T + 9.6], [69.5, T + 10], [81.5, T + 7.2]]
+      .map(([sx, sy]): Piece => ({ d: ellipse(sx, sy, 0.75, 0.65), c: XX_SPECK, ink: "inner", flat: true, lod: 1 }));
+    const drips: Piece[] = [
+      { d: `M59.8 ${T - 13.2}L59.8 ${T - 10.6}`, c: XX_DRIP, w: 1.1, ink: "inner", flat: true, lod: 2 },
+      { d: `M48.3 ${T + 4}L48.3 ${T + 7.2}`, c: XX_DRIP, w: 1, ink: "inner", flat: true, lod: 2 },
+      { d: `M76.4 ${T + 4.5}L76.4 ${T + 8.4}`, c: XX_DRIP, w: 1, ink: "inner", flat: true, lod: 2 },
+    ];
+    return {
+      body: [
+        { d: `M45 ${T + 3}C45 ${T - 9} 50 ${T - 14} 60 ${T - 14}C70 ${T - 14} 75 ${T - 9} 75 ${T + 3}Z`, c: XX_BLACK },
+        { d: brim, c: XX_BLACK },
+      ],
+      front: [
+        { d: `M45.1 ${T - 3.4}L74.9 ${T - 3.4}L75 ${T + 1.6}L45 ${T + 1.6}Z`, c: XX_BAND, ink: "inner" },
+        { d: brim, c: XX_BLACK, ink: "inner", stroke: 2 },
+        ...drips, ...specks, ...puffLines(eyes), ...puffLines(grin),
+      ],
+    };
+  };
+}
 function straw(T: number): HatArt {
   const crown = `M45 ${T + 5.5}C45 ${T - 7.5} 49 ${T - 12.5} 60 ${T - 12.5}C71 ${T - 12.5} 75 ${T - 7.5} 75 ${T + 5.5}Q60 ${T + 7.5} 45 ${T + 5.5}Z`;
   return {
@@ -575,6 +621,11 @@ export default batch({
     { ...TALL, id: "chef-hat", label: "gorro de chef", draw: hat(chefHat) },
     { ...HAT, id: "hardhat", label: "casco de obra", draw: hat(hardHat) },
     { ...HAT, id: "bucket", label: "gorro de pescador", draw: hat(bucket) },
+    // The XX bucket, one part per puff colour, each at a modest weight (1 against a hat's usual 10): about a tenth of the
+    // bucket's showing, the three together. Their own ids let a seed ask for one colour by name.
+    { ...HAT, id: "xx-bucket-purple", label: "gorro XX morado", weight: 1, draw: hat(xxBucket(XX_PUFF.purple)) },
+    { ...HAT, id: "xx-bucket-lime", label: "gorro XX lima", weight: 1, draw: hat(xxBucket(XX_PUFF.lime)) },
+    { ...HAT, id: "xx-bucket-orange", label: "gorro XX naranja", weight: 1, draw: hat(xxBucket(XX_PUFF.orange)) },
     { ...HAT, id: "straw", label: "sombrero de paja", draw: hat(straw) },
     { ...HAT, id: "leaf-hat", label: "hoja", group: "sprout", draw: hat(leafHat) },
     { ...HAT, id: "propeller-cap", label: "gorra con hélice", noise: 3, tags: ["blocks-band"], draw: hat(propellerCap) },
@@ -605,6 +656,9 @@ export default batch({
     "bicho:furry/bear:b09-chef?headgear=chef-hat&eyewear=mustache",
     "bicho:bots/robot:b09-obra?headgear=hardhat&earwear=none",
     "bicho:pond/frog:b09-pescador?headgear=bucket",
+    "bicho:furry/cat:b09-xx-morado?headgear=xx-bucket-purple",
+    "bicho:monsters/monster:b09-xx-lima?headgear=xx-bucket-lime&eyes=two",
+    "bicho:furry/bear:b09-xx-naranja?headgear=xx-bucket-orange",
     "bicho:furry/bunny:b09-paja?headgear=straw",
     "bicho:monsters/monster:b09-hoja?headgear=leaf-hat&top=none&eyes=two",
     "bicho:monsters/monster:b09-helice?headgear=propeller-cap&eyes=cyclops",
