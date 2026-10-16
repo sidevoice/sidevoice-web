@@ -66,9 +66,12 @@
 .perm-badge-focus:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
 
 /* The step's row: the permission's plain icon (its state is the badge's to say), and on a narrow screen its action or
- * badge on a line of its own, at the end (operator, 2026-10-16). */
+ * badge at the top right, on the name's line, the why under both across the row (operator, 2026-10-16). */
 .perm-plain-icon { display: inline-grid; place-items: center; flex: none; color: var(--sv-text-muted); }
 @media (max-width: 559px), (max-width: 899px) and (pointer: coarse) {
-  .perm-step-row { grid-template-columns: minmax(0, 1fr); }
-  .perm-step-row > .ui-row-control { justify-self: end; }
+  .perm-step-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .perm-step-row > .ui-row-text { display: contents; }
+  .perm-step-row .ui-row-label { grid-column: 1; grid-row: 1; align-self: center; }
+  .perm-step-row > .ui-row-control { grid-column: 2; grid-row: 1; }
+  .perm-step-row .ui-row-description { grid-column: 1 / -1; grid-row: 2; margin: 0; }
 }
