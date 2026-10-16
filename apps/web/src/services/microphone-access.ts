@@ -28,7 +28,8 @@ export interface MicrophoneSnapshot {
 
 /** The desktop app's microphone permission (sidevoice-desktop `host.microphone`, macOS). */
 export interface MicrophoneBridge {
-  state(): Promise<"prompt" | "granted" | "denied">;
+  /** `missing`: not denied, and the system lists no audio input device. */
+  state(): Promise<"prompt" | "granted" | "denied" | "missing">;
   request(): Promise<"granted" | "denied">;
   openSettings?(): Promise<void>;
   /** Tells when the system's answer changes (the person changed it in the system's settings); returns how to stop. */
@@ -84,10 +85,10 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
   }
 
   /** The state as the platform says it now, without asking; null where it cannot say. */
-  async function read(): Promise<"prompt" | "granted" | "denied" | null> {
+  async function read(): Promise<"prompt" | "granted" | "denied" | "missing" | null> {
     if (bridge) {
       const answer = await bridge.state();
-      return answer === "granted" || answer === "denied" ? answer : "prompt";
+      return answer === "granted" || answer === "denied" || answer === "missing" ? answer : "prompt";
     }
     if (!status) return null;
     return status.state === "granted" || status.state === "denied" ? status.state : "prompt";
@@ -137,7 +138,7 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
     let state: MicrophoneState;
     if (bridge) {
       // The app's own read is the system's answer: authoritative, in every direction.
-      state = now ?? (before === "granted" || before === "denied" ? before : "prompt");
+      state = now ?? (before === "granted" || before === "denied" || before === "missing" ? before : "prompt");
     } else {
       const plugged = await devices();
       if (mine !== run) return;
