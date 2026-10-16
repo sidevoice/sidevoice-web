@@ -220,3 +220,23 @@ test("where its settings are: the platform the page runs on, a phone none", () =
   expect(devicePlatform(nav("Linux x86_64"))).toBe("linux");
   expect(devicePlatform(nav("Linux armv8l", "Mozilla/5.0 (Linux; Android 14)"))).toBe("other");
 });
+
+test("without a microphone, the end of turn's step offers no try: one line says why, the choice and Continue stay", async () => {
+  const kokoro = { id: "kokoro-82m-v1.0", family: "kokoro", capabilities: ["tts"], languages: ["es"], voices: [{ id: "ef_dora", languages: ["es"] }], speed: { min: 0.5, max: 2 }, parametersM: 1, license: "MIT", installed: true, builds: [{ id: "kokoro/int8", available: true, reasons: [] }] };
+  browser("denied", () => Promise.reject(refused("NotAllowedError")));
+  const store = createRoomStore();
+  act(() => store.patch({ machinesReady: true, speechLanguage: "es", voiceSettings: defaultVoiceSettings(), pairings: [NUC], machineLinks: { [NUC.fp]: { reach: "ok", via: "node" } },
+    voiceCatalogue: { state: "ready", catalogs: [{ id: "local", name: null, status: { stale: false }, models: [kokoro] }] as never, error: "" } }));
+  render(<App store={store} />);
+  await waitFor(() => expect(document.getElementById("wizard")).toHaveAttribute("open"));
+  await act(async () => { fireEvent.click(proceed()); });
+  expect(title()).toHaveTextContent("Set up voice");
+  await act(async () => { fireEvent.click(document.getElementById("wizard-stage-action")!); });
+  expect(title()).toHaveTextContent("When your turn ends");
+  expect(document.getElementById("voice-end-of-turn")).toBeInTheDocument();
+  expect(document.querySelector("#wizard #turn-try")).toBeNull();
+  expect(document.getElementById("wizard-try")).toBeNull();
+  expect(document.querySelector("#wizard #turn-try-nomic")).toHaveTextContent("needs a microphone");
+  expect(document.getElementById("wizard-stage-action")).toHaveTextContent("Continue");
+  expect(document.getElementById("wizard-stage-action")).not.toBeDisabled();
+}, WHOLE_APP_MS);

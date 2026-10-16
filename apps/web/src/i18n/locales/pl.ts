@@ -1127,6 +1127,7 @@ export const messages: Messages = {
   "wizard.mic.allow": "Zezwól na mikrofon",
   "wizard.mic.allowed": "Mikrofon dozwolony",
   "wizard.mic.continueWithout": "Kontynuuj bez mikrofonu",
+  "wizard.turn.noMicrophone": "Do wypróbowania potrzebny jest mikrofon, a kontynuowano bez niego.",
   "wizard.mic.checkAgain": "Sprawdź ponownie",
   "wizard.mic.openSettings": "Otwórz Ustawienia systemowe",
   "perm.mic.why": "Używany, gdy głos jest włączony w rozmowie, oraz podczas prób w konfiguracji — i tylko wtedy.",

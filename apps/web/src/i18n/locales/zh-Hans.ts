@@ -1109,6 +1109,7 @@ export const messages: Messages = {
   "wizard.mic.allow": "允许麦克风",
   "wizard.mic.allowed": "已允许麦克风",
   "wizard.mic.continueWithout": "不使用麦克风继续",
+  "wizard.turn.noMicrophone": "试用需要麦克风，而你选择了不使用麦克风继续。",
   "wizard.mic.checkAgain": "再检查一次",
   "wizard.mic.openSettings": "打开系统设置",
   "perm.mic.why": "仅在通话中开启语音时，以及设置过程中的试用时使用。",

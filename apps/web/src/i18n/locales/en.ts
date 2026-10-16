@@ -1138,6 +1138,7 @@ export const messages = {
   "wizard.mic.allow": "Allow microphone",
   "wizard.mic.allowed": "Microphone allowed",
   "wizard.mic.continueWithout": "Continue without microphone",
+  "wizard.turn.noMicrophone": "Trying this needs a microphone, and you continued without one.",
   "wizard.mic.checkAgain": "Check again",
   "wizard.mic.openSettings": "Open System Settings",
   // The permissions screen (PermissionsStep, Settings › Permissions).

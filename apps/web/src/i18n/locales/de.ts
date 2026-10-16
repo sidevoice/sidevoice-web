@@ -1112,6 +1112,7 @@ export const messages: Messages = {
   "wizard.mic.allow": "Mikrofon erlauben",
   "wizard.mic.allowed": "Mikrofon erlaubt",
   "wizard.mic.continueWithout": "Ohne Mikrofon fortfahren",
+  "wizard.turn.noMicrophone": "Zum Ausprobieren ist ein Mikrofon nötig, und du hast ohne eins weitergemacht.",
   "wizard.mic.checkAgain": "Erneut prüfen",
   "wizard.mic.openSettings": "Systemeinstellungen öffnen",
   "perm.mic.why": "Wird genutzt, solange die Stimme in einem Anruf aktiv ist, und bei den Tests der Einrichtung – nur dann.",
