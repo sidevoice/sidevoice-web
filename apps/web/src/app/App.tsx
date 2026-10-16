@@ -78,18 +78,18 @@ function RoomContent() {
             space says what is missing — first the setup put off, then no machine — one at a time. */}
         <main className="call-layout">
           <ErrorBoundary area="participants"><ConversationSidebar blocked={callBlocked} /></ErrorBoundary>
-          {callBlocked ? <div className="call-column call-column--waiting">
+          {callBlocked && <div className="call-column call-column--waiting">
             {setupPending ? <SetupPending /> : <NoMachineScreen source="no-machine" />}
-          </div> : <>
-            {/* The stage and its call bar share a column, so the bar centres under the stage and the conversations and
-                the transcript run the screen's whole height beside them. */}
-            <div className="call-column">
-              {/* An update waiting, said over the stage: a pill at its top, a desktop's only, never moving it. */}
-              <ErrorBoundary area="stage"><CallStage notice={<UpdateNotice />} /></ErrorBoundary>
-              <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>
-            </div>
-            <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>
-          </>}
+          </div>}
+          {/* The stage and its call bar share a column, so the bar centres under the stage and the conversations and
+              the transcript run the screen's whole height beside them. Kept in the page while the call's space waits (only
+              hidden): the runtime binds their controls as it starts. */}
+          <div className="call-column" hidden={callBlocked}>
+            {/* An update waiting, said over the stage: a pill at its top, a desktop's only, never moving it. */}
+            <ErrorBoundary area="stage"><CallStage notice={<UpdateNotice />} /></ErrorBoundary>
+            <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>
+          </div>
+          <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>
         </main>
         {!callBlocked && <PresenceSound />}
         <ConnectionStatsDialog />
