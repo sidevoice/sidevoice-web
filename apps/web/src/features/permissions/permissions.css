@@ -66,20 +66,11 @@
 .perm-badge-focus:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
 
 /* The step's row: the permission's plain icon (its state is the badge's to say). Laid out by the row's own width (no jump
- * between the window's breakpoints): the action, and once allowed the badge, always at the right; narrow, on the name's
- * line, the why under both (operator, 2026-10-16). The why is a few words. */
+ * between the window's breakpoints): one line at every size — the action, and once allowed the badge, always at the right;
+ * only the why wraps if it must (operator, 2026-10-16). The why is a few words. */
 .perm-plain-icon { display: inline-grid; place-items: center; flex: none; color: var(--sv-text-muted); }
-.wizard-perm .ui-group { container-type: inline-size; }
-.ui-row.perm-step-row { position: relative; grid-template-columns: minmax(0, 1fr) auto; }
-.ui-row.perm-step-row .ui-row-control { width: auto; justify-content: flex-end; }
-/* Narrow: the action or the badge always at the right, on the name's line; the why under both, across the row. */
-@container (max-width: 30rem) {
-  .ui-row.perm-step-row { grid-template-columns: minmax(0, 1fr) auto; }
-  .ui-row.perm-step-row > .ui-row-text { display: contents; }
-  .ui-row.perm-step-row .ui-row-label { grid-column: 1; grid-row: 1; align-self: center; }
-  .ui-row.perm-step-row > .ui-row-control { grid-column: 2; grid-row: 1; }
-  .ui-row.perm-step-row .ui-row-description { grid-column: 1 / -1; grid-row: 2; margin: 0; }
-}
+.wizard-perm .ui-row.perm-step-row { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.wizard-perm .ui-row.perm-step-row .ui-row-control { width: auto; justify-content: flex-end; }
 
 /* The setup's Continue while the microphone is not allowed yet: the primary's own colour, faded — waiting, not broken. */
 .ui-button.wizard-continue-waiting:is(:disabled, [aria-disabled="true"]):not([data-loading]) { background: var(--sv-accent); border-color: var(--sv-accent); color: var(--sv-on-accent); opacity: .45; }
