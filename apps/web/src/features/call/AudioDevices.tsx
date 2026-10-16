@@ -3,6 +3,7 @@ import { useContext, useEffect, useRef, useState, type PointerEvent } from "reac
 import { Button } from "../../components/ui/Button";
 import { ErrorText } from "../../components/ui/ErrorText";
 import { Select } from "../../components/ui/Select";
+import { Group, Row } from "../../components/ui/Card";
 import { ChevronIcon, MicrophoneIcon, SpeakerIcon } from "../../components/ui/Icons";
 import { overlayContainer, useOverlayPortal } from "../../components/ui/Tooltip";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
@@ -98,15 +99,13 @@ function devicesError(error: unknown, t: Translate): ErrorMessage {
   return key ? { text: t(key) } : errorMessage(error, { generic: t("devices.error.other") });
 }
 
-/** What the panel holds: the microphone and the speaker to choose, a lost device said once, and why a choice failed. */
-function DeviceChoices() {
+/** The devices to choose and what choosing does: the list read again where it is drawn, busy while a choice is made,
+ *  why a choice failed. The call's panel and Settings › Call share it. */
+function useDeviceChoices() {
   const t = translator();
   const devices = useRoomStore((state) => state.facts.audioDevices);
-  const lost = useRoomStore((state) => state.facts.audioLost);
-  const store = useContext(RoomStoreContext);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ErrorMessage | null>(null);
-  // Drawn only while the panel is open: opened, it reads the list again.
   useEffect(() => { void window.sidevoiceActions?.refreshAudioDevices?.(); }, []);
   const choose = async (choice: { input?: string | null; output?: string | null }) => {
     setBusy(true); setError(null);
@@ -114,17 +113,45 @@ function DeviceChoices() {
     catch (failure) { setError(devicesError(failure, t)); }
     finally { setBusy(false); }
   };
+  const inputs = devices ? [{ value: "", label: t("devices.default") }, ...devices.inputs.map((device, index) => ({ value: device.id, label: deviceName(device.label, index, "mic", t) }))] : [];
+  const outputs = devices ? [{ value: "", label: t("devices.default") }, ...devices.outputs.map((device, index) => ({ value: device.id, label: deviceName(device.label, index, "speaker", t) }))] : [];
+  return { t, devices, busy, error, choose, inputs, outputs };
+}
+
+/** Settings › Call: the microphone and the speaker as rows, the same choices as the call's panel, the system's by
+ *  default (operator, 2026-10-16: where people look for them). */
+export function AudioDeviceRows() {
+  const { t, devices, busy, error, choose, inputs, outputs } = useDeviceChoices();
+  return <Group title={t("devices.toggle")}>
+    {!devices ? <p className="audio-devices-note" role="status">{t("devices.loading")}</p> : <>
+      <Row label={t("devices.mic")}>
+        <Select id="settings-audio-input" aria-label={t("devices.mic")} leading={<MicrophoneIcon />} value={devices.input ?? ""} disabled={busy} onValueChange={(input) => void choose({ input: input || null })} options={inputs} />
+      </Row>
+      <Row label={t("devices.speaker")} description={devices.outputSelectable ? undefined : t("devices.speakerFixed")}>
+        <Select id="settings-audio-output" aria-label={t("devices.speaker")} leading={<SpeakerIcon />} value={devices.outputSelectable ? devices.output ?? "" : ""} disabled={busy || !devices.outputSelectable} onValueChange={(output) => void choose({ output: output || null })} options={outputs} />
+      </Row>
+    </>}
+    {error && <ErrorText className="audio-devices-error" role="alert" message={error} />}
+  </Group>;
+}
+
+/** What the panel holds: the microphone and the speaker to choose, a lost device said once, and why a choice failed. */
+function DeviceChoices() {
+  // Drawn only while the panel is open: opened, it reads the list again.
+  const { t, devices, busy, error, choose, inputs, outputs } = useDeviceChoices();
+  const lost = useRoomStore((state) => state.facts.audioLost);
+  const store = useContext(RoomStoreContext);
   const dismissLost = () => store?.patch({ audioLost: null });
   return <>
     {!devices ? <p className="audio-devices-note" role="status">{t("devices.loading")}</p> : <>
       {/* Each box says what it holds by its icon, before the device chosen; its name is for screen readers. */}
       <div className="audio-devices-choice">
         <Select id="audio-input" aria-label={t("devices.mic")} leading={<MicrophoneIcon />} value={devices.input ?? ""} disabled={busy} onValueChange={(input) => void choose({ input: input || null })}
-          options={[{ value: "", label: t("devices.default") }, ...devices.inputs.map((device, index) => ({ value: device.id, label: deviceName(device.label, index, "mic", t) }))]} />
+          options={inputs} />
       </div>
       <div className="audio-devices-choice">
         <Select id="audio-output" aria-label={t("devices.speaker")} aria-describedby={devices.outputSelectable ? undefined : "audio-output-hint"} leading={<SpeakerIcon />} value={devices.outputSelectable ? devices.output ?? "" : ""} disabled={busy || !devices.outputSelectable} onValueChange={(output) => void choose({ output: output || null })}
-          options={[{ value: "", label: t("devices.default") }, ...devices.outputs.map((device, index) => ({ value: device.id, label: deviceName(device.label, index, "speaker", t) }))]} />
+          options={outputs} />
         {!devices.outputSelectable && <p className="ui-field-hint" id="audio-output-hint">{t("devices.speakerFixed")}</p>}
       </div>
     </>}
