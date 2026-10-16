@@ -27,7 +27,7 @@ export function RoomHeader({ blocked = false }: { blocked?: boolean } = {}) {
     <>
       <header className="room-header" data-list-down={listDown || undefined}>
         <h1 className="brand"><SidevoiceMark size={22} /> <span className="brand-name">Sidevoice</span></h1>
-        <HeaderConversations t={t} />
+        <HeaderConversations t={t} blocked={blocked} />
         <SettingsButton t={t} />
       </header>
     </>
@@ -95,7 +95,7 @@ function useRowWidth(row: RefObject<HTMLElement | null>) {
 
 /* A tap on one moves the call there and the row stays as it is: the one tapped is marked where it is, and keeps the
  * focus. With the list down (the header stays above it) it also puts the list away, as choosing in the list does. */
-function HeaderConversations({ t }: { t: Translate }) {
+function HeaderConversations({ t, blocked }: { t: Translate; blocked: boolean }) {
   const participants = useRoomStore((state) => state.participants);
   const inCall = useRoomStore(selectInCall);
   const stage = useStageConversation();
