@@ -758,7 +758,7 @@ test("in a browser: no Updates section while no machine is behind", () => {
 
 test("in a browser, a machine behind: Updates lists only the machines — no app, no service — and goes as the machine is updated", async () => {
   const unnamed: PairingSummary = { ...lab, fp: "fp-x", host: "", device_id: "d-x" };
-  const { store } = open({ build: null, section: "updates", machines: [lab, unnamed], remote: { "fp-lab": behind(), "fp-x": behind(null, "sidevoice update") } });
+  const { store } = open({ build: null, section: "updates", machines: [lab, unnamed], remote: { "fp-lab": behind(), "fp-x": behind(null, "npx sidevoice@latest install") } });
   await settle();
   expect(entry()).toHaveTextContent(/^Updates$/);
   expect(updates().getByText("Machines whose Sidevoice is behind, and how to update them.")).toBeInTheDocument();
@@ -766,7 +766,7 @@ test("in a browser, a machine behind: Updates lists only the machines — no app
   expect(pane("updates").querySelector(".app-update-settings")).toBeNull();
   expect(machineRows()).toEqual([
     ["Lab box", "0.4.0 · 0.5.0 available", "Run this on Lab box:", COMMAND],
-    ["Unnamed machine", "Version 0.5.0 available", "Run this on Unnamed machine:", "sidevoice update"],
+    ["Unnamed machine", "Version 0.5.0 available", "Run this on Unnamed machine:", "npx sidevoice@latest install"],
   ]);
   // Updated (and the other forgotten): no machine behind, no section, and Settings is back where the person can be.
   act(() => { store.patch({ pairings: [lab], remoteHostStatus: { "fp-lab": { state: "connected", checkedAt: 2, version: "0.5.0", update: null } } } as never); });

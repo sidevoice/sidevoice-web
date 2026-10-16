@@ -2796,14 +2796,14 @@ test('A paired machine that says it is behind says how to update it there; anyth
   assert.deepEqual(status(),{version:'0.4.0',update:null},JSON.stringify(update));
  }
  // Up to date once more: no update; a version that is not one is unknown.
- says={version:'0.4.0',update:{latest:'0.5.0',command:'sidevoice update'}};await s.run("loadMachineInfo('fp-mac')");
+ says={version:'0.4.0',update:{latest:'0.5.0',command:'npx sidevoice@latest install'}};await s.run("loadMachineInfo('fp-mac')");
  says={version:'v0.5'};await s.run("loadMachineInfo('fp-mac')");
  assert.deepEqual(status(),{version:null,update:null});
  // A machine that cannot be asked keeps what it last said.
- says={version:'0.4.0',update:{latest:'0.5.0',command:'sidevoice update'}};await s.run("loadMachineInfo('fp-mac')");
+ says={version:'0.4.0',update:{latest:'0.5.0',command:'npx sidevoice@latest install'}};await s.run("loadMachineInfo('fp-mac')");
  s.context.fetch=async()=>{throw new TypeError('Failed to fetch')};
  await s.run("loadMachineInfo('fp-mac')");
- assert.deepEqual(status(),{version:'0.4.0',update:{latest:'0.5.0',command:'sidevoice update'}});
+ assert.deepEqual(status(),{version:'0.4.0',update:{latest:'0.5.0',command:'npx sidevoice@latest install'}});
  // Asked from several places at once (its page's card, each place the updates show): one request, one answer for all.
  let answer;asked.length=0;
  s.context.fetch=async url=>{asked.push([String(url)]);return new Promise(resolve=>{answer=()=>resolve({ok:true,status:200,json:async()=>({version:'0.5.0'})})})};

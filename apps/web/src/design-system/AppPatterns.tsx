@@ -459,7 +459,7 @@ function HostAgents() {
       <div className="ui-row ui-row--block pt-agent">
         <div className="pt-machine-line"><span className="pt-machine-icon"><HarnessIcon harness="cursor" size={18} /></span>
           <div className="ui-row-text"><span className="ui-row-label">Cursor</span><p className="ui-row-description">{t("agents.manual.toggle")}</p></div></div>
-        <div className="ui-row-control pt-howto"><Snippet text="sidevoice mcp install --client cursor" /><p className="pt-hint">Waiting for Cursor to connect…</p></div>
+        <div className="ui-row-control pt-howto"><Snippet text="npx sidevoice agents connect cursor" /><p className="pt-hint">Waiting for Cursor to connect…</p></div>
       </div>
     </Group>
   );

@@ -17,7 +17,7 @@ import { ConnectorSteps } from "./ConnectorSteps";
 import { CONNECTOR_PAIR_DEVICE } from "./connector-commands";
 import "./pairing.css";
 
-/* "Connect to your machine": the one-time code from the machine where the agents run (`sidevoice pair-device`, or the
+/* "Connect to your machine": the one-time code from the machine where the agents run (`npx sidevoice pair-device`, or the
  * agent), pasted on this device — in the first-run setup (W2r) and in the pairing dialog (Settings › Machines › Add a
  * machine), the same everywhere: one card, the code first, and how to get one behind a disclosure for when it is needed.
  * This computer's own machine pairs by itself and never comes here. */
