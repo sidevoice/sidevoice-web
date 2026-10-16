@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { DangerZone, ResetReportNotice } from "./DangerZone";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
@@ -40,18 +40,14 @@ test("the Danger zone shows Uninstall where the app offers it", () => {
   expect(screen.getByRole("button", { name: "Uninstall Sidevoice" })).toBeInTheDocument();
 });
 
-test("Delete's confirmation is one sentence, its limits folded under a disclosure", () => {
+test("Delete's confirmation is one sentence, then one line on what it leaves alone", () => {
   bridge(null, { uninstall: true });
   show();
   fireEvent.click(screen.getByRole("button", { name: "Delete all Sidevoice data" }));
   const dialog = screen.getByRole("dialog");
   expect(dialog).toHaveTextContent(/restarts at setup; the app itself stays/);
-  const disclosure = screen.getByRole("button", { name: "What isn’t deleted?" });
-  expect(disclosure).toHaveAttribute("aria-expanded", "false");
-  expect(screen.getByText(/Other machines and devices \(revoke this device there\)/)).not.toBeVisible();
-  fireEvent.click(disclosure);
-  expect(disclosure).toHaveAttribute("aria-expanded", "true");
-  expect(screen.getByText(/Other machines and devices \(revoke this device there\)/)).toBeVisible();
+  expect(dialog).toHaveTextContent("Only Sidevoice’s own data on this device is removed; nothing else is touched.");
+  expect(within(dialog).queryByRole("button", { expanded: false })).toBeNull();
 });
 
 test("Uninstall's confirmation says the app quits and moves itself to the Trash; Cancel calls nothing", () => {
@@ -59,7 +55,6 @@ test("Uninstall's confirmation says the app quits and moves itself to the Trash;
   show();
   fireEvent.click(screen.getByRole("button", { name: "Uninstall Sidevoice" }));
   expect(screen.getByRole("dialog", { name: "Uninstall Sidevoice?" })).toHaveTextContent(/quits and moves itself to the Trash/);
-  expect(screen.getByRole("button", { name: "What isn’t deleted?" })).toHaveAttribute("aria-expanded", "false");
   expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   expect(data.uninstall).not.toHaveBeenCalled();

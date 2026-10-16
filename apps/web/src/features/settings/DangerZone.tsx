@@ -2,7 +2,6 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "../../components/ui/Button";
 import { Dialog } from "../../components/ui/Dialog";
-import { DisclosureButton } from "../../components/ui/DisclosureButton";
 import { Group, Row } from "../../components/ui/Card";
 import { useRoomStore } from "../../state/room-store";
 import { desktopResetBridge, desktopUninstallBridge, type DesktopResetBridge } from "../../services/desktop-host";
@@ -76,14 +75,12 @@ function DangerAction({ action, run, inCall }: { action: keyof typeof COPY; run:
   const t = translator();
   const copy = COPY[action];
   const [open, setOpen] = useState(false);
-  const [limits, setLimits] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<MessageKey | null>(null);
   const [report, setReport] = useState<Report>(null);
   const [quitting, setQuitting] = useState(false);
   const cancel = useRef<HTMLButtonElement>(null);
   const titleId = useId();
-  const limitsId = useId();
 
   async function confirm() {
     if (!open || busy || inCall) return;
@@ -107,7 +104,7 @@ function DangerAction({ action, run, inCall }: { action: keyof typeof COPY; run:
   return <>
     <Row label={t(copy.title)} description={t(copy.hint)}>
       <Button id={copy.id} variant="danger" size="sm" disabled={inCall || busy || quitting}
-        onClick={() => { setError(null); setLimits(false); setOpen(true); }}>{t(copy.action)}</Button>
+        onClick={() => { setError(null); setOpen(true); }}>{t(copy.action)}</Button>
     </Row>
     {quitting && <p className="data-reset-note" role="status">{t(copy.quitting)}</p>}
     {report && <div className="data-reset-note" role={report.state === "partial" ? "alert" : "status"}>
@@ -122,8 +119,8 @@ function DangerAction({ action, run, inCall }: { action: keyof typeof COPY; run:
         <Button variant="danger" loading={busy} disabled={inCall} onClick={() => void confirm()}>{t(copy.action)}</Button>
       </>}>
       <p>{t(copy.confirmWhat)}</p>
-      <DisclosureButton className="data-limits-toggle" open={limits} controls={limitsId} onClick={() => setLimits((shown) => !shown)}>{t("data.limitsToggle")}</DisclosureButton>
-      <p id={limitsId} className="muted" hidden={!limits}>{t("data.confirmLimits")}</p>
+      {/* What it does not touch, in one line (operator, 2026-10-16): only Sidevoice's own data here. */}
+      <p className="muted">{t("data.confirmLimits")}</p>
       {error && <p role="alert">{t(error)}</p>}
     </Dialog>, document.body)}
   </>;

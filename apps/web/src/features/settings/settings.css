@@ -245,8 +245,6 @@
 .settings-back svg:dir(rtl) { transform: scaleX(-1); }
 /* The Danger zone, last in Advanced: its title in red, its rows in a red-bordered group. */
 .danger-zone .ui-group-title { color: var(--sv-danger); }
-/* "What isn't deleted?" opens under the confirmation's sentence, from its left edge, as a question (operator, 2026-10-16). */
-.ui-button.data-limits-toggle { justify-self: start; margin-inline-start: calc(-1 * var(--sv-space-2)); }
 .danger-group .ui-group-card { border-color: var(--sv-danger); }
 .ui-dialog .ui-disclosure + p.muted { margin-block-start: var(--sv-space-2); }
 /* The reset's result stays legible after the confirmation closes. */
