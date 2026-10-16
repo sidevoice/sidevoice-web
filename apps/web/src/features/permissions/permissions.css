@@ -64,7 +64,7 @@
 /* Settings › Permissions: the name with its mark, the badge and the row's action at its end. */
 .perm-label { display: inline-flex; align-items: center; gap: var(--sv-space-2-5, 10px); }
 .perm-settings-row .perm-mark { width: 28px; height: 28px; }
-.perm-settings-row .perm-mark svg { width: 16px; height: 16px; }
+.perm-settings-row .perm-mark > svg { width: 16px; height: 16px; }
 .perm-settings-control { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sv-space-2); }
 .perm-site-note { display: grid; gap: var(--sv-space-1); margin: var(--sv-space-2) 0 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .perm-site-note p { margin: 0; }
