@@ -122,7 +122,7 @@ function DangerAction({ action, run, inCall }: { action: keyof typeof COPY; run:
         <Button variant="danger" loading={busy} disabled={inCall} onClick={() => void confirm()}>{t(copy.action)}</Button>
       </>}>
       <p>{t(copy.confirmWhat)}</p>
-      <DisclosureButton open={limits} controls={limitsId} onClick={() => setLimits((shown) => !shown)}>{t("data.limitsToggle")}</DisclosureButton>
+      <DisclosureButton className="data-limits-toggle" open={limits} controls={limitsId} onClick={() => setLimits((shown) => !shown)}>{t("data.limitsToggle")}</DisclosureButton>
       <p id={limitsId} className="muted" hidden={!limits}>{t("data.confirmLimits")}</p>
       {error && <p role="alert">{t(error)}</p>}
     </Dialog>, document.body)}

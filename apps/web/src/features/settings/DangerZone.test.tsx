@@ -46,12 +46,12 @@ test("Delete's confirmation is one sentence, its limits folded under a disclosur
   fireEvent.click(screen.getByRole("button", { name: "Delete all Sidevoice data" }));
   const dialog = screen.getByRole("dialog");
   expect(dialog).toHaveTextContent(/restarts at setup; the app itself stays/);
-  const disclosure = screen.getByRole("button", { name: "What is not deleted" });
+  const disclosure = screen.getByRole("button", { name: "What isn’t deleted?" });
   expect(disclosure).toHaveAttribute("aria-expanded", "false");
-  expect(screen.getByText(/Remote machines and other devices keep their data/)).not.toBeVisible();
+  expect(screen.getByText(/Other machines and devices (revoke this device there)/)).not.toBeVisible();
   fireEvent.click(disclosure);
   expect(disclosure).toHaveAttribute("aria-expanded", "true");
-  expect(screen.getByText(/Remote machines and other devices keep their data/)).toBeVisible();
+  expect(screen.getByText(/Other machines and devices (revoke this device there)/)).toBeVisible();
 });
 
 test("Uninstall's confirmation says the app quits and moves itself to the Trash; Cancel calls nothing", () => {
@@ -59,7 +59,7 @@ test("Uninstall's confirmation says the app quits and moves itself to the Trash;
   show();
   fireEvent.click(screen.getByRole("button", { name: "Uninstall Sidevoice" }));
   expect(screen.getByRole("dialog", { name: "Uninstall Sidevoice?" })).toHaveTextContent(/quits and moves itself to the Trash/);
-  expect(screen.getByRole("button", { name: "What is not deleted" })).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByRole("button", { name: "What isn’t deleted?" })).toHaveAttribute("aria-expanded", "false");
   expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   expect(data.uninstall).not.toHaveBeenCalled();
