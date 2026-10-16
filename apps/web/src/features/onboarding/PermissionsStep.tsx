@@ -1,12 +1,8 @@
-import { useEffect, useRef } from "react";
 import { Button } from "../../components/ui/Button";
-import { PERSON_AVATAR, type AvatarSpec } from "../avatar/avatar-spec";
-import { CharacterAvatar } from "../avatar/CharacterAvatar";
-import { MicrophoneIcon, MicrophoneOffIcon } from "../../components/ui/Icons";
 import { Tooltip } from "../../components/ui/Tooltip";
-import { Group, Row } from "../../components/ui/Card";
-import { announcement, MicrophoneBadge, MicrophoneHowTo, microphoneAction, MIC_HELP_ID, microphoneView, type MicrophoneView, type Platform } from "../permissions/permission-view";
-import { devicePlatform, type MicrophoneSnapshot } from "../../services/microphone-access";
+import { PermissionsList } from "../permissions/PermissionsList";
+import { microphoneAction, type Platform } from "../permissions/permission-view";
+import type { MicrophoneSnapshot } from "../../services/microphone-access";
 import type { Translate } from "../../i18n/translator";
 
 /* The setup's permissions step (W4m; web#129, moved early on 2026-10-16): right after the basics, before this computer
@@ -26,54 +22,10 @@ import type { Translate } from "../../i18n/translator";
  * Calm always: the permission check lets the microphone go at once, so nothing is heard here and the bicho never acts
  * out listening (the transcription try after it tests the microphone for real). */
 
-/* The bicho on top, and under it the list of what Sidevoice needs allowed, as Settings › Permissions has it (operator,
- * 2026-10-16): each permission a row — its mark, its name, why it is needed — with its action at the end, Allow, that
- * becomes the green Allowed badge once allowed (focus moves to the badge, never to the page); blocked, Check again and,
- * under the row, how to allow it. Refresh status re-reads by hand, though it follows the platform by itself. Another
- * permission is one more row. */
-function MicrophoneRow({ microphone, view, onRequest, openSettings, t }: {
-  microphone: MicrophoneSnapshot; view: MicrophoneView; onRequest(): void; openSettings: (() => Promise<void>) | null; t: Translate;
-}) {
-  const { busy, again } = microphoneAction(microphone);
-  const allowed = view.state === "granted" || view.state === "none";
-  const badge = useRef<HTMLSpanElement>(null);
-  const button = useRef<HTMLButtonElement>(null);
-  const hadFocus = useRef(false);
-  useEffect(() => {
-    if (allowed && hadFocus.current) badge.current?.focus();
-    hadFocus.current = false;
-  }, [allowed]);
-  return <>
-    <Row className="perm-settings-row perm-step-row" label={<span className="perm-label"><span className="perm-plain-icon" aria-hidden>{view.blocked ? <MicrophoneOffIcon size={18} /> : <MicrophoneIcon size={18} />}</span>{t("wizard.mic.label")}</span>}
-      description={t("perm.mic.why")}>
-      <span className="perm-settings-control">
-        {allowed
-          ? <span ref={badge} tabIndex={-1} className="perm-badge-focus"><MicrophoneBadge view={view} t={t} /></span>
-          : <Button ref={button} id="wizard-mic-action" size="sm" variant="primary" loading={busy}
-              aria-describedby={microphone.state === "denied" ? MIC_HELP_ID : undefined}
-              onFocus={() => { hadFocus.current = true; }} onBlur={() => { hadFocus.current = false; }}
-              onClick={() => { hadFocus.current = true; onRequest(); }}>{t(again ? "wizard.mic.checkAgain" : "wizard.mic.allow")}</Button>}
-      </span>
-    </Row>
-    <MicrophoneHowTo view={view} openSettings={openSettings} t={t} />
-  </>;
-}
-
-/** The person's bicho with the microphone in its hand, once it is allowed (operator, 2026-10-16). */
-const PERSON_WITH_MIC: AvatarSpec = { kind: "person", hold: "microphone" };
-
-export function PermissionsStep({ microphone, openSettings, onRequest = () => {}, t, platform = devicePlatform() }: {
+export function PermissionsStep({ microphone, openSettings, onRequest = () => {}, t, platform }: {
   microphone: MicrophoneSnapshot; openSettings: (() => Promise<void>) | null; onRequest?(): void; t: Translate; platform?: Platform;
 }) {
-  const view = microphoneView(microphone, platform);
-  return <section className="wizard-mic wizard-perm" data-state={view.state}>
-    <span className="perm-hero-figure" data-state={view.state} aria-hidden><CharacterAvatar spec={view.state === "granted" ? PERSON_WITH_MIC : PERSON_AVATAR} mood="present" size="pip" /></span>
-    <Group>
-      <MicrophoneRow microphone={microphone} view={view} onRequest={onRequest} openSettings={openSettings} t={t} />
-    </Group>
-    {/* Each change said once, as it happens; the title, focused on arrival, says the step. */}
-    <p className="sr-only" role="status" aria-live="polite">{announcement(microphone, t)}</p>
-  </section>;
+  return <section className="wizard-mic"><PermissionsList microphone={microphone} openSettings={openSettings} onRequest={onRequest} t={t} platform={platform} /></section>;
 }
 
 /** The footer's forward action, always there and never waiting for the microphone (operator, 2026-10-16): quiet and saying
