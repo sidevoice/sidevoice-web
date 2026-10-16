@@ -1,7 +1,7 @@
 import { Fragment, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { OverlayPortalProvider } from "../../components/ui/Tooltip";
-import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ShortcutsIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon, UpdateIcon } from "../../components/ui/Icons";
+import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ShortcutsIcon, PermissionsIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon, UpdateIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Select } from "../../components/ui/Select";
@@ -19,6 +19,7 @@ import { DeleteAllData } from "./DeleteAllData";
 import { DeviceNameField } from "./DeviceNameField";
 import { DesktopCallSettings } from "./DesktopCallSettings";
 import { desktopHost } from "../../services/desktop-host";
+import { PermissionsSettings } from "./PermissionsSettings";
 import { ShortcutsSettings, useShortcutsSection } from "./ShortcutsSettings";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
 import { machineStatus, type MachineStatus } from "./machine-status";
@@ -48,6 +49,8 @@ const SECTIONS: { id: string; label: MessageKey; icon: (size?: number) => ReactN
   { id: "transcription", label: "settings.section.transcription", icon: (size) => <TranscriptionIcon size={size} /> },
   { id: "voice", label: "settings.section.voice", icon: (size) => <VoicesIcon size={size} /> },
   { id: "call", label: "settings.section.call", icon: (size) => <CallSettingsIcon size={size} /> },
+  // What the call needs this device to allow (the microphone), next to where its devices are chosen.
+  { id: "permissions", label: "settings.section.permissions", icon: (size) => <PermissionsIcon size={size} /> },
   // The keys for the microphone: in the desktop app, or wherever there is a keyboard (ShortcutsSettings).
   { id: "shortcuts", label: "settings.section.shortcuts", icon: (size) => <ShortcutsIcon size={size} /> },
   { id: "this-computer", label: "settings.section.thisDevice", icon: (size = 18) => <ThisComputerIcon size={size} /> },
@@ -324,6 +327,7 @@ export function SettingsDialog() {
                 <Pane id="transcription" current={current}><SlotSection id="transcription" t={t} /></Pane>
                 <Pane id="voice" current={current}><SlotSection id="voice" t={t} /></Pane>
                 <Pane id="call" current={current}><CallSettings t={t} /></Pane>
+                <Pane id="permissions" current={current}><PermissionsSettings t={t} /></Pane>
                 {shortcutsShown && <Pane id="shortcuts" current={current}><ShortcutsSettings t={t} /></Pane>}
                 <Pane id="providers" current={current}><ProviderKeys /></Pane>
                 {ownComputer && <Pane id="this-computer" current={current}><ThisComputerSettings /></Pane>}

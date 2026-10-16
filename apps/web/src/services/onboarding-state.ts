@@ -135,13 +135,14 @@ export interface ResumeFacts {
 export function resumeOnboarding(facts: ResumeFacts): OnboardingStep {
   const { record } = facts;
   if (!record.basics_done) return "W0";
+  // The permissions right after the basics (operator, 2026-10-16): nothing after them, a machine's install included,
+  // then fails for a permission nobody asked for.
+  if (!facts.microphoneReady) return "W4m";
   const path = !facts.canHostAgents ? "remote" : record.choice ?? (facts.localReady ? "agents" : null);
   if (!path) return "W1";
   if (path === "agents" && !facts.localReady) return "W2";
   if (path === "remote" && !facts.remoteReady) return "W2r";
   if (path === "agents" && !record.agents_done) return "W3";
-  // The microphone before the first voice step: its try, the first thing that listens, then works the first time.
-  if (!facts.microphoneReady) return "W4m";
   // Chosen, tried or not: trying is the setup's suggestion, not a condition.
   const settled = (task: OnboardingTask, key: string | null) => !!key && (record.chosen[task] === key || record.trials[task] === key);
   if (!settled("stt", facts.sttKey)) return "W4";

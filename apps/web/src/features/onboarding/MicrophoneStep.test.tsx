@@ -53,7 +53,7 @@ const wizard = () => within(document.getElementById("wizard")!);
 const title = () => wizard().getByRole("heading", { level: 2 });
 const action = () => document.getElementById("wizard-mic-action")!;
 const said = () => document.querySelector("#wizard .wizard-mic [role=status]")!.textContent;
-const tile = () => document.querySelector("#wizard .wizard-mic-tile")!.textContent;
+const tile = () => document.querySelector("#wizard [data-permission=microphone]")!.textContent;
 
 /** The setup over the room, its other machine paired: where it resumes is the microphone's or transcription's. */
 async function setup() {
@@ -67,7 +67,7 @@ test("not asked yet: Allow microphone asks the browser, lets the microphone go a
   let answer!: (value: unknown) => void;
   const { media } = browser("prompt", () => new Promise((resolve) => { answer = resolve; }));
   await setup();
-  expect(title()).toHaveTextContent("Allow the microphone");
+  expect(title()).toHaveTextContent("Permissions");
   expect(wizard().getByRole("list", { name: "Setup progress" }).children).toHaveLength(8);
   expect(tile()).toContain("Not allowed yet");
   expect(tile()).toContain("Your browser will ask you once.");
@@ -82,7 +82,7 @@ test("not asked yet: Allow microphone asks the browser, lets the microphone go a
   expect(said()).toBe("Microphone allowed.");
   // Allowed, it says so and waits for Continue: it never moves on by itself.
   await waitFor(() => expect(tile()).toContain("Allowed"));
-  expect(title()).toHaveTextContent("Allow the microphone");
+  expect(title()).toHaveTextContent("Permissions");
   await act(async () => { fireEvent.click(action()); });
   expect(title()).toHaveTextContent("Set up transcription");
   // Kept for a browser that could not say so without asking again.
@@ -92,7 +92,7 @@ test("not asked yet: Allow microphone asks the browser, lets the microphone go a
 test("blocked: how to allow it for the site, Check again (still blocked, said so), and allowed in the browser it says so and waits for Continue", async () => {
   const { granted, media } = browser("denied", () => Promise.reject(refused("NotAllowedError")));
   await setup();
-  expect(title()).toHaveTextContent("Allow the microphone");
+  expect(title()).toHaveTextContent("Permissions");
   expect(tile()).toContain("Blocked");
   expect(document.querySelector("#wizard .wizard-mic-help .ui-alert-title")).toHaveTextContent("Sidevoice can’t use the microphone");
   expect(wizard().getByText(/select the site settings icon beside the web address/)).toBeInTheDocument();
@@ -107,7 +107,7 @@ test("blocked: how to allow it for the site, Check again (still blocked, said so
   await act(async () => { granted.set("granted"); });
   // Allowed, it says so and waits for Continue: it never moves on by itself.
   await waitFor(() => expect(tile()).toContain("Allowed"));
-  expect(title()).toHaveTextContent("Allow the microphone");
+  expect(title()).toHaveTextContent("Permissions");
   await act(async () => { fireEvent.click(action()); });
   expect(title()).toHaveTextContent("Set up transcription");
 }, WHOLE_APP_MS);
@@ -124,13 +124,13 @@ test("the request closed without an answer is not a block: Allow microphone agai
 test("already allowed: never asked again; the step still shows it allowed, with Continue", async () => {
   const { media } = browser("granted", () => Promise.resolve(stream()));
   await setup();
-  expect(title()).toHaveTextContent("Allow the microphone");
+  expect(title()).toHaveTextContent("Permissions");
   expect(tile()).toContain("Allowed");
   expect(action()).toHaveTextContent("Continue");
   expect(media.getUserMedia).not.toHaveBeenCalled();
   // It stays until Continue.
   await new Promise((resolve) => setTimeout(resolve, 1200));
-  expect(title()).toHaveTextContent("Allow the microphone");
+  expect(title()).toHaveTextContent("Permissions");
 }, WHOLE_APP_MS);
 
 test("none connected: No microphone found, and Check again finds one", async () => {
@@ -145,7 +145,7 @@ test("none connected: No microphone found, and Check again finds one", async () 
   await act(async () => { fireEvent.click(action()); });
   // Allowed, it says so and waits for Continue: it never moves on by itself.
   await waitFor(() => expect(tile()).toContain("Allowed"));
-  expect(title()).toHaveTextContent("Allow the microphone");
+  expect(title()).toHaveTextContent("Permissions");
   await act(async () => { fireEvent.click(action()); });
   expect(title()).toHaveTextContent("Set up transcription");
 }, WHOLE_APP_MS);
@@ -155,7 +155,7 @@ test("in the desktop app on a Mac: the system's permission through the app, its 
   const microphone = { state: vi.fn(async () => state), request: vi.fn(async () => state === "granted" ? "granted" : "denied"), openSettings: vi.fn(async () => {}) };
   Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { voice: {}, microphone } } });
   await setup();
-  expect(title()).toHaveTextContent("Allow the microphone");
+  expect(title()).toHaveTextContent("Permissions");
   expect(wizard().getByText(/System Settings › Privacy & Security › Microphone and turn on Sidevoice/)).toBeInTheDocument();
   fireEvent.click(wizard().getByRole("button", { name: "Open System Settings" }));
   expect(microphone.openSettings).toHaveBeenCalled();
@@ -164,7 +164,7 @@ test("in the desktop app on a Mac: the system's permission through the app, its 
   expect(microphone.request).toHaveBeenCalled();
   // Allowed, it says so and waits for Continue: it never moves on by itself.
   await waitFor(() => expect(tile()).toContain("Allowed"));
-  expect(title()).toHaveTextContent("Allow the microphone");
+  expect(title()).toHaveTextContent("Permissions");
   await act(async () => { fireEvent.click(action()); });
   expect(title()).toHaveTextContent("Set up transcription");
 }, WHOLE_APP_MS);

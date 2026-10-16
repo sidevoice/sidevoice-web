@@ -60,14 +60,17 @@ test("resume: the basics, where the agents run, then the machine, the agents, tr
   expect(resumeOnboarding(facts({ record: tried, remoteReady: false }))).toBe("W2r");
 });
 
-test("resume: the microphone, once the machine is there and before transcription, whenever it may not be used now", () => {
+test("resume: the permissions right after the basics, before the machine, whenever the microphone may not be used now", () => {
   const remote = { ...basics(), choice: "remote" as const };
   expect(resumeOnboarding(facts({ record: remote, remoteReady: true, microphoneReady: false }))).toBe("W4m");
+  // Before the machine: no machine needed to be asked.
+  expect(resumeOnboarding(facts({ record: remote, microphoneReady: false }))).toBe("W4m");
+  expect(resumeOnboarding(facts({ record: { ...basics(), choice: null }, microphoneReady: false }))).toBe("W4m");
   // Allowed once and blocked since: asked again, even with everything else done.
   const done = { ...remote, microphone_done: true, chosen: { stt: trialKey(stt)!, tts: trialKey(tts)! }, turn_done: true };
   expect(resumeOnboarding(facts({ record: done, remoteReady: true, microphoneReady: false }))).toBe("W4m");
-  // The machine comes first: no microphone step without one.
-  expect(resumeOnboarding(facts({ record: remote, microphoneReady: false }))).toBe("W2r");
+  // The basics come first.
+  expect(resumeOnboarding(facts({ record: { ...basics(), basics_done: false }, microphoneReady: false }))).toBe("W0");
   expect(normalizeOnboardingRecord({ microphone_done: true }).microphone_done).toBe(true);
 });
 

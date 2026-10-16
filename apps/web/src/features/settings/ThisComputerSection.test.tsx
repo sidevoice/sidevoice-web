@@ -46,7 +46,7 @@ const navIcon = (id: string) => document.getElementById("settings-" + id)!.query
 
 test("in the desktop app: This device right before Providers, Remote machines after, each with its own icon", () => {
   open([local, paired()]);
-  expect(sections()).toEqual(["General", "Transcription", "Voice", "Call", "This device", "Providers", "Remote machines", "Advanced"]);
+  expect(sections()).toEqual(["General", "Transcription", "Voice", "Call", "Permissions", "This device", "Providers", "Remote machines", "Advanced"]);
   // A laptop for this device, a server for the others: the wizard's This computer and Another machine.
   expect(navIcon("this-computer")).toHaveClass("lucide-laptop");
   expect(navIcon("machines")).toHaveClass("lucide-server");
@@ -70,7 +70,7 @@ test("in the desktop app, in Spanish: Este dispositivo before Proveedores, then 
 
 test("in a browser: no This device, and plain Machines with its own icon, in English and in Spanish", () => {
   open([paired()]);
-  expect(sections()).toEqual(["General", "Transcription", "Voice", "Call", "Providers", "Machines", "Advanced"]);
+  expect(sections()).toEqual(["General", "Transcription", "Voice", "Call", "Permissions", "Providers", "Machines", "Advanced"]);
   expect(document.getElementById("pane-this-computer")).toBeNull();
   expect(navIcon("machines")).toHaveClass("lucide-monitor");
   expect(machinesPane().querySelector(".ui-section-title")).toHaveTextContent(/^Machines$/);

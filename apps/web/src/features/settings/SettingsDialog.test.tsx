@@ -32,9 +32,9 @@ function open(draftModel: string) {
   return store;
 }
 
-test("the sections are General, Transcription, Voice, Call, Providers, Machines and Advanced, one showing at a time", () => {
+test("the sections are General, Transcription, Voice, Call, Permissions, Providers, Machines and Advanced, one showing at a time", () => {
   open("whisper-base");
-  expect([...document.querySelectorAll(".settings-nav > button")].map((button) => button.textContent)).toEqual(["General", "Transcription", "Voice", "Call", "Providers", "Machines", "Advanced"]);
+  expect([...document.querySelectorAll(".settings-nav > button")].map((button) => button.textContent)).toEqual(["General", "Transcription", "Voice", "Call", "Permissions", "Providers", "Machines", "Advanced"]);
   expect(document.getElementById("pane-general")).not.toHaveAttribute("hidden");
   fireEvent.click(document.getElementById("settings-advanced")!);
   expect(document.getElementById("pane-general")).toHaveAttribute("hidden");
@@ -69,7 +69,7 @@ const navLabels = () => [...document.querySelectorAll(".settings-nav > button")]
 test("Shortcuts is hidden for now (sidevoice-web#148): not with a keyboard, not in the desktop app, and a place asked in it opens General", async () => {
   withKeyboard();
   const store = open("whisper-base");
-  expect(navLabels()).toEqual(["General", "Transcription", "Voice", "Call", "Providers", "Machines", "Advanced"]);
+  expect(navLabels()).toEqual(["General", "Transcription", "Voice", "Call", "Permissions", "Providers", "Machines", "Advanced"]);
   expect(document.getElementById("pane-shortcuts")).toBeNull();
   act(() => store.patch({ settingsSection: "shortcuts" }));
   expect(store.getState().facts.settingsSection).toBe("general");

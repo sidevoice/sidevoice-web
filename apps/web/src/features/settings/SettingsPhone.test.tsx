@@ -112,7 +112,7 @@ test("opened from the gear it is the list of sections, under Settings: each a ro
   expect(dialog()).not.toHaveAttribute("aria-labelledby");
   expect(nav()).not.toHaveAttribute("hidden");
   expect(content()).toHaveAttribute("hidden");
-  expect([...nav().querySelectorAll(".settings-menu-label")].map((label) => label.textContent)).toEqual(["General", "Transcription", "Voice", "Call", "Providers", "Machines", "Advanced"]);
+  expect([...nav().querySelectorAll(".settings-menu-label")].map((label) => label.textContent)).toEqual(["General", "Transcription", "Voice", "Call", "Permissions", "Providers", "Machines", "Advanced"]);
   // A line under the sections with one state; none under those of preferences; no row is "current".
   expect(summary("transcription")).toBe("whisper-base");
   expect(summary("voice")).toBe("kokoro-82m-v1.0");
@@ -337,7 +337,7 @@ test("a desktop is as it was: its sections beside the page, named by its title, 
   expect(dialog()).toHaveAttribute("aria-labelledby", "settings-title");
   expect(dialog()).not.toHaveAttribute("aria-label");
   expect(document.querySelector(".settings-menu")).toBeNull();
-  expect([...document.querySelectorAll(".settings-nav > button")].map((button) => button.textContent)).toEqual(["General", "Transcription", "Voice", "Call", "Providers", "Machines", "Advanced"]);
+  expect([...document.querySelectorAll(".settings-nav > button")].map((button) => button.textContent)).toEqual(["General", "Transcription", "Voice", "Call", "Permissions", "Providers", "Machines", "Advanced"]);
   expect(document.getElementById("settings-call")).toHaveAttribute("aria-current", "page");
   expect(nav()).not.toHaveAttribute("hidden");
   expect(content()).not.toHaveAttribute("hidden");

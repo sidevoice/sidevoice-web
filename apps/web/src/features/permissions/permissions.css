@@ -1,0 +1,74 @@
+/* What Sidevoice needs allowed (permission-view.tsx): the setup's permissions step in its four looks (PermissionsStep,
+ * variant `permissionsStep`) and Settings › Permissions. On the app's surfaces and tokens; the colours follow the
+ * state — the accent's until answered, positive once allowed, the warning's blocked or none found — and only ever
+ * repeat what the words say. */
+
+/* The microphone's mark: a round tile with its icon, a check on it once allowed. */
+.perm-mark { position: relative; display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%;
+  background: var(--sv-accent-soft); color: var(--sv-accent-text); transition: background-color var(--sv-dur-fast) var(--sv-ease), color var(--sv-dur-fast) var(--sv-ease); }
+.perm-mark[data-state="granted"] { background: var(--sv-positive-soft); color: var(--sv-positive); }
+.perm-mark:is([data-state="denied"], [data-state="missing"]) { background: var(--sv-warning-soft); color: var(--sv-warning); }
+.perm-mark[data-state="none"] { background: var(--sv-bg-sunken); color: var(--sv-text-muted); }
+.perm-mark-check { position: absolute; inset-block-end: -2px; inset-inline-end: -2px; display: grid; place-items: center; width: 16px; height: 16px;
+  border: 2px solid var(--sv-surface); border-radius: 50%; background: var(--sv-positive); color: var(--sv-surface); animation: wizard-ready-pop 220ms var(--sv-ease) both; }
+.perm-badge { flex: none; gap: var(--sv-space-1); white-space: nowrap; }
+.perm-badge svg { width: 12px; height: 12px; }
+.perm-name { font-weight: var(--sv-weight-semibold); color: var(--sv-text); }
+.perm-why, .perm-line { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.perm-text { display: grid; gap: 2px; min-width: 0; }
+.perm-help { margin-top: var(--sv-space-1); }
+.wizard-body > section > p.perm-also, .perm-also { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+
+/* a: the settings-style list — one card, a row per permission (mark, name and why, badge at the end) — and Refresh
+ * status under it, quiet. */
+.perm-list { display: grid; margin: 0; padding: 0; list-style: none; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface); }
+.perm-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--sv-space-3); padding: var(--sv-space-3) var(--sv-space-4); }
+.perm-row + .perm-row { border-top: 1px solid var(--sv-border); }
+.perm-refresh { justify-self: start; gap: var(--sv-space-1-5); }
+.wizard-perm .perm-refresh { margin-top: calc(-1 * var(--sv-space-1)); }
+
+/* b: the person's bicho, large and centred, the microphone's mark on its badge; the state under it in a display weight,
+ * its line, and why. */
+.perm-hero { display: grid; justify-items: center; gap: var(--sv-space-1); padding: var(--sv-space-5) var(--sv-space-4) var(--sv-space-4); text-align: center;
+  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: radial-gradient(circle at 50% 30%, var(--sv-accent-soft), transparent 70%), var(--sv-bg-subtle); }
+.perm-hero-figure { position: relative; display: block; width: 112px; height: 112px; margin-bottom: var(--sv-space-2); }
+.perm-hero-figure .sv-avatar { display: block; width: 100%; height: 100%; }
+.perm-hero-badge { position: absolute; inset-block-end: 2px; inset-inline-end: -4px; width: 40px; height: 40px; border: 3px solid var(--sv-surface); }
+.perm-hero .perm-name { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-regular); color: var(--sv-text-muted); }
+.perm-hero-state { display: inline-flex; align-items: center; gap: var(--sv-space-2); font-size: var(--sv-font-xl); line-height: 1.75rem; font-weight: var(--sv-weight-heavy);
+  letter-spacing: -.01em; color: var(--sv-text); }
+.wizard-body > section > p.perm-hero-why { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); text-align: center; }
+
+/* c: a checklist card, "Before your first call": a ring per permission that fills as it is allowed. */
+.perm-checklist { display: grid; gap: var(--sv-space-3); padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface);
+  box-shadow: var(--sv-shadow-xs); }
+.perm-checklist-title { margin: 0; font-size: var(--sv-font-md); line-height: 1.375rem; font-weight: var(--sv-weight-semibold); color: var(--sv-text); }
+.perm-checklist-items { display: grid; gap: var(--sv-space-3); margin: 0; padding: 0; list-style: none; }
+.perm-check { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: var(--sv-space-3); }
+.perm-check-mark { display: grid; place-items: center; width: 24px; height: 24px; border: 2px solid var(--sv-border-strong); border-radius: 50%;
+  font-size: var(--sv-font-sm); font-weight: var(--sv-weight-bold); line-height: 1; color: var(--sv-surface); }
+.perm-check[data-state="granted"] .perm-check-mark { border-color: var(--sv-positive); background: var(--sv-positive); }
+.perm-check:is([data-state="denied"], [data-state="missing"]) .perm-check-mark { border-color: var(--sv-warning); background: var(--sv-warning); }
+.perm-check:is([data-state="checking"], [data-state="requesting"]) .perm-check-mark { border-color: var(--sv-accent); color: var(--sv-accent-text); }
+.perm-check-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--sv-space-2); }
+.perm-check-line strong { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
+.perm-check[data-state="granted"] .perm-check-line strong { color: var(--sv-positive); }
+
+/* d: one compact row — the mark, the name, the badge — its line under it, aligned with the name. */
+.perm-compact { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--sv-space-1) var(--sv-space-3); padding: var(--sv-space-2) var(--sv-space-3);
+  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-pill); background: var(--sv-surface); }
+.perm-compact .perm-line { grid-column: 2 / -1; }
+.perm-compact:has(.perm-line) { border-radius: var(--sv-radius-lg); }
+
+/* Settings › Permissions: the name with its mark, the badge and the row's action at its end. */
+.perm-label { display: inline-flex; align-items: center; gap: var(--sv-space-2-5, 10px); }
+.perm-settings-row .perm-mark { width: 28px; height: 28px; }
+.perm-settings-row .perm-mark svg { width: 16px; height: 16px; }
+.perm-settings-control { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sv-space-2); }
+.perm-site-note { margin: var(--sv-space-2) 0 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+
+@media (max-width: 520px) {
+  .perm-row { grid-template-columns: auto minmax(0, 1fr); }
+  .perm-row .perm-badge { grid-column: 2; justify-self: start; }
+}
+@media (prefers-reduced-motion: reduce) { .perm-mark { transition: none; } .perm-mark-check { animation: none; } }
