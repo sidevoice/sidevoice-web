@@ -9,7 +9,7 @@ import { PairMachine } from "./PairMachine";
 import "./pairing.css";
 
 /** Pairing this device with a machine (the node side: sidevoice-core `server/devices.py`): the machine issues a one-time code — shown by
- *  the agent when the person asks, or by `sidevoice pair-device` — and it is pasted here. The page opens this by
+ *  the agent when the person asks, or by `npx sidevoice pair-device` — and it is pasted here. The page opens this by
  *  itself when it has no machine to talk to, or when the one it used no longer knows it; it says why on top.
  *  The code is checked and redeemed by the controller; this only collects it and says how that went. The dialog stays
  *  in the page while closed, so the form is there (emptied) for the next time. */
