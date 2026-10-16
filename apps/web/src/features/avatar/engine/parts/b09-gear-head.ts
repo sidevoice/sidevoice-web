@@ -187,47 +187,52 @@ function bucket(T: number): HatArt {
  * a face in raised 3D-puff lines of one bright colour — two big X eyes on the crown, a stitched grin across the band (a
  * line with short ticks across it) curving up the sides toward the eyes. The puff lines are drawn the cast's way, ink
  * under the colour, thicker at the small sizes so the eyes and the grin still read in the sidebar; the splatter is
- * a few specks (gone at the rail) and drips (the stage only). One part per colour, so each can be asked for by name. */
+ * a few big specks (gone at the rail) and drips down the crown (the stage only). One part per colour, so each can be
+ * asked for by name. It is big enough to cover the top of the head: it blocks the headphones' band, as the tall hats do. */
 const XX_BLACK: Paint = "#2c2832", XX_BAND: Paint = "#221e28", XX_SPECK: Paint = "#f4f1ea", XX_DRIP: Paint = "#8d8796";
 const XX_PUFF: Record<"purple" | "lime" | "orange", Paint> = { purple: "#9b5de5", lime: "#c6f36b", orange: "#ff6a2b" };
 
 function xxBucket(puff: Paint) {
   return (T: number, ctx: Ctx): HatArt => {
     const small = ctx.size !== "stage";
-    const brim = `M45 ${T + 1}L75 ${T + 1}Q81.5 ${T + 1.6} 88 ${T + 8}Q90 ${T + 11.2} 85.5 ${T + 11.4}Q60 ${T + 13.2} 34.5 ${T + 11.4}Q30 ${T + 11.2} 32 ${T + 8}Q38.5 ${T + 1.6} 45 ${T + 1}Z`;
-    // The face: two X eyes on the crown, the grin across the band with its stitches, and its ends rising up the sides.
+    // A real bucket hat, bigger than the plain one: a tall rounded crown over the top of the head, and a wide brim that
+    // hangs down at both sides past the head. Only its front, between the brows, decides how high it sits.
+    const crown = `M31 ${T + 13}C29.5 ${T + 1} 33 ${T - 11.5} 60 ${T - 12.5}C87 ${T - 11.5} 90.5 ${T + 1} 89 ${T + 13}Z`;
+    const brim = `M24 ${T + 13}Q60 ${T + 7} 96 ${T + 13}Q103 ${T + 15.5} 104 ${T + 20.5}Q104.5 ${T + 23} 100 ${T + 22.5}Q60 ${T + 16} 20 ${T + 22.5}Q15.5 ${T + 23} 16 ${T + 20.5}Q17 ${T + 15.5} 24 ${T + 13}Z`;
+    // The face: two big X eyes on the crown's front, about a third of its width each; the grin along the band, its
+    // stitches crossing it onto the brim, its ends rising up the sides toward the eyes. At the small sizes the
+    // silhouette and the eyes come first: no stitches, thicker lines.
     const x = (cx: number, cy: number, r: number) => `M${n(cx - r)} ${n(cy - r)}L${n(cx + r)} ${n(cy + r)}M${n(cx + r)} ${n(cy - r)}L${n(cx - r)} ${n(cy + r)}`;
-    const eyes = x(53.4, T - 8.2, small ? 3.4 : 3) + x(66.6, T - 8.2, small ? 3.4 : 3);
-    const ticks = small ? [49, 53.5, 58, 62.5, 67, 71] : [47.8, 50.6, 53.4, 56.2, 59, 61.8, 64.6, 67.4, 70.2, 73];
-    const len = small ? 2.2 : 1.9;
-    const grin = `M46.2 ${T - 0.9}L73.8 ${T - 0.9}` + ticks.map((tx) => `M${n(tx)} ${n(T - 0.9 - len)}L${n(tx)} ${n(T - 0.9 + len)}`).join("")
-      + `M46.2 ${T - 0.9}Q45.4 ${T - 5} 47.4 ${T - 10}M73.8 ${T - 0.9}Q74.6 ${T - 5} 72.6 ${T - 10}`
-      + (small ? "" : `M44.9 ${T - 4.4}L47.4 ${T - 4.6}M75.1 ${T - 4.4}L72.6 ${T - 4.6}M45.9 ${T - 7.6}L48.2 ${T - 7.4}M74.1 ${T - 7.6}L71.8 ${T - 7.4}`);
-    const w = small ? 2.6 : 1.7, k = small ? 4.4 : 3.3;
+    const r = small ? 6.6 : 6;
+    const eyes = x(47.5, T - 1.5, r) + x(72.5, T - 1.5, r);
+    const gy = T + 10.5;
+    const smile = `M34 ${n(gy)}L86 ${n(gy)}M34 ${n(gy)}Q30.4 ${n(gy - 6)} 34.8 ${T - 3.5}M86 ${n(gy)}Q89.6 ${n(gy - 6)} 85.2 ${T - 3.5}`;
+    const stitches = small ? "" : [37.5, 41.5, 45.5, 49.5, 53.5, 57.5, 62.5, 66.5, 70.5, 74.5, 78.5, 82.5].map((tx) => `M${tx} ${n(gy - 2.6)}L${tx} ${n(gy + 2.6)}`).join("")
+      + `M30.4 ${n(gy - 3.4)}L34.4 ${n(gy - 3.9)}M31.2 ${T + 1.6}L35 ${T + 1.6}M89.6 ${n(gy - 3.4)}L85.6 ${n(gy - 3.9)}M88.8 ${T + 1.6}L85 ${T + 1.6}`;
+    const w = small ? 3.4 : 2.6, k = small ? 6 : 4.6;
     const puffLines = (d: string): Piece[] => [
       { d, c: "ink", w: k, ink: "inner", flat: true },
       { d, c: puff, w, ink: "inner", flat: true },
     ];
-    const specks = [[49.5, T - 12], [62, T - 12.4], [71.2, T - 6.4], [57.8, T - 4.6], [40, T + 7.4], [52, T + 9.6], [69.5, T + 10], [81.5, T + 7.2]]
-      .map(([sx, sy]): Piece => ({ d: ellipse(sx, sy, 0.75, 0.65), c: XX_SPECK, ink: "inner", flat: true, lod: 1 }));
+    // Paint: a few big white specks (gone at the rail), and grey drips down the crown (the stage alone).
+    const specks = [[39, T - 5, 1.5], [60, T - 8.5, 1.2], [83, T + 4.5, 1.4], [27.5, T + 18.5, 1.3], [55, T + 16.8, 1.2], [92, T + 17.6, 1.5]]
+      .map(([sx, sy, sr]): Piece => ({ d: ellipse(sx, sy, sr, sr * 0.85), c: XX_SPECK, ink: "inner", flat: true, lod: 1 }));
     const drips: Piece[] = [
-      { d: `M59.8 ${T - 13.2}L59.8 ${T - 10.6}`, c: XX_DRIP, w: 1.1, ink: "inner", flat: true, lod: 2 },
-      { d: `M48.3 ${T + 4}L48.3 ${T + 7.2}`, c: XX_DRIP, w: 1, ink: "inner", flat: true, lod: 2 },
-      { d: `M76.4 ${T + 4.5}L76.4 ${T + 8.4}`, c: XX_DRIP, w: 1, ink: "inner", flat: true, lod: 2 },
+      { d: `M60 ${T - 11.6}L60 ${T - 7.4}`, c: XX_DRIP, w: 1.3, ink: "inner", flat: true, lod: 2 },
+      { d: `M36.5 ${T + 2}L36.5 ${T + 6.2}`, c: XX_DRIP, w: 1.2, ink: "inner", flat: true, lod: 2 },
+      { d: `M81.5 ${T - 6}L81.5 ${T - 2}`, c: XX_DRIP, w: 1.2, ink: "inner", flat: true, lod: 2 },
     ];
     return {
-      body: [
-        { d: `M45 ${T + 3}C45 ${T - 9} 50 ${T - 14} 60 ${T - 14}C70 ${T - 14} 75 ${T - 9} 75 ${T + 3}Z`, c: XX_BLACK },
-        { d: brim, c: XX_BLACK },
-      ],
+      body: [{ d: crown, c: XX_BLACK }, { d: brim, c: XX_BLACK }],
       front: [
-        { d: `M45.1 ${T - 3.4}L74.9 ${T - 3.4}L75 ${T + 1.6}L45 ${T + 1.6}Z`, c: XX_BAND, ink: "inner" },
+        { d: `M31.2 ${T + 7.6}L88.8 ${T + 7.6}L89 ${T + 13}L31 ${T + 13}Z`, c: XX_BAND, ink: "inner" },
         { d: brim, c: XX_BLACK, ink: "inner", stroke: 2 },
-        ...drips, ...specks, ...puffLines(eyes), ...puffLines(grin),
+        ...drips, ...specks, ...puffLines(eyes), ...puffLines(smile + stitches),
       ],
     };
   };
 }
+
 function straw(T: number): HatArt {
   const crown = `M45 ${T + 5.5}C45 ${T - 7.5} 49 ${T - 12.5} 60 ${T - 12.5}C71 ${T - 12.5} 75 ${T - 7.5} 75 ${T + 5.5}Q60 ${T + 7.5} 45 ${T + 5.5}Z`;
   return {
@@ -623,9 +628,9 @@ export default batch({
     { ...HAT, id: "bucket", label: "gorro de pescador", draw: hat(bucket) },
     // The XX bucket, one part per puff colour, each at a modest weight (1 against a hat's usual 10): about a tenth of the
     // bucket's showing, the three together. Their own ids let a seed ask for one colour by name.
-    { ...HAT, id: "xx-bucket-purple", label: "gorro XX morado", weight: 1, draw: hat(xxBucket(XX_PUFF.purple)) },
-    { ...HAT, id: "xx-bucket-lime", label: "gorro XX lima", weight: 1, draw: hat(xxBucket(XX_PUFF.lime)) },
-    { ...HAT, id: "xx-bucket-orange", label: "gorro XX naranja", weight: 1, draw: hat(xxBucket(XX_PUFF.orange)) },
+    { ...HAT, tags: ["blocks-band"], id: "xx-bucket-purple", label: "gorro XX morado", weight: 1, draw: hat(xxBucket(XX_PUFF.purple)) },
+    { ...HAT, tags: ["blocks-band"], id: "xx-bucket-lime", label: "gorro XX lima", weight: 1, draw: hat(xxBucket(XX_PUFF.lime)) },
+    { ...HAT, tags: ["blocks-band"], id: "xx-bucket-orange", label: "gorro XX naranja", weight: 1, draw: hat(xxBucket(XX_PUFF.orange)) },
     { ...HAT, id: "straw", label: "sombrero de paja", draw: hat(straw) },
     { ...HAT, id: "leaf-hat", label: "hoja", group: "sprout", draw: hat(leafHat) },
     { ...HAT, id: "propeller-cap", label: "gorra con hélice", noise: 3, tags: ["blocks-band"], draw: hat(propellerCap) },

@@ -33,7 +33,7 @@ The app talks to the engine only through `features/avatar/` (`bicho-draw.ts`, `C
 | `src/parts/b06-furry.ts` | `parts/b06-furry.ts` | verbatim | 489a512cb630 |
 | `src/parts/b07-snacks.ts` | `parts/b07-snacks.ts` | verbatim | ea73214994d7 |
 | `src/parts/b08-birds.ts` | `parts/b08-birds.ts` | verbatim | e9bfaaf6aa71 |
-| `src/parts/b09-gear-head.ts` | `parts/b09-gear-head.ts` | verbatim | 77e635906be5 |
+| `src/parts/b09-gear-head.ts` | `parts/b09-gear-head.ts` | verbatim | 58adb1c00504 |
 | `src/parts/b10-gear-body.ts` | `parts/b10-gear-body.ts` | verbatim | 05f090747b8d |
 | `src/parts/b11-pond-sea.ts` | `parts/b11-pond-sea.ts` | verbatim | 370c2f44b17a |
 | `src/parts/b12-bugs-spirits.ts` | `parts/b12-bugs-spirits.ts` | verbatim | e310951d73f0 |
