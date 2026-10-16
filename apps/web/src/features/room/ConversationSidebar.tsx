@@ -35,7 +35,9 @@ export const OPEN_CONVERSATIONS = "sidevoice-conversations-open";
  * A compact desktop window (560–899px, a fine pointer: COMPACT_QUERY, 2026-10-15) has room for the rail alone: its
  * toggle opens the whole list over the dimmed stage, from the rail's own place, without moving the call or touching the
  * saved choice — a dialog as the phone's is, put away the same ways, focus back to the toggle or to the one chosen. */
-export function ConversationSidebar() {
+/** `blocked`: nothing set up to talk to yet (the setup put off, or no machine): no conversations and no New
+ *  conversation, only the brand and Settings (operator, 2026-10-16). */
+export function ConversationSidebar({ blocked = false }: { blocked?: boolean } = {}) {
   // The conversation on the stage is the one marked in the list, whether or not the call has moved to it yet.
   const onStage = useStageConversation().threadId;
   const t = translator();
@@ -133,7 +135,7 @@ export function ConversationSidebar() {
           </Button>
         </div>
         <div id="participants" className="sidebar-body">
-          {machineGroups(participants).map((group) => {
+          {!blocked && machineGroups(participants).map((group) => {
             const machine = group.machine || t("sidebar.unknownMachine");
             return (
               <section className="sidebar-group" key={group.key} aria-label={machine}>
@@ -164,9 +166,9 @@ export function ConversationSidebar() {
               </section>
             );
           })}
-          {!participants.length && <p className="sidebar-empty">{t("sidebar.empty")}</p>}
+          {!blocked && !participants.length && <p className="sidebar-empty">{t("sidebar.empty")}</p>}
           {/* A new conversation follows the last one, in either layout. */}
-          <div className="sidebar-new"><NewConversation rail={rail && !narrow} /></div>
+          {!blocked && <div className="sidebar-new"><NewConversation rail={rail && !narrow} /></div>}
         </div>
         {/* Settings holds a desktop's foot (a phone has its gear in the header); what joins it later (notifications…)
             opens upward from here. A phone has no updates entry: its page picks up a new version when next opened. */}

@@ -77,7 +77,7 @@ function RoomContent() {
             whatever is set up (operator, 2026-10-16): the conversations' column and Settings always; only the call's own
             space says what is missing — first the setup put off, then no machine — one at a time. */}
         <main className="call-layout">
-          <ErrorBoundary area="participants"><ConversationSidebar /></ErrorBoundary>
+          <ErrorBoundary area="participants"><ConversationSidebar blocked={callBlocked} /></ErrorBoundary>
           {callBlocked ? <div className="call-column call-column--waiting">
             {setupPending ? <SetupPending /> : <NoMachineScreen source="no-machine" />}
           </div> : <>
