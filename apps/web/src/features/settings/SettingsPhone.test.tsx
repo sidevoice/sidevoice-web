@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
+import { withMicrophone } from "./with-microphone.test-util";
 import { SettingsDialog } from "./SettingsDialog";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
@@ -99,6 +100,7 @@ const row = (id: string) => document.getElementById("settings-" + id)!;
 const summary = (id: string) => row(id).querySelector(".settings-menu-summary")?.textContent ?? null;
 
 test("opened from the gear it is the list of sections, under Settings: each a row saying how it stands, one history entry", async () => {
+  withMicrophone();
   room();
   await open();
   expect(title()).toHaveTextContent(/^Settings$/);
@@ -331,6 +333,7 @@ test("across the breakpoint while open: into a phone at the section's page; out 
 });
 
 test("a desktop is as it was: its sections beside the page, named by its title, no history of its own", async () => {
+  withMicrophone();
   viewport(false);
   room({ settingsSection: "call" });
   await open();

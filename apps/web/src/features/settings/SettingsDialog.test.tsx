@@ -1,5 +1,6 @@
 import { afterEach, expect, onTestFinished, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { withMicrophone } from "./with-microphone.test-util";
 import { SettingsDialog } from "./SettingsDialog";
 import { KEYBOARD_QUERY } from "./ShortcutsSettings";
 import { RoomProvider } from "../../app/RoomProvider";
@@ -33,6 +34,7 @@ function open(draftModel: string) {
 }
 
 test("the sections are General, Transcription, Voice, Call, Permissions, Providers, Machines and Advanced, one showing at a time", () => {
+  withMicrophone();
   open("whisper-base");
   expect([...document.querySelectorAll(".settings-nav > button")].map((button) => button.textContent)).toEqual(["General", "Transcription", "Voice", "Call", "Permissions", "Providers", "Machines", "Advanced"]);
   expect(document.getElementById("pane-general")).not.toHaveAttribute("hidden");
@@ -68,6 +70,7 @@ const navLabels = () => [...document.querySelectorAll(".settings-nav > button")]
 
 test("Shortcuts is hidden for now (sidevoice-web#148): not with a keyboard, not in the desktop app, and a place asked in it opens General", async () => {
   withKeyboard();
+  withMicrophone();
   const store = open("whisper-base");
   expect(navLabels()).toEqual(["General", "Transcription", "Voice", "Call", "Permissions", "Providers", "Machines", "Advanced"]);
   expect(document.getElementById("pane-shortcuts")).toBeNull();
@@ -274,4 +277,28 @@ test("a model of another family chosen in the first-run setup, with Settings dra
   fireEvent.click(document.getElementById("settings-voice")!);
   expect(document.getElementById("tts-family")).toHaveAttribute("data-value", "supertonic");
   expect(document.getElementById("tts-model")).toHaveAttribute("data-value", "supertonic-3");
+});
+
+test("Permissions is hidden where there is nothing to ask (no microphone API), and a place asked in it opens General", async () => {
+  const store = open("whisper-base");
+  expect(navLabels()).not.toContain("Permissions");
+  expect(document.getElementById("pane-permissions")).toBeNull();
+  act(() => store.patch({ settingsSection: "permissions" }));
+  expect(store.getState().facts.settingsSection).toBe("general");
+});
+
+test("Call links to Permissions while the microphone is not allowed, and not once it is", async () => {
+  withMicrophone("denied");
+  const store = open("whisper-base");
+  act(() => store.patch({ settingsSection: "call" }));
+  const pane = document.getElementById("pane-call")!;
+  const link = await within(pane).findByRole("button", { name: "Open Permissions" });
+  fireEvent.click(link);
+  expect(store.getState().facts.settingsSection).toBe("permissions");
+  cleanup();
+  withMicrophone("granted");
+  const again = open("whisper-base");
+  act(() => again.patch({ settingsSection: "call" }));
+  await within(document.getElementById("pane-call")!).findByText("Thinking sound");
+  expect(within(document.getElementById("pane-call")!).queryByRole("button", { name: "Open Permissions" })).toBeNull();
 });

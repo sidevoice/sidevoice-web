@@ -89,7 +89,7 @@ test("not asked yet: Allow microphone asks the browser, lets the microphone go a
   expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).microphone_done).toBe(true);
 }, WHOLE_APP_MS);
 
-test("blocked: how to allow it for the site, Check again (still blocked, said so), and allowed in the browser it says so and waits for Continue", async () => {
+test("blocked: how to allow it for the site, Check again (still blocked, said so), and Check again once it is allowed in the browser says so and waits for Continue", async () => {
   const { granted, media } = browser("denied", () => Promise.reject(refused("NotAllowedError")));
   await setup();
   expect(title()).toHaveTextContent("Permissions");
@@ -104,7 +104,12 @@ test("blocked: how to allow it for the site, Check again (still blocked, said so
   expect(media.getUserMedia).toHaveBeenCalledTimes(1);
   expect(said()).toBe("Still blocked.");
   expect(document.activeElement).toBe(action());
+  // The site now reads allowed, but a plain read never upgrades a block (the computer may still be blocking the
+  // browser): only a successful request does.
   await act(async () => { granted.set("granted"); });
+  expect(tile()).toContain("Blocked");
+  media.getUserMedia.mockResolvedValue(stream());
+  await act(async () => { fireEvent.click(action()); });
   // Allowed, it says so and waits for Continue: it never moves on by itself.
   await waitFor(() => expect(tile()).toContain("Allowed"));
   expect(title()).toHaveTextContent("Permissions");

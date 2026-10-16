@@ -19,13 +19,12 @@
 .perm-help { margin-top: var(--sv-space-1); }
 .wizard-body > section > p.perm-also, .perm-also { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 
-/* a: the settings-style list — one card, a row per permission (mark, name and why, badge at the end) — and Refresh
- * status under it, quiet. */
+/* a: the settings-style list: one card, a row per permission (mark, name and why, badge at the end). Refresh
+ * status stays in Settings. */
 .perm-list { display: grid; margin: 0; padding: 0; list-style: none; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface); }
 .perm-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--sv-space-3); padding: var(--sv-space-3) var(--sv-space-4); }
 .perm-row + .perm-row { border-top: 1px solid var(--sv-border); }
 .perm-refresh { justify-self: start; gap: var(--sv-space-1-5); }
-.wizard-perm .perm-refresh { margin-top: calc(-1 * var(--sv-space-1)); }
 
 /* b: the person's bicho, large and centred, the microphone's mark on its badge; the state under it in a display weight,
  * its line, and why. */
@@ -54,18 +53,21 @@
 .perm-check-line strong { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
 .perm-check[data-state="granted"] .perm-check-line strong { color: var(--sv-positive); }
 
-/* d: one compact row — the mark, the name, the badge — its line under it, aligned with the name. */
-.perm-compact { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--sv-space-1) var(--sv-space-3); padding: var(--sv-space-2) var(--sv-space-3);
-  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-pill); background: var(--sv-surface); }
-.perm-compact .perm-line { grid-column: 2 / -1; }
-.perm-compact:has(.perm-line) { border-radius: var(--sv-radius-lg); }
+/* d: one compact row: the mark, the name, the badge, its line under it, aligned with the name. It wraps, so at a large
+ * root text size a long state ("No microphone found") drops under the name instead of over it. */
+.perm-compact { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-1) var(--sv-space-3); padding: var(--sv-space-2) var(--sv-space-3);
+  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface); }
+.perm-compact .perm-name { flex: 1 1 6rem; min-width: 0; overflow-wrap: anywhere; }
+.perm-compact .perm-badge { flex: 0 1 auto; white-space: normal; max-width: 100%; }
+.perm-compact .perm-line { flex: 1 0 100%; padding-inline-start: calc(36px + var(--sv-space-3)); }
 
 /* Settings › Permissions: the name with its mark, the badge and the row's action at its end. */
 .perm-label { display: inline-flex; align-items: center; gap: var(--sv-space-2-5, 10px); }
 .perm-settings-row .perm-mark { width: 28px; height: 28px; }
 .perm-settings-row .perm-mark svg { width: 16px; height: 16px; }
 .perm-settings-control { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sv-space-2); }
-.perm-site-note { margin: var(--sv-space-2) 0 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.perm-site-note { display: grid; gap: var(--sv-space-1); margin: var(--sv-space-2) 0 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.perm-site-note p { margin: 0; }
 
 @media (max-width: 520px) {
   .perm-row { grid-template-columns: auto minmax(0, 1fr); }

@@ -38,7 +38,6 @@ interface OnboardingValue {
   /** Asks for the microphone (Allow, Check again). */
   requestMicrophone(): Promise<void>;
   /** Reads the microphone's state again without asking (Refresh status). */
-  checkMicrophone(): Promise<void>;
   /** Where the app can open the system's microphone settings. */
   openMicrophoneSettings: (() => Promise<void>) | null;
   /** Whether the voice settings being edited for `task` are the ones the person tried. */
@@ -174,7 +173,6 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
     remoteReady: live.remoteReady,
     microphone: { ...microphone, ready: microphoneReady(microphone, record) },
     requestMicrophone: () => microphoneAccess.request(),
-    checkMicrophone: () => microphoneAccess.check(),
     openMicrophoneSettings: microphoneAccess.openSettings,
     tried: (task) => !!draft && record.trials[task] === trialKey(draft[task]),
     openWizard(requested) {

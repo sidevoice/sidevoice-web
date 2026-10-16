@@ -1,8 +1,7 @@
 import { Button } from "../../components/ui/Button";
-import { RefreshIcon } from "../../components/ui/Icons";
 import { PERSON_AVATAR } from "../avatar/avatar-spec";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
-import { announcement, MicrophoneBadge, MicrophoneHowTo, MicrophoneMark, microphoneView, type MicrophoneView, type Platform } from "../permissions/permission-view";
+import { announcement, MicrophoneBadge, MicrophoneHowTo, MicrophoneMark, microphoneAction, MIC_HELP_ID, microphoneView, type MicrophoneView, type Platform } from "../permissions/permission-view";
 import { devicePlatform, type MicrophoneSnapshot } from "../../services/microphone-access";
 import { useVariant } from "../../lib/variants";
 import type { Translate } from "../../i18n/translator";
@@ -17,16 +16,15 @@ import type { Translate } from "../../i18n/translator";
  * waits for it. A live region says each change.
  *
  * Four looks are compared on the live page (variant `permissionsStep`): a, the settings-style list Settings ›
- * Permissions shows too; b, the person's bicho listening, the microphone on its badge; c, a checklist card; d, one
+ * Permissions shows too; b, the person's bicho, calm, the microphone on its badge; c, a checklist card; d, one
  * compact row. Each covers every state; behaviour is the same. */
 
 const LOOKS = ["a", "b", "c", "d"] as const;
 
-/** a: the settings-style list — each permission a row with its mark, name and why, its badge at the end — and Refresh
- *  status under it, as Settings › Permissions draws it. */
-function ListLook({ view, onRefresh, t }: { view: MicrophoneView; onRefresh(): void; t: Translate }) {
+/** a (recommended): the settings-style list: each permission a row with its mark, name, why (used in calls and the
+ *  setup's tries, only then) and its badge at the end, as Settings › Permissions draws it. */
+function ListLook({ view, t }: { view: MicrophoneView; t: Translate }) {
   return <>
-    <p>{t("perm.intro")}</p>
     <ul className="perm-list" aria-label={t("perm.list")}>
       <li className="perm-row" data-permission="microphone" data-state={view.state}>
         <MicrophoneMark view={view} />
@@ -38,14 +36,15 @@ function ListLook({ view, onRefresh, t }: { view: MicrophoneView; onRefresh(): v
         <MicrophoneBadge view={view} t={t} />
       </li>
     </ul>
-    <Button type="button" variant="ghost" tone="neutral" size="sm" className="perm-refresh" disabled={view.busy} onClick={onRefresh}><RefreshIcon size={14} />{t("perm.refresh")}</Button>
   </>;
 }
 
-/** b: the person's own bicho, listening once it may (the cue of sound flowing in), the microphone on its badge; under
+/** b: the person's own bicho, calm, the microphone on its badge; under
  *  it the state, large, its line, and why. */
 function HeroLook({ view, t }: { view: MicrophoneView; t: Translate }) {
-  const mood = view.state === "granted" || view.state === "requesting" ? "listening" : "present";
+  // Calm always: the permission check lets the microphone go at once, so nothing is being heard here and the bicho never
+  // acts out listening.
+  const mood = "present";
   return <>
     <div className="perm-hero" data-permission="microphone" data-state={view.state}>
       <span className="perm-hero-figure" aria-hidden>
@@ -56,7 +55,7 @@ function HeroLook({ view, t }: { view: MicrophoneView; t: Translate }) {
       <strong className="perm-hero-state">{view.busy && <span className="ui-spinner ui-spinner--inline" aria-hidden />}{t(view.label)}</strong>
       {view.line && <span className="perm-line">{t(view.line)}</span>}
     </div>
-    <p className="perm-hero-why">{t("wizard.mic.intro")}</p>
+    <p className="perm-hero-why">{t(view.state === "granted" ? "perm.hero.granted" : view.blocked ? "perm.hero.blocked" : "wizard.mic.intro")}</p>
   </>;
 }
 
@@ -91,13 +90,13 @@ function CompactLook({ view, t }: { view: MicrophoneView; t: Translate }) {
   </>;
 }
 
-export function PermissionsStep({ microphone, openSettings, onRefresh, t, platform = devicePlatform() }: {
-  microphone: MicrophoneSnapshot; openSettings: (() => Promise<void>) | null; onRefresh(): void; t: Translate; platform?: Platform;
+export function PermissionsStep({ microphone, openSettings, t, platform = devicePlatform() }: {
+  microphone: MicrophoneSnapshot; openSettings: (() => Promise<void>) | null; t: Translate; platform?: Platform;
 }) {
   const look = useVariant("permissionsStep", LOOKS);
   const view = microphoneView(microphone, platform);
   return <section className="wizard-mic wizard-perm" data-look={look} data-state={view.state}>
-    {look === "a" && <ListLook view={view} onRefresh={onRefresh} t={t} />}
+    {look === "a" && <ListLook view={view} t={t} />}
     {look === "b" && <HeroLook view={view} t={t} />}
     {look === "c" && <ChecklistLook view={view} t={t} />}
     {look === "d" && <CompactLook view={view} t={t} />}
@@ -112,11 +111,10 @@ export function PermissionsStep({ microphone, openSettings, onRefresh, t, platfo
 export function MicrophoneAction({ microphone, onRequest, onContinue, t }: {
   microphone: MicrophoneSnapshot; onRequest(): void; onContinue(): void; t: Translate;
 }) {
-  const { state, from } = microphone;
-  const done = state === "granted" || state === "none";
-  const again = state === "denied" || state === "missing" || (state === "requesting" && (from === "denied" || from === "missing"));
-  return <Button type="button" variant="primary" id="wizard-mic-action" loading={state === "requesting" || state === "checking"}
+  const { label, done, busy } = microphoneAction(microphone);
+  // Blocked, the how-to is the button's description; a step resumed there says it when the button is reached.
+  return <Button type="button" variant="primary" id="wizard-mic-action" loading={busy} aria-describedby={microphone.state === "denied" ? MIC_HELP_ID : undefined}
     onClick={done ? onContinue : onRequest}>
-    {t(done ? "wizard.continue" : again ? "wizard.mic.checkAgain" : "wizard.mic.allow")}
+    {t(label)}
   </Button>;
 }

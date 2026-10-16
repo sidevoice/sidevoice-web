@@ -114,7 +114,11 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
     try { now = await read(); } catch { now = null; }
     if (mine !== run) return;
     // Unknown, it stays as this page last found it: asked and allowed stays allowed; otherwise not asked yet.
-    const state: MicrophoneState = now ?? (before === "granted" || before === "denied" || before === "missing" ? before : "prompt");
+    let state: MicrophoneState = now ?? (before === "granted" || before === "denied" || before === "missing" ? before : "prompt");
+    // Only an answer to a request (getUserMedia) moves a page out of blocked or none found. The site's permission can
+    // read allowed while the computer blocks the browser itself, so a plain read never upgrades it: it only confirms
+    // the block. The app's own read is the system's answer, and may.
+    if (!bridge && (before === "denied" || before === "missing")) state = now === "denied" ? "denied" : before;
     // A missing microphone is only found by asking: a read that says allowed (or not asked) keeps it until the next ask.
     const kept = before === "missing" && state !== "denied" ? "missing" : state;
     set({ state: kept, unchanged: kept === before && snapshot.unchanged, dismissed: kept === "prompt" && snapshot.dismissed });

@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useLayoutEffect, useState, useSyncExternalStore } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -57,7 +57,8 @@ export function announcement(microphone: MicrophoneSnapshot, t: Translate) {
   const { state, asker, dismissed, unchanged } = microphone;
   if (state === "requesting") return t(asker === "app" ? "wizard.mic.requestingSystem" : "wizard.mic.requestingBrowser");
   if (state === "granted") return t("wizard.mic.allowedNow");
-  if (state === "denied") return t(unchanged ? "wizard.mic.stillDenied" : "wizard.mic.denied.title");
+  // The how-to alert is a live alert: it says a block when it appears, so only "still blocked" is said here.
+  if (state === "denied") return unchanged ? t("wizard.mic.stillDenied") : "";
   if (state === "missing") return t(unchanged ? "wizard.mic.stillMissing" : "wizard.mic.state.missing");
   if (state === "prompt" && dismissed) return t("wizard.mic.dismissed");
   return "";
@@ -74,17 +75,17 @@ export function MicrophoneMark({ view, className = "perm-mark" }: { view: Microp
 /** Where it stands, as a badge whose word says it (its colour only repeats it); a spinner while it is being read or
  *  asked. */
 export function MicrophoneBadge({ view, t }: { view: MicrophoneView; t: Translate }) {
-  const tone = view.state === "granted" ? "positive" : view.state === "denied" ? "danger" : view.state === "missing" ? "warning" : "neutral";
+  const tone = view.state === "granted" ? "positive" : view.state === "denied" || view.state === "missing" ? "warning" : "neutral";
   return <Badge tone={tone} className="perm-badge">
     {view.busy ? <span className="ui-spinner ui-spinner--inline" aria-hidden /> : view.state === "granted" ? <CheckIcon size={12} /> : null}{t(view.label)}
   </Badge>;
 }
 
 /** Blocked: how to allow it where this page runs — and, where the app can open them, the system's settings. */
-export function MicrophoneHowTo({ view, openSettings, t }: { view: MicrophoneView; openSettings: (() => Promise<void>) | null; t: Translate }) {
+export function MicrophoneHowTo({ view, openSettings, t, id = MIC_HELP_ID }: { view: MicrophoneView; openSettings: (() => Promise<void>) | null; t: Translate; id?: string }) {
   if (view.state !== "denied") return null;
   return <>
-    <Alert tone="warning" className="wizard-mic-help perm-help" title={t("wizard.mic.denied.title")}
+    <Alert tone="warning" live id={id} className="wizard-mic-help perm-help" title={t("wizard.mic.denied.title")}
       action={openSettings ? <Button type="button" variant="secondary" size="sm" id="wizard-mic-settings" onClick={() => void openSettings()}>{t("wizard.mic.openSettings")}</Button> : undefined}>
       {t(view.howTo[0])}
     </Alert>
@@ -96,7 +97,7 @@ export function MicrophoneHowTo({ view, openSettings, t }: { view: MicrophoneVie
  *  as the screen shows and let go as it goes. */
 export function useMicrophoneAccess(): { access: MicrophoneAccess | null; microphone: MicrophoneSnapshot | null } {
   const [access, setAccess] = useState<MicrophoneAccess | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const made = createMicrophoneAccess();
     setAccess(made);
     return () => made.dispose();
@@ -106,4 +107,17 @@ export function useMicrophoneAccess(): { access: MicrophoneAccess | null; microp
     () => access?.getSnapshot() ?? null,
     () => null);
   return { access, microphone };
+}
+
+/** The blocked how-to's id: the action that checks again points to it (aria-describedby). */
+export const MIC_HELP_ID = "wizard-mic-help";
+
+/** The one action's words, from the state: Allow microphone, Check again once blocked or none found (also while it asks
+ *  from there), Continue once allowed or nothing to ask. Settings and the setup share it, so a button keeps its place
+ *  and only its label changes. */
+export function microphoneAction(microphone: MicrophoneSnapshot): { label: MessageKey; done: boolean; again: boolean; busy: boolean } {
+  const { state, from } = microphone;
+  const done = state === "granted" || state === "none";
+  const again = state === "denied" || state === "missing" || (state === "requesting" && (from === "denied" || from === "missing"));
+  return { label: done ? "wizard.continue" : again ? "wizard.mic.checkAgain" : "wizard.mic.allow", done, again, busy: state === "requesting" || state === "checking" };
 }

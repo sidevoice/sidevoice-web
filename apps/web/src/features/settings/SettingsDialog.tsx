@@ -20,6 +20,8 @@ import { DeviceNameField } from "./DeviceNameField";
 import { DesktopCallSettings } from "./DesktopCallSettings";
 import { desktopHost } from "../../services/desktop-host";
 import { PermissionsSettings } from "./PermissionsSettings";
+import { useMicrophoneAccess } from "../permissions/permission-view";
+import type { MicrophoneSnapshot } from "../../services/microphone-access";
 import { ShortcutsSettings, useShortcutsSection } from "./ShortcutsSettings";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
 import { machineStatus, type MachineStatus } from "./machine-status";
@@ -96,7 +98,8 @@ function SlotSection({ id, t }: { id: "transcription" | "voice"; t: Translate })
 
 /** The call's own behaviour: when your turn ends (kept on Save), the sound while the agent works and the screen during
  *  a call (this device's, applied at once). */
-function CallSettings({ t }: { t: Translate }) {
+function CallSettings({ t, microphone }: { t: Translate; microphone: MicrophoneSnapshot | null }) {
+  const store = useContext(RoomStoreContext);
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const ready = useRoomStore((state) => catalogueShown(state.facts.voiceCatalogue));
   // Every section is drawn, one shown: another section shown (or, on a phone, the list of them, or Settings closed)
@@ -111,6 +114,9 @@ function CallSettings({ t }: { t: Translate }) {
   ];
   return <Section id="call" title={t("settings.section.call")} description={t("settings.call.description")}>
     <RestartNote t={t} />
+    {/* The microphone not allowed: a call can't hear you. The way to allow it is in Permissions. */}
+    {microphone && (microphone.state === "prompt" || microphone.state === "requesting" || microphone.state === "denied" || microphone.state === "missing") &&
+      <Alert tone="warning" title={t("settings.call.micNotAllowed")} action={<Button type="button" variant="secondary" size="sm" onClick={() => store?.patch({ settingsSection: "permissions", settingsLevel: "page" })}>{t("settings.call.openPermissions")}</Button>} />}
     {ready && draft ? <TurnChoices draft={draft} active={shown} /> : <p className="muted" role="status">{t("voice.loading")}</p>}
     <Group title={t("settings.call.working")}>
       <Row label={t("settings.call.presence")} description={t(prefs.presence === "off" ? "settings.call.presence.offHint" : prefs.presence === "hidden" ? "settings.call.presence.hiddenHint" : "settings.call.presence.alwaysHint")}>
@@ -251,13 +257,17 @@ export function SettingsDialog() {
   const updatesShown = useUpdatesSection();
   // Shortcuts: in the desktop app, or wherever there is a keyboard; never on a phone.
   const shortcutsShown = useShortcutsSection();
+  // The microphone's reader, one for Permissions and Call's link to it. Permissions is drawn only where there is
+  // something to ask (not in an app that asks for itself when its call opens, nor a page with no microphone).
+  const mic = useMicrophoneAccess();
+  const permissionsShown = mic.microphone?.state !== "none";
   const sections = SECTIONS.filter((section) => (section.id !== "this-computer" || ownComputer) && (section.id !== "updates" || updatesShown)
-    && (section.id !== "shortcuts" || shortcutsShown));
+    && (section.id !== "shortcuts" || shortcutsShown) && (section.id !== "permissions" || permissionsShown));
   // Updates shown as the last machine behind is updated (a browser, a phone), or Shortcuts as the mouse or trackpad
   // goes (a tablet's keyboard taken off): General.
   useEffect(() => {
-    if ((current === "updates" && !updatesShown) || (current === "shortcuts" && !shortcutsShown)) show("general");
-  }, [current, updatesShown, shortcutsShown]); // eslint-disable-line react-hooks/exhaustive-deps
+    if ((current === "updates" && !updatesShown) || (current === "shortcuts" && !shortcutsShown) || (current === "permissions" && !permissionsShown)) show("general");
+  }, [current, updatesShown, shortcutsShown, permissionsShown]); // eslint-disable-line react-hooks/exhaustive-deps
   const label = (id: string) => t(ownComputer && id === "machines" ? "settings.section.remoteMachines" : SECTIONS.find((section) => section.id === id)?.label ?? "settings.title");
   // This device's icon wears its connected dot, as a machine's does.
   const icon = (id: string, size?: number) => ownComputer && id === "machines" ? <OtherMachineIcon size={size ?? 18} />
@@ -326,8 +336,8 @@ export function SettingsDialog() {
                 <Pane id="general" current={current}><GeneralSettings t={t} /></Pane>
                 <Pane id="transcription" current={current}><SlotSection id="transcription" t={t} /></Pane>
                 <Pane id="voice" current={current}><SlotSection id="voice" t={t} /></Pane>
-                <Pane id="call" current={current}><CallSettings t={t} /></Pane>
-                <Pane id="permissions" current={current}><PermissionsSettings t={t} /></Pane>
+                <Pane id="call" current={current}><CallSettings t={t} microphone={mic.microphone} /></Pane>
+                {permissionsShown && <Pane id="permissions" current={current}><PermissionsSettings t={t} access={mic.access} microphone={mic.microphone} /></Pane>}
                 {shortcutsShown && <Pane id="shortcuts" current={current}><ShortcutsSettings t={t} /></Pane>}
                 <Pane id="providers" current={current}><ProviderKeys /></Pane>
                 {ownComputer && <Pane id="this-computer" current={current}><ThisComputerSettings /></Pane>}

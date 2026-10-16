@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { waitFor } from "@testing-library/react";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { withMicrophone } from "./with-microphone.test-util";
 import { SettingsDialog } from "./SettingsDialog";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
@@ -45,6 +46,7 @@ const addSays = (whole: string) => { expect(add()).toHaveAccessibleName(whole); 
 const navIcon = (id: string) => document.getElementById("settings-" + id)!.querySelector("svg")!;
 
 test("in the desktop app: This device right before Providers, Remote machines after, each with its own icon", () => {
+  withMicrophone();
   open([local, paired()]);
   expect(sections()).toEqual(["General", "Transcription", "Voice", "Call", "Permissions", "This device", "Providers", "Remote machines", "Advanced"]);
   // A laptop for this device, a server for the others: the wizard's This computer and Another machine.
@@ -57,6 +59,7 @@ test("in the desktop app: This device right before Providers, Remote machines af
 });
 
 test("in the desktop app, in Spanish: Este dispositivo before Proveedores, then Máquinas remotas", () => {
+  withMicrophone();
   localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
   open([local, paired()]);
   const names = sections();
@@ -69,6 +72,7 @@ test("in the desktop app, in Spanish: Este dispositivo before Proveedores, then 
 });
 
 test("in a browser: no This device, and plain Machines with its own icon, in English and in Spanish", () => {
+  withMicrophone();
   open([paired()]);
   expect(sections()).toEqual(["General", "Transcription", "Voice", "Call", "Permissions", "Providers", "Machines", "Advanced"]);
   expect(document.getElementById("pane-this-computer")).toBeNull();
