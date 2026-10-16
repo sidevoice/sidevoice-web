@@ -1108,6 +1108,7 @@ export const messages: Messages = {
   "wizard.mic.denied.siteWindows": "すでに許可済みですか？Windows がブラウザをブロックしている可能性があります：設定 › プライバシーとセキュリティ › マイク。",
   "wizard.mic.stillDenied": "まだブロックされています。",
   "wizard.mic.allow": "マイクを許可",
+  "wizard.mic.allowed": "マイクを許可済み",
   "wizard.mic.continueWithout": "マイクなしで続ける",
   "wizard.mic.checkAgain": "もう一度確認",
   "wizard.mic.openSettings": "システム設定を開く",

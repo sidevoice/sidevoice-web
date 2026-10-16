@@ -1,10 +1,9 @@
 import type { ReactNode } from "react";
 import { Button } from "../../components/ui/Button";
-import { CheckIcon } from "../../components/ui/Icons";
-import { useVariant } from "../../lib/variants";
+import { CheckIcon, MicrophoneIcon } from "../../components/ui/Icons";
 import { PERSON_AVATAR } from "../avatar/avatar-spec";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
-import { announcement, MicrophoneHowTo, MicrophoneMark, microphoneAction, MIC_HELP_ID, microphoneView, type MicrophoneView, type Platform } from "../permissions/permission-view";
+import { announcement, MicrophoneHowTo, microphoneAction, MIC_HELP_ID, microphoneView, type MicrophoneView, type Platform } from "../permissions/permission-view";
 import { devicePlatform, type MicrophoneSnapshot } from "../../services/microphone-access";
 import type { Translate } from "../../i18n/translator";
 
@@ -25,59 +24,41 @@ import type { Translate } from "../../i18n/translator";
  * Calm always: the permission check lets the microphone go at once, so nothing is heard here and the bicho never acts
  * out listening (the transcription try after it tests the microphone for real). */
 
-const BUTTON_LOOKS = ["a", "b", "c"] as const;
-type ButtonLook = typeof BUTTON_LOOKS[number];
+/* Simplified (operator, 2026-10-16): the block is the bicho and its one button, nothing around them but, blocked, how to
+ * recover. The button says it all: the microphone's icon and Allow microphone; Check again once blocked or none found;
+ * Microphone allowed (a check, not pressable) once allowed — one element, so focus stays on it. */
 const LINE_ID = "wizard-mic-line";
 
-/** The card's one control: its words follow the state, it is never swapped for another element (focus stays), and once
- *  allowed it keeps its size, shows a check and cannot be pressed. a: full width under the bicho; b: a pill beside the
- *  state; c: a toggle that flips to Allowed. */
-function MicrophoneControl({ microphone, view, onRequest, look, t }: { microphone: MicrophoneSnapshot; view: MicrophoneView; onRequest(): void; look: ButtonLook; t: Translate }) {
+function MicrophoneControl({ microphone, view, onRequest, t }: { microphone: MicrophoneSnapshot; view: MicrophoneView; onRequest(): void; t: Translate }) {
   const { done, busy, again } = microphoneAction(microphone);
-  const label = t(done ? "wizard.mic.state.granted" : again ? "wizard.mic.checkAgain" : "wizard.mic.allow");
   const allowed = view.state === "granted" || view.state === "none";
-  return <Button type="button" variant={look === "c" ? "secondary" : "primary"} size={look === "b" ? "sm" : "md"} id="wizard-mic-action" className="perm-control"
-    data-look={look} data-state={allowed ? "granted" : view.state} loading={busy} disabled={allowed} blockedBy={allowed ? LINE_ID : undefined}
-    block={look === "a"} aria-pressed={look === "c" ? allowed : undefined}
+  const label = t(allowed || done ? "wizard.mic.allowed" : again ? "wizard.mic.checkAgain" : "wizard.mic.allow");
+  return <Button type="button" variant="primary" id="wizard-mic-action" className="perm-control" data-state={allowed ? "granted" : view.state}
+    loading={busy} disabled={allowed} blockedBy={allowed ? LINE_ID : undefined} block
     aria-describedby={microphone.state === "denied" ? MIC_HELP_ID : undefined} onClick={onRequest}>
-    {look === "c" && <span className="perm-toggle-track" aria-hidden><span className="perm-toggle-knob" /></span>}
-    {allowed && look !== "c" && <CheckIcon size={16} />}{label}
+    {allowed ? <CheckIcon size={16} /> : <MicrophoneIcon size={16} />}{label}
   </Button>;
 }
 
-/** One permission's block, self-contained: its figure, name, where it stands, the line under it, its one action and, when
- *  it is blocked, everything to recover it (the how-to, the system's settings, Check again) — nothing of it is in the footer
- *  or outside the block. The step is a list of these, so another permission is one more entry with its own action and
- *  recovery. `action` sits under the state, or `inline` beside it. */
-function PermissionBlock({ id, state, figure, name, mark, label, busy, line, action, inline, why, recovery }: {
-  id: string; state: string; figure: ReactNode; name: string; mark: ReactNode; label: string; busy: boolean; line: ReactNode | null;
-  action: ReactNode; inline?: boolean; why: string; recovery: ReactNode;
-}) {
+/** One permission's block, self-contained: its figure, its one action and, blocked, everything to recover it. The step is a
+ *  list of these, so another permission is one more entry with its own action and recovery. */
+function PermissionBlock({ id, state, figure, action, recovery, line }: { id: string; state: string; figure: ReactNode; action: ReactNode; recovery: ReactNode; line: ReactNode | null }) {
   return <li className="perm-hero" data-permission={id} data-state={state}>
     <span className="perm-hero-figure" data-state={state} aria-hidden>{figure}</span>
-    <span className="perm-name">{name}</span>
-    <span className="perm-hero-chip">
-      {mark}
-      <strong className="perm-hero-state">{busy && <span className="ui-spinner ui-spinner--inline" aria-hidden />}{label}</strong>
-      {inline && action}
-    </span>
+    {action}
     {line}
-    {!inline && action}
-    <p className="perm-hero-why">{why}</p>
     {recovery}
   </li>;
 }
 
-/** The microphone's block: the person's own bicho, calm, the microphone as a chip with its state. */
+/** The microphone's block: the person's own bicho, moving a little by state, and its button. */
 function MicrophoneBlock({ microphone, view, openSettings, onRequest, t }: {
   microphone: MicrophoneSnapshot; view: MicrophoneView; openSettings: (() => Promise<void>) | null; onRequest(): void; t: Translate;
 }) {
-  const look = useVariant("permissionButton", BUTTON_LOOKS);
-  return <PermissionBlock id="microphone" state={view.state} name={t("wizard.mic.label")} busy={view.busy} label={t(view.label)}
-    figure={<CharacterAvatar spec={PERSON_AVATAR} mood="present" size="pip" />} mark={<MicrophoneMark view={view} />}
-    line={view.line ? <span className="perm-line" id={LINE_ID}>{t(view.line)}</span> : null}
-    action={<MicrophoneControl microphone={microphone} view={view} onRequest={onRequest} look={look} t={t} />} inline={look === "b"}
-    why={t(view.state === "granted" ? "perm.hero.granted" : view.blocked ? "perm.hero.blocked" : "wizard.mic.intro")}
+  return <PermissionBlock id="microphone" state={view.state}
+    figure={<CharacterAvatar spec={PERSON_AVATAR} mood="present" size="pip" />}
+    action={<MicrophoneControl microphone={microphone} view={view} onRequest={onRequest} t={t} />}
+    line={view.line && view.state !== "granted" ? <span className="perm-line" id={LINE_ID}>{t(view.line)}</span> : null}
     recovery={<MicrophoneHowTo view={view} openSettings={openSettings} t={t} />} />;
 }
 

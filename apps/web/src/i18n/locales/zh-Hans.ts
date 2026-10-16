@@ -1107,6 +1107,7 @@ export const messages: Messages = {
   "wizard.mic.denied.siteWindows": "已经允许了？可能是 Windows 阻止了浏览器：设置 › 隐私和安全性 › 麦克风。",
   "wizard.mic.stillDenied": "仍被阻止。",
   "wizard.mic.allow": "允许麦克风",
+  "wizard.mic.allowed": "已允许麦克风",
   "wizard.mic.continueWithout": "不使用麦克风继续",
   "wizard.mic.checkAgain": "再检查一次",
   "wizard.mic.openSettings": "打开系统设置",

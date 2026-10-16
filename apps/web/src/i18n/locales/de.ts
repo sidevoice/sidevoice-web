@@ -1110,6 +1110,7 @@ export const messages: Messages = {
   "wizard.mic.denied.siteWindows": "Dort schon erlaubt? Dann blockiert vielleicht Windows den Browser: Einstellungen › Datenschutz und Sicherheit › Mikrofon.",
   "wizard.mic.stillDenied": "Immer noch blockiert.",
   "wizard.mic.allow": "Mikrofon erlauben",
+  "wizard.mic.allowed": "Mikrofon erlaubt",
   "wizard.mic.continueWithout": "Ohne Mikrofon fortfahren",
   "wizard.mic.checkAgain": "Erneut prüfen",
   "wizard.mic.openSettings": "Systemeinstellungen öffnen",

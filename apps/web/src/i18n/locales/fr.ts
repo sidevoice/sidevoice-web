@@ -1107,6 +1107,7 @@ export const messages: Messages = {
   "wizard.mic.denied.siteWindows": "Déjà autorisé ? Windows bloque peut-être le navigateur : Paramètres › Confidentialité et sécurité › Microphone.",
   "wizard.mic.stillDenied": "Toujours bloqué.",
   "wizard.mic.allow": "Autoriser le micro",
+  "wizard.mic.allowed": "Micro autorisé",
   "wizard.mic.continueWithout": "Continuer sans microphone",
   "wizard.mic.checkAgain": "Vérifier à nouveau",
   "wizard.mic.openSettings": "Ouvrir Réglages Système",
