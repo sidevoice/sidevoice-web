@@ -17,7 +17,7 @@ import type { Translate } from "../../i18n/translator";
  * One block per permission (PermissionBlock), each with its own action and, blocked, all its recovery inside it. The
  * action is in the block: one control that changes its label — Allow microphone, Check again once blocked or none
  * found, Allowed (a check, not pressable) — so focus stays on it; the footer's forward action is always there: "Continue without
- * microphone" (quiet) until allowed, then Continue. Three looks of that control are compared (variant `permissionButton`). The bicho moves a little by state
+ * microphone" (quiet) until allowed, then Continue. The bicho moves a little by state
  * (a hop once allowed, a droop while blocked, a lean while asked) on a wrapper: the engine has no expressions.
  *
  * Calm always: the permission check lets the microphone go at once, so nothing is heard here and the bicho never acts
