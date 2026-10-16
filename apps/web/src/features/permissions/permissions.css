@@ -80,4 +80,3 @@
   .ui-row.perm-step-row > .ui-row-control { grid-column: 2; grid-row: 1; }
   .ui-row.perm-step-row .ui-row-description { grid-column: 1 / -1; grid-row: 2; margin: 0; }
 }
-}
