@@ -7,6 +7,10 @@
   background: var(--sv-accent-soft); color: var(--sv-accent-text); transition: background-color var(--sv-dur-fast) var(--sv-ease), color var(--sv-dur-fast) var(--sv-ease); }
 .perm-mark[data-state="granted"] { background: var(--sv-positive-soft); color: var(--sv-positive); }
 .perm-mark:is([data-state="denied"], [data-state="missing"]) { background: var(--sv-warning-soft); color: var(--sv-warning); }
+/* In the setup's button, the same mark, smaller, so the button keeps its height. */
+.perm-mark--in-button { width: 28px; height: 28px; margin-inline-start: calc(-1 * var(--sv-space-1)); }
+.perm-mark--in-button > svg { width: 16px; height: 16px; }
+.perm-mark--in-button .perm-mark-check { width: 14px; height: 14px; }
 .perm-mark[data-state="none"] { background: var(--sv-bg-sunken); color: var(--sv-text-muted); }
 .perm-mark-check { position: absolute; inset-block-end: -2px; inset-inline-end: -2px; display: grid; place-items: center; width: 16px; height: 16px;
   border: 2px solid var(--sv-surface); border-radius: 50%; background: var(--sv-positive); color: var(--sv-surface); animation: wizard-ready-pop 220ms var(--sv-ease) both; }

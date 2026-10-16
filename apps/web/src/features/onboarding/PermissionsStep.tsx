@@ -1,9 +1,8 @@
 import type { ReactNode } from "react";
 import { Button } from "../../components/ui/Button";
-import { CheckIcon, MicrophoneIcon } from "../../components/ui/Icons";
 import { PERSON_AVATAR } from "../avatar/avatar-spec";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
-import { announcement, MicrophoneHowTo, microphoneAction, MIC_HELP_ID, microphoneView, type MicrophoneView, type Platform } from "../permissions/permission-view";
+import { announcement, MicrophoneHowTo, MicrophoneMark, microphoneAction, MIC_HELP_ID, microphoneView, type MicrophoneView, type Platform } from "../permissions/permission-view";
 import { devicePlatform, type MicrophoneSnapshot } from "../../services/microphone-access";
 import type { Translate } from "../../i18n/translator";
 
@@ -36,7 +35,7 @@ function MicrophoneControl({ microphone, view, onRequest, t }: { microphone: Mic
   return <Button type="button" variant="primary" id="wizard-mic-action" className="perm-control" data-state={allowed ? "granted" : view.state}
     loading={busy} disabled={allowed} blockedBy={allowed ? LINE_ID : undefined} block
     aria-describedby={microphone.state === "denied" ? MIC_HELP_ID : undefined} onClick={onRequest}>
-    {allowed ? <CheckIcon size={16} /> : <MicrophoneIcon size={16} />}{label}
+    <MicrophoneMark view={view} className="perm-mark perm-mark--in-button" />{label}
   </Button>;
 }
 
