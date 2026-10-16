@@ -7,10 +7,6 @@
   background: var(--sv-accent-soft); color: var(--sv-accent-text); transition: background-color var(--sv-dur-fast) var(--sv-ease), color var(--sv-dur-fast) var(--sv-ease); }
 .perm-mark[data-state="granted"] { background: var(--sv-positive-soft); color: var(--sv-positive); }
 .perm-mark:is([data-state="denied"], [data-state="missing"]) { background: var(--sv-warning-soft); color: var(--sv-warning); }
-/* In the setup's button, the same mark, smaller, so the button keeps its height. */
-.perm-mark--in-button { width: 28px; height: 28px; margin-inline-start: calc(-1 * var(--sv-space-1)); }
-.perm-mark--in-button > svg { width: 16px; height: 16px; }
-.perm-mark--in-button .perm-mark-check { width: 14px; height: 14px; }
 .perm-mark[data-state="none"] { background: var(--sv-bg-sunken); color: var(--sv-text-muted); }
 .perm-mark-check { position: absolute; inset-block-end: -2px; inset-inline-end: -2px; display: grid; place-items: center; width: 16px; height: 16px;
   border: 2px solid var(--sv-surface); border-radius: 50%; background: var(--sv-positive); color: var(--sv-surface); animation: wizard-ready-pop 220ms var(--sv-ease) both; }
@@ -39,7 +35,12 @@
 /* The block's one button (decided look: full width under the bicho, one size in every state). Allowed, it wears the
  * positive green of an allowed permission, a check before its words, and cannot be pressed. */
 .perm-control { width: 100%; max-width: 18rem; min-width: 12rem; margin-top: var(--sv-space-2); gap: var(--sv-space-2); }
-.ui-button.perm-control[data-state="granted"], .ui-button.perm-control[data-state="granted"]:is(:disabled, [aria-disabled="true"]):not([data-loading]) { opacity: 1; border-color: transparent; background: var(--sv-positive-soft); color: var(--sv-positive); cursor: default; }
+/* Allowed, it stays as if pressed: the brand's soft tint, its ink, the microphone with its check — never the grey of a
+ * button that cannot be used. */
+.ui-button.perm-control[data-state="granted"], .ui-button.perm-control[data-state="granted"]:is(:disabled, [aria-disabled="true"]):not([data-loading]) { opacity: 1; border-color: transparent; background: var(--sv-accent-soft); color: var(--sv-accent-text); box-shadow: none; cursor: default; }
+.perm-control-icon { position: relative; display: inline-grid; place-items: center; flex: none; }
+.perm-control-check { position: absolute; inset-block-end: -3px; inset-inline-end: -4px; display: grid; place-items: center; width: 12px; height: 12px;
+  border-radius: 50%; background: var(--sv-accent); color: var(--sv-on-accent); box-shadow: 0 0 0 2px var(--sv-accent-soft); animation: wizard-ready-pop 220ms var(--sv-ease) both; }
 .perm-hero-figure .sv-avatar { display: block; width: 100%; height: 100%; }
 .perm-hero .perm-name { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-regular); color: var(--sv-text-muted); }
 .perm-hero-state { display: inline-flex; align-items: center; gap: var(--sv-space-2); font-size: var(--sv-font-xl); line-height: 1.75rem; font-weight: var(--sv-weight-heavy);
