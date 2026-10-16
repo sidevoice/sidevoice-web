@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.3.0](https://github.com/sidevoice/sidevoice-web/compare/v0.2.1...v0.3.0) (2026-10-16)
+
+
+### Features
+
+* Add per-host agent setup in Machines ([#43](https://github.com/sidevoice/sidevoice-web/issues/43)) ([e7ebd66](https://github.com/sidevoice/sidevoice-web/commit/e7ebd665fd66da8c3987c90e1f944d8bf2680852)), closes [#39](https://github.com/sidevoice/sidevoice-web/issues/39)
+* **agents:** show readiness on agent cards ([#133](https://github.com/sidevoice/sidevoice-web/issues/133)) ([77f56b5](https://github.com/sidevoice/sidevoice-web/commit/77f56b5868b06da6cd6e89cad61e88ff29f11a69)), closes [#98](https://github.com/sidevoice/sidevoice-web/issues/98)
+* **avatar:** follow agent playback levels ([#116](https://github.com/sidevoice/sidevoice-web/issues/116)) ([1263cf0](https://github.com/sidevoice/sidevoice-web/commit/1263cf049f480e9c6cc48b03ca09a35e758d667a)), closes [#113](https://github.com/sidevoice/sidevoice-web/issues/113)
+* **bubbles:** soft cards, and bigger, clearer speech on the stage ([#120](https://github.com/sidevoice/sidevoice-web/issues/120)) ([6af6d76](https://github.com/sidevoice/sidevoice-web/commit/6af6d766230e84bd6690d7d6a543c4808b7c4e0d)), closes [#114](https://github.com/sidevoice/sidevoice-web/issues/114)
+* **data:** add desktop data deletion in Advanced settings ([#127](https://github.com/sidevoice/sidevoice-web/issues/127)) ([1d10454](https://github.com/sidevoice/sidevoice-web/commit/1d1045431d27bf912d4382b85b0381176dfc2891))
+* **i18n:** six new UI languages, one catalogue per language ([#100](https://github.com/sidevoice/sidevoice-web/issues/100)) ([582afe7](https://github.com/sidevoice/sidevoice-web/commit/582afe73625b2d403fba55821c04bf11cd8af295))
+* **models:** use engine accelerator class for runtime labels ([#122](https://github.com/sidevoice/sidevoice-web/issues/122)) ([17114b1](https://github.com/sidevoice/sidevoice-web/commit/17114b184c9b991ac83c922b6310505e4ad9b9ef))
+* **onboarding:** prepare this computer, or do it yourself with the command ([#102](https://github.com/sidevoice/sidevoice-web/issues/102)) ([68a48da](https://github.com/sidevoice/sidevoice-web/commit/68a48dadf220ee03df7867fa3a4047d937b54718))
+* **trial:** Stop ends the open turn at once with endInput ([#141](https://github.com/sidevoice/sidevoice-web/issues/141)) ([a40d07f](https://github.com/sidevoice/sidevoice-web/commit/a40d07f0a45a1fee78af1baab4e512391c773c33))
+* **turns:** honor conversation epochs and playback fate ([#126](https://github.com/sidevoice/sidevoice-web/issues/126)) ([f520828](https://github.com/sidevoice/sidevoice-web/commit/f52082809e4d58b07a17fd078d0a56fc17cc171c))
+* **updates:** cancel a download in progress ([#144](https://github.com/sidevoice/sidevoice-web/issues/144)) ([eb84c65](https://github.com/sidevoice/sidevoice-web/commit/eb84c65ed1c9ed87adcf97b5ea0c99d191d499fb))
+* **voice:** route input through a call per conversation ([#140](https://github.com/sidevoice/sidevoice-web/issues/140)) ([4fa01aa](https://github.com/sidevoice/sidevoice-web/commit/4fa01aa041b516b99653394d4ddc49f0d9d91d7a))
+* **voice:** use voice 0.4.0 takes and playback level ([#124](https://github.com/sidevoice/sidevoice-web/issues/124)) ([3d3ddf4](https://github.com/sidevoice/sidevoice-web/commit/3d3ddf45f48d2ae5a353d85039688c22be0be62e))
+* **web:** each conversation's agent is a bicho, on a stage with a backdrop, a desk and a wanted poster ([#81](https://github.com/sidevoice/sidevoice-web/issues/81)) ([030275d](https://github.com/sidevoice/sidevoice-web/commit/030275dab714db34481466e252badb3b95c4c925))
+* **web:** first-run setup: where you work, the agents, and this device's voice tried for real ([#97](https://github.com/sidevoice/sidevoice-web/issues/97)) ([483011d](https://github.com/sidevoice/sidevoice-web/commit/483011d011577e667047452d8aea6954a11aee40))
+
+
+### Bug Fixes
+
+* **agents:** show only the agents installed on a machine, and Other ([#128](https://github.com/sidevoice/sidevoice-web/issues/128)) ([d343663](https://github.com/sidevoice/sidevoice-web/commit/d34366317c9eca12b4b770bda1eaa6af98a630a0))
+* **call:** the unread dot sits on the transcript button in the call bar ([#115](https://github.com/sidevoice/sidevoice-web/issues/115)) ([d64f55c](https://github.com/sidevoice/sidevoice-web/commit/d64f55ce1d42591e87e2b3161757feedb1eef315))
+* **call:** Working shows only once the agent has worked 3 s without a break ([#117](https://github.com/sidevoice/sidevoice-web/issues/117)) ([1e933c4](https://github.com/sidevoice/sidevoice-web/commit/1e933c4068f9d89fb4c0631440d55033075fda39))
+* **copy:** stop saying room/sala to the user ([#99](https://github.com/sidevoice/sidevoice-web/issues/99)) ([e26a01d](https://github.com/sidevoice/sidevoice-web/commit/e26a01d4ec62a3e462313bd1417da566ae39dba8))
+* **onboarding:** prepare this computer shows the install command when the app cannot install ([#101](https://github.com/sidevoice/sidevoice-web/issues/101)) ([f2f16e6](https://github.com/sidevoice/sidevoice-web/commit/f2f16e6c062fee0dfd9850d111da27558eee32cc))
+* **onboarding:** the try's own button in its block from the start, and the block before its model is ready ([#107](https://github.com/sidevoice/sidevoice-web/issues/107)) ([3f1b364](https://github.com/sidevoice/sidevoice-web/commit/3f1b364806094c836ef014156df224ada2e2abef))
+* **room:** agent cards build one title, show Working, and blink a green light while working ([#119](https://github.com/sidevoice/sidevoice-web/issues/119)) ([cc468a3](https://github.com/sidevoice/sidevoice-web/commit/cc468a3d53c15a04641ea6f322a3c24f5a6fe6ed))
+* **settings:** a model of another family no longer breaks Voice or Transcription ([#106](https://github.com/sidevoice/sidevoice-web/issues/106)) ([f7e23b8](https://github.com/sidevoice/sidevoice-web/commit/f7e23b85199c4d0d6328b33db04f4ac3be560a9a))
+* **settings:** a model's "runs on" names its real accelerator ([#108](https://github.com/sidevoice/sidevoice-web/issues/108)) ([15f9918](https://github.com/sidevoice/sidevoice-web/commit/15f99180a0c6f2b3ceeb2a87da3358c417e49529))
+* **settings:** the Connect dialog opens whole on the macOS app ([#135](https://github.com/sidevoice/sidevoice-web/issues/135)) ([2641b94](https://github.com/sidevoice/sidevoice-web/commit/2641b948034400225111612e5f01f5cc595617fc)), closes [#134](https://github.com/sidevoice/sidevoice-web/issues/134)
+* **settings:** the end-of-turn try says where the person is: not started, speaking, in a pause, their turn ended ([#109](https://github.com/sidevoice/sidevoice-web/issues/109)) ([cf12993](https://github.com/sidevoice/sidevoice-web/commit/cf1299366afa25acbb924eab9975b914aeb01c84))
+* **settings:** the voice is always a list, even with one choice in it ([#104](https://github.com/sidevoice/sidevoice-web/issues/104)) ([dcc15b1](https://github.com/sidevoice/sidevoice-web/commit/dcc15b145b5f35fa24142253929b5c19cb8583f1))
+* **setup:** keep host preparation in its intended place ([#125](https://github.com/sidevoice/sidevoice-web/issues/125)) ([cd4da72](https://github.com/sidevoice/sidevoice-web/commit/cd4da72a0cdb1ee6535b54220f9e502fb404c904)), closes [#123](https://github.com/sidevoice/sidevoice-web/issues/123)
+* **try:** Stop ends the transcription take on screen at once ([#105](https://github.com/sidevoice/sidevoice-web/issues/105)) ([42446a2](https://github.com/sidevoice/sidevoice-web/commit/42446a26656c80e01f2f8b37d74957280619c394))
+* **try:** the transcription try ends at Stop, 10 s or the voice's own end of the turn, and its take marks only its start and stop ([#131](https://github.com/sidevoice/sidevoice-web/issues/131)) ([c8cc6fe](https://github.com/sidevoice/sidevoice-web/commit/c8cc6fe369ee527ba4f91a4b1be904cc7409e6c4))
+* **ui:** visual polish from the operator's trial ([#139](https://github.com/sidevoice/sidevoice-web/issues/139)) ([366fcd9](https://github.com/sidevoice/sidevoice-web/commit/366fcd946ee3984692b20866f1f1686f7dd788a1))
+* **voice:** the end-of-turn model downloads only from its Download; until then a call ends turns with silence ([#132](https://github.com/sidevoice/sidevoice-web/issues/132)) ([8257553](https://github.com/sidevoice/sidevoice-web/commit/825755307579e56bb2034797b72ffabd1a68e930))
+* **web:** a browser that blocks site data says so, and the voice never shows a bare error number ([#73](https://github.com/sidevoice/sidevoice-web/issues/73)) ([094605b](https://github.com/sidevoice/sidevoice-web/commit/094605bc9b4c9dd92b42891e82e236fe9eb6bfe8))
+* **web:** a voice try loads no end-of-turn model, so End of turn's download is real ([#103](https://github.com/sidevoice/sidevoice-web/issues/103)) ([c3f1b36](https://github.com/sidevoice/sidevoice-web/commit/c3f1b36f4452ef34eafbb9eeaa590aada30139bf))
+* **web:** Settings opens from the header menu again ([#76](https://github.com/sidevoice/sidevoice-web/issues/76)) ([2d5bee0](https://github.com/sidevoice/sidevoice-web/commit/2d5bee01196784645cef01b00066ce6f05761b14))
+
 ## [0.2.1](https://github.com/sidevoice/sidevoice-web/compare/v0.2.0...v0.2.1) (2026-10-10)
 
 
