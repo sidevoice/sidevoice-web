@@ -151,7 +151,7 @@ test("the notice's Download acts in place, its download said in Updates only; a 
   await installHarness(page);
   // The paired machine says its Sidevoice is behind (contract gap #57).
   await page.route("**/api/host/status", (route) => route.fulfill({ status: 200, contentType: "application/json",
-    body: JSON.stringify({ version: "0.8.1", update: { latest: "0.9.0", command: "sidevoice update" } }) }));
+    body: JSON.stringify({ version: "0.8.1", update: { latest: "0.9.0", command: "npx sidevoice@latest install" } }) }));
   await withUpdater(page, "en", STATES[1]);
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/voice/");
@@ -161,11 +161,11 @@ test("the notice's Download acts in place, its download said in Updates only; a 
   await page.evaluate((version) => window.__pushUpdate({ state: "downloading", version, progress: 0.3 }), VERSION);
   // Downloading: the room offers Cancel, and says nothing of the machine behind elsewhere.
   await expect(shown.getByRole("button", { name: "Cancel download" })).toBeVisible();
-  await expect(shown).not.toContainText("sidevoice update");
+  await expect(shown).not.toContainText("npx sidevoice@latest install");
   await page.locator(".sidebar-settings").click();
   await page.locator("#settings-updates").click();
   await expect(page.locator("#updates-app")).toHaveAttribute("data-state", "downloading");
   const machine = page.locator("[id^='updates-machine-']").first();
-  await expect(machine).toContainText("sidevoice update");
-  await expect(page.locator(".update-notice")).not.toContainText("sidevoice update");
+  await expect(machine).toContainText("npx sidevoice@latest install");
+  await expect(page.locator(".update-notice")).not.toContainText("npx sidevoice@latest install");
 });
