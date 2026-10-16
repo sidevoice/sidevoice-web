@@ -102,12 +102,8 @@
 /* Small to the eye, not to a finger, here and on the stage. */
 :is(.person-bubble, .chat-bubble) .cancel-input::after { content: ""; position: absolute; inset: -6px; }
 
-/* The open turn is the microphone's own waveform, on the person's bubble. */
-.chat-bubble[data-live] { padding: var(--sv-space-2) var(--sv-space-3); }
-/* The open turn's waveform, here and on the stage, on a pill in the voice's own colours: the person speaking. */
-:is(.person-bubble, .chat-bubble[data-live]) .voice-wave { box-sizing: content-box; padding: var(--sv-space-1) var(--sv-space-2); }
-:is(.person-bubble, .chat-bubble[data-live]) .voice-bars { box-sizing: content-box; padding: var(--sv-space-1-5) 10px; }
-:is(.person-bubble, .chat-bubble[data-live]) :is(.voice-wave, .voice-bars) { border-radius: var(--sv-radius-lg); background: var(--sv-voice-soft); color: var(--sv-voice-text); }
+/* The open turn is the microphone's own waveform, on the person's balloon: the stage's (LiveVoiceBalloon, call-view.css),
+ * which sizes and colours it. */
 
 /* The conversation is working on your turn: three dots in the agent's bubble. */
 .chat-bubble.thinking { display: inline-flex; align-items: center; height: 36px; padding: 0 var(--sv-space-4); color: var(--sv-text-muted); }
