@@ -1133,7 +1133,6 @@ export const messages: Messages = {
   "wizard.skip.stt": "Continua senza trascrizione",
   "wizard.skip.tts": "Continua senza una voce",
   "wizard.skip.turn": "Continua con il silenzio per ora",
-  "wizard.skip.micReason": "I tuoi agenti avranno bisogno del microfono per sentirti. Puoi consentirne l’uso dall’area di chiamata.",
   "wizard.skip.machineReason": "Ti servirà una macchina per chiamare i tuoi agenti. Puoi collegarne una dall’area di chiamata.",
   "wizard.skip.sttReason": "Ti servirà la trascrizione perché i tuoi agenti ti sentano. Puoi ottenerla dall’area di chiamata.",
   "wizard.skip.ttsReason": "Ti servirà una voce per sentire le risposte dei tuoi agenti. Puoi ottenerla dall’area di chiamata.",

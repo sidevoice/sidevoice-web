@@ -1116,7 +1116,6 @@ export const messages: Messages = {
   "wizard.skip.stt": "文字起こしなしで続ける",
   "wizard.skip.tts": "音声なしで続ける",
   "wizard.skip.turn": "今は無音検出で続ける",
-  "wizard.skip.micReason": "エージェントがあなたの声を聞くにはマイクが必要です。通話エリアから許可できます。",
   "wizard.skip.machineReason": "エージェントに通話するにはマシンが必要です。通話エリアから接続できます。",
   "wizard.skip.sttReason": "エージェントに声を届けるには文字起こしが必要です。通話エリアから用意できます。",
   "wizard.skip.ttsReason": "エージェントの返答を聞くには音声が必要です。通話エリアから用意できます。",

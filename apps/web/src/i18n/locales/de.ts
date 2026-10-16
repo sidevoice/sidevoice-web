@@ -1118,7 +1118,6 @@ export const messages: Messages = {
   "wizard.skip.stt": "Ohne Transkription fortfahren",
   "wizard.skip.tts": "Ohne Stimme fortfahren",
   "wizard.skip.turn": "Vorerst mit Stille fortfahren",
-  "wizard.skip.micReason": "Deine Agenten brauchen das Mikrofon, um dich zu hören. Du kannst es im Anrufbereich erlauben.",
   "wizard.skip.machineReason": "Du brauchst eine Maschine, um deine Agenten anzurufen. Du kannst sie im Anrufbereich verbinden.",
   "wizard.skip.sttReason": "Du brauchst die Transkription, damit deine Agenten dich hören. Du bekommst sie im Anrufbereich.",
   "wizard.skip.ttsReason": "Du brauchst eine Stimme, um die Antworten deiner Agenten zu hören. Du bekommst sie im Anrufbereich.",

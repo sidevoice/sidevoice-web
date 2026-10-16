@@ -1115,7 +1115,6 @@ export const messages: Messages = {
   "wizard.skip.stt": "不使用转写继续",
   "wizard.skip.tts": "不使用语音继续",
   "wizard.skip.turn": "暂时用停顿检测继续",
-  "wizard.skip.micReason": "你的智能体需要麦克风才能听到你。可以在通话区域允许使用麦克风。",
   "wizard.skip.machineReason": "你需要一台机器才能呼叫你的智能体。可以在通话区域连接。",
   "wizard.skip.sttReason": "你需要转写，智能体才能听到你。可以在通话区域获取。",
   "wizard.skip.ttsReason": "你需要语音才能听到智能体的回复。可以在通话区域获取。",

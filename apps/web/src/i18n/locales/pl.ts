@@ -1133,7 +1133,6 @@ export const messages: Messages = {
   "wizard.skip.stt": "Kontynuuj bez transkrypcji",
   "wizard.skip.tts": "Kontynuuj bez głosu",
   "wizard.skip.turn": "Na razie kontynuuj z ciszą",
-  "wizard.skip.micReason": "Agenci będą potrzebować mikrofonu, żeby cię słyszeć. Możesz zezwolić na dostęp do niego w obszarze rozmowy.",
   "wizard.skip.machineReason": "Do rozmów z agentami potrzebna będzie maszyna. Możesz ją połączyć w obszarze rozmowy.",
   "wizard.skip.sttReason": "Aby agenci cię słyszeli, potrzebna będzie transkrypcja. Możesz ją przygotować w obszarze rozmowy.",
   "wizard.skip.ttsReason": "Aby słyszeć odpowiedzi agentów, potrzebny będzie głos. Możesz go przygotować w obszarze rozmowy.",
