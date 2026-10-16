@@ -89,7 +89,7 @@ function BasicsStep({ t }: { t: Translate }) {
 
 /** When a turn ends, as Settings → Call has it: Smart preselected (where it runs here), Silence the other; patience;
  *  and its try, optional — Continue stays the step's action, and leaving the step (Continue, Back, Later) stops it. */
-function TurnStep({ turnTry, t }: { turnTry: TurnTryHandle; t: Translate }) {
+function TurnStep({ turnTry, noMicrophone, t }: { turnTry: TurnTryHandle; noMicrophone: boolean; t: Translate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
   useEffect(() => { if (catalogue.state === "idle") void window.sidevoiceActions?.loadVoiceCatalogue(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -97,7 +97,7 @@ function TurnStep({ turnTry, t }: { turnTry: TurnTryHandle; t: Translate }) {
     <p>{t("wizard.turnIntro")}</p>
     {catalogue.state === "failed" ? <Alert tone="danger" live className="voice-catalogue-error" title={catalogue.error} details={catalogue.details} />
       : !catalogueShown(catalogue) || !draft ? <p className="wizard-loading" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("voice.loading")}</p>
-        : <TurnChoices draft={draft} setup turnTry={turnTry} />}
+        : <TurnChoices draft={draft} setup turnTry={turnTry} noMicrophone={noMicrophone} />}
   </section>;
 }
 
@@ -374,7 +374,7 @@ export function Wizard() {
       {step === "W3" && <section>{agentsBlock}</section>}
       {step === "W4m" && <PermissionsStep microphone={onboarding.microphone} openSettings={onboarding.openMicrophoneSettings} onRequest={() => void onboarding.requestMicrophone()} t={t} />}
       {stageTask && <StageStep key={step} task={stageTask} stage={stage} t={t} />}
-      {step === "W5" && <TurnStep turnTry={turnTry} t={t} />}
+      {step === "W5" && <TurnStep turnTry={turnTry} noMicrophone={!onboarding.microphone.ready} t={t} />}
       {ready && <ReadyStep path={onboarding.path} machineName={remoteName} title={title} t={t} />}
       {ready && error && <Alert tone="danger" live className="wizard-ready-error" title={error} />}
     </div>
@@ -391,7 +391,11 @@ export function Wizard() {
         tryReason={stageTask === "tts" && !sample.trim() ? t("wizard.wait.sentence") : undefined}
         running={trial.trial.phase === "running"} tried={onboarding.tried(stageTask)}
         onTry={tryAgain} onStop={trial.finish} onContinue={() => void finishStage(stageTask)} t={t} />}
-      {step === "W5" && <ModelStepFooter reason={turnWaits ? waitReason(turnModel, "turn", t) : ""} tryReason={sttModel.ready ? undefined : t("settings.save.waitTranscription")}
+      {step === "W5" && !onboarding.microphone.ready && <>
+        {turnWaits && <p className="wizard-reason" id="wizard-stage-reason" title={waitReason(turnModel, "turn", t)}>{waitReason(turnModel, "turn", t)}</p>}
+        <Button type="button" variant="primary" id="wizard-stage-action" {...(turnWaits ? { disabled: true, blockedBy: "wizard-stage-reason" } : {})} onClick={() => void finishTurn()}>{t("wizard.continue")}</Button>
+      </>}
+      {step === "W5" && onboarding.microphone.ready && <ModelStepFooter reason={turnWaits ? waitReason(turnModel, "turn", t) : ""} tryReason={sttModel.ready ? undefined : t("settings.save.waitTranscription")}
         running={turnTry.running} tried={turnTried} onTry={turnTry.start} onStop={turnTry.stop} onContinue={() => void finishTurn()} t={t} />}
       {ready && <Button type="button" variant="primary" size="lg" className="wizard-enter" loading={completing} onClick={() => void complete()}>
         {error ? t("wizard.retryCompletion") : t("wizard.enter")}<ArrowRightIcon />

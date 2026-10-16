@@ -1109,6 +1109,7 @@ export const messages: Messages = {
   "wizard.mic.stillDenied": "まだブロックされています。",
   "wizard.mic.allow": "マイクを許可",
   "wizard.mic.continueWithout": "マイクなしで続ける",
+  "wizard.turn.noMicrophone": "試すにはマイクが必要ですが、マイクなしで続けています。",
   "wizard.mic.checkAgain": "もう一度確認",
   "wizard.mic.openSettings": "システム設定を開く",
   "perm.mic.why": "通話中に音声がオンのとき、およびセットアップのテスト中にだけ使われます。",
