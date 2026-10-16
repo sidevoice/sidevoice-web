@@ -843,7 +843,7 @@ export const messages: Messages = {
   "data.action": "Alle Sidevoice-Daten löschen",
   "data.confirmTitle": "Alle Sidevoice-Daten löschen?",
   "data.confirmWhat": "Der Sidevoice-Dienst wird deinstalliert und die Daten, Modelle und Anbieterschlüssel dieser App werden gelöscht; danach startet Sidevoice mit der Einrichtung neu, die App selbst bleibt.",
-  "data.confirmLimits": "Andere Maschinen und Geräte (widerrufe dieses Gerät dort), deine Anbieterkonten, die Systemberechtigungen und Backups.",
+  "data.confirmLimits": "Andere Rechner und Geräte (widerrufe dieses Gerät dort), deine Anbieterkonten, die Systemberechtigungen und Backups.",
   "data.cancel": "Abbrechen",
   "data.endCall": "Beende den aktuellen Anruf, bevor du Daten löschst.",
   "data.restarting": "Sidevoice wird beendet, um die Datenlöschung abzuschließen.",

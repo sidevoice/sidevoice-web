@@ -851,7 +851,7 @@ export const messages: Messages = {
   "data.action": "Usuń wszystkie dane Sidevoice",
   "data.confirmTitle": "Usunąć wszystkie dane Sidevoice?",
   "data.confirmWhat": "Usługa Sidevoice zostanie odinstalowana, a dane, modele i klucze dostawców tej aplikacji usunięte; potem Sidevoice uruchomi się ponownie od konfiguracji, a sama aplikacja pozostanie.",
-  "data.confirmLimits": "Inne maszyny i urządzenia (tam cofnij dostęp temu urządzeniu), twoje konta u dostawców, uprawnienia systemowe i kopie zapasowe.",
+  "data.confirmLimits": "Inne maszyny i urządzenia (tam unieważnij to urządzenie), twoje konta u dostawców, uprawnienia systemowe i kopie zapasowe.",
   "data.cancel": "Anuluj",
   "data.endCall": "Zakończ bieżącą rozmowę przed usunięciem danych.",
   "data.restarting": "Sidevoice zamyka się, aby dokończyć usuwanie danych.",

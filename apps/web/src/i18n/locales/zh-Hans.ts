@@ -840,7 +840,7 @@ export const messages: Messages = {
   "data.action": "删除所有 Sidevoice 数据",
   "data.confirmTitle": "删除所有 Sidevoice 数据？",
   "data.confirmWhat": "这将卸载 Sidevoice 服务并删除本应用的数据、模型和提供商密钥，然后 Sidevoice 重新进入初始设置；应用本身会保留。",
-  "data.confirmLimits": "其他机器和设备（请在那里撤销本设备）、你的服务商账户、系统权限和备份。",
+  "data.confirmLimits": "其他计算机和设备（请在那里撤销此设备）、你的提供商账户、系统权限和备份。",
   "data.cancel": "取消",
   "data.endCall": "请先结束当前通话，再删除数据。",
   "data.restarting": "Sidevoice 正在关闭，以完成数据删除。",

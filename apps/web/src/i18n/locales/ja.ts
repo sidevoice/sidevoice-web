@@ -841,7 +841,7 @@ export const messages: Messages = {
   "data.action": "Sidevoice のすべてのデータを削除",
   "data.confirmTitle": "Sidevoice のすべてのデータを削除しますか？",
   "data.confirmWhat": "Sidevoice サービスをアンインストールし、このアプリのデータ、モデル、プロバイダーキーを削除したあと、Sidevoice は初期設定から再開します。アプリ本体は残ります。",
-  "data.confirmLimits": "ほかのマシンやデバイス（そちらでこのデバイスのアクセスを取り消してください）、プロバイダーのアカウント、システムの権限、バックアップ。",
+  "data.confirmLimits": "ほかのマシンやデバイス（そちらでこのデバイスのアクセスを取り消してください）、プロバイダのアカウント、システムの権限、バックアップ。",
   "data.cancel": "キャンセル",
   "data.endCall": "データを削除する前に現在の通話を終了してください。",
   "data.restarting": "データの削除を完了するため、Sidevoice を終了しています。",
