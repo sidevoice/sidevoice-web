@@ -71,7 +71,7 @@ function RoomContent() {
       <StorageBlockedBanner />
       <ResetReportNotice />
       <div className="room-shell" hidden={roomHidden} aria-hidden={roomHidden || undefined}>
-        <RoomHeader />
+        <RoomHeader blocked={callBlocked} />
         <LocalHostBanner />
         {/* The call: the conversations, the stage over its bar, and the transcript when it is open (2026-10-10). One layout
             whatever is set up (operator, 2026-10-16): the conversations' column and Settings always; only the call's own

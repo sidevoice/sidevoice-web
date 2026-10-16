@@ -18,7 +18,8 @@ import "./room.css";
  * conversations have no column, they sit in the header as a row of avatars (header-row.ts): as many as fit, the one on
  * the stage marked in place, then "+" for a new one, then the chevron when some are not in the row. A tap moves the call
  * to one; the whole list comes down from the chevron, and the header stays lit above the dimmed call while it is down. */
-export function RoomHeader() {
+/** `blocked`: nothing set up to talk to yet: no New conversation here either (as the sidebar). */
+export function RoomHeader({ blocked = false }: { blocked?: boolean } = {}) {
   const t = translator();
   const listDown = useCallLayout((state) => state.conversationsOpen);
   // No updates entry on a phone (decided): the page there picks up a new version the next time it is opened.
@@ -135,7 +136,7 @@ function HeaderConversations({ t }: { t: Translate }) {
           <ConversationAvatar row={row} />
         </button>
       ))}
-      <NewConversation header />
+      {!blocked && <NewConversation header />}
       {chevron && <ConversationsToggle t={t} hidden={hidden} />}
     </div>
   );
