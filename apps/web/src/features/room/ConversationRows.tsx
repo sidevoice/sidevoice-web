@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactElement, type ReactNode } from "react";
 import type { ParticipantView } from "../../state/room-types";
 
 /** The shortest thing that still tells two conversations apart, for the narrow rail a phone gets. */
@@ -16,6 +16,8 @@ export interface ConversationRowsProps {
   disabled?(row: ParticipantView): boolean;
   /** What goes beside a row: the room's options menu, the card's unread badge. */
   aside?(row: ParticipantView): ReactNode;
+  /** What holds the whole row: the room's context menu (its ⋯ options on the secondary click). */
+  wrap?(row: ParticipantView, node: ReactElement): ReactNode;
   /** What closes the row itself, after its title, and chooses it like the rest of it: the room's unread badge. */
   end?(row: ParticipantView): ReactNode;
   /** The row's tooltip; its title by default. */
@@ -31,11 +33,11 @@ export interface ConversationRowsProps {
 /** The conversations of the call, as rows to choose from: the room's sidebar (ConversationSidebar) and the desktop app's
  *  call controls card both show them through this, each with its own words, actions and styles. A row is a plain
  *  button, not the system's Button: it is a list entry laid out by whoever shows it, and its parts are its own children. */
-export function ConversationRows({ rows, onSelect, sub, disabled = (row) => row.switching, aside, end, tooltip = (row) => row.title, label, lead, id, className }: ConversationRowsProps) {
+export function ConversationRows({ rows, onSelect, sub, disabled = (row) => row.switching, aside, wrap = (_row, node) => node, end, tooltip = (row) => row.title, label, lead, id, className }: ConversationRowsProps) {
   return (
     <div id={id} className={className}>
-      {rows.map((row) => (
-        <div className="participant-row" data-thread={row.threadId} data-selected={row.selected || undefined} key={row.threadId}>
+      {rows.map((row) => <Fragment key={row.threadId}>{wrap(row,
+        <div className="participant-row" data-thread={row.threadId} data-selected={row.selected || undefined}>
           <button
             type="button"
             className="person"
@@ -51,8 +53,7 @@ export function ConversationRows({ rows, onSelect, sub, disabled = (row) => row.
             {end?.(row)}
           </button>
           {aside?.(row)}
-        </div>
-      ))}
+        </div>)}</Fragment>)}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useContext, useEffect, useLayoutEffect, useRef } from "react";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { DropdownMenu, DropdownMenuItem } from "../../components/ui/DropdownMenu";
+import { ContextMenu, ContextMenuItem } from "../../components/ui/ContextMenu";
 import { CloseIcon, CloseUpIcon, ConversationsIcon, HarnessIcon, MachinesIcon, MoreIcon, SidebarCollapseIcon, SidebarExpandIcon, SettingsIcon, SidevoiceMark } from "../../components/ui/Icons";
 import { useSurface } from "../../lib/use-surface";
 import { COMPACT_QUERY, isNarrow, NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
@@ -157,6 +158,9 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
                     {(row.unheard ?? 0) > 0 && <Badge tone="accent" className="sidebar-unread">{t("state.unheard", { n: row.unheard ?? 0 })}</Badge>}
                     {unread(row) && <Badge tone="accent" className="sidebar-unread">{t("state.unread", { n: row.unread })}</Badge>}
                   </>}
+                  // The same options on the secondary click anywhere on the row (operator, 2026-10-16): Close conversation, for now.
+                  wrap={(row, node) => <ContextMenu label={t("sidebar.options", { title: row.title })}
+                    items={<ContextMenuItem danger onSelect={() => void window.sidevoiceActions?.closeParticipant(row.threadId)}><CloseIcon />{t("sidebar.closeConversation")}</ContextMenuItem>}>{node}</ContextMenu>}
                   aside={(row) => (
                     <DropdownMenu label={t("sidebar.options", { title: row.title })} trigger={<Button variant="ghost" tone="neutral" size="icon-sm" className="participant-more" aria-label={t("sidebar.options", { title: row.title })}><MoreIcon /></Button>}>
                       <DropdownMenuItem danger onSelect={() => void window.sidevoiceActions?.closeParticipant(row.threadId)}><CloseIcon />{t("sidebar.closeConversation")}</DropdownMenuItem>
