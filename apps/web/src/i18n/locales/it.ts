@@ -1074,7 +1074,6 @@ export const messages: Messages = {
   "runtime.device.noGpu": "nessuna scheda grafica utilizzabile dal browser",
   "runtime.device.memory": "circa {gb} GB di memoria",
   "runtime.device.cores": "{n} core",
-  "settings.section.notReady": "Non pronto",
   "runtime.advanced": "Avanzate: come viene eseguito",
   "runtime.info": "Quale motore e formato eseguono questo modello sul tuo computer (ad es. MLX su Apple silicon). L’opzione consigliata è già la migliore per questo computer: cambiala solo se sai perché.",
   // The smart end of turn's model (TurnChoices).

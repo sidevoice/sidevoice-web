@@ -3,7 +3,6 @@ import { DialogSurface } from "../../components/ui/Dialog";
 import { OverlayPortalProvider } from "../../components/ui/Tooltip";
 import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ShortcutsIcon, PermissionsIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon, UpdateIcon, WarningIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
-import { Badge } from "../../components/ui/Badge";
 import { Select } from "../../components/ui/Select";
 import { Group, Row, Section } from "../../components/ui/Card";
 import { Segmented } from "../../components/ui/Tabs";
@@ -280,8 +279,12 @@ export function SettingsDialog() {
       : SECTIONS.find((section) => section.id === id)!.icon(size);
   // How many new things are under a section (its mark, VARIANTS `section-new`).
   const isNew = (id: string) => news.filter((item) => item.section === id).length;
-  const notReady = (id: string) => (id === "transcription" && waits.stt) || (id === "voice" && waits.tts) || (id === "call" && waits.turn);
-  const badge = (id: string) => notReady(id) && <Badge tone="warning" className="ui-nav-badge" title={t("settings.section.waiting")}>{t("settings.section.notReady")}</Badge>;
+  // What needs attention wears the one warning dot the app uses (the stage's title has it too; operator, 2026-10-16):
+  // a model chosen but not ready, or the microphone not allowed; said in words on hover and to assistive tech.
+  const micBlocked = ["prompt", "requesting", "denied", "missing"].includes(mic.microphone?.state ?? "");
+  const attention = (id: string): MessageKey | null => (id === "transcription" && waits.stt) || (id === "voice" && waits.tts) || (id === "call" && waits.turn)
+    ? "settings.section.waiting" : id === "permissions" && micBlocked ? "settings.call.micNotAllowed" : null;
+  const badge = (id: string) => { const why = attention(id); return why && <span className="ui-nav-badge settings-attention" role="img" aria-label={t(why)} title={t(why)} />; };
   // A phone's header says where the person is: Settings on the list, the section on its page, the machine on its own.
   const shownMachine = useRoomStore((state) => state.machines.find((entry) => entry.id === machine) ?? null);
   const title = !phone || level === 1 ? t("settings.title") : level === 3 && shownMachine ? machineName(shownMachine, t) : label(current);

@@ -1,5 +1,5 @@
 import { afterEach, expect, onTestFinished, test, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { withMicrophone } from "./with-microphone.test-util";
 import { SettingsDialog } from "./SettingsDialog";
 import { KEYBOARD_QUERY } from "./ShortcutsSettings";
@@ -330,4 +330,17 @@ test("Call links to Permissions while the microphone is not allowed, and not onc
   act(() => again.patch({ settingsSection: "call" }));
   await within(document.getElementById("pane-call")!).findByText("Thinking sound");
   expect(within(document.getElementById("pane-call")!).queryByRole("button", { name: "Open Permissions" })).toBeNull();
+});
+
+test("Permissions wears the warning dot while the microphone is not allowed, said in words; none once it is", async () => {
+  withMicrophone("denied");
+  open("whisper-base");
+  const dot = await waitFor(() => { const found = document.querySelector("#settings-permissions .settings-attention"); expect(found).not.toBeNull(); return found!; });
+  expect(dot).toHaveAttribute("role", "img");
+  expect(dot.getAttribute("aria-label")).toBeTruthy();
+  cleanup();
+  withMicrophone("granted");
+  open("whisper-base");
+  await waitFor(() => expect(document.getElementById("settings-permissions")).toBeInTheDocument());
+  expect(document.querySelector("#settings-permissions .settings-attention")).toBeNull();
 });

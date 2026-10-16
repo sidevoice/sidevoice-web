@@ -1061,7 +1061,6 @@ export const messages: Messages = {
   "runtime.device.noGpu": "keine Grafikkarte, die der Browser nutzen kann",
   "runtime.device.memory": "etwa {gb} GB Arbeitsspeicher",
   "runtime.device.cores": "Kerne: {n}",
-  "settings.section.notReady": "Nicht bereit",
   "runtime.advanced": "Erweitert: Ausführung",
   "runtime.info": "Welche Engine und welches Format dieses Modell auf deinem Gerät ausführen (z. B. MLX auf Apple Silicon). Die Empfehlung ist bereits die beste Wahl für dieses Gerät – ändere sie nur, wenn du weißt, warum.",
   "settings.save.waitTurn": "Das Modell für das Redeende ist noch nicht bereit.",

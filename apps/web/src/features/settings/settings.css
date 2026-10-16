@@ -51,6 +51,8 @@
 }
 /* A section whose chosen model is not ready says so in the nav, in words. */
 .ui-nav-badge { margin-inline-start: auto; }
+/* Needs attention: the warning dot, as on the stage's title. */
+.settings-attention { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--sv-warning); box-shadow: 0 0 0 2px var(--sv-surface); }
 /* This device's entry: a machine's (MachineEntryCopy), "This device" in the other sections' size, its state under it
    only where it is said in words (Not working); else one line, as any section. A
    phone's menu says it on its row's line (settings-levels.tsx). */

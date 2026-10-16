@@ -1058,7 +1058,6 @@ export const messages: Messages = {
   "runtime.device.noGpu": "aucune carte graphique utilisable par le navigateur",
   "runtime.device.memory": "environ {gb} Go de mémoire",
   "runtime.device.cores": "Cœurs : {n}",
-  "settings.section.notReady": "Pas prêt",
   "runtime.advanced": "Avancé : exécution",
   "runtime.info": "Le moteur et le format qui exécutent ce modèle sur votre appareil (par ex. MLX sur Apple silicon). Le choix recommandé est déjà le meilleur pour cet appareil — ne le changez que si vous savez pourquoi.",
   "settings.save.waitTurn": "Le modèle de fin de tour n’est pas encore prêt.",

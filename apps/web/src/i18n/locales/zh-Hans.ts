@@ -1058,7 +1058,6 @@ export const messages: Messages = {
   "runtime.device.noGpu": "没有浏览器可用的显卡",
   "runtime.device.memory": "约 {gb} GB 内存",
   "runtime.device.cores": "{n} 个核心",
-  "settings.section.notReady": "未就绪",
   "runtime.advanced": "高级：运行方式",
   "runtime.info": "在你的设备上用哪个引擎和格式运行此模型（例如 Apple 芯片上的 MLX）。推荐选项已是此设备的最佳选择，除非你清楚原因，否则不要更改。",
   "settings.save.waitTurn": "发言结束模型尚未就绪。",

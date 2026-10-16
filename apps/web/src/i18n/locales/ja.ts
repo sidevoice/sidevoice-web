@@ -1059,7 +1059,6 @@ export const messages: Messages = {
   "runtime.device.noGpu": "ブラウザで使えるグラフィックカードなし",
   "runtime.device.memory": "メモリ約 {gb} GB",
   "runtime.device.cores": "{n} コア",
-  "settings.section.notReady": "未準備",
   "runtime.advanced": "詳細：実行方法",
   "runtime.info": "このモデルをデバイス上で動かすエンジンと形式です（例：Apple シリコンでは MLX）。推奨の選択肢がすでにこのデバイスに最適です。理由がある場合にのみ変更してください。",
   "settings.save.waitTurn": "ターン終了モデルの準備がまだできていません。",
