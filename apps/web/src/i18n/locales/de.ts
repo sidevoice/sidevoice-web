@@ -900,7 +900,6 @@ export const messages: Messages = {
   "storage.blockedTitle": "Websitedaten sind blockiert",
   "settings.section.call": "Anruf",
   "settings.section.permissions": "Berechtigungen",
-  "settings.permissions.description": "Was Sidevoice auf diesem Gerät nutzen darf. Es wird erneut geprüft, wenn du zur App oder Seite zurückkehrst.",
   "settings.permissions.site": "Im Browser ist das die Berechtigung der Website. Auf einem Computer änderst du sie über das Symbol für Website-Einstellungen neben der Webadresse.",
   "settings.permissions.sitePhone": "Auf dem iPhone oder iPad in Safari: Tippe auf aA, dann auf Website-Einstellungen und stelle Mikrofon auf Erlauben.",
   "settings.call.description": "Wie sich ein Anruf verhält: wann dein Redebeitrag endet, der Ton, während der Agent arbeitet, und der Bildschirm.",
