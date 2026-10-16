@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/sidevoice/sidevoice-web/compare/v0.7.1...v0.7.2) (2026-10-16)
+
+
+### Bug Fixes
+
+* **devices:** keep the device list fresh from the runtime ([#157](https://github.com/sidevoice/sidevoice-web/issues/157)) ([f6dbd7b](https://github.com/sidevoice/sidevoice-web/commit/f6dbd7b3f6ddd12b08ae36c70f9a01d668ba0a0e)), closes [#156](https://github.com/sidevoice/sidevoice-web/issues/156)
+
 ## [0.7.1](https://github.com/sidevoice/sidevoice-web/compare/v0.7.0...v0.7.1) (2026-10-16)
 
 
