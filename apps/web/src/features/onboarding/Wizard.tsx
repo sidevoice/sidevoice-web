@@ -310,6 +310,9 @@ export function Wizard() {
   }
 
   // "Continue without …" (d): kept in the record, so a reload does not send the person back; Back still reaches the step.
+  async function skipMicrophone() {
+    if (await onboarding.skip("microphone")) onboarding.goTo(permissionsNext);
+  }
   async function skipMachine() {
     if (await onboarding.skip("machine")) onboarding.goTo(sttStep);
   }
@@ -394,7 +397,7 @@ export function Wizard() {
       {step === "W4m" && <PermissionsStep microphone={onboarding.microphone} openSettings={onboarding.openMicrophoneSettings} onRequest={() => void onboarding.requestMicrophone()} t={t} />}
       {stageTask && <StageStep key={step} task={stageTask} stage={stage} t={t} />}
       {step === "W5" && <TurnStep turnTry={turnTry} t={t} />}
-      {ready && <ReadyStep path={onboarding.path} machineName={remoteName} title={title} t={t} live={skips ? { machine: onboarding.machineAnswers } : undefined} />}
+      {ready && <ReadyStep path={onboarding.path} machineName={remoteName} title={title} t={t} live={skips ? { machine: onboarding.machineAnswers, microphone: onboarding.microphone.ready } : undefined} />}
       {ready && error && !skips && <Alert tone="danger" live className="wizard-ready-error" title={error} />}
     </div>
     <footer className="wizard-actions" data-model-step={stageTask || step === "W5" || step === "W4m" ? "" : undefined}>
@@ -409,7 +412,8 @@ export function Wizard() {
       </>}
       <span ref={setFooterSlot} className="wizard-slot" />
       {step === "W3" && <Button type="button" variant="primary" onClick={() => void finishAgents()}>{t("wizard.continue")}</Button>}
-      {step === "W4m" && <MicrophoneContinue microphone={onboarding.microphone} onContinue={() => void onboarding.markMicrophoneDone().then((done) => { if (done) onboarding.goTo(permissionsNext); })} t={t} />}
+      {step === "W4m" && <MicrophoneContinue microphone={onboarding.microphone} onContinue={() => void onboarding.markMicrophoneDone().then((done) => { if (done) onboarding.goTo(permissionsNext); })}
+        onSkip={skips ? () => void skipMicrophone() : undefined} t={t} />}
       {stageTask && <ModelStepFooter reason={waitReason(model, stageTask, t, skips)} skip={stageSkip}
         tryReason={stageTask === "tts" && !sample.trim() ? t("wizard.wait.sentence") : undefined}
         running={trial.trial.phase === "running"} tried={onboarding.tried(stageTask)}

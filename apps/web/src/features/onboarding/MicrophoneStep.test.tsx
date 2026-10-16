@@ -124,9 +124,9 @@ test("blocked: how to allow it for the site, Check again (still blocked, said so
   expect(title()).toHaveTextContent("Set up transcription");
 }, WHOLE_APP_MS);
 
-test("required in this release, in every flow: no way past the step without the microphone, reloaded or not", async () => {
+test("required in this release, in a, b and c: no way past the step without the microphone, reloaded or not", async () => {
   const { media } = browser("denied", () => Promise.reject(refused("NotAllowedError")));
-  for (const flow of ["a", "b", "c", "d"]) {
+  for (const flow of ["a", "b", "c"]) {
     localStorage.setItem("sidevoice.variants", JSON.stringify({ onboardingFlow: flow }));
     await setup();
     expect(title()).toHaveTextContent("Permissions");
@@ -148,6 +148,21 @@ test("required in this release, in every flow: no way past the step without the 
   await waitFor(() => expect(proceed()).not.toHaveAttribute("aria-disabled", "true"));
   await act(async () => { fireEvent.click(proceed()); });
   expect(title()).toHaveTextContent("Set up transcription");
+}, WHOLE_APP_MS);
+
+test("d: Continue without microphone is kept, a reload goes on from there, and allowed it is gone", async () => {
+  browser("denied", () => Promise.reject(refused("NotAllowedError")));
+  localStorage.setItem("sidevoice.variants", JSON.stringify({ onboardingFlow: "d" }));
+  await setup();
+  expect(title()).toHaveTextContent("Permissions");
+  expect(proceed()).toHaveAttribute("aria-disabled", "true");
+  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Continue without microphone" })); });
+  expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).microphone_skipped).toBe(true);
+  expect(title()).not.toHaveTextContent("Permissions");
+  cleanup();
+  await setup();
+  expect(title()).not.toHaveTextContent("Permissions");
+  localStorage.removeItem("sidevoice.variants");
 }, WHOLE_APP_MS);
 
 test("the request closed without an answer is not a block: Allow microphone again", async () => {

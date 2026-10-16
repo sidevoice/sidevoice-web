@@ -28,11 +28,17 @@ export function PermissionsStep({ microphone, openSettings, onRequest = () => {}
   return <section className="wizard-mic"><PermissionsList microphone={microphone} openSettings={openSettings} onRequest={onRequest} t={t} platform={platform} /></section>;
 }
 
-/** The footer's forward action: Continue, waiting until the microphone is allowed. The microphone is required in this
- *  release (operator, 2026-10-16): there is no way past the step without it. One element, so focus stays on it. */
-export function MicrophoneContinue({ microphone, onContinue, t }: { microphone: MicrophoneSnapshot; onContinue(): void; t: Translate }) {
+/** The footer's forward action: Continue, waiting until the microphone is allowed. The microphone is required to call in
+ *  this release (operator, 2026-10-16); one element, so focus stays on it. `onSkip` (onboardingFlow d, operator
+ *  2026-10-16): while it is not allowed, the quiet "Continue without microphone" left of it, its consequence said once in
+ *  the reason line — the call area asks for it afterwards. */
+export function MicrophoneContinue({ microphone, onContinue, onSkip, t }: { microphone: MicrophoneSnapshot; onContinue(): void; onSkip?: () => void; t: Translate }) {
   const { done } = microphoneAction(microphone);
   return <>
+    {!done && onSkip && <>
+      <p className="wizard-reason" id="wizard-stage-reason" title={t("wizard.skip.micReason")}>{t("wizard.skip.micReason")}</p>
+      <Button type="button" variant="secondary" id="wizard-step-skip" onClick={onSkip}>{t("wizard.skip.microphone")}</Button>
+    </>}
     {/* Waiting, it says why on hover and focus: aria-disabled (blockedBy), so it stays focusable and its tooltip shows. */}
     <Tooltip content={done ? null : t("wizard.mic.continueWaiting")}>
       <Button type="button" variant="primary" id="wizard-mic-continue" className={done ? undefined : "wizard-continue-waiting"}

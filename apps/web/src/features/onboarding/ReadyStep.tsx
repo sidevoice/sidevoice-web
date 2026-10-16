@@ -1,5 +1,5 @@
 import type { ReactNode, Ref } from "react";
-import { CheckIcon, EndOfTurnIcon, OtherMachineIcon, SidevoiceMark, ThisComputerIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
+import { CheckIcon, EndOfTurnIcon, MicrophoneIcon, OtherMachineIcon, SidevoiceMark, ThisComputerIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { useRoomStore } from "../../state/room-store";
 import { ConnectYourAgent } from "../room/ConnectYourAgent";
 import { useModelState } from "../settings/ModelSetup";
@@ -29,7 +29,7 @@ function RecapRow({ icon, label, value, detail, state = "done" }: { icon: ReactN
 /** `live` (onboardingFlow d): the rows read as things stand now — what was passed without shows as not there yet, a
  *  download under way with its percentage — and with anything missing the title is a calmer one. */
 export function ReadyStep({ path, machineName, title, t, live }: {
-  path: "agents" | "remote" | null; machineName: string; title: Ref<HTMLHeadingElement>; t: Translate; live?: { machine: boolean };
+  path: "agents" | "remote" | null; machineName: string; title: Ref<HTMLHeadingElement>; t: Translate; live?: { machine: boolean; microphone: boolean };
 }) {
   const models = useVoiceModels().rows;
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
@@ -52,9 +52,12 @@ export function ReadyStep({ path, machineName, title, t, live }: {
   const machine = !live || live.machine
     ? { value: here ? t("wizard.recap.here") : machineName || t("wizard.choice.remote"), state: "done" as RowState }
     : { value: t("wizard.recap.notConnected"), detail: t("wizard.recap.later"), state: "missing" as RowState };
+  // The microphone, passed without (d): not allowed yet, and the call area asks for it.
+  const micRow = !live || live.microphone ? { value: t("wizard.mic.state.granted"), state: "done" as RowState }
+    : { value: t("wizard.mic.state.prompt"), detail: t("wizard.recap.micLater"), state: "missing" as RowState };
   const sttRow = voiceRow("stt", draft?.stt.model ?? "", stt.local ? undefined : catalogName("stt"));
   const ttsRow = voiceRow("tts", draft?.tts.model ?? "", tts.local ? undefined : catalogName("tts"));
-  const partial = [machine, sttRow, ttsRow].some((row) => row.state !== "done");
+  const partial = [micRow, machine, sttRow, ttsRow].some((row) => row.state !== "done");
   return <section className="wizard-ready">
     <div className="wizard-ready-hero">
       <span className="wizard-ready-mark" aria-hidden><SidevoiceMark size={64} /></span>
@@ -65,6 +68,7 @@ export function ReadyStep({ path, machineName, title, t, live }: {
     <div className="wizard-recap">
       <h3 className="sr-only">{t("wizard.recap.title")}</h3>
       <dl className="wizard-recap-list">
+        {live && <RecapRow icon={<MicrophoneIcon size={16} />} label={t("wizard.mic.label")} {...micRow} />}
         <RecapRow icon={here ? <ThisComputerIcon size={16} /> : <OtherMachineIcon size={16} />} label={t("wizard.group.where")} {...machine} />
         <RecapRow icon={<TranscriptionIcon size={16} />} label={t("wizard.group.transcription")} {...sttRow} />
         <RecapRow icon={<VoicesIcon size={16} />} label={t("wizard.group.voice")} {...ttsRow} />

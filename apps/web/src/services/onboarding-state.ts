@@ -19,8 +19,9 @@ export interface OnboardingRecord {
   microphone_done: boolean;
   /** The end of turn step was answered. */
   turn_done: boolean;
-  /** Steps passed with their "Continue without …" (onboardingFlow d): the machine, transcription, the voice. Resume goes
+  /** Steps passed with their "Continue without …" (onboardingFlow d): the microphone, the machine, transcription, the voice. Resume goes
    *  past them; Back still reaches them, and doing the step clears its mark. */
+  microphone_skipped: boolean;
   machine_skipped: boolean;
   stt_skipped: boolean;
   tts_skipped: boolean;
@@ -45,7 +46,7 @@ export type OnboardingPatch = Partial<Omit<OnboardingRecord, "version" | "trials
 export const ONBOARDING_STORAGE_KEY = "sidevoice.onboarding";
 
 export const emptyOnboardingRecord = (): OnboardingRecord => ({
-  version: 1, basics_done: false, choice: null, agents_done: false, microphone_done: false, turn_done: false, machine_skipped: false, stt_skipped: false, tts_skipped: false, deferred_at: null, completed_at: null, trials: {}, chosen: {}, baseline_release: 0, features: {},
+  version: 1, basics_done: false, choice: null, agents_done: false, microphone_done: false, turn_done: false, microphone_skipped: false, machine_skipped: false, stt_skipped: false, tts_skipped: false, deferred_at: null, completed_at: null, trials: {}, chosen: {}, baseline_release: 0, features: {},
 });
 
 export class OnboardingStorageError extends Error {
@@ -85,6 +86,7 @@ export function normalizeOnboardingRecord(value: unknown): OnboardingRecord {
     agents_done: input.agents_done === true,
     microphone_done: input.microphone_done === true,
     turn_done: input.turn_done === true,
+    microphone_skipped: input.microphone_skipped === true,
     machine_skipped: input.machine_skipped === true,
     stt_skipped: input.stt_skipped === true,
     tts_skipped: input.tts_skipped === true,

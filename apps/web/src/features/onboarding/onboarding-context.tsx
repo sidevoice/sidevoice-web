@@ -40,7 +40,7 @@ interface OnboardingValue {
   /** The call's voice as it stands (transcription and voice), with the rows of the models it needs. */
   voice: { state: VoiceReadiness; rows: VoiceModelRow[]; sttReady: boolean; ttsReady: boolean };
   /** "Continue without …" (d): the step passed and kept as such. */
-  skip(step: "machine" | "stt" | "tts"): Promise<boolean>;
+  skip(step: "microphone" | "machine" | "stt" | "tts"): Promise<boolean>;
   error: ErrorKey | null;
   open: boolean;
   step: OnboardingStep;
@@ -99,9 +99,10 @@ function microphoneReady(microphone: MicrophoneSnapshot, record: OnboardingRecor
 }
 
 /** What resume reads of the microphone: whether the permissions step was passed with it allowed, and it still is (or there
- *  is nothing to ask). Required in this release (operator, 2026-10-16): no way past without it. */
-function microphoneFacts(microphone: MicrophoneSnapshot, record: OnboardingRecord) {
-  return { passed: microphone.state === "none" || (record.microphone_done && microphoneReady(microphone, record)) };
+ *  is nothing to ask). Required to call in this release (operator, 2026-10-16); in the setup, only d lets it be passed
+ *  without (`skips`), and the call area then asks for it. */
+function microphoneFacts(microphone: MicrophoneSnapshot, record: OnboardingRecord, skips: boolean) {
+  return { passed: microphone.state === "none" || (record.microphone_done && microphoneReady(microphone, record)) || (skips && record.microphone_skipped) };
 }
 
 /** What resume reads of the room: which machines answer, and the device's kept voice settings; and the microphone. */
@@ -151,7 +152,7 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
   const done = !!record.completed_at || (rules.autoComplete && readinessMet) || (rules.skips && entered);
   // Resume asks the microphone's step until it was passed with Continue (or there is nothing to ask): allowed already,
   // it still shows, saying so (operator, 2026-10-16).
-  const live = liveFacts(room, microphoneFacts(microphone, record));
+  const live = liveFacts(room, microphoneFacts(microphone, record, rules.skips));
   const resume = useCallback((current: OnboardingRecord, facts: ReturnType<typeof liveFacts>) =>
     resumeOnboarding({ record: current, canHostAgents, ...facts,
       ...(rules.liveResume ? { live: { sttReady: readiness.current.stt, ttsReady: readiness.current.tts } } : {}),
@@ -227,7 +228,7 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
   const value: OnboardingValue = {
     ready, record, error, open, step, canHostAgents, flow, rules, done, machineAnswers,
     voice,
-    skip: (what) => persist(what === "machine" ? { machine_skipped: true } : what === "stt" ? { stt_skipped: true } : { tts_skipped: true }),
+    skip: (what) => persist(what === "microphone" ? { microphone_skipped: true } : what === "machine" ? { machine_skipped: true } : what === "stt" ? { stt_skipped: true } : { tts_skipped: true }),
     path: canHostAgents ? record.choice : "remote",
     localReady: live.localReady,
     remoteReady: live.remoteReady,
@@ -244,7 +245,7 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
     // Taken up again after "Later": c opens it by itself again from then on; b never does.
     setPath: (path) => persist({ choice: path, ...(rules.pendingCard ? { deferred_at: null } : {}) }),
     markAgentsDone: () => persist({ agents_done: true }),
-    markMicrophoneDone: () => persist({ microphone_done: true }),
+    markMicrophoneDone: () => persist({ microphone_done: true, microphone_skipped: false }),
     markBasicsDone: () => persist({ basics_done: true }),
     markTurnDone: () => persist({ turn_done: true }),
     markFeatures: (ids, state) => persist({ features: Object.fromEntries(ids.map((id) => [id, { state, at: Date.now() }])) }),
@@ -276,7 +277,7 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
         if (saved) setOpen(false);
         return saved;
       }
-      const now = resume(recordRef.current, liveFacts(roomStore.getState(), microphoneFacts(microphoneAccess.getSnapshot(), recordRef.current)));
+      const now = resume(recordRef.current, liveFacts(roomStore.getState(), microphoneFacts(microphoneAccess.getSnapshot(), recordRef.current, rules.skips)));
       if (now !== "W6") { setStep(now); setError("onboarding.prerequisites"); return false; }
       // Set up on this release: what it already has is not news to the person.
       const saved = await persist({ completed_at: Math.floor(Date.now() / 1000), deferred_at: null, baseline_release: RELEASE });

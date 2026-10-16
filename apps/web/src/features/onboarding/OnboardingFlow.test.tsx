@@ -200,7 +200,8 @@ test("d: each step passed without is kept, a reload goes on from there, and Read
   expect(record().completed_at).toBeGreaterThan(0);
   expect(record().baseline_release).toBe(RELEASE);
   const rows = [...document.querySelectorAll(".wizard-recap-row")] as HTMLElement[];
-  const [machine, stt, tts] = rows;
+  const [mic, machine, stt, tts] = rows;
+  expect(mic).toHaveTextContent("Allowed");
   expect(machine).toHaveTextContent("Not connected yet");
   expect(stt).toHaveTextContent("Not downloaded yet");
   expect(tts).toHaveTextContent("Not downloaded yet");
