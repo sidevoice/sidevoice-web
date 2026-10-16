@@ -96,6 +96,8 @@ export const messages: Messages = {
   "titleDetail.effort": "推理强度",
   "titleDetail.voice": "语音",
   "titleDetail.noVoice": "尚未选择语音模型。",
+  "titleDetail.pin": "固定在标题旁",
+  "titleDetail.unpin": "取消固定",
   "devices.toggle": "麦克风和扬声器",
   "devices.mic": "麦克风",
   "devices.speaker": "扬声器",

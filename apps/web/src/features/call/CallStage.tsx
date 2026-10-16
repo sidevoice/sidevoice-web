@@ -16,11 +16,10 @@ import { sounding, useAgentTurns, useSpokenTo, type AgentTurn } from "./speech-r
 import { PagedText } from "./PagedText";
 import { useStageConversation, type StageConversation } from "./stage-view";
 import { BalloonTail } from "./BalloonTail";
-import { useVariant } from "../../lib/variants";
 import { PersonTurn } from "./PersonTurn";
 import { TranscriptEntry } from "./TranscriptEntry";
 import { useVoiceModels } from "./VoiceModels";
-import { harnessName, StageHeading, TITLE_DETAILS, type TitleDetail } from "./CallDetails";
+import { harnessName, StageHeading } from "./CallDetails";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { errorLine } from "../settings/error-message";
 import { desktopHost } from "../../services/desktop-host";
@@ -72,13 +71,14 @@ function AgentBadge({ stage }: { stage: StageConversation }) {
 
 /** The conversation's name over its machine, opening what the call runs on (CallDetails); above the tile on a desktop,
  *  on its corner on a phone. */
-function StageName({ stage, className, tone, detail, voice }: { stage: StageConversation; className: string; tone: string; detail: TitleDetail;
+function StageName({ stage, className, tone, voice }: { stage: StageConversation; className: string; tone: string;
   voice: ReturnType<typeof useVoiceModels> }) {
   const Tag = className === "stage-title" ? "header" : "div";
   return (
     // Its own tint: above the tile on a desktop, outside the tile that carries it.
     <Tag className={className} translate="no" style={avatarTone(tone) as CSSProperties}>
-      <StageHeading stage={stage} detail={detail} voice={voice} />
+      {/* Above the tile (a desktop) the details can stay pinned along the title. */}
+      <StageHeading stage={stage} voice={voice} pinnable={Tag === "header"} />
     </Tag>
   );
 }
@@ -130,9 +130,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
   const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
   // A phone keeps the transcript's button in the tile's corner; a desktop has it at the bar's right (CallToolbar).
   const narrow = useMedia(NARROW_QUERY);
-  // What the call runs on, behind the title (CallDetails), in the form compared on the live page; and whether a voice
-  // model needs something, for the title's dot.
-  const detail = useVariant("titleDetail", TITLE_DETAILS);
+  // What the call runs on, behind the title (CallDetails); and whether a voice model needs something, for its dot.
   const voice = useVoiceModels();
 
   if (!stage.threadId) {
@@ -154,7 +152,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
     <section className="call-stage" aria-label={t("stage.label")}>
         <BootError />
       {/* Named above the tile where the room has no header (a desktop), in place of the tile's own name. */}
-      <StageName stage={stage} className="stage-title" tone={tone} detail={detail} voice={voice} />
+      <StageName stage={stage} className="stage-title" tone={tone} voice={voice} />
       {/* The tile keeps its form factor's shape, as a slide does: as large as the room allows, centred, the app's own
           background around it (useSceneScale fits it in its slot; call-view.css names the shapes). What the tile says —
           the name, the voice models, the replies, the badge — is laid on the tile, at its corners. */}
@@ -170,7 +168,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
             <StageDesk seed={stage.threadId} />
           </div>
         </div>
-        <StageName stage={stage} className="stage-name" tone={tone} detail={detail} voice={voice} />
+        <StageName stage={stage} className="stage-name" tone={tone} voice={voice} />
         <div className="stage-top">
           {/* Its own conversation's: another one on the stage starts with none of the replies before it. */}
           <AgentBubbles key={stage.threadId} reply={reply} spokenTo={spokenTo} onUp={setBalloonUp} />

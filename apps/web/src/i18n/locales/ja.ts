@@ -97,6 +97,8 @@ export const messages: Messages = {
   "titleDetail.effort": "推論の強度",
   "titleDetail.voice": "音声",
   "titleDetail.noVoice": "音声モデルはまだ選ばれていません。",
+  "titleDetail.pin": "タイトルの横に固定",
+  "titleDetail.unpin": "固定を解除",
   "devices.toggle": "マイクとスピーカー",
   "devices.mic": "マイク",
   "devices.speaker": "スピーカー",

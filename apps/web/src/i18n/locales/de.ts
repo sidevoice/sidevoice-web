@@ -96,6 +96,8 @@ export const messages: Messages = {
   "titleDetail.effort": "Aufwand",
   "titleDetail.voice": "Stimme",
   "titleDetail.noVoice": "Noch keine Sprachmodelle gewählt.",
+  "titleDetail.pin": "Neben dem Titel anheften",
+  "titleDetail.unpin": "Lösen",
   "devices.toggle": "Mikrofon und Lautsprecher",
   "devices.mic": "Mikrofon",
   "devices.speaker": "Lautsprecher",

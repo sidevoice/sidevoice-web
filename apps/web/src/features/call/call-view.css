@@ -385,8 +385,7 @@
 /* What the call runs on (CallDetails): the machine, the agent (harness, model, effort) and the voice's models — each
  * group a small heading over its lines, at the interface's size. A model is one row: its task's icon, what it is for,
  * its model's id, where it runs and its state; one that needs something wears the warning's soft fill and offers its
- * action under its words. In a popover under the title (titleDetail "popover"), or a sheet from the window's right edge,
- * from its foot on a phone ("sheet"), the agent's avatar at its head. */
+ * action under its words. In a popover under the title; on a desktop it can pin them along the title instead (below). */
 .call-details { display: grid; gap: var(--sv-space-4); min-width: 0; }
 .call-details-group { display: grid; gap: var(--sv-space-1-5); min-width: 0; }
 .call-details-group h3 { margin: 0; font-size: var(--sv-font-xs); line-height: 1rem; font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
@@ -410,18 +409,29 @@
 .voice-model-state::before { content: "·"; margin-inline: .35em; }
 .voice-model[data-attention] .voice-model-state { font-weight: var(--sv-weight-semibold); color: var(--sv-text); }
 .voice-model-action { grid-column: 2; justify-self: start; }
+/* Pinned along the title (a desktop; operator 2026-10-16): the title's row holds the name and, to its right, the agent and
+ * the voice models as quiet chips in one line — what does not fit fades out at the end rather than wrapping — and the
+ * way to put them back. The popover's own pin sits at its top. */
+@media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
+  .room-shell .stage-title:has(.call-details-pinned) { grid-template-columns: minmax(0, max-content) minmax(0, 1fr); align-items: center; column-gap: var(--sv-space-4); }
+}
+.call-details-pinned { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; overflow: hidden; font-size: var(--sv-font-sm); letter-spacing: normal;
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 3.5rem), transparent calc(100% - 2rem)); mask-image: linear-gradient(to right, #000 calc(100% - 3.5rem), transparent calc(100% - 2rem));
+  padding-inline-end: 2rem; position: relative; animation: call-details-pin-in 180ms var(--sv-ease) both; }
+.call-details-chip { display: inline-flex; align-items: center; gap: var(--sv-space-1-5); flex: none; height: 28px; padding: 0 var(--sv-space-2-5, 10px); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-pill);
+  background: color-mix(in srgb, var(--sv-surface) 84%, transparent); font-weight: var(--sv-weight-semibold); line-height: 1.25rem; white-space: nowrap; color: var(--sv-text); }
+.call-details-chip > svg { flex: none; color: var(--sv-text-muted); }
+.call-details-chip[data-attention] { border-color: color-mix(in srgb, var(--sv-warning) 45%, var(--sv-border)); }
+.call-details-chip .stage-attention { font-size: var(--sv-font-xl); }
+.call-details-pinned > .call-details-unpin { position: absolute; right: 0; top: 50%; transform: translateY(-50%); -webkit-mask-image: none; }
+.call-details-pin { justify-self: end; margin: calc(-1 * var(--sv-space-2)) calc(-1 * var(--sv-space-2)) 0 auto; }
+.ui-popover.call-details-popover:has(.call-details-pin) { display: grid; gap: var(--sv-space-2); }
+@keyframes call-details-pin-in { from { opacity: 0; transform: translateX(-8px); } }
+@media (prefers-reduced-motion: reduce) { .call-details-pinned { animation: none; } }
 .ui-popover.call-details-popover { width: min(22rem, calc(100vw - 24px)); max-height: min(70dvh, 34rem); overflow: auto; padding: var(--sv-space-4); }
 /* The sheet: the window's height at its right edge, sliding in; a phone's from its foot, as tall as it needs. */
-.ui-dialog.call-details-sheet[data-layout="dialog"] { --ui-dialog-width: 380px; margin: 0 0 0 auto; height: 100dvh; }
-.ui-dialog.call-details-sheet .ui-dialog-surface { height: 100%; max-height: none; border-radius: var(--sv-radius-2xl) 0 0 var(--sv-radius-2xl); animation: call-details-in 220ms var(--sv-ease); }
-.ui-dialog.call-details-sheet .conversation-avatar { width: 36px; height: 36px; }
-@keyframes call-details-in { from { transform: translateX(24px); opacity: 0; } }
 @media (max-width: 899px) {
-  .ui-dialog.call-details-sheet[data-layout="dialog"] { inset: auto 0 0 0; width: 100vw; height: auto; margin: auto 0 0; }
-  .ui-dialog.call-details-sheet .ui-dialog-surface { height: auto; max-height: 85dvh; border-radius: var(--sv-radius-2xl) var(--sv-radius-2xl) 0 0; animation-name: call-details-up; }
-  @keyframes call-details-up { from { transform: translateY(24px); opacity: 0; } }
 }
-@media (prefers-reduced-motion: reduce) { .ui-dialog.call-details-sheet .ui-dialog-surface { animation: none; } }
 .stage-badge { background: color-mix(in srgb, var(--sv-surface) 84%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 
 /* The microphone and the speaker (AudioDevices): the devices' button at the microphone's left, in its pill, and the
