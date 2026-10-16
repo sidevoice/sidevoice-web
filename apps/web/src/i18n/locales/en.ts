@@ -886,7 +886,6 @@ export const messages = {
   "data.dismiss": "Dismiss",
   "data.retryAfterSetup": "After setup, open Settings › Danger zone to retry.",
   "settings.section.danger": "Danger zone",
-  "settings.danger.description": "These delete things for good. They can’t be undone.",
   "data.limitsToggle": "What is not deleted",
   "data.uninstall.title": "Uninstall Sidevoice",
   "data.uninstall.hint": "Delete all Sidevoice data and move the app to the Trash.",

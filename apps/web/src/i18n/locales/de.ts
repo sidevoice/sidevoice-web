@@ -869,7 +869,6 @@ export const messages: Messages = {
   "data.dismiss": "Schließen",
   "data.retryAfterSetup": "Öffne nach der Einrichtung Einstellungen › Gefahrenbereich, um es erneut zu versuchen.",
   "settings.section.danger": "Gefahrenbereich",
-  "settings.danger.description": "Diese Aktionen löschen Daten endgültig. Sie können nicht rückgängig gemacht werden.",
   "data.limitsToggle": "Was nicht gelöscht wird",
   "data.uninstall.title": "Sidevoice deinstallieren",
   "data.uninstall.hint": "Löscht alle Sidevoice-Daten und legt die App in den Papierkorb.",

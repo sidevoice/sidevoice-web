@@ -866,7 +866,6 @@ export const messages: Messages = {
   "data.dismiss": "关闭",
   "data.retryAfterSetup": "完成初始设置后，打开“设置”›“危险区域”以重试。",
   "settings.section.danger": "危险区域",
-  "settings.danger.description": "这些操作会永久删除内容，且无法撤销。",
   "data.limitsToggle": "哪些内容不会删除",
   "data.uninstall.title": "卸载 Sidevoice",
   "data.uninstall.hint": "删除所有 Sidevoice 数据，并将应用移到废纸篓。",

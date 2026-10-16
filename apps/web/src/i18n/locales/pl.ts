@@ -877,7 +877,6 @@ export const messages: Messages = {
   "data.dismiss": "Zamknij",
   "data.retryAfterSetup": "Po konfiguracji otwórz Ustawienia › Strefa zagrożenia, aby spróbować ponownie.",
   "settings.section.danger": "Strefa zagrożenia",
-  "settings.danger.description": "Te działania trwale usuwają dane. Nie można ich cofnąć.",
   "data.limitsToggle": "Co nie zostanie usunięte",
   "data.uninstall.title": "Odinstaluj Sidevoice",
   "data.uninstall.hint": "Usuwa wszystkie dane Sidevoice i przenosi aplikację do Kosza.",

@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { Button } from "../../components/ui/Button";
 import { Dialog } from "../../components/ui/Dialog";
 import { DisclosureButton } from "../../components/ui/DisclosureButton";
-import { Group, Row, Section } from "../../components/ui/Card";
+import { Group, Row } from "../../components/ui/Card";
 import { useRoomStore } from "../../state/room-store";
 import { desktopResetBridge, desktopUninstallBridge, type DesktopResetBridge } from "../../services/desktop-host";
 import { translator, type MessageKey } from "../../i18n/translator";
@@ -131,22 +131,19 @@ function DangerAction({ action, run, inCall }: { action: keyof typeof COPY; run:
 
 /** Whether Settings has a Danger zone: only where one of its actions exists (the desktop app that can reset its
  *  machine). A browser has no machine-wide deletion, so it shows none. */
-export function dangerZoneShown() {
-  return desktopResetBridge() !== null;
-}
-
-/** The last section of Settings, in red: what deletes Sidevoice's data, and, where the app can, Sidevoice itself. */
+/** The last group of Settings › Advanced, in red (operator, 2026-10-16: not a section of its own): what deletes
+ *  Sidevoice's data, and, where the app can, Sidevoice itself. Only where the app can delete its data (a browser can't). */
 export function DangerZone() {
   const data = desktopResetBridge();
   const uninstall = desktopUninstallBridge();
   const t = translator();
   const inCall = useRoomStore((state) => Boolean(state.facts.ws || state.facts.reconnecting));
   if (!data) return null;
-  return <Section id="danger" className="danger-zone" title={t("settings.section.danger")} description={t("settings.danger.description")}>
-    <Group className="danger-group">
+  return <div className="danger-zone">
+    <Group className="danger-group" title={t("settings.section.danger")}>
       <DangerAction action="deleteAll" run={() => data.deleteAll()} inCall={inCall} />
       {uninstall && <DangerAction action="uninstall" run={() => uninstall.uninstall()} inCall={inCall} />}
     </Group>
     {inCall && <p className="data-reset-note" role="status">{t("data.endCall")}</p>}
-  </Section>;
+  </div>;
 }

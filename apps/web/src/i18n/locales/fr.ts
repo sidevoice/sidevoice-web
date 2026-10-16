@@ -866,7 +866,6 @@ export const messages: Messages = {
   "data.dismiss": "Fermer",
   "data.retryAfterSetup": "Après la configuration, ouvrez Réglages › Zone de danger pour réessayer.",
   "settings.section.danger": "Zone de danger",
-  "settings.danger.description": "Ces actions suppriment des données définitivement. Elles sont irréversibles.",
   "data.limitsToggle": "Ce qui n’est pas supprimé",
   "data.uninstall.title": "Désinstaller Sidevoice",
   "data.uninstall.hint": "Supprime toutes les données Sidevoice et place l’app dans la Corbeille.",

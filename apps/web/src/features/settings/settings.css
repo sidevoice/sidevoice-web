@@ -241,11 +241,8 @@
 .settings-page .ui-dialog-head > .settings-back { flex: none; margin-inline-start: calc(-1 * var(--sv-space-2)); }
 .settings-page .settings-back[hidden] { display: none; }
 .settings-back svg:dir(rtl) { transform: scaleX(-1); }
-/* The Danger zone, last in Settings: its name in red in the nav and as its title, its rows in a red-bordered group. */
-.ui-nav-item.settings-nav-danger, .ui-nav-item.settings-nav-danger:hover, .ui-nav-item.settings-nav-danger[aria-current="page"],
-.settings-menu-row.settings-nav-danger .settings-menu-label, .settings-menu-row.settings-nav-danger .settings-menu-icon { color: var(--sv-danger); }
-.ui-nav-item.settings-nav-danger[aria-current="page"] { background: var(--sv-danger-soft); }
-.danger-zone .ui-section-title { color: var(--sv-danger); }
+/* The Danger zone, last in Advanced: its title in red, its rows in a red-bordered group. */
+.danger-zone .ui-group-title { color: var(--sv-danger); }
 .danger-group .ui-group-card { border-color: var(--sv-danger); }
 .ui-dialog .ui-disclosure + p.muted { margin-block-start: var(--sv-space-2); }
 /* The reset's result stays legible after the confirmation closes. */

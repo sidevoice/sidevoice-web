@@ -867,7 +867,6 @@ export const messages: Messages = {
   "data.dismiss": "閉じる",
   "data.retryAfterSetup": "初期設定後、設定 › 危険な操作から再試行してください。",
   "settings.section.danger": "危険な操作",
-  "settings.danger.description": "ここでの操作はデータを完全に削除するため、元に戻せません。",
   "data.limitsToggle": "削除されないもの",
   "data.uninstall.title": "Sidevoice をアンインストール",
   "data.uninstall.hint": "Sidevoice のすべてのデータを削除し、アプリをゴミ箱に移動します。",

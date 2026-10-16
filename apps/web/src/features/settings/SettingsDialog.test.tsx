@@ -97,28 +97,25 @@ function withReset({ uninstall }: { uninstall: boolean }) {
   onTestFinished(() => { delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; });
 }
 
-test("a browser has no Danger zone, and a place asked in it opens General", () => {
+test("a browser has no Danger zone, and no section of its own anywhere", () => {
   withMicrophone();
-  const store = open("whisper-base");
+  open("whisper-base");
   expect(navLabels()).not.toContain("Danger zone");
-  expect(document.getElementById("pane-danger")).toBeNull();
+  expect(document.querySelector(".danger-zone")).toBeNull();
   expect(document.getElementById("delete-all-sidevoice-data")).toBeNull();
-  act(() => store.patch({ settingsSection: "danger" }));
-  expect(store.getState().facts.settingsSection).toBe("general");
 });
 
-test.each([false, true])("the desktop app's Danger zone is the last section, in red, with Delete out of Advanced (uninstall: %s)", (uninstall) => {
+test.each([false, true])("the desktop app's Danger zone is the last group of Advanced, in red, not a section (uninstall: %s)", (uninstall) => {
   withMicrophone();
   withReset({ uninstall });
   open("whisper-base");
-  expect(navLabels().at(-1)).toBe("Danger zone");
-  expect(document.getElementById("settings-danger")).toHaveClass("settings-nav-danger");
-  expect(document.getElementById("pane-advanced")!.querySelector("#delete-all-sidevoice-data")).toBeNull();
-  fireEvent.click(document.getElementById("settings-danger")!);
-  const pane = document.getElementById("pane-danger")!;
-  expect(pane).not.toHaveAttribute("hidden");
-  expect(pane.querySelector(".danger-group #delete-all-sidevoice-data")).toBeInTheDocument();
-  expect(!!pane.querySelector(".danger-group #uninstall-sidevoice")).toBe(uninstall);
+  expect(navLabels()).not.toContain("Danger zone");
+  const groups = [...document.querySelectorAll("#pane-advanced .ui-group")];
+  const last = groups.at(-1)!;
+  expect(last).toHaveClass("danger-group");
+  expect(last.querySelector(".ui-group-title")).toHaveTextContent("Danger zone");
+  expect(last.querySelector("#delete-all-sidevoice-data")).toBeInTheDocument();
+  expect(!!last.querySelector("#uninstall-sidevoice")).toBe(uninstall);
 });
 
 test("General: appearance, this device's name, then the interface's language", () => {
