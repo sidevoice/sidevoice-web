@@ -1136,7 +1136,7 @@ export const messages: Messages = {
   "wizard.recap.notDownloaded": "Jeszcze nie pobrano",
   "wizard.recap.later": "Obszar rozmowy to zaproponuje",
   "wizard.recap.downloading": "Pobieranie · {percent}",
-  "wizard.mic.continueWaiting": "Zezwól na mikrofon, aby kontynuować, albo idź dalej bez niego.",
+  "wizard.mic.continueWaiting": "Zezwól na mikrofon, aby kontynuować.",
   "wizard.mic.checkAgain": "Sprawdź ponownie",
   "wizard.mic.openSettings": "Otwórz Ustawienia systemowe",
   "perm.mic.why": "Potrzebny, żeby agent cię słyszał",

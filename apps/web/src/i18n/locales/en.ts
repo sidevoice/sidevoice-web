@@ -1147,7 +1147,7 @@ export const messages = {
   "wizard.recap.notDownloaded": "Not downloaded yet",
   "wizard.recap.later": "The call area will offer it",
   "wizard.recap.downloading": "Downloading · {percent}",
-  "wizard.mic.continueWaiting": "Allow the microphone to continue, or go on without it.",
+  "wizard.mic.continueWaiting": "Allow the microphone to continue.",
   "wizard.mic.checkAgain": "Check again",
   "wizard.mic.openSettings": "Open System Settings",
   // The permissions screen (PermissionsStep, Settings › Permissions).

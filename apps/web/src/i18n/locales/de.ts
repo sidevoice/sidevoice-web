@@ -1121,7 +1121,7 @@ export const messages: Messages = {
   "wizard.recap.notDownloaded": "Noch nicht heruntergeladen",
   "wizard.recap.later": "Der Anrufbereich bietet es an",
   "wizard.recap.downloading": "Wird heruntergeladen · {percent}",
-  "wizard.mic.continueWaiting": "Erlaube das Mikrofon, um fortzufahren, oder mach ohne weiter.",
+  "wizard.mic.continueWaiting": "Erlaube das Mikrofon, um fortzufahren.",
   "wizard.mic.checkAgain": "Erneut prüfen",
   "wizard.mic.openSettings": "Systemeinstellungen öffnen",
   "perm.mic.why": "Nötig, damit dein Agent dich hört",

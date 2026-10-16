@@ -1118,7 +1118,7 @@ export const messages: Messages = {
   "wizard.recap.notDownloaded": "尚未下载",
   "wizard.recap.later": "通话区域会提供",
   "wizard.recap.downloading": "正在下载 · {percent}",
-  "wizard.mic.continueWaiting": "允许麦克风以继续，或者不使用麦克风继续。",
+  "wizard.mic.continueWaiting": "允许麦克风以继续。",
   "wizard.mic.checkAgain": "再检查一次",
   "wizard.mic.openSettings": "打开系统设置",
   "perm.mic.why": "让你的智能体听到你所必需",
