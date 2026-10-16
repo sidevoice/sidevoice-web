@@ -1134,7 +1134,7 @@ export const messages: Messages = {
   "perm.refresh": "Odśwież stan",
   "perm.checklist.title": "Przed pierwszym połączeniem",
   "perm.compact.lead": "Jedna rzecz na start: Sidevoice potrzebuje mikrofonu, żeby cię słyszeć.",
-  "perm.state.none": "Nie ma tu nic do zezwolenia",
+  "perm.state.none": "Nie trzeba tu udzielać żadnych uprawnień",
   "wizard.turnIntro": "Skąd Sidevoice wie, że kończysz mówić. Możesz to zmienić w Ustawieniach → Połączenie.",
   "voice.endOfTurn.smartHint": "Mały model słyszy, kiedy kończysz, więc pauza na zastanowienie ci nie przerwie.",
   "voice.endOfTurn.silenceHint": "Twoja wypowiedź kończy się po pauzie; jej długość ustawia Cierpliwość.",

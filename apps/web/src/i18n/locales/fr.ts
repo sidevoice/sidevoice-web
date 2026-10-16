@@ -899,7 +899,7 @@ export const messages: Messages = {
   "settings.section.permissions": "Autorisations",
   "settings.permissions.description": "Ce que Sidevoice peut utiliser sur cet appareil. La vérification se refait quand vous revenez dans l’app ou sur la page.",
   "settings.permissions.site": "Dans un navigateur, c’est l’autorisation du site. Sur un ordinateur, modifiez-la depuis l’icône des paramètres du site à côté de l’adresse web.",
-  "settings.permissions.sitePhone": "Sur un iPhone ou un iPad, dans Safari : touchez aA, puis Réglages du site web, et réglez Microphone sur Autoriser.",
+  "settings.permissions.sitePhone": "Sur un iPhone ou un iPad, dans Safari : touchez aA, puis Réglages du site web, et réglez Micro sur Autoriser.",
   "settings.call.description": "Le comportement d’un appel : quand votre tour se termine, le son pendant que l’agent travaille, et l’écran.",
   "settings.call.turn": "Votre tour",
   "settings.call.working": "Pendant que l’agent travaille",
