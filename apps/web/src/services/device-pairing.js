@@ -8,7 +8,7 @@
  * That proof does not make a relay safe. A room relaying to the node forwards the node's signature, terminates
  * TLS on both sides, and sees the pairing secret, the token and everything the page and the node say: a room is
  * trusted with all of it until there is an end-to-end encrypted channel to the pinned identity. And a secret or
- * a token goes only over https, or plain http to this same machine (loopback): never in clear over a network.
+ * a token goes only over https, loopback http, or private-network http after the person's explicit consent.
  *
  * No DOM and no clock of its own: storage, fetch, WebCrypto and the time are handed in, so each step can be
  * tested alone. Only `export function|async function|const`: the controller's node tests inline this file. */
@@ -106,6 +106,28 @@ export const PAIRING_HTTP_PRIVATE = 'pairing-http-private';
 /** HTTPS did not answer at a private address, and this page (served over https) may not ask over plain http at all: only
  *  the desktop app or a page served over http could pair with a machine that answers only without encryption. */
 export const PAIRING_HTTP_BLOCKED = 'pairing-http-blocked';
+const DEFAULT_CORE_PORT = '10829';
+/** An explicitly written port must survive a protocol change, including https://host:443 (which URL normalizes away). */
+function writtenPort(address) {
+    const raw = String(address || '').trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
+    const authority = raw.split(/[/?#]/, 1)[0];
+    return authority.match(/^(?:\[[^\]]+\]|[^:]+):(\d{1,5})$/)?.[1] || null;
+}
+/** An older code still carries its actual Core port in its loopback URL. */
+function codeHttpPort(code) {
+    const urls = readPairingCode(code).urls.map(url => new URL(url));
+    const direct = urls.find(url => url.protocol === 'http:' && privateHost(url.hostname) && !LOOPBACK.has(url.hostname));
+    const loopback = urls.find(url => url.protocol === 'http:' && LOOPBACK.has(url.hostname));
+    // URL removes :80 from HTTP URLs; an empty port on an advertised HTTP URL means port 80.
+    return direct ? direct.port || '80' : loopback ? loopback.port || '80' : DEFAULT_CORE_PORT;
+}
+function plainAddress(written, address, code) {
+    const url = new URL(written);
+    url.protocol = 'http:';
+    const port = writtenPort(address) || (privateHost(url.hostname) ? codeHttpPort(code) : null);
+    if (port) url.port = port;
+    return url.origin + url.pathname.replace(/\/+$/, '');
+}
 /** Plain http:// written to a private-network address is that address without encryption, asked for on purpose: no
  *  https attempt first, and reached only once the person agrees (`insecure`; until then PAIRING_HTTP_PRIVATE), never
  *  from a page served over https (PAIRING_HTTP_BLOCKED). Written to any other address, it is refused (ADDRESS_INSECURE). */
@@ -275,7 +297,7 @@ export async function redeemPairingCode(code, { name = '', address = '', target 
     // Agreed to (`insecure`), a private address is reached over plain http instead, and the pairing says so for good.
     // Written with http:// to a private address, it is that already (machineAddress).
     const written = machineAddress(address, { insecure, origin });
-    const plain = insecure && written && privateHost(new URL(written).hostname) ? written.replace(/^https:/, 'http:') : null;
+    const plain = insecure && written && privateHost(new URL(written).hostname) ? plainAddress(written, address, code) : null;
     const typed = plain ?? written;
     const decoded = decodePairingCode(code, now, { address: typed });
     const payload = { ...(typed ? { ...decoded, urls: [typed, ...decoded.urls.filter(url => url !== typed)] } : decoded), ...(plain ? { insecure: true } : {}) };
@@ -286,7 +308,7 @@ export async function redeemPairingCode(code, { name = '', address = '', target 
         const privateAddress = privateHost(new URL(written).hostname);
         // Over https, this page may not ask over plain http at all (mixed content): say what would work.
         if (privateAddress && plainHttpBlocked(origin)) throw pairingError(PAIRING_HTTP_BLOCKED);
-        if (await answersPlainHttp(written, get)) throw pairingError(privateAddress ? PAIRING_HTTP_PRIVATE : PAIRING_HTTP_ONLY);
+        if (await answersPlainHttp(written, plainAddress(written, address, code), get)) throw pairingError(privateAddress ? PAIRING_HTTP_PRIVATE : PAIRING_HTTP_ONLY);
     }
     if (!place) throw pairingError('No se pudo llegar a ' + called + ' por ningún camino. Comprueba que está encendida y vuelve a intentarlo.', 'unreachable');
     let response, answer = null;
@@ -311,12 +333,11 @@ export async function redeemPairingCode(code, { name = '', address = '', target 
 }
 /** Whether the machine at `base` (https, as typed) answers at the same place over plain http — asked only to say why
  *  it could not be reached; nothing is sent there. A page on https may not ask (mixed content): then it is not known. */
-async function answersPlainHttp(base, get) {
+async function answersPlainHttp(base, plainBase, get) {
     try {
         const url = new URL(base);
         if (url.protocol !== 'https:') return false;
-        url.protocol = 'http:';
-        const response = await patiently(get(url.origin + '/api/device/identity?nonce=probe', { headers: { accept: 'application/json' }, cache: 'no-store', redirect: 'error' }), 4000);
+        const response = await patiently(get(new URL(plainBase).origin + '/api/device/identity?nonce=probe', { headers: { accept: 'application/json' }, cache: 'no-store', redirect: 'error' }), 4000);
         return !!response;
     } catch { return false; }
 }
