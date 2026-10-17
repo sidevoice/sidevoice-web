@@ -470,6 +470,40 @@ test("a private machine answering only over http is asked about, then paired une
   expect(pairingSummary(pairing).insecure).toBe(true);
 });
 
+test("a bare private address uses the code's Core port for http while https keeps port 443", async () => {
+  const node = await fakeNode("nuc"), asked: string[] = [];
+  const code = codeFor(payload(node, { urls: ["http://127.0.0.1:45678"], rv: null }));
+  const get = network({ "http://192.168.1.20:45678": node }, asked);
+  await expect(redeemPairingCode(code, { address: "192.168.1.20", get, subtle, now: NOW, origin: "http://localhost:5173" }))
+    .rejects.toThrow(PAIRING_HTTP_PRIVATE);
+  expect(asked.some(request => request.includes("https://192.168.1.20/api/device/identity"))).toBe(true);
+  expect(node.secrets).toEqual([]);
+  const result = await redeemPairingCode(code, { address: "192.168.1.20", get, subtle, now: NOW, origin: "http://localhost:5173", insecure: true });
+  expect(result.base.base).toBe("http://192.168.1.20:45678");
+  expect(node.secrets).toHaveLength(1);
+});
+
+test("a code for Core on HTTP's default port keeps port 80 after URL normalization", async () => {
+  const node = await fakeNode("nuc");
+  const code = codeFor(payload(node, { urls: ["http://127.0.0.1:80"], rv: null }));
+  const result = await redeemPairingCode(code, { address: "192.168.1.20", get: network({ "http://192.168.1.20": node }),
+    subtle, now: NOW, origin: "http://localhost:5173", insecure: true });
+  expect(result.base.base).toBe("http://192.168.1.20");
+});
+
+test("an explicit port survives private http consent, including an explicit https port 443", async () => {
+  const node = await fakeNode("nuc");
+  const code = codeFor(payload(node, { urls: ["http://127.0.0.1:45678"], rv: null }));
+  for (const address of ["192.168.1.20:9000", "https://192.168.1.20:9000", "http://192.168.1.20:9000"]) {
+    const result = await redeemPairingCode(code, { address, get: network({ "http://192.168.1.20:9000": node }), subtle, now: NOW,
+      origin: "http://localhost:5173", insecure: true });
+    expect(result.base.base).toBe("http://192.168.1.20:9000");
+  }
+  const result = await redeemPairingCode(code, { address: "https://192.168.1.20:443", get: network({ "http://192.168.1.20:443": node }),
+    subtle, now: NOW, origin: "http://localhost:5173", insecure: true });
+  expect(result.base.base).toBe("http://192.168.1.20:443");
+});
+
 test("a public machine answering only over http is refused, consent or not; an https page is told where it can work", async () => {
   const node = await fakeNode("vps");
   const code = codeFor(payload(node, { urls: [], rv: null }));
