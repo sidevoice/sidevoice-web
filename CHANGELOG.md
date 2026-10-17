@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.3](https://github.com/sidevoice/sidevoice-web/compare/v0.7.2...v0.7.3) (2026-10-17)
+
+
+### Bug Fixes
+
+* **pairing:** infer private HTTP port from machine code ([#168](https://github.com/sidevoice/sidevoice-web/issues/168)) ([9a97dda](https://github.com/sidevoice/sidevoice-web/commit/9a97dda672a2101633a3025bdb0f59cd3aba006c))
+
 ## [0.7.2](https://github.com/sidevoice/sidevoice-web/compare/v0.7.1...v0.7.2) (2026-10-16)
 
 
