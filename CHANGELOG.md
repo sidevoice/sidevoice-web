@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.2](https://github.com/sidevoice/sidevoice-web/compare/v0.8.1...v0.8.2) (2026-10-18)
+
+
+### Bug Fixes
+
+* **test:** cover setup language picker in browser e2e ([#181](https://github.com/sidevoice/sidevoice-web/issues/181)) ([255d411](https://github.com/sidevoice/sidevoice-web/commit/255d41137e9970711d175629d3355100fab35ae1))
+* **web:** recover onboarding transcription and Safari microphone access ([#191](https://github.com/sidevoice/sidevoice-web/issues/191)) ([3fc7971](https://github.com/sidevoice/sidevoice-web/commit/3fc79715419ce0dddd0020a6c9cbebc540114333)), closes [#188](https://github.com/sidevoice/sidevoice-web/issues/188)
+
 ## [0.8.1](https://github.com/sidevoice/sidevoice-web/compare/v0.8.0...v0.8.1) (2026-10-18)
 
 
