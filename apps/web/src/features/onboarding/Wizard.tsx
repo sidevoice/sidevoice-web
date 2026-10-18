@@ -86,7 +86,7 @@ function BasicsStep({ t }: { t: Translate }) {
       <Row label={t("settings.appearance")} description={t("settings.appearance.hint")}><Appearance t={t} /></Row>
       <Row label={t("settings.deviceName")} description={t("settings.deviceName.hint")} htmlFor="wizard-device-name"><DeviceNameField id="wizard-device-name" /></Row>
       <Row label={t("wizard.basics.uiLanguage")} htmlFor="wizard-ui-language">
-        <LanguagePicker id="wizard-ui-language" value={language} label={t("wizard.basics.uiLanguage")} onValueChange={(next) => { setLanguage(next); window.sidevoiceActions?.setInterfaceLanguage?.(next); }} options={languages} />
+        <LanguagePicker id="wizard-ui-language" showLanguageIcon={false} value={language} label={t("wizard.basics.uiLanguage")} onValueChange={(next) => { setLanguage(next); window.sidevoiceActions?.setInterfaceLanguage?.(next); }} options={languages} />
       </Row>
     </Group>
   </section>;
