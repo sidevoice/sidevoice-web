@@ -75,7 +75,9 @@ for (const [name, viewport, phone] of [["desktop", { width: 1280, height: 800 },
       expect(box && anchor).toBeTruthy();
       expect(await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest(".language-picker-popover"),
         { x: box.x + box.width / 2, y: box.y + box.height / 2 })).toBe(true);
-      expect(Math.abs(box.y - (anchor.y + anchor.height))).toBeLessThanOrEqual(10);
+      const side = await popup.getAttribute("data-side");
+      const gap = side === "top" ? anchor.y - (box.y + box.height) : box.y - (anchor.y + anchor.height);
+      expect(Math.abs(gap)).toBeLessThanOrEqual(10);
       const german = popup.getByRole("option", { name: "Deutsch" });
       if (phone) await german.tap(); else await german.click();
       await expect(popup).toHaveCount(0);
