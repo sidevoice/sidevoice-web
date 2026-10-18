@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.8.0](https://github.com/sidevoice/sidevoice-web/compare/v0.7.3...v0.8.0) (2026-10-18)
+
+
+### Features
+
+* **voice:** add searchable voice and language pickers ([#178](https://github.com/sidevoice/sidevoice-web/issues/178)) ([1c6f0e0](https://github.com/sidevoice/sidevoice-web/commit/1c6f0e0324872da6a3694a872f0c5445d6171045))
+
+
+### Bug Fixes
+
+* **room:** remember offline conversations across restarts ([#176](https://github.com/sidevoice/sidevoice-web/issues/176)) ([cbc806c](https://github.com/sidevoice/sidevoice-web/commit/cbc806c1357e01cddf85c69e77ce7f1e17636966))
+* **voice:** match preview sample to selected speaker ([#174](https://github.com/sidevoice/sidevoice-web/issues/174)) ([8ccf135](https://github.com/sidevoice/sidevoice-web/commit/8ccf1357ebfe54539df0be474366bcb95b1d030e))
+* **web:** refine pairing and transcript visual feedback ([#175](https://github.com/sidevoice/sidevoice-web/issues/175)) ([e435e37](https://github.com/sidevoice/sidevoice-web/commit/e435e37b25594c9990e962ee5ac91511724840dc))
+
 ## [0.7.3](https://github.com/sidevoice/sidevoice-web/compare/v0.7.2...v0.7.3) (2026-10-17)
 
 
