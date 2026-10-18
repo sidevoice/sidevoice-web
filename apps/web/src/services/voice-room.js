@@ -5,7 +5,7 @@
  * offsets into the reply's text. Nothing here keeps state: the page holds the replies and the outbox. */
 
 /** The reasons the room takes on a playback report. */
-export const ROOM_PLAYBACK_REASONS = ['user_interrupted', 'newer_turn', 'focus_changed', 'call_ended', 'unheard', 'agents_muted', 'voice_off', 'connector_disconnected', 'heard_elsewhere'];
+export const ROOM_PLAYBACK_REASONS = ['user_interrupted', 'newer_turn', 'focus_changed', 'call_ended', 'unheard', 'agents_muted', 'voice_off', 'connector_disconnected', 'heard_elsewhere', 'auto_start_expired'];
 
 /**
  * A turn event of the voice as the room's `voice-user-turn` data (the page adds the session and the message id).
@@ -13,13 +13,16 @@ export const ROOM_PLAYBACK_REASONS = ['user_interrupted', 'newer_turn', 'focus_c
  * @param {{thread_id: string, binding_id: string} | null} [target]
  */
 export function turnMessage(turn, target = null) {
+  const onset = turn.playback_at_turn_start
+    ? {playback_at_turn_start: turn.playback_at_turn_start} : {};
   if (turn.phase === 'started') return {
     turn_id: turn.turn_id, phase: 'started', started_at: turn.started_at,
+    ...onset,
     // Core admits the start against this captured focus, even if selection has since moved.
     thread_id: target?.thread_id && target?.binding_id ? target.thread_id : '',
     binding_id: target?.thread_id && target?.binding_id ? target.binding_id : '',
   };
-  if (turn.phase === 'cancelled') return { turn_id: turn.turn_id, phase: 'cancelled', merged: !!turn.merged };
+  if (turn.phase === 'cancelled') return { turn_id: turn.turn_id, phase: 'cancelled', merged: !!turn.merged, ...onset };
   return {
     turn_id: turn.turn_id,
     phase: 'finished',
@@ -29,6 +32,9 @@ export function turnMessage(turn, target = null) {
     ended_at: turn.ended_at,
     merged: !!turn.merged,
     timings_ms: turn.timings,
+    ...onset,
+    ...(turn.not_played_at_turn_start ? {not_played_at_turn_start: turn.not_played_at_turn_start} : {}),
+    ...(turn.not_played_at_turn_start_truncated ? {not_played_at_turn_start_truncated: true} : {}),
     ...(target?.thread_id && target?.binding_id ? { thread_id: target.thread_id, binding_id: target.binding_id } : {}),
   };
 }

@@ -19,6 +19,17 @@ test("a turn's phases become the room's voice-user-turn data, the timings under 
   });
 });
 
+test('spoken turn frames keep the acoustic snapshot and certified later absence', () => {
+  const playback_at_turn_start = {knowledge: 'known', last_played: {utterance_id: 'A', hearing: 'complete', heard_chars: 10},
+    recent: [{utterance_id: 'A', hearing: 'complete', heard_chars: 10}], truncated: false};
+  const started = turnMessage(turnEvent({phase: 'started', turn_id: 't', started_at: 4, playback_at_turn_start} as any));
+  const finished = turnMessage(turnEvent({phase: 'finished', turn_id: 't', text: 'yes', started_at: 4, ended_at: 8,
+    playback_at_turn_start, not_played_at_turn_start: [{utterance_id: 'B', hearing: 'not_played', heard_chars: 0}]} as any));
+  expect(started).toMatchObject({playback_at_turn_start});
+  expect(finished).toMatchObject({playback_at_turn_start,
+    not_played_at_turn_start: [{utterance_id: 'B', hearing: 'not_played', heard_chars: 0}]});
+});
+
 test("how something said ended becomes the room's playback report, with only the room's reasons", () => {
   expect(playbackReport({ status: "heard" }, "héllo 👋")).toEqual({ status: "heard", heard_chars: 7 });
   expect(characters("héllo 👋")).toBe(7);

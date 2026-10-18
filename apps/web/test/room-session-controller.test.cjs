@@ -15,8 +15,8 @@ function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:nu
  if(outboxScope)context.sessionStorage={getItem:key=>key==='sidevoice.outbox-scope'?outboxScope:null,setItem(){}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. A TypeScript module is transpiled here.
- const modules={'./audio-choice.ts':'AudioChoice','./device-name-rules.js':'DeviceNameRules','../services/device-name-rules.js':'DeviceNameRules','./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','./desktop-host':'DesktopHost','./microphone-access':'MicrophoneAccess','./audio-device-refresh.ts':'AudioDeviceRefresh','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./locales/en':'LocaleEn','../../i18n/locales/en':'LocaleEn','./locales/es':'LocaleEs','../../i18n/locales/es':'LocaleEs','./locales/fr':'LocaleFr','../../i18n/locales/fr':'LocaleFr','./locales/it':'LocaleIt','../../i18n/locales/it':'LocaleIt','./locales/de':'LocaleDe','../../i18n/locales/de':'LocaleDe','./locales/ja':'LocaleJa','../../i18n/locales/ja':'LocaleJa','./locales/zh-Hans':'LocaleZhHans','../../i18n/locales/zh-Hans':'LocaleZhHans','./locales/pl':'LocalePl','../../i18n/locales/pl':'LocalePl','../../i18n/translator':'Translator','../i18n/translator.ts':'Translator','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./voice-trial.js':'VoiceTrial','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./reply-eligibility.js':'ReplyEligibility','./reply-hearing-policy.js':'HearingPolicy','./voice-settings.js':'VoiceSettings','./call-preferences.ts':'CallPreferences','./model-housekeeping.js':'ModelHousekeeping','../features/settings/error-message.ts':'ErrorMessage','../../services/failure-code.js':'FailureCode','./working-clock.ts':'WorkingClock','../state/shortcuts.ts':'Shortcuts'};
- const files={AudioChoice:sourceRoot+'/services/audio-choice.ts',MicrophoneAccess:sourceRoot+'/services/microphone-access.ts',AudioDeviceRefresh:sourceRoot+'/services/audio-device-refresh.ts',Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',LocaleEn:sourceRoot+'/i18n/locales/en.ts',LocaleEs:sourceRoot+'/i18n/locales/es.ts',LocaleFr:sourceRoot+'/i18n/locales/fr.ts',LocaleIt:sourceRoot+'/i18n/locales/it.ts',LocaleDe:sourceRoot+'/i18n/locales/de.ts',LocaleJa:sourceRoot+'/i18n/locales/ja.ts',LocaleZhHans:sourceRoot+'/i18n/locales/zh-Hans.ts',LocalePl:sourceRoot+'/i18n/locales/pl.ts',Translator:sourceRoot+'/i18n/translator.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',VoiceTrial:sourceRoot+'/services/voice-trial.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',ReplyEligibility:sourceRoot+'/services/reply-eligibility.js',HearingPolicy:sourceRoot+'/services/reply-hearing-policy.js',VoiceSettings:sourceRoot+'/services/voice-settings.js',CallPreferences:sourceRoot+'/services/call-preferences.ts',ModelHousekeeping:sourceRoot+'/services/model-housekeeping.js',DeviceNameRules:sourceRoot+'/services/device-name-rules.js',ErrorMessage:sourceRoot+'/features/settings/error-message.ts',WorkingClock:sourceRoot+'/services/working-clock.ts',Shortcuts:sourceRoot+'/state/shortcuts.ts'};
+ const modules={'./audio-choice.ts':'AudioChoice','./device-name-rules.js':'DeviceNameRules','../services/device-name-rules.js':'DeviceNameRules','./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','./desktop-host':'DesktopHost','./microphone-access':'MicrophoneAccess','./audio-device-refresh.ts':'AudioDeviceRefresh','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./locales/en':'LocaleEn','../../i18n/locales/en':'LocaleEn','./locales/es':'LocaleEs','../../i18n/locales/es':'LocaleEs','./locales/fr':'LocaleFr','../../i18n/locales/fr':'LocaleFr','./locales/it':'LocaleIt','../../i18n/locales/it':'LocaleIt','./locales/de':'LocaleDe','../../i18n/locales/de':'LocaleDe','./locales/ja':'LocaleJa','../../i18n/locales/ja':'LocaleJa','./locales/zh-Hans':'LocaleZhHans','../../i18n/locales/zh-Hans':'LocaleZhHans','./locales/pl':'LocalePl','../../i18n/locales/pl':'LocalePl','../../i18n/translator':'Translator','../i18n/translator.ts':'Translator','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./voice-trial.js':'VoiceTrial','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./playback-evidence.js':'PlaybackEvidence','./reply-eligibility.js':'ReplyEligibility','./reply-hearing-policy.js':'HearingPolicy','./voice-settings.js':'VoiceSettings','./call-preferences.ts':'CallPreferences','./model-housekeeping.js':'ModelHousekeeping','../features/settings/error-message.ts':'ErrorMessage','../../services/failure-code.js':'FailureCode','./working-clock.ts':'WorkingClock','../state/shortcuts.ts':'Shortcuts'};
+ const files={AudioChoice:sourceRoot+'/services/audio-choice.ts',MicrophoneAccess:sourceRoot+'/services/microphone-access.ts',AudioDeviceRefresh:sourceRoot+'/services/audio-device-refresh.ts',Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',LocaleEn:sourceRoot+'/i18n/locales/en.ts',LocaleEs:sourceRoot+'/i18n/locales/es.ts',LocaleFr:sourceRoot+'/i18n/locales/fr.ts',LocaleIt:sourceRoot+'/i18n/locales/it.ts',LocaleDe:sourceRoot+'/i18n/locales/de.ts',LocaleJa:sourceRoot+'/i18n/locales/ja.ts',LocaleZhHans:sourceRoot+'/i18n/locales/zh-Hans.ts',LocalePl:sourceRoot+'/i18n/locales/pl.ts',Translator:sourceRoot+'/i18n/translator.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',VoiceTrial:sourceRoot+'/services/voice-trial.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',PlaybackEvidence:sourceRoot+'/services/playback-evidence.js',ReplyEligibility:sourceRoot+'/services/reply-eligibility.js',HearingPolicy:sourceRoot+'/services/reply-hearing-policy.js',VoiceSettings:sourceRoot+'/services/voice-settings.js',CallPreferences:sourceRoot+'/services/call-preferences.ts',ModelHousekeeping:sourceRoot+'/services/model-housekeeping.js',DeviceNameRules:sourceRoot+'/services/device-name-rules.js',ErrorMessage:sourceRoot+'/features/settings/error-message.ts',WorkingClock:sourceRoot+'/services/working-clock.ts',Shortcuts:sourceRoot+'/state/shortcuts.ts'};
  const imports=(source,dir)=>source.replace(/^import (\w+) from ['"](.*\.json)['"][^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
   .replace(/^import \{(.*)\} from ['"](.*)['"];\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
@@ -1165,9 +1165,12 @@ function fakeVoice({start=async()=>{},setSettings=async()=>{}}={}){
  // What the voice is asked to say: a handle the test steps through (`step`), as the voice's own goes.
  const say=(text,options)=>{
   calls.push(['say',text,options]);const listeners=new Set();let settle;
-  const handle={id:'say-'+(said.length+1),text,options,cancelled:false,
+  const handle={id:'say-'+(said.length+1),text,options,cancelled:false,physicalStarted:false,
    cancel(){handle.cancelled=true;calls.push(['cancel',handle.id])},
-   onEvent(listener){listeners.add(listener)},outcome:new Promise(resolve=>{settle=resolve}),step(event){for(const listener of listeners)listener(event);if(event.type==='done')settle(event.outcome)}};
+   cancelPending(){if(handle.physicalStarted)return false;handle.cancel();return true},
+   onEvent(listener){listeners.add(listener)},outcome:new Promise(resolve=>{settle=resolve}),step(event){
+    if(event.type==='playing'||event.type==='progress'&&event.heard_chars>0)handle.physicalStarted=true;
+    for(const listener of listeners)listener(event);if(event.type==='done')settle(event.outcome)}};
   said.push(handle);return handle;
  };
  const owner={calls,said,created,routes,routed:null,
@@ -1177,6 +1180,7 @@ function fakeVoice({start=async()=>{},setSettings=async()=>{}}={}){
    const call=Object.create(owner);call.id='call-'+(created.length+1);
    call.emit=(name,value)=>{for(const listener of on[name]||[])listener(value)};
    call.onTurn=sub('turn');call.onState=sub('state');call.onLevel=sub('level');call.onPlaybackLevel=sub('output');call.onTake=listener=>typeof owner.onTake==='function'?owner.onTake(listener):sub('take')(listener);call.onError=sub('error');
+   call.markEvidence=mark=>calls.push(['markEvidence',mark]);
    // As the shared audio does: only a started call's lane can be given the microphone, and stopping it lets it go.
    call.active=false;
    call.start=async options=>{await owner.start(options);call.active=true};
@@ -1306,16 +1310,298 @@ test('A reply is written at once and said by the voice; its handle lights the ro
  assert.deepEqual(plain(s.run('karaokeState')),{segment:'h-1',from:0,to:0},'from its start the reply is being said');
  handle.step({type:'progress',sounding:[0,6],heard_chars:0});
  assert.deepEqual(plain(s.run('karaokeState')),{segment:'h-1',from:0,to:6});
+ assert.equal(sentOf(c,first,'voice-playback').filter(d=>d.heard_chars!=null).length,0,'the sounding chunk is not confirmed hearing');
  // Between its chunks nothing sounds: the reply is still being said, lit up to what was heard.
  handle.step({type:'progress',sounding:null,heard_chars:6});
  assert.deepEqual(plain(s.run('karaokeState')),{segment:'h-1',from:6,to:6});
+ assert.deepEqual(plain(sentOf(c,first,'voice-playback').filter(d=>d.heard_chars!=null).map(d=>[d.attempt_id??null,d.hearing,d.heard_chars])),[[null,'partial',6]]);
  assert.equal(s.run("SessionState.conversationView(state).messages.at(-1).playback"),'playing');
  handle.step({type:'done',outcome:{status:'heard'}});
- assert.deepEqual(plain(sentOf(c,first,'voice-playback').at(-1)),{utterance_id:'r-1',status:'heard',heard_chars:11,session_id:'s1',client_msg_id:sentOf(c,first,'voice-playback').at(-1).client_msg_id});
+ assert.deepEqual(plain(sentOf(c,first,'voice-playback').at(-1)),{utterance_id:'r-1',status:'heard',hearing:'complete',heard_chars:11,session_id:'s1',client_msg_id:sentOf(c,first,'voice-playback').at(-1).client_msg_id});
  assert.equal(s.run('karaokeState'),null);
  c.push(first,{type:'voice-reply',data:{...reply,utterance_id:'r-2',session_id:'other'}});
  assert.equal(voice.said.length,1,'another session\'s reply is not said here');
  s.run('disconnect()');
+});
+
+test('acoustic onset freezes heard A while a later admitted B is certified absent at finished words',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',thread_id:'a',utterance_id:'A',attempt_id:'A-1',
+  revision:1,reply_revision:1,epoch:0,history_id:'A-row',text:'Approve X?'}});
+ const a=c.voice.said[0];a.step({type:'playing'});a.step({type:'done',outcome:{status:'heard'}});
+ const heard={say_id:a.id,hearing:'complete',heard_chars:10,played_order:1};
+ c.voice.emit('turn',{phase:'candidate',candidate_id:'candidate-yes',onset_at:1,
+  playback:{mark:c.s.run('playbackEvidence.watermark()'),recent:[heard],last_played:heard,truncated:false}});
+ c.voice.emit('turn',{...started('yes-turn'),candidate_id:'candidate-yes'});
+ const atStart=turnSent(c,c.first,'yes-turn','started')[0].playback_at_turn_start;
+ assert.deepEqual(plain(atStart),{knowledge:'known',last_played:{utterance_id:'A',hearing:'complete',heard_chars:10},
+  recent:[{utterance_id:'A',hearing:'complete',heard_chars:10}],truncated:false});
+ c.push(c.first,{type:'voice-reply-admitted',data:{session_id:'s1',thread_id:'a',utterance_id:'B',attempt_id:'B-1'}});
+ c.voice.emit('turn',finished('yes-turn','Yes'));
+ const final=turnSent(c,c.first,'yes-turn','finished')[0];
+ assert.deepEqual(plain(final.playback_at_turn_start),plain(atStart));
+ assert.deepEqual(plain(final.not_played_at_turn_start),[{utterance_id:'B',hearing:'not_played',heard_chars:0}]);
+ c.s.run('disconnect()');
+});
+
+test('an expired v1 attempt is fenced before its voice handle starts',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',thread_id:'a',utterance_id:'late',
+  attempt_id:'late-1',revision:1,reply_revision:1,epoch:0,history_id:'late-row',
+  text:'Too late',auto_start_deadline_ms:Date.now()-1000}});
+ assert.equal(c.voice.said.length,0);
+ const terminal=sentOf(c,c.first,'voice-playback').at(-1);
+ assert.deepEqual(plain([terminal.status,terminal.hearing,terminal.heard_chars,terminal.reason]),
+  ['unplayed','not_played',0,'auto_start_expired']);
+ c.s.run('disconnect()');
+});
+
+test('an expired pending-only withdrawal leaves a physically playing attempt alone',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',thread_id:'a',utterance_id:'live',
+  attempt_id:'live-1',revision:1,reply_revision:1,epoch:0,history_id:'live-row',text:'Playing'}});
+ const handle=c.voice.said[0];handle.step({type:'playing'});
+ c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',reason:'expired_pending_only',
+  attempt_ids:['live-1'],utterance_ids:['live']}});
+ assert.equal(handle.cancelled,false);
+ handle.step({type:'done',outcome:{status:'heard'}});
+ assert.equal(sentOf(c,c.first,'voice-playback').at(-1).status,'heard');
+ c.s.run('disconnect()');
+});
+
+test('binding withdrawal leaves an active attempt alone and settles a local queued attempt',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',thread_id:'a',utterance_id:'live',
+  attempt_id:'live-1',revision:1,reply_revision:1,epoch:0,history_id:'live-row',text:'Playing'}});
+ const active=c.voice.said[0];active.step({type:'playing'});
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',thread_id:'a',utterance_id:'queued',
+  attempt_id:'queued-1',revision:2,reply_revision:2,epoch:0,history_id:'queued-row',text:'Queued'}});
+ c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',reason:'binding_inactive_pending_only',
+  attempt_ids:['live-1','queued-1'],utterance_ids:['live','queued']}});
+ assert.equal(active.cancelled,false);
+ assert.equal(c.voice.said.length,1);
+ const terminal=sentOf(c,c.first,'voice-playback').filter(frame=>frame.attempt_id==='queued-1').at(-1);
+ assert.deepEqual(plain([terminal.status,terminal.hearing,terminal.heard_chars,terminal.reason]),
+  ['unplayed','not_played',0,'binding_inactive']);
+ active.step({type:'done',outcome:{status:'heard'}});
+ assert.equal(sentOf(c,c.first,'voice-playback').filter(frame=>frame.attempt_id==='live-1').at(-1).status,'heard');
+ c.s.run('disconnect()');
+});
+
+test('a physical start before its delayed playing callback survives typed and binding fences',async()=>{
+ for(const fence of ['typed','binding']){
+  const c=await callOnRoom();
+  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',thread_id:'a',utterance_id:'live',
+   attempt_id:'live-1',revision:1,reply_revision:1,epoch:0,history_id:'live-row',text:'Playing'}});
+  const handle=c.voice.said[0];handle.physicalStarted=true;
+  if(fence==='typed')c.s.run('fenceQueuedReplies()');
+  else c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',reason:'binding_inactive_pending_only',
+   attempt_ids:['live-1'],utterance_ids:['live']}});
+  assert.equal(handle.cancelled,false,`${fence} must respect the physical source before actor receipt`);
+  handle.step({type:'playing'});handle.step({type:'done',outcome:{status:'heard'}});
+  assert.equal(sentOf(c,c.first,'voice-playback').filter(frame=>frame.attempt_id==='live-1').at(-1).status,'heard');
+  c.s.run('disconnect()');
+ }
+});
+
+test('a native handle without a physical pending fence is left to report its outcome',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',thread_id:'a',utterance_id:'native',
+  attempt_id:'native-1',revision:1,reply_revision:1,epoch:0,history_id:'native-row',text:'May sound'}});
+ const handle=c.voice.said[0];delete handle.cancelPending;
+ c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',reason:'binding_inactive_pending_only',
+  attempt_ids:['native-1'],utterance_ids:['native']}});
+ assert.equal(handle.cancelled,false);
+ handle.step({type:'playing'});handle.step({type:'done',outcome:{status:'heard'}});
+ assert.equal(sentOf(c,c.first,'voice-playback').filter(frame=>frame.attempt_id==='native-1').at(-1).status,'heard');
+ c.s.run('disconnect()');
+});
+
+test('a v1 actor not-played result without source proof remains physically unknown',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',thread_id:'a',utterance_id:'uncertain',
+  attempt_id:'uncertain-1',revision:1,reply_revision:1,epoch:0,history_id:'uncertain-row',text:'Maybe'}});
+ c.voice.said[0].step({type:'done',outcome:{status:'not-played',reason:'failed',code:'speaker-unavailable'}});
+ const terminal=sentOf(c,c.first,'voice-playback').filter(frame=>frame.attempt_id==='uncertain-1').at(-1);
+ assert.deepEqual(plain([terminal.status,terminal.hearing,terminal.heard_chars]),['failed','unknown',null]);
+ assert.equal(sentOf(c,c.first,'reply-hearing').filter(frame=>frame.attempt_id==='uncertain-1').length,0);
+ c.s.run('disconnect()');
+});
+
+test('an asynchronous native fence reports not played only after the source acknowledges it',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',thread_id:'a',utterance_id:'native',
+  attempt_id:'native-1',revision:1,reply_revision:1,epoch:0,history_id:'native-row',text:'Queued'}});
+ const handle=c.voice.said[0];let acknowledge;
+ handle.cancelPending=()=>new Promise(resolve=>{acknowledge=resolve});
+ c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',reason:'binding_inactive_pending_only',
+  attempt_ids:['native-1'],utterance_ids:['native']}});
+ assert.equal(sentOf(c,c.first,'voice-playback').filter(frame=>frame.attempt_id==='native-1').length,0);
+ acknowledge(true);await settleSoon();
+ const terminal=sentOf(c,c.first,'voice-playback').filter(frame=>frame.attempt_id==='native-1').at(-1);
+ assert.deepEqual(plain([terminal.status,terminal.hearing,terminal.heard_chars,terminal.reason]),
+  ['unplayed','not_played',0,'binding_inactive']);
+ c.s.run('disconnect()');
+});
+
+test('a rejected native pending fence cancels and stops before later synthesis, with unknown hearing',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',thread_id:'a',utterance_id:'native',
+  attempt_id:'native-1',revision:1,reply_revision:1,epoch:0,history_id:'native-row',text:'Queued'}});
+ const handle=c.voice.said[0];
+ handle.cancelPending=()=>Promise.reject(new Error('IPC failed'));
+ const call=c.voice.created.at(-1),previousStop=call.stop;let stops=0;
+ call.stop=async()=>{stops++;await previousStop()};
+ c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',reason:'binding_inactive_pending_only',
+  attempt_ids:['native-1'],utterance_ids:['native']}});
+ await settleSoon();
+ assert.equal(handle.cancelled,true,'fallback prevents a later synthesized chunk from sounding');
+ assert.equal(stops,1,'the call is stopped if the native pending command fails');
+ assert.equal(sentOf(c,c.first,'voice-playback').filter(frame=>frame.attempt_id==='native-1').length,0,
+  'an IPC error is not a certified zero');
+ handle.step({type:'done',outcome:{status:'not-played',reason:'cancelled'}});
+ const terminal=sentOf(c,c.first,'voice-playback').filter(frame=>frame.attempt_id==='native-1').at(-1);
+ assert.deepEqual(plain([terminal.status,terminal.hearing,terminal.heard_chars]),['failed','unknown',null]);
+ assert.equal(sentOf(c,c.first,'reply-hearing').filter(frame=>frame.attempt_id==='native-1').length,0);
+ c.s.run('disconnect()');
+});
+
+test('uncertain socket loss fences queued output and stops sound before a new session',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',thread_id:'a',utterance_id:'live',
+  attempt_id:'live-1',revision:1,reply_revision:1,epoch:0,history_id:'live-row',text:'Playing'}});
+ const active=c.voice.said[0];active.step({type:'playing'});
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',thread_id:'a',utterance_id:'queued',
+  attempt_id:'queued-1',revision:2,reply_revision:2,epoch:0,history_id:'queued-row',text:'Queued'}});
+ c.drop(c.first);
+ assert.equal(active.cancelled,true,'an indistinguishable critical abort must stop active sound');
+ assert.equal(c.voice.said.length,1,'queued sound never reaches the voice source');
+ const queued=c.s.run("outbox.list().filter(entry=>entry.payload.type==='voice-playback'&&entry.payload.data.attempt_id==='queued-1').map(entry=>entry.payload.data)");
+ assert.deepEqual(plain(queued.map(frame=>[frame.status,frame.hearing,frame.heard_chars,frame.reason])),
+  [['unplayed','not_played',0,'connector_disconnected']]);
+ active.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'cancelled'}});
+ const live=c.s.run("outbox.list().filter(entry=>entry.payload.type==='voice-playback'&&entry.payload.data.attempt_id==='live-1').map(entry=>entry.payload.data)");
+ assert.deepEqual(plain([live.at(-1).hearing,live.at(-1).heard_chars]),['partial',2],
+  'a completed chunk retains its confirmed prefix even if its receipt is stranded');
+ await c.until(()=>c.sockets.length===2,'replacement socket');
+ await c.answer({session_id:'s2',resume:{token:'new'},resumed:false});
+ assert.equal(sentOf(c,c.sockets[1],'voice-playback').some(frame=>frame.attempt_id==='live-1'),false,
+  'the new listener session must not claim the old attempt as its own');
+ c.s.run('disconnect()');
+});
+
+test('socket abort with delayed source start never converts missing progress into not played',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',thread_id:'a',utterance_id:'uncertain',
+  attempt_id:'uncertain-1',revision:1,reply_revision:1,epoch:0,history_id:'uncertain-row',text:'Perhaps'}});
+ const handle=c.voice.said[0];handle.physicalStarted=true;
+ c.drop(c.first);
+ assert.equal(handle.cancelled,true);
+ handle.step({type:'done',outcome:{status:'not-played',reason:'cancelled'}});
+ const terminal=c.s.run("outbox.list().find(entry=>entry.payload.type==='voice-playback'&&entry.payload.data.attempt_id==='uncertain-1')?.payload.data");
+ assert.deepEqual(plain([terminal.status,terminal.hearing,terminal.heard_chars]),['failed','unknown',null]);
+ c.s.run('disconnect()');
+});
+
+test('a publication arriving while final words wait for playback is certified at actual delivery',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',thread_id:'a',utterance_id:'A',attempt_id:'A-1',
+  revision:1,reply_revision:1,epoch:0,history_id:'A-row',text:'First answer'}});
+ const a=c.voice.said[0];a.step({type:'playing'});
+ const sounding={say_id:a.id,hearing:'unknown',heard_chars:null,played_order:1};
+ c.voice.emit('turn',{phase:'candidate',candidate_id:'candidate-crossing',onset_at:1,
+  playback:{mark:c.s.run('playbackEvidence.watermark()'),recent:[sounding],last_played:sounding,truncated:false}});
+ c.voice.emit('turn',{...started('crossing'),candidate_id:'candidate-crossing'});
+ c.voice.emit('turn',finished('crossing','Yes'));
+ assert.equal(turnSent(c,c.first,'crossing','finished').length,0);
+ c.push(c.first,{type:'voice-reply-admitted',data:{session_id:'s1',thread_id:'a',utterance_id:'B',attempt_id:'B-1'}});
+ a.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'barge-in'}});
+ await settleSoon();
+ const final=turnSent(c,c.first,'crossing','finished')[0];
+ assert.deepEqual(plain(final.not_played_at_turn_start),[{utterance_id:'B',hearing:'not_played',heard_chars:0}]);
+ assert.equal(final.playback_at_turn_start.knowledge,'unknown');
+ assert.deepEqual(plain(final.playback_at_turn_start.recent),[]);
+ c.s.run('disconnect()');
+});
+
+test('a chunk completed during delayed VAD does not rewrite the earlier sample cutoff',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',thread_id:'a',utterance_id:'A',attempt_id:'A-1',
+  revision:1,reply_revision:1,epoch:0,history_id:'A-row',text:'Approve X?'}});
+ const a=c.voice.said[0];a.step({type:'playing'});
+ const atCapture={say_id:a.id,hearing:'unknown',heard_chars:null,played_order:1};
+ // The physical chunk completes after microphone ingress and before this VAD callback.
+ a.step({type:'done',outcome:{status:'heard'}});
+ c.voice.emit('turn',{phase:'candidate',candidate_id:'early',onset_at:100,
+  playback:{mark:c.s.run('playbackEvidence.watermark()'),recent:[atCapture],last_played:atCapture,truncated:false}});
+ c.voice.emit('turn',{...started('late-confirmation',500),candidate_id:'early'});
+ const onset=turnSent(c,c.first,'late-confirmation','started')[0].playback_at_turn_start;
+ assert.equal(onset.knowledge,'unknown');
+ assert.deepEqual(plain(onset.recent),[]);
+ c.voice.emit('turn',finished('late-confirmation','Yes'));
+ assert.deepEqual(plain(turnSent(c,c.first,'late-confirmation','finished')[0].playback_at_turn_start),plain(onset));
+ c.s.run('disconnect()');
+});
+
+test('an admission delivered during VAD delay is absent from immutable recent and certified later',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',thread_id:'a',utterance_id:'A',attempt_id:'A-1',
+  revision:1,reply_revision:1,epoch:0,history_id:'A-row',text:'Hello'}});
+ const a=c.voice.said[0];a.step({type:'playing'});a.step({type:'done',outcome:{status:'heard'}});
+ const mark=c.s.run('playbackEvidence.watermark()');
+ c.push(c.first,{type:'voice-reply-admitted',data:{session_id:'s1',thread_id:'a',utterance_id:'B',attempt_id:'B-1'}});
+ const heard={say_id:a.id,hearing:'complete',heard_chars:5,played_order:1};
+ c.voice.emit('turn',{phase:'candidate',candidate_id:'before-B',onset_at:100,
+  playback:{mark,recent:[heard],last_played:heard,truncated:false}});
+ c.voice.emit('turn',{...started('question'),candidate_id:'before-B'});
+ const onset=turnSent(c,c.first,'question','started')[0].playback_at_turn_start;
+ assert.deepEqual(plain(onset.recent),[{utterance_id:'A',hearing:'complete',heard_chars:5}]);
+ c.voice.emit('turn',finished('question','Yes'));
+ assert.deepEqual(plain(turnSent(c,c.first,'question','finished')[0].not_played_at_turn_start),
+  [{utterance_id:'B',hearing:'not_played',heard_chars:0}]);
+ c.s.run('disconnect()');
+});
+
+test('a rejected speech candidate sends no room turn and a legacy late start has unknown onset',async()=>{
+ const c=await callOnRoom();
+ c.voice.emit('turn',{phase:'candidate',candidate_id:'false',onset_at:100,
+  playback:{mark:0,recent:[],last_played:null,truncated:false}});
+ c.voice.emit('turn',{phase:'candidate-cancelled',candidate_id:'false'});
+ assert.equal(sentOf(c,c.first,'voice-user-turn').length,0);
+ c.voice.emit('turn',started('without-candidate',500));
+ assert.equal(turnSent(c,c.first,'without-candidate','started')[0].playback_at_turn_start.knowledge,'unknown');
+ c.s.run('disconnect()');
+});
+
+test('speaker evidence belongs to the listener session and survives only a genuine resume',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply-admitted',data:{session_id:'s1',thread_id:'a',utterance_id:'A',attempt_id:'A-1'}});
+ assert.equal(c.s.run("playbackEvidence.cutoff('a').snapshot.recent.length"),1);
+ c.drop(c.first);await c.until(()=>c.sockets.length===2,'resume socket');
+ await c.answer({session_id:'s1',resume:{token:'tok-b'},resumed:true});
+ assert.equal(c.s.run("playbackEvidence.cutoff('a').snapshot.recent.length"),1);
+ c.drop(c.sockets[1]);await c.until(()=>c.sockets.length===3,'new session socket');
+ await c.answer({session_id:'s2',resume:{token:'new'},resumed:false});
+ assert.equal(c.s.run("playbackEvidence.cutoff('a').snapshot.recent.length"),0);
+ assert.equal(c.s.run('seenAttempts.size'),0);
+ c.s.run('disconnect()');
+});
+
+test('a replay is a distinct attempt and starts at a Unicode scalar offset',async()=>{
+ const c=await callOnRoom();
+ const common={session_id:'s1',thread_id:'a',utterance_id:'original',revision:1,reply_revision:1,epoch:0,
+  history_id:'row',text:'🐙 Hi. Again.'};
+ c.push(c.first,{type:'voice-reply',data:{...common,attempt_id:'first'}});
+ c.voice.said[0].step({type:'done',outcome:{status:'heard'}});
+ c.push(c.first,{type:'voice-reply',data:{...common,attempt_id:'replay',replay:true,replay_start_chars:6}});
+ assert.equal(c.voice.said[1].text,'Again.');
+ c.voice.said[1].step({type:'playing'});
+ c.voice.said[1].step({type:'progress',sounding:null,heard_chars:2});
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.attempt_id==='replay'&&d.heard_chars!=null).map(d=>[d.hearing,d.heard_chars])),[['partial',8]]);
+ c.voice.said[1].step({type:'done',outcome:{status:'heard'}});
+ c.push(c.first,{type:'voice-reply',data:{...common,attempt_id:'replay',replay:true,replay_start_chars:6}});
+ assert.equal(c.voice.said.length,2,'redelivery of the same attempt cannot start another sound');
+ c.s.run('disconnect()');
 });
 
 test('The room\'s withdrawals cancel what it names, and each reply\'s end goes to the room in its words',async()=>{
@@ -1337,11 +1623,11 @@ test('The room\'s withdrawals cancel what it names, and each reply\'s end goes t
  five.step({type:'done',outcome:{status:'not-played',reason:'failed',code:'credential-missing'}});
  const ends=sentOf(c,first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.utterance_id,d.status,d.reason,d.heard_chars]);
  assert.deepEqual(plain(ends),[
-  ['r-2','unplayed','newer_turn',null],
+  ['r-2','unplayed','newer_turn',0],
   ['r-1','interrupted','focus_changed',4],
   ['r-3','interrupted','user_interrupted',2],
-  ['r-4','unplayed','newer_turn',null],
-  ['r-5','failed',null,null],
+  ['r-4','unplayed','newer_turn',0],
+  ['r-5','failed',null,0],
  ]);
  c.push(first,{type:'voice-reply-withdrawn',data:{session_id:'other',utterance_ids:['r-6'],reason:'newer_turn'}});
  s.run('disconnect()');
@@ -1416,7 +1702,7 @@ test('T01 and T02 map played-zero barge-in to physical and semantic receipts bef
  handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:0,reason:'barge-in'}});
  c.voice.emit('turn',finished('spoken','New words'));
  const frames=c.frames(c.first).filter(f=>['voice-playback','reply-hearing','voice-user-turn'].includes(f.type));
- assert.deepEqual(plain(frames.filter(f=>f.type==='voice-playback'&&f.data.status!=='playing').map(f=>[f.data.utterance_id,f.data.status,f.data.reason,f.data.heard_chars])),[['core-reply','interrupted','user_interrupted',0]]);
+ assert.deepEqual(plain(frames.filter(f=>f.type==='voice-playback'&&f.data.status!=='playing').map(f=>[f.data.utterance_id,f.data.status,f.data.reason,f.data.hearing,f.data.heard_chars])),[['core-reply','interrupted','user_interrupted','unknown',null]]);
  assert.deepEqual(plain(frames.filter(f=>f.type==='reply-hearing').map(f=>[f.data.history_id,f.data.utterance_id,f.data.outcome,f.data.heard_chars??null])),[['row','core-reply','not_heard',null]]);
  assert.ok(frames.findIndex(f=>f.data.status==='interrupted')<frames.findIndex(f=>f.type==='reply-hearing'));
  assert.ok(frames.findIndex(f=>f.type==='reply-hearing')<frames.findIndex(f=>f.data.phase==='finished'));
@@ -1504,7 +1790,7 @@ test('T04b a spoken turn retires several locally queued replies at the old epoch
  reply('fresh',1);assert.equal(c.voice.said.at(-1).text,'fresh');
  c.s.run('disconnect()');
 });
-test('T08 typed context leaves queued playback and an open spoken turn untouched',async()=>{
+test('T08 typed context fences queued playback without cutting active sound or closing a spoken turn',async()=>{
  const c=await callOnRoom();
  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'one',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'one',text:'One'}});
  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'two',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'two',text:'Two'}});
@@ -1515,7 +1801,7 @@ test('T08 typed context leaves queued playback and an open spoken turn untouched
  c.s.context.fetch=async()=>({ok:true,status:200,json:async()=>({accepted:true,messages:[]})});await c.s.run('sendText()');
  assert.equal(handle.cancelled,false);assert.equal(c.s.run("openVoiceTurns.has('open')"),true);
  assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.utterance_id==='two').map(d=>[d.status,d.reason])),[['unplayed','newer_turn']],'the spoken start, not typing, retired the queued old reply');
- assert.equal(sentOf(c,c.first,'voice-playback').some(d=>d.utterance_id==='three'),false,'typing does not retire a new held reply');
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.utterance_id==='three').map(d=>[d.status,d.hearing,d.heard_chars])),[['unplayed','not_played',0]],'typing retires new held audio locally');
  c.s.run('disconnect()');
 });
 test('T06 output settings report local fate and send reliable eligibility without muting the mic',async()=>{
@@ -2048,6 +2334,7 @@ test('T08 typing during playback adds context without cutting audio or advancing
  c.s.context.fetch=async(path,options)=>{if(options?.body)typed=JSON.parse(options.body);return {ok:true,status:200,json:async()=>({messages:[]})}};
  await c.s.run('sendText()');
  assert.equal(typed.text,'One more detail');
+ assert.equal(typed.origin,'typed_room');
  assert.equal(handle.cancelled,false);
  assert.equal(c.s.run("threadEpochs.get('a')"),0);
  assert.equal(sentOf(c,c.first,'voice-playback').filter(d=>d.status==='interrupted').length,0);
@@ -2163,18 +2450,17 @@ test('A page with no voice keeps its settings unchecked and says why it cannot k
 });
 
 // ----- the independent review of #60/#61 (briefs/reviews/2026-10-09-web-60-61.md): each of its probes, the right way round -----
-test('A resumed session sends at once what waited while the room was away',async()=>{
+test('A resumed session sends stopped audio evidence before words collected while away',async()=>{
  const c=await callOnRoom();const {s,voice}=c;
  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'r-1',revision:1,epoch:0,reply_revision:1,thread_id:'a',history_id:'h',text:'twelve chars'}});
  c.drop(c.first);
  voice.emit('turn',started('away'));
  voice.emit('turn',finished('away','offline words'));
- voice.said[0].step({type:'done',outcome:{status:'heard'}});
  await c.until(()=>c.sockets.length===2,'reconnect socket');
  const {socket}=await c.answer({session_id:'s1',resume:{token:'new'},resumed:true});
  await c.until(()=>!s.run('state.reconnecting'),'resumed');await settleSoon();
  const sent=c.frames(socket).filter(f=>['voice-user-turn','voice-playback','reply-hearing'].includes(f.type));
- assert.deepEqual(plain(sent.map(f=>[f.type,f.data.phase??f.data.status??f.data.outcome,f.data.offline])),[['voice-user-turn','started',null],['voice-playback','heard',null],['reply-hearing','heard',null],['voice-user-turn','finished',null]],'physical and semantic evidence precede the final turn frame');
+ assert.deepEqual(plain(sent.map(f=>[f.type,f.data.phase??f.data.status??f.data.outcome,f.data.offline])),[['voice-playback','unplayed',null],['reply-hearing','not_heard',null],['voice-user-turn','started',null],['voice-user-turn','finished',null]],'socket loss stops queued audio before later words; both receipts precede the final turn frame');
  for(const frame of sent)c.push(socket,{type:'voice-ack',data:{client_msg_id:frame.data.client_msg_id}});
  assert.equal(s.run('outbox.size'),0);
  s.run('disconnect()');

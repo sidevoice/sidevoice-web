@@ -18,7 +18,8 @@ import {clampDeviceName,deviceNameProblem} from './device-name-rules.js';
 import {readDeleteUnused,writeDeleteUnused,staleModels} from './model-housekeeping.js';
 import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,voiceSettingsToLoad,endOfTurnModel,readyVoiceSettings,modelReady} from './voice-settings.js';
 import {createTurnRelay} from './turn-relay.js';
-import {turnMessage,playbackReport,sayingRange} from './voice-room.js';
+import {turnMessage,playbackReport,sayingRange,scalarExtent,characters} from './voice-room.js';
+import {createPlaybackEvidence} from './playback-evidence.js';
 import {replyEligibility} from './reply-eligibility.js';
 import {playbackHearing,writtenReplyHearing} from './reply-hearing-policy.js';
 import {refusalError} from './refusals.js';
@@ -483,8 +484,15 @@ function nameOfflineRow(turnId,id){
  * The voice says a reply as something of its own (a handle); the room names it by its `utterance_id`. While a reply
  * lives the page keeps one for the other: the room may withdraw it (`voice-reply-withdrawn`), and how it ended is the
  * room's `voice-playback`. Where its reader is lights the reply's bubble. */
-const replies=new Map(); // core utterance_id → queued or active reply
+const replies=new Map(); // physical attempt_id → queued or active reply
 const replyQueue=[];
+const seenAttempts=new Set();
+const playbackEvidence=createPlaybackEvidence();
+const turnEvidence=new Map();
+const candidateEvidence=new Map();
+const sourceSays=new Map(); // call id → (voice say id → room original and replay offset)
+let evidenceOverflow=false,attemptOverflow=false;
+const EVIDENCE_HANDLES_LIMIT=2048, EVIDENCE_TURNS_LIMIT=256, ATTEMPTS_LIMIT=4096;
 const threadEpochs=new Map();
 function acceptEpoch(thread,epoch){if(Number.isInteger(epoch))threadEpochs.set(thread,Math.max(epoch,threadEpochs.get(thread)??epoch))}
 const openVoiceTurns=new Map();
@@ -494,6 +502,8 @@ const turnWireIds=new Map(),usedWireIds=new Set();
 let callGeneration=0;
 function clearTurnLifecycle(){
  ++callGeneration;turnNodes.clear();openVoiceTurns.clear();replyQueue.length=0;
+ playbackEvidence.clear();turnEvidence.clear();candidateEvidence.clear();sourceSays.clear();seenAttempts.clear();
+ evidenceOverflow=false;attemptOverflow=false;
  turnWireIds.clear();usedWireIds.clear();
  awaitingTurnAck.clear();startMessageTurns.clear();threadEpochs.clear();turnSend=Promise.resolve();turnSendPending=0;
 }
@@ -502,19 +512,42 @@ let stoppingReplies=false;
 function reportPlayback(said,data){
  if(said.terminal)return;
  if(data.status!=='playing')said.terminal=true;
- keepMessage('playback','voice-playback',{utterance_id:said.reply.utterance_id,...data});flushOutbox();
+ keepMessage('playback','voice-playback',{utterance_id:said.reply.utterance_id,
+  ...(said.attemptId?{attempt_id:said.attemptId}:{}),...data});flushOutbox();
 }
 function reportHearing(said,data){
  const reply=said.reply;
  keepMessage('hearing','reply-hearing',{history_id:reply.history_id,utterance_id:reply.utterance_id,
+  ...(said.attemptId?{attempt_id:said.attemptId}:{}),
   ...playbackHearing(data,reply.text,said.action??said.withdrawn??data.reason)});
  flushOutbox();
 }
+function physicalReport(said,data){
+ const total=characters(said.reply.text);
+ const relative=Number.isInteger(data.heard_chars) && data.heard_chars >= 0
+  ? Math.min(data.heard_chars,characters(said.spokenText)) : 0;
+ const confirmed=Math.max(said.confirmedRelative,relative);
+ if(data.status==='heard'){
+  playbackEvidence.complete(said.reply);
+  return {...data,hearing:'complete',heard_chars:total};
+ }
+ if(confirmed>0){
+  const heard=Math.min(total,said.replayStart+confirmed);
+  playbackEvidence.progress(said.reply,heard);
+  return {...data,hearing:heard>=total?'complete':'partial',heard_chars:heard};
+ }
+ const mayHaveStarted=!said.sourceNoStartCertified&&(said.playing||said.sourceMayHaveStarted);
+ return {...data,status:mayHaveStarted&&data.status==='unplayed'?'failed':data.status,
+  hearing:mayHaveStarted?'unknown':'not_played',heard_chars:mayHaveStarted?null:0};
+}
 function finishReply(said,data){
- if(replies.get(said.reply.utterance_id)!==said)return;
- reportPlayback(said,data);
- reportHearing(said,data);
- replies.delete(said.reply.utterance_id);
+ if(replies.get(said.key)!==said)return;
+ if(said.deadlineTimer)clearTimeout(said.deadlineTimer);
+ const physical=physicalReport(said,data);
+ reportPlayback(said,physical);
+ // A v1 attempt with no source proof has no semantic hearing fact either.
+ if(!said.attemptId||physical.hearing!=='unknown')reportHearing(said,data);
+ replies.delete(said.key);
  if(state.karaokeState?.segment===speechSegment(said.reply))state.karaokeState=null;
  if(!stoppingReplies)drainReplies();
 }
@@ -529,27 +562,100 @@ function stopReplies(reason,onlyPlaying=false){
  stoppingReplies=false;
  drainReplies();
 }
+function cancelPendingReply(said,reason){
+ // The browser audio adapter fences future scheduled chunks synchronously.
+ // Without that capability, a delayed `playing` event cannot prove that the
+ // physical source is still pending, so leave the handle to report its truth.
+ if(said.pendingFence)return true;
+ const failClosed=()=>{
+  said.pendingFence=false;
+  if(replies.get(said.key)!==said)return;
+  // IPC failure is not the source's "already started" decision. Stop this
+  // saying and its call; no zero-hearing receipt follows from the failure.
+  said.sourceMayHaveStarted=true;
+  said.action=reason;
+  try{said.saying?.cancel?.()}catch{}
+  try{void Promise.resolve(conversationCalls.get(said.thread)?.call.stop?.()).catch(()=>{})}catch{}
+ };
+ let result;
+ try{result=said.saying?.cancelPending?.()}catch{failClosed();return true}
+ if(result&&typeof result.then==='function'){
+  said.pendingFence=true;
+  Promise.resolve(result).then(fenced=>{
+   said.pendingFence=false;
+   if(fenced&&replies.get(said.key)===said){said.sourceNoStartCertified=true;said.action=reason;finishReply(said,{status:'unplayed',reason})}
+   else if(!fenced)said.sourceMayHaveStarted=true;
+  }).catch(failClosed);
+  return true;
+ }
+ if(said.saying&&!result){said.sourceMayHaveStarted=true;return false}
+ said.sourceNoStartCertified=true;
+ said.action=reason;
+ finishReply(said,{status:'unplayed',reason});
+ return true;
+}
+// Typed room words fence only attempts that have not begun sound. The person can
+// type alongside an already playing reply without cutting that audio.
+function fencePendingReplies(reason){
+ stoppingReplies=true;
+ for(const said of [...replies.values()]){
+  if(said.playing)continue;
+  cancelPendingReply(said,reason);
+ }
+ stoppingReplies=false;
+ drainReplies();
+}
+function fenceQueuedReplies(){fencePendingReplies('newer_turn')}
 function drainReplies(){
  if([...replies.values()].some(said=>said.saying&&!said.terminal))return;
  while(replyQueue.length){
   const said=replyQueue[0];
-  if(replies.get(said.reply.utterance_id)!==said){replyQueue.shift();continue}
+  if(replies.get(said.key)!==said){replyQueue.shift();continue}
   const reply=said.reply;
   const openHere=new Set([...openVoiceTurns.values(),...awaitingTurnAck.values()].filter(thread=>thread===reply.thread_id));
   const eligibility=moving?'focus_changed':replyEligibility(reply,{sessionId:state.sessionId,threadId:targetThread(),epoch:threadEpochs.get(reply.thread_id),openTurns:openHere,output:speechOutput,connected:!!state.ws&&!state.reconnecting});
   if(eligibility==='hold')return;
   replyQueue.shift();
+  if(deadlineExpired(reply)){finishReply(said,{status:'unplayed',reason:'auto_start_expired'});continue}
   if(eligibility!=='play'){finishReply(said,{status:'unplayed',reason:eligibility});continue}
-  const saying=conversationCalls.get(conversationKey(state.callNode,reply.thread_id))?.call.say(reply.text,reply.language?{language:reply.language}:undefined);
+  const call=conversationCalls.get(conversationKey(state.callNode,reply.thread_id))?.call;
+  const saying=call?.say(said.spokenText,reply.language?{language:reply.language}:undefined);
   if(!saying){finishReply(said,{status:'unplayed',reason:'voice_off'});continue}
   said.saying=saying;
+  // The native source may start before its `playing` callback reaches this
+  // page. Only an atomic pending-fence ack can later certify zero playback.
+  if(said.attemptId)said.sourceMayHaveStarted=true;
+  if(saying.id){
+   playbackEvidence.handled(reply);
+   if(!evidenceOverflow){
+    if(!sourceSays.has(call.id))sourceSays.set(call.id,new Map());
+    sourceSays.get(call.id).set(saying.id,{thread_id:reply.thread_id,
+     utterance_id:reply.utterance_id,replay_start_chars:said.replayStart});
+    if([...sourceSays.values()].reduce((n,group)=>n+group.size,0)>EVIDENCE_HANDLES_LIMIT){
+     evidenceOverflow=true;sourceSays.clear();
+    }
+   }
+  }
   saying.onEvent(event=>{
-   if(replies.get(reply.utterance_id)!==said)return;
-   if(event.type==='playing'){said.playing=true;state.karaokeState={segment:speechSegment(reply),from:0,to:0};reportPlayback(said,{status:'playing'})}
-   else if(event.type==='progress')state.karaokeState={segment:speechSegment(reply),...sayingRange(event,reply.text)};
-   else if(event.type==='done')finishReply(said,playbackReport(event.outcome,reply.text,said.withdrawn,said.action));
+   if(replies.get(said.key)!==said)return;
+   if(event.type==='playing'){
+    said.playing=true;playbackEvidence.playing(reply);
+    state.karaokeState={segment:speechSegment(reply),from:0,to:0};reportPlayback(said,{status:'playing'});
+   }
+   else if(event.type==='progress'){
+    const relative=scalarExtent(said.spokenText,event.heard_chars);
+    if(relative!=null&&relative>said.confirmedRelative){
+     said.confirmedRelative=relative;
+     const absolute=said.replayStart+relative;
+     playbackEvidence.progress(reply,absolute);
+     reportPlayback(said,{status:'playing',hearing:'partial',heard_chars:absolute});
+    }
+    const range=sayingRange(event,said.spokenText),base=[...reply.text].slice(0,said.replayStart).join('').length;
+    state.karaokeState={segment:speechSegment(reply),from:base+range.from,to:base+range.to};
+   }
+   else if(event.type==='done')finishReply(said,playbackReport(event.outcome,said.spokenText,said.withdrawn,said.action));
   });
-  void saying.outcome.then(outcome=>finishReply(said,playbackReport(outcome,reply.text,said.withdrawn,said.action))).catch(()=>{});
+  void saying.outcome.then(outcome=>finishReply(said,playbackReport(outcome,said.spokenText,said.withdrawn,said.action))).catch(()=>{});
   return;
  }
 }
@@ -559,7 +665,17 @@ function skipReply(){for(const said of replies.values())if(said.playing){said.ac
 // The room took back replies it sent and this call has not finished: each is cancelled, and its end says why.
 function withdrawReplies(d){
  if(d.session_id!==state.sessionId)return;
- for(const id of d.utterance_ids||[]){const said=replies.get(id);if(!said)continue;said.withdrawn=d.reason;if(said.saying)said.saying.cancel();else finishReply(said,{status:'unplayed',reason:d.reason})}
+ const attempts=Array.isArray(d.attempt_ids)?new Set(d.attempt_ids):null;
+ const originals=new Set(d.utterance_ids||[]);
+ for(const said of [...replies.values()]){
+  if(attempts?!attempts.has(said.key):!originals.has(said.reply.utterance_id))continue;
+  const pendingOnly=d.reason==='new_words_pending_only'||d.reason==='expired_pending_only'
+   ||d.reason==='binding_inactive_pending_only';
+  if(pendingOnly){if(!said.playing)cancelPendingReply(said,d.reason==='new_words_pending_only'?'newer_turn'
+    :d.reason==='expired_pending_only'?'auto_start_expired':'binding_inactive');continue}
+  said.withdrawn=d.reason;
+  if(said.saying)said.saying.cancel();else finishReply(said,{status:'unplayed',reason:said.withdrawn});
+ }
 }
 function markHistorySeen() {
     const id = historyThreadId(), seen = Math.max(state.roomSeen[id] || 0, ...state.history.filter(r => r.thread === id).map(r => r.seq || 0));
@@ -588,7 +704,7 @@ function cancelDraft(turn){state.cancelledInput=true;state.history=state.history
 function partial(text){state.pendingUserText=text||''}
 // The text box comes and goes with the call view: with none mounted there is nothing to update.
 function updateComposer(){const input=$('text-message'),send=$('text-send');if(!input||!send)return;const ready=!!(state.ws||state.reconnecting)&&!!state.sessionId&&!!targetId()&&historyThreadId()===targetId()&&!state.switching;input.disabled=!ready;send.disabled=!ready||state.textSending;const t=translator();input.placeholder=t(ready?'transcript.placeholder':'transcript.joinToWrite');}
-async function sendText(){personSignal();const input=$('text-message'),text=input?.value;if(text==null)return;if(state.textSending||!text.trim()||!state.sessionId||!targetId())return;const destination=targetThread(),key=JSON.stringify([state.sessionId,targetId(),text]);if(textAttempt?.key!==key)textAttempt={key,id:crypto.randomUUID()};const attempt=textAttempt;state.textSending=true;updateComposer();setRoomError('');try{await post('/api/presentation/text',{text,thread_id:destination,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:attempt.id});if(input.value===text)input.value='';if(textAttempt===attempt)textAttempt=null;await refreshHistory(state.callNode)}catch(e){setRoomError(roomError(e,'room',bundled('room.failure.textNotSent').text))}finally{state.textSending=false;updateComposer()}}
+async function sendText(){personSignal();const input=$('text-message'),text=input?.value;if(text==null)return;if(state.textSending||!text.trim()||!state.sessionId||!targetId())return;const destination=targetThread(),key=JSON.stringify([state.sessionId,targetId(),text]);if(textAttempt?.key!==key)textAttempt={key,id:crypto.randomUUID()};const attempt=textAttempt;fenceQueuedReplies();state.textSending=true;updateComposer();setRoomError('');try{await post('/api/presentation/text',{text,origin:'typed_room',thread_id:destination,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:attempt.id});if(input.value===text)input.value='';if(textAttempt===attempt)textAttempt=null;await refreshHistory(state.callNode)}catch(e){setRoomError(roomError(e,'room',bundled('room.failure.textNotSent').text))}finally{state.textSending=false;updateComposer()}}
 // Taken where they bubble to, not on the box itself, so a box mounted after this runs sends too.
 document.addEventListener('submit',event=>{if(event.target?.id!=='text-composer')return;event.preventDefault();return sendText()});
 document.addEventListener('keydown',event=>{if(event.target?.id==='text-message'&&event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();$('text-composer')?.requestSubmit()}});
@@ -1339,6 +1455,10 @@ function recordMessage(raw, socket) {
         receiveReply(d);
         return;
     }
+    if (t === 'voice-reply-admitted') {
+        if(d.session_id===state.sessionId)observePublication(d);
+        return;
+    }
     if (t === 'voice-reply-withdrawn') {
         withdrawReplies(d);
         return;
@@ -1492,6 +1612,18 @@ let turnSend=Promise.resolve();
 let turnSendPending=0;
 function voiceTurn(event,entry=null){
  const source=entry??{call:{id:'local'},node:state.callNode,thread_id:targetThread(),binding_id:state.roomBinding?.binding_id,generation:callGeneration};
+ if(event.phase==='candidate'){
+  const key=source.call.id+'\0'+event.candidate_id;
+  if(!evidenceOverflow)candidateEvidence.set(key,{thread_id:source.thread_id,generation:source.generation,
+   cutoff:playbackEvidence.cutoffFromSource(source.thread_id,event.playback,
+    sourceSays.get(source.call.id)??new Map())});
+  if(candidateEvidence.size>EVIDENCE_TURNS_LIMIT){evidenceOverflow=true;candidateEvidence.clear();sourceSays.clear()}
+  return;
+ }
+ if(event.phase==='candidate-cancelled'){
+  candidateEvidence.delete(source.call.id+'\0'+event.candidate_id);
+  return;
+ }
  const key=source.call.id+'\0'+event.turn_id;
  if(event.phase==='started'){
   let id=event.turn_id;
@@ -1509,6 +1641,20 @@ function voiceTurn(event,entry=null){
  const target=turnNodes.get(turn.turn_id);
  if(turn.phase!=='started')turnNodes.delete(turn.turn_id);
  if(!target||target.node!==state.callNode||target.generation!==callGeneration)return;
+ let cutoff=turnEvidence.get(turn.turn_id);
+ if(turn.phase==='started'){
+  const candidate=candidateEvidence.get(source.call.id+'\0'+event.candidate_id);
+  candidateEvidence.delete(source.call.id+'\0'+event.candidate_id);
+  // A legacy voice engine supplies no sample-time candidate. Arrival after its
+  // qualification window cannot establish the earlier acoustic cutoff.
+  cutoff=candidate?.thread_id===target.thread_id&&candidate.generation===callGeneration
+   ? candidate.cutoff : playbackEvidence.cutoff(null);
+  turnEvidence.set(turn.turn_id,cutoff);
+  if(turnEvidence.size>EVIDENCE_TURNS_LIMIT)turnEvidence.delete(turnEvidence.keys().next().value);
+ }
+ const onset=cutoff?.snapshot??{knowledge:'unknown',last_played:null,recent:[],truncated:false};
+ if(turn.phase!=='started')turnEvidence.delete(turn.turn_id);
+ turn.playback_at_turn_start=onset;
  if(turn.phase==='started'){
   openVoiceTurns.set(turn.turn_id,target.thread_id);
   // The voice displaces active handles itself. Replies still only in this page's queue need their own terminal receipt.
@@ -1546,6 +1692,7 @@ function voiceTurn(event,entry=null){
  const generation=callGeneration;
  const send=()=>{
   if(generation!==callGeneration||target.node!==state.callNode||!state.sessionId)return;
+  if(turn.phase==='finished'&&cutoff)Object.assign(payload,playbackEvidence.certifiedAbsence(target.thread_id,cutoff));
   const entry=keepMessage('user-turn','voice-user-turn',payload);
   if(turn.phase==='started'){awaitingTurnAck.set(turn.turn_id,target.thread_id);startMessageTurns.set(entry.id,turn.turn_id)}
   flushOutbox();drainReplies();
@@ -1596,13 +1743,44 @@ window.sidevoiceAudio={readWaveform(){return voice?waveLevels.map((value,index)=
 // A reply to say: written in the conversation, and said after what is being said. Which replies are stale is the
 // room's to say (`voice-reply-withdrawn`); one this page already says is not said twice.
 function receiveReply(d){
- if(d.session_id!==state.sessionId||replies.has(d.utterance_id))return;
+ const attemptId=d.attempt_id||d.utterance_id;
+ if(d.session_id!==state.sessionId||!d.utterance_id||!attemptId||seenAttempts.has(attemptId))return;
+ if(attemptOverflow){
+  keepMessage('playback','voice-playback',{utterance_id:d.utterance_id,
+   ...(d.attempt_id?{attempt_id:d.attempt_id}:{}),status:'unplayed',
+   hearing:'not_played',heard_chars:0,reason:'unheard'});
+  flushOutbox();return;
+ }
+ const replayStart=Number.isInteger(d.replay_start_chars)&&d.replay_start_chars>=0
+  ? Math.min(d.replay_start_chars,characters(d.text)) : 0;
+ const spokenText=[...d.text].slice(replayStart).join('');
+ observePublication(d);
  state.roomRevision=Math.max(state.roomRevision,d.revision);
  if(!d.replay)state.turns=recordReply(state,d);
  add('assistant',d.text,'voice:'+d.utterance_id,conversationKey(state.callNode,d.thread_id),{history_id:d.history_id,session:d.session_id,revision:d.revision});
- const said={reply:d,saying:null,withdrawn:null,action:null,terminal:false,playing:false,thread:conversationKey(state.callNode,d.thread_id)};
- replies.set(d.utterance_id,said);replyQueue.push(said);
+ const said={key:attemptId,attemptId:d.attempt_id||null,reply:d,spokenText,replayStart,confirmedRelative:0,saying:null,withdrawn:null,action:null,terminal:false,playing:false,thread:conversationKey(state.callNode,d.thread_id)};
+ if(Number.isSafeInteger(d.auto_start_deadline_ms)){
+  const delay=Math.max(0,d.auto_start_deadline_ms-Date.now()-5000);
+  said.deadlineTimer=setTimeout(()=>{
+   if(replies.get(said.key)!==said||said.playing)return;
+   cancelPendingReply(said,'auto_start_expired');
+  },delay);
+ }
+ seenAttempts.add(attemptId);
+ if(seenAttempts.size>=ATTEMPTS_LIMIT)attemptOverflow=true;
+ replies.set(attemptId,said);replyQueue.push(said);
  drainReplies();
+}
+function deadlineExpired(reply){
+ return Number.isSafeInteger(reply.auto_start_deadline_ms)
+  && Date.now()+5000>=reply.auto_start_deadline_ms;
+}
+function observePublication(d){
+ const record=playbackEvidence.publication(d);
+ if(record){
+  const call=conversationCalls.get(conversationKey(state.callNode,d.thread_id))?.call;
+  call?.markEvidence?.(playbackEvidence.watermark());
+ }
 }
 function roomSocketUrl(fp){const base=linkBase(fp);if(base==null)throw worded(reachNote(state)||noMachine());return callSocketUrl(base,location)}
 /* Why the room refused, asked of the room itself over an ordinary request.
@@ -1837,6 +2015,14 @@ async function joinRoom(epoch,context){
  // new session knows none of the last one's turns.
  if(!resumedSession(session,context.resume)||state.sessionId!==session.session_id){
   if(!resumedSession(session,context.resume)){lastSeq=0;state.roomRevision=0}
+  if(state.sessionId&&state.sessionId!==session.session_id){
+   // The listener changed. Evidence and attempt dedup belong to the old seat,
+   // whereas a genuine resume above preserves them through the network gap.
+   for(const said of replies.values())said.saying?.cancel();
+   replies.clear();replyQueue.length=0;
+   playbackEvidence.clear();turnEvidence.clear();candidateEvidence.clear();sourceSays.clear();seenAttempts.clear();
+   evidenceOverflow=false;attemptOverflow=false;
+  }
   state.sessionId=session.session_id;relay.reset();awaitingTurnAck.clear();startMessageTurns.clear();threadEpochs.clear();
  }
  keepTicket(true);
@@ -1862,10 +2048,13 @@ async function settleRejoin(epoch,hold){
 async function lostConnection(event,epoch,token=null){
  if(epoch!==connectEpoch||state.reconnecting)return;
  state.ws=null;keepTicket(true);
+ fencePendingReplies('connector_disconnected');
+ // A critical Core abort can look exactly like an ordinary 1006 if its close
+ // frame is lost. Stop remaining sound before a replacement session; a late
+ // old-session receipt cannot be assumed to reach Core after that replacement.
+ for(const said of replies.values())if(said.saying)said.sourceMayHaveStarted=true;
  stopReplies('connector_disconnected');
  window.sidevoiceTelemetry?.endCall?.('connection_lost');
- // Nothing the call is doing stops with its socket: the voice goes on hearing and speaking, and what it reports waits
- // in the outbox. The room parks the session meanwhile, so its turn and its history stay as they are here too.
  if(event?.code===4401){void pairingRefused(state.callNode,{call:true,token}).catch(()=>{});return}
  if(!shouldReconnect(event)){const message=bundled('room.failure.closed');callEndedBy('failed',message.text);disconnect();failJoin(message);return}
  state.reconnecting=true;
