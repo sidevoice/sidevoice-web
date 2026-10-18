@@ -47,3 +47,7 @@ test("speech languages without a full interface bundle still use matching exampl
     language: "hi", sample: "नमस्ते! Sidevoice आपके एजेंट के जवाब इसी तरह पढ़ेगा।",
   });
 });
+
+test("a Korean-only voice never receives an English fallback sample or an unsupported English locale", () => {
+  expect(voicePreview(settings, catalogs(["ko"], []), "en")).toEqual({ language: "ko", sample: "" });
+});

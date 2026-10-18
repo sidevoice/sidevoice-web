@@ -1,6 +1,6 @@
 import type { CatalogView } from "./model-catalogs.js";
 import type { DeviceVoiceSettings } from "./voice-settings.js";
-import { translator } from "../i18n/translator";
+import { hasTranslation, translator, UI_LANGUAGES } from "../i18n/translator";
 import { messages as pt } from "../i18n/speech-samples/pt";
 import { messages as hi } from "../i18n/speech-samples/hi";
 
@@ -20,8 +20,11 @@ export function voicePreview(settings: DeviceVoiceSettings, catalogs: CatalogVie
   const matching = (tag: string) => languages.find((supported) => supported.toLowerCase() === tag.toLowerCase())
     ?? languages.find((supported) => primary(supported) === primary(tag));
   const language = preferred.map(matching).find(Boolean) ?? languages[0] ?? preferred[0] ?? "en";
-  // The UI bundle is only a source of localized example words. It never chooses the speech locale.
-  const sample = extraSamples[primary(language)]
-    ?? translator(primary(language) === "zh" ? "zh-Hans" : primary(language))("wizard.sampleText");
+  // A missing bundle must not supply the translator's English fallback while keeping a different speech language.
+  // The person can enter their own phrase; never claim that an English example is suitable for an unknown voice.
+  const locale = primary(language) === "zh" ? "zh-Hans" : primary(language);
+  const sample = extraSamples[locale]
+    ?? (UI_LANGUAGES.includes(locale) && hasTranslation(locale, "wizard.sampleText")
+      ? translator(locale)("wizard.sampleText") : "");
   return { language, sample };
 }

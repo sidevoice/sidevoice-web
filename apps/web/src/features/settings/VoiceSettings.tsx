@@ -168,7 +168,7 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
   // the try's block, which the setup shows whether or not the model is ready (Settings, once it is).
   const reasonId = useId();
   const tryReason = !model.model || !model.ready ? t(task === "stt" ? "settings.save.waitTranscription" : "settings.save.waitVoice")
-    : setupTry && task === "tts" && !setupTry.sentence?.trim() ? t("wizard.wait.sentence") : "";
+    : task === "tts" && !(setupTry?.sentence ?? sentence).trim() ? t("wizard.wait.sentence") : "";
   const tryButton = handle && <TryButton task={task} handle={handle} id={setupTry ? "wizard-card-try" : task + "-try"} again={setupTry?.tried}
     reason={tryReason} reasonId={reasonId} stopsElsewhere={!!setupTry} t={t} />;
   const tryPanel = handle && <TryPanel task={task} handle={handle} model={draft[task].model} hint={setupTry?.hint} sample={setupTry?.sample} button={tryButton} t={t} />;
