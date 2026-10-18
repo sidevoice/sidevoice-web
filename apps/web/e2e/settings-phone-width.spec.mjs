@@ -76,14 +76,16 @@ for (const [language, width] of [["en", 360], ["es", 360], ["de", 360], ["pl", 3
     expect(sections.length).toBeGreaterThan(4);
     expect(await overflow(page), "the list").toEqual([]);
     for (const id of sections) {
+      await expect(page.locator("#language-settings .settings-nav")).not.toHaveAttribute("data-motion", /.+/);
       await page.locator("#" + id).click();
+      await expect(page.locator("#language-settings .settings-back:not(#settings-close)")).toBeVisible();
       await seed();
       // Its "how it runs" open too, where it has one.
       for (const fold of await page.locator(".model-runtime-toggle[aria-expanded='false']:visible").all()) await fold.click();
       if (id === "settings-transcription") await expect(page.locator(".model-runtime-summary:visible")).toContainText("WebGPU");
       await page.waitForTimeout(350);
       expect(await overflow(page), id).toEqual([]);
-      await page.goBack();
+      await page.locator("#language-settings .settings-back:not(#settings-close)").click();
       await expect(page.locator("#" + id)).toBeVisible();
     }
   });
