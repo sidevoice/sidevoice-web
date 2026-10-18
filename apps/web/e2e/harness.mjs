@@ -96,6 +96,9 @@ export async function installHarness(page, { onboarding = { version: 1, choice: 
   // pointed at the machine: the static site's own origin.
   // The microphone's permission as the browser reads it (the setup's microphone step, web#129): allowed unless a test
   // says otherwise, so a setup walked to a later step is not stopped at it. Only the read: nothing here opens a microphone.
+  // The setup no longer takes the permission's word (web#188): an allowed microphone is one a stream opened, which only
+  // the person's click does. So an allowed harness has nothing to ask (no getUserMedia: the setup's "none"), as a
+  // browser without the API is.
   await page.addInitScript((state) => {
     const permissions = navigator.permissions;
     if (!permissions) return;
@@ -105,6 +108,7 @@ export async function installHarness(page, { onboarding = { version: 1, choice: 
     // A computer with a microphone plugged in: the setup reads an allowed permission with no input device as "none found",
     // and a headless browser lists none.
     const devices = navigator.mediaDevices;
+    if (devices && state === "granted") Object.defineProperty(devices, "getUserMedia", { value: undefined, configurable: true });
     if (devices) devices.enumerateDevices = async () => [{ kind: "audioinput", deviceId: "default", groupId: "e2e", label: "", toJSON() { return this; } }];
   }, microphone);
   // A finished setup is a room whose voice works (the default flow shows the Voice setup card, not the stage, while the
