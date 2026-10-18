@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/sidevoice/sidevoice-web/compare/v0.8.0...v0.8.1) (2026-10-18)
+
+
+### Bug Fixes
+
+* **onboarding:** drop the language icon from the interface language picker ([#184](https://github.com/sidevoice/sidevoice-web/issues/184)) ([bb8242b](https://github.com/sidevoice/sidevoice-web/commit/bb8242b29373a596c99416ba73dcbb99bc7daffd))
+
 ## [0.8.0](https://github.com/sidevoice/sidevoice-web/compare/v0.7.3...v0.8.0) (2026-10-18)
 
 
