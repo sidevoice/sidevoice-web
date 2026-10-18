@@ -194,17 +194,17 @@ test("the voice's try is all in its block — its sentence shown and editable be
   await act(async () => { fireEvent.click(stageAction()); });
   expect(title()).toHaveTextContent("Set up voice");
   // Before the try: the sentence, editable, in the level's place; the block's own button and the footer's start it.
-  expect(tryBlock("tts").querySelector("button.tts-try-said")).toHaveTextContent("Hi! This is how Sidevoice will read your agent's replies.");
+  expect(tryBlock("tts").querySelector("button.tts-try-said")).toHaveTextContent("¡Hola! Así leerá Sidevoice las respuestas de tu agente.");
   expect(tryBlock("tts").querySelector(".stt-try-head button.tts-try-said")).toBeInTheDocument();
   expect(tryBlock("tts").querySelector(".voice-wave")).toBeNull();
   expect(tryBlock("tts").querySelector("#wizard-sample")).toBeNull();
   const running = pendingTry();
   await act(async () => { fireEvent.click(tryButton()); });
-  expect(actions.tryVoiceSettings).toHaveBeenCalledWith("tts", expect.objectContaining({ text: "Hi! This is how Sidevoice will read your agent's replies.", keep: true }));
+  expect(actions.tryVoiceSettings).toHaveBeenCalledWith("tts", expect.objectContaining({ text: "¡Hola! Así leerá Sidevoice las respuestas de tu agente.", language: "es", keep: true }));
   expect(tryBlock("tts")).toHaveTextContent("Getting ready…");
   // Playing: the sentence lit as heard, not editable; the footer's is the one Stop.
   act(() => { running.told.onProgress!({ from: 0, to: 0 }); running.told.onProgress!({ from: 3, to: 3 }); });
-  expect(tryBlock("tts").querySelector(".model-try-said")).toHaveTextContent(/^Hi!$/);
+  expect(tryBlock("tts").querySelector(".model-try-said")).toHaveTextContent(/^¡Hola!$/);
   expect(tryBlock("tts").querySelector("#tts-sentence, button.tts-try-said")).toBeNull();
   expect(tryBlock("tts").querySelector("#wizard-card-try")).toHaveAttribute("aria-busy", "true");
   expect(tryBlock("tts").querySelector("#wizard-card-try")).toHaveTextContent(/^Try it: listen$/);

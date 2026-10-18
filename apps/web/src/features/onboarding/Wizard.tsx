@@ -26,6 +26,8 @@ import { ReadyStep } from "./ReadyStep";
 import { MicrophoneContinue, PermissionsStep } from "./PermissionsStep";
 import "./onboarding.css";
 import { useRoomStore } from "../../state/room-store";
+import { voicePreview } from "../../services/voice-preview";
+import { defaultVoiceSettings } from "../../services/voice-settings.js";
 import type { OnboardingStep } from "../../services/onboarding-state";
 
 /* The first-run setup, one dialog over the room: of a fixed height, so nothing jumps between steps, and the whole
@@ -241,11 +243,16 @@ export function Wizard() {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const trial = useVoiceTry(stageTask, { onTried: (task) => void onboarding.markTried(task) });
   const model = useModelState(stageTask ?? "stt", draft);
-  const [sample, setSample] = useState(() => t("wizard.sampleText"));
   const speechLanguage = useRoomStore((state) => state.facts.speechLanguage);
-  const tryAgain = () => void trial.run(stageTask === "stt" ? {} : { text: sample.trim(), language: draft?.stt.language || speechLanguage });
+  const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
+  const preview = voicePreview(draft ?? defaultVoiceSettings(), catalogs, speechLanguage);
+  const [sample, setSample] = useState(() => preview.sample);
+  const editedSample = useRef(false);
+  useEffect(() => { if (!editedSample.current) setSample(preview.sample); }, [preview.sample]);
+  const editSample = (text: string) => { editedSample.current = true; setSample(text); };
+  const tryAgain = () => void trial.run(stageTask === "stt" ? {} : { text: sample.trim(), language: preview.language });
   const tried = !!stageTask && onboarding.tried(stageTask);
-  const stage: StageTry = { ...trial, start: tryAgain, tried, hint: tried ? undefined : t("wizard.tryHint"), sentence: sample, setSentence: setSample };
+  const stage: StageTry = { ...trial, start: tryAgain, tried, hint: tried ? undefined : t("wizard.tryHint"), sentence: sample, setSentence: editSample };
   // The end of turn waits for its model when it is the smart one, as the voice steps wait for theirs.
   const turnModel = useModelState("end-of-turn", draft);
   const turnWaits = !!turnModel.model && !turnModel.ready;

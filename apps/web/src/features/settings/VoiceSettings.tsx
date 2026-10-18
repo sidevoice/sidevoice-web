@@ -8,6 +8,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Segmented } from "../../components/ui/Tabs";
 import { voiceChoices, voiceSettingsToLoad, endOfTurnModel, endOfTurnModels, IDLE_UNLOAD_MINUTES, SPEED, type DeviceVoiceSettings as Settings, type Note } from "../../services/voice-settings.js";
 import { SPEECH_LANGUAGES } from "../../services/system-language.js";
+import { voicePreview } from "../../services/voice-preview";
 import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 import { PROVIDER_SAYS, ProviderKeyNeeded, reasonState } from "./ProviderConnect";
 import { NewMark } from "../highlights/highlights";
@@ -153,17 +154,21 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
   const optionNote = slot.options.find((option: Option) => option.id === draft[task].model)?.note;
   const languages = model.model?.languages ?? [];
   const meta = [optionNote ? noteText(t, optionNote) : "", languages.length ? languages.slice(0, 4).map(languageName).join(", ") + (languages.length > 4 ? " " + t("voice.languages.more", { n: languages.length - 4 }) : "") : ""].filter(Boolean).join(" · ");
-  const tryLanguage = draft.stt.language || speechLanguage;
+  const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
+  const preview = voicePreview(draft, catalogs, speechLanguage);
   // Settings' try says its sentence (the sample, editable once it is shown); the first-run setup's is the setup's,
   // started from its footer too.
-  const [sentence, setSentence] = useState(() => t("wizard.sampleText"));
-  const handle: VoiceTry | null = setupTry ?? (setup ? null : { ...own, start: () => void own.run(task === "stt" ? {} : { text: sentence.trim(), language: tryLanguage }),
-    ...(task === "tts" ? { sentence, setSentence } : {}) });
+  const [sentence, setSentence] = useState(() => preview.sample);
+  const edited = useRef(false);
+  useEffect(() => { if (!edited.current) setSentence(preview.sample); }, [preview.sample]);
+  const editSentence = (text: string) => { edited.current = true; setSentence(text); };
+  const handle: VoiceTry | null = setupTry ?? (setup ? null : { ...own, start: () => void own.run(task === "stt" ? {} : { text: sentence.trim(), language: preview.language }),
+    ...(task === "tts" ? { sentence, setSentence: editSentence } : {}) });
   // Why the try cannot run now, in the words the setup's footer uses: its model not ready, no sentence to say. Said in
   // the try's block, which the setup shows whether or not the model is ready (Settings, once it is).
   const reasonId = useId();
   const tryReason = !model.model || !model.ready ? t(task === "stt" ? "settings.save.waitTranscription" : "settings.save.waitVoice")
-    : setupTry && task === "tts" && !setupTry.sentence?.trim() ? t("wizard.wait.sentence") : "";
+    : task === "tts" && !(setupTry?.sentence ?? sentence).trim() ? t("wizard.wait.sentence") : "";
   const tryButton = handle && <TryButton task={task} handle={handle} id={setupTry ? "wizard-card-try" : task + "-try"} again={setupTry?.tried}
     reason={tryReason} reasonId={reasonId} stopsElsewhere={!!setupTry} t={t} />;
   const tryPanel = handle && <TryPanel task={task} handle={handle} model={draft[task].model} hint={setupTry?.hint} sample={setupTry?.sample} button={tryButton} t={t} />;
