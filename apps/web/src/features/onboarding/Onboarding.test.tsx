@@ -97,7 +97,8 @@ test("the basics come first: appearance and the interface's language, Automatic 
   expect(selectedValue("wizard-ui-language")).toBe("");
   expect(document.getElementById("wizard-ui-language")).toHaveTextContent("Automatic");
   expect(document.getElementById("wizard-speech-language")).toBeNull();
-  chooseOption("wizard-ui-language", "es");
+  fireEvent.click(document.getElementById("wizard-ui-language")!);
+  fireEvent.click(screen.getByRole("option", { name: "Español" }));
   expect(actions.setInterfaceLanguage).toHaveBeenCalledWith("es");
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Continue" })); });
   expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).basics_done).toBe(true);

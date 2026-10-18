@@ -4,6 +4,7 @@ import { OverlayPortalProvider, Tooltip } from "../../components/ui/Tooltip";
 import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ShortcutsIcon, PermissionsIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon, UpdateIcon, WarningIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { Select } from "../../components/ui/Select";
+import { LanguagePicker } from "../../components/ui/LanguagePicker";
 import { Group, Row, Section } from "../../components/ui/Card";
 import { Segmented } from "../../components/ui/Tabs";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
@@ -83,7 +84,7 @@ function GeneralSettings({ t }: { t: Translate }) {
       <Row label={t("settings.appearance")} description={t("settings.appearance.hint")}><Appearance t={t} /></Row>
       <Row label={t("settings.deviceName")} description={t("settings.deviceName.hint")} htmlFor="device-name"><DeviceNameField id="device-name" /></Row>
       <Row label={t("settings.general.languageLabel")} description={t("settings.general.languageHint")} htmlFor="ui-language">
-        <Select id="ui-language" value={language} onValueChange={(next) => window.sidevoiceActions?.setInterfaceLanguage?.(next)}
+        <LanguagePicker id="ui-language" value={language} label={t("settings.general.languageLabel")} showLanguageIcon={false} onValueChange={(next) => window.sidevoiceActions?.setInterfaceLanguage?.(next)}
           options={[{ value: "", label: t("settings.general.languageAuto") }, ...UI_LANGUAGES.map((value) => ({ value, label: languageName(value) }))]} />
       </Row>
     </Group>

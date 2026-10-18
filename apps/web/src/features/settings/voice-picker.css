@@ -1,0 +1,20 @@
+.voice-picker-trigger { justify-content: space-between; }
+.voice-picker-trigger > svg { flex: none; color: var(--sv-text-muted); }
+.voice-picker { width: min(390px, calc(100vw - 24px)); padding: 0; gap: 0; overflow: hidden; }
+.voice-picker-command { min-width: 0; }
+.voice-picker-tools { padding: 10px; border-bottom: 1px solid var(--sv-border); }
+.voice-picker-search { display: flex; align-items: center; gap: 9px; min-height: 44px; padding: 4px 5px 4px 11px; border: 1px solid var(--sv-border-strong); border-radius: var(--sv-radius-md); color: var(--sv-text-muted); background: var(--sv-input-bg); }
+.voice-picker-search:focus-within { outline: 2px solid var(--sv-focus); outline-offset: 1px; }
+.voice-picker-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--sv-text); font: inherit; }
+.voice-picker-search input::placeholder { color: var(--sv-text-subtle); }
+.voice-picker-search .language-picker-trigger { background: var(--sv-surface-raised); }
+.voice-picker-list { max-height: min(320px, 48vh); overflow: auto; padding: 6px; }
+.voice-picker-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; padding: 6px 10px; border-radius: var(--sv-radius-sm); cursor: pointer; outline: 0; }
+.voice-picker-item[data-current] { color: var(--sv-accent-text); }
+.voice-picker-item[data-current] > svg { flex: none; }
+.voice-picker-item[data-current="true"] { background: var(--sv-accent-soft); }
+.voice-picker-item[aria-selected="true"] { background: var(--sv-hover); }
+.voice-picker-item-main { display: flex; flex: 1; align-items: baseline; gap: 10px; min-width: 0; }
+.voice-picker-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--sv-text); }
+.voice-picker-meta { flex: none; max-width: 48%; margin-inline-start: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--sv-text-muted); font-size: var(--sv-font-sm); }
+.voice-picker-empty { padding: 18px 12px; text-align: center; color: var(--sv-text-muted); }

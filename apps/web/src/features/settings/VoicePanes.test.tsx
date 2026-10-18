@@ -118,10 +118,12 @@ const withVoiceModel = (model: string, catalog = "local") => ({ ...defaultVoiceS
 
 test("the voice is always a list, its automatic voice first, even when the model or the account lists no other", () => {
   renderPane({ voiceSettings: withVoiceModel("supertonic-3") });
-  expect(listOptions("tts-voice").map((option) => [option.value, option.label])).toEqual([["", "Automatic (the model's own)"]]);
+  fireEvent.click(document.getElementById("tts-voice")!);
+  expect([...document.querySelectorAll(".voice-picker-item")].map((item) => item.textContent)).toEqual(["Automatic (the model's own)"]);
   cleanup();
   renderPane({ voiceSettings: withVoiceModel("eleven_flash_v2_5", "elevenlabs") });
-  expect(listOptions("tts-voice").map((option) => [option.value, option.label])).toEqual([["", "Automatic (your account's first)"]]);
+  fireEvent.click(document.getElementById("tts-voice")!);
+  expect([...document.querySelectorAll(".voice-picker-item")].map((item) => item.textContent)).toEqual(["Automatic (your account's first)"]);
 });
 
 test("a model not on this device offers its download with its size; its voices wait until it is here", () => {
@@ -155,7 +157,9 @@ test("while it downloads the card shows how far it has got, and the download can
 test("once it is here its voices appear, and it can be tried without saving; a provider's model needs no download", async () => {
   const { actions } = renderPane();
   expect(document.getElementById("tts-model-card")).toHaveTextContent("Ready");
-  expect(listOptions("tts-voice").map((option) => [option.value, option.label, option.detail])).toEqual([["", "Automatic (the model's own)", ""], ["ef_dora", "ef_dora", "Spanish"]]);
+  fireEvent.click(document.getElementById("tts-voice")!);
+  expect([...document.querySelectorAll(".voice-picker-item")].map((item) => item.textContent)).toEqual(["Automatic (the model's own)", "ef_doraSpanish"]);
+  fireEvent.keyDown(document, { key: "Escape" });
   await act(async () => { fireEvent.click(document.getElementById("tts-try")!); });
   expect(actions.tryVoiceSettings).toHaveBeenCalledWith("tts", expect.objectContaining({ keep: false }));
   cleanup();
