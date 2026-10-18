@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.3](https://github.com/sidevoice/sidevoice-web/compare/v0.8.2...v0.8.3) (2026-10-18)
+
+
+### Bug Fixes
+
+* **deploy:** redirect by path so the static image never sends visitors to port 8080 ([#196](https://github.com/sidevoice/sidevoice-web/issues/196)) ([4d71671](https://github.com/sidevoice/sidevoice-web/commit/4d71671d74e3f5fb6fc20bb1a34beef9315776cb))
+
 ## [0.8.2](https://github.com/sidevoice/sidevoice-web/compare/v0.8.1...v0.8.2) (2026-10-18)
 
 
