@@ -172,8 +172,8 @@ function StageTile({ mood, compact = false, phone = false }: { mood: "speaking" 
         <span>…and make the dark theme a little warmer</span>
         <Button variant="ghost" tone="neutral" size="sm">{t("stage.cancelTurn")}</Button>
       </div>}
-      {/* The way into the transcript, phone and desktop: a round button in the tile's corner, a dot when something is unread. */}
-      <Button size="icon" variant="secondary" className="pt-transcript" aria-label={t("transcript.showUnread", { n: 1 })}><TranscriptIcon size={20} /><span className="pt-transcript-dot" aria-hidden /></Button>
+      {/* The way into the transcript, phone and desktop: a round button in the tile's corner. */}
+      <Button size="icon" variant="secondary" className="pt-transcript" aria-label={t("transcript.show")}><TranscriptIcon size={20} /></Button>
     </div>
   );
 }
@@ -254,7 +254,6 @@ function Transcript({ phone = false }: { phone?: boolean }) {
         <Message role="assistant" last={false} text="Sure. I'll try three directions and put them side by side on the design system page." time="11:02" replay />
         <Message role="assistant" text="The first is near-black with a brighter lila." time="11:03" interrupted />
         <Message role="user" text="Perfect, and the buttons too." time="11:04" />
-        <Button size="sm" variant="secondary" className="pt-new-messages">2 new messages</Button>
       </div>
       <form className="pt-composer" onSubmit={(event) => event.preventDefault()}>
         <div className="pt-composer-field">

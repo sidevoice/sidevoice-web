@@ -27,8 +27,6 @@ export function MessageList({ conversation, visible = true }: { conversation: Co
   const groups = useMemo(() => groupMessages(conversation.messages), [conversation.messages]);
   const viewport = useRef<HTMLDivElement>(null);
   const nearBottom = useRef(true);
-  const previousLast = useRef<string | null>(null);
-  const [showNewMessages, setShowNewMessages] = useState(false);
   const [away, setAway] = useState(false);
   const lastId = conversation.messages.at(-1)?.segment || null;
   // The dots are the agent's next run starting, so they wear its face like any run's foot.
@@ -40,7 +38,6 @@ export function MessageList({ conversation, visible = true }: { conversation: Co
     if (!node) return;
     node.scrollTo({ top: node.scrollHeight, behavior });
     nearBottom.current = true;
-    setShowNewMessages(false);
     setAway(false);
   };
 
@@ -48,8 +45,6 @@ export function MessageList({ conversation, visible = true }: { conversation: Co
   // this ran and left the view a sliver short of the bottom, which is exactly where the dots live.
   useLayoutEffect(() => {
     if (nearBottom.current) scrollToBottom("auto");
-    else if (lastId && lastId !== previousLast.current) setShowNewMessages(true);
-    previousLast.current = lastId;
   }, [lastId, conversation.pendingText, conversation.pendingPhase, conversation.working, conversation.messages.length]);
 
   // Opening lands on the latest at once: "auto" would take the list's smooth scrolling and pass for being away.
@@ -80,7 +75,6 @@ export function MessageList({ conversation, visible = true }: { conversation: Co
         const node = event.currentTarget;
         nearBottom.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80;
         setAway(!nearBottom.current);
-        if (nearBottom.current) setShowNewMessages(false);
       }}>
         {!groups.length && !conversation.pendingText && !conversation.pendingPhase && !conversation.working &&
           <div className="messages-empty"><TranscriptIcon size={28} /><p>{t("messages.empty")}</p></div>}
@@ -111,8 +105,8 @@ export function MessageList({ conversation, visible = true }: { conversation: Co
           <article className="chat-bubble thinking" data-role="assistant" data-position="only" aria-label={t("messages.thinking")}><span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span></article>
         </div></div>}
       </div>
-      {(showNewMessages || away) && <Button variant="secondary" size="sm" className="new-messages" aria-label={t("messages.toLatest")} onClick={() => scrollToBottom()}>
-        {showNewMessages ? t("messages.new") : t("messages.latest")}<ChevronIcon />
+      {away && <Button variant="secondary" size="sm" className="latest-jump" aria-label={t("messages.toLatest")} onClick={() => scrollToBottom()}>
+        {t("messages.latest")}<ChevronIcon />
       </Button>}
     </div>
   );

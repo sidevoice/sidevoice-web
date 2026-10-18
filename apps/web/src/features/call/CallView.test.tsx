@@ -702,14 +702,15 @@ test("exactly one way into the transcript: on a phone in the tile, on a desktop 
   }
 });
 
-test("on a desktop the bar's transcript button opens and closes the panel and wears the unread dot", async () => {
+test("on a desktop the bar's transcript button opens and closes the panel without a message notice", async () => {
   viewport({ narrow: false });
   const store = room();
   const button = document.querySelector(".call-bar-end #transcript-toggle")!;
   expect(button).not.toBeNull();
   patch(store, { history: [...store.getState().facts.history,
     { segment: "h-3", thread: "fp-1|t-login", role: "assistant", text: "Shall I also add a retry?", name: "Fix the slow login", time: 2, session: "s1" }] });
-  expect(button.querySelector(".transcript-entry-dot")).not.toBeNull();
+  expect(button).toHaveAccessibleName("Show transcript");
+  expect(button.querySelector(".transcript-entry-dot")).toBeNull();
   await act(async () => { fireEvent.click(button); });
   expect(button).toHaveAttribute("aria-expanded", "true");
   expect(document.getElementById("transcript")).toHaveAttribute("data-open");
@@ -720,16 +721,17 @@ test("on a desktop the bar's transcript button opens and closes the panel and we
   expect(document.querySelectorAll("#transcript-toggle")).toHaveLength(1);
 }, WHOLE_APP_MS);
 
-test("the transcript button wears a dot for what arrives while it is closed; opening it reads them", async () => {
+test("the transcript button stays directly accessible without an unread count", async () => {
   const store = room();
   const button = document.getElementById("transcript-toggle")!;
   expect(button).toHaveAccessibleName("Show transcript");
   expect(button.querySelector(".transcript-entry-dot")).toBeNull();
   patch(store, { history: [...store.getState().facts.history,
     { segment: "h-3", thread: "fp-1|t-login", role: "assistant", text: "Shall I also add a retry?", name: "Fix the slow login", time: 2, session: "s1" }] });
-  expect(button).toHaveAccessibleName("Show transcript, 1 unread");
-  expect(button.querySelector(".transcript-entry-dot")).not.toBeNull();
+  expect(button).toHaveAccessibleName("Show transcript");
+  expect(button.querySelector(".transcript-entry-dot")).toBeNull();
   await act(async () => { fireEvent.click(button); });
+  expect(button).toHaveAccessibleName("Hide transcript");
   await act(async () => { fireEvent.click(button); });
   expect(button).toHaveAccessibleName("Show transcript");
 });

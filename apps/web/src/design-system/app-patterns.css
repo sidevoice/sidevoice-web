@@ -166,7 +166,6 @@
 .pt-listen { width: 22px; height: 22px; }
 .pt-receipt { display: inline-flex; color: var(--sv-text-subtle); }
 .pt-receipt[data-read] { color: var(--sv-accent-text); }
-.pt-new-messages { position: sticky; bottom: 0; justify-self: center; box-shadow: var(--sv-shadow-md); }
 .pt-composer { padding: var(--sv-space-2) var(--sv-space-4) var(--sv-space-4); background: var(--sv-bg); }
 .pt-composer-field { display: flex; align-items: flex-end; gap: var(--sv-space-1); padding: var(--sv-space-1) var(--sv-space-1) var(--sv-space-1) var(--sv-space-4); border: 1px solid transparent; border-radius: 22px; background: var(--sv-bg-sunken); }
 [data-theme="dark"] .pt-composer-field { background: var(--sv-surface-raised); }
@@ -263,9 +262,8 @@
 .pt-stage:has(.pt-bubble--person) .pt-stage-tags { display: none; }
 .pt-sidebar-new { display: flex; justify-content: center; }
 
-/* The transcript's button in the tile's corner (the room's TranscriptEntry), a dot when something is unread. */
+/* The transcript's button in the tile's corner (the room's TranscriptEntry). */
 .pt-transcript { position: absolute; right: var(--sv-space-3); bottom: var(--sv-space-3); width: 44px; height: 44px; border-radius: 50%; box-shadow: var(--sv-shadow-xs); }
-.pt-transcript-dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border: 2px solid var(--sv-surface); border-radius: 50%; background: var(--sv-accent); box-sizing: content-box; }
 
 /* The stage pattern wears the bicho's backdrop behind everything else in it (the room's StageScene). */
 .pt-stage { isolation: isolate; }

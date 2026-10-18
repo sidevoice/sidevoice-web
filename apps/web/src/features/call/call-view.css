@@ -153,12 +153,12 @@
 .person-turns { --live-w: min(calc(var(--person-live-w) * var(--u)), 75cqi);
   --live-h: calc(3 * round(nearest, calc(var(--person-fs) * var(--person-lh)), 1px) + 16 * var(--u) + 2 * var(--person-pad-b) * var(--u));
   position: absolute; z-index: 3; right: var(--stage-inset); bottom: var(--stage-inset); display: flex; flex-direction: column; align-items: flex-end; gap: calc(8 * var(--u)); }
-/* The same balloon in the transcript's message list (MessageList): the transcript column's width, as a message there,
+/* The same balloon in the transcript's message list (MessageList): capped like the final chat bubble at 86% or 34rem,
  * drawn as the stage's for a tile of about 590px (--u); no corner to sit in, so it flows, its tail hung below it. */
 .person-turns[data-inline] { --u: .75px; --peek: 20; --tail-w: calc(72 * var(--u)); --tail-h: calc(40 * var(--u));
   --person-fs: clamp(16px, calc(22.4 * var(--u)), 28px); --person-lh: 1.4286; --person-pad-b: 12; --person-pad-i: 20;
-  --live-w: 100%; --live-h: auto; position: relative; inset: auto; align-items: stretch; width: 100%; margin-bottom: var(--tail-h); }
-.person-turns[data-inline] .person-bubble { max-width: none; }
+  --live-w: min(86%, 34rem); --live-h: auto; position: relative; inset: auto; align-items: flex-end; width: 100%; margin-bottom: var(--tail-h); }
+.person-turns[data-inline] .person-bubble { max-width: min(86%, 34rem); }
 .person-bubble { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: calc(4 * var(--u)) calc(8 * var(--u));
   width: max-content; max-width: min(75cqi, calc(448 * var(--u))); padding: calc(var(--person-pad-b) * var(--u)) calc(var(--person-pad-i) * var(--u)); overflow-wrap: anywhere; }
 .person-turns .person-bubble { --balloon-line: clamp(3px, calc(var(--k, 1) * 3.6px), 5px); --balloon-ink: #1b1428; --balloon-fill: var(--sv-chat-person-bg);
@@ -338,13 +338,12 @@
 
 
 /* The way into the transcript, in the tile's corner (TranscriptEntry): round, opaque for contrast over the tile's glow,
- * 44px to touch on the phone's slide (--entry: with the tile, never under 36px), a dot when something arrived unread;
- * the person's bubble and the agent's badge keep clear of it. */
+ * 44px to touch on the phone's slide (--entry: with the tile, never under 36px). The person's bubble and the agent's
+ * badge keep clear of it. */
 .transcript-entry { position: absolute; z-index: 3; right: var(--stage-inset); bottom: var(--stage-inset); width: 44px; height: 44px; padding: 0; border-radius: 50%; box-shadow: var(--sv-shadow-xs); }
 .stage-tile > #transcript-toggle.transcript-entry { width: var(--entry); height: var(--entry); }
 .stage-tile > #transcript-toggle.transcript-entry svg { width: calc(var(--entry) * .4545); height: calc(var(--entry) * .4545); }
 .transcript-entry[aria-expanded="true"] { background: var(--sv-accent-soft); color: var(--sv-accent-text); }
-.transcript-entry-dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border: 2px solid var(--sv-surface); border-radius: 50%; background: var(--sv-accent); box-sizing: content-box; }
 .stage-tile:has(.transcript-entry) .person-turns { right: calc(var(--stage-inset) + var(--entry) + calc(8 * var(--u))); }
 .stage-tile:has(.transcript-entry) .stage-tags { max-width: calc(100% - 2 * (var(--stage-inset) + var(--entry) + calc(8 * var(--u)))); }
 
