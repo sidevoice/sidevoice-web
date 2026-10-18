@@ -1,10 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { installHarness } from "./harness.mjs";
 
-/* The shared Select in real browsers, inside the two modal dialogs that hold most of them — Settings and the first-run
- * setup — which live in the browser's top layer: a list drawn outside them would be open and invisible beneath. So each
- * list is checked to be on top (the element at its centre is the list) and anchored to its box (dropped from it, or,
- * with no room below, raised above it). On a desktop with the mouse and the keyboard, on a phone by tap. */
+/* The shared Select in Settings and the language picker in the first-run setup, inside modal dialogs. Their popups
+ * must be in the browser's top layer, visible and anchored to their triggers. On a desktop with the mouse and the
+ * keyboard, on a phone by tap. */
 
 // The setup's record at its first step, the basics.
 const AT_BASICS = {
@@ -60,7 +59,7 @@ for (const [name, viewport, phone] of [["desktop", { width: 1280, height: 800 },
   test.describe(name, () => {
     test.use({ viewport, hasTouch: phone, isMobile: phone });
 
-    test("the setup's basics: the interface language picked from a list on top of the dialog, dropped from its box", async ({ page }) => {
+    test("the setup's basics: the language picker opens on top of the dialog and stays anchored", async ({ page }) => {
       await installHarness(page, { onboarding: AT_BASICS });
       await page.goto("/voice/");
       const wizard = page.locator("#wizard");
@@ -68,8 +67,28 @@ for (const [name, viewport, phone] of [["desktop", { width: 1280, height: 800 },
       expect(await wizard.evaluate((element) => element.matches(":modal"))).toBe(true);
       // The interface's language is the basics' one list (the language spoken is the speech model's own setting).
       const language = page.locator("#wizard-ui-language");
-      await pick(page, language, "de", "Deutsch", phone);
-      if (!phone) await escapeKeepsDialog(page, language, wizard);
+      if (phone) await language.tap(); else await language.click();
+      const popup = page.locator(".language-picker-popover");
+      await expect(popup).toBeVisible();
+      const box = await popup.boundingBox();
+      const anchor = await language.boundingBox();
+      expect(box && anchor).toBeTruthy();
+      expect(await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest(".language-picker-popover"),
+        { x: box.x + box.width / 2, y: box.y + box.height / 2 })).toBe(true);
+      expect(Math.abs(box.y - (anchor.y + anchor.height))).toBeLessThanOrEqual(10);
+      const german = popup.getByRole("option", { name: "Deutsch" });
+      if (phone) await german.tap(); else await german.click();
+      await expect(popup).toHaveCount(0);
+      await expect(language).toHaveAttribute("data-value", "de");
+      await expect(language).toContainText("Deutsch");
+      if (!phone) {
+        await language.click();
+        await expect(popup).toBeVisible();
+        await page.keyboard.press("Escape");
+        await expect(popup).toHaveCount(0);
+        await expect(wizard).toBeVisible();
+        await expect(language).toBeFocused();
+      }
     });
 
     test("Settings › Advanced: a list on top of Settings, anchored to its box, which goes up near the bottom edge", async ({ page }) => {
