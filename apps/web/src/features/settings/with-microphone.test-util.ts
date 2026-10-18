@@ -4,7 +4,9 @@ import { onTestFinished, vi } from "vitest";
  *  one there is nothing to ask and Settings hides Permissions. */
 export function withMicrophone(state: PermissionState = "prompt") {
   const status = { state, addEventListener: vi.fn(), removeEventListener: vi.fn() };
+  const getUserMedia = vi.fn().mockResolvedValue({ getTracks: () => [{ readyState: "live", stop: vi.fn() }] });
   Object.defineProperty(navigator, "permissions", { configurable: true, value: { query: vi.fn().mockResolvedValue(status) } });
-  Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: vi.fn() } });
+  Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia } });
   onTestFinished(() => { delete (navigator as { mediaDevices?: unknown }).mediaDevices; delete (navigator as { permissions?: unknown }).permissions; });
+  return { getUserMedia, status };
 }

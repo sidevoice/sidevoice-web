@@ -105,7 +105,7 @@ test("false Allowed: the computer blocks the browser while the site reads allowe
   const { status, getUserMedia } = browser("granted");
   getUserMedia.mockRejectedValue(Object.assign(new Error("blocked by the system"), { name: "NotAllowedError" }));
   const access = createMicrophoneAccess();
-  await waitFor(() => expect(access.getSnapshot().state).toBe("granted"));
+  await waitFor(() => expect(access.getSnapshot().state).toBe("prompt"));
   await access.request();
   expect(access.getSnapshot().state).toBe("denied");
   // The site still reads allowed: a focus or a refresh must not flip it.
@@ -126,7 +126,7 @@ test("false Allowed: no microphone found stays so through a plain read that says
   const { getUserMedia } = browser("granted");
   getUserMedia.mockRejectedValue(Object.assign(new Error("none"), { name: "NotFoundError" }));
   const access = createMicrophoneAccess();
-  await waitFor(() => expect(access.getSnapshot().state).toBe("granted"));
+  await waitFor(() => expect(access.getSnapshot().state).toBe("prompt"));
   await access.request();
   expect(access.getSnapshot().state).toBe("missing");
   await access.check();
@@ -167,10 +167,26 @@ test("Settings › Permissions: the one button stays mounted and keeps focus whi
 });
 
 test("Settings › Permissions, blocked: how to allow it under the row, and Check again; no badge, no Refresh", async () => {
-  browser("denied");
+  const { getUserMedia } = browser("denied");
+  getUserMedia.mockRejectedValue(Object.assign(new Error("blocked"), { name: "NotAllowedError" }));
   render(<Settings />);
+  await act(async () => { fireEvent.click(await screen.findByRole("button", { name: "Allow microphone" })); });
   await waitFor(() => expect(document.querySelector(".wizard-mic-help")).toHaveTextContent("Allow it for this site"));
   expect(screen.getByRole("button", { name: "Check again" })).toBeInTheDocument();
   expect(document.querySelector(".perm-badge")).toBeNull();
   expect(screen.queryByRole("button", { name: "Refresh status" })).toBeNull();
+});
+
+test("Settings › Permissions trusts a successful stream when Safari's query rejects or says denied", async () => {
+  for (const query of ["denied", "reject"] as const) {
+    const { getUserMedia } = browser("denied");
+    if (query === "reject") vi.mocked(navigator.permissions.query).mockRejectedValue(new TypeError("unsupported"));
+    render(<Settings />);
+    await act(async () => { fireEvent.click(await screen.findByRole("button", { name: "Allow microphone" })); });
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(document.querySelector(".perm-badge")).toHaveTextContent("Allowed"));
+    window.dispatchEvent(new Event("focus"));
+    await waitFor(() => expect(document.querySelector(".perm-badge")).toHaveTextContent("Allowed"));
+    cleanup();
+  }
 });

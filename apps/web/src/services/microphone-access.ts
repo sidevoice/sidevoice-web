@@ -55,11 +55,11 @@ export function microphoneBridge(): MicrophoneBridge | null {
 
 type PermissionView = { state: string; addEventListener?(type: "change", listener: () => void): void; removeEventListener?(type: "change", listener: () => void): void };
 
-/** What a refused `getUserMedia` says: no device, or no permission. A device that is there but busy was allowed. */
-function refusal(error: unknown): "missing" | "denied" | "granted" {
+/** A failed open never proves that audio can be captured. */
+function refusal(error: unknown): "missing" | "denied" {
   const name = (error as { name?: string } | null)?.name ?? "";
   if (name === "NotFoundError" || name === "OverconstrainedError" || name === "DevicesNotFoundError") return "missing";
-  if (name === "NotReadableError" || name === "TrackStartError") return "granted";
+  if (name === "NotReadableError" || name === "TrackStartError") return "missing";
   return "denied";
 }
 
@@ -74,6 +74,9 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
   const askable = !!bridge || (!inAppCall && typeof media?.getUserMedia === "function");
   let snapshot: MicrophoneSnapshot = { state: askable ? "checking" : "none", asker, known: !!bridge, dismissed: false, unchanged: false, from: null };
   let status: PermissionView | null = null;
+  // A browser permission query is a hint. WebKit can report denied after getUserMedia has opened a stream.
+  let verified = false;
+  let lastRequestFailure: "denied" | "missing" | null = null;
   let disposed = false;
   // Only the newest read or request writes the state: a slow one never overwrites a later answer.
   let run = 0;
@@ -96,6 +99,7 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
 
   // A change while the prompt is open is its answer: the request says it, with what only it knows (none found, closed).
   const onChange = () => { if (snapshot.state !== "requesting") void check(); };
+  const onDeviceChange = () => { verified = false; lastRequestFailure = null; onChange(); };
 
   async function start() {
     if (!askable) return;
@@ -118,16 +122,6 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
     } catch { return null; }
   }
 
-  /** A silent getUserMedia (the permission already reads allowed, so nothing is shown), its tracks stopped at once:
-   *  what the browser really gives, whatever the site's permission says (the computer may block the browser itself). */
-  async function probe(): Promise<"granted" | "denied" | "missing"> {
-    try {
-      const stream = await media!.getUserMedia({ audio: true });
-      for (const track of stream.getTracks()) track.stop();
-      return "granted";
-    } catch (error) { return refusal(error); }
-  }
-
   async function check() {
     if (!askable || disposed) return;
     const mine = ++run;
@@ -142,20 +136,10 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
     } else {
       const plugged = await devices();
       if (mine !== run) return;
-      if (now === "denied") state = "denied";
+      if (verified) state = "granted";
       else if (plugged === false) state = "missing";
-      else if (now === "granted") {
-        // A site permission that reads allowed is not the browser's word: the computer may block it. Moving up from
-        // anything else is confirmed by a silent probe; only its success is "granted".
-        if (before === "denied" || before === "missing" || before === "prompt") {
-          const probed = await probe();
-          if (mine !== run) return;
-          state = probed;
-        } else state = "granted";
-      } else if (now === "prompt") {
-        // Without a device list, a missing microphone is only found by asking: a read of "not asked" keeps it.
-        state = before === "missing" && plugged === null ? "missing" : "prompt";
-      } else state = before === "granted" || before === "denied" || before === "missing" ? before : "prompt";
+      else if (lastRequestFailure) state = lastRequestFailure;
+      else state = "prompt";
     }
     set({ state, unchanged: state === before && snapshot.unchanged, dismissed: state === "prompt" && snapshot.dismissed });
   }
@@ -171,6 +155,11 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
     } else {
       try {
         const stream = await media!.getUserMedia({ audio: true });
+        const audio = stream.getAudioTracks?.() ?? stream.getTracks();
+        if (!audio.length || audio.every((track) => track.readyState === "ended")) {
+          for (const track of stream.getTracks()) track.stop();
+          throw new DOMException("No live audio track", "NotFoundError");
+        }
         // Only the permission was wanted: the microphone is let go at once.
         for (const track of stream.getTracks()) track.stop();
         answer = "granted";
@@ -184,6 +173,8 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
       if (mine !== run) return;
       if (now === "prompt") { set({ state: "prompt", dismissed: true, from: null }); return; }
     }
+    verified = answer === "granted";
+    lastRequestFailure = answer === "granted" ? null : answer;
     set({ state: answer, unchanged: answer === before, from: null });
   }
 
@@ -194,7 +185,7 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
     win.addEventListener?.("focus", onReturn);
     win.document?.addEventListener?.("visibilitychange", onReturn);
     // A microphone plugged in or out.
-    media?.addEventListener?.("devicechange", onChange);
+    media?.addEventListener?.("devicechange", onDeviceChange);
     // The app says when the system's answer changes, where it can.
     unwatchBridge = bridge?.onChange?.(onChange);
     void start();
@@ -209,7 +200,7 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
     dispose() {
       disposed = true;
       status?.removeEventListener?.("change", onChange);
-      media?.removeEventListener?.("devicechange", onChange);
+      media?.removeEventListener?.("devicechange", onDeviceChange);
       unwatchBridge?.();
       win.removeEventListener?.("focus", onReturn);
       win.document?.removeEventListener?.("visibilitychange", onReturn);

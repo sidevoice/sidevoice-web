@@ -25,6 +25,26 @@ export async function browserHost(navigator, credentials) {
 
 const loadPackages = () => Promise.all([import('@sidevoice/voice'), import('@sidevoice/engine')]);
 
+/** Begin microphone permission and Web Audio in the button's user gesture, before models or chunks are awaited. */
+export function beginBrowserAudioActivation(input = null) {
+  if (!globalThis.navigator?.mediaDevices?.getUserMedia || !globalThis.AudioContext) return null;
+  const context = new AudioContext();
+  const resumed = context.resume();
+  const stream = navigator.mediaDevices.getUserMedia({ audio: {
+    echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1,
+    ...(input ? { deviceId: { exact: input } } : {}),
+  } }).catch((error) => { throw Object.assign(new Error(error?.message || "getUserMedia"), {
+    code: error?.name === "NotAllowedError" || error?.name === "SecurityError" ? "microphone-denied" : "microphone-unavailable",
+  }); });
+  // A model may load for a while before these promises are observed.
+  void resumed.catch(() => {});
+  void stream.catch(() => {});
+  return { context, resumed, stream, release() {
+    void stream.then((opened) => opened.getTracks().forEach((track) => track.stop()), () => {});
+    void context.close().catch(() => {});
+  } };
+}
+
 /** The packages and this page's one engine, made the first time they are asked for. */
 function browserParts(load) {
   return (async () => {

@@ -24,6 +24,10 @@ test("the same failure under another name, and a build that does not fit, say wh
   expect(voiceFailure({ code: "wasm-memory" }, { t: es }).text)
     .toBe("Ese modelo no se puede ejecutar en este dispositivo: necesita más memoria de la que una página puede usar. Elige otro.");
   expect(voiceFailure({ code: "trial-silence" }, { t: en }).text).toBe(en("wizard.trial.silence"));
+  expect(voiceFailure({ code: "trial-preparation-timeout" }, { t: en }).text).toBe(en("wizard.trial.preparation-timeout"));
+  expect(voiceFailure({ code: "model-load-failed" }, { t: en }).text).toBe(en("voice.failure.model-load-failed"));
+  expect(en("voice.failure.model-load-failed")).not.toContain("smaller");
+  expect(voiceFailure({ code: "model-needs-memory" }, { t: en }).text).toBe(en("voice.failure.memory"));
   expect(voiceFailure(new DOMException("The operation is insecure.", "SecurityError"), { t: en }).text).toBe(en("storage.blocked"));
 });
 

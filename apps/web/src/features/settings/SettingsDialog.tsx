@@ -118,7 +118,7 @@ function CallSettings({ t, microphone }: { t: Translate; microphone: MicrophoneS
     <RestartNote t={t} />
     {/* The microphone not allowed: a call can't hear you. The way to allow it is in Permissions. */}
     {microphone && (microphone.state === "prompt" || microphone.state === "requesting" || microphone.state === "denied" || microphone.state === "missing") &&
-      <Alert tone="warning" title={t("settings.call.micNotAllowed")} action={<Button type="button" variant="secondary" size="sm" onClick={() => store?.patch({ settingsSection: "permissions", settingsLevel: "page" })}>{t("settings.call.openPermissions")}</Button>} />}
+      <Alert tone="warning" title={t(microphone.state === "denied" ? "settings.call.micNotAllowed" : "call.needsMic")} action={<Button type="button" variant="secondary" size="sm" onClick={() => store?.patch({ settingsSection: "permissions", settingsLevel: "page" })}>{t("settings.call.openPermissions")}</Button>} />}
     {/* The microphone and the speaker, as the call's own panel chooses them. */}
     <AudioDeviceRows />
     {ready && draft ? <TurnChoices draft={draft} active={shown} /> : <p className="muted" role="status">{t("voice.loading")}</p>}

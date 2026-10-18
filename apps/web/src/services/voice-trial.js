@@ -72,13 +72,21 @@ function failureOf(error) {
 }
 
 /** `promise`, or `signal`'s abort and the time limit first, as a try's own failures. */
-function bounded(promise, { signal, timeoutMs }) {
+function bounded(promise, { signal, timeoutMs, timeoutCode = 'trial-silence' }) {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(trialError('trial-silence')), timeoutMs);
-    const abort = () => reject(trialError('trial-cancelled'));
+    let settled = false;
+    const finish = (answer, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
+      answer(value);
+    };
+    const timer = setTimeout(() => finish(reject, trialError(typeof timeoutCode === 'function' ? timeoutCode() : timeoutCode)), timeoutMs);
+    const abort = () => finish(reject, trialError('trial-cancelled'));
     if (signal?.aborted) abort();
-    signal?.addEventListener('abort', abort, { once: true });
-    promise.then(resolve, reject).finally(() => { clearTimeout(timer); signal?.removeEventListener('abort', abort); });
+    else signal?.addEventListener('abort', abort, { once: true });
+    promise.then((value) => finish(resolve, value), (error) => finish(reject, error));
   });
 }
 
@@ -105,6 +113,7 @@ function bounded(promise, { signal, timeoutMs }) {
  * @returns {Promise<string>}
  */
 export async function tryTranscription(voice, settings, { signal, finish, timeoutMs = 20000, maxTakeMs = MAX_TAKE_MS, onState, onTimings, onListening, onLevel, onTranscribing, onTake, fence } = {}) {
+  const deadline = now() + timeoutMs;
   const stops = [];
   let readyMs = null;
   // Where the take ended, in Unix ms: the take handed stops there.
@@ -155,7 +164,7 @@ export async function tryTranscription(voice, settings, { signal, finish, timeou
     clearTimeout(timer);
   };
   try {
-    await voice.setSettings({ ...settings, ...TAKE_ENDS });
+    await bounded(voice.setSettings({ ...settings, ...TAKE_ENDS }), { signal, timeoutMs, timeoutCode: 'trial-preparation-timeout' });
     const heard = new Promise((resolve, reject) => {
       nothing = () => reject(trialError('trial-silence'));
       fail = reject;
@@ -196,14 +205,15 @@ export async function tryTranscription(voice, settings, { signal, finish, timeou
       if (finish?.aborted) stopped(); else finish?.addEventListener('abort', stopped, { once: true });
     });
     asked.catch(() => {});
-    return await bounded(Promise.race([listened, asked]), { signal, timeoutMs: timeoutMs + maxTakeMs });
+    return await bounded(Promise.race([listened, asked]), { signal, timeoutMs: Math.max(0, deadline - now()) + maxTakeMs,
+      timeoutCode: () => listening ? 'trial-silence' : 'trial-preparation-timeout' });
   } finally {
     closed = true;
     clearTimeout(tooLong);
     if (stopped) finish?.removeEventListener('abort', stopped);
     for (const stop of stops) stop();
     await leaveTake();
-    await voice.stop().catch(() => {});
+    await Promise.race([voice.stop().catch(() => {}), new Promise((done) => setTimeout(done, LEAVE_TAKE_MS))]);
     recorder.stop();
     recorder.hand();
   }

@@ -328,6 +328,8 @@ test("Call links to Permissions while the microphone is not allowed, and not onc
   cleanup();
   withMicrophone("granted");
   const again = open("whisper-base");
+  fireEvent.click(document.getElementById("settings-permissions")!);
+  await act(async () => { fireEvent.click(await within(document.getElementById("pane-permissions")!).findByRole("button", { name: "Allow microphone" })); });
   act(() => again.patch({ settingsSection: "call" }));
   await within(document.getElementById("pane-call")!).findByText("Thinking sound");
   expect(within(document.getElementById("pane-call")!).queryByRole("button", { name: "Open Permissions" })).toBeNull();
@@ -342,6 +344,8 @@ test("Permissions wears the warning dot while the microphone is not allowed, sai
   cleanup();
   withMicrophone("granted");
   open("whisper-base");
-  await waitFor(() => expect(document.getElementById("settings-permissions")).toBeInTheDocument());
+  fireEvent.click(document.getElementById("settings-permissions")!);
+  await act(async () => { fireEvent.click(await within(document.getElementById("pane-permissions")!).findByRole("button", { name: "Allow microphone" })); });
+  await waitFor(() => expect(document.querySelector("#pane-permissions .perm-badge")).toHaveTextContent("Allowed"));
   expect(document.querySelector("#settings-permissions .settings-attention")).toBeNull();
 });
