@@ -2,12 +2,12 @@ const fs=require('node:fs'),vm=require('node:vm'),test=require('node:test'),{moc
 // This device's pairing, as the page keeps it, for every test that does not say otherwise: the machine proved itself
 // at the page's own origin a moment ago, so requests go where they always went and carry its token.
 const PAIRED={fp:'fp-mac',public_key:'pk',host:'macbook',urls:['http://127.0.0.1:8768'],rv:{url:'https://room.example',node:'mac'},device_id:'dev-1',token:'tok-1',paired_at:1};
-function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,localHost=null,nativeData=null,indexedDB=null,outboxScope=null,readingMode=false}={}){
+function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,siteData=null,localHost=null,nativeData=null,indexedDB=null,outboxScope=null,readingMode=false}={}){
  const sourceRoot=__dirname+'/../src'; const uiSource=fs.readdirSync(sourceRoot,{recursive:true}).filter(file=>String(file).endsWith('.tsx')).map(file=>fs.readFileSync(sourceRoot+'/'+file,'utf8')).join('\n');
  class Element{constructor(id){this.id=id;this.children=[];this.dataset={};this.style={setProperty(){}};this.classList={add(){},remove(){}};this.parentElement=this;this.listeners={};this.attributes={}}addEventListener(name,fn){this.listeners[name]=fn}showModal(){this.open=true}close(){this.open=false;this.listeners.close?.()}contains(node){return node===this||this.children.includes(node)}removeAttribute(){}closest(){return null}querySelector(){return null}append(...children){this.children.push(...children)}replaceChildren(...children){this.children=[...children]}remove(){}setAttribute(name,value){this.attributes[name]=value}getAttribute(name){return this.attributes[name]}click(){this.onclick?.()}}
  const elements=new Map(),handlers={},documentHandlers={},observers=[];
  if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element(match[1]));for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','stats-recognition','stats-response'])elements.set(id,new Element(id))}
- const saved=stored?{'sidevoice.pairings':JSON.stringify(stored)}:{};
+ const saved=siteData??(stored?{'sidevoice.pairings':JSON.stringify(stored)}:{});
  const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element(id))}return elements.get(id)},body:new Element('body'),createElement:()=>new Element(),addEventListener:(name,fn)=>(documentHandlers[name]??=[]).push(fn)},window:{addEventListener:(name,fn)=>handlers[name]=fn},MutationObserver:class{constructor(fn){observers.push(fn)}observe(){}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
  if(localHost||nativeData)context.window.__sidevoiceDesktop={host:{...(localHost?{localHost}:{}),...(nativeData?{data:nativeData}:{})}};
  // The outbox's storage across reloads, and this tab's scope in it.
@@ -810,7 +810,7 @@ function network({at={},target=null,roomSays=null,refuse=false}={}){
   if(path.startsWith('/api/device/identity?nonce='))return reply(200,{fingerprint:node.fp,public_key:node.public_key,host:node.host,signature:await node.sign(decodeURIComponent(path.split('nonce=')[1]))});
   if(path==='/api/device/pair'){const body=JSON.parse(init.body);if(body.secret!=='fresh')return reply(403,{detail:'Código de emparejamiento desconocido, usado o caducado.'});node.tokens.add('tok-new');return reply(200,{device_id:'dev-9',token:'tok-new',node:{fingerprint:node.fp,public_key:node.public_key,host:node.host}})}
   if(refuse||!node.tokens.has(String(auth).replace('Bearer ','')))return reply(401,{detail:'Dispositivo no emparejado con esta máquina.'});
-  return reply(200,{binding:null,participants:node.people||[],messages:node.messages||[],room:{revision:0},clients:[],call:null});
+  return reply(200,{binding:null,participants:node.people||[],closed_threads:node.closed_threads||[],messages:node.messages||[],room:{revision:0},clients:[],call:null});
  };
  return {get,asked};
 }
@@ -1034,6 +1034,133 @@ test('Every paired machine at once: each at its own address with its own token, 
  s.run('settleLink(__pc,null,"away")');
  const after=s.run('roomStore.getState().participants');
  assert.deepEqual(plain(after.map(row=>[row.available,row.reach])),[[true,'listening'],[false,'offline']]);
+});
+
+test('A paired machine keeps its remembered conversation card after page restart while unreachable',async()=>{
+ const node=await fakeNode();node.tokens.add('tok-1');node.people=[{thread_id:'old',title:'Old conversation',available:true}];
+ const first=setup({paired:false,stored:{pairings:[pairingOf(node,{rv:null})]}});
+ first.context.__fp=node.fp;
+ first.run("const link=linkOf(__fp);link.base='http://127.0.0.1:8768';link.reach='ok';publishLinks()");
+ first.context.fetch=network({at:{'http://127.0.0.1:8768':node}}).get;
+ await first.run('refreshPeople(__fp)');
+ assert.equal(first.run('roomStore.getState().participants[0].threadId'),node.fp+'|old');
+ const restarted=setup({paired:false,siteData:first.saved});
+ assert.deepEqual(plain(restarted.run('roomStore.getState().participants.map(p=>[p.threadId,p.available,p.reach])')),
+  [[node.fp+'|old',false,'offline']]);
+});
+
+test('Desktop native pairing hydration restores only card metadata after restart',async()=>{
+ const node=await fakeNode();node.tokens.add('tok-1');node.people=[{thread_id:'old',title:'Old conversation',available:true}];
+ const pairing=pairingOf(node,{rv:null});
+ const data={pairings:{read:async()=>({pairings:[pairing],pendingRevokes:[]}),write:async()=>{}}};
+ const first=setup({paired:false,nativeData:data});first.context.__fp=node.fp;
+ await new Promise(resolve=>setTimeout(resolve,0));
+ first.run("const link=linkOf(__fp);link.base='http://127.0.0.1:8768';link.reach='ok';publishLinks()");
+ first.context.fetch=network({at:{'http://127.0.0.1:8768':node}}).get;
+ await first.run('refreshPeople(__fp)');
+ const restarted=setup({paired:false,siteData:first.saved,nativeData:data});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.deepEqual(plain(restarted.run('roomStore.getState().participants.map(p=>[p.threadId,p.available])')),
+  [[node.fp+'|old',false]]);
+ assert.equal(restarted.saved['sidevoice.pairings'],undefined,'the WebView stores no native pairing token');
+ assert.doesNotMatch(restarted.saved['sidevoice.conversation-cards.v1'],/tok-1/);
+});
+
+test('A temporary empty machine inventory does not erase a remembered conversation',async()=>{
+ const node=await fakeNode();node.tokens.add('tok-1');node.people=[];
+ const s=setup({paired:false,stored:{pairings:[pairingOf(node,{rv:null})]}});
+ s.context.__fp=node.fp;
+ s.run("const link=linkOf(__fp);link.base='http://127.0.0.1:8768';link.reach='ok';link.people=[{node:__fp,thread_id:'old',title:'Old conversation',available:true}];publishLinks();mergePeople()");
+ s.context.fetch=network({at:{'http://127.0.0.1:8768':node}}).get;
+ await s.run('refreshPeople(__fp)');
+ assert.deepEqual(plain(s.run('roomStore.getState().participants.map(p=>[p.threadId,p.available])')),
+  [[node.fp+'|old',false]]);
+});
+
+test('A paired machine returning at its saved address restores the same card without a duplicate',async()=>{
+ const node=await fakeNode();node.tokens.add('tok-1');node.people=[{thread_id:'old',title:'Old conversation',available:true}];
+ const first=setup({paired:false,stored:{pairings:[pairingOf(node,{rv:null})]}});
+ first.context.__fp=node.fp;
+ first.run("const link=linkOf(__fp);link.base='http://127.0.0.1:8768';link.reach='ok';publishLinks()");
+ first.context.fetch=network({at:{'http://127.0.0.1:8768':node}}).get;
+ await first.run('refreshPeople(__fp)');
+ const restarted=setup({paired:false,siteData:first.saved});restarted.context.__fp=node.fp;
+ let online=false;const reachable=network({at:{'http://127.0.0.1:8768':node}});
+ restarted.context.fetch=(...args)=>online?reachable.get(...args):Promise.reject(Error('offline'));
+ await restarted.run('locate(__fp,{fresh:true})');
+ assert.deepEqual(plain(restarted.run('roomStore.getState().participants.map(p=>[p.threadId,p.available])')),
+  [[node.fp+'|old',false]]);
+ online=true;
+ await restarted.run('locate(__fp,{fresh:true})');await restarted.run('refreshPeople(__fp)');
+ assert.deepEqual(plain(restarted.run('roomStore.getState().participants.map(p=>[p.threadId,p.available])')),
+  [[node.fp+'|old',true]]);
+ assert.equal(restarted.run('roomStore.getState().machines[0].state'),'connected');
+});
+
+test('A network return wakes the saved-address probe without waiting for a suspended WebView timer',async()=>{
+ const node=await fakeNode();node.tokens.add('tok-1');node.people=[{thread_id:'old',title:'Old conversation',available:true}];
+ const s=setup({paired:false,stored:{pairings:[pairingOf(node,{rv:null})]}});
+ s.context.__fp=node.fp;
+ s.context.fetch=network({at:{'http://127.0.0.1:8768':node}}).get;
+ assert.equal(typeof s.handlers.online,'function');
+ s.handlers.online();
+ for(let n=0;n<25&&s.run('linkOf(__fp).reach')!=='ok';n++)await new Promise(resolve=>setTimeout(resolve,10));
+ assert.equal(s.run('linkOf(__fp).reach'),'ok');
+ await s.run('refreshPeople(__fp)');
+ assert.deepEqual(plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')),[node.fp+'|old']);
+});
+
+test('Repeated offline beats coalesce one identity probe per machine until it settles',async()=>{
+ const node=await fakeNode();node.tokens.add('tok-1');
+ const s=setup({paired:false,stored:{pairings:[pairingOf(node,{rv:null})]}});
+ const replies=network({at:{'http://127.0.0.1:8768':node}});
+ let release,identityCalls=0;
+ s.context.fetch=(url,init)=>{
+  if(String(url).includes('/api/device/identity')){
+   identityCalls++;
+   return new Promise(resolve=>{release=()=>resolve(replies.get(url,init))});
+  }
+  return replies.get(url,init);
+ };
+ s.run('machinesBeat();machinesBeat();machinesBeat()');
+ for(let n=0;n<20&&!identityCalls;n++)await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(identityCalls,1,'three wake events must not start three parallel probes');
+ release();
+ for(let n=0;n<20&&s.run('beatLocates.size');n++)await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(s.run('beatLocates.size'),0,'the probe is released for the next bounded retry');
+});
+
+test('An explicit agent leave retires the card across restart; a new explicit join can show it again',async()=>{
+ const node=await fakeNode();node.tokens.add('tok-1');node.people=[{thread_id:'old',title:'Old conversation',available:true}];
+ const first=setup({paired:false,stored:{pairings:[pairingOf(node,{rv:null})]}});first.context.__fp=node.fp;
+ first.run("const link=linkOf(__fp);link.base='http://127.0.0.1:8768';link.reach='ok';publishLinks()");
+ first.context.fetch=network({at:{'http://127.0.0.1:8768':node}}).get;
+ await first.run('refreshPeople(__fp)');
+ node.people=[];node.closed_threads=['old'];
+ await first.run('refreshPeople(__fp)');
+ assert.deepEqual(plain(first.run('roomStore.getState().participants.map(p=>p.threadId)')),[]);
+ const restarted=setup({paired:false,siteData:first.saved});
+ assert.deepEqual(plain(restarted.run('roomStore.getState().participants.map(p=>p.threadId)')),[]);
+ node.closed_threads=[];node.people=[{thread_id:'old',title:'Rejoined',available:true}];
+ restarted.context.__fp=node.fp;
+ restarted.run("const link=linkOf(__fp);link.base='http://127.0.0.1:8768';link.reach='ok';publishLinks()");
+ restarted.context.fetch=network({at:{'http://127.0.0.1:8768':node}}).get;
+ await restarted.run('refreshPeople(__fp)');
+ assert.deepEqual(plain(restarted.run('roomStore.getState().participants.map(p=>[p.threadId,p.title])')),
+  [[node.fp+'|old','Rejoined']]);
+});
+
+test('A failed user close leaves the remembered card until Core accepts explicit leave',async()=>{
+ const node=await fakeNode();node.tokens.add('tok-1');node.people=[{thread_id:'old',title:'Old conversation',available:true}];
+ const s=setup({paired:false,stored:{pairings:[pairingOf(node,{rv:null})]}});s.context.__fp=node.fp;
+ s.run("const link=linkOf(__fp);link.base='http://127.0.0.1:8768';link.reach='ok';publishLinks()");
+ const net=network({at:{'http://127.0.0.1:8768':node}});s.context.fetch=net.get;
+ await s.run('refreshPeople(__fp)');
+ s.context.fetch=(url,init)=>url.endsWith('/api/presentation/close')?Promise.resolve({ok:false,status:409,json:async()=>({detail:'No se encuentra'})}):net.get(url,init);
+ await assert.rejects(s.run('window.sidevoiceActions.closeParticipant')(node.fp+'|old'));
+ assert.deepEqual(plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')),[node.fp+'|old']);
+ const restarted=setup({paired:false,siteData:s.saved});
+ assert.deepEqual(plain(restarted.run('roomStore.getState().participants.map(p=>p.threadId)')),[node.fp+'|old']);
 });
 
 test('Olvidar forgets the machine here at once, and asks it to revoke this device only where it proves itself',async()=>{
