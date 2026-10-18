@@ -1,8 +1,25 @@
 import { expect, test, vi } from "vitest";
-import { pageVoice } from "./voice-module.js";
+import { beginBrowserAudioActivation, pageVoice } from "./voice-module.js";
 import type { VoiceHost, VoiceModelSource } from "@sidevoice/voice";
 
 /* Where the page's voice and its models' catalogues come from: the desktop app's, or one engine on this page. */
+
+test("the onboarding try opens one microphone and resumes audio in the button gesture", async () => {
+  const order: string[] = [];
+  const stop = vi.fn();
+  const close = vi.fn(async () => {});
+  const getUserMedia = vi.fn(async () => { order.push("microphone"); return { getTracks: () => [{ stop }] }; });
+  Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia } });
+  vi.stubGlobal("AudioContext", class { resume() { order.push("resume"); return Promise.resolve(); } close = close; });
+  const prepared = beginBrowserAudioActivation();
+  order.push("model load begins");
+  expect(order).toEqual(["resume", "microphone", "model load begins"]);
+  expect(getUserMedia).toHaveBeenCalledTimes(1);
+  prepared?.release();
+  await vi.waitFor(() => expect(stop).toHaveBeenCalledTimes(1));
+  expect(close).toHaveBeenCalledTimes(1);
+  vi.unstubAllGlobals();
+});
 
 test("in the desktop app both are the app's: the voice, and the engine's catalogues and keys", async () => {
   const builds = [{ accelerator: "metal", acceleratorClass: "gpu" }, { accelerator: "cpu" }];

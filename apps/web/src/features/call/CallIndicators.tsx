@@ -75,12 +75,13 @@ export function CallButton() {
   const t = translator();
   const call = useRoomStore((state) => state.call);
   const store = useContext(RoomStoreContext);
+  const onboarding = useOnboardingIfAny();
   // The microphone not allowed: the call waits, held back and saying why on hover and focus (operator, 2026-10-16);
   // pressed, it opens Settings › Permissions. A call already joined can always be left.
-  const held = !call.joined && !(useOnboardingIfAny()?.microphone?.ready ?? true);
+  const held = !call.joined && !(onboarding?.microphone?.ready ?? true);
   return (<span className="call-held">
     {/* Held: said above it, as the microphone that gives no sound is (operator, 2026-10-16). */}
-    {held && <span className="call-held-note" role="status"><WarningIcon size={14} />{t("wizard.mic.denied.title")}</span>}
+    {held && <span className="call-held-note" role="status"><WarningIcon size={14} />{t("call.needsMic")}</span>}
     <Tooltip action content={held ? t("call.needsMic") : call.label}>
       <Button id="connect" variant="primary" className={cn("call-button", call.joined && "joined", call.busy && "reconnecting")}
         aria-label={call.label} disabled={held} blockedBy={held ? "connect-why" : undefined} onBlocked={() => openSettings({ section: "permissions" }, store)} onClick={() => void window.sidevoiceActions?.toggleCall()}>

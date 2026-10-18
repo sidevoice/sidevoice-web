@@ -108,6 +108,18 @@ test("nothing heard in time, a cancel, a voice error or a start that fails: each
   expect(listeners(denied)).toBe(0);
 });
 
+test("a stalled provider setup leaves preparing with an actionable error even when stopping also stalls", async () => {
+  vi.useFakeTimers();
+  const voice = fakeVoice();
+  vi.spyOn(voice, "setSettings").mockImplementation(async () => new Promise<void>(() => {}));
+  vi.spyOn(voice, "stop").mockImplementation(async () => new Promise<void>(() => {}));
+  const result = tryTranscription(voice as unknown as Voice, SETTINGS as never, { timeoutMs: 25 });
+  const failed = expect(result).rejects.toMatchObject({ code: "trial-preparation-timeout" });
+  await vi.advanceTimersByTimeAsync(1025);
+  await failed;
+  expect(voice.calls).not.toContainEqual(["start"]);
+});
+
 test("a sentence said through the settings, in its language, heard to its end; cut short or failed, the try says why", async () => {
   const voice = fakeVoice();
   await expect(tryVoice(voice as unknown as Voice, SETTINGS as never, "Hola", { language: "es" })).resolves.toMatchObject({ status: "heard" });

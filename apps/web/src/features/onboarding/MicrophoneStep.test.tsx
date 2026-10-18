@@ -97,6 +97,8 @@ test("blocked: how to allow it for the site, Check again (still blocked, said so
   const { granted, media } = browser("denied", () => Promise.reject(refused("NotAllowedError")));
   await setup();
   expect(title()).toHaveTextContent("Permissions");
+  expect(action()).toHaveTextContent("Allow microphone");
+  await act(async () => { fireEvent.click(action()!); });
   expect(document.querySelector("#wizard .wizard-mic-help .ui-alert-title")).toHaveTextContent("Sidevoice can’t use the microphone");
   expect(wizard().getByText(/select the site settings icon beside the web address/)).toBeInTheDocument();
   expect(action()).toHaveTextContent("Check again");
@@ -108,7 +110,7 @@ test("blocked: how to allow it for the site, Check again (still blocked, said so
   expect(document.querySelector("#wizard .perm-list .wizard-mic-help")).not.toBeNull();
   action()!.focus();
   await act(async () => { fireEvent.click(action()!); });
-  expect(media.getUserMedia).toHaveBeenCalledTimes(1);
+  expect(media.getUserMedia).toHaveBeenCalledTimes(2);
   expect(said()).toBe("Still blocked.");
   expect(document.activeElement).toBe(action());
   // The site now reads allowed, but a plain read never upgrades a block (the computer may still be blocking the
@@ -165,18 +167,44 @@ test("the request closed without an answer is not a block: Allow microphone agai
   expect(action()).toHaveTextContent("Allow microphone");
 }, WHOLE_APP_MS);
 
-test("already allowed: never asked again; the step still shows it allowed, with Continue", async () => {
+test("a saved allow decision is checked with a live stream when the person asks", async () => {
   const { media } = browser("granted", () => Promise.resolve(stream()));
   await setup();
   expect(title()).toHaveTextContent("Permissions");
-  expect(action()).toBeNull();
+  expect(action()).toHaveTextContent("Allow microphone");
+  expect(media.getUserMedia).not.toHaveBeenCalled();
+  await act(async () => { fireEvent.click(action()!); });
+  expect(media.getUserMedia).toHaveBeenCalledTimes(1);
   expect(badge()).toHaveTextContent("Allowed");
   expect(proceed()).toHaveTextContent("Continue");
   expect(proceed()).toHaveClass("ui-button--primary");
-  expect(media.getUserMedia).not.toHaveBeenCalled();
   // It stays until Continue.
   await new Promise((resolve) => setTimeout(resolve, 1200));
   expect(title()).toHaveTextContent("Permissions");
+}, WHOLE_APP_MS);
+
+test("a saved wizard completion and browser permission do not claim a blocked microphone works", async () => {
+  localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "remote", microphone_done: true }));
+  const { media } = browser("granted", () => Promise.reject(refused("NotReadableError")));
+  await setup();
+  expect(title()).toHaveTextContent("Permissions");
+  expect(action()).toHaveTextContent("Allow microphone");
+  expect(media.getUserMedia).not.toHaveBeenCalled();
+  await act(async () => { fireEvent.click(action()!); });
+  expect(document.querySelector("#wizard .perm-list")).not.toHaveTextContent("Allowed");
+  expect(proceed()).toHaveAttribute("aria-disabled", "true");
+}, WHOLE_APP_MS);
+
+test("Safari's denied permission hint cannot override a stream the person allowed", async () => {
+  const { media } = browser("denied", () => Promise.resolve(stream()));
+  await setup();
+  expect(action()).toHaveTextContent("Allow microphone");
+  await act(async () => { fireEvent.click(action()!); });
+  expect(media.getUserMedia).toHaveBeenCalledTimes(1);
+  expect(badge()).toHaveTextContent("Allowed");
+  window.dispatchEvent(new Event("focus"));
+  await waitFor(() => expect(badge()).toHaveTextContent("Allowed"));
+  expect(proceed()).not.toHaveAttribute("aria-disabled", "true");
 }, WHOLE_APP_MS);
 
 test("none connected: No microphone found, and Check again finds one", async () => {

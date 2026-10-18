@@ -12,7 +12,7 @@ import {probeSiteStorage} from './site-storage.js';
 import {tryTranscription,tryVoice,tryEndOfTurn} from './voice-trial.js';
 import {systemLanguage,SPEECH_LANGUAGES} from './system-language.js';
 import {createOutbox} from './outbox.js';
-import {pageVoice} from './voice-module.js';
+import {pageVoice,beginBrowserAudioActivation} from './voice-module.js';
 import {readCallPreferences} from './call-preferences.ts';
 import {clampDeviceName,deviceNameProblem} from './device-name-rules.js';
 import {readDeleteUnused,writeDeleteUnused,staleModels} from './model-housekeeping.js';
@@ -1886,7 +1886,7 @@ async function joinRoom(epoch,context){
 function resumedSession(session,ticket){return !!ticket&&session?.resumed===true&&session.session_id===ticket.session_id}
 function resumeTicket(){return resumeToken&&state.sessionId?{session_id:state.sessionId,token:resumeToken,last_seq:lastSeq}:null}
 // A promise with a patience of its own: past `ms` nobody waits for it any more (it is not cancelled).
-function within(promise,ms){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('timeout')),ms)})]).finally(()=>clearTimeout(timer))}
+function within(promise,ms,code){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Object.assign(Error(code||'timeout'),code?{code}:{})),ms)})]).finally(()=>clearTimeout(timer))}
 // One attempt — the machine located, the room answering the hello — has a deadline past the room's own patience with
 // a hello (25 s, and 3 more to ask why): nothing it waits on keeps the call from the next attempt.
 const RECONNECT_ATTEMPT_MS=35000,REJOIN_STEP_MS=5000;
@@ -2033,6 +2033,7 @@ async function replayReply(historyId){
 const page=pageVoice();
 let voiceHostOpening=null,catalogsOpening=null;
 function voiceHost(){return voiceHostOpening??=page.voice().then(host=>{void watchAudioDevices(host).catch(()=>{});return host}).catch(error=>{voiceHostOpening=null;throw error})}
+async function trialVoiceHost(ms){const opening=voiceHost();try{return await within(opening,ms,'trial-preparation-timeout')}catch(error){if(error?.code==='trial-preparation-timeout'&&voiceHostOpening===opening)voiceHostOpening=null;throw error}}
 function modelCatalogs(){return catalogsOpening??=page.catalogs().catch(error=>{catalogsOpening=null;throw error})}
 async function keptProviderKeys(models,catalogs){return Object.fromEntries(await Promise.all(remoteProviders(catalogs).map(async({id})=>[id,await models.hasCredential(id).catch(()=>null)])))}
 async function loadVoiceCatalogue(){
@@ -2086,24 +2087,28 @@ function refuseTryInCall(){
 }
 async function tryVoiceSettings(task,{text='',language=null,keep=true,onListening,onLevel,onProgress,onTranscribing,onTake}={}){
  refuseTryInCall();
+ const preparationMs=task==='stt'?(state.voiceDraft||state.voiceSettings)?.stt?.catalog==='local'?90000:20000:0;
+ const preparationDeadline=Date.now()+preparationMs;
+ const activation=task==='stt'&&!window.__sidevoiceDesktop?.host?.voice?beginBrowserAudioActivation(state.audioDevices?.input):null;
  voiceTry?.abort();const abort=voiceTry=new AbortController();
  // Stop on a transcription try ends its take with what was said (finishVoiceTry), rather than dropping it.
  const finish=voiceTryFinish=new AbortController();
  const settings=voiceSettingsHere(state.voiceDraft||state.voiceSettings,state.voiceCatalogue.catalogs);
  try{
-  const host=await voiceHost();
+  const host=task==='stt'?await trialVoiceHost(preparationMs):await voiceHost();
+  if(activation)host.activateAudio?.(activation);
   const trial=host.createCall();
   try{
   // What each phase took, for the try to say how quick it was.
   let timings=null;const onTimings=value=>{timings=value};
-  const result=task==='stt'?{text:await tryTranscription(routedTrial(host,trial),settings,{signal:abort.signal,finish:finish.signal,onTimings,onListening,onLevel,onTranscribing,onTake,fence:()=>unroute(host,trial)})}
+  const result=task==='stt'?{text:await tryTranscription(routedTrial(host,trial),settings,{signal:abort.signal,finish:finish.signal,timeoutMs:Math.max(1,preparationDeadline-Date.now()),onTimings,onListening,onLevel,onTranscribing,onTake,fence:()=>unroute(host,trial)})}
    :(await tryVoice(routedTrial(host,trial),settings,text,{language,signal:abort.signal,onTimings,onProgress:onProgress&&(progress=>onProgress(sayingRange(progress,text)))}),{});
   result.timings=timings;
   if(keep){writeVoiceSettings(pageStorage(),settings);roomStore.patch({voiceSettings:settings})}
   return result;
-  }finally{await unroute(host,trial).catch(()=>{});await trial.dispose()}
+  }finally{await within(unroute(host,trial),1000).catch(()=>{});await within(trial.dispose(),1000).catch(()=>{})}
  }catch(error){throw voiceRefused(error,'try')}
- finally{if(voiceTry===abort)voiceTry=null;if(voiceTryFinish===finish)voiceTryFinish=null}
+ finally{activation?.release();if(voiceTry===abort)voiceTry=null;if(voiceTryFinish===finish)voiceTryFinish=null}
 }
 /* A try's call takes the microphone once it has started (its settings, models and take in place), and each time it
  * starts again (a retune stops it, which lets the microphone go): only a started call can be given it. */

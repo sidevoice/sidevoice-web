@@ -87,17 +87,16 @@ function answering(room: RoomViewState, local: boolean) {
     && room.facts.machineLinks[machine.pairingId]?.reach === "ok") ?? null;
 }
 
-/** Whether the setup has what it needs of the microphone: allowed, or nothing to ask here; where the browser cannot say
- *  without asking, allowed once in this setup. */
-function microphoneReady(microphone: MicrophoneSnapshot, record: OnboardingRecord) {
-  return microphone.state === "granted" || microphone.state === "none" || (!microphone.known && microphone.state === "prompt" && record.microphone_done);
+/** Only an opened stream or the app's live permission answer confirms this device's microphone. */
+function microphoneReady(microphone: MicrophoneSnapshot) {
+  return microphone.state === "granted" || microphone.state === "none";
 }
 
 /** What resume reads of the microphone: whether the permissions step was passed with it allowed, and it still is (or there
  *  is nothing to ask). Required to call in this release (operator, 2026-10-16); the setup lets it be passed without
  *  ("Continue without …"), and the call area then asks for it. */
 function microphoneFacts(microphone: MicrophoneSnapshot, record: OnboardingRecord) {
-  return { passed: microphone.state === "none" || (record.microphone_done && microphoneReady(microphone, record)) || record.microphone_skipped };
+  return { passed: microphone.state === "none" || (record.microphone_done && microphoneReady(microphone)) || record.microphone_skipped };
 }
 
 /** What resume reads of the room: which machines answer, and the device's kept voice settings; and the microphone. */
@@ -201,7 +200,7 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
     path: canHostAgents ? record.choice : "remote",
     localReady: live.localReady,
     remoteReady: live.remoteReady,
-    microphone: { ...microphone, ready: microphoneReady(microphone, record) },
+    microphone: { ...microphone, ready: microphoneReady(microphone) },
     requestMicrophone: () => microphoneAccess.request(),
     openMicrophoneSettings: microphoneAccess.openSettings,
     tried: (task) => !!draft && record.trials[task] === trialKey(draft[task]),
