@@ -164,6 +164,35 @@ test("once it is here its voices appear, and it can be tried without saving; a p
   expect(document.getElementById("stt-language")).toBeInTheDocument();
 });
 
+test("English interface previews Spanish-only Dora with Spanish words and speech language", async () => {
+  setUiLanguage("en");
+  const settings = { ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-base", language: "en" },
+    tts: { catalog: "local", model: "kokoro-82m-v1.0", voice: "ef_dora", speed: 1 } };
+  const { actions } = renderPane({ voiceSettings: settings, speechLanguage: "en" });
+  expect(document.querySelector("#tts-try-block button.tts-try-said")).toHaveTextContent("¡Hola! Así leerá Sidevoice las respuestas de tu agente.");
+  await act(async () => { fireEvent.click(document.getElementById("tts-try")!); });
+  expect(actions.tryVoiceSettings).toHaveBeenCalledWith("tts", expect.objectContaining({
+    text: "¡Hola! Así leerá Sidevoice las respuestas de tu agente.", language: "es", keep: false,
+  }));
+});
+
+test("changing voices updates the default sample but keeps a sentence the person edited", () => {
+  setUiLanguage("en");
+  const { store } = renderPane({ speechLanguage: "en" });
+  const said = () => document.querySelector("#tts-try-block button.tts-try-said")!;
+  expect(said()).toHaveTextContent("¡Hola! Así leerá Sidevoice las respuestas de tu agente.");
+  const model = catalogs[0].models.find((candidate) => candidate.id === "kokoro-82m-v1.0")!;
+  const changedCatalogs = [{ ...catalogs[0], models: catalogs[0].models.map((candidate) => candidate === model
+    ? { ...candidate, voices: [...candidate.voices, { id: "af_heart", languages: ["en-US"] }] } : candidate) }, ...catalogs.slice(1)] as CatalogView[];
+  act(() => store.patch({ voiceCatalogue: { state: "ready", catalogs: changedCatalogs, error: "" },
+    voiceSettings: { ...defaultVoiceSettings(), tts: { ...defaultVoiceSettings().tts, voice: "af_heart" } } }));
+  expect(said()).toHaveTextContent("Hi! This is how Sidevoice will read your agent's replies.");
+  fireEvent.click(said());
+  fireEvent.change(document.getElementById("tts-sentence")!, { target: { value: "My own phrase." } });
+  act(() => store.patch({ voiceSettings: { ...defaultVoiceSettings(), tts: { ...defaultVoiceSettings().tts, voice: "ef_dora" } } }));
+  expect(document.getElementById("tts-sentence")).toHaveValue("My own phrase.");
+});
+
 /** A try that runs until the test ends it, and what the pane asked it to tell as it goes. */
 function pendingTry(actions: { tryVoiceSettings: ReturnType<typeof vi.fn> }) {
   const running: { told: TrialProgress; finish(result: unknown): void } = { told: {}, finish: () => {} };
@@ -303,10 +332,10 @@ test("the voice's try: the button and the sentence on its first row, the sentenc
   expect(block.querySelector(".stt-try-area.tts-try-area .model-try-live")).toHaveAttribute("aria-live", "polite");
   // The sentence, before any try: a quote; a click on it, or its pencil, makes it a box to edit.
   const said = block.querySelector("button.tts-try-said")!;
-  expect(said).toHaveTextContent(/^Hi! This is how Sidevoice will read your agent's replies\.$/);
+  expect(said).toHaveTextContent(/^¡Hola! Así leerá Sidevoice las respuestas de tu agente\.$/);
   expect(block.querySelector("#tts-sentence")).toBeNull();
   fireEvent.click(said);
-  expect(block.querySelector("#tts-sentence")).toHaveValue("Hi! This is how Sidevoice will read your agent's replies.");
+  expect(block.querySelector("#tts-sentence")).toHaveValue("¡Hola! Así leerá Sidevoice las respuestas de tu agente.");
   fireEvent.blur(block.querySelector("#tts-sentence")!);
   expect(block.querySelector("#tts-sentence")).toBeNull();
   fireEvent.click(block.querySelector(".tts-try-sentence > button.ui-button")!);
