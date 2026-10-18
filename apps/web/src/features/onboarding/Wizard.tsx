@@ -17,6 +17,7 @@ import { useTurnTry, type TurnTryHandle } from "../settings/TurnTry";
 import { Appearance } from "../settings/SettingsDialog";
 import { Group, Row } from "../../components/ui/Card";
 import { Select } from "../../components/ui/Select";
+import { LanguagePicker } from "../../components/ui/LanguagePicker";
 import { useModelState, useVoiceTry, type ModelState, type SetupTry, catalogueShown } from "../settings/ModelSetup";
 import { languageName, translator, UI_LANGUAGES, type MessageKey, type Translate } from "../../i18n/translator";
 import { hostStatusText, localHostRecovery, runLocalHostAction, type LocalHostAction } from "../settings/local-host-status";
@@ -83,7 +84,7 @@ function BasicsStep({ t }: { t: Translate }) {
       <Row label={t("settings.appearance")} description={t("settings.appearance.hint")}><Appearance t={t} /></Row>
       <Row label={t("settings.deviceName")} description={t("settings.deviceName.hint")} htmlFor="wizard-device-name"><DeviceNameField id="wizard-device-name" /></Row>
       <Row label={t("wizard.basics.uiLanguage")} htmlFor="wizard-ui-language">
-        <Select id="wizard-ui-language" value={language} onValueChange={(next) => { setLanguage(next); window.sidevoiceActions?.setInterfaceLanguage?.(next); }} options={languages} />
+        <LanguagePicker id="wizard-ui-language" value={language} label={t("wizard.basics.uiLanguage")} onValueChange={(next) => { setLanguage(next); window.sidevoiceActions?.setInterfaceLanguage?.(next); }} options={languages} />
       </Row>
     </Group>
   </section>;

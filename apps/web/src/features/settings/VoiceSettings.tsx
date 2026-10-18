@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRoomStore } from "../../state/room-store";
 import { Select, type SelectOption } from "../../components/ui/Select";
+import { LanguagePicker } from "../../components/ui/LanguagePicker";
 import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
 import { Group, Row } from "../../components/ui/Card";
@@ -18,6 +19,7 @@ import { cancelDownload, catalogueShown, downloadModel, TryButton, TryPanel, use
 import { TurnTry, type TurnTryHandle } from "./TurnTry";
 import { useMedia } from "../../state/call-layout";
 import { SETTINGS_PHONE_QUERY, useSectionShown } from "./settings-levels";
+import { VoicePicker } from "./VoicePicker";
 
 /* The call's voice as the person chooses it, for what transcribes and for what speaks: where it runs — this device, or
  * a remote provider — then, on this device, a family of models and one of them, made ready here (ModelPrepare); then
@@ -180,15 +182,13 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
   // The model's own settings (language; voice and speed), in a card of their own under the model once it can take them.
   const modelSettings = model.ready ? <>
     {model.ready && task === "stt" && <Row label={<>{t("voice.language")}<NewMark id="feature:speech-language" /></>} description={t("voice.language.hint")} htmlFor="stt-language">
-      <Select id="stt-language" value={draft.stt.language ?? ""} onValueChange={(language) => edit({ stt: { language: language || null } })}
+      <LanguagePicker id="stt-language" value={draft.stt.language ?? ""} label={t("voice.language")} onValueChange={(language) => edit({ stt: { language: language || null } })}
         options={[{ value: "", label: t("voice.language.detect") }, ...choices.stt.languages.map((tag: string) => ({ value: tag, label: languageName(tag) }))]} />
     </Row>}
     {/* Always a list, even with the automatic voice alone in it: what the voice is, and that it is a choice. */}
     {model.ready && task === "tts" && <Row label={t("voice.voice")} htmlFor="tts-voice">
-      <Select id="tts-voice" value={draft.tts.voice ?? ""} onValueChange={(voice) => edit({ tts: { voice: voice || null } })}
-        options={[{ value: "", label: t(choices.tts.automaticVoice as MessageKey) }, ...voices.map((voice: { id: string; name: string | null; languages: string[] }) => ({
-          value: voice.id, label: voice.name ?? voice.id, description: voice.languages.length ? voice.languages.map(languageName).join(", ") : undefined,
-        }))]} />
+      <VoicePicker id="tts-voice" value={draft.tts.voice ?? ""} automatic={t(choices.tts.automaticVoice as MessageKey)}
+        voices={voices} onValueChange={(voice) => edit({ tts: { voice: voice || null } })} />
     </Row>}
     {model.ready && speed && <Row label={t("voice.speed")} htmlFor="tts-speed">
       <span className="voice-speed">
