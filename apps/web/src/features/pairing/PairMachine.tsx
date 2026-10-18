@@ -90,6 +90,7 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
   const [address, setAddress] = useState("");
   // The address's disclosure open: by the person (it opens and closes), or by itself where the address is needed.
   const [addressOpen, setAddressOpen] = useState(false);
+  const addressOpenedByUser = useRef(false);
   // This code's addresses (or the one typed) did not reach its machine: in A and B, an address is needed until another code.
   const [unreached, setUnreached] = useState(false);
   // Connecting: over https (Connect), or without encryption once the person agreed (its own button).
@@ -132,7 +133,7 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
 
   // The address is needed when the code does not say where another device finds the machine; in A and B, also once
   // the addresses it does say did not reach it. Otherwise it is optional (C: only ever when the code says nowhere).
-  const needsAddress = !!preview && !preview.reachable;
+  const needsAddress = !!preview && !preview.reachable && !preview.plain.length;
   const addressRequired = needsAddress || (recognised && unreached);
   const addressShown = addressOpen;
 
@@ -142,13 +143,12 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
     setNow(at);
     setConnected("");
     setUnreached(false);
-    // A code that does not say where its machine is opens the address.
-    if (seen && !seen.reachable) setAddressOpen(true);
+    // A code with an embedded private address can use it without opening the manual field.
+    if (seen) setAddressOpen(addressOpenedByUser.current || (!seen.reachable && !seen.plain.length));
     // Agreeing to no encryption is for the code and the address it was asked about, and no other.
     if (alert?.kind === "httpPrivate") setAlert(null);
     setHeard(seen ? t("pairing.recognised", { host: named(seen.host, t), minutes: minutesLeft(seen, at) }) : "");
-    // A code that lists its machine only over plain http on a private network starts the address there: the https
-    // attempt, and what follows when only plain http answers, go to an address typed.
+    // The code's private address is ready for the HTTPS attempt, while the field remains available for an override.
     const plain = seen && !seen.reachable ? seen.plain[0] ?? "" : "";
     const replaced = !address.trim() || address === prefilled.current;
     if (replaced) setAddress(plain);
@@ -190,8 +190,9 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
     let seen: PairingCodePreview;
     try { seen = previewPairingCode(code); } catch (reason) { refuse(failure(reason, t), "", ""); return; }
     const host = named(seen.host, t);
-    // An address folded away (A) or never brought in (B) is not used, unless it is needed.
-    const typed = addressShown || addressRequired ? address.trim() : "";
+    // A folded manual field uses the address embedded in this code, never a stale override from another code.
+    const typed = (addressShown || addressRequired) && address.trim() ? address.trim()
+      : !unreached && !seen.reachable ? seen.plain[0] ?? "" : "";
     if (!seen.reachable && !typed) { refuse({ field: "address", key: "pairing.addressNeeded" }, host, ""); return; }
     if (addressRequired && !typed) { refuse({ field: "address", key: "pairing.addressUnreached" }, host, ""); return; }
     if (typed) {
@@ -291,7 +292,7 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
           where the code carries no usable address or its addresses did not reach the machine. */}
       <span className="pairing-address-head">
         <button type="button" className="pairing-address-link" aria-expanded={addressOpen} aria-controls={addressBodyId}
-          onClick={() => { if (!addressOpen) focusAddress.current = true; setAddressOpen(!addressOpen); }}>
+          onClick={() => { addressOpenedByUser.current = !addressOpen; if (!addressOpen) focusAddress.current = true; setAddressOpen(!addressOpen); }}>
           <ChevronIcon size={14} />{t(addressRequired ? "pairing.addressToggleNeeded" : "pairing.addressToggle")}
         </button>
         <InfoTip label={t("pairing.addressWhenAbout")}>{t("pairing.addressWhen")}</InfoTip>

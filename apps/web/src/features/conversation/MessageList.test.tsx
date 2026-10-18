@@ -196,6 +196,23 @@ test("at the end, the list stays there when the text box takes its height; scrol
   }
 });
 
+test("scrolling away keeps a neutral way back without announcing new messages", () => {
+  const { container, rerender } = render(<MessageList conversation={view([message({ segment: "a" })])} />);
+  const list = container.querySelector<HTMLElement>("#messages")!;
+  Object.defineProperties(list, { scrollHeight: { configurable: true, value: 900 }, clientHeight: { configurable: true, value: 300 } });
+  const scrollTo = vi.fn();
+  Object.defineProperty(list, "scrollTo", { configurable: true, value: scrollTo });
+  list.scrollTop = 100;
+  fireEvent.scroll(list);
+  expect(screen.getByRole("button", { name: "Go to the end of the conversation" })).toHaveTextContent("Go to the end");
+  rerender(<MessageList conversation={view([message({ segment: "a" }), message({ segment: "b", text: "Another reply" })])} />);
+  expect(scrollTo).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Go to the end of the conversation" })).toHaveTextContent("Go to the end");
+  fireEvent.click(screen.getByRole("button", { name: "Go to the end of the conversation" }));
+  expect(scrollTo).toHaveBeenCalledWith({ top: 900, behavior: "smooth" });
+  expect(screen.queryByRole("button", { name: "Go to the end of the conversation" })).toBeNull();
+});
+
 test("a delivery status this version does not know shows no mark, never the warning of one that failed (core#112)", () => {
   const { container } = render(<MessageList conversation={view([
     message({ segment: "u1", role: "user", name: "Tú", text: "Uno", delivery: "queued_offline" }),

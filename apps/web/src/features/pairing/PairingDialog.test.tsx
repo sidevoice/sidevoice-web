@@ -198,14 +198,14 @@ test("a machine its code's addresses don't reach is asked for by its address, wh
   await connect();
   expect(pairDevice).toHaveBeenLastCalledWith(pasted, expect.any(String), "192.168.1.20:8768");
   expect(screen.getByRole("alert")).toHaveTextContent("Couldn't reach 192.168.1.20:8768 over https. Check the address and port.");
-  // Another code: its own addresses are tried again, the address optional (and still there).
+  // Another code with its own reachable address closes the automatically opened manual field.
   paste(pairingCode({ host: "other" }));
   expect(disclosure()).toHaveAccessibleName(toggleOptional);
-  expect(address()).toHaveAccessibleName(fieldName);
-  expect(address()).not.toBeRequired();
+  expect(disclosure()).toHaveAttribute("aria-expanded", "false");
+  noAddress();
 });
 
-test("a code that doesn't say where its machine is needs its address; one it lists over plain http on a private network is filled in", async () => {
+test("a code without an address opens the field; an embedded private address stays collapsed and is used", async () => {
   const pairDevice = vi.fn().mockResolvedValue({ host: "nuc" });
   dialog(pairDevice);
   paste(pairingCode({ urls: ["http://127.0.0.1:8768"] }));
@@ -216,19 +216,22 @@ test("a code that doesn't say where its machine is needs its address; one it lis
   expect(pairDevice).not.toHaveBeenCalled();
   expect(address()).toHaveAttribute("aria-invalid", "true");
   expect(document.activeElement).toBe(address());
-  // Listed over plain http on a private network: the address starts there, for https first and then the person's say.
-  paste(pairingCode({ urls: ["http://127.0.0.1:8768", "http://192.168.1.20:8768"] }));
-  expect(address().value).toBe("192.168.1.20:8768");
-  expect(address()).not.toHaveAccessibleDescription(/doesn't say/);
-  // Folded away, it is still needed: Connect opens it again, saying so.
-  fireEvent.click(disclosure());
+  // The next code carries its own private address. Its field is populated but the old automatic disclosure closes.
+  const pasted = pairingCode({ urls: ["http://127.0.0.1:8768", "http://192.168.1.20:8768"] });
+  paste(pasted);
+  expect(disclosure()).toHaveAttribute("aria-expanded", "false");
   noAddress();
-  fireEvent.change(document.getElementById("device-pairing-address")!, { target: { value: "" } });
+  expect((document.getElementById("device-pairing-address") as HTMLInputElement).value).toBe("192.168.1.20:8768");
   await connect();
-  expect(disclosure()).toHaveAttribute("aria-expanded", "true");
-  expect(address()).toHaveAccessibleDescription("This code doesn't say where the machine is. Enter its address.");
-  expect(document.activeElement).toBe(address());
-  expect(pairDevice).not.toHaveBeenCalled();
+  expect(pairDevice).toHaveBeenCalledWith(pasted, expect.any(String), "192.168.1.20:8768");
+  // A person can still open the field and change the address explicitly.
+  paste(pasted);
+  fireEvent.click(disclosure());
+  expect(address()).not.toBeRequired();
+  expect(address()).not.toHaveAccessibleDescription(/doesn't say/);
+  fireEvent.change(address(), { target: { value: "192.168.1.21:8768" } });
+  await connect();
+  expect(pairDevice).toHaveBeenLastCalledWith(pasted, expect.any(String), "192.168.1.21:8768");
 });
 
 test("an http:// address on a private network goes straight to agreeing to no encryption; at a public address or a name, it is refused under the field", async () => {
@@ -285,6 +288,8 @@ test("a machine on a private network that answers only without encryption is rea
   dialog(pairDevice);
   const pasted = pairingCode({ urls: ["http://127.0.0.1:8768", "http://192.168.1.20:8768"] });
   paste(pasted);
+  expect(disclosure()).toHaveAttribute("aria-expanded", "false");
+  noAddress();
   submit().focus();
   await connect();
   expect(pairDevice).toHaveBeenLastCalledWith(pasted, expect.any(String), "192.168.1.20:8768");
@@ -304,7 +309,7 @@ test("a machine on a private network that answers only without encryption is rea
   expect(submit()).not.toHaveAttribute("aria-busy");
   expect(submit().form).toHaveAttribute("aria-busy", "true");
   expect(code().readOnly).toBe(true);
-  expect(address().readOnly).toBe(true);
+  expect((document.getElementById("device-pairing-address") as HTMLInputElement).readOnly).toBe(true);
   expect(warning).toBeInTheDocument();
   await act(async () => { finish({ host: "nuc" }); });
   expect(screen.getByText("Connected to “nuc”.")).toHaveAttribute("role", "status");
@@ -323,6 +328,7 @@ test("agreeing holds for that code and address only, Connect and Enter never go 
   expect(pairDevice).toHaveBeenCalledTimes(3);
   expect(pairDevice.mock.calls.every((call) => call.length === 3)).toBe(true);
   // Another address, or another code, and the warning is gone.
+  fireEvent.click(disclosure());
   fireEvent.change(address(), { target: { value: "192.168.1.21:8768" } });
   expect(document.querySelector(".pairing-consent")).toBeNull();
   await connect();
@@ -441,7 +447,8 @@ test("the field's only hint is what a code that says nowhere needs; a code that 
   expect(hint).toHaveClass("ui-field-hint");
   expect(before(address(), hint)).toBe(true);
   paste(pairingCode({ urls: ["http://127.0.0.1:8768", "http://192.168.1.20:8768"] }));
-  expect(address().value).toBe("192.168.1.20:8768");
+  expect(disclosure()).toHaveAttribute("aria-expanded", "false");
+  expect((document.getElementById("device-pairing-address") as HTMLInputElement).value).toBe("192.168.1.20:8768");
   expect(document.getElementById("device-pairing-address-hint")).toBeNull();
   expect(screen.queryByText(when)).toBeNull();
 });

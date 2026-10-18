@@ -7,7 +7,6 @@ import { CloseIcon } from "../../components/ui/Icons";
 import { Composer } from "./Composer";
 import { translator } from "../../i18n/translator";
 import { MessageList } from "./MessageList";
-import { useMarkTranscriptSeen } from "./transcript-unread";
 import "./transcript.css";
 
 /* The whole conversation, out of the call's way behind the call bar's button (2026-10-10): docked at the call's
@@ -25,7 +24,6 @@ export function TranscriptPanel() {
   const compact = useMedia(COMPACT_QUERY);
   const modal = (narrow || compact) && open;
   const panel = useRef<HTMLElement>(null);
-  useMarkTranscriptSeen();
   useSurface({
     open, close, container: panel, modal,
     initialFocus: () => panel.current?.querySelector<HTMLElement>(".transcript-close"),
