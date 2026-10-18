@@ -84,7 +84,7 @@ function GeneralSettings({ t }: { t: Translate }) {
       <Row label={t("settings.appearance")} description={t("settings.appearance.hint")}><Appearance t={t} /></Row>
       <Row label={t("settings.deviceName")} description={t("settings.deviceName.hint")} htmlFor="device-name"><DeviceNameField id="device-name" /></Row>
       <Row label={t("settings.general.languageLabel")} description={t("settings.general.languageHint")} htmlFor="ui-language">
-        <LanguagePicker id="ui-language" value={language} label={t("settings.general.languageLabel")} onValueChange={(next) => window.sidevoiceActions?.setInterfaceLanguage?.(next)}
+        <LanguagePicker id="ui-language" value={language} label={t("settings.general.languageLabel")} showLanguageIcon={false} onValueChange={(next) => window.sidevoiceActions?.setInterfaceLanguage?.(next)}
           options={[{ value: "", label: t("settings.general.languageAuto") }, ...UI_LANGUAGES.map((value) => ({ value, label: languageName(value) }))]} />
       </Row>
     </Group>

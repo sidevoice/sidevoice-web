@@ -122,6 +122,7 @@ test("General: appearance, this device's name, then the interface's language", (
   open("whisper-base");
   expect([...document.querySelectorAll("#pane-general .ui-row-label")].map((label) => label.textContent))
     .toEqual(["Appearance", "This device’s name", "Language"]);
+  expect(document.querySelector("#ui-language .lucide-languages")).toBeNull();
 });
 
 /** Leaving Settings: the back arrow before the title, the button whose click the runtime binds to close it. */

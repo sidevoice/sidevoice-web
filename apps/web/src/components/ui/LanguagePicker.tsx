@@ -14,6 +14,7 @@ interface LanguagePickerProps {
   onValueChange: (value: string) => void;
   options: LanguageOption[];
   label: string;
+  showLanguageIcon?: boolean;
   size?: "sm" | "md";
   className?: string;
 }
@@ -21,7 +22,7 @@ interface LanguagePickerProps {
 const fold = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase();
 
 /** Searchable language choices, shared by interface, transcription and voice filtering. */
-export function LanguagePicker({ id, value, onValueChange, options, label, size = "md", className }: LanguagePickerProps) {
+export function LanguagePicker({ id, value, onValueChange, options, label, showLanguageIcon = true, size = "md", className }: LanguagePickerProps) {
   const t = translator();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -33,7 +34,7 @@ export function LanguagePicker({ id, value, onValueChange, options, label, size 
   return <Popover label={label} side="bottom" align="start" open={open} onOpenChange={changeOpen} className="language-picker-popover"
     trigger={<button id={id} type="button" className={cn("language-picker-trigger", size === "sm" && "language-picker-trigger--sm", className)}
       data-value={value} aria-label={`${label}: ${chosen?.label ?? ""}`}>
-      <Languages size={18} aria-hidden="true" />
+      {showLanguageIcon && <Languages size={18} aria-hidden="true" />}
       <span className="language-picker-value">{chosen?.label ?? t("languagePicker.search")}</span>
       <ChevronDown size={16} aria-hidden="true" className="language-picker-chevron" />
     </button>}>
