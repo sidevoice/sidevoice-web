@@ -80,6 +80,27 @@ const describeTarget=()=>targetAnswers(target)?askTarget(target,fetch):Promise.r
 // This device's pairings, every one of them live, kept across tabs and reloads. The tokens stay in here and in
 // storage; the store the interface reads gets everything else.
 function pageStorage(){try{return localStorage}catch{return null}}
+// Remember only card labels while a paired machine cannot answer. Credentials and transcripts have separate stores.
+const CARDS_KEY='sidevoice.conversation-cards.v1',MAX_CARDS=256;
+function cardOf(person,fp){
+ const thread=person?.thread_id,title=person?.title;
+ if(typeof fp!=='string'||!fp||fp.length>128||typeof thread!=='string'||!thread||thread.length>256)return null;
+ return {node:fp,thread_id:thread,title:typeof title==='string'?title.slice(0,256):''};
+}
+function readCards(){
+ try{const rows=JSON.parse(pageStorage()?.getItem(CARDS_KEY)||'[]');return Array.isArray(rows)?rows.slice(-MAX_CARDS).map(row=>cardOf(row,row?.node)).filter(Boolean):[]}
+ catch{return []}
+}
+let rememberedCards=readCards();
+function saveCards(){try{pageStorage()?.setItem(CARDS_KEY,JSON.stringify(rememberedCards.slice(-MAX_CARDS)))}catch{}}
+function rememberCards(fp,people){
+ const byKey=new Map(rememberedCards.map(row=>[conversationKey(row.node,row.thread_id),row]));
+ for(const person of people){const row=cardOf(person,fp);if(row)byKey.set(conversationKey(fp,row.thread_id),row)}
+ rememberedCards=[...byKey.values()].slice(-MAX_CARDS);saveCards();
+}
+function forgetCard(fp,thread){
+ rememberedCards=rememberedCards.filter(row=>row.node!==fp||row.thread_id!==thread);saveCards();
+}
 const nativeData=desktopDataBridge();
 const pairingStorage=nativeData?null:pageStorage(),storedPairingState=readPairingState(pairingStorage);
 let nativePairingsReady=!nativeData,nativePendingRevokes=[];
@@ -230,7 +251,8 @@ if(!nativeData)subscribeLocalHost();
  * that loses its machine keeps its conversations, shown unreachable, until the machine is forgotten. */
 const MAX_LINKS=6;
 const links=new Map();
-function linkOf(fp){let link=links.get(fp);if(!link){link={fp,base:null,reach:'checking',via:'',asked:0,applied:0,doubted:null,people:[],peopleAnswered:false};links.set(fp,link)}return link}
+function linkOf(fp){let link=links.get(fp);if(!link){link={fp,base:null,reach:'checking',via:'',asked:0,applied:0,doubted:null,
+ people:rememberedCards.filter(row=>row.node===fp).map(row=>({...row,available:false,reach:{state:'offline'}})),peopleAnswered:false};links.set(fp,link)}return link}
 function linkBase(fp){return fp!=null&&links.has(fp)?links.get(fp).base:null}
 /** The machines this page watches now: unrevoked pairings in the list's order, bounded, and the call's. */
 function liveMachines(){
@@ -247,6 +269,7 @@ function syncLinks(){
  publishLinks();
 }
 function forgetMachineState(fp){
+ rememberedCards=rememberedCards.filter(row=>row.node!==fp);saveCards();
  roomStore.batch(()=>{
   state.people=state.people.filter(p=>p.node!==fp);
   state.history=state.history.filter(r=>conversationOf(r.thread)?.node!==fp);save();
@@ -800,8 +823,16 @@ async function refreshPeople(fp=state.callNode){
  try{
   const data=await api(roomQuery('/api/presentation/participants',fp),undefined,fp);
   if(links.get(fp)!==link||link.base!==base||asked!==link.peopleAsked||fp===state.callNode&&session!==state.sessionId||!Array.isArray(data?.participants))return;
-  link.peopleAnswered=true;link.people=data.participants.map(person=>({...person,node:fp}));
-  const open=new Set(data.participants.map(person=>conversationKey(fp,person.thread_id)));
+  link.peopleAnswered=true;
+  // Only an explicit leave reported by the paired Core retires a remembered card. Missing rows alone are not a
+  // closure: the connector may still be registering after Core restart, or the response may be partial.
+  const closed=new Set((Array.isArray(data.closed_threads)?data.closed_threads:[]).filter(thread=>typeof thread==='string'));
+  for(const thread of closed)forgetCard(fp,thread);
+  const merged=new Map(link.people.filter(person=>!closed.has(person.thread_id))
+   .map(person=>[person.thread_id,{...person,available:false,reach:{state:'offline'}}]));
+  for(const person of data.participants)if(!closed.has(person.thread_id))merged.set(person.thread_id,{...person,node:fp});
+  link.people=[...merged.values()];rememberCards(fp,link.people);
+  const open=new Set(link.people.map(person=>conversationKey(fp,person.thread_id)));
   for(const entry of [...conversationCalls.values()])if(entry.node===fp&&!open.has(entry.key)&&entry.key!==targetId())void disposeConversation(entry.key).catch(()=>{});
   if(fp===state.callNode)for(const person of data.participants)acceptEpoch(person.thread_id,person.epoch);
   mergePeople();
@@ -817,11 +848,17 @@ async function refreshPeople(fp=state.callNode){
 /* The machines' beat: every live machine is located while it has no address (or its proof is old), and asked for its
  * conversations — and, unless the call is on it, its history — once it has one. The call's machine also has the call's
  * own quicker beat (`callBeat`). */
+const beatLocates=new Map();
+function locateOnBeat(fp){
+ if(beatLocates.has(fp))return;
+ const pending=Promise.resolve().then(()=>locate(fp)).finally(()=>{if(beatLocates.get(fp)===pending)beatLocates.delete(fp)});
+ beatLocates.set(fp,pending);
+}
 function machinesBeat(){
  roomStore.patch({machinesAt:Date.now()});
  for(const fp of liveMachines()){
   const link=links.get(fp),fresh=link?.base!=null&&Date.now()-(verified.get(link.base)||0)<VERIFIED_FOR_MS&&link.doubted!==link.base;
-  if(!link||link.base==null||!fresh&&!pairings.list.find(p=>p.fp===fp)?.local)void locate(fp);
+  if(!link||link.base==null||!fresh&&!pairings.list.find(p=>p.fp===fp)?.local)locateOnBeat(fp);
   if(link?.base!=null){void refreshPeople(fp);if(fp!==state.callNode)void refreshHistory(fp)}
  }
 }
@@ -2270,10 +2307,11 @@ window.sidevoiceActions={
   const to=conversationOf(key);if(!to)return;
   try{await post('/api/presentation/close',{thread_id:to.thread},to.node)}
   catch(e){
-   // The room does not know it (it was closed elsewhere, or the room restarted): only this page remembered it.
-   if(!/No se encuentra/.test(e.message||'')){setRoomError(roomError(e));throw e}
-   forgetThread(key)
+   // A Core restart can make a remembered binding temporarily unknown. Only a confirmed close retires its card.
+   setRoomError(roomError(e));throw e;
   }
+  forgetCard(to.node,to.thread);
+  const link=links.get(to.node);if(link){link.peopleAsked++;link.people=link.people.filter(person=>person.thread_id!==to.thread);mergePeople()}
   await disposeConversation(key);
   if(to.node===state.callNode)await refresh();await refreshPeople(to.node);await refreshHistory(to.node)
  },
@@ -2382,6 +2420,8 @@ setUiLanguage(devicePreferences().ui_language);
 if(rememberedThread())state.viewedThread=rememberedThread();
 function startInitialLocate(){
  publishPairings();
+ for(const fp of liveMachines())linkOf(fp);
+ mergePeople();
  scanPairedAgents();
  void Promise.allSettled(liveMachines().map(fp=>locate(fp))).finally(()=>setUiLanguage(devicePreferences().ui_language));
 }
@@ -2406,7 +2446,9 @@ if(nativeData)void loadPairingsBeforeDiscovery();
 else if(desktopLocalHost)void refreshLocalHost().finally(startInitialLocate);
 else{void refreshLocalHost();startInitialLocate()}
 setInterval(callBeat,1500);setInterval(machinesBeat,6000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.ws)keepScreenAwake()});
+window.addEventListener('online',machinesBeat);
+window.addEventListener('pageshow',machinesBeat);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){machinesBeat();if(state.ws)keepScreenAwake()}});
 setupIdleWatch();
 
 // ----- a call nobody is using ends itself, for this browser only -----
