@@ -16,7 +16,6 @@ import { PairingDialog } from "../features/pairing/PairingDialog";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { NoMachineScreen } from "../features/pairing/NoMachineScreen";
 import { LocalHostBanner } from "../features/settings/LocalHostBanner";
-import { UpdateNotice } from "../features/updates/UpdateNotice";
 import { StorageBlockedBanner } from "../features/settings/StorageBlockedBanner";
 import { OnboardingProvider, useOnboarding } from "../features/onboarding/onboarding-context";
 import { Wizard } from "../features/onboarding/Wizard";
@@ -72,8 +71,6 @@ function RoomContent() {
       <StorageBlockedBanner />
       <ResetReportNotice />
       <div className="room-shell" hidden={roomHidden} aria-hidden={roomHidden || undefined}>
-        {/* An update waiting, said first at the window's top: a slim bar, a desktop's only, over nothing of the stage. */}
-        <UpdateNotice />
         <RoomHeader blocked={blocked} />
         <LocalHostBanner />
         {/* The call: the conversations, the stage over its bar, and the transcript when it is open (2026-10-10). One layout

@@ -109,11 +109,13 @@ function NoticeLine({ notice, data }: { notice: Notice; data: Notices }) {
   </div>;
 }
 
-/** The notice, the bar at the window's top; a desktop's only. */
+/** The notice, hanging under the conversation's title over the tile's top edge (operator, 2026-10-19: of the title,
+ *  the canvas's top and the conversations' foot, the title); a desktop's only. It floats: it never moves the stage. Never
+ *  on the floating card. */
 export function UpdateNotice() {
   const narrow = useMedia(NARROW_QUERY);
   if (narrow) return null;
-  return <NoticeShown />;
+  return <div className="update-anchor"><NoticeShown /></div>;
 }
 
 /** The most pressing update that × did not hide (hidden, the next one waiting shows): its icon, its line, then ×. It comes and goes softly (none under reduced

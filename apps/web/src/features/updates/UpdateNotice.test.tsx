@@ -45,7 +45,7 @@ const NOTICES = [undefined, "pill", "title", "two-lines", "banner"] as const;
 const STALE = [undefined, "two-lines"] as const;
 
 /** The desktop app (a release, its updater as fakeUpdater makes it), its service as `service` says, the stage with a
- *  conversation on it (none: `stage` false) and Settings, the room's notice where App puts it; `notice` picked. */
+ *  conversation on it (none: `stage` false) and Settings, the room's notice where CallStage puts it; `notice` picked. */
 function room({ updater = {}, service = CURRENT, remote = {}, facts = {}, stage = true, notice, sidebar = false }: { updater?: Parameters<typeof fakeUpdater>[0]; service?: LocalHostVersion;
   remote?: Record<string, unknown>; facts?: Record<string, unknown>; stage?: boolean; notice?: string; sidebar?: boolean } = {}) {
   if (notice) localStorage.setItem("sidevoice.variants", JSON.stringify({ "update-notice": notice }));
@@ -64,15 +64,18 @@ function room({ updater = {}, service = CURRENT, remote = {}, facts = {}, stage 
       people: [{ thread_id: "t-login", title: "Fix the slow login", available: true, reach: { state: "listening" }, node: "fp-local", machine: { host: "MacBook", id: "m1" } }] } : {}),
     ...facts } as never); });
   // As App lays it out: the conversations and the stage in the room's main region.
-  render(<RoomProvider store={store}><UpdateNotice /><main>{sidebar && <ConversationSidebar />}
+  render(<RoomProvider store={store}><main>{sidebar && <ConversationSidebar />}
     <CallStage /></main><SettingsDialog /></RoomProvider>);
   return { store, fake, update, reloadToUpdate };
 }
 const settle = () => act(async () => {});
 /** The notice shown (one going is not). */
 const notice = () => document.querySelector<HTMLElement>(".update-notice:not([data-leaving])");
-/** Where it is: the bar before the room's main region ("bar"), or anywhere else. */
-const where = () => notice()?.nextElementSibling?.tagName === "MAIN" ? "bar" : null;
+/** Where it is: hanging under the conversation's title, or before the empty stage's tile when none is on it ("title"). */
+const where = () => {
+  const anchor = notice()?.closest(".update-anchor");
+  return anchor && (anchor.previousElementSibling?.matches(".stage-title") || anchor.nextElementSibling?.matches(".stage-empty")) ? "title" : null;
+};
 const words = () => notice()?.querySelector(".update-notice-text")?.textContent ?? null;
 const action = () => within(notice()!).getAllByRole("button")[0];
 const hide = () => within(notice()!).getByRole("button", { name: /Hide until a newer version|Ocultar hasta una versión más nueva/ });
@@ -81,10 +84,10 @@ const said = () => notice() ? `${words()} · ${action().textContent}` : null;
 /** Gone, once it has left. */
 const gone = () => waitFor(() => expect(document.querySelector(".update-notice")).toBeNull());
 
-test("the bar, hanging from the window's top, whatever update-notice value is still stored: nothing over the stage's tile, in the title row nor at the sidebar's foot", async () => {
+test("hanging under the title, whatever update-notice value is still stored: nothing over the stage's tile, in the title row nor at the sidebar's foot", async () => {
   for (const picked of NOTICES) {
     room({ updater: { status: READY }, notice: picked, sidebar: true });
-    await waitFor(() => expect(where()).toBe("bar"));
+    await waitFor(() => expect(where()).toBe("title"));
     // Not on the tile: the canvas is never covered.
     expect(document.querySelector(".stage-tile .update-notice")).toBeNull();
     expect(document.querySelectorAll(".update-notice")).toHaveLength(1);
@@ -96,9 +99,9 @@ test("the bar, hanging from the window's top, whatever update-notice value is st
   }
 });
 
-test("with no conversation on the stage, the same bar", async () => {
+test("with no conversation on the stage, over the empty tile", async () => {
   room({ updater: { status: READY }, notice: "title", stage: false });
-  await waitFor(() => expect(where()).toBe("bar"));
+  await waitFor(() => expect(where()).toBe("title"));
 });
 
 test("manual, whatever update-notice value is stored: nothing by itself; once a check found one, Version 0.4.0 available · Download; Cancel while it downloads; then Sidevoice 0.4.0 is ready · Restart to update", async () => {
@@ -108,7 +111,7 @@ test("manual, whatever update-notice value is stored: nothing by itself; once a 
     expect(notice()).toBeNull();
     await act(async () => { fake.push(FOUND); });
     await waitFor(() => expect(said()).toBe("Version 0.4.0 available · Download"));
-    expect(where()).toBe("bar");
+    expect(where()).toBe("title");
     // Its action reads the words as its description.
     expect(within(notice()!).getByRole("button", { name: "Download", description: "Version 0.4.0 available" })).toBeInTheDocument();
     expect(fake.updater.download).not.toHaveBeenCalled();
@@ -133,7 +136,7 @@ test("automatic, whatever update-notice value is stored: nothing while the app's
     expect(said()).toBe("Sidevoice 0.4.0 · Downloading… · Cancel download");
     await act(async () => { fake.push(READY); });
     await waitFor(() => expect(said()).toBe("Sidevoice 0.4.0 is ready · Restart to update"));
-    expect(where()).toBe("bar");
+    expect(where()).toBe("title");
     await act(async () => { fireEvent.click(action()); });
     expect(fake.updater.restart).toHaveBeenCalledTimes(1);
     // Sidevoice as one: the app's restart asks its service to follow.

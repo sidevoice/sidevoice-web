@@ -1,5 +1,6 @@
 import { useContext, useEffect, useState, type CSSProperties } from "react";
 import { Alert } from "../../components/ui/Alert";
+import { UpdateNotice } from "../updates/UpdateNotice";
 import { Button } from "../../components/ui/Button";
 import { CloseIcon, HarnessIcon, MachinesIcon } from "../../components/ui/Icons";
 import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
@@ -135,6 +136,7 @@ export function CallStage() {
     return (
       <section className="call-stage" aria-label={t("stage.label")}>
         <BootError />
+        <UpdateNotice />
         <div className="stage-tile stage-empty">
           <p>{t("stage.empty")}</p>
           <Button className="stage-choose" onClick={showConversations}>{t("stage.chooseConversation")}</Button>
@@ -150,6 +152,7 @@ export function CallStage() {
         <BootError />
       {/* Named above the tile where the room has no header (a desktop), in place of the tile's own name. */}
       <StageName stage={stage} className="stage-title" tone={tone} voice={voice} />
+      <UpdateNotice />
       {/* The tile keeps its form factor's shape, as a slide does: as large as the room allows, centred, the app's own
           background around it (useSceneScale fits it in its slot; call-view.css names the shapes). What the tile says —
           the name, the voice models, the replies, the badge — is laid on the tile, at its corners. */}

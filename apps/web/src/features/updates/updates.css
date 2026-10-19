@@ -18,12 +18,14 @@
 .app-update-failure { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--sv-space-2); font-size: var(--sv-font-sm); }
 /* Automatic | Manual fits a 320px card in Spanish too: narrower padding in its segments. */
 .app-update-setting .ui-segment { padding-inline: 10px; }
-/* Where the room says an update waits (UpdateNotice): a slim bar hanging from the window's top, over nothing of the stage —
- * the update's icon, its words cut short before anything else is, its action, then ×. What failed hangs under it. It comes
- * in and goes softly; under reduced motion, at once. Never the voice's colour. */
-.update-notice { position: relative; z-index: 5; flex: none; display: flex; align-items: center; justify-content: center; gap: var(--sv-space-2); min-width: 0; padding: var(--sv-space-1) var(--sv-space-4);
-  border-bottom: 1px solid var(--sv-border); background: var(--sv-accent-soft); color: var(--sv-text);
-  font-size: var(--sv-font-sm); animation: update-notice-in var(--sv-dur-base, 180ms) ease-out both; }
+/* Where the room says an update waits (UpdateNotice): a pill hanging just under the conversation's title, centred over
+ * the tile's top edge; it floats (a zero-height anchor), so the stage never moves. The update's icon, its words cut short
+ * before anything else is, its action, then ×. What failed hangs under it. Never the voice's colour. */
+.update-anchor { position: relative; z-index: 25; height: 0; }
+.update-notice { position: absolute; top: 0; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: var(--sv-space-2);
+  width: max-content; max-width: min(36rem, calc(100% - 2 * var(--sv-space-3))); min-width: 0; padding: var(--sv-space-1) var(--sv-space-3);
+  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg, 12px); background: var(--sv-accent-soft); color: var(--sv-text);
+  box-shadow: var(--sv-shadow-sm); font-size: var(--sv-font-sm); animation: update-notice-in var(--sv-dur-base, 180ms) ease-out both; }
 .update-notice[data-leaving] { animation: update-notice-out 200ms ease-in both; }
 .update-notice-icon { flex: none; color: var(--sv-accent-text); }
 .update-notice-line { display: flex; flex: 0 1 auto; align-items: center; gap: var(--sv-space-2); min-width: 0; }
@@ -34,6 +36,6 @@
 .update-notice-error { position: absolute; z-index: 1; top: calc(100% + var(--sv-space-1)); inset-inline-end: 0; width: max-content; max-width: min(24rem, 100%);
   padding: var(--sv-space-2) var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-surface);
   box-shadow: var(--sv-shadow-sm); font-size: var(--sv-font-xs); overflow-wrap: anywhere; }
-@keyframes update-notice-in { from { opacity: 0; transform: translateY(-6px); } }
-@keyframes update-notice-out { to { opacity: 0; transform: translateY(-6px); } }
+@keyframes update-notice-in { from { opacity: 0; transform: translate(-50%, -6px); } }
+@keyframes update-notice-out { to { opacity: 0; transform: translate(-50%, -6px); } }
 @media (prefers-reduced-motion: reduce) { .update-notice, .update-notice[data-leaving] { animation: none; } }
