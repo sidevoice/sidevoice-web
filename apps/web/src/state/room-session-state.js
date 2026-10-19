@@ -80,12 +80,14 @@ export function speechSegment(speech) { return speech.history_id || speech.sessi
 /** Whether the conversation is working on what this browser said, as soon as that is known: the harness's own report,
  *  else the turn's receipts. Shown only once it has lasted (working). */
 export function busy(s, thread = selectedThread(s)) {
-    if (!inCall(s) || !thread)
+    if (!thread)
         return false;
-    // false is an authoritative report too. Receipts and replies can never override it.
+    // false is an authoritative report too. Receipts and replies can never override it. The harness reports every
+    // conversation of a paired machine, call or no call, so its word counts outside the call too.
     if (typeof s.harness[thread] === 'boolean')
         return s.harness[thread];
-    return Object.values(s.turns).some(t => t.thread === thread && t.session === s.sessionId && !t.settled &&
+    // The receipts are this call's own: without a call there are none to read.
+    return inCall(s) && Object.values(s.turns).some(t => t.thread === thread && t.session === s.sessionId && !t.settled &&
         !['not_sent', 'channel_closed'].includes(t.status) &&
         (t.status === 'read' || (['delivered', 'unconfirmed'].includes(t.status) && s.now >= t.readyAt)));
 }
