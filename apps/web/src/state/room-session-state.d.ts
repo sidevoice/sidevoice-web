@@ -185,6 +185,7 @@ export interface StageFacts {
  speaking: boolean;
  /** The person's turn to it is open: they are talking, or it is being transcribed (ConversationView.pendingPhase). */
  personSpeaking: boolean;
+ /** Its harness says it is busy, and has been for a while (ParticipantView.working). */
  working: boolean;
 }
 export function stageMood(facts: StageFacts): import('../features/avatar/avatar-spec').AvatarMood;

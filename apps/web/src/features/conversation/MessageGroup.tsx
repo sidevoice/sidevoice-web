@@ -1,5 +1,6 @@
 import { Avatar } from "../../components/ui/Avatar";
 import { avatarFor } from "../avatar/avatar-spec";
+import { stillAvatar } from "../avatar/avatar-state";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
 import { translator } from "../../i18n/translator";
 import { speakerName, type MessageGroupView } from "./group-messages";
@@ -9,7 +10,7 @@ import { MessageBubble } from "./MessageBubble";
  *  conversation keeps its initials. */
 export function Speaker({ name, thread }: { name: string; thread?: string | null }) {
   if (!thread) return <Avatar name={name} decorative />;
-  return <span className="ui-avatar chat-character" aria-hidden="true"><CharacterAvatar spec={avatarFor(thread)} mood="present" size="small" /></span>;
+  return <span className="ui-avatar chat-character" aria-hidden="true"><CharacterAvatar spec={avatarFor(thread)} state={stillAvatar("present")} size="small" /></span>;
 }
 
 /* A run of one side's messages, as a chat app draws it (2026-10-11): the agent's at the left with its face once, at

@@ -17,6 +17,7 @@ import {
 import { avatarFor, PERSON_AVATAR, type AvatarMood } from "../features/avatar/avatar-spec";
 import { avatarColor } from "../features/avatar/bicho-draw";
 import { StageBackdrop, useSceneScale } from "../features/avatar/StageScene";
+import { useAvatarState } from "../features/avatar/avatar-state";
 import { CharacterAvatar, type AvatarSize } from "../features/avatar/CharacterAvatar";
 import { translator } from "../i18n/translator";
 import { ModelPrepare } from "../features/settings/ModelPrepare";
@@ -38,10 +39,11 @@ type State = "in-call" | "working" | "waiting" | "idle";
 function Avatar({ id, mood = "idle", state, size = "small", person = false }: { id: string; mood?: AvatarMood; state?: State; size?: AvatarSize; person?: boolean }) {
   const spec = person ? PERSON_AVATAR : avatarFor(id);
   const color = avatarColor(spec);
+  const avatar = useAvatarState(spec, mood);
   const tone = { "--pt-tone": color, "--pt-tone-bg": `color-mix(in srgb, ${color} 22%, var(--sv-surface))` } as CSSProperties;
   return (
     <span className="pt-avatar" data-size={size} style={tone}>
-      <CharacterAvatar spec={spec} mood={mood} size={size} />
+      <CharacterAvatar spec={spec} state={avatar} size={size} />
       {state && <span className="pt-state-dot" data-state={state} aria-hidden />}
     </span>
   );

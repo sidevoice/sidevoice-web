@@ -3,6 +3,7 @@ import { Button } from "../../components/ui/Button";
 import { Group, Row } from "../../components/ui/Card";
 import { MicrophoneIcon, MicrophoneOffIcon } from "../../components/ui/Icons";
 import { PERSON_AVATAR, type AvatarSpec } from "../avatar/avatar-spec";
+import { stillAvatar } from "../avatar/avatar-state";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
 import { announcement, MicrophoneBadge, MicrophoneHowTo, microphoneAction, MIC_HELP_ID, microphoneView, type MicrophoneView, type Platform } from "./permission-view";
 import { devicePlatform, type MicrophoneSnapshot } from "../../services/microphone-access";
@@ -48,7 +49,7 @@ export function PermissionsList({ microphone, openSettings, onRequest, t, platfo
 }) {
   const view = microphoneView(microphone, platform);
   return <div className="wizard-perm perm-list" data-state={view.state}>
-    <span className="perm-hero-figure" data-state={view.state} aria-hidden><CharacterAvatar spec={view.state === "granted" ? PERSON_WITH_MIC : PERSON_AVATAR} mood="present" size="pip" /></span>
+    <span className="perm-hero-figure" data-state={view.state} aria-hidden><CharacterAvatar spec={view.state === "granted" ? PERSON_WITH_MIC : PERSON_AVATAR} state={stillAvatar("present")} size="pip" /></span>
     <Group>
       <MicrophoneRow microphone={microphone} view={view} onRequest={onRequest} openSettings={openSettings} t={t} actionId={actionId} helpId={helpId} />
     </Group>

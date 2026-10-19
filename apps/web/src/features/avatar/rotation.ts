@@ -1,11 +1,10 @@
-import { useLayoutEffect, useSyncExternalStore } from "react";
 import { nextIdle, type Idle, type IdleStep } from "./engine/bichos/idle";
 import { nextWork, workTurn, type Work } from "./engine/bichos/work";
 
 /* What a bicho does with its hands is the client's, not the bicho's: a working style while it works (work.ts), an idle
- * step while it rests (idle.ts). One pick per conversation, shared by every copy of its avatar on the page (the stage,
- * the header, the sidebar), and dropped when no copy is in that state any more: the next time it starts afresh. The
- * engine reads the pick from the root (`data-work`, `data-idle`).
+ * step while it rests (idle.ts). One pick per figure, held by its state (avatar-state.ts) while it is in that state and
+ * dropped when it leaves it: the next time it starts afresh. Every copy of the figure shows that one pick; the engine
+ * reads it from the root (`data-work`, `data-idle`).
  *
  *   work  a random tool when work starts, swapped for another after that tool's own spell (hammering comes in short
  *         bursts, reading goes on: WORK_DURATION)
@@ -50,7 +49,8 @@ function tick() {
   if (changed) notify();
 }
 
-/** A copy of `key`'s avatar is in this state: start a pick if none is running. Returns its release. */
+/** `key`'s avatar is in this state: start a pick if none is running. Returns its release (held more than once, it lets go
+ *  once every holder has). */
 export function holdRotation(kind: RotationKind, key: string, pool: readonly string[]): () => void {
   const id = kind + "\u0000" + key;
   let entry = entries.get(id);
@@ -69,20 +69,11 @@ export function holdRotation(kind: RotationKind, key: string, pool: readonly str
   };
 }
 
-/** The current pick for `key`, if a copy holds one. */
+/** The current pick for `key`, while it is held. */
 export const rotationValue = (kind: RotationKind, key: string) => entries.get(kind + "\u0000" + key)?.step.value;
 
-function subscribe(listener: () => void) {
+/** Calls `listener` whenever a pick is made. */
+export function subscribeRotation(listener: () => void) {
   listeners.add(listener);
   return () => { listeners.delete(listener); };
-}
-
-/** The pick of `kind` for `key` while `active` and the pool has something; nothing otherwise. Held before the first
- *  paint, so a bicho starts its state with the pick in hand. */
-export function useRotation(kind: RotationKind, key: string, pool: readonly string[], active: boolean): string | undefined {
-  const on = active && pool.length > 0;
-  // The pool is compared by its contents: a new array with the same styles is the same pool.
-  const poolKey = pool.join(" ");
-  useLayoutEffect(() => (on ? holdRotation(kind, key, pool) : undefined), [on, kind, key, poolKey]);
-  return useSyncExternalStore(subscribe, () => (on ? rotationValue(kind, key) : undefined), () => undefined);
 }

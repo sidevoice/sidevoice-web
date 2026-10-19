@@ -134,7 +134,9 @@ export function stageMood(facts) {
     if (facts.reach === 'offline')
         return 'offline';
     if (!facts.inCall || !facts.isTarget || !facts.canHear)
-        return 'idle';
+        // It does not react to the person then; but working is the conversation's own, whoever it talks to: every copy
+        // of its agent (the stage, its row, the header) acts it out (#166).
+        return facts.working ? 'working' : 'idle';
     if (facts.speaking)
         return 'speaking';
     if (facts.personSpeaking && (facts.reach === 'listening' || facts.reach === null))
