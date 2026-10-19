@@ -8,11 +8,23 @@
  * `recognition_ms`; voice: `ready_ms`, `first_sound_ms`.
  * @typedef {{ ready_ms: number | null, audio_ms?: number | null, endpoint_silence_ms?: number | null, recognition_ms?: number | null, first_sound_ms?: number | null }} TrialTimings */
 
-/* What no try can ask for (the voice's settings name both slots, and the voice loads what they name): a transcription
- * try also loads the voice slot's model, and a voice try the transcription slot's, and every try the detector. A
- * model of this device that is not on disk is downloaded by that load, with no progress said to the page: a first try
- * on a new device may download the model of the step after it, and a download that fails fails the try as
- * `download-failed`, whatever the step shows of its own model. */
+/* The voice's settings name both slots, and the voice loads what they name, downloading what is not on disk with no
+ * progress said to the page: a try that handed them as they are would wait for the model of the slot it does not try
+ * (seconds, with a provider's model in the slot it does), and a download of it that failed would fail the try as
+ * `download-failed`, whatever the step shows of its own model. `settingsToTry` hands the page's own voice only the
+ * slot tried; every try still loads the detector. */
+/**
+ * `settings` for a try of `task` on this page's own voice (`voice-source.ts`): the other slot is marked `unused`, which
+ * its models read as neither to check nor to load. The desktop app's voice takes the settings as they are, whole.
+ * @template {{stt: object, tts: object}} S
+ * @param {S} settings
+ * @param {'stt' | 'tts'} task
+ * @returns {S}
+ */
+export function settingsToTry(settings, task) {
+  const other = task === 'stt' ? 'tts' : 'stt';
+  return { ...settings, [other]: { ...settings[other], unused: true } };
+}
 /** A transcription try records until Stop or its longest take, with no end of turn of its own: when a turn ends is End
  *  of turn's to choose and to try, not this one's (decided 2026-10-15). The voice has no end of turn that never ends one
  *  (`end_of_turn` is `silence` or `smart-turn`), so the try asks for silence — the detector alone, no end-of-turn model

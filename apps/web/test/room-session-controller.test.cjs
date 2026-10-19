@@ -2692,6 +2692,7 @@ test('A try of the voice settings being edited goes through the page\'s voice, o
  assert.equal(typeof result.timings.ready_ms,'number');assert.equal(result.timings.recognition_ms,null);
  assert.deepEqual(voice.calls.map(([name])=>name),['setSettings','start','stop','dispose','stop'],'the temporary call is stopped and disposed after the try');
  assert.equal(voice.calls[0][1].stt.model,'moonshine-tiny','what is being edited is what is tried');
+ assert.ok(!('unused' in voice.calls[0][1].tts)&&!('unused' in voice.calls[0][1].stt),'the desktop app\'s voice is given both slots, as chosen: only this page\'s own loads the slot tried');
  assert.equal(JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')")).stt.model,'moonshine-tiny','what worked is this device\'s now');
  assert.deepEqual(asked,[],'nothing of it goes to the room or the machine');
  // During a call the voice is the call's: no try takes it.

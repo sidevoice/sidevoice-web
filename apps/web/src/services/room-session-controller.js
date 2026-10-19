@@ -9,7 +9,7 @@ import {translator,setUiLanguage,onUiLanguage,UI_LANGUAGES} from '../i18n/transl
 import {voiceFailure,roomFailure,worded,errorLine} from '../features/settings/error-message.ts';
 import {failureCode} from './failure-code.js';
 import {probeSiteStorage} from './site-storage.js';
-import {tryTranscription,tryVoice,tryEndOfTurn} from './voice-trial.js';
+import {tryTranscription,tryVoice,tryEndOfTurn,settingsToTry} from './voice-trial.js';
 import {systemLanguage,SPEECH_LANGUAGES} from './system-language.js';
 import {createOutbox} from './outbox.js';
 import {pageVoice,beginBrowserAudioActivation} from './voice-module.js';
@@ -2110,11 +2110,14 @@ async function tryVoiceSettings(task,{text='',language=null,keep=true,onListenin
  refuseTryInCall();
  const preparationMs=task==='stt'?(state.voiceDraft||state.voiceSettings)?.stt?.catalog==='local'?90000:20000:0;
  const preparationDeadline=Date.now()+preparationMs;
- const activation=task==='stt'&&!window.__sidevoiceDesktop?.host?.voice?beginBrowserAudioActivation(state.audioDevices?.input):null;
+ const ownVoice=!window.__sidevoiceDesktop?.host?.voice;
+ const activation=task==='stt'&&ownVoice?beginBrowserAudioActivation(state.audioDevices?.input):null;
  voiceTry?.abort();const abort=voiceTry=new AbortController();
  // Stop on a transcription try ends its take with what was said (finishVoiceTry), rather than dropping it.
  const finish=voiceTryFinish=new AbortController();
  const settings=voiceSettingsHere(state.voiceDraft||state.voiceSettings,state.voiceCatalogue.catalogs);
+ // This page's own voice loads only the slot tried; the desktop app's takes both, as they are.
+ const asked=ownVoice?settingsToTry(settings,task):settings;
  try{
   const host=task==='stt'?await trialVoiceHost(preparationMs):await voiceHost();
   if(activation)host.activateAudio?.(activation);
@@ -2122,10 +2125,10 @@ async function tryVoiceSettings(task,{text='',language=null,keep=true,onListenin
   try{
   // What each phase took, for the try to say how quick it was.
   let timings=null;const onTimings=value=>{timings=value};
-  const result=task==='stt'?{text:await tryTranscription(routedTrial(host,trial),settings,{signal:abort.signal,finish:finish.signal,timeoutMs:Math.max(1,preparationDeadline-Date.now()),onTimings,onListening,onLevel,onTranscribing,onTake,fence:()=>unroute(host,trial)})}
+  const result=task==='stt'?{text:await tryTranscription(routedTrial(host,trial),asked,{signal:abort.signal,finish:finish.signal,timeoutMs:Math.max(1,preparationDeadline-Date.now()),onTimings,onListening,onLevel,onTranscribing,onTake,fence:()=>unroute(host,trial)})}
    // A voice try only listens: its call is never given the microphone (an unrouted call hears silence), so nothing on the
    // microphone — the room, the speaker's own echo — can take a turn over the sentence and cut it short as a barge-in.
-   :(await tryVoice(trial,settings,text,{language,signal:abort.signal,onTimings,onProgress:onProgress&&(progress=>onProgress(sayingRange(progress,text)))}),{});
+   :(await tryVoice(trial,asked,text,{language,signal:abort.signal,onTimings,onProgress:onProgress&&(progress=>onProgress(sayingRange(progress,text)))}),{});
   result.timings=timings;
   if(keep){writeVoiceSettings(pageStorage(),settings);roomStore.patch({voiceSettings:settings})}
   return result;

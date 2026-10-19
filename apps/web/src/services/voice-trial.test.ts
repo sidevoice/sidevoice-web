@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { tryEndOfTurn, tryTranscription, tryVoice, type TurnStep } from "./voice-trial.js";
+import { settingsToTry, tryEndOfTurn, tryTranscription, tryVoice, type TurnStep } from "./voice-trial.js";
 
 /* A try of the device's voice settings, through a voice that records what it was asked. */
 
@@ -39,6 +39,13 @@ async function takeOn(voice: object, options: TranscriptionOptions & { settings?
   await listened;
   return { heard, stop: () => finish.abort() };
 }
+
+test("a try of one slot hands the page's voice the other slot as unused, and leaves the settings it was given, which it keeps, as they were", () => {
+  expect(settingsToTry(SETTINGS, "stt")).toEqual({ stt: SETTINGS.stt, tts: { ...SETTINGS.tts, unused: true } });
+  expect(settingsToTry(SETTINGS, "tts")).toEqual({ stt: { ...SETTINGS.stt, unused: true }, tts: SETTINGS.tts });
+  expect(SETTINGS.stt).not.toHaveProperty("unused");
+  expect(SETTINGS.tts).not.toHaveProperty("unused");
+});
 
 test("the voice ending the person's turn on its own (its long pause) ends the take there: the try is that turn's words", async () => {
   const told: boolean[] = [];

@@ -85,6 +85,28 @@ test("a remote slot loads from its provider's catalogue; the detector stays this
   expect(loaded).toEqual([["local", "silero-vad"], ["elevenlabs", "scribe_v2"], ["elevenlabs", "eleven_flash_v2_5"]]);
 });
 
+test("a slot marked unused (a try of the other slot's) is neither checked nor loaded, and refuses if it is asked after all", async () => {
+  const refusal = (ask: () => unknown) => { try { ask(); } catch (error) { return error as { code: string }; } return null; };
+  // A provider's transcriber tried while the voice slot names a model this device never had: the voice is not the try's to refuse or to load.
+  const sttTry = fakeEngine();
+  const models = await engineVoiceSource(sttTry.engine).models(settings({
+    stt: { catalog: "elevenlabs", model: "scribe_v2", language: "es" }, tts: { catalog: "local", model: "no-longer-here", unused: true },
+  }));
+  const slots = await models.load();
+  expect(sttTry.loaded).toEqual([["local", "silero-vad"], ["elevenlabs", "scribe_v2"]]);
+  expect(await slots.transcriber.transcribe(new Float32Array(1), 16000, undefined)).toBe("hola");
+  expect(refusal(() => slots.speaker.speak("hola", undefined, "es", 1))).toMatchObject({ code: "model-unused" });
+  // And the voice tried while the transcription slot is not its business.
+  const ttsTry = fakeEngine();
+  const spoken = await (await engineVoiceSource(ttsTry.engine).models(settings({ stt: { catalog: "local", model: "whisper-base", unused: true } }))).load();
+  expect(ttsTry.loaded).toEqual([["local", "silero-vad"], ["local", "kokoro-82m-v1.0"]]);
+  expect(refusal(() => spoken.transcriber.transcribe(new Float32Array(1), 16000, undefined))).toMatchObject({ code: "model-unused" });
+  // A slot in use is checked as ever, whatever the other one is.
+  await expect(Promise.resolve(engineVoiceSource(fakeEngine().engine).models(settings({
+    stt: { catalog: "local", model: "parakeet" }, tts: { catalog: "local", model: "kokoro-82m-v1.0", unused: true },
+  })))).rejects.toMatchObject({ code: "model-unknown" });
+});
+
 test("two conversation calls load shared weights but receive separate detector streams", async () => {
   const { engine, loaded, calls } = fakeEngine();
   const slots = await (await engineVoiceSource(engine).models(settings())).load();

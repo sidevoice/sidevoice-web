@@ -4,7 +4,8 @@
  * - the voice activity detector: the local catalogue's Silero VAD (family `silero-vad`), else another `vad` model that
  *   runs here; never a person's choice;
  * - the transcriber and the speaker: the models of the person's settings, each `{catalog, model}`, loaded from that
- *   catalogue (`engine.catalog(catalog).load(model)`);
+ *   catalogue (`engine.catalog(catalog).load(model)`); a slot marked `unused` (a try of the other one) is neither
+ *   checked nor loaded, and refuses what it would be asked to do;
  * - the end-of-turn classifier: the local catalogue's `end-of-turn` model, only when the settings choose `smart-turn`.
  *
  * It is the `source` @sidevoice/voice's `createVoiceHost` takes: `models(settings)` refuses with a code what this
@@ -34,6 +35,9 @@ function asRefusal(error: unknown): Error {
   const code = engineFailureCode(error, "");
   return code ? voiceRefusal(code, (error as Error).message, (error as Partial<EngineError>).detail) : (error as Error);
 }
+
+/** A slot no call of these settings uses: a try of the other slot's marks it (voice-trial.js `settingsToTry`). */
+const isUnused = (slot: VoiceSettings["stt"] | VoiceSettings["tts"]) => (slot as { unused?: unknown }).unused === true;
 
 /** `choice` as the settings hold it, or null when it does not name a catalogue and a model. */
 function choiceOf(slot: VoiceSettings["stt"] | VoiceSettings["tts"]): ModelChoice | null {
@@ -104,6 +108,11 @@ function speakerOf(model: Model): VoiceSpeaker {
   };
 }
 
+/** What an unused slot answers if it is asked after all. */
+const NOT_LOADED = () => { throw voiceRefusal("model-unused"); };
+const unusedTranscriber: VoiceTranscriber = { transcribe: NOT_LOADED };
+const unusedSpeaker: VoiceSpeaker = { speak: NOT_LOADED };
+
 function endOfTurnOf(model: Model): VoiceEndOfTurn {
   const classifier = model.asEndOfTurn();
   if (!classifier) throw voiceRefusal("model-wrong-task");
@@ -125,9 +134,10 @@ export function engineVoiceSource(engine: WebEngine, { onProgress }: VoiceSource
     .catch((error: unknown) => { throw asRefusal(error); });
   return {
     async models(settings: VoiceSettings): Promise<VoiceModels> {
-      const stt = choiceOf(settings.stt), tts = choiceOf(settings.tts);
-      if (!stt || !tts) throw voiceRefusal("model-unknown");
-      const refusal = (await choiceRefusal(engine, stt, "stt")) ?? (await choiceRefusal(engine, tts, "tts"));
+      // A slot in use names a model; one unused names none to check.
+      const stt = isUnused(settings.stt) ? null : choiceOf(settings.stt), tts = isUnused(settings.tts) ? null : choiceOf(settings.tts);
+      if ((!stt && !isUnused(settings.stt)) || (!tts && !isUnused(settings.tts))) throw voiceRefusal("model-unknown");
+      const refusal = (stt && await choiceRefusal(engine, stt, "stt")) || (tts && await choiceRefusal(engine, tts, "tts"));
       if (refusal) throw refusal;
       const local = engine.localCatalog();
       const vad = runnable(await local.models("vad"), "silero-vad");
@@ -141,14 +151,14 @@ export function engineVoiceSource(engine: WebEngine, { onProgress }: VoiceSource
         async load() {
           const [detector, transcriber, speaker, classifier] = await Promise.all([
             load({ catalog: LOCAL_CATALOG, model: vad.id }),
-            load(stt),
-            load(tts),
+            stt && load(stt),
+            tts && load(tts),
             endOfTurn ? load({ catalog: LOCAL_CATALOG, model: endOfTurn.id }) : Promise.resolve(null),
           ]);
           return {
             createVad: () => vadOf(detector),
-            transcriber: transcriberOf(transcriber),
-            speaker: speakerOf(speaker),
+            transcriber: transcriber ? transcriberOf(transcriber) : unusedTranscriber,
+            speaker: speaker ? speakerOf(speaker) : unusedSpeaker,
             ...(classifier ? { endOfTurn: endOfTurnOf(classifier) } : {}),
           };
         },
