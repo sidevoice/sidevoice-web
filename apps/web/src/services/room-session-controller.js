@@ -1,4 +1,4 @@
-import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,noMachine,reachNote,conversationKey,conversationOf,personKey,displayTitle} from '../state/room-session-state.js';
+import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,noMachine,reachNote,conversationKey,conversationOf,personKey,displayTitle,focusedThread} from '../state/room-session-state.js';
 import {pageTarget,targetAnswers,routeUrl,callSocketUrl,isNodePath,askTarget,askRoomNode} from './rendezvous.js';
 import {readPairingState,projectPairings,writePairings,withPairing,withoutPairing,revokedPairing,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {localHostBridge,desktopDataBridge,normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
@@ -522,6 +522,12 @@ function clearTurnLifecycle(){
 }
 let speechOutput='on';
 let stoppingReplies=false;
+// Only the conversation in focus sounds, connected or not: with the window shown the one on screen, minimised the one
+// selected on the call card (`focusedThread`). The call's voice is its conversation's, so it sounds only while the
+// call is on the one in focus; the focus leaving it, by a pick or by the window going away, stops what it says at once.
+function callInFocus(){return focusedThread(state,document.hidden)===targetId()}
+let inFocus=true;
+function followFocus(){const now=callInFocus(),lost=inFocus&&!now;inFocus=now;if(lost)stopReplies('focus_changed')}
 function reportPlayback(said,data){
  if(said.terminal)return;
  if(data.status!=='playing')said.terminal=true;
@@ -559,7 +565,7 @@ function drainReplies(){
   if(replies.get(said.reply.utterance_id)!==said){replyQueue.shift();continue}
   const reply=said.reply;
   const openHere=new Set([...openVoiceTurns.values(),...awaitingTurnAck.values()].filter(thread=>thread===reply.thread_id));
-  const eligibility=moving?'focus_changed':replyEligibility(reply,{sessionId:state.sessionId,threadId:targetThread(),epoch:threadEpochs.get(reply.thread_id),openTurns:openHere,output:speechOutput,connected:!!state.ws&&!state.reconnecting});
+  const eligibility=moving?'focus_changed':replyEligibility(reply,{sessionId:state.sessionId,threadId:targetThread(),focused:callInFocus(),epoch:threadEpochs.get(reply.thread_id),openTurns:openHere,output:speechOutput,connected:!!state.ws&&!state.reconnecting});
   if(eligibility==='hold')return;
   replyQueue.shift();
   if(eligibility!=='play'){finishReply(said,{status:'unplayed',reason:eligibility});continue}
@@ -2508,6 +2514,8 @@ function publishSessionView(view = roomStore.getState()) {
     updateComposer();
 }
 roomStore.subscribe(reconcileSession);
+roomStore.subscribe(followFocus);
+document.addEventListener('visibilitychange',followFocus);
 reconcileSession(roomStore.getState());
 // Working shows once a conversation has been busy for a while (WORKING_SHOWN_AFTER_MS): this keeps its start and clock.
 followWorking(roomStore);

@@ -1,8 +1,9 @@
-/** The room's reply is admitted only against facts for this session and conversation. */
-export function replyEligibility(reply, {sessionId, threadId, epoch, openTurns, output, connected}) {
+/** The room's reply is admitted only against facts for this session and conversation, and only while that conversation
+ *  is the one in focus (`focused`): every other one is silent, connected or not. */
+export function replyEligibility(reply, {sessionId, threadId, focused, epoch, openTurns, output, connected}) {
   if (reply.session_id !== sessionId) return 'call_ended';
   if (!connected) return 'connector_disconnected';
-  if (reply.thread_id !== threadId) return 'focus_changed';
+  if (reply.thread_id !== threadId || !focused) return 'focus_changed';
   if (output !== 'on') return output;
   if (!Number.isInteger(epoch) || !Number.isInteger(reply.epoch)) return 'hold';
   // Manual replay deliberately keeps the history row's original epoch. Core issued it for this current session.
