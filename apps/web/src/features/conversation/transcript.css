@@ -137,7 +137,9 @@
 .text-composer .composer-field .ui-textarea:disabled { background: transparent; }
 .text-composer .composer-send { flex: none; border-radius: 50%; background: var(--sv-accent); color: var(--sv-on-accent); }
 .text-composer .composer-send:hover { background: var(--sv-accent-hover); }
-.text-composer .composer-send:is(:disabled, [data-empty]) { background: var(--sv-disabled-bg); border-color: transparent; color: var(--sv-disabled-text); pointer-events: none; }
+.text-composer .composer-send:disabled { background: var(--sv-disabled-bg); border-color: transparent; color: var(--sv-disabled-text); pointer-events: none; }
+/* Waiting for something to write, Send is still the box's one action: the accent's soft fill, never the greyed one of a box that cannot take text. */
+.text-composer .composer-send[data-empty]:not(:disabled) { background: var(--sv-accent-soft); border-color: transparent; color: var(--sv-accent-text); pointer-events: none; }
 
 /* ----- a phone: the transcript rises from the bottom as a sheet over the dimmed call */
 @media (max-width: 559px), (max-width: 899px) and (pointer: coarse) {

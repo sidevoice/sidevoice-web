@@ -17,6 +17,7 @@ test("search and language filter use the same catalogue choices, then pick a voi
   fireEvent.click(screen.getByRole("button", { name: "Automatic" }));
   expect(document.activeElement).toBe(screen.getByRole("combobox", { name: "Search voices" }));
   expect(names()).toEqual(["Automatic", "Luna", "River", "Ash"]);
+  expect(document.querySelector("#voice-picker-language .lucide-languages")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Language: All languages" }));
   const languageSearch = screen.getByRole("combobox", { name: "Search languages" });
   expect(document.activeElement).toBe(languageSearch);

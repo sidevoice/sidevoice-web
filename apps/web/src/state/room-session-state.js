@@ -83,12 +83,14 @@ export function speechSegment(speech) { return speech.history_id || speech.sessi
 /** Whether the conversation is working on what this browser said, as soon as that is known: the harness's own report,
  *  else the turn's receipts. Shown only once it has lasted (working). */
 export function busy(s, thread = selectedThread(s)) {
-    if (!inCall(s) || !thread)
+    if (!thread)
         return false;
-    // false is an authoritative report too. Receipts and replies can never override it.
+    // false is an authoritative report too. Receipts and replies can never override it. The harness reports every
+    // conversation of a paired machine, call or no call, so its word counts outside the call too.
     if (typeof s.harness[thread] === 'boolean')
         return s.harness[thread];
-    return Object.values(s.turns).some(t => t.thread === thread && t.session === s.sessionId && !t.settled &&
+    // The receipts are this call's own: without a call there are none to read.
+    return inCall(s) && Object.values(s.turns).some(t => t.thread === thread && t.session === s.sessionId && !t.settled &&
         !['not_sent', 'channel_closed'].includes(t.status) &&
         (t.status === 'read' || (['delivered', 'unconfirmed'].includes(t.status) && s.now >= t.readyAt)));
 }
@@ -128,11 +130,13 @@ export function canHear(row) {
 }
 /** The agent on the stage, by priority: offline (the room cannot reach it: the stage shows its wanted poster), then
  *  speaking, listening (the person is talking to it and it can hear them), working, and idle for everything else.
- *  Short of offline it is idle whenever it cannot hear the person: out of the call, not the one the microphone talks
- *  to, or holding what it is sent — a conversation that is holding does not react to the person at all. */
+ *  A reply it is saying in the call plays to its end whatever happens to the link, so it speaks until then and only
+ *  then shows the poster (#220). Short of offline it is idle whenever it cannot hear the person: out of the call, not
+ *  the one the microphone talks to, or holding what it is sent — a conversation that is holding does not react to the
+ *  person at all. */
 export function stageMood(facts) {
     if (facts.reach === 'offline')
-        return 'offline';
+        return facts.inCall && facts.isTarget && facts.speaking ? 'speaking' : 'offline';
     if (!facts.inCall || !facts.isTarget || !facts.canHear)
         return 'idle';
     if (facts.speaking)
@@ -298,8 +302,9 @@ export function conversationView(s) {
     const id = viewedThread(s), own = s.userTurn?.thread === id, activeDraft = own ? s.userTurn.segment : null;
     // A browser outside the room reads no transcript. What was said belongs to the call, and showing it
     // to somebody who has not joined put the last thing they said, undelivered, on an empty page. The
-    // session, not the socket: a reconnection must not blank the transcript somebody is reading.
-    const records = s.sessionId ? orderedHistory(s, id) : [];
+    // session, not the socket: a reconnection must not blank the transcript somebody is reading. Nor a call that has
+    // not reached its machine yet: what is written meanwhile waits there, and says so.
+    const records = s.sessionId || inCall(s) ? orderedHistory(s, id) : [];
     const ahead = new Map();
     let sounding = 0;
     for (const r of records) {
@@ -451,7 +456,7 @@ export function createRoomSessionStore(seed = {}) {
 /** Input that never reached the conversation, said plainly under it. The tick beside the clock is for
  *  the ordinary path; a message that will never arrive is not a shade of delivered. */
 export function deliveryNote(r) {
-    if (r.role !== 'user' || r.status !== 'not_sent')
+    if (r.role !== 'user' || (r.delivery ?? r.status) !== 'not_sent')
         return '';
     return say(r.audio_reason === 'expired' ? 'session.delivery.notReachedExpired' : 'session.delivery.notReached');
 }

@@ -13,7 +13,7 @@ import { voicePreview } from "../../services/voice-preview";
 import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 import { PROVIDER_SAYS, ProviderKeyNeeded, reasonState } from "./ProviderConnect";
 import { NewMark } from "../highlights/highlights";
-import { ModelPrepare, type PrepareStatus } from "./ModelPrepare";
+import { ModelPrepare } from "./ModelPrepare";
 import { ModelRuntime } from "./ModelRuntime";
 import { InfoTip } from "../../components/ui/InfoTip";
 import { cancelDownload, catalogueShown, downloadModel, TryButton, TryPanel, useModelState, useVoiceTry, type ModelState, type SetupTry, type VoiceTry } from "./ModelSetup";
@@ -85,7 +85,7 @@ function SourceSelect({ id, value, sources, onChange, t }: { id: string; value: 
 
 /** The family first, then a model of it: a family changed picks its first model that runs here. A provider's models
  *  have no family, and are one list. */
-function ModelPickers({ task, draft, options, locked, t }: { task: Task; draft: Settings; options: Option[]; locked: boolean; t: Translate }) {
+function ModelPickers({ task, draft, options, locked, needsKey, t }: { task: Task; draft: Settings; options: Option[]; locked: boolean; needsKey: boolean; t: Translate }) {
   const families = [...new Set(options.map((option) => option.group).filter((group): group is string => !!group))];
   const current = options.find((option) => option.id === draft[task].model);
   const family = current?.group ?? null;
@@ -96,20 +96,14 @@ function ModelPickers({ task, draft, options, locked, t }: { task: Task; draft: 
   };
   return <>
     {families.length > 0 && <Field label={t("voice.family")}>
-      <Select id={task + "-family"} value={family ?? ""} disabled={locked} onValueChange={pickFamily} placeholder={t("voice.family.none")}
+      <Select id={task + "-family"} value={family ?? ""} disabled={locked || needsKey} onValueChange={pickFamily} placeholder={t("voice.family.none")}
         options={families.map((name) => ({ value: name, label: familyName(name) }))} />
     </Field>}
     <Field label={t("voice.model")}>
-      <Select id={task + "-model"} value={draft[task].model} disabled={locked} onValueChange={(model) => edit({ [task]: { model } })}
-        options={shown.map((option) => ({ value: option.id, label: option.id, disabled: option.disabled, ...noted(t, option) }))} />
+      <Select id={task + "-model"} value={needsKey ? "" : draft[task].model} disabled={locked || needsKey} placeholder={needsKey ? t("voice.prepare.badge.needsKey") : undefined}
+        onValueChange={(model) => edit({ [task]: { model } })} options={shown.map((option) => ({ value: option.id, label: option.id, disabled: option.disabled, ...noted(t, option) }))} />
     </Field>
   </>;
-}
-
-/** Where the slot's model stands, for ModelPrepare: a provider's without its key needs it; else as the model is here. */
-function prepareStatus(model: ModelState, sourceNote: Note | null | undefined): PrepareStatus | null {
-  if (!model.local && keyless(sourceNote)) return "needs-key";
-  return model.status;
 }
 
 /** A slot chosen with no model (a provider whose key just came) takes its catalogue's first runnable one. */
@@ -151,8 +145,7 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
   const sourceNote = slot.sources.find((source) => source.id === draft[task].catalog)?.note;
   const current = slot.sources.find((source) => source.id === draft[task].catalog);
   const remote = current && !current.local ? current : null;
-  const provider = keyless(sourceNote) ? current : null;
-  const status = prepareStatus(model, sourceNote);
+  const provider = model.needsKey ? current : null;
   const optionNote = slot.options.find((option: Option) => option.id === draft[task].model)?.note;
   const languages = model.model?.languages ?? [];
   const meta = [optionNote ? noteText(t, optionNote) : "", languages.length ? languages.slice(0, 4).map(languageName).join(", ") + (languages.length > 4 ? " " + t("voice.languages.more", { n: languages.length - 4 }) : "") : ""].filter(Boolean).join(" · ");
@@ -172,7 +165,7 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
   const tryReason = !model.model || !model.ready ? t(task === "stt" ? "settings.save.waitTranscription" : "settings.save.waitVoice")
     : task === "tts" && !(setupTry?.sentence ?? sentence).trim() ? t("wizard.wait.sentence") : "";
   const tryButton = handle && <TryButton task={task} handle={handle} id={setupTry ? "wizard-card-try" : task + "-try"} again={setupTry?.tried}
-    reason={tryReason} reasonId={reasonId} stopsElsewhere={!!setupTry} t={t} />;
+    reason={tryReason} reasonId={reasonId} t={t} />;
   const tryPanel = handle && <TryPanel task={task} handle={handle} model={draft[task].model} hint={setupTry?.hint} sample={setupTry?.sample} button={tryButton} t={t} />;
   const voices = task === "tts" ? choices.tts.voices : [];
   const speed = task === "tts" ? choices.tts.speed : null;
@@ -209,8 +202,8 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
       </Row>
       {remote && <ProviderKeyNeeded key={remote.id} provider={remote.id} name={remote.name ?? remote.id} needed={!!provider} onDone={() => keyKept(remote.name ?? remote.id)} />}
       <Row label={t("voice.model")} block>
-        <ModelPrepare id={task + "-model-card"} actionIds={task + "-model"} pending={pending} status={status} model={draft[task].model} size={model.local ? model.size : null} fraction={model.fraction} error={model.failure} errorDetails={model.failureDetails}
-          meta={meta || undefined} pickers={(locked) => <ModelPickers task={task} draft={draft} options={slot.options} locked={locked} t={t} />}
+        <ModelPrepare id={task + "-model-card"} actionIds={task + "-model"} pending={pending} status={model.status} model={draft[task].model} size={model.local ? model.size : null} fraction={model.fraction} error={model.failure} errorDetails={model.failureDetails}
+          meta={!model.needsKey && meta || undefined} pickers={(locked) => <ModelPickers task={task} draft={draft} options={slot.options} locked={locked} needsKey={model.needsKey} t={t} />}
           runtime={<ModelRuntime task={task} state={model} locked={model.installing} />}
           onDownload={() => downloadModel(task)} onCancel={cancelDownload} onRetry={() => downloadModel(task)} />
       </Row>
