@@ -52,7 +52,7 @@ export function useSentTurns(conversation: ConversationView): { turns: SentTurn[
 /** A reply on the stage: its text, how far the voice is into it, and whether it is leaving. */
 export interface AgentTurn { key: string; text: string; spoken: number; leaving: boolean }
 /** How long a reply stays once its last words are said, before it leaves. */
-export const AGENT_LINGER_MS = 3000;
+export const AGENT_LINGER_MS = 1500;
 
 /** The replies the stage shows: the one sounding (`reply`, `spokenTo` into it); the one just finished, whole, for
  *  AGENT_LINGER_MS; and any leaving, for SENT_LEAVING_MS. A new reply sends the one before away at once. */
