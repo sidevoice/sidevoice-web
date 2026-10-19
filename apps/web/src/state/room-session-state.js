@@ -314,9 +314,12 @@ export function conversationView(s) {
         sounding += Number(r.role === 'assistant' && ['queued', 'synthesizing', 'waiting_for_turn', 'waiting_for_pause', 'playing'].includes(r.audio));
     }
     // A reply is said again through the call: one of another machine is not offered.
-    return { messages: records.map(r => ({ ...r, replayable: !!r.replayable && conversationOf(r.thread)?.node === s.callNode, cancellable: !!activeDraft && !s.cancelledInput && r.draft === true && r.segment === activeDraft,
+    const messages = records.map(r => ({ ...r, replayable: !!r.replayable && conversationOf(r.thread)?.node === s.callNode, cancellable: !!activeDraft && !s.cancelledInput && r.draft === true && r.segment === activeDraft,
             audioNote: audioNote(r, ahead.get(r)), deliveryNote: deliveryNote(r),
-            playback: playbackState(r, s), karaoke: saying(s, r) ? { from: s.karaokeState.from, to: s.karaokeState.to } : null })),
+            playback: playbackState(r, s), karaoke: saying(s, r) ? { from: s.karaokeState.from, to: s.karaokeState.to } : null }));
+    // The stage's balloon is the reply this page's voice is saying, where it has got to: playback alone, never a row's
+    // status nor a reply waiting its turn, so a reply that no longer plays leaves none behind (#221).
+    return { messages, saying: messages.find(m => m.karaoke) ?? null,
         pendingText: own ? s.pendingUserText : '', pendingPhase: own && !s.cancelledInput ? s.pendingPhase : '',
         pendingCancellable: own && !s.cancelledInput, working: working(s, id) };
 }
@@ -334,8 +337,10 @@ export function experimentalNote(p) {
         marked.includes('sessionIdentity') ? say('session.note.experimentalIdentity') : null].filter(Boolean).join(' ') || null;
 }
 export function workingCapabilityNote(p) { const v = p.capabilities?.working; return v === 'supported' ? null : v === 'unsupported' ? say('session.note.workingUnsupported') : say('session.note.workingUnknown'); }
-/** Whether a machine this device is paired with cannot be reached now: its conversations cannot hear anybody. */
-function machineDown(s, fp) { const reach = s.machineLinks?.[fp]?.reach; return !!reach && reach !== 'ok'; }
+/** Whether a machine this device is paired with cannot be reached now: its conversations cannot hear anybody. The call's
+ *  own is also not there once its drop has outlasted the grace (`reconnectShown`): its link keeps the address it proved for
+ *  minutes, which a call looking for it does not trust that long. */
+function machineDown(s, fp) { const reach = s.machineLinks?.[fp]?.reach; return !!reach && reach !== 'ok' || (!!s.reconnectShown && fp === s.callNode); }
 const REACH_STATES = new Set(['listening', 'holding', 'offline']);
 /** What this device calls a paired machine: its alias here, else the machine's own name. */
 function machineName(s, fp) { return (s.pairings || []).find(p => p.fp === fp)?.host || null; }

@@ -12,8 +12,8 @@ import { continueAfterRestart, UPDATE_PLACE, useUpdates, type UpdaterStatus } fr
 import "./updates.css";
 
 /* Where the room says an update waits, on a desktop (a phone has none: its page picks up a new version when next
- * opened): a pill floating at the top centre of the stage, over it (decided: the update-notice variant is gone, and a
- * value still stored for it changes nothing). It takes no room of its own: the room never moves for it. It says this
+ * opened): a slim bar hanging from the window's top, over nothing of the stage (decided: the update-notice variant is gone, and a
+ * value still stored for it changes nothing). It says this
  * computer's most pressing update and its action, then × — the desktop app's (manual: Version 0.4.0 available · Download once a check found one;
  * either mode, while it downloads: Sidevoice 0.4.0 · Downloading… · Cancel; automatic: nothing otherwise, it downloads by itself; once downloaded: Sidevoice 0.4.0 is ready · Restart to
  * update; nothing while the person's own check runs: appUpdateShown), the page's (Reload). Only this computer's: a
@@ -109,11 +109,13 @@ function NoticeLine({ notice, data }: { notice: Notice; data: Notices }) {
   </div>;
 }
 
-/** The notice, the pill over the stage's top (CallStage's `notice`); a desktop's only. */
+/** The notice, hanging under the conversation's title over the tile's top edge (operator, 2026-10-19: of the title,
+ *  the canvas's top and the conversations' foot, the title); a desktop's only. It floats: it never moves the stage. Never
+ *  on the floating card. */
 export function UpdateNotice() {
   const narrow = useMedia(NARROW_QUERY);
   if (narrow) return null;
-  return <NoticeShown />;
+  return <div className="update-anchor"><NoticeShown /></div>;
 }
 
 /** The most pressing update that × did not hide (hidden, the next one waiting shows): its icon, its line, then ×. It comes and goes softly (none under reduced

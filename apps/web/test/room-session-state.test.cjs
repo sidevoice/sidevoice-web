@@ -221,6 +221,18 @@ test('A delivery status not known yet has no mark and no words, never the warnin
  const {receiptView}=await moduleReady;
  for(const status of ['queued_offline','',undefined])assert.deepEqual(receiptView(status),{symbol:'',label:''},String(status));
 });
+test('A conversation reads offline by its own machine: one that does not answer, or the call\'s own once its drop is shown',async()=>{
+ const api=await moduleReady;
+ const people=[{node:'m',thread_id:'a',title:'A',available:true,reach:{state:'listening'}},{node:'n',thread_id:'b',title:'B',available:true,reach:{state:'listening'}}];
+ const reaches=patch=>api.participantsView(facts(api,{people,...patch})).map(p=>p.reach);
+ const ok={m:{reach:'ok'},n:{reach:'ok'}};
+ assert.deepEqual(reaches({machineLinks:ok}),['listening','listening']);
+ assert.deepEqual(reaches({machineLinks:{...ok,n:{reach:'offline'}}}),['listening','offline'],'only the machine that does not answer');
+ // The call's machine proved its address minutes ago, so its link still says ok; its socket is gone.
+ const dropped={machineLinks:ok,ws:null,reconnecting:true};
+ assert.deepEqual(reaches(dropped),['listening','listening'],'within the grace, nothing is said');
+ assert.deepEqual(reaches({...dropped,reconnectShown:true}),['offline','listening'],'past it, the call\'s machine is away and the other is not');
+});
 test('A call whose machine is away still reads its conversation, and a message that never arrived says why',async()=>{
  const api=await moduleReady;
  api.speakWith(key=>key);

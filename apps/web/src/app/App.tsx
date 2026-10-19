@@ -16,7 +16,6 @@ import { PairingDialog } from "../features/pairing/PairingDialog";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { NoMachineScreen } from "../features/pairing/NoMachineScreen";
 import { LocalHostBanner } from "../features/settings/LocalHostBanner";
-import { UpdateNotice } from "../features/updates/UpdateNotice";
 import { StorageBlockedBanner } from "../features/settings/StorageBlockedBanner";
 import { OnboardingProvider, useOnboarding } from "../features/onboarding/onboarding-context";
 import { Wizard } from "../features/onboarding/Wizard";
@@ -88,8 +87,7 @@ function RoomContent() {
               the transcript run the screen's whole height beside them. Kept in the page while the call's space waits (only
               hidden): the runtime binds their controls as it starts. */}
           <div className="call-column" hidden={callBlocked}>
-            {/* An update waiting, said over the stage: a pill at its top, a desktop's only, never moving it. */}
-            <ErrorBoundary area="stage"><CallStage notice={<UpdateNotice />} /></ErrorBoundary>
+            <ErrorBoundary area="stage"><CallStage /></ErrorBoundary>
             <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>
           </div>
           <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>

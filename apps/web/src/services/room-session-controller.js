@@ -1686,6 +1686,8 @@ function voiceStateChanged(next){
   state.userLive=next?.listening==='speaking';
   state.botLive=next?.playback==='playing';
   if(state.userTurn&&next?.listening!=='speaking'&&next?.recognising>0)state.pendingPhase='transcribing';
+  // Speaking again while the turn is transcribed: listening wins, the waveform moves again (operator, 2026-10-19).
+  if(state.userTurn&&next?.listening==='speaking')state.pendingPhase='listening';
   if(next?.listening==='speaking')state.userQuietAt=0;
  });
 }
