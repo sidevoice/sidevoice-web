@@ -3011,3 +3011,35 @@ test('replacement retains its own microphone after the previous trial\'s close c
  voice.created[1].emit('turn',{phase:'finished',turn_id:'second',text:'second'});
  assert.equal(plain(await second).text,'second');
 });
+
+test('Tries in a row each take the voice anew and let it go, whatever the one before ended with',async()=>{
+ const s=setup({strictDOM:true}),voice=withVoice(s,fakeVoice());s.context.localStorage.setItem('sidevoice.settings','{}');
+ const heard=async()=>{
+  const tried=s.run("window.sidevoiceActions.tryVoiceSettings('stt',{keep:false})");
+  await settleSoon();voice.created.at(-1).emit('turn',{phase:'finished',turn_id:'t',text:'hola'});
+  return plain(await tried).text;
+ };
+ // A failed one (the device gave out as it started) and a stopped one come between the ones that hear.
+ const start=voice.start;
+ const failed=async()=>{
+  voice.start=async()=>{throw Object.assign(new Error('x'),{code:'audio-device-failed'})};
+  const words=await s.run("window.sidevoiceActions.tryVoiceSettings('stt',{keep:false})").then(()=>null,error=>plain(error.words));
+  voice.start=start;return words;
+ };
+ const stopped=async()=>{
+  const tried=s.run("window.sidevoiceActions.tryVoiceSettings('stt',{keep:false})");
+  await settleSoon();s.run('window.sidevoiceActions.cancelVoiceTry()');
+  await assert.rejects(tried,{code:'trial-cancelled'});
+ };
+ assert.equal(await heard(),'hola');
+ assert.equal(await heard(),'hola');
+ assert.match((await failed()).text,/microphone or speaker/,'a try that fails says it in the try\'s words, not the call\'s');
+ assert.equal(await heard(),'hola');
+ await stopped();
+ assert.equal(await heard(),'hola');
+ assert.deepEqual(voice.created.map(call=>call.id),['call-1','call-2','call-3','call-4','call-5','call-6'],'each try has a voice call of its own');
+ assert.equal(voice.calls.filter(([name])=>name==='dispose').length,6,'and lets it go');
+ assert.equal(voice.routed,null,'none keeps the microphone');
+ assert.equal(s.run('voiceTry'),null);
+ assert.equal(s.run('voiceTryFinish'),null);
+});
