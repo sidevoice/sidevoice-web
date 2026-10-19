@@ -1,7 +1,6 @@
 import { SWATCHES, batch, type ColorRule } from "../bichos/kit";
 
-/* The existing species as v4 families and members (docs/catalogue.md §1).
- * (Sidevoice: the lab's frozen rollers, its "v3:" and "monstruo:" seed prefixes, are left out; scripts/sync-bichos.mjs.) */
+/* The existing species as v4 families and members (docs/catalogue.md §1). */
 
 const PAPER: ColorRule[] = SWATCHES.slice(0, 7).map(([, hue, sat, light]) => ({ hue, sat, light, spot: 160 }));
 const PINS = (p: number) => ({ p, pick: "pins" });

@@ -1,7 +1,7 @@
 /* What an avatar shows, and how it is feeling. A conversation's agent is a bicho rolled from the conversation's
  * identity (its thread id) and nothing else: the same conversation gets the same bicho on every reload and every
  * device, and nothing is stored. Choosing one by hand, and keeping the choice, is sidevoice/sidevoice-web#65. The
- * drawing itself is the bichos engine's (engine/, vendored from the avatar lab), reached through bicho-draw.ts. */
+ * drawing itself is the bichos engine's (engine/), reached through bicho-draw.ts. */
 
 /** What an avatar draws: a conversation's bicho, the person's own, or — only when asked for by name — the Sidevoice
  *  mascot. A seed is never read as a mascot's name. */

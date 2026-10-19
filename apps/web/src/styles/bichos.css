@@ -1,5 +1,6 @@
-/* GENERATED from the bichos engine (src/features/avatar/engine) by scripts/sync-bichos.mjs: do not edit.
-   The figures' moods, sizes and shared groups under .sv-avatar[data-style=bichos], then the stage backdrops. */
+/* Built from the bichos engine (src/features/avatar/engine) by features/avatar/engine-stylesheet.ts: do not edit by
+   hand, run `npx vitest run -u src/features/avatar/engine-css.test.ts`. The figures' moods, sizes and shared groups
+   under .sv-avatar[data-style=bichos], then the stage backdrops. */
 
 .sv-avatar[data-style=bichos] .ground { fill: rgb(0 0 0 / .16) }
 .sv-avatar[data-style=bichos] .shine { fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; opacity: .7 }
