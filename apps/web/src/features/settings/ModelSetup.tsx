@@ -139,8 +139,9 @@ export function useVoiceTry(task: Task | null, { keep = true, onTried }: { keep?
   }, [slot, task]);
   useEffect(() => () => window.sidevoiceActions?.cancelVoiceTry?.(), [task]);
   const cancel = () => window.sidevoiceActions?.cancelVoiceTry?.();
-  // Stop: a transcription try's take ends with what was said, and is transcribed; a voice try is cancelled.
-  const finish = () => task === "stt" && window.sidevoiceActions?.finishVoiceTry ? window.sidevoiceActions.finishVoiceTry() : cancel();
+  // Stop: a transcription try's take ends with what was said, and is transcribed; a voice try is cancelled, and so is
+  // a transcription once its take has ended (it has nothing left to end: Stop drops what is being transcribed).
+  const finish = () => task === "stt" && !trialRef.current.transcribing && window.sidevoiceActions?.finishVoiceTry ? window.sidevoiceActions.finishVoiceTry() : cancel();
   async function run(options: { text?: string; language?: string | null } = {}) {
     if (!task) return;
     const mine = ++attempt.current;
@@ -172,8 +173,8 @@ export function useVoiceTry(task: Task | null, { keep = true, onTried }: { keep?
 /** A try as it is offered: `start` runs it; for the voice, `sentence` is what it says, edited in the try itself. */
 export type VoiceTry = ReturnType<typeof useVoiceTry> & { start(): void; sentence?: string; setSentence?(sentence: string): void };
 
-/** The first-run setup's try, shown in the slot's block: started from the block's button or the setup's footer, which
- *  stops it (the one Stop); `tried` already (then the block's button says again), a line before it (`hint`), and the
+/** The first-run setup's try, shown in the slot's block: started and stopped from the block's button or the setup's
+ *  footer, both saying Stop while it runs; `tried` already (then the block's button says again), a line before it (`hint`), and the
  *  sentence to hear, to edit (`sample`). */
 export type SetupTry = VoiceTry & { tried: boolean; hint?: string; sample?: ReactNode };
 
@@ -205,17 +206,15 @@ export function TryTiming({ task, timings, t }: { task: Task; timings: TrialTimi
 const FIRST = { stt: "voice.try.speak", tts: "voice.try.listen" } as const;
 const AGAIN = { stt: "try.speakAgain", tts: "try.listenAgain" } as const;
 
-/** The try's button, first in its block whether or not the try can run: try it, Stop while it runs, then again.
- *  `reason`: why it cannot run now (its model not ready), said by the text `reasonId` names — the button stays reachable
- *  and reads it. `stopsElsewhere`: the first-run setup's, whose footer is the one Stop; here a try running is only
- *  said (busy). `again`: tried already, before this visit. */
-export function TryButton({ task, handle, id, again = false, reason = "", reasonId, stopsElsewhere = false, t }: {
-  task: Task; handle: VoiceTry; id: string; again?: boolean; reason?: string; reasonId?: string; stopsElsewhere?: boolean; t: Translate;
+/** The try's button, first in its block whether or not the try can run: try it, Stop for as long as it runs (getting
+ *  ready, listening or sounding; in Settings and in the first-run setup alike, whose footer has its own Stop beside it),
+ *  then again. `reason`: why it cannot run now (its model not ready), said by the text `reasonId` names — the button
+ *  stays reachable and reads it. `again`: tried already, before this visit. */
+export function TryButton({ task, handle, id, again = false, reason = "", reasonId, t }: {
+  task: Task; handle: VoiceTry; id: string; again?: boolean; reason?: string; reasonId?: string; t: Translate;
 }) {
   const running = handle.trial.phase === "running";
-  // While it runs, the label it was pressed with (a first try is still one).
-  const label = t(again || (!running && handle.trial.phase !== "idle") ? AGAIN[task] : FIRST[task]);
-  if (running && stopsElsewhere) return <Button size="sm" id={id} loading>{label}</Button>;
+  const label = t(again || handle.trial.phase !== "idle" ? AGAIN[task] : FIRST[task]);
   const blocked = !running && !!reason;
   return <Button size="sm" id={id} disabled={blocked} blockedBy={blocked ? reasonId : undefined} onClick={running ? handle.finish : handle.start}>
     {running ? t("try.stop") : label}
