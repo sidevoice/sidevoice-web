@@ -239,12 +239,15 @@ test("the voice's try is all in its block — its sentence shown and editable be
   await act(async () => { fireEvent.click(tryButton()); });
   expect(actions.tryVoiceSettings).toHaveBeenCalledWith("tts", expect.objectContaining({ text: "¡Hola! Así leerá Sidevoice las respuestas de tu agente.", language: "es", keep: true }));
   expect(tryBlock("tts")).toHaveTextContent("Getting ready…");
-  // Playing: the sentence lit as heard, not editable; the footer's is the one Stop.
+  // Getting ready already: Stop, as soon as it is pressed.
+  expect(tryBlock("tts").querySelector("#wizard-card-try")).toHaveTextContent(/^Stop$/);
+  // Playing: the sentence lit as heard, not editable; the block's button and the footer's both say Stop.
   act(() => { running.told.onProgress!({ from: 0, to: 0 }); running.told.onProgress!({ from: 3, to: 3 }); });
   expect(tryBlock("tts").querySelector(".model-try-said")).toHaveTextContent(/^¡Hola!$/);
   expect(tryBlock("tts").querySelector("#tts-sentence, button.tts-try-said")).toBeNull();
-  expect(tryBlock("tts").querySelector("#wizard-card-try")).toHaveAttribute("aria-busy", "true");
-  expect(tryBlock("tts").querySelector("#wizard-card-try")).toHaveTextContent(/^Try it: listen$/);
+  expect(tryBlock("tts").querySelector("#wizard-card-try")).not.toHaveAttribute("aria-busy");
+  expect(tryBlock("tts").querySelector("#wizard-card-try")).toHaveTextContent(/^Stop$/);
+  expect(document.getElementById("wizard-try")).toHaveTextContent(/^Stop$/);
   await act(async () => { running.finish({ timings: { ready_ms: 600, first_sound_ms: 320 } }); });
   expect(tryBlock("tts").querySelector(".tts-try-area #tts-timing")).toHaveTextContent(/^First sound in 0\.3 s$/);
   expect(tryBlock("tts").querySelector(".stt-try-head #wizard-card-try")).toHaveTextContent(/^Play again$/);
@@ -509,9 +512,10 @@ for (const step of MODEL_STEPS) {
     if (!turn) pendingTry();
     await act(async () => { fireEvent.click(card()); });
     expect(turn ? actions.tryTurnSettings : actions.tryVoiceSettings).toHaveBeenCalled();
-    // Running: the footer's is the one Stop; the block's button says it runs.
-    expect(wizard().queryAllByRole("button", { name: "Stop" }).map((button) => button.id)).toEqual(["wizard-try"]);
-    expect(card()).toHaveAttribute("aria-busy", "true");
+    // Running: the footer's Stop, and the block's button too — the voice steps'; End of turn's block only says it runs.
+    expect(wizard().queryAllByRole("button", { name: "Stop" }).map((button) => button.id)).toEqual(turn ? ["wizard-try"] : ["wizard-card-try", "wizard-try"]);
+    if (turn) expect(card()).toHaveAttribute("aria-busy", "true");
+    else expect(card()).not.toHaveAttribute("aria-busy");
   }, WHOLE_APP_MS);
 }
 

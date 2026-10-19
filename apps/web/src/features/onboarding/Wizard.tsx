@@ -167,7 +167,7 @@ function PrepareStep({ ready, t }: { ready: boolean; t: Translate }) {
 type StageTry = SetupTry & { sentence: string; setSentence(value: string): void };
 
 /** A voice step: its slot as Settings has it, the try in its block (what it shows and where, the `try-result`
- *  variant's) with its own button, there before the model is; the footer offers it too, and is its one Stop. The sentence to hear is edited in the block, where it is then lit
+ *  variant's) with its own button, there before the model is, Stop while it runs; the footer offers it too, with its own Stop. The sentence to hear is edited in the block, where it is then lit
  *  as it is heard (`card`); with the try in its own dialog, beside the block (`dialog`). */
 function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t: Translate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);

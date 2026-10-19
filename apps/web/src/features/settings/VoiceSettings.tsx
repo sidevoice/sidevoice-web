@@ -172,7 +172,7 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
   const tryReason = !model.model || !model.ready ? t(task === "stt" ? "settings.save.waitTranscription" : "settings.save.waitVoice")
     : task === "tts" && !(setupTry?.sentence ?? sentence).trim() ? t("wizard.wait.sentence") : "";
   const tryButton = handle && <TryButton task={task} handle={handle} id={setupTry ? "wizard-card-try" : task + "-try"} again={setupTry?.tried}
-    reason={tryReason} reasonId={reasonId} stopsElsewhere={!!setupTry} t={t} />;
+    reason={tryReason} reasonId={reasonId} t={t} />;
   const tryPanel = handle && <TryPanel task={task} handle={handle} model={draft[task].model} hint={setupTry?.hint} sample={setupTry?.sample} button={tryButton} t={t} />;
   const voices = task === "tts" ? choices.tts.voices : [];
   const speed = task === "tts" ? choices.tts.speed : null;
