@@ -339,8 +339,13 @@ test("the stage's agent and its thumbnails are one creature in one state: rest a
   tick(AGENT_LINGER_MS + SENT_LEAVING_MS);
   expect(stageBubbles()).toHaveLength(0);
   expect(inStep(login)).toContain("data-avatar-state=working");
-  // Its machine stops answering: the stage hangs its wanted poster, and every copy sleeps.
-  patch(store, { machineLinks: { ...live("fp-2"), "fp-1": { reach: "offline", via: "node" } } } as Partial<SessionFacts>);
+  // Its machine stops answering mid-reply: it says the reply to its end (#220), on the stage and in every thumbnail;
+  // then the stage hangs its wanted poster, and every copy sleeps.
+  patch(store, { botLive: true, karaokeState: { segment: "h-2", from: 0, to: 0 }, history: [{ ...played, audio: "playing" }],
+    machineLinks: { ...live("fp-2"), "fp-1": { reach: "offline", via: "node" } } } as Partial<SessionFacts>);
+  expect(document.querySelector(".wanted")).toBeNull();
+  expect(inStep(login)).toContain("data-avatar-state=speaking");
+  patch(store, { botLive: false, karaokeState: null, history: [played] } as Partial<SessionFacts>);
   expect(document.querySelector(".wanted")).not.toBeNull();
   expect(inStep(login)).toEqual(expect.arrayContaining(["data-avatar-state=offline", "data-offline=true", "data-idle=null", "data-work=null"]));
 }, WHOLE_APP_MS);
