@@ -45,7 +45,7 @@ export function VoicePicker({ id, value, automatic, voices, onValueChange }: Pro
       <div className="voice-picker-tools">
         <div className="voice-picker-search"><Search size={17} aria-hidden="true" />
           <Command.Input autoFocus value={query} onValueChange={setQuery} aria-label={t("voice.picker.search")} placeholder={t("voice.picker.search")} />
-          {languages.length > 0 && <LanguagePicker id="voice-picker-language" size="sm" value={language} onValueChange={setLanguage} label={t("voice.picker.language")}
+          {languages.length > 0 && <LanguagePicker id="voice-picker-language" size="sm" showLanguageIcon value={language} onValueChange={setLanguage} label={t("voice.picker.language")}
             options={[{ value: "", label: t("voice.picker.allLanguages") }, ...languages.map((tag) => ({ value: tag, label: languageName(tag) }))]} />}
         </div>
       </div>
