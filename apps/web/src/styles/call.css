@@ -3,8 +3,8 @@
 
 /* ---------- avatars (features/avatar): the bichos engine's drawings ---------- */
 /* Where an avatar sits sizes it; the drawing fills its box. How a figure moves is the engine's (styles/bichos.css,
-   generated); what follows is the app's side of it: the shared contract the avatar lab keeps in lab.css, the dark
-   theme pinned, the person's microphone mouth, and the stage scene. */
+   built from it); what follows is the app's side of it: the shared contract the engine's rules assume (the avatar
+   lab kept it in lab.css), the dark theme pinned, the person's microphone mouth, and the stage scene. */
 .ui-avatar.chat-character { overflow:hidden;background:var(--sv-surface-raised) }
 .chat-character .sv-avatar { width:100%;height:100%;background:var(--av-bg) }
 .sv-avatar { position:relative;display:inline-block;flex:none;line-height:0 }

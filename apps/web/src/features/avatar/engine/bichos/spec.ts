@@ -2,8 +2,7 @@ import { hsl } from "../core";
 import { SWATCHES, type BodyDef, type Spec, type SpecInput } from "./kit";
 import { BODIES, SLOTS, asMatchable, bodyOf, conflict, matches, partOf, partsIn, slotOf, type Entry, type Matchable } from "./registry";
 
-/* The spec: a body, one part id per single slot, a list per multi slot, a colour and a shape seed.
- * (Sidevoice: the lab's adapter for old recipes is left out, the app never stored one; scripts/sync-bichos.mjs.) */
+/* The spec: a body, one part id per single slot, a list per multi slot, a colour and a shape seed. */
 
 
 const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);

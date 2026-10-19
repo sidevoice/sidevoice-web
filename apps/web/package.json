@@ -8,8 +8,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "test": "node --test test/*.cjs && vitest run",
-    "e2e": "playwright test -c playwright.config.mjs",
-    "sync:bichos": "node scripts/sync-bichos.mjs"
+    "e2e": "playwright test -c playwright.config.mjs"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",
