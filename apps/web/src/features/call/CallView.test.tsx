@@ -780,3 +780,17 @@ test("the voice error lies over the stage's top as one alert, outside the tile; 
   expect(store.getState().facts.bootError).toBeNull();
   expect(document.querySelector("#error")).toBeEmptyDOMElement();
 }, WHOLE_APP_MS);
+
+test("each machine's group in the conversations wears the connected mark Machines wears, from that machine's own reach", () => {
+  const store = room();
+  const group = (host: string) => [...document.querySelectorAll<HTMLElement>(".conversation-sidebar .sidebar-group")].find((section) => section.textContent?.includes(host))!;
+  const dot = (host: string) => group(host).querySelector(".state-on-icon-dot");
+  expect(dot("Laptop")).not.toBeNull();
+  expect(dot("Home server")).not.toBeNull();
+  expect(group("Home server")).toHaveAttribute("aria-label", "Home server, Online");
+  // The reach of one machine changes: only its group does.
+  patch(store, { machineLinks: { ...live("fp-1"), "fp-2": { reach: "offline", via: "" } } });
+  expect(dot("Laptop")).not.toBeNull();
+  expect(dot("Home server")).toBeNull();
+  expect(group("Home server")).toHaveAttribute("aria-label", "Home server, Offline");
+});

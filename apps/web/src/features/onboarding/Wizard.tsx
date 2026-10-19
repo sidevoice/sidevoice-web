@@ -86,7 +86,7 @@ function BasicsStep({ t }: { t: Translate }) {
       <Row label={t("settings.appearance")} description={t("settings.appearance.hint")}><Appearance t={t} /></Row>
       <Row label={t("settings.deviceName")} description={t("settings.deviceName.hint")} htmlFor="wizard-device-name"><DeviceNameField id="wizard-device-name" /></Row>
       <Row label={t("wizard.basics.uiLanguage")} htmlFor="wizard-ui-language">
-        <LanguagePicker id="wizard-ui-language" showLanguageIcon={false} value={language} label={t("wizard.basics.uiLanguage")} onValueChange={(next) => { setLanguage(next); window.sidevoiceActions?.setInterfaceLanguage?.(next); }} options={languages} />
+        <LanguagePicker id="wizard-ui-language" value={language} label={t("wizard.basics.uiLanguage")} onValueChange={(next) => { setLanguage(next); window.sidevoiceActions?.setInterfaceLanguage?.(next); }} options={languages} />
       </Row>
     </Group>
   </section>;
@@ -167,7 +167,7 @@ function PrepareStep({ ready, t }: { ready: boolean; t: Translate }) {
 type StageTry = SetupTry & { sentence: string; setSentence(value: string): void };
 
 /** A voice step: its slot as Settings has it, the try in its block (what it shows and where, the `try-result`
- *  variant's) with its own button, there before the model is; the footer offers it too, and is its one Stop. The sentence to hear is edited in the block, where it is then lit
+ *  variant's) with its own button, there before the model is, Stop while it runs; the footer offers it too, with its own Stop. The sentence to hear is edited in the block, where it is then lit
  *  as it is heard (`card`); with the try in its own dialog, beside the block (`dialog`). */
 function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t: Translate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
@@ -420,7 +420,7 @@ export function Wizard() {
         onSkip={() => void skipMicrophone()} t={t} />}
       {stageTask && <ModelStepFooter reason={waitReason(model, stageTask, t)} skip={stageSkip}
         tryReason={stageTask === "tts" && !sample.trim() ? t("wizard.wait.sentence") : undefined}
-        running={trial.trial.phase === "running"} tried={onboarding.tried(stageTask)}
+        running={trial.trial.phase === "running"} tried={onboarding.tried(stageTask) && !model.needsKey}
         onTry={tryAgain} onStop={trial.finish} onContinue={() => void finishStage(stageTask)} t={t} />}
       {step === "W5" && <ModelStepFooter reason={turnWaits ? waitReason(turnModel, "turn", t) : ""} skip={turnSkip} tryReason={sttModel.ready ? undefined : t("settings.save.waitTranscription")}
         running={turnTry.running} tried={turnTried} onTry={turnTry.start} onStop={turnTry.stop} onContinue={() => void finishTurn()} t={t} />}

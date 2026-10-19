@@ -68,16 +68,63 @@ test("a granted site permission asks only on the person's action, and a real str
   access.dispose();
 });
 
-test("devicechange: unplugging the microphone is no microphone found, plugging it in finds it again", async () => {
-  const b = browser("granted");
+test("devicechange: none listed is no microphone found, one plugged in finds it again", async () => {
+  const b = browser("prompt", 0);
+  const access = createMicrophoneAccess();
+  await waitFor(() => expect(stateOf(access)()).toBe("missing"));
+  b.plug(1);
+  await waitFor(() => expect(stateOf(access)()).toBe("prompt"));
+  access.dispose();
+});
+
+test("iPhone Safari: the device list changes as the stream opens and is let go, listing none after; it stays allowed", async () => {
+  const b = browser("prompt");
   const access = createMicrophoneAccess();
   await waitFor(() => expect(stateOf(access)()).toBe("prompt"));
   await access.request();
   expect(stateOf(access)()).toBe("granted");
   b.plug(0);
-  await waitFor(() => expect(stateOf(access)()).toBe("missing"));
-  b.plug(1);
+  b.status.dispatchEvent(new Event("change"));
+  window.dispatchEvent(new Event("focus"));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(stateOf(access)()).toBe("granted");
+  access.dispose();
+});
+
+test("a stream one reader opens is the page's answer: the call's reader and one made later read it allowed", async () => {
+  const b = browser("prompt");
+  const call = createMicrophoneAccess();
+  const settings = createMicrophoneAccess();
+  await waitFor(() => expect(stateOf(call)()).toBe("prompt"));
+  await waitFor(() => expect(stateOf(settings)()).toBe("prompt"));
+  await settings.request();
+  expect(b.media.getUserMedia).toHaveBeenCalledTimes(1);
+  await waitFor(() => expect(stateOf(call)()).toBe("granted"));
+  settings.dispose();
+  const later = createMicrophoneAccess();
+  await waitFor(() => expect(stateOf(later)()).toBe("granted"));
+  expect(b.media.getUserMedia).toHaveBeenCalledTimes(1);
+  call.dispose(); later.dispose();
+});
+
+test("getUserMedia is called in the tap itself, before anything is awaited", () => {
+  const b = browser("prompt");
+  const access = createMicrophoneAccess();
+  void access.request();
+  expect(b.media.getUserMedia).toHaveBeenCalledWith({ audio: true });
+  access.dispose();
+});
+
+test("a refusal is a block though the permission still says prompt (iPhone Safari); a prompt the browser says it dismissed is not", async () => {
+  const b = browser("prompt");
+  const access = createMicrophoneAccess();
   await waitFor(() => expect(stateOf(access)()).toBe("prompt"));
+  b.media.getUserMedia.mockRejectedValueOnce(Object.assign(new Error("The request is not allowed by the user agent or the platform in the current context, possibly because the user denied permission."), { name: "NotAllowedError" }));
+  await access.request();
+  expect(access.getSnapshot()).toMatchObject({ state: "denied", dismissed: false });
+  b.media.getUserMedia.mockRejectedValueOnce(Object.assign(new Error("Permission dismissed"), { name: "NotAllowedError" }));
+  await access.request();
+  expect(access.getSnapshot()).toMatchObject({ state: "prompt", dismissed: true });
   access.dispose();
 });
 

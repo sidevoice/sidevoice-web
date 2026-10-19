@@ -90,6 +90,9 @@
    narrows it rather than pushing the try past its card. */
 .stt-try-head { min-width: 0; }
 .stt-try-head .voice-wave { width: 100%; max-width: 9rem; }
+/* The try's button keeps one width through its states (Try it, Stop, again): the level or the sentence beside it stays put,
+   and Stop is under the pointer that pressed Try it. */
+.stt-try-head > .ui-button { min-width: 6.5rem; }
 .stt-try-area { display: grid; align-content: start; gap: var(--sv-space-1-5); min-width: 0; }
 .stt-try-area:empty { display: none; }
 .stt-try-area .model-try-take { flex: none; width: 100%; }

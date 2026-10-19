@@ -250,14 +250,14 @@ function Pickers({ locked }: { locked: boolean }) {
 
 const STATES: { status: PrepareStatus; fraction?: number; error?: string }[] = [
   { status: "absent" }, { status: "downloading", fraction: 0.42 }, { status: "verifying" }, { status: "loading" }, { status: "ready" },
-  { status: "failed", error: "The connection dropped. Check it and try again." }, { status: "needs-key" },
+  { status: "failed", error: "The connection dropped. Check it and try again." },
 ];
 
 function Prepare() {
   return <div className="ds-stack">
     <ModelPrepare status="absent" model="whisper-small" size={466e6} meta="English, Spanish and 4 more · good accuracy, fast" pickers={(locked) => <Pickers locked={locked} />} />
     {STATES.map((state) => <div className="ds-state" key={state.status}><code>{state.status}</code>
-      <ModelPrepare model="whisper-small" size={state.status === "needs-key" ? null : 466e6} {...state} readyAction={<Button size="sm">Try it</Button>} />
+      <ModelPrepare model="whisper-small" size={466e6} {...state} readyAction={<Button size="sm">Try it</Button>} />
     </div>)}
   </div>;
 }

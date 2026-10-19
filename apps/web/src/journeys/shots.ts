@@ -141,9 +141,12 @@ const PAIRING = { pairings: [], callNode: null, machineLinks: {}, pairingOpen: t
 const absent = (id: string) => ({ voiceCatalogue: { state: "ready", error: "", catalogs: CATALOGS.map((catalog) => ({ ...catalog, models: catalog.models.map((model) => model.id !== id ? model
   : { ...model, installed: false, builds: model.builds?.map((entry) => ({ ...entry, installed: false })) }) })) } });
 const never = () => new Promise(() => {});
+/** Transcription from a provider whose key is not kept yet. */
+const KEYLESS = { voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "openai", model: "", language: null } } };
 /** The voice steps' tries, as the runtime's actions would run them: listening (the level up) or playing (half the
  *  sentence heard) until the shot ends, or done — what was heard, how quick. */
 const TRIES = {
+  starting: { tryVoiceSettings: () => never() },
   listening: { tryVoiceSettings: (_task: string, progress: TrialProgress) => { progress.onListening?.(); progress.onLevel?.(0.5); return never(); } },
   playing: { tryVoiceSettings: (_task: string, progress: TrialProgress) => { progress.onListening?.(); progress.onProgress?.({ from: 0, to: 24 }); return never(); } },
   heard: { tryVoiceSettings: async (task: string) => task === "stt"
@@ -184,14 +187,18 @@ export const JOURNEYS: Journey[] = [
     { id: "w4", caption: "Transcription, its model not downloaded yet: the try's block already there, its button and the footer's waiting for the model, saying why.", setup: { step: "W4", record: { basics_done: true, choice: "remote" } },
       facts: { voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-small", language: null } } } },
     { id: "w4-ready", caption: "Transcription, its model ready: Try it in the try's block and in the footer — recommended, not required.", setup: { step: "W4", record: { basics_done: true, choice: "remote" } } },
-    { id: "w4-listening", caption: "Transcription, listening: the level moving, the take's bar filling; the footer's Stop is the one.", setup: { step: "W4", record: { basics_done: true, choice: "remote" } },
+    { id: "w4-starting", caption: "Transcription, getting ready: the block's button is Stop from the moment it is pressed, as the footer's is.", setup: { step: "W4", record: { basics_done: true, choice: "remote" } },
+      actions: TRIES.starting, after: press("wizard-try") },
+    { id: "w4-listening", caption: "Transcription, listening: the level moving, the take's bar filling; Stop in the block and in the footer.", setup: { step: "W4", record: { basics_done: true, choice: "remote" } },
       actions: TRIES.listening, after: press("wizard-try") },
     { id: "w4-heard", caption: "Transcription, tried: what was heard and how quick, Speak again in the block; Continue.", setup: { step: "W4", record: { basics_done: true, choice: "remote" } },
       actions: TRIES.heard, after: press("wizard-try") },
+    { id: "w4-keyless", caption: "Transcription from a provider without its key: its key's line says it (the badge, Connect), the Model dropdown is disabled, and there is no Continue — only skipping, or the key, goes on.",
+      setup: { step: "W4", record: { basics_done: true, choice: "remote" } }, facts: KEYLESS },
     { id: "w4v-absent", caption: "Voice, its model not downloaded yet: the try's block already there, waiting for the model, saying why.", setup: { step: "W4v", record: { basics_done: true, choice: "remote" } },
       facts: absent("kokoro-82m-v1.0") },
     { id: "w4v", caption: "Voice: a sentence to hear, editable; Try it in the try's block and in the footer.", setup: { step: "W4v", record: { basics_done: true, choice: "remote" } } },
-    { id: "w4v-playing", caption: "Voice, playing: the sentence lit as it is heard; the footer's Stop is the one.", setup: { step: "W4v", record: { basics_done: true, choice: "remote" } },
+    { id: "w4v-playing", caption: "Voice, playing: the sentence lit as it is heard; Stop in the block and in the footer.", setup: { step: "W4v", record: { basics_done: true, choice: "remote" } },
       actions: TRIES.playing, after: press("wizard-try") },
     { id: "w4v-heard", caption: "Voice, tried: how quick its first sound was, Play again in the block; Continue.", setup: { step: "W4v", record: { basics_done: true, choice: "remote" } },
       actions: TRIES.heard, after: press("wizard-try") },
@@ -253,6 +260,7 @@ export const JOURNEYS: Journey[] = [
   { id: "settings", title: "Settings", note: "Each section, applied as it changes (no Save).", shots: [
     { id: "s-general", caption: "General: language and appearance.", after: openSettings("general") },
     { id: "s-transcription", caption: "Transcription: source and model, the model prepared in place.", after: openSettings("transcription") },
+    { id: "s-transcription-keyless", caption: "Transcription from a provider without its key: its key's line says it (the badge, Connect), the Model dropdown is disabled.", facts: KEYLESS, after: openSettings("transcription") },
     { id: "s-voice", caption: "Voice.", after: openSettings("voice") },
     { id: "s-call", caption: "Call: end of turn and patience (with their timings), the thinking sound, the screen.", after: openSettings("call") },
     { id: "s-providers-none", caption: "Providers: none connected.", facts: { providerKeys: { elevenlabs: false, openai: false } }, after: openSettings("providers") },
