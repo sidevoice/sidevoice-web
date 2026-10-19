@@ -42,6 +42,9 @@ export interface ChatMessage {
 
 export interface ConversationView {
   messages: ChatMessage[];
+  /** The reply this page's voice is saying now, where it has got to (`karaoke`); none when nothing plays. The stage's
+   *  balloon shows this and nothing else. */
+  saying?: ChatMessage | null;
   pendingText: string;
   pendingCancellable: boolean;
   /** While a turn is open the bubble shows bars instead of text: listening, then transcribing. */

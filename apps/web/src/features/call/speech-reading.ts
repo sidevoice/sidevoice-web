@@ -5,16 +5,6 @@ import { readingMoves, readingPosition, readOn, type Reading } from "./speech-ch
 /* Where the voice is in a reply, and what the person's spoken turn sent, on the clocks the stage's bubbles (CallStage)
  * read them by. */
 
-/** The reply sounding now. Until its row says so the voice may already be playing it: then it is the oldest one
- *  waiting, since replies are said in order. */
-export function sounding(messages: ChatMessage[], voiceLive: boolean) {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (message.role === "assistant" && message.playback === "playing") return message;
-  }
-  return voiceLive ? messages.find((message) => message.role === "assistant" && message.playback === "pending") ?? null : null;
-}
-
 /** How far into `reply` the voice is (speech-chunks.ts `readOn`): the part sounding now, its words moving on at a
  *  speaking pace within it, or that pace from the start while the voice gives no cue yet. A reply that has finished,
  *  or left the list, is read from the start if it sounds again (listening again). */

@@ -458,20 +458,31 @@ test("a whole sentence sounding is read at a speaking pace, never past its end",
   expect(document.querySelector(".stage-bubble .karaoke-upcoming")?.textContent).toBe(REPLY.slice("Okay. I'll start with the login".length));
 });
 
-test("without a cue from the voice, the bubble reads on at a speaking pace instead of staying dim", () => {
-  vi.useFakeTimers();
-  room({ botLive: true, karaokeState: null });
-  expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe("");
-  act(() => { vi.advanceTimersByTime(3000); });
-  // Three seconds at a speaking pace: to "then look", from the reply's start.
-  expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe("Okay. I'll start with the login and then look");
-});
-
 const stageBubbles = () => [...document.querySelectorAll<HTMLElement>(".stage-bubble")];
 /** The reply `segment` as the room has it, its voice `audio` ("playing", or "played" once said). */
 const reply = (segment: string, text: string, audio: string, time: number) =>
   ({ segment, thread: "fp-1|t-login", role: "assistant" as const, text, name: "Fix the slow login", time, session: "s1", audio });
 const NEXT = "Done: the login is fast again.";
+
+test("the balloon is what this page plays: none for a reply the room lists as playing or queued while the voice says neither (#221)", () => {
+  room({ botLive: true, karaokeState: null, history: [reply("h-2", REPLY, "playing", 1), reply("h-3", NEXT, "queued", 2)] });
+  expect(stageBubbles()).toHaveLength(0);
+});
+
+test("a reply cut short and still listed as playing by the room leaves, and a newer one played does not bring it back (#221)", () => {
+  // Cut halfway when its machine restarted: the restarted room still lists it as playing.
+  const store = room({ botLive: true, karaokeState: { segment: "h-2", from: 20, to: 20 } });
+  vi.useFakeTimers();
+  patch(store, { botLive: false, karaokeState: null });
+  tick(AGENT_LINGER_MS + SENT_LEAVING_MS);
+  expect(stageBubbles()).toHaveLength(0);
+  // A newer reply plays, then ends.
+  patch(store, { botLive: true, karaokeState: { segment: "h-3", from: 0, to: 0 }, history: [reply("h-2", REPLY, "playing", 1), reply("h-3", NEXT, "playing", 2)] } as Partial<SessionFacts>);
+  expect(stageBubbles()).toHaveLength(1);
+  patch(store, { botLive: false, karaokeState: null, history: [reply("h-2", REPLY, "playing", 1), reply("h-3", NEXT, "played", 2)] } as Partial<SessionFacts>);
+  tick(AGENT_LINGER_MS + SENT_LEAVING_MS);
+  expect(stageBubbles()).toHaveLength(0);
+}, WHOLE_APP_MS);
 
 test("its last words said, a reply stays whole AGENT_LINGER_MS, then lifts away; the next one sends it away at once", () => {
   const store = room({ botLive: true, karaokeState: { segment: "h-2", from: 20, to: 20 } });
@@ -739,7 +750,8 @@ test("the transcript button stays directly accessible without an unread count", 
 /* The stage's "Working…" line over the agent while it works is only for assistive tech: the sidebar and the desk say it
  * to the eye. It stays a status, so a screen reader hears it. */
 test("the Working… line over the agent is an sr-only status, with no visible badge in its place", () => {
-  const store = room();
+  // A reply this page is saying, its balloon up.
+  const store = room({ karaokeState: { segment: "h-2", from: 0, to: 0 } });
   expect(workingLine()).toBeNull();
   vi.useFakeTimers();
   patch(store, { harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login") });

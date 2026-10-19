@@ -12,7 +12,7 @@ import { StageBackdrop, StageDesk, useSceneScale, WantedPoster, type PosterWords
 import { KaraokeText } from "../conversation/KaraokeText";
 import { uiLanguage, translator, type Translate } from "../../i18n/translator";
 import { moodText } from "./conversation-state";
-import { sounding, useAgentTurns, useSpokenTo, type AgentTurn } from "./speech-reading";
+import { useAgentTurns, useSpokenTo, type AgentTurn } from "./speech-reading";
 import { PagedText } from "./PagedText";
 import { useStageConversation, type StageConversation } from "./stage-view";
 import { BalloonTail } from "./BalloonTail";
@@ -125,7 +125,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
   const joined = useRoomStore((state) => state.call.joined);
   const interaction = [joined, stage.threadId, conversation.pendingPhase, balloonUp, mood].join("|");
   const showConversations = useCallLayout((state) => state.showConversations);
-  const reply = stage.isTarget ? sounding(conversation.messages, stage.speaking) : null;
+  const reply = stage.isTarget ? conversation.saying ?? null : null;
   const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
   // A phone keeps the transcript's button in the tile's corner; a desktop has it at the bar's right (CallToolbar).
   const narrow = useMedia(NARROW_QUERY);

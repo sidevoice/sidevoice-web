@@ -1781,6 +1781,49 @@ test('H3 Skip chosen before hang-up stays heard through delayed voice cancellati
  assert.deepEqual(plain(sentOf(c,c.first,'reply-hearing').map(d=>[d.history_id,d.outcome,d.heard_chars??null])),[['s1:voice:skip-hangup','heard',null]]);
  assert.equal(sentOf(c,c.first,'reply-hearing').length,1,'the late callback cannot change the settled choice');
 });
+// The stage's balloon is the reply this page is saying, where it has got to: nothing plays, no balloon (#221).
+const balloonOf=c=>plain(c.s.run('SessionState.conversationView(state).saying'));
+test('#221 the balloon follows playback alone: none before a reply sounds, its words as they sound, none once it ends',async()=>{
+ const c=await callOnRoom();
+ const say=id=>c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'s1:voice:'+id,text:'Hola mundo'}});
+ say('one');say('two');
+ assert.equal(balloonOf(c),null,'handed to the voice, not sounding yet: no balloon');
+ const one=c.voice.said[0];one.step({type:'playing'});
+ assert.equal(balloonOf(c).segment,'s1:voice:one');
+ one.step({type:'progress',sounding:[0,4],heard_chars:0});
+ assert.deepEqual(balloonOf(c).karaoke,{from:0,to:4});
+ one.step({type:'done',outcome:{status:'heard'}});
+ assert.equal(c.voice.said.length,2,'the next one is handed to the voice');
+ assert.equal(balloonOf(c),null,'and is not shown before it sounds: nothing waits in a balloon');
+ c.voice.said[1].step({type:'playing'});c.voice.said[1].step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'barge-in'}});
+ assert.equal(balloonOf(c),null,'cut short, it leaves none either');
+ c.s.run('disconnect()');
+});
+test('#221 a reply cut when its machine restarted leaves no balloon once the call is back, though the room still lists it as playing',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'cut',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'s1:voice:cut',text:'Lo tengo: es el bucle'}});
+ const cut=c.voice.said[0];cut.step({type:'playing'});cut.step({type:'progress',sounding:[0,9],heard_chars:0});
+ c.drop(c.first);
+ await c.until(()=>c.sockets.length===2,'an attempt');
+ cut.step({type:'done',outcome:{status:'heard-up-to',heard_chars:9,reason:'cancelled'}});
+ // The restarted room has a new session for the call, and still lists the cut reply as playing.
+ c.s.context.fetch=async path=>({ok:true,status:200,json:async()=>path.includes('/participants')
+  ?{participants:[{thread_id:'a',title:'A',available:true,reach:{state:'listening'},epoch:0}]}
+  :path.includes('/history')?{messages:[{id:'s1:voice:cut',thread:'a',role:'assistant',text:'Lo tengo: es el bucle',status:'playing',time:1,seq:1}]}
+  :{binding:{thread_id:'a',title:'A',binding_id:'b2',epoch:0},room:{revision:0},clients:[],call:null,messages:[]}});
+ await c.answer({session_id:'s2',resume:{token:'tok-b',seconds:60},resumed:false});
+ await c.until(()=>c.s.run('state.roomBinding?.binding_id')==='b2','back in the call');
+ await c.s.run('refreshHistory()');
+ assert.equal(c.s.run("history.find(r=>r.segment==='s1:voice:cut').audio"),'playing');
+ assert.equal(balloonOf(c),null,'it no longer plays: no balloon');
+ // A newer reply plays and ends: the cut one does not come back in its place.
+ c.push(c.sockets.at(-1),{type:'voice-reply',data:{session_id:'s2',utterance_id:'newer',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'s2:voice:newer',text:'Ya está'}});
+ const newer=c.voice.said.at(-1);newer.step({type:'playing'});
+ assert.equal(balloonOf(c).segment,'s2:voice:newer');
+ newer.step({type:'done',outcome:{status:'heard'}});
+ assert.equal(balloonOf(c),null);
+ c.s.run('disconnect()');
+});
 test('T16 a written muted reply gets one reliable semantic receipt without an audio handle',async()=>{
  const c=await callOnRoom();
  const row={id:'s1:voice:written',thread:'a',role:'assistant',text:'Written only',status:'text_only',audio_reason:'agents_muted',hearing:null,hearing_unconfirmed:true,heard_chars:null,globally_heard:false,replayable:true,time:1,seq:1};
