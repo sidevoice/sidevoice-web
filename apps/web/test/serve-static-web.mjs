@@ -9,6 +9,10 @@ const app = path.resolve(here, "..");
 const repo = path.resolve(app, "../..");
 const site = path.resolve(process.env.SIDEVOICE_STATIC_SITE || path.join(repo, ".playwright-static-web"));
 const entry = path.join(site, "voice", "index.html");
+// The voice package as installed, for the specs that run its own browser audio: its worklets load from the server
+// itself, where a test cannot route them.
+const VOICE_PACKAGE = "/voice-contract/";
+const voicePackage = path.join(repo, "node_modules", "@sidevoice", "voice");
 
 if (!existsSync(entry)) {
   const assembled = spawnSync(process.execPath, [path.join(repo, "scripts/assemble-static-web.mjs"), site], { cwd: repo, stdio: "inherit" });
@@ -28,8 +32,9 @@ createServer((request, response) => {
   catch { response.writeHead(400).end(); return; }
   if (pathname === "/voice") { response.writeHead(308, { location: "/voice/" }).end(); return; }
   if (pathname.endsWith("/")) pathname += "index.html";
-  const file = path.resolve(site, `.${pathname}`);
-  if (file !== site && !file.startsWith(site + path.sep)) { response.writeHead(403).end(); return; }
+  const [root, relative] = pathname.startsWith(VOICE_PACKAGE) ? [voicePackage, pathname.slice(VOICE_PACKAGE.length - 1)] : [site, pathname];
+  const file = path.resolve(root, `.${relative}`);
+  if (file !== root && !file.startsWith(root + path.sep)) { response.writeHead(403).end(); return; }
   try {
     if (!statSync(file).isFile()) { response.writeHead(404).end(); return; }
   } catch { response.writeHead(404).end(); return; }
