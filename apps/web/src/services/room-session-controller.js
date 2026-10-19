@@ -502,6 +502,13 @@ function nameOfflineRow(turnId,id){
  state.history=state.history.map(r=>mine(r)?{...r,segment:id,offline:true,delivery:takeReceipt(id)||r.delivery}:r);save();markHistorySeen();
 }
 
+/* Refusals of one of this page's own messages that give the person nothing to do, so they raise no banner: the room
+ * keeps the message for later (`room.turns_full`, `room.input_ended`), or has nothing to apply it to. The latter is
+ * `room.stale_utterance`: a report of how a reply played or was heard (`voice-playback`, `reply-hearing`), about a reply
+ * the room no longer knows — it restarted, or the reply's call or row is gone. Expected, and a second try would be
+ * refused the same way. */
+const QUIET_REFUSALS=new Set(['room.turns_full','room.input_ended','room.stale_utterance']);
+
 /* ----- the replies being said -----
  * The voice says a reply as something of its own (a handle); the room names it by its `utterance_id`. While a reply
  * lives the page keeps one for the other: the room may withdraw it (`voice-reply-withdrawn`), and how it ended is the
@@ -1439,7 +1446,7 @@ function recordMessage(raw, socket) {
                 keepMessage('user-turn', 'voice-user-turn', words);
             flushOutbox();
             drainReplies();
-            if(d.key!=='room.turns_full'&&d.key!=='room.input_ended')setRoomError(roomError(refusalError(d)));
+            if(!QUIET_REFUSALS.has(d.key))setRoomError(roomError(refusalError(d)));
             return;
         }
         setRoomError(roomError(refusalError(d)));
