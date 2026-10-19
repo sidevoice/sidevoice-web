@@ -1,22 +1,27 @@
-/* The person's voice settings: kept on this device (the room keeps none), handed to the voice as its `VoiceSettings`
- * (@sidevoice/voice `js/voice-host.d.ts`), and the choices the settings pane offers from the engine's catalogues
- * (`model-catalogs.js`). A slot names its model by catalogue and id, `{catalog, model}`: the catalogue of models that
- * run on this device (`local`), or a remote provider's. What the pane shows it says by message key, with its params. */
+/* The person's voice settings: kept on this device (the room keeps none), handed to the voice as the halves of a call
+ * (`VoiceSettings`, @sidevoice/voice `js/voice-host.d.ts`: an input half, an output half, each only where the call
+ * uses it), and the choices the settings pane offers from the engine's catalogues (`model-catalogs.js`). A slot names
+ * its model by catalogue and id, `{catalog, model}`: the catalogue of models that run on this device (`local`), or a
+ * remote provider's. What the pane shows it says by message key, with its params. */
 
 import { LOCAL_CATALOG } from './model-catalogs.js';
 
 /**
  * @typedef {import('@sidevoice/voice').VoiceSettings} VoiceSettings
+ * @typedef {import('@sidevoice/voice').VoiceInputSettings} VoiceInputSettings
+ * @typedef {import('@sidevoice/voice').VoiceOutputSettings} VoiceOutputSettings
+ * @typedef {import('@sidevoice/voice').VoiceEndOfTurnSettings} VoiceEndOfTurnSettings
  * @typedef {import('./model-catalogs.js').CatalogView} CatalogView
  * @typedef {import('./model-catalogs.js').CatalogModel} CatalogModel
  * @typedef {{
  *   stt: {catalog: string, model: string, language: string | null, build?: string},
  *   tts: {catalog: string, model: string, voice: string | null, speed: number, build?: string},
- *   patience: NonNullable<VoiceSettings['patience']>,
- *   end_of_turn: NonNullable<VoiceSettings['end_of_turn']>,
+ *   patience: NonNullable<VoiceInputSettings['patience']>,
+ *   end_of_turn: 'silence' | 'smart-turn',
  *   idle_unload_minutes: number,
  *   turn_model?: string,
- * }} DeviceVoiceSettings The settings this device keeps: every field filled, so they are the voice's `VoiceSettings` as they are.
+ * }} DeviceVoiceSettings The settings this device keeps: every field filled. The voice is given them as the halves of
+ *   a call (`voiceHalves`).
  * @typedef {{key: string, params?: Record<string, string | number>, reasons?: string[], detail?: string}} Note What the pane
  *   says about a choice: a message key and its params, the codes of why a model does not run here, and a provider's own
  *   words.
@@ -240,10 +245,10 @@ export function voiceSettingsHere(settings, catalogs) {
 }
 
 /**
- * `settings` as the voice is given them, for a call or a try: as this device can take them (voiceSettingsHere), and the
- * smart end of turn as silence while its model is not on disk. The voice loads every model its settings name and
- * downloads what is missing; this one is downloaded only by End of turn's Download (its size, progress and cancel said),
- * and switched to once it is there. With no catalogues read, nothing is known to be on disk.
+ * `settings` as the voice is given them, for a call: as this device can take them (voiceSettingsHere), and the smart end
+ * of turn as silence while its model is not on disk. A call loads every model its halves use and downloads what is
+ * missing; this one is downloaded only by End of turn's Download (its size, progress and cancel said), and switched to
+ * once it is there. With no catalogues read, nothing is known to be on disk.
  * @param {DeviceVoiceSettings} settings
  * @param {CatalogView[]} catalogs
  * @returns {DeviceVoiceSettings}
@@ -251,6 +256,55 @@ export function voiceSettingsHere(settings, catalogs) {
 export function voiceSettingsToLoad(settings, catalogs) {
   const here = voiceSettingsHere(settings, catalogs);
   return modelReady(here, 'end-of-turn', catalogs) ? here : { ...here, end_of_turn: 'silence' };
+}
+
+/**
+ * What ends a person's turn, as the voice names it: its pause (`ms`, the patience's when absent) or, for Smart, the
+ * end-of-turn model the settings chose (the source's own choice when none is).
+ * @param {DeviceVoiceSettings} settings
+ * @returns {VoiceEndOfTurnSettings}
+ */
+export function voiceEndOfTurn(settings) {
+  return settings.end_of_turn === 'smart-turn'
+    ? { kind: 'smart', ...(settings.turn_model ? { model: { catalog: LOCAL_CATALOG, model: settings.turn_model } } : {}) }
+    : { kind: 'silence' };
+}
+
+/**
+ * The input half of a call (the microphone, the detector, the transcriber and, for Smart, its model), for `settings`.
+ * `endOfTurn` replaces what ends a turn where a call asks for its own (a try of transcription).
+ * @param {DeviceVoiceSettings} settings
+ * @param {VoiceEndOfTurnSettings} [endOfTurn]
+ * @returns {VoiceInputSettings}
+ */
+export function voiceInput(settings, endOfTurn = voiceEndOfTurn(settings)) {
+  return { stt: { ...settings.stt }, endOfTurn, patience: settings.patience };
+}
+
+/**
+ * The output half of a call (the speaker and its playback), for `settings`. Its language, for what is said when a reply
+ * names none, is the one the person hears in: the voice has no transcriber's to take it from in a call that only speaks.
+ * @param {DeviceVoiceSettings} settings
+ * @returns {VoiceOutputSettings}
+ */
+export function voiceOutput(settings) {
+  const { catalog, model, build, voice, speed } = settings.tts;
+  return { tts: { catalog, model, ...(build ? { build } : {}) }, voice, speed, language: settings.stt.language };
+}
+
+/**
+ * `settings` as the halves of a call: the input where `input` says the call listens, the output where `output` says it
+ * speaks, and how long its models stay loaded with no call holding them.
+ * @param {DeviceVoiceSettings} settings
+ * @param {{input?: boolean, output?: boolean}} [halves] Both by default.
+ * @returns {VoiceSettings}
+ */
+export function voiceHalves(settings, { input = true, output = true } = {}) {
+  return {
+    ...(input ? { input: voiceInput(settings) } : {}),
+    ...(output ? { output: voiceOutput(settings) } : {}),
+    idle_unload_minutes: settings.idle_unload_minutes,
+  };
 }
 
 /**

@@ -44,10 +44,10 @@ test("on the web the voice and the catalogues share one engine, made once, whose
   const createVoiceHost = vi.fn((source: object) => ({ source }));
   const load = vi.fn(async () => [{ default: async () => {}, createVoiceHost }, { default: async () => {}, WebEngine: { create } }]);
   const page = pageVoice({ host: {}, load });
-  const voice = await page.voice() as unknown as { source: { models: unknown } };
+  const voice = await page.voice() as unknown as { source: { vad: unknown } };
   const catalogs = await page.catalogs();
   expect(create).toHaveBeenCalledTimes(1);
-  expect(typeof voice.source.models).toBe("function");
+  expect(typeof voice.source.vad).toBe("function");
   expect(await catalogs.catalogs()).toEqual([{ id: "local", name: null, status: { stale: false }, models: [{ id: "whisper", builds }] }]);
   expect(builds[1]).not.toHaveProperty("acceleratorClass");
   await catalogs.setCredential("openai", "sk-1");
@@ -75,12 +75,12 @@ test("an engine the browser will not let keep files (site data blocked) is the v
 });
 
 
-test("the browser supplies the new shared owner and creates separate calls through it", async () => {
+test("the browser supplies the shared owner and starts separate calls through it", async () => {
   const calls: string[] = [];
-  const source: VoiceModelSource = { models: () => { throw Error("unused"); } };
   const owner = {
-    createCall: () => ({ id: `call-${calls.push("created")}` }),
+    start: () => ({ id: `call-${calls.push("started")}` }),
     routeInput: async (call: { id: string } | null) => { calls.push(call?.id ?? "none"); },
+    preload: async () => { calls.push("preloaded"); },
   };
   const create = vi.fn((_source: VoiceModelSource) => owner);
   const { voice } = pageVoice({ host: {}, load: async () => [
@@ -88,13 +88,16 @@ test("the browser supplies the new shared owner and creates separate calls throu
     { default: async () => {}, WebEngine: { create: async () => ({ catalogs: () => [] }) } },
   ] });
   const host = await voice();
-  const a = host.createCall();
-  const b = host.createCall();
+  const a = host.start({ output: { tts: { catalog: "local", model: "kokoro" } } });
+  const b = host.start({ input: { stt: { catalog: "local", model: "whisper" } } });
   expect(a).not.toBe(b);
   await host.routeInput(a);
   await host.routeInput(b);
   await host.routeInput(null);
-  expect(calls).toEqual(["created", "created", "call-1", "call-2", "none"]);
+  await host.preload({ output: { tts: { catalog: "local", model: "kokoro" } } });
+  expect(calls).toEqual(["started", "started", "call-1", "call-2", "none", "preloaded"]);
   expect(create).toHaveBeenCalledOnce();
-  expect(source.models).toBeDefined();
+  // The source it is made on loads one slot at a time.
+  const source = create.mock.calls[0][0];
+  expect(["vad", "transcriber", "speaker", "endOfTurn"].map((slot) => typeof (source as unknown as Record<string, unknown>)[slot])).toEqual(["function", "function", "function", "function"]);
 });

@@ -16,7 +16,7 @@ import {pageVoice,beginBrowserAudioActivation} from './voice-module.js';
 import {readCallPreferences} from './call-preferences.ts';
 import {clampDeviceName,deviceNameProblem} from './device-name-rules.js';
 import {readDeleteUnused,writeDeleteUnused,staleModels} from './model-housekeeping.js';
-import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,voiceSettingsToLoad,endOfTurnModel,readyVoiceSettings,modelReady} from './voice-settings.js';
+import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,voiceSettingsToLoad,endOfTurnModel,readyVoiceSettings,modelReady,voiceHalves,voiceInput,voiceOutput} from './voice-settings.js';
 import {createTurnRelay} from './turn-relay.js';
 import {turnMessage,playbackReport,sayingRange} from './voice-room.js';
 import {replyEligibility} from './reply-eligibility.js';
@@ -25,6 +25,7 @@ import {refusalError} from './refusals.js';
 import {followWorking} from './working-clock.ts';
 import {shortcut} from '../state/shortcuts.ts';
 import {watchAudioDeviceRefresh} from './audio-device-refresh.ts';
+import {createMicrophoneAccess} from './microphone-access.ts';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
 // What this browser speaks in a call: the language of its system, among those the voice handles.
@@ -694,7 +695,7 @@ let composerBox=$('text-message');
 onUiLanguage(updateComposer);
 new MutationObserver(()=>{const box=$('text-message');if(box===composerBox)return;composerBox=box;updateComposer()}).observe(document.body,{childList:true,subtree:true});
 function updateMic(){updateComposer()}
-function setMic(enabled){personSignal();state.micEnabled=enabled;applyMicState();updateMic();syncNowPlaying()}
+function setMic(enabled){personSignal();state.micEnabled=enabled;applyMicState();updateMic();syncNowPlaying();if(enabled)void askMicrophone()}
 function setSpeechOutput(next){
  if(next===speechOutput)return;
  speechOutput=next;state.speechOutput=next;
@@ -741,6 +742,9 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
   try{await routeConversation(fp,nextThread,d.binding?.binding_id)}catch(error){voiceFailed(error)}
   if(asked<refreshApplied||session!==state.sessionId||fp!==state.callNode)return;
  }
+ // A call that lost its microphone and has none yet is given it again at the beat, where one can be had.
+ const listening=nextThread?conversationCalls.get(conversationKey(fp,nextThread)):null;
+ if(listening&&microphoneUsable())giveMicrophone(listening);
  refreshApplied=asked;
  const previousThread=targetId(),changed=state.roomBinding?.binding_id!==d.binding?.binding_id;roomStore.batch(()=>{state.roomBinding=d.binding;if(d.binding?.thread_id)rememberThread(targetId());
   if(d.binding?.thread_id)acceptEpoch(d.binding.thread_id,d.binding.epoch);
@@ -1524,32 +1528,50 @@ function recordMessage(raw, socket) {
 // machine (its words, transcribed late; its cancellation) is that machine's no longer, and goes nowhere.
 const turnNodes=new Map();
 let routing=Promise.resolve(),routeVersion=0,desiredRouteKey=null;
-/* A call the voice stopped by itself: started once, it says it is idle again because its microphone or speaker failed
- * (a microphone track that ended, a capture that broke), and it hears nothing until it is started again. The page
- * starts it again whenever it gives it the microphone, and the call beat does so for the conversation the call is on:
- * the person is heard again without hanging up (web#190, web#192). */
+/* A call the voice ended by itself: started once, it says it is idle again because its speaker failed (an output that went
+ * away, a lane that broke), and it neither hears nor speaks. A call that stopped is over, and the page makes another
+ * for the conversation whenever it gives it the microphone; the call beat does so for the conversation the call is on:
+ * the person is heard again without hanging up (web#190, web#192). A microphone that goes away is no such end: the call
+ * goes on speaking, without its input half (`listening: 'off'`), and takes it back when a microphone can be had
+ * (`giveMicrophone`). */
 function stoppedByVoice(entry){return !!entry?.started&&entry.state?.listening==='idle'}
+/* What a call is given: its output always, since it speaks; its input unless this device is known to have no
+ * microphone it may use (blocked, or none plugged in), when the call joins to listen only and takes the input once it
+ * can (`giveMicrophones`). A microphone that is wanted and cannot be opened is no failure of the call either: the voice
+ * says why and goes on speaking. */
+function microphoneUsable(){const reading=microphone.getSnapshot().state;return reading!=='denied'&&reading!=='missing'}
+function callSettings(){return voiceHalves(handed??voiceSettingsToLoad(state.voiceSettings,state.voiceCatalogue.catalogs),{input:microphoneUsable()})}
 async function prepareConversationCall(node,thread_id,binding_id){
  if(!thread_id)return null;
  const key=conversationKey(node,thread_id);
  let entry=conversationCalls.get(key);
- if(stoppedByVoice(entry))await entry.call.start();
+ if(stoppedByVoice(entry)){await within(forgetConversation(entry),3000).catch(()=>{});entry=null}
  if(!entry){
   const owner=voiceOwner??await voiceHost();
-  const call=owner.createCall();
-  entry={call,key,node,thread_id,activations:[],generation:callGeneration,listeners:[],started:false};
+  const settings=callSettings();
+  // The call is returned at once and works when `ready` says so: its models load, each slot on its own, and the
+  // microphone opens, only for the halves it was given.
+  const call=owner.start(settings);
+  entry={call,key,node,thread_id,activations:[],generation:callGeneration,listeners:[],started:false,giving:null};
   conversationCalls.set(key,entry);
   entry.listeners.push(call.onTurn(turn=>voiceTurn(turn,entry)),call.onState(next=>{entry.state=next;if(voice===call)voiceStateChanged(next)}),
    call.onLevel(level=>{if(voice===call)voiceLevel(level)}),call.onError(voiceFailed),
    call.onPlaybackLevel(level=>voicePlaybackLevel(level,entry)));
   call.mute(!state.micEnabled||!binding_id);
   try{
-   await call.setSettings(handed??voiceSettingsToLoad(state.voiceSettings,state.voiceCatalogue.catalogs));
-   if(conversationCalls.get(key)!==entry||entry.generation!==callGeneration)return null;
-   await call.start();
+   await call.ready;
    entry.started=true;
+   if(conversationCalls.get(key)!==entry||entry.generation!==callGeneration){await call.stop().catch(()=>{});return null}
   }
-  catch(error){conversationCalls.delete(key);for(const stop of entry.listeners)stop();await call.dispose().catch(()=>{});throw error}
+  catch(error){
+   const left=conversationCalls.get(key)!==entry||entry.generation!==callGeneration;
+   if(conversationCalls.get(key)===entry)conversationCalls.delete(key);
+   for(const stop of entry.listeners)stop();
+   await call.stop().catch(()=>{});
+   // A call the page itself let go of before it worked is none to report.
+   if(left&&error?.code==='stopped')return null;
+   throw error;
+  }
  }
  return entry;
 }
@@ -1600,12 +1622,16 @@ async function disposeConversation(key){
   if(!desiredRouteKey||desiredRouteKey===key)await routeConversation(null,null,null);
   else voice=null;
  }
- conversationCalls.delete(key);
+ await forgetConversation(entry);
+}
+/* A conversation's call let go of: stopped, and no longer the page's. */
+async function forgetConversation(entry){
+ if(conversationCalls.get(entry.key)===entry)conversationCalls.delete(entry.key);
  // Its listeners stay until the call is gone: stopping it ends its open turns, and those ends go to the room.
- try{await entry.call.dispose()}
+ try{await entry.call.stop()}
  finally{
   for(const stop of entry.listeners)stop();
-  // A turn the call never ended (its disposal failed, or said nothing) is cancelled here, once.
+  // A turn the call never ended (its stop failed, or said nothing) is cancelled here, once.
   const prefix=entry.call.id+'\0';
   for(const open of [...turnWireIds.keys()])if(open.startsWith(prefix))voiceTurn({phase:'cancelled',turn_id:open.slice(prefix.length),merged:false},entry);
  }
@@ -1807,7 +1833,7 @@ function disconnect() {
     void voiceOwner?.routeInput(null).catch(()=>{});
     for(const entry of conversationCalls.values()){
      for(const stop of entry.listeners)stop();
-     void entry.call.dispose().catch(()=>{});
+     void entry.call.stop().catch(()=>{});
     }
     conversationCalls.clear();
     window.sidevoiceUI?.playbackLevel?.clear?.();
@@ -1888,7 +1914,34 @@ async function refreshAudioDevices(){
 }
 // The list stays fresh by itself: the permission changing and the window coming back read it again (the host tells of
 // devices plugged in or out), whatever Settings or the panel did or did not do at load.
-watchAudioDeviceRefresh({refresh:refreshAudioDevices});
+/* Whether this page may use the microphone, as the platform says it (microphone-access.ts); the device list's refresh
+ * follows the same reader. A microphone that becomes usable — allowed now, or plugged in — is given to the calls that
+ * joined without one. */
+const microphone=createMicrophoneAccess(window);
+watchAudioDeviceRefresh({refresh:refreshAudioDevices,access:microphone});
+let microphoneWas=microphone.getSnapshot().state;
+function microphoneChanged(){
+ const now=microphone.getSnapshot().state,before=microphoneWas;microphoneWas=now;
+ if(now==='granted'&&before!=='granted')giveMicrophones();
+}
+microphone.subscribe(microphoneChanged);
+/* A call without its input half takes it back live (the voice's `update`), without rejoining: the microphone it was
+ * missing can be had. The change comes at the next turn; the mute the person chose stays. */
+function giveMicrophone(entry){
+ if(!entry.started||entry.giving||entry.state?.listening!=='off')return;
+ entry.giving=Promise.resolve().then(()=>entry.call.update({input:voiceInput(handed??voiceSettingsToLoad(state.voiceSettings,state.voiceCatalogue.catalogs))}))
+  .catch(()=>{}).finally(()=>{entry.giving=null;applyMicState()});
+}
+function giveMicrophones(){for(const entry of conversationCalls.values())giveMicrophone(entry)}
+/* The person turning the microphone on while a call has none is the gesture that may ask for it (the browser's prompt,
+ * the system's); an answer that changes what the page can use gives it to the calls on its own (above), one that does
+ * not (an app that asks for itself) is tried here. */
+async function askMicrophone(){
+ if(![...conversationCalls.values()].some(entry=>entry.state?.listening==='off'))return;
+ const before=microphone.getSnapshot().state;
+ await microphone.request().catch(()=>{});
+ if(microphone.getSnapshot().state===before&&microphoneUsable())giveMicrophones();
+}
 // Joining and leaving are the same button, and it belongs to React: this is what it calls.
 /* Which machine a join goes to: the one of the conversation being looked at (or the one this tab remembers) — and
  * then that one or none, so the call never lands somewhere the person did not pick —, else the first watched machine
@@ -2103,7 +2156,7 @@ function leaveSession(){
  void voiceOwner?.routeInput(null).catch(()=>{});
  for(const entry of conversationCalls.values()){
   for(const stop of entry.listeners)stop();
-  void entry.call.dispose().catch(()=>{});
+  void entry.call.stop().catch(()=>{});
  }
  conversationCalls.clear();voice=null;
  writtenHearing.clear();
@@ -2158,22 +2211,53 @@ function applyVoiceSettings(){
  applying=applying.then(saveVoiceSettings).catch(error=>{roomStore.patch({settingsError:voiceError(error)})});
  return applying;
 }
-// The voice takes the settings first when this page has one: what it refuses is not kept, and a call goes on as it was.
-// It is given them as voiceSettingsToLoad has them; `handed` is what it was last given (a call's start, a change), which
-// Smart's model coming onto disk changes while the settings stay as they were.
+// The calls take the settings as they change (the voice's `update`: the input half at the next turn, the output half at
+// the next utterance, nothing playing cut), and a model that cannot load is that call's error, with the call going on as
+// it was. It is given them as voiceSettingsToLoad has them; `handed` is what it was last given (a call's start, a
+// change), which Smart's model coming onto disk changes while the settings stay as they were. A model just chosen, or
+// just downloaded, is warmed into the voice (`warmVoice`).
 let handed=null;
 async function saveVoiceSettings(){
  const saved=state.voiceSettings,draft=state.voiceDraft||saved;if(!draft||!saved)return;
- const next=readyVoiceSettings(draft,saved,state.voiceCatalogue.catalogs),load=voiceSettingsToLoad(next,state.voiceCatalogue.catalogs);
+ const catalogs=state.voiceCatalogue.catalogs;
+ const next=readyVoiceSettings(draft,saved,catalogs),load=voiceSettingsToLoad(next,catalogs);
  const changed=JSON.stringify(next)!==JSON.stringify(saved);
- if(!changed&&(!handed||JSON.stringify(load)===JSON.stringify(handed)))return;
- if(conversationCalls.size)await Promise.all([...conversationCalls.values()].map(entry=>entry.call.setSettings(load)));
- else{
-  const host=await voiceHost().catch(()=>null);
-  if(host){const probe=host.createCall();try{await probe.setSettings(load)}finally{await probe.dispose()}}
- }
+ if(!changed&&handed&&JSON.stringify(load)===JSON.stringify(handed))return;
+ const before=handed??voiceSettingsToLoad(saved,catalogs);
+ // Not waited for: a call still loading its models takes the change once it works, and the settings apply meanwhile.
+ for(const entry of conversationCalls.values())void updateCall(entry,load);
  handed=load;
  if(changed){writeVoiceSettings(pageStorage(),next);roomStore.patch({voiceSettings:next,settingsSavedAt:Date.now(),settingsError:null})}
+ void warmVoice(warmTasks(before,load),load);
+}
+/* A running call, given the settings: its output always, its input only where it has one (a call that joined without
+ * a microphone stays so until `giveMicrophone`). A call not working yet takes them as it does. */
+function updateCall(entry,load){
+ return entry.call.ready.then(()=>entry.call.update(voiceHalves(load,{input:entry.state?.listening!=='off'}))).catch(()=>{});
+}
+/* A model just chosen, or just downloaded, loaded into the voice now (the host's `preload`), so the first try or call
+ * with it does not wait for it (web#160): only the slots whose choice changed, only a model that is ready, and quietly
+ * — it is a hint: nothing fails for it, and the try or call that needs the model says why it cannot load. The voice
+ * lets it go `idle_unload_minutes` after nothing uses it. */
+const sameChoice=(a,b)=>a.catalog===b.catalog&&a.model===b.model&&a.build===b.build;
+function warmTasks(before,after){
+ const tasks=[];
+ if(!sameChoice(before.stt,after.stt))tasks.push('stt');
+ if(!sameChoice(before.tts,after.tts))tasks.push('tts');
+ if(after.end_of_turn==='smart-turn'&&(before.end_of_turn!=='smart-turn'||before.turn_model!==after.turn_model))tasks.push('end-of-turn');
+ return tasks;
+}
+async function warmVoice(tasks,settings){
+ const catalogs=state.voiceCatalogue.catalogs;
+ const ready=tasks.filter(task=>(task!=='end-of-turn'||settings.end_of_turn==='smart-turn')&&modelReady(settings,task,catalogs));
+ if(!ready.length)return;
+ const smart=ready.includes('end-of-turn');
+ const input=smart||ready.includes('stt'),output=ready.includes('tts');
+ try{
+  const host=await voiceHost();
+  if(typeof host.preload!=='function')return;
+  await host.preload({...(input?{input:voiceInput(settings,smart?undefined:{kind:'silence'})}:{}),...(output?{output:voiceOutput(settings)}:{}),idle_unload_minutes:settings.idle_unload_minutes});
+ }catch{}
 }
 // A try of the settings being edited (`voice-trial.js`), through the page's voice and outside any call: never during
 // one, since it would take that call's voice. Settings that work are this device's from then on. As it goes it tells
@@ -2197,31 +2281,41 @@ async function tryVoiceSettings(task,{text='',language=null,keep=true,onListenin
  try{
   const host=task==='stt'?await trialVoiceHost(preparationMs):await voiceHost();
   if(activation)host.activateAudio?.(activation);
-  const trial=host.createCall();
+  const trial=routedTrial(host);
   try{
   // What each phase took, for the try to say how quick it was.
   let timings=null;const onTimings=value=>{timings=value};
-  const result=task==='stt'?{text:await tryTranscription(routedTrial(host,trial),settings,{signal:abort.signal,finish:finish.signal,timeoutMs:Math.max(1,preparationDeadline-Date.now()),onTimings,onListening,onLevel,onTranscribing,onTake,fence:()=>unroute(host,trial)})}
-   // A voice try only listens: its call is never given the microphone (an unrouted call hears silence), so nothing on the
-   // microphone — the room, the speaker's own echo — can take a turn over the sentence and cut it short as a barge-in.
-   :(await tryVoice(trial,settings,text,{language,signal:abort.signal,onTimings,onProgress:onProgress&&(progress=>onProgress(sayingRange(progress,text)))}),{});
+  const result=task==='stt'?{text:await tryTranscription(trial,settings,{signal:abort.signal,finish:finish.signal,timeoutMs:Math.max(1,preparationDeadline-Date.now()),onTimings,onListening,onLevel,onTranscribing,onTake,fence:()=>trial.unroute()})}
+   // A voice try asks for the output half alone: no microphone is opened or routed, so nothing on it — the room, the
+   // speaker's own echo — can take a turn over the sentence and cut it short as a barge-in, and a blocked one cannot fail it.
+   :(await tryVoice(host,settings,text,{language,signal:abort.signal,onTimings,onProgress:onProgress&&(progress=>onProgress(sayingRange(progress,text)))}),{});
   result.timings=timings;
   if(keep){writeVoiceSettings(pageStorage(),settings);roomStore.patch({voiceSettings:settings})}
   return result;
-  }finally{await within(unroute(host,trial),1000).catch(()=>{});await within(trial.dispose(),1000).catch(()=>{})}
+  }finally{await within(trial.unroute(),1000).catch(()=>{})}
  }catch(error){throw voiceRefused(error,'try')}
  finally{activation?.release();if(voiceTry===abort)voiceTry=null;if(voiceTryFinish===finish)voiceTryFinish=null}
 }
-/* A try's call takes the microphone once it has started (its settings, models and take in place), and each time it
- * starts again (a retune stops it, which lets the microphone go): only a started call can be given it. */
-function routedTrial(host,trial){
- return Object.create(trial,{start:{value:async options=>{await trial.start(options);routeOwner=trial;await host.routeInput(trial)}}});
+/* The calls a try starts take the microphone once they work (`ready`: their models loaded, their input open), and each
+ * time a call starts again (a retune stops the call, which lets the microphone go): only a working call can be given
+ * it. `unroute` takes it from the try's newest call. */
+function routedTrial(host){
+ let current=null;
+ return {
+  start(settings,options){
+   const call=host.start(settings,options);current=call;
+   const ready=call.ready.then(async()=>{if(current!==call)return;routeOwner=call;await host.routeInput(call)});
+   ready.catch(()=>{});
+   return Object.create(call,{ready:{value:ready}});
+  },
+  unroute:()=>current?unroute(host,current):Promise.resolve(),
+ };
 }
 /* Whose the microphone is among the tries: a try that is replaced while it closes its take (its fence, its last release)
  * must not take the microphone from the one that replaced it, which routed itself while the first was still closing. */
 let routeOwner=null;
-async function unroute(host,trial){
- if(routeOwner!==trial)return;
+async function unroute(host,call){
+ if(routeOwner!==call)return;
  routeOwner=null;
  await host.routeInput(null);
 }
@@ -2244,11 +2338,11 @@ async function tryTurnSettings({onLevel,onTurnStep,onTake}={}){
  voiceTry?.abort();const abort=voiceTry=new AbortController();
  try{
   const host=await voiceHost();
-  const trial=host.createCall();
+  const trial=routedTrial(host);
   const settings=turnTrySettings();if(!modelReady(settings,'end-of-turn',state.voiceCatalogue.catalogs))abort.abort();
-  const run=tryEndOfTurn(routedTrial(host,trial),settings,{signal:abort.signal,onLevel,onTurnStep,onTake});
+  const run=tryEndOfTurn(trial,settings,{signal:abort.signal,onLevel,onTurnStep,onTake});
   turnTry={abort,run};
-  try{await run.done}finally{await unroute(host,trial).catch(()=>{});await trial.dispose()}
+  try{await run.done}finally{await trial.unroute().catch(()=>{})}
  }catch(error){throw voiceRefused(error,'try')}
  finally{if(voiceTry===abort)voiceTry=null;if(turnTry?.abort===abort)turnTry=null}
 }
@@ -2273,6 +2367,8 @@ async function installVoiceModel(task){
   const models=await modelCatalogs();
   await models.install(slot.model,{build:build?.id??null,engine:build?.backend??null,signal:abort.signal,onProgress:progress=>{if(voiceInstall===abort)at(progress.fraction)}});
   roomStore.patch({voiceInstall:null});await loadVoiceCatalogue();
+  // Downloaded: loaded into the voice now (when it is the choice in use, which the catalogue read just put there).
+  await applying;void warmVoice([task],voiceSettingsToLoad(state.voiceSettings,state.voiceCatalogue.catalogs));
  }catch(error){roomStore.patch({voiceInstall:failureCode(error,'')==='install-cancelled'?null:{task,model:slot.model,state:'failed',fraction:null,...installFailure(error)}})}
  finally{if(voiceInstall===abort)voiceInstall=null}
 }

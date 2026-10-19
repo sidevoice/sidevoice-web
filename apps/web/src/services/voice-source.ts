@@ -1,18 +1,18 @@
 /* The page's models for its voice: @sidevoice/engine's models wired into @sidevoice/voice's model interfaces
- * (`js/voice-models.d.ts`). The voice names no model; this file chooses which one fills each slot:
+ * (`js/voice-models.d.ts`). The voice names no model; this file chooses which one fills each slot, one slot at a time
+ * (`VoiceModelSource`), each asked for only when a call's halves use it:
  *
- * - the voice activity detector: the local catalogue's Silero VAD (family `silero-vad`), else another `vad` model that
- *   runs here; never a person's choice;
- * - the transcriber and the speaker: the models of the person's settings, each `{catalog, model}`, loaded from that
- *   catalogue (`engine.catalog(catalog).load(model)`);
- * - the end-of-turn classifier: the local catalogue's `end-of-turn` model, only when the settings choose `smart-turn`.
+ * - `vad()`, the voice activity detector: the local catalogue's Silero VAD (family `silero-vad`), else another `vad`
+ *   model that runs here; never a person's choice;
+ * - `transcriber(choice)` and `speaker(choice)`: the model of the person's settings, `{catalog, model}`, loaded from
+ *   that catalogue (`engine.catalog(catalog).load(model)`);
+ * - `endOfTurn(choice)`: the local catalogue's `end-of-turn` model, only for a call whose end of turn is smart.
  *
- * It is the `source` @sidevoice/voice's `createVoiceHost` takes: `models(settings)` refuses with a code what this
- * device cannot run before anything loads. Both packages are typed here, so a version of one that no longer fits the
- * other fails this page's type check. */
+ * Each slot refuses with a code what this device cannot run, before it loads anything: the call's `ready` rejects with
+ * it. Both packages are typed here, so a version of one that no longer fits the other fails this page's type check. */
 import type { Catalog, EngineError, LocalModelInfo, Model, ModelInfo, Progress, WebEngine } from "@sidevoice/engine";
 import type {
-  VoiceEndOfTurn, VoiceModels, VoiceModelSource, VoiceSettings, VoiceSpeaker, VoiceTranscriber, VoiceVad,
+  VoiceEndOfTurn, VoiceModelChoice, VoiceModelSource, VoiceSpeaker, VoiceTranscriber, VoiceVad, VoiceVadModel,
 } from "@sidevoice/voice";
 import { LOCAL_CATALOG } from "./model-catalogs.js";
 import { engineFailureCode } from "./failure-code.js";
@@ -35,9 +35,9 @@ function asRefusal(error: unknown): Error {
   return code ? voiceRefusal(code, (error as Error).message, (error as Partial<EngineError>).detail) : (error as Error);
 }
 
-/** `choice` as the settings hold it, or null when it does not name a catalogue and a model. */
-function choiceOf(slot: VoiceSettings["stt"] | VoiceSettings["tts"]): ModelChoice | null {
-  const { catalog, model, build } = slot as Partial<ModelChoice>;
+/** `slot` as the settings hold it, or null when it does not name a catalogue and a model. */
+function choiceOf(slot: VoiceModelChoice | null | undefined): ModelChoice | null {
+  const { catalog, model, build } = (slot ?? {}) as Partial<ModelChoice>;
   return typeof catalog === "string" && catalog && typeof model === "string" && model
     ? { catalog, model, ...(typeof build === "string" && build ? { build } : {}) } : null;
 }
@@ -123,36 +123,34 @@ export function engineVoiceSource(engine: WebEngine, { onProgress }: VoiceSource
     ? engine.load(choice.model, choice.build, progress(choice.model))
     : catalogOf(engine, choice.catalog).load(choice.model, progress(choice.model))) as Promise<Model>)
     .catch((error: unknown) => { throw asRefusal(error); });
+  /** The model the person's settings name for a slot of `capability`, once this device is known to be able to run it. */
+  const chosen = async (slot: VoiceModelChoice, capability: Capability): Promise<Model> => {
+    const choice = choiceOf(slot);
+    if (!choice) throw voiceRefusal("model-unknown");
+    const refusal = await choiceRefusal(engine, choice, capability);
+    if (refusal) throw refusal;
+    return load(choice);
+  };
   return {
-    async models(settings: VoiceSettings): Promise<VoiceModels> {
-      const stt = choiceOf(settings.stt), tts = choiceOf(settings.tts);
-      if (!stt || !tts) throw voiceRefusal("model-unknown");
-      const refusal = (await choiceRefusal(engine, stt, "stt")) ?? (await choiceRefusal(engine, tts, "tts"));
-      if (refusal) throw refusal;
-      const local = engine.localCatalog();
-      const vad = runnable(await local.models("vad"), "silero-vad");
+    async vad(): Promise<VoiceVadModel> {
+      const vad = runnable(await engine.localCatalog().models("vad"), "silero-vad");
       if (!vad) throw voiceRefusal("vad-unavailable");
-      // The end-of-turn model chosen (Settings → Call), when it runs here; else the first that does.
-      const turnModels = settings.end_of_turn === "smart-turn" ? (await local.models("end-of-turn")).filter(runsHere) : [];
-      const chosenTurn = (settings as { turn_model?: unknown }).turn_model;
-      const endOfTurn = turnModels.find((model) => model.id === chosenTurn) ?? turnModels[0] ?? null;
-      if (settings.end_of_turn === "smart-turn" && !endOfTurn) throw voiceRefusal("end-of-turn-unavailable");
-      return {
-        async load() {
-          const [detector, transcriber, speaker, classifier] = await Promise.all([
-            load({ catalog: LOCAL_CATALOG, model: vad.id }),
-            load(stt),
-            load(tts),
-            endOfTurn ? load({ catalog: LOCAL_CATALOG, model: endOfTurn.id }) : Promise.resolve(null),
-          ]);
-          return {
-            createVad: () => vadOf(detector),
-            transcriber: transcriberOf(transcriber),
-            speaker: speakerOf(speaker),
-            ...(classifier ? { endOfTurn: endOfTurnOf(classifier) } : {}),
-          };
-        },
-      };
+      const detector = await load({ catalog: LOCAL_CATALOG, model: vad.id });
+      return { createVad: () => vadOf(detector) };
+    },
+    async transcriber(choice: VoiceModelChoice): Promise<VoiceTranscriber> {
+      return transcriberOf(await chosen(choice, "stt"));
+    },
+    async speaker(choice: VoiceModelChoice): Promise<VoiceSpeaker> {
+      return speakerOf(await chosen(choice, "tts"));
+    },
+    // The end-of-turn model chosen (Settings → Call), when it runs here; else the first that does.
+    async endOfTurn(choice: VoiceModelChoice | null): Promise<VoiceEndOfTurn> {
+      const models = (await engine.localCatalog().models("end-of-turn")).filter(runsHere);
+      const wanted = (choice as { model?: unknown } | null)?.model;
+      const model = models.find((candidate) => candidate.id === wanted) ?? models[0] ?? null;
+      if (!model) throw voiceRefusal("end-of-turn-unavailable");
+      return endOfTurnOf(await load({ catalog: LOCAL_CATALOG, model: model.id }));
     },
   };
 }

@@ -9,8 +9,8 @@ test("the published browser host records opt-in takes and reports rendered speak
     await init();
     let sink;
     const seen = { states: [], turns: [], takes: [], output: [] };
-    const source = { models: () => ({ load: async () => ({
-      createVad: () => ({
+    const source = {
+      vad: () => ({ createVad: () => ({
         position: 0,
         accept(samples) {
           const frames = [];
@@ -21,10 +21,10 @@ test("the published browser host records opt-in takes and reports rendered speak
           return frames;
         },
         reset() { this.position = 0; },
-      }),
-      transcriber: { transcribe: async () => "hello" },
-      speaker: { speak: async () => ({ samples: new Float32Array(16000).fill(0.6), sampleRate: 16000 }) },
-    }) }) };
+      }) }),
+      transcriber: () => ({ transcribe: async () => "hello" }),
+      speaker: () => ({ speak: async () => ({ samples: new Float32Array(16000).fill(0.6), sampleRate: 16000 }) }),
+    };
     const audio = {
       attach() { const lane = { active: false }; return { io: { start(next) { lane.active = true; sink = next; queueMicrotask(() => sink.ready()); },
         stop() { lane.active = false; }, stopPlayback() {}, play() {}, dispose() {} }, input: { id: 1, lane } }; },
@@ -33,15 +33,15 @@ test("the published browser host records opt-in takes and reports rendered speak
       setInputDevice: async () => {}, setOutputDevice: async () => {}, outputSelectable: false,
     };
     const owner = createVoiceHost(source, { io: audio });
-    const host = owner.createCall();
+    const halves = { input: { stt: { model: "fake" }, endOfTurn: { kind: "silence" }, patience: "fast" }, output: { tts: { model: "fake" } } };
+    const host = owner.start(halves, { take: true });
     const stops = [
       host.onState((state) => seen.states.push(state.listening)),
       host.onTurn((turn) => seen.turns.push(turn.phase)),
       host.onTake((take) => seen.takes.push({ samples: take.samples.length, turns: take.turns })),
       host.onPlaybackLevel((level) => seen.output.push(level)),
     ];
-    await host.setSettings({ stt: { model: "fake" }, tts: { model: "fake" }, end_of_turn: "silence", patience: "fast" });
-    await host.start({ take: true });
+    await host.ready;
     await owner.routeInput(host);
     // The fake output reports what a rendered browser audio window would give the host.
     sink.rendered(new Float32Array(16000).fill(0.6));
@@ -55,11 +55,12 @@ test("the published browser host records opt-in takes and reports rendered speak
     await feed(0.5, 1000);
     await feed(0, 2500);
     await host.stop();
-    await host.start();
+    // A restart is a new call, which asked for no take: it hands none.
+    const again = owner.start(halves);
+    await again.ready;
     sink.captured(new Float32Array(512).fill(0.5));
-    await host.stop();
+    await again.stop();
     stops.forEach((stop) => stop());
-    await host.dispose();
     return seen;
   });
   expect(result.states).toContain("speaking");
@@ -82,11 +83,11 @@ test("the candidate browser host reports a heard reply with scalar progress and 
     await init();
     let sink;
     const played = [], events = [];
-    const source = { models: () => ({ load: async () => ({
-      createVad: () => ({ position: 0, accept() { return []; }, reset() { this.position = 0; } }),
-      transcriber: { transcribe: async () => "" },
-      speaker: { speak: async () => ({ samples: new Float32Array(16000).fill(0.2), sampleRate: 16000 }) },
-    }) }) };
+    const source = {
+      vad: () => ({ createVad: () => ({ position: 0, accept() { return []; }, reset() { this.position = 0; } }) }),
+      transcriber: () => ({ transcribe: async () => "" }),
+      speaker: () => ({ speak: async () => ({ samples: new Float32Array(16000).fill(0.2), sampleRate: 16000 }) }),
+    };
     const audio = {
       attach() { const lane = { active: false }; return { io: { start(next) { lane.active = true; sink = next; queueMicrotask(() => sink.ready()); },
         stop() { lane.active = false; }, stopPlayback() {},
@@ -98,13 +99,13 @@ test("the candidate browser host reports a heard reply with scalar progress and 
       routeInput: async (target) => { if (target && !target.lane.active) throw new TypeError("an inactive lane"); },
       setInputDevice: async () => {}, setOutputDevice: async () => {}, outputSelectable: false,
     };
-    const host = createVoiceHost(source, { io: audio }).createCall();
-    await host.setSettings({ stt: { model: "fake" }, tts: { model: "fake" }, end_of_turn: "silence", patience: "fast" });
-    await host.start();
+    // A call that only speaks: the output half, no microphone asked for.
+    const host = createVoiceHost(source, { io: audio }).start({ output: { tts: { model: "fake" } } });
+    await host.ready;
     const saying = host.say("é🐙ab");
     saying.onEvent((event) => events.push(event));
     const outcome = await Promise.race([saying.outcome, new Promise((_, reject) => setTimeout(() => reject(Error("reply did not settle")), 5000))]);
-    await host.dispose();
+    await host.stop();
     return { played, events, outcome };
   });
   expect(result.played.length).toBeGreaterThan(0);
@@ -123,8 +124,8 @@ test("a recorded settings try delivers the package take through the real trial a
   await page.evaluate(async () => {
     const { default: init, createVoiceHost } = await import("/voice-contract/js/index.js");
     await init();
-    const source = { models: () => ({ load: async () => ({
-      createVad: () => ({
+    const source = {
+      vad: () => ({ createVad: () => ({
         position: 0,
         accept(samples) {
           const frames = [];
@@ -135,10 +136,10 @@ test("a recorded settings try delivers the package take through the real trial a
           return frames;
         },
         reset() { this.position = 0; },
-      }),
-      transcriber: { transcribe: async () => "hello" },
-      speaker: { speak: async () => ({ samples: new Float32Array(16000), sampleRate: 16000 }) },
-    }) }) };
+      }) }),
+      transcriber: () => ({ transcribe: async () => "hello" }),
+      speaker: () => ({ speak: async () => ({ samples: new Float32Array(16000), sampleRate: 16000 }) }),
+    };
     const audio = {
       attach() { const lane = { active: false }; return { io: { start(sink) { lane.active = true; window.__trialSink = sink; queueMicrotask(() => sink.ready()); },
         stop() { lane.active = false; }, stopPlayback() {}, play() {}, dispose() {} }, input: { id: 1, lane } }; },
@@ -150,8 +151,8 @@ test("a recorded settings try delivers the package take through the real trial a
     window.__trialTakes = [];
     window.__turnStarted = false;
     // The trial makes its own call on the page's voice: each call it makes is watched.
-    const host = { ...owner, createCall() {
-      const call = owner.createCall();
+    const host = { ...owner, start(settings, options) {
+      const call = owner.start(settings, options);
       call.onTake((take) => window.__trialTakes.push(take));
       call.onTurn((turn) => { if (turn.phase === "started") window.__turnStarted = true; });
       return call;
@@ -159,7 +160,7 @@ test("a recorded settings try delivers the package take through the real trial a
     window.__sidevoiceDesktop = { host: { voice: host } };
     const model = (id, capability) => ({ id, family: "fake", capabilities: [capability], languages: ["en"], voices: [], installed: true,
       builds: [{ id: id + "/test", backend: "test", precision: "test", accelerator: "cpu", available: true, installed: true, reasons: [] }] });
-    const settings = { stt: { catalog: "local", model: "fake-stt", language: null }, tts: { catalog: "local", model: "fake-tts", voice: null, speed: 1 }, end_of_turn: "silence", patience: "normal" };
+    const settings = { stt: { catalog: "local", model: "fake-stt", language: null }, tts: { catalog: "local", model: "fake-tts", voice: null, speed: 1 }, end_of_turn: "silence", patience: "normal", idle_unload_minutes: 10 };
     window.__trialSettings = settings;
     window.__trialCatalogue = { state: "ready", catalogs: [
       { id: "local", name: null, status: { stale: false }, models: [model("fake-stt", "stt"), model("fake-tts", "tts")] },
@@ -180,7 +181,7 @@ test("a recorded settings try delivers the package take through the real trial a
   // as the voice has transcribed and merged them, well inside the 2.5 s of ordinary patience.
   const stopped = Date.now();
   await page.locator("#stt-try").click();
-  // Stop mutes the call, and a muted call ends its turn as silence does: the microphone goes on giving frames.
+  // The microphone goes on giving frames after Stop; the try fenced it off.
   await page.evaluate(() => {
     for (let n = 0; n < 160; n++) window.__trialSink.captured(new Float32Array(512));
   });
