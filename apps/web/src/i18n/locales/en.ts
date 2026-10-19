@@ -809,6 +809,7 @@ export const messages = {
   "voice.prepare.retry": "Retry",
   "voice.prepare.downloading": "Downloading…",
   "voice.prepare.downloadingAt": "Downloading… {percent}%",
+  "voice.prepare.stalled": "No data is arriving",
   "voice.prepare.progress": "{done} of {size}",
   "voice.prepare.verifying": "Checking the model…",
   "voice.prepare.loading": "Loading the model…",

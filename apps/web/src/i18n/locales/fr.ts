@@ -792,6 +792,7 @@ export const messages: Messages = {
   "voice.prepare.retry": "Réessayer",
   "voice.prepare.downloading": "Téléchargement…",
   "voice.prepare.downloadingAt": "Téléchargement… {percent} %",
+  "voice.prepare.stalled": "Aucune donnée n'arrive",
   "voice.prepare.progress": "{done} sur {size}",
   "voice.prepare.verifying": "Vérification du modèle…",
   "voice.prepare.loading": "Chargement du modèle…",

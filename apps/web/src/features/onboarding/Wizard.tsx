@@ -58,15 +58,17 @@ const TITLES: Record<OnboardingStep, MessageKey> = {
 /** The steps in the order they come, for the side a new one slides in from. */
 const ORDER: OnboardingStep[] = ["W0", "W4m", "W1", "W2", "W2r", "W3", "W4", "W4v", "W5", "W6"];
 
-/** The step Back goes to. `microphone`: whether there is a microphone to ask for here (else the permissions step is
- *  never shown). */
-function previous(step: OnboardingStep, path: "agents" | "remote" | null, canHostAgents: boolean, microphone: boolean): OnboardingStep | null {
+/** The step Back goes to: the one before it in the order going on walks. `microphone`: whether there is a microphone to
+ *  ask for here (else the permissions step is never shown). `remoteReady`: the other machine answers, so going on passes
+ *  its pairing (`permissionsNext`, `choosePath`) and Back passes it too, as it does this computer's preparation. */
+function previous(step: OnboardingStep, path: "agents" | "remote" | null, canHostAgents: boolean, microphone: boolean, remoteReady: boolean): OnboardingStep | null {
   const permissions: OnboardingStep = microphone ? "W4m" : "W0";
+  const beforePairing: OnboardingStep = canHostAgents ? "W1" : permissions;
   if (step === "W4m") return "W0";
   if (step === "W1") return permissions;
   if (step === "W2" || step === "W3") return "W1";
-  if (step === "W2r") return canHostAgents ? "W1" : permissions;
-  if (step === "W4") return path === "agents" ? "W3" : "W2r";
+  if (step === "W2r") return beforePairing;
+  if (step === "W4") return path === "agents" ? "W3" : remoteReady ? beforePairing : "W2r";
   if (step === "W4v") return "W4";
   if (step === "W5") return "W4v";
   if (step === "W6") return "W5";
@@ -284,7 +286,7 @@ export function Wizard() {
 
   // A machine prepared or paired while its step shows moves the setup on by itself, to where it then stands (a machine
   // that answers after the setup opened leaves the steps already done behind). Only one that becomes ready there: a
-  // step arrived at with its machine already ready (Back) stays, with Continue — Back always lands where it says.
+  // step arrived at with its machine already ready (asked for by name) stays, with Continue.
   const readyOnArrival = useRef({ step, local: onboarding.localReady, remote: onboarding.remoteReady });
   if (readyOnArrival.current.step !== step) readyOnArrival.current = { step, local: onboarding.localReady, remote: onboarding.remoteReady };
   useEffect(() => {
@@ -349,7 +351,7 @@ export function Wizard() {
   }
 
   const current = GROUPS.findIndex((group) => group.steps.includes(step));
-  const before = previous(step, onboarding.path, onboarding.canHostAgents, onboarding.microphone.state !== "none");
+  const before = previous(step, onboarding.path, onboarding.canHostAgents, onboarding.microphone.state !== "none", onboarding.remoteReady);
   // With this computer passed without (d), Back from the voice goes to preparing it, not to its agents.
   const back = before === "W3" && !onboarding.localReady ? "W2" : before;
   const error = onboarding.error ? t(`wizard.error.${onboarding.error.replace("onboarding.", "")}` as MessageKey) : "";

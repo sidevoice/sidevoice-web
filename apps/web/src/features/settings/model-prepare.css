@@ -111,3 +111,4 @@
   .stt-try-head > .model-try-wave, .stt-try-head > .try-take, .stt-try-head > .tts-try-sentence { flex-basis: 100%; }
   .stt-try-head .voice-wave { max-width: none; }
 }
+.model-prepare-stalled { color: var(--sv-warning); }

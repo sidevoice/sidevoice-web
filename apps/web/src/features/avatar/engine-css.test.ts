@@ -27,10 +27,10 @@ test("the engine's nested CSS comes out flat under one root, keyframes hoisted",
   expect(splitSelectors("&:is(.a, .b) .c, .d")).toEqual(["&:is(.a, .b) .c", ".d"]);
 });
 
-test("styles/bichos.css is the engine's, as scripts/sync-bichos.mjs last wrote it from engine/", () => {
-  // If this fails, the engine or the builder changed without the stylesheet: run the sync (engine/README.md).
+test("styles/bichos.css is the engine's, as engine-stylesheet.ts builds it from engine/", async () => {
+  // If this fails, the engine or the builder changed without the stylesheet: `npx vitest run -u <this file>` rewrites it.
+  await expect(bichosStylesheet()).toMatchFileSnapshot("../../styles/bichos.css");
   const file = readFileSync(resolve(process.cwd(), "src/styles/bichos.css"), "utf8");
-  expect(file).toBe(bichosStylesheet());
   expect(file).not.toContain("&");
   expect(file).toContain(`${BICHOS_SCOPE}[data-mood=listening] .fig`);
   expect(file).toContain(`${BICHOS_SCOPE}[data-unread] .bang`);
