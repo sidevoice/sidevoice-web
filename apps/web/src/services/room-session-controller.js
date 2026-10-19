@@ -473,8 +473,9 @@ function flushOutbox(socket=state.ws){
   for(const entry of outbox.list()){
    if(entry.sentOn===socket||entry.kind==='text')continue;
    if(entry.node!==state.callNode){outbox.remove(entry.id);continue}
-   // What a reply of a replaced session became is that session's; the room ended its replies with it.
-   if((entry.kind==='playback'||entry.kind==='hearing'||entry.kind==='speech')&&entry.session_id!==state.sessionId){outbox.remove(entry.id);continue}
+   // What a reply of another call became is that call's. A reply of an earlier session of this call is reported on: the
+   // room counts what this device says for the earlier session it was sent to.
+   if((entry.kind==='speech'&&entry.session_id!==state.sessionId)||((entry.kind==='playback'||entry.kind==='hearing')&&!callSessions.has(entry.session_id))){outbox.remove(entry.id);continue}
    let data=entry.payload.data;
    if(entry.kind==='user-turn'){
     // A start made for a session the room has replaced is never answered there: the room takes each message once
@@ -515,6 +516,9 @@ const QUIET_REFUSALS=new Set(['room.turns_full','room.input_ended','room.stale_u
  * lives the page keeps one for the other: the room may withdraw it (`voice-reply-withdrawn`), and how it ended is the
  * room's `voice-playback`. Where its reader is lights the reply's bubble. */
 const replies=new Map(); // core utterance_id → queued or active reply
+// The sessions the room has given this call so far. The call is one for as long as the person stays in it: a reply sent
+// to an earlier session of it is still this call's to play, and its reports go to the room under the current one.
+const callSessions=new Set();
 const replyQueue=[];
 const threadEpochs=new Map();
 function acceptEpoch(thread,epoch){if(Number.isInteger(epoch))threadEpochs.set(thread,Math.max(epoch,threadEpochs.get(thread)??epoch))}
@@ -573,7 +577,7 @@ function drainReplies(){
   if(replies.get(said.reply.utterance_id)!==said){replyQueue.shift();continue}
   const reply=said.reply;
   const openHere=new Set([...openVoiceTurns.values(),...awaitingTurnAck.values()].filter(thread=>thread===reply.thread_id));
-  const eligibility=moving?'focus_changed':replyEligibility(reply,{sessionId:state.sessionId,threadId:targetThread(),focused:callInFocus(),epoch:threadEpochs.get(reply.thread_id),openTurns:openHere,output:speechOutput});
+  const eligibility=moving?'focus_changed':replyEligibility(reply,{sessionId:state.sessionId,earlierSessions:callSessions,threadId:targetThread(),focused:callInFocus(),epoch:threadEpochs.get(reply.thread_id),openTurns:openHere,output:speechOutput});
   if(eligibility==='hold')return;
   replyQueue.shift();
   if(eligibility!=='play'){finishReply(said,{status:'unplayed',reason:eligibility});continue}
@@ -1809,6 +1813,7 @@ function disconnect() {
     window.sidevoiceUI?.playbackLevel?.clear?.();
     // The call owns these handles; their hearing choices were offered above before the socket closes.
     replies.clear();
+    callSessions.clear();
     // 1000 is a hang-up: any other close the room takes for a drop, and parks the call for its return.
     socket?.close(1000);
     state.sessionId = null;
@@ -1969,6 +1974,7 @@ async function joinRoom(epoch,context){
   if(!resumedSession(session,context.resume)){lastSeq=0;state.roomRevision=0}
   state.sessionId=session.session_id;relay.reset();awaitingTurnAck.clear();startMessageTurns.clear();threadEpochs.clear();
  }
+ callSessions.add(session.session_id);
  keepTicket(true);
  // From here this socket speaks for the session: the outbox may use it.
  socket.session=state.sessionId;
@@ -2104,7 +2110,7 @@ function leaveSession(){
  const socket=state.ws;
  if(socket){socket.onclose=socket.onmessage=socket.onerror=null;try{socket.close(1000)}catch{}}
  window.sidevoiceTelemetry?.endCall?.('moved');
- resumeToken=null;lastSeq=0;keepTicket(true);outboxHold=null;relay.reset();replies.clear();
+ resumeToken=null;lastSeq=0;keepTicket(true);outboxHold=null;relay.reset();replies.clear();callSessions.clear();
  roomStore.batch(()=>{
   state.ws=null;state.sessionId=null;state.roomBinding=null;state.roomRevision=0;
   state.harness={};state.turns={};state.userTurn=null;state.pendingPhase='';state.pendingUserText='';

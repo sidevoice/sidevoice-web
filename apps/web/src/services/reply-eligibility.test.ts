@@ -21,3 +21,12 @@ test.each([
 ] as const)('%s has the correct playback decision',(_name,input,decision)=>{
  expect(replyEligibility(reply,input)).toBe(decision);
 });
+test('a reply sent to an earlier session of the same call plays whatever its epoch says; one of another call never does',()=>{
+ const earlier={...reply,session_id:'old',epoch:7};
+ const mine={...facts,sessionId:'new',earlierSessions:new Set(['old','new']),epoch:null};
+ expect(replyEligibility(earlier,mine)).toBe('play');
+ expect(replyEligibility(earlier,{...mine,openTurns:new Set(['t'])})).toBe('hold');
+ expect(replyEligibility(earlier,{...mine,output:'voice_off'})).toBe('voice_off');
+ expect(replyEligibility(earlier,{...mine,earlierSessions:new Set(['new'])})).toBe('call_ended');
+ expect(replyEligibility(earlier,{...mine,earlierSessions:undefined})).toBe('call_ended');
+});

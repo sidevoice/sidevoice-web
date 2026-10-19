@@ -1907,6 +1907,30 @@ test('#220 a restarted machine that has not got the conversation back yet: the r
  assert.equal(c.s.run('roomStore.getState().callCard.mood'),'speaking');
  c.s.run('disconnect()');
 });
+test('sidevoice-core#155 the room restarting while the person stays in the call: every reply already held plays in order, and its reports go to the new session',async()=>{
+ const c=await callOnRoom();
+ sayTo(c,'one');sayTo(c,'two');
+ const one=c.voice.said[0];one.step({type:'playing'});
+ c.drop(c.first);
+ await c.until(()=>c.sockets.length===2,'an attempt');
+ // The restarted room lost the session: a new one, on the same conversation; its epoch counts from nothing again.
+ c.s.context.fetch=conversationA({binding:{thread_id:'a',title:'A',binding_id:'b2'}});
+ await c.answer({session_id:'s2',resume:{token:'tok-b',seconds:60},resumed:false});
+ await c.until(()=>c.s.run('state.roomBinding?.binding_id')==='b2','the new binding');
+ one.step({type:'done',outcome:{status:'heard'}});
+ assert.equal(c.voice.said.length,2,'the reply queued behind it is said, not dropped as the call having ended');
+ const two=c.voice.said[1];two.step({type:'playing'});two.step({type:'done',outcome:{status:'heard'}});
+ const last=c.sockets.at(-1);
+ assert.deepEqual(plain(sentOf(c,last,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.session_id,d.utterance_id,d.status])),[['s2','one','heard'],['s2','two','heard']]);
+ assert.deepEqual(plain(sentOf(c,last,'reply-hearing').map(d=>[d.history_id,d.outcome])),[['s1:voice:one','heard'],['s1:voice:two','heard']]);
+ c.s.run('disconnect()');
+});
+test('sidevoice-core#155 a person who hung up and came back holds nothing of the old call: a reply of it is never said',async()=>{
+ const c=await callOnRoom();
+ c.s.run('disconnect()');
+ assert.equal(c.s.run('callSessions.size'),0,'the hang-up ends the call, and the sessions with it');
+ assert.equal(c.s.run("replyEligibility({session_id:'s1',thread_id:'a',epoch:0},{sessionId:'s2',earlierSessions:callSessions,threadId:'a',focused:true,epoch:0,openTurns:new Set(),output:'on'})"),'call_ended');
+});
 test('T07 deliberate hang-up offers a not_heard decision for a pending reply before closing',async()=>{
  const c=await callOnRoom();
  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'hangup',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'s1:voice:hangup',text:'Answer'}});
