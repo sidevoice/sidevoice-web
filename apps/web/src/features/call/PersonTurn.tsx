@@ -26,8 +26,8 @@ const reducedMotion = () => !!window.matchMedia?.("(prefers-reduced-motion: redu
 
 /** One turn sent, on its own clock: shown PAGE_MS, then leaving for
  *  SENT_LEAVING_MS, then done. `cut`: the person spoke again — it leaves at once. `from`: the bars' balloon it takes
- *  the place of, which it pops out of. */
-function SentBubble({ turn, delivery, cut, under, from, onDone }: { turn: SentTurn; delivery?: string; cut: boolean; under: boolean; from: Footprint | null; onDone: (key: string) => void }) {
+ *  the place of, which it pops out of. `away`: another conversation is on the stage; its clock goes on unseen. */
+function SentBubble({ turn, delivery, cut, under, away, from, onDone }: { turn: SentTurn; delivery?: string; cut: boolean; under: boolean; away: boolean; from: Footprint | null; onDone: (key: string) => void }) {
   // Sent can no longer be taken back: what it shows instead is that it got there, as the transcript's checks say.
   const receipt = delivery && receiptView(delivery).label ? delivery : null;
   const box = useRef<HTMLDivElement>(null);
@@ -52,6 +52,7 @@ function SentBubble({ turn, delivery, cut, under, from, onDone }: { turn: SentTu
     const next = window.setTimeout(() => onDone(turn.key), SENT_LEAVING_MS);
     return () => window.clearTimeout(next);
   }, [leaving]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (away) return null;
   return (
     <div ref={box} className="speech-bubble person-bubble" data-sent="" data-leaving={leaving || undefined} data-under={under || undefined} translate="no">
       <span className="person-said">{turn.text}</span>
@@ -74,12 +75,12 @@ export function PersonTurn({ conversation, t }: { conversation: ConversationView
     if (live.current) footprint.current = { width: live.current.offsetWidth, height: live.current.offsetHeight };
   });
   if (!pending && !turns.length) return null;
-  const newest = turns[turns.length - 1]?.key;
+  const newest = [...turns].reverse().find((turn) => turn.thread === conversation.thread)?.key;
   return (
     <div className="person-turns">
       {turns.map((turn) => <SentBubble key={turn.key} turn={turn} onDone={done}
         delivery={conversation.messages.find((message) => message.role === "user" && (message.segment ?? String(message.time)) === turn.key)?.delivery}
-        cut={pending} under={pending} from={!pending && turn.key === newest ? footprint.current : null} />)}
+        cut={pending} under={pending} away={turn.thread !== conversation.thread} from={!pending && turn.key === newest ? footprint.current : null} />)}
       {pending && (
         <LiveVoiceBalloon key="live" balloonRef={live} phase={conversation.pendingPhase === "transcribing" ? "transcribing" : "listening"}>
           {conversation.pendingCancellable && <Tooltip action content={t("stage.cancelTurn")}>

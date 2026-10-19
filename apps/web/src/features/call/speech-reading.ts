@@ -25,25 +25,27 @@ export function useSpokenTo(reply: ChatMessage | null, sounding: boolean, messag
 /** How long what was sent takes to leave (call-view.css). */
 export const SENT_LEAVING_MS = 500;
 
-export interface SentTurn { text: string; key: string }
+export interface SentTurn { text: string; key: string; thread: ConversationView["thread"] }
 
 /** The person's spoken turns just sent, oldest first, each until `done(key)`: what shows one owns its own clock
- *  (SentBubble), so a turn sent after it never cuts or restarts it. Only a turn spoken here is shown as sent, never a
- *  message typed. */
+ *  (SentBubble), so a turn sent after it never cuts or restarts it. Each belongs to the conversation it was said to
+ *  (`thread`), whichever is on the stage: the caller shows it there alone. Only a turn spoken there is shown as sent,
+ *  never a message typed, nor what another conversation's turn left behind when the stage moved. */
 export function useSentTurns(conversation: ConversationView): { turns: SentTurn[]; done: (key: string) => void } {
   const pending = !!conversation.pendingText || !!conversation.pendingPhase;
   const lastUser = [...conversation.messages].reverse().find((message) => message.role === "user") ?? null;
   const lastKey = lastUser ? lastUser.segment ?? String(lastUser.time) : null;
   const [turns, setTurns] = useState<SentTurn[]>([]);
-  const spoke = useRef(false);
-  const seen = useRef(lastKey);
-  if (pending) spoke.current = true;
+  // What this conversation's turns have shown so far; another conversation on the stage starts it over.
+  const own = useRef({ thread: conversation.thread, seen: lastKey, spoke: false });
+  if (own.current.thread !== conversation.thread) own.current = { thread: conversation.thread, seen: lastKey, spoke: false };
+  if (pending) own.current.spoke = true;
   useEffect(() => {
-    if (lastKey === seen.current) return;
-    seen.current = lastKey;
-    if (!spoke.current || !lastUser?.text.trim()) return;
-    spoke.current = false;
-    setTurns((now) => [...now, { text: lastUser.text, key: lastKey! }]);
+    if (lastKey === own.current.seen) return;
+    own.current.seen = lastKey;
+    if (!own.current.spoke || !lastUser?.text.trim()) return;
+    own.current.spoke = false;
+    setTurns((now) => [...now, { text: lastUser.text, key: lastKey!, thread: conversation.thread }]);
   }, [lastKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const done = useCallback((key: string) => setTurns((now) => now.filter((turn) => turn.key !== key)), []);
   return { turns, done };

@@ -41,6 +41,8 @@ export interface ChatMessage {
 }
 
 export interface ConversationView {
+  /** The conversation this is the view of, the one on the stage. */
+  thread?: string | null;
   messages: ChatMessage[];
   /** The reply this page's voice is saying now, where it has got to (`karaoke`); none when nothing plays. The stage's
    *  balloon shows this and nothing else. */
