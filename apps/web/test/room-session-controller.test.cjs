@@ -1564,6 +1564,38 @@ test('T02b an acknowledged but refused start releases its gate and says why',asy
  assert.ok(errors.some(Boolean),'the terminal refusal is visible');
  c.s.run('disconnect()');
 });
+test('A report of how a reply played or was heard, refused as stale, raises no banner (#199)',async()=>{
+ const c=await callOnRoom(),errors=[];
+ c.s.context.window.sidevoiceUI=new Proxy({setBootError:value=>{errors.push(value)}},{get:(ui,name)=>name in ui?ui[name]:()=>{}});
+ const reply=id=>c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:id,text:'Good morning'}});
+ reply('gone');
+ c.voice.said[0].step({type:'playing'});
+ c.voice.said[0].step({type:'done',outcome:{status:'heard'}});
+ const reports=[...sentOf(c,c.first,'voice-playback'),...sentOf(c,c.first,'reply-hearing')];
+ assert.ok(reports.length>=3,'it said it was playing, and how it ended, and whether it was heard');
+ // The room — restarted since, or no longer holding the reply — takes each message and refuses it as stale.
+ for(const sent of reports){
+  c.push(c.first,{type:'voice-ack',data:{client_msg_id:sent.client_msg_id}});
+  c.push(c.first,{type:'error',data:{key:'room.stale_utterance',message:'Stale utterance.',client_msg_id:sent.client_msg_id}});
+ }
+ assert.deepEqual(errors.filter(Boolean),[],'nothing to show, and nothing to do');
+ reply('after');
+ assert.deepEqual(c.voice.said.map(s=>s.text),['Good morning','Good morning'],'the call goes on and says the next reply');
+ // Any other refusal of such a report is still shown.
+ c.push(c.first,{type:'error',data:{key:'room.receipt_invalid',message:'Invalid receipt.',client_msg_id:reports[0].client_msg_id}});
+ assert.equal(errors.filter(Boolean).length,1);
+ c.s.run('disconnect()');
+});
+test('Listening again to a reply names no utterance: the machine mints a fresh one for each press (#199)',async()=>{
+ const c=await callOnRoom(),posts=[];
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'original',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'s1:voice:original',text:'Good morning'}});
+ const fetching=c.s.context.fetch;
+ c.s.context.fetch=async(url,options)=>{if(String(url).includes('/api/presentation/replay'))posts.push(JSON.parse(options.body));return fetching(url,options)};
+ await c.s.run("replayReply('s1:voice:original')");
+ await c.s.run("replayReply('s1:voice:original')");
+ assert.deepEqual(posts,[{session_id:'s1',history_id:'s1:voice:original'},{session_id:'s1',history_id:'s1:voice:original'}]);
+ c.s.run('disconnect()');
+});
 test('T01 empty turn retires queued replies before its terminal frame, including requested replay',async()=>{
  const c=await callOnRoom();
  const reply=(id,requested=false)=>c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:id,text:id,requested}});
