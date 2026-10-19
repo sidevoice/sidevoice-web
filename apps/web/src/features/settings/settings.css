@@ -21,6 +21,8 @@
 .provider-name { display: inline-flex; align-items: center; gap: var(--sv-space-3); }
 .provider-mark { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-sm); background: var(--sv-surface); color: var(--sv-text); }
 .provider-mark:empty { display: none; }
+/* A voice slot's provider without its key (ProviderConnect.tsx): the badge, then Connect. */
+.provider-key-needed .ui-row-control { gap: var(--sv-space-3); flex-wrap: wrap; }
 .provider-key-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--sv-space-2); }
 .provider-key-actions [role="status"] { margin: 0 auto 0 0; font-size: var(--sv-font-sm); }
 .provider-key-actions [role="status"]:empty { visibility: hidden; }

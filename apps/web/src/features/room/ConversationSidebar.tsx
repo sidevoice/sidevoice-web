@@ -2,12 +2,14 @@ import { useContext, useEffect, useLayoutEffect, useRef } from "react";
 import { Button } from "../../components/ui/Button";
 import { DropdownMenu, DropdownMenuItem } from "../../components/ui/DropdownMenu";
 import { ContextMenu, ContextMenuItem } from "../../components/ui/ContextMenu";
-import { CloseIcon, CloseUpIcon, ConversationsIcon, HarnessIcon, MachinesIcon, MoreIcon, SidebarCollapseIcon, SidebarExpandIcon, SettingsIcon, SidevoiceMark } from "../../components/ui/Icons";
+import { CloseIcon, CloseUpIcon, ConversationsIcon, HarnessIcon, MoreIcon, OtherMachineIcon, SidebarCollapseIcon, SidebarExpandIcon, SettingsIcon, SidevoiceMark, ThisComputerIcon } from "../../components/ui/Icons";
 import { useSurface } from "../../lib/use-surface";
 import { COMPACT_QUERY, isNarrow, NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { GearNewMark, useHighlights } from "../highlights/highlights";
 import { useSettingsAttention } from "../settings/settings-attention";
+import { machineStatus } from "../settings/machine-status";
+import { StateOnIcon, machineEntryName, machineEntryTitle } from "../settings/MachineState";
 import type { ParticipantView } from "../../state/room-types";
 import { translator } from "../../i18n/translator";
 import { ConversationAvatar } from "../call/ConversationAvatar";
@@ -43,6 +45,8 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
   const onStage = useStageConversation().threadId;
   const t = translator();
   const participants = useRoomStore((state) => state.participants);
+  const machines = useRoomStore((state) => state.machines);
+  const localStatus = useRoomStore((state) => state.facts.localHostStatus);
   const inCall = useRoomStore(selectInCall);
   const collapsed = useCallLayout((state) => state.sidebarCollapsed);
   const open = useCallLayout((state) => state.conversationsOpen);
@@ -136,9 +140,13 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
         <div id="participants" className="sidebar-body">
           {!blocked && machineGroups(participants).map((group) => {
             const machine = group.machine || t("sidebar.unknownMachine");
+            // The machine's connected mark is the one Machines wears (StateOnIcon), from the same reach.
+            const view = machines.find((entry) => entry.pairingId === group.rows[0]?.machineId) ?? null;
+            const state = view ? machineStatus(view, localStatus, false, t) : null;
             return (
-              <section className="sidebar-group" key={group.key} aria-label={machine}>
-                <h3 className="sidebar-group-label" aria-hidden={rail || undefined}><MachinesIcon size={12} /><span translate="no">{machine}</span></h3>
+              <section className="sidebar-group" key={group.key} aria-label={state ? machineEntryName(machine, state, false, t) : machine}>
+                <h3 className="sidebar-group-label" aria-hidden={rail || undefined} title={state ? machineEntryTitle(machine, state) : undefined}>
+                  <StateOnIcon icon={view?.local ? <ThisComputerIcon size={14} /> : <OtherMachineIcon size={14} />} status={state} /><span translate="no">{machine}</span></h3>
                 <ConversationRows
                   className="sidebar-rows"
                   rows={group.rows.map((row) => row.threadId === onStage && !row.selected ? { ...row, selected: true } : row)}

@@ -28,7 +28,7 @@ beforeEach(() => {
   actions = {
     openPairing: vi.fn(), loadVoiceCatalogue: vi.fn().mockResolvedValue(undefined), editVoice: vi.fn(),
     // A try that runs until the test is over.
-    tryVoiceSettings: vi.fn(() => new Promise(() => {})), cancelVoiceTry: vi.fn(), loadHostAgents: vi.fn().mockResolvedValue(undefined),
+    tryVoiceSettings: vi.fn(() => new Promise(() => {})), cancelVoiceTry: vi.fn(), finishVoiceTry: vi.fn(), loadHostAgents: vi.fn().mockResolvedValue(undefined),
     installVoiceModel: vi.fn().mockResolvedValue(undefined), cancelVoiceInstall: vi.fn(),
   };
   window.sidevoiceActions = actions as unknown as SidevoiceActions;
@@ -55,19 +55,24 @@ test("the basics: appearance, this device's name, then the interface's language"
     .toEqual(["Appearance", "This device’s name", "Interface language"]);
 });
 
-test("the first try starts from the block's own button or the footer's, and stops from the footer alone, never a second Stop in the step", async () => {
+test("the first try starts from the block's own button or the footer's, and both say Stop while it runs, each stopping it", async () => {
   transcriptionStep();
   // Not tried: the block offers it as well as the footer.
   const card = () => document.querySelector("#wizard #wizard-card-try")!;
   expect(card()).toHaveTextContent(/^Try it: speak$/);
   await act(async () => { fireEvent.click(card()); });
   expect(actions.tryVoiceSettings).toHaveBeenCalledWith("stt", expect.objectContaining({ keep: true }));
-  expect(stops()).toHaveLength(1);
-  expect(stops()[0]).toHaveAttribute("id", "wizard-try");
-  // The block's button says the try runs, and is not pressed again.
-  expect(card()).toHaveAttribute("aria-busy", "true");
+  // The block's button is Stop at once, not a spinner; the footer's, the step's main action, is Stop as it was.
+  expect(stops().map((button) => button.id)).toEqual(["wizard-card-try", "wizard-try"]);
+  expect(card()).toHaveTextContent(/^Stop$/);
+  expect(card()).not.toHaveAttribute("aria-busy");
+  expect(card().querySelector(".ui-spinner")).toBeNull();
+  // Pressed, the block's Stop stops the try (a transcription's take ends with what was said), and never starts another.
   await act(async () => { fireEvent.click(card()); });
   expect(actions.tryVoiceSettings).toHaveBeenCalledTimes(1);
+  expect(actions.finishVoiceTry).toHaveBeenCalledTimes(1);
+  await act(async () => { fireEvent.click(document.querySelector("#wizard #wizard-try")!); });
+  expect(actions.finishVoiceTry).toHaveBeenCalledTimes(2);
 }, WHOLE_APP_MS);
 
 test("Try it in the block and Try it in the footer are one action: one try each time, asked the same way, for transcription and for the voice", async () => {

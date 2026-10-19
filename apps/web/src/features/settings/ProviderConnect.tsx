@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { useRoomStore } from "../../state/room-store";
+import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Dialog } from "../../components/ui/Dialog";
 import { Field } from "../../components/ui/Field";
@@ -203,16 +204,18 @@ export function listed(names: string[]) {
   try { return new Intl.ListFormat(uiLocale(), { type: "conjunction" }).format(names); } catch { return names.join(", "); }
 }
 
-/** A voice slot's provider while it has no key (`needed`): "OpenAI needs a key" and Connect, which opens the key's
- *  dialog (keeping the key where Providers keeps it). Its dialog stays open while the provider is asked, even if the
- *  slot stops needing it meanwhile. Once kept, the row goes: `onDone` is for the slot to say so and take the focus. */
+/** A voice slot's provider while it has no key (`needed`): its key's line — "OpenAI API key", the warning badge,
+ *  Connect, which opens the key's dialog (keeping the key where Providers keeps it). Its dialog stays open while the
+ *  provider is asked, even if the slot stops needing it meanwhile. Once kept, the row goes: `onDone` is for the slot to
+ *  say so and take the focus. */
 export function ProviderKeyNeeded({ provider, name, needed, onDone }: { provider: string; name: string; needed: boolean; onDone: () => void }) {
   const t = translator();
   const [open, setOpen] = useState(false);
   const connect = useRef<HTMLButtonElement>(null);
   const focusBack = useFocusBack(() => connect.current);
   if (!needed && !open) return null;
-  return <Row label={t("keys.needsKey", { provider: name })} className="provider-key-needed">
+  return <Row label={t("keys.label", { provider: name })} className="provider-key-needed">
+    <Badge tone="warning" dot>{t("voice.prepare.badge.needsKey")}</Badge>
     <Button ref={connect} variant="primary" size="sm" aria-label={t("keys.connectNamed", { provider: name })} aria-haspopup="dialog"
       onClick={() => setOpen(true)}>{t("keys.connect")}</Button>
     {open && <KeyDialog provider={provider} name={name} replacing={null} onDone={() => { setOpen(false); onDone(); }} onCancel={() => { setOpen(false); focusBack(); }} />}
