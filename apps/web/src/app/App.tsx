@@ -72,6 +72,8 @@ function RoomContent() {
       <StorageBlockedBanner />
       <ResetReportNotice />
       <div className="room-shell" hidden={roomHidden} aria-hidden={roomHidden || undefined}>
+        {/* An update waiting, said first at the window's top: a slim bar, a desktop's only, over nothing of the stage. */}
+        <UpdateNotice />
         <RoomHeader blocked={blocked} />
         <LocalHostBanner />
         {/* The call: the conversations, the stage over its bar, and the transcript when it is open (2026-10-10). One layout
@@ -88,8 +90,7 @@ function RoomContent() {
               the transcript run the screen's whole height beside them. Kept in the page while the call's space waits (only
               hidden): the runtime binds their controls as it starts. */}
           <div className="call-column" hidden={callBlocked}>
-            {/* An update waiting, said over the stage: a pill at its top, a desktop's only, never moving it. */}
-            <ErrorBoundary area="stage"><CallStage notice={<UpdateNotice />} /></ErrorBoundary>
+            <ErrorBoundary area="stage"><CallStage /></ErrorBoundary>
             <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>
           </div>
           <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>

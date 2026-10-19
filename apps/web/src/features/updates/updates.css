@@ -18,15 +18,15 @@
 .app-update-failure { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--sv-space-2); font-size: var(--sv-font-sm); }
 /* Automatic | Manual fits a 320px card in Spanish too: narrower padding in its segments. */
 .app-update-setting .ui-segment { padding-inline: 10px; }
-/* Where the room says an update waits (UpdateNotice, VARIANTS `update-notice`): one line — the update's icon, its words
- * cut short before anything else is, its action, then × — wherever the room puts it (the stage's top, the title row's
- * end), taking no room of its own. What failed hangs under it, over the room too. It comes in and goes softly; under
- * reduced motion, at once. Never the voice's colour. */
-.update-notice { position: relative; display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; max-width: 100%; color: var(--sv-text);
+/* Where the room says an update waits (UpdateNotice): a slim bar hanging from the window's top, over nothing of the stage —
+ * the update's icon, its words cut short before anything else is, its action, then ×. What failed hangs under it. It comes
+ * in and goes softly; under reduced motion, at once. Never the voice's colour. */
+.update-notice { position: relative; z-index: 5; flex: none; display: flex; align-items: center; justify-content: center; gap: var(--sv-space-2); min-width: 0; padding: var(--sv-space-1) var(--sv-space-4);
+  border-bottom: 1px solid var(--sv-border); background: var(--sv-accent-soft); color: var(--sv-text);
   font-size: var(--sv-font-sm); animation: update-notice-in var(--sv-dur-base, 180ms) ease-out both; }
 .update-notice[data-leaving] { animation: update-notice-out 200ms ease-in both; }
 .update-notice-icon { flex: none; color: var(--sv-accent-text); }
-.update-notice-line { display: flex; flex: 1 1 auto; align-items: center; gap: var(--sv-space-2); min-width: 0; }
+.update-notice-line { display: flex; flex: 0 1 auto; align-items: center; gap: var(--sv-space-2); min-width: 0; }
 .update-notice-text { flex: 0 1 auto; min-width: 0; margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: var(--sv-weight-medium);
   font-variant-numeric: tabular-nums; }
 .update-notice-line > .ui-button, .update-notice-hide { flex: none; }
