@@ -70,6 +70,30 @@ test("the first try starts from the block's own button or the footer's, and stop
   expect(actions.tryVoiceSettings).toHaveBeenCalledTimes(1);
 }, WHOLE_APP_MS);
 
+test("Try it in the block and Try it in the footer are one action: one try each time, asked the same way, for transcription and for the voice", async () => {
+  transcriptionStep();
+  const footer = () => document.querySelector("#wizard #wizard-try")!;
+  const card = () => document.querySelector("#wizard #wizard-card-try")!;
+  // The try the step offers, as the page is asked for it: what is tried, and with what.
+  const asked = () => actions.tryVoiceSettings.mock.calls.map(([task, options]) => JSON.stringify([task, options.keep, options.text ?? null, options.language ?? null, Object.keys(options).sort()]));
+  // A try that fails leaves both buttons where they were (a done one leaves the block's alone), so each is pressed in turn.
+  actions.tryVoiceSettings.mockRejectedValue(Object.assign(new Error("download-failed"), { code: "download-failed" }));
+  for (const button of [footer, card, card, footer, card]) await act(async () => { fireEvent.click(button()); });
+  expect(actions.tryVoiceSettings).toHaveBeenCalledTimes(5);
+  expect(new Set(asked()).size, "transcription: the same try from either button").toBe(1);
+  expect(JSON.parse(asked()[0]).slice(0, 2)).toEqual(["stt", true]);
+
+  actions.tryVoiceSettings.mockReset();
+  actions.tryVoiceSettings.mockRejectedValue(Object.assign(new Error("download-failed"), { code: "download-failed" }));
+  await act(async () => { fireEvent.click(document.getElementById("wizard-stage-action")!); });
+  expect(within(document.getElementById("wizard")!).getByRole("heading", { level: 2 })).toHaveTextContent("Set up voice");
+  for (const button of [footer, card, card, footer, card]) await act(async () => { fireEvent.click(button()); });
+  expect(actions.tryVoiceSettings).toHaveBeenCalledTimes(5);
+  expect(new Set(asked()).size, "voice: the same try from either button").toBe(1);
+  expect(JSON.parse(asked()[0]).slice(0, 2)).toEqual(["tts", true]);
+  expect(JSON.parse(asked()[0])[2]).toEqual(expect.stringMatching(/\S/));
+}, WHOLE_APP_MS);
+
 test("preparing this computer, the setup offers no other machine in any state of the install: Back is the way there", async () => {
   let settle!: { resolve(status: unknown): void; reject(error: unknown): void };
   const install = vi.fn(() => Object.assign(new Promise((resolve, reject) => { settle = { resolve, reject }; }), { job: "prep-job" }));

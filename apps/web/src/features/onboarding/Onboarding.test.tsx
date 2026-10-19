@@ -179,6 +179,42 @@ test("a failed try says why and keeps the step; a completion that is not stored 
   setItem.mockRestore();
 }, WHOLE_APP_MS);
 
+test("a try can be made again and again, from either button, and a try the device gives out on says so in the try's words with the way to try again", async () => {
+  const store = room();
+  paired(store);
+  const card = () => tryBlock("stt").querySelector("#wizard-card-try")!;
+  const gaveOut = (code: string) => actions.tryVoiceSettings.mockRejectedValueOnce(Object.assign(new Error(code), { code }));
+  // The device gives out on the first try: what went wrong is the try's, never the call's (there is none to join).
+  gaveOut("audio-device-failed");
+  await act(async () => { fireEvent.click(tryButton()); });
+  const said = wizard().getByRole("alert");
+  expect(said).toHaveTextContent("The microphone or speaker stopped working. Check it is connected, and try again.");
+  expect(said.textContent).not.toMatch(/call|join/i);
+  expect(tryBlock("stt")).toContainElement(said);
+  // Both buttons are there to try again, the block's saying so; the footer's starts the next.
+  expect(tryButton()).toHaveTextContent("Try it");
+  expect(card()).toHaveTextContent("Speak again");
+  await act(async () => { fireEvent.click(tryButton()); });
+  expect(wizard().queryByRole("alert")).toBeNull();
+  expect(tryBlock("stt").querySelector("#stt-heard")).toHaveTextContent("hola, ¿me oyes?");
+  // Tried: the block's button makes every one after it, each as the first was made.
+  for (let again = 0; again < 3; again++) {
+    expect(card()).toHaveTextContent("Speak again");
+    expect(card()).not.toHaveAttribute("aria-disabled");
+    await act(async () => { fireEvent.click(card()); });
+    expect(tryBlock("stt").querySelector("#stt-heard")).toHaveTextContent("hola, ¿me oyes?");
+  }
+  // One that fails after those leaves the block's button to try again with, in its own words.
+  gaveOut("microphone-denied");
+  await act(async () => { fireEvent.click(card()); });
+  expect(wizard().getByRole("alert")).toHaveTextContent("The microphone is blocked for this page. Allow it in the browser and try again.");
+  expect(card()).toHaveTextContent("Speak again");
+  await act(async () => { fireEvent.click(card()); });
+  expect(wizard().queryByRole("alert")).toBeNull();
+  expect(actions.tryVoiceSettings).toHaveBeenCalledTimes(7);
+  expect(actions.tryVoiceSettings.mock.calls.every(([task, options]) => task === "stt" && options.keep === true)).toBe(true);
+}, WHOLE_APP_MS);
+
 /** A try that runs until the test ends it, and what the page asked it to tell as it goes. */
 function pendingTry() {
   const running: { told: TrialProgress; finish(result: unknown): void } = { told: {}, finish: () => {} };
