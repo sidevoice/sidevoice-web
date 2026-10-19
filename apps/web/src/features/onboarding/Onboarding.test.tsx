@@ -479,13 +479,19 @@ async function walkBack() {
   return seen;
 }
 
+/** Continue, the primary action of the step the setup stands at. */
+const next = () => act(async () => { fireEvent.click(document.querySelector<HTMLButtonElement>("#wizard .wizard-actions .ui-button--primary")!); });
+
 test("Back from the last step lands on each step before it and stays there, on another machine's path", async () => {
   localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "remote", chosen: CHOSEN }));
   const store = room();
   paired(store);
   expect(title()).toHaveTextContent("When your turn ends");
-  // Its machine paired and answering: Connect to your machine stays, with Continue, rather than moving on again.
-  expect(await walkBack()).toEqual(["When your turn ends", "Set up voice", "Set up transcription", "Connect to your machine", "The basics"]);
+  // Its machine paired and answering: going on passes Connect to your machine, so Back does too — never a step in one
+  // direction alone.
+  expect(await walkBack()).toEqual(["When your turn ends", "Set up voice", "Set up transcription", "The basics"]);
+  await next();
+  expect(title()).toHaveTextContent("Set up transcription");
 }, WHOLE_APP_MS);
 
 test("Back from the last step lands on each step before it and stays there, on this computer's path", async () => {
@@ -504,6 +510,24 @@ test("Back from the last step lands on each step before it and stays there, on t
   // And forward again from the choice: this computer ready, its agents' step, not a jump past it.
   await act(async () => { fireEvent.click(document.querySelector<HTMLButtonElement>("#wizard .wizard-actions .ui-button--primary")!); });
   expect(title()).toHaveTextContent("Where do you use your agents?");
+}, WHOLE_APP_MS);
+
+test("on another machine's path in the desktop app too, going on and Back pass its pairing once the machine answers", async () => {
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+    state: vi.fn(async () => ({ state: "absent", installed: false, reachable: false })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install: vi.fn(),
+  } } } });
+  localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "remote", chosen: CHOSEN }));
+  const store = createRoomStore();
+  act(() => store.patch({ machinesReady: true, speechLanguage: "es", localHostAvailable: true, localHostStatus: { state: "absent" },
+    voiceSettings: defaultVoiceSettings(), voiceCatalogue: { state: "ready", catalogs: CATALOGS, error: "" } }));
+  render(<App store={store} />);
+  paired(store);
+  expect(title()).toHaveTextContent("When your turn ends");
+  expect(await walkBack()).toEqual(["When your turn ends", "Set up voice", "Set up transcription", "Where do you use your agents?", "The basics"]);
+  await next();
+  expect(title()).toHaveTextContent("Where do you use your agents?");
+  await next();
+  expect(title()).toHaveTextContent("Set up transcription");
 }, WHOLE_APP_MS);
 
 /* Continue without trying goes on without the try, never without the model: in every model step, it is not offered while
