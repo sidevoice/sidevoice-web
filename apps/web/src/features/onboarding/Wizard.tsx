@@ -420,7 +420,7 @@ export function Wizard() {
         onSkip={() => void skipMicrophone()} t={t} />}
       {stageTask && <ModelStepFooter reason={waitReason(model, stageTask, t)} skip={stageSkip}
         tryReason={stageTask === "tts" && !sample.trim() ? t("wizard.wait.sentence") : undefined}
-        running={trial.trial.phase === "running"} tried={onboarding.tried(stageTask)}
+        running={trial.trial.phase === "running"} tried={onboarding.tried(stageTask) && !model.needsKey}
         onTry={tryAgain} onStop={trial.finish} onContinue={() => void finishStage(stageTask)} t={t} />}
       {step === "W5" && <ModelStepFooter reason={turnWaits ? waitReason(turnModel, "turn", t) : ""} skip={turnSkip} tryReason={sttModel.ready ? undefined : t("settings.save.waitTranscription")}
         running={turnTry.running} tried={turnTried} onTry={turnTry.start} onStop={turnTry.stop} onContinue={() => void finishTurn()} t={t} />}

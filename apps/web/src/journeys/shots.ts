@@ -141,6 +141,8 @@ const PAIRING = { pairings: [], callNode: null, machineLinks: {}, pairingOpen: t
 const absent = (id: string) => ({ voiceCatalogue: { state: "ready", error: "", catalogs: CATALOGS.map((catalog) => ({ ...catalog, models: catalog.models.map((model) => model.id !== id ? model
   : { ...model, installed: false, builds: model.builds?.map((entry) => ({ ...entry, installed: false })) }) })) } });
 const never = () => new Promise(() => {});
+/** Transcription from a provider whose key is not kept yet. */
+const KEYLESS = { voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "openai", model: "", language: null } } };
 /** The voice steps' tries, as the runtime's actions would run them: listening (the level up) or playing (half the
  *  sentence heard) until the shot ends, or done — what was heard, how quick. */
 const TRIES = {
@@ -188,6 +190,8 @@ export const JOURNEYS: Journey[] = [
       actions: TRIES.listening, after: press("wizard-try") },
     { id: "w4-heard", caption: "Transcription, tried: what was heard and how quick, Speak again in the block; Continue.", setup: { step: "W4", record: { basics_done: true, choice: "remote" } },
       actions: TRIES.heard, after: press("wizard-try") },
+    { id: "w4-keyless", caption: "Transcription from a provider without its key: its key's line says it (the badge, Connect), the Model dropdown is disabled, and there is no Continue — only skipping, or the key, goes on.",
+      setup: { step: "W4", record: { basics_done: true, choice: "remote" } }, facts: KEYLESS },
     { id: "w4v-absent", caption: "Voice, its model not downloaded yet: the try's block already there, waiting for the model, saying why.", setup: { step: "W4v", record: { basics_done: true, choice: "remote" } },
       facts: absent("kokoro-82m-v1.0") },
     { id: "w4v", caption: "Voice: a sentence to hear, editable; Try it in the try's block and in the footer.", setup: { step: "W4v", record: { basics_done: true, choice: "remote" } } },
@@ -253,6 +257,7 @@ export const JOURNEYS: Journey[] = [
   { id: "settings", title: "Settings", note: "Each section, applied as it changes (no Save).", shots: [
     { id: "s-general", caption: "General: language and appearance.", after: openSettings("general") },
     { id: "s-transcription", caption: "Transcription: source and model, the model prepared in place.", after: openSettings("transcription") },
+    { id: "s-transcription-keyless", caption: "Transcription from a provider without its key: its key's line says it (the badge, Connect), the Model dropdown is disabled.", facts: KEYLESS, after: openSettings("transcription") },
     { id: "s-voice", caption: "Voice.", after: openSettings("voice") },
     { id: "s-call", caption: "Call: end of turn and patience (with their timings), the thinking sound, the screen.", after: openSettings("call") },
     { id: "s-providers-none", caption: "Providers: none connected.", facts: { providerKeys: { elevenlabs: false, openai: false } }, after: openSettings("providers") },

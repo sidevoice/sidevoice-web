@@ -25,7 +25,8 @@ import { voiceFailure, type ErrorMessage } from "./error-message";
 
 export type Task = "stt" | "tts";
 
-/** Where the slot's model stands: not on this device yet (with its download size), being installed, failed, ready. */
+/** Where the slot's model stands: not on this device yet (with its download size), being installed, failed, ready; or
+ *  `needsKey`: its provider has no key, and nothing of a provider's runs without one. */
 export function useModelState(task: Task | "end-of-turn", draft: Settings | null) {
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
   const catalogueState = useRoomStore((state) => state.facts.voiceCatalogue.state);
@@ -33,8 +34,10 @@ export function useModelState(task: Task | "end-of-turn", draft: Settings | null
   // The end of turn has no slot of its own: its model is this device's end-of-turn model, when it is the smart one.
   const turnModel = task === "end-of-turn" && draft?.end_of_turn === "smart-turn" ? endOfTurnModel(catalogs, draft?.turn_model) : null;
   const slot = task === "end-of-turn" ? (turnModel ? { catalog: "local", model: turnModel.id, build: undefined as string | undefined } : undefined) : draft?.[task];
-  const model = slot ? catalogs.find((catalog) => catalog.id === slot.catalog)?.models.find((candidate) => candidate.id === slot.model) ?? null : null;
+  const catalog = slot ? catalogs.find((candidate) => candidate.id === slot.catalog) : undefined;
+  const model = slot ? catalog?.models.find((candidate) => candidate.id === slot.model) ?? null : null;
   const local = slot?.catalog === "local";
+  const needsKey = !!slot && !local && catalog?.status?.reason?.code === "credential-missing";
   // The build it runs as: the one chosen (Settings, "How it runs"), else the engine's recommended one.
   const chosen = slot?.build ? model?.builds?.find((candidate) => candidate.id === slot.build) : undefined;
   const build = chosen ?? model?.builds?.find((candidate) => candidate.id === model.recommendedBuild) ?? model?.builds?.find((candidate) => candidate.available);
@@ -43,9 +46,9 @@ export function useModelState(task: Task | "end-of-turn", draft: Settings | null
   const installing = mine?.state === "running";
   const failure = mine?.state === "failed" ? mine.error : "";
   const failureDetails = mine?.state === "failed" ? mine.details ?? "" : "";
-  const ready = !!model && installed;
+  const ready = !!model && installed && !needsKey;
   // Downloaded in full, it is checked before the install ends; then the catalogues are read again to see it there.
-  const status: PrepareStatus | null = !model ? null
+  const status: PrepareStatus | null = !model || needsKey ? null
     : installing ? ((mine?.fraction ?? 0) >= 1 ? "verifying" : "downloading")
     : failure ? "failed"
     : ready ? "ready"
@@ -55,8 +58,10 @@ export function useModelState(task: Task | "end-of-turn", draft: Settings | null
     status,
     model,
     local,
-    /** Ready to use: a provider's listed model, or one of this device's that is on disk. */
+    /** Ready to use: a provider's listed model (its key kept), or one of this device's that is on disk. */
     ready,
+    /** The slot's provider has no key: its models can be neither chosen nor tried until one is connected. */
+    needsKey,
     size: build?.downloadBytes ?? null,
     /** The build it runs as, and whether it was chosen rather than the engine's. */
     build: build ?? null,
