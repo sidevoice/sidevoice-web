@@ -130,11 +130,13 @@ export function canHear(row) {
 }
 /** The agent on the stage, by priority: offline (the room cannot reach it: the stage shows its wanted poster), then
  *  speaking, listening (the person is talking to it and it can hear them), working, and idle for everything else.
- *  Short of offline it is idle whenever it cannot hear the person: out of the call, not the one the microphone talks
- *  to, or holding what it is sent — a conversation that is holding does not react to the person at all. */
+ *  A reply it is saying in the call plays to its end whatever happens to the link, so it speaks until then and only
+ *  then shows the poster (#220). Short of offline it is idle whenever it cannot hear the person: out of the call, not
+ *  the one the microphone talks to, or holding what it is sent — a conversation that is holding does not react to the
+ *  person at all. */
 export function stageMood(facts) {
     if (facts.reach === 'offline')
-        return 'offline';
+        return facts.inCall && facts.isTarget && facts.speaking ? 'speaking' : 'offline';
     if (!facts.inCall || !facts.isTarget || !facts.canHear)
         return 'idle';
     if (facts.speaking)

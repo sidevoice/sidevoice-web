@@ -1838,6 +1838,75 @@ test('#200 minimised, the conversation selected on the call card sounds even if 
  assert.equal(playing.cancelled,true,'the window shows B again: A is not the one in focus');
  c.s.run('disconnect()');
 });
+// No loss of the link stops a reply already here (#220): it plays to its end, and the agent speaks until then.
+const conversationA=(extra={})=>async path=>({ok:true,status:200,json:async()=>path.includes('/participants')
+ ?{participants:'binding' in extra&&!extra.binding?[]:[{thread_id:'a',title:'A',available:true,reach:{state:'listening'},epoch:0,...extra.person}]}
+ :{binding:'binding' in extra?extra.binding:{thread_id:'a',title:'A',binding_id:'b'},room:{revision:0},clients:[],call:null,messages:[]}});
+const sounding=(c,state='playing')=>c.voice.emit('state',{listening:'listening',recognising:0,playback:state});
+test('#220 a drop mid-reply stops nothing: the reply plays to its end and the next one after it, and the room is told on its return',async()=>{
+ const c=await callOnRoom();
+ sayTo(c,'one');sayTo(c,'two');
+ const one=c.voice.said[0];one.step({type:'playing'});
+ c.drop(c.first);
+ await c.until(()=>c.sockets.length===2,'an attempt');
+ assert.equal(one.cancelled,false,'what it was saying goes on');
+ one.step({type:'done',outcome:{status:'heard'}});
+ assert.equal(c.voice.said.length,2,'what came after it is said while the room is away');
+ const two=c.voice.said[1];two.step({type:'playing'});two.step({type:'done',outcome:{status:'heard'}});
+ await c.answer({session_id:'s1',resume:{token:'tok-b',seconds:60},resumed:true});
+ await c.until(()=>!c.s.run('state.reconnecting'),'back in the call');
+ assert.deepEqual(plain(sentOf(c,c.sockets.at(-1),'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.utterance_id,d.status])),[['one','heard'],['two','heard']]);
+ c.s.run('disconnect()');
+});
+test('#220 its conversation unreachable mid-reply, the agent speaks until the reply ends, and only then shows as wanted',async()=>{
+ const c=await callOnRoom();
+ const mood=()=>c.s.run('roomStore.getState().callCard.mood');
+ sayTo(c,'one');
+ const one=c.voice.said[0];one.step({type:'playing'});sounding(c);
+ assert.equal(mood(),'speaking');
+ // Its agent's connector goes away: the room lists the conversation offline.
+ c.s.context.fetch=conversationA({person:{available:false,reach:{state:'offline'}}});
+ await c.s.run('refreshPeople()');
+ assert.equal(mood(),'speaking','the reply already here is still being said: no poster yet');
+ assert.equal(one.cancelled,false);
+ one.step({type:'done',outcome:{status:'heard'}});sounding(c,'idle');
+ assert.equal(mood(),'offline','said to its end, it shows as wanted');
+ c.s.run('disconnect()');
+});
+test('#220 its machine restarting mid-reply: a new session on the same conversation keeps the reply playing and the agent speaking',async()=>{
+ const c=await callOnRoom();
+ const mood=()=>c.s.run('roomStore.getState().callCard.mood');
+ sayTo(c,'one');
+ const one=c.voice.said[0];one.step({type:'playing'});sounding(c);
+ c.drop(c.first);
+ await c.until(()=>c.sockets.length===2,'an attempt');
+ // The restarted room lost the session: a new one, on the same conversation under a new binding.
+ c.s.context.fetch=conversationA({binding:{thread_id:'a',title:'A',binding_id:'b2'}});
+ await c.answer({session_id:'s2',resume:{token:'tok-b',seconds:60},resumed:false});
+ await c.until(()=>c.s.run('state.roomBinding?.binding_id')==='b2','the new binding');
+ assert.equal(one.cancelled,false,'what it was saying goes on');
+ assert.equal(mood(),'speaking');
+ c.s.run('disconnect()');
+});
+test('#220 a restarted machine that has not got the conversation back yet: the reply plays on through it, and once it is back',async()=>{
+ const c=await callOnRoom();
+ sayTo(c,'one');
+ const one=c.voice.said[0];one.step({type:'playing'});sounding(c);
+ c.drop(c.first);
+ await c.until(()=>c.sockets.length===2,'an attempt');
+ // A new session that lands on no conversation: its agent has not come back to the room yet.
+ c.s.context.fetch=conversationA({binding:null});
+ await c.answer({session_id:'s2',resume:{token:'tok-b',seconds:60},resumed:false});
+ await c.until(()=>!c.s.run('state.reconnecting')&&c.s.run('state.roomBinding')==null,'the call on no conversation');
+ assert.equal(one.cancelled,false,'the room losing the conversation is not the person leaving it');
+ // The agent is back, and the call goes back to its conversation.
+ c.s.context.fetch=conversationA({binding:{thread_id:'a',title:'A',binding_id:'b3'}});
+ await c.s.run('refreshPeople()');
+ await c.until(()=>c.s.run('state.roomBinding?.binding_id')==='b3','the conversation back');
+ assert.equal(one.cancelled,false,'what it says for it goes on');
+ assert.equal(c.s.run('roomStore.getState().callCard.mood'),'speaking');
+ c.s.run('disconnect()');
+});
 test('T07 deliberate hang-up offers a not_heard decision for a pending reply before closing',async()=>{
  const c=await callOnRoom();
  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'hangup',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'s1:voice:hangup',text:'Answer'}});
