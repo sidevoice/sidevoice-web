@@ -2108,7 +2108,9 @@ async function tryVoiceSettings(task,{text='',language=null,keep=true,onListenin
   // What each phase took, for the try to say how quick it was.
   let timings=null;const onTimings=value=>{timings=value};
   const result=task==='stt'?{text:await tryTranscription(routedTrial(host,trial),settings,{signal:abort.signal,finish:finish.signal,timeoutMs:Math.max(1,preparationDeadline-Date.now()),onTimings,onListening,onLevel,onTranscribing,onTake,fence:()=>unroute(host,trial)})}
-   :(await tryVoice(routedTrial(host,trial),settings,text,{language,signal:abort.signal,onTimings,onProgress:onProgress&&(progress=>onProgress(sayingRange(progress,text)))}),{});
+   // A voice try only listens: its call is never given the microphone (an unrouted call hears silence), so nothing on the
+   // microphone — the room, the speaker's own echo — can take a turn over the sentence and cut it short as a barge-in.
+   :(await tryVoice(trial,settings,text,{language,signal:abort.signal,onTimings,onProgress:onProgress&&(progress=>onProgress(sayingRange(progress,text)))}),{});
   result.timings=timings;
   if(keep){writeVoiceSettings(pageStorage(),settings);roomStore.patch({voiceSettings:settings})}
   return result;

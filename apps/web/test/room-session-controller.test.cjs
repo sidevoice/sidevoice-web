@@ -2115,7 +2115,7 @@ for(const failing of ['start','routeInput'])test(`F1 B's ${failing} rejected: B 
  assert.notEqual(voice.routed,a);
  s.run('disconnect()');
 });
-test('F2 each settings try gives its call the microphone only once started, and again after a retune',async()=>{
+test('F2 each try that records gives its call the microphone only once started, and again after a retune; a voice try never has it',async()=>{
  const s=setup({strictDOM:true}),voice=withVoice(s,fakeVoice());s.context.localStorage.setItem('sidevoice.settings','{}');
  const stt=s.run("window.sidevoiceActions.tryVoiceSettings('stt',{keep:false})");
  await settleSoon();
@@ -2126,7 +2126,7 @@ test('F2 each settings try gives its call the microphone only once started, and 
  await settleSoon();
  voice.said.at(-1).step({type:'done',outcome:{status:'heard'}});
  await tts;
- assert.deepEqual([...voice.routes].slice(2),['call-2',null]);
+ assert.deepEqual([...voice.routes],['call-1',null],'a voice try only listens: its call never gets the microphone');
  s.run("roomStore.patch({voiceDraft:{...voiceSettings,end_of_turn:'silence'}})");
  const turn=s.run('window.sidevoiceActions.tryTurnSettings()');
  await settleSoon();
@@ -2134,7 +2134,40 @@ test('F2 each settings try gives its call the microphone only once started, and 
  await settleSoon();
  s.run('window.sidevoiceActions.cancelVoiceTry()');
  await assert.rejects(turn,{code:'trial-cancelled'});
- assert.deepEqual([...voice.routes].slice(4),['call-3','call-3',null],'routed as it starts, and again as the retune starts it again');
+ assert.deepEqual([...voice.routes].slice(2),['call-3','call-3',null],'routed as it starts, and again as the retune starts it again');
+});
+test('A voice try only listens, whichever voice says it: the microphone is never given to its call, so nothing it hears can cut the sentence short; a provider that refuses says why',async()=>{
+ const s=setup({strictDOM:true}),voice=withVoice(s,fakeVoice());s.context.localStorage.setItem('sidevoice.settings','{}');
+ const said=async(draft,outcome)=>{
+  s.run(`roomStore.patch({voiceDraft:{...voiceSettings,tts:${JSON.stringify(draft)}}})`);
+  const tried=s.run("window.sidevoiceActions.tryVoiceSettings('tts',{text:'Hola.',language:'es',keep:false})");
+  await settleSoon();
+  voice.said.at(-1).step({type:'done',outcome});
+  return tried;
+ };
+ // OpenAI's two voices and this device's: the voice is given the settings as chosen, the sentence is said, nobody
+ // routes the microphone (an unrouted call hears silence), and each ends with the voice let go.
+ for(const draft of [{catalog:'openai',model:'tts-1',voice:null,speed:1},{catalog:'openai',model:'tts-1-hd',voice:null,speed:1},{catalog:'local',model:'kokoro-82m-v1.0',voice:null,speed:1}]){
+  voice.calls.length=0;
+  await said(draft,{status:'heard'});
+  assert.equal(voice.calls[0][0],'setSettings');
+  assert.deepEqual(plain(voice.calls[0][1].tts),draft,'the provider\'s model reaches the voice as chosen');
+  assert.deepEqual(plain(voice.calls.find(([name])=>name==='say').slice(1)),['Hola.',{language:'es'}]);
+  assert.deepEqual(voice.calls.map(([name])=>name).filter(name=>name==='dispose'),['dispose']);
+ }
+ assert.deepEqual([...voice.routes],[],'no voice try took the microphone');
+ assert.equal(voice.routed,null);
+ // The provider refusing is its own message, never that the sentence was not heard to its end.
+ const key=await said({catalog:'openai',model:'tts-1',voice:null,speed:1},{status:'not-played',reason:'failed',code:'credential-rejected'}).then(()=>null,error=>plain(error));
+ assert.equal(key.code,'credential-rejected');
+ assert.match(key.words.text,/didn.t accept the key/);
+ const quota=await said({catalog:'openai',model:'tts-1',voice:null,speed:1},{status:'not-played',reason:'failed',code:'provider-quota'}).then(()=>null,error=>plain(error));
+ assert.match(quota.words.text,/out of credit/);
+ // Cut short by the voice itself, it is the try's own sentence.
+ const cut=await said({catalog:'openai',model:'tts-1',voice:null,speed:1},{status:'heard-up-to',heard_chars:2,reason:'barge-in'}).then(()=>null,error=>plain(error));
+ assert.equal(cut.code,'trial-not-heard');
+ assert.match(cut.words.text,/did not play to its end/);
+ assert.deepEqual([...voice.routes],[]);
 });
 test('F3 a delayed start heard before a rebind keeps the binding it was heard under; speech after it, the new one',async()=>{
  const c=await callOnRoom(),a=c.voice.created[0];
