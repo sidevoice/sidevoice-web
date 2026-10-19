@@ -18,9 +18,9 @@ The app talks to the engine only through `features/avatar/` (`bicho-draw.ts`, `C
 | `src/desk.ts` | `desk.ts` | verbatim | 180c8c4b4595 |
 | `src/backdrop.ts` | `backdrop.ts` | verbatim | aa7987177660 |
 | `src/bichos/idle.ts` | `bichos/idle.ts` | verbatim | ba54febacb73 |
-| `src/bichos/kit.ts` | `bichos/kit.ts` | verbatim | d0c9f908bd48 |
+| `src/bichos/kit.ts` | `bichos/kit.ts` | verbatim | ed819449ea43 |
 | `src/bichos/registry.ts` | `bichos/registry.ts` | verbatim | 4668ce57cd7a |
-| `src/bichos/render.ts` | `bichos/render.ts` | verbatim | e8f1223e5358 |
+| `src/bichos/render.ts` | `bichos/render.ts` | verbatim | ac5346b6521b |
 | `src/bichos/rig.ts` | `bichos/rig.ts` | verbatim | 54908db76cd4 |
 | `src/bichos/seed.ts` | `bichos/seed.ts` | verbatim | 1ae48bbc6c59 |
 | `src/bichos/spec.ts` | `bichos/spec.ts` | patched | 271f45fde528 |
@@ -37,7 +37,7 @@ The app talks to the engine only through `features/avatar/` (`bicho-draw.ts`, `C
 | `src/parts/b10-gear-body.ts` | `parts/b10-gear-body.ts` | verbatim | 05f090747b8d |
 | `src/parts/b11-pond-sea.ts` | `parts/b11-pond-sea.ts` | verbatim | 370c2f44b17a |
 | `src/parts/b12-bugs-spirits.ts` | `parts/b12-bugs-spirits.ts` | verbatim | e310951d73f0 |
-| `src/parts/b13-bots.ts` | `parts/b13-bots.ts` | verbatim | 29f98de777e3 |
+| `src/parts/b13-bots.ts` | `parts/b13-bots.ts` | verbatim | e64d2c7c67c2 |
 | `src/parts/b15-elementals.ts` | `parts/b15-elementals.ts` | verbatim | 5f5b0619a17c |
 | `src/parts/core-bodies.ts` | `parts/core-bodies.ts` | verbatim | e9905f6a4af7 |
 | `src/parts/core-face.ts` | `parts/core-face.ts` | verbatim | b14691645ddc |

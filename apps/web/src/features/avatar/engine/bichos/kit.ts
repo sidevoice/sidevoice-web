@@ -62,6 +62,9 @@ export interface BodyDef {
   anchors?: Record<string, Anchor>;
   /** The gloss stroke; default follows the frame (rig.ts). */
   shine?: (rig: Rig) => string;
+  /** The gloss is painted under the arms and everything worn, as under a hat (see `Drawing.glossUnder`): for a body whose
+   * highlight runs where the arms join. */
+  glossUnder?: boolean;
   /** The ground shadow under the `ground` anchor, in the 120 box: half width `rx` (default 0.85·half), half height `ry`
    * (default 4.5) and `opacity` (default 1). A body that floats gives a smaller, fainter one. */
   shadow?: { rx?: number; ry?: number; opacity?: number };
@@ -126,6 +129,9 @@ export interface Drawing {
    * coordinates (a rigid part's is placed with it). Later parts read the lowest one as `ctx.brim`. Brows that would
    * reach it when raised are not drawn: there is no room to push them down, since they sit right on the eyes. */
   brim?: number;
+  /** The part sits on the body's edge, where the body's gloss can run (a robot's arm on a can's side): the gloss is painted
+   * under it, as under a hat, so it never crosses the part, at rest or swinging. */
+  glossUnder?: boolean;
   /** A fitted part's pivot for its `group` (a rigid part pivots on its socket). Without it the group's CSS sets it. */
   pivot?: [number, number];
   /** Overrides the body's ground shadow (`BodyDef.shadow`, field by field; the last part that sets it wins): legs that

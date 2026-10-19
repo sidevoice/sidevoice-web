@@ -218,6 +218,8 @@ export function renderSpec(spec: Spec, size: Size): Drawn {
   let shine: string | undefined;
   /** The lowest brim any part draws across the forehead (see `Drawing.brim`). */
   let brim = -Infinity;
+  /** A part asked for the body's gloss under it (see `Drawing.glossUnder`). */
+  let partGlossUnder = false;
   /** Parts' overrides of the body's ground shadow (`Drawing.shadow`). */
   let shadowOver: Drawing["shadow"];
   /** Markup in a group (a riding part's `over`): `pg-<g>` round its pivot. */
@@ -260,6 +262,7 @@ export function renderSpec(spec: Spec, size: Size): Drawn {
       if (d.shadow && !mirrored) shadowOver = { ...shadowOver, ...d.shadow };
       for (const k of ["eyes", "closed", "brows", "mouthRest", "mouthOpen"] as const) if (d.face?.[k]) face[k] += wrap(d.face[k]!, t);
       if (d.face?.shine !== undefined) shine = d.face.shine;
+      if (d.glossUnder) partGlossUnder = true;
       if (d.brim !== undefined) ctx.brim = brim = Math.max(brim, pl ? pl.map(e.socket?.[0] ?? 60, d.brim)[1] : d.brim);
       if (d.eyes) ctx.eyes = pl ? d.eyes.map((ey) => { const [x, y] = pl.map(mirrored ? 120 - ey.x : ey.x, ey.y); return { x: n(x), y: n(y), r: ey.r }; }) : d.eyes;
       for (const [name, a] of Object.entries(d.emits ?? {})) {
@@ -331,9 +334,9 @@ export function renderSpec(spec: Spec, size: Size): Drawn {
   // Inner pieces on the skin layer are drawn with the fills (right after the body's); on the nose layer, in the face.
   const isMerged = (l: Laid) => (l.p.ink ?? "merge") === "merge", onSkin = (l: Laid) => !isMerged(l) && l.layer === LAYER.skin, onNose = (l: Laid) => !isMerged(l) && l.layer === LAYER.nose;
   const shineD = shine ?? (body.shine ?? defaultShine)(rig), gloss = shineD ? `<path class="shine" d="${shineD}"/>` : "";
-  // Under a hat (any drawn brim) the body's gloss is painted right after the skin, so the hat, arms and everything worn
-  // cover it; a part's own gloss (`face.shine`: a cap's, a topping's highlight) stays where it always was, on top.
-  const glossUnder = !!gloss && shine === undefined && brim > -Infinity;
+  // Under a hat (any drawn brim), or a body or part that asked for it (the robots'), the body's gloss is painted right after the
+  // skin, so the hat, arms and everything worn cover it; a part's own gloss (`face.shine`: a cap's, a topping's highlight) stays where it always was, on top.
+  const glossUnder = !!gloss && shine === undefined && (brim > -Infinity || partGlossUnder || !!body.glossUnder);
   const fills = shown.filter((l) => isMerged(l) || onSkin(l));
   const outlineHtml = pass(shown.filter(isMerged), true);
   const fillsHtml = glossUnder ? pass(fills.filter((l) => l.layer <= LAYER.skin), false) + gloss + pass(fills.filter((l) => l.layer > LAYER.skin), false) : pass(fills, false);
