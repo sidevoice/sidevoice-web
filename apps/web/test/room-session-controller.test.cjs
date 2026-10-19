@@ -2100,6 +2100,58 @@ test('successful join routes and unmutes before first speech',async()=>{
  assert.equal(c.voice.calls.filter(([name])=>name==='mute').at(-1)[1],false);
  c.s.run('disconnect()');
 });
+// web#190, web#192: the browser's shared audio stops every call when the microphone goes (a track that ended, a capture
+// that broke): each says why and that it is idle, and lets the microphone go. Nobody started it again, so the person
+// stayed unheard until they hung up.
+const stopByVoice=(call,code='microphone-lost')=>{
+ call.active=false;
+ call.emit('error',Object.assign(Error(code),{code}));
+ call.emit('state',{listening:'idle',recognising:0,playback:'idle',microphone:'live'});
+};
+const listeningAfterStart=call=>{const start=call.start;call.start=async options=>{await start(options);call.emit('state',{listening:'listening',recognising:0,playback:'idle',microphone:'live'})}};
+test('a call the voice stopped is started again and given the microphone at the next beat',async()=>{
+ const c=await callOnRoom(),{s,voice}=c,a=voice.created[0];
+ listeningAfterStart(a);
+ const starts=()=>voice.calls.filter(([name])=>name==='start').length,before=starts();
+ stopByVoice(a);voice.routed=null;
+ await s.run('refresh()');
+ assert.equal(starts(),before+1,'started again');
+ assert.equal(voice.routed,a,'and given the microphone again');
+ assert.equal(voice.calls.filter(([name])=>name==='mute').at(-1)[1],false,'unmuted');
+ a.emit('turn',started('after'));a.emit('turn',finished('after','Heard again'));
+ assert.equal(turnSent(c,c.first,'after','finished')[0].text,'Heard again');
+ await s.run('refresh()');
+ assert.equal(starts(),before+1,'a call that hears is left alone');
+ s.run('disconnect()');
+});
+test('a conversation whose call the voice stopped is started again when the call goes back to it',async()=>{
+ const c=await callOnRoom(),{s,voice}=c,a=voice.created[0];
+ toB(c);await s.run("select('fp-mac|b')");
+ const b=voice.created[1];assert.equal(voice.routed,b);
+ stopByVoice(a);
+ const starts=()=>voice.calls.filter(([name])=>name==='start').length,before=starts();
+ c.s.context.fetch=async(path,options)=>({ok:true,status:200,json:async()=>String(path).includes('/select')||options?.method==='POST'?{}
+  :{binding:{thread_id:'a',title:'A',binding_id:'a-again'},room:{revision:2},clients:[],call:null,participants:[]}});
+ await s.run("select('fp-mac|a')");
+ assert.equal(starts(),before+1,'A started again');
+ assert.equal(voice.routed,a,'A hears the microphone');
+ s.run('disconnect()');
+});
+test('a call the voice could not start again leaves the microphone with nobody, and a later beat tries again',async()=>{
+ const c=await callOnRoom(),{s,voice}=c,a=voice.created[0];
+ const said=[];s.context.window.sidevoiceUI=new Proxy({},{get:(_,key)=>key==='setBootError'?value=>said.push(value):()=>{}});
+ stopByVoice(a);voice.routed=null;
+ const start=a.start;let fail=true;
+ a.start=async options=>{if(fail)throw Object.assign(Error('microphone-unavailable'),{code:'microphone-unavailable'});await start(options);a.emit('state',{listening:'listening',recognising:0,playback:'idle',microphone:'live'})};
+ await s.run('refresh()');
+ assert.equal(voice.routed,null,'nobody has the microphone');
+ assert.equal(s.run('voice'),null);
+ assert.ok(said.some(Boolean),'the failure is said');
+ fail=false;
+ await s.run('refresh()');
+ assert.equal(voice.routed,a,'the next beat gives it back');
+ s.run('disconnect()');
+});
 test('a late terminal retains source call after many later starts',async()=>{
  const c=await callOnRoom(),a=c.voice.created[0];
  a.emit('turn',started('old'));

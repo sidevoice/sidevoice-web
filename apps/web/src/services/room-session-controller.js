@@ -676,7 +676,8 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
  const d=await api(roomQuery('/api/presentation',fp),undefined,fp);
  if(asked<refreshApplied||session!==state.sessionId||fp!==state.callNode)return;
  const nextThread=d.binding?.thread_id||null;
- if(nextThread!==targetThread()||d.binding?.binding_id!==state.roomBinding?.binding_id||nextThread&&voice!==conversationCalls.get(conversationKey(fp,nextThread))?.call){
+ const onCall=nextThread?conversationCalls.get(conversationKey(fp,nextThread)):null;
+ if(nextThread!==targetThread()||d.binding?.binding_id!==state.roomBinding?.binding_id||nextThread&&(voice!==onCall?.call||stoppedByVoice(onCall))){
   try{await routeConversation(fp,nextThread,d.binding?.binding_id)}catch(error){voiceFailed(error)}
   if(asked<refreshApplied||session!==state.sessionId||fp!==state.callNode)return;
  }
@@ -1459,14 +1460,20 @@ function recordMessage(raw, socket) {
 // machine (its words, transcribed late; its cancellation) is that machine's no longer, and goes nowhere.
 const turnNodes=new Map();
 let routing=Promise.resolve(),routeVersion=0,desiredRouteKey=null;
+/* A call the voice stopped by itself: started once, it says it is idle again because its microphone or speaker failed
+ * (a microphone track that ended, a capture that broke), and it hears nothing until it is started again. The page
+ * starts it again whenever it gives it the microphone, and the call beat does so for the conversation the call is on:
+ * the person is heard again without hanging up (web#190, web#192). */
+function stoppedByVoice(entry){return !!entry?.started&&entry.state?.listening==='idle'}
 async function prepareConversationCall(node,thread_id,binding_id){
  if(!thread_id)return null;
  const key=conversationKey(node,thread_id);
  let entry=conversationCalls.get(key);
+ if(stoppedByVoice(entry))await entry.call.start();
  if(!entry){
   const owner=voiceOwner??await voiceHost();
   const call=owner.createCall();
-  entry={call,key,node,thread_id,activations:[],generation:callGeneration,listeners:[]};
+  entry={call,key,node,thread_id,activations:[],generation:callGeneration,listeners:[],started:false};
   conversationCalls.set(key,entry);
   entry.listeners.push(call.onTurn(turn=>voiceTurn(turn,entry)),call.onState(next=>{entry.state=next;if(voice===call)voiceStateChanged(next)}),
    call.onLevel(level=>{if(voice===call)voiceLevel(level)}),call.onError(voiceFailed),
@@ -1476,6 +1483,7 @@ async function prepareConversationCall(node,thread_id,binding_id){
    await call.setSettings(handed??voiceSettingsToLoad(state.voiceSettings,state.voiceCatalogue.catalogs));
    if(conversationCalls.get(key)!==entry||entry.generation!==callGeneration)return null;
    await call.start();
+   entry.started=true;
   }
   catch(error){conversationCalls.delete(key);for(const stop of entry.listeners)stop();await call.dispose().catch(()=>{});throw error}
  }
