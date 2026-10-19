@@ -207,6 +207,60 @@ test("a message typed, with no spoken turn before it, is not shown as sent", () 
   expect(personBubble()).toBeNull();
 }, WHOLE_APP_MS);
 
+/** The person speaks to the login conversation: its bars while they do, then its words once sent. */
+const spokenTo = (store: RoomStore, segment: string, text: string, time: number, phase: "speaking" | "sent") => {
+  if (phase === "speaking") return patch(store, { userLive: true, userTurn: { id: segment, segment: "turn:" + segment, thread: "fp-1|t-login" }, pendingPhase: "listening" });
+  patch(store, { userLive: false, pendingPhase: "transcribing" });
+  patch(store, { pendingPhase: "", userTurn: null, history: [...store.getState().facts.history, said(segment, text, time)] } as Partial<SessionFacts>);
+};
+
+test("the person's balloon belongs to the conversation they spoke to: another on the stage shows none of it, and it is back if still current", () => {
+  const store = room();
+  vi.useFakeTimers();
+  // While they speak.
+  spokenTo(store, "u-1", "", 2, "speaking");
+  expect(personBubble()!.querySelector(".voice-wave")).not.toBeNull();
+  patch(store, { viewedThread: "fp-2|t-backup" });
+  expect(personBubble()).toBeNull();
+  patch(store, { viewedThread: "fp-1|t-login" });
+  expect(personBubble()!.querySelector(".voice-wave")).not.toBeNull();
+  // Once sent: its moment is its own, whichever conversation is on the stage.
+  spokenTo(store, "u-1", "Split it into two commits.", 2, "sent");
+  expect(personBubble()).toHaveTextContent("Split it into two commits.");
+  tick(1000);
+  patch(store, { viewedThread: "fp-2|t-backup" });
+  expect(personBubble()).toBeNull();
+  tick(1000);
+  expect(personBubble()).toBeNull();
+  patch(store, { viewedThread: "fp-1|t-login" });
+  expect(personBubble()).toHaveTextContent("Split it into two commits.");
+  expect(personBubble()).not.toHaveAttribute("data-leaving");
+  // Its clock ran on meanwhile: it does not start over on coming back.
+  tick(PAGE_MS - 2000 - 1);
+  expect(personBubble()).not.toHaveAttribute("data-leaving");
+  tick(1);
+  expect(personBubble()).toHaveAttribute("data-leaving");
+  tick(SENT_LEAVING_MS);
+  expect(personBubble()).toBeNull();
+  // Sent and gone while another conversation was on the stage: nothing to come back to.
+  spokenTo(store, "u-2", "Second thing.", 3, "sent");
+  patch(store, { viewedThread: "fp-2|t-backup" });
+  tick(PAGE_MS + SENT_LEAVING_MS);
+  patch(store, { viewedThread: "fp-1|t-login" });
+  expect(personBubble()).toBeNull();
+}, WHOLE_APP_MS);
+
+test("a message typed in another conversation than the one spoken to is not shown as sent there", () => {
+  const store = room();
+  vi.useFakeTimers();
+  spokenTo(store, "u-1", "", 2, "speaking");
+  patch(store, { viewedThread: "fp-2|t-backup" });
+  patch(store, { history: [...store.getState().facts.history, { ...said("u-2", "Typed over there.", 3), thread: "fp-2|t-backup" }] });
+  expect(personBubble()).toBeNull();
+  tick(PAGE_MS);
+  expect(personBubble()).toBeNull();
+}, WHOLE_APP_MS);
+
 test("a second spoken turn arriving while the first leaves starts over cleanly, and a typed one meanwhile does not stop it", () => {
   const store = room();
   vi.useFakeTimers();
