@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useContext, useEffect, type CSSProperties } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { UpdateNotice } from "../updates/UpdateNotice";
 import { Button } from "../../components/ui/Button";
@@ -21,6 +21,7 @@ import { PersonTurn } from "./PersonTurn";
 import { TranscriptEntry } from "./TranscriptEntry";
 import { useVoiceModels } from "./VoiceModels";
 import { harnessName, StageHeading } from "./CallDetails";
+import { useConversationAvatar, useConversationAvatars } from "./conversation-avatars";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { errorLine } from "../settings/error-message";
 import { desktopHost } from "../../services/desktop-host";
@@ -116,14 +117,12 @@ export function CallStage() {
   const t = translator();
   const stage = useStageConversation();
   const sceneRef = useSceneScale();
-  const [balloonUp, setBalloonUp] = useState(false);
-  // Under its balloon the agent holds still (operator, 2026-10-15): work that starts meanwhile waits for it to go.
-  const mood = balloonUp && stage.mood === "working" ? "speaking" : stage.mood;
+  // The agent is its conversation's one state, the one its thumbnails show too (conversation-avatars.ts); the stage
+  // tells it when its balloon is up, for it to hold still under it.
+  const avatars = useConversationAvatars();
+  const avatar = useConversationAvatar(stage.threadId);
+  const holdStill = useCallback((up: boolean) => { if (stage.threadId) avatars.hold(stage.threadId, up); }, [avatars, stage.threadId]);
   const conversation = useRoomStore((state) => state.conversation);
-  // Anything that happens with the agent restarts its rest before a pastime: the call starting, the conversation on
-  // the stage, the person speaking, a balloon, its mood (operator, 2026-10-15).
-  const joined = useRoomStore((state) => state.call.joined);
-  const interaction = [joined, stage.threadId, conversation.pendingPhase, balloonUp, mood].join("|");
   const showConversations = useCallLayout((state) => state.showConversations);
   const reply = stage.isTarget ? conversation.saying ?? null : null;
   const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
@@ -157,20 +156,20 @@ export function CallStage() {
           background around it (useSceneScale fits it in its slot; call-view.css names the shapes). What the tile says —
           the name, the voice models, the replies, the badge — is laid on the tile, at its corners. */}
       <div ref={sceneRef} className="stage-slot">
-      <div className="stage-tile" data-mood={mood} data-app={desktopHost() ? "" : undefined} style={avatarTone(tone) as CSSProperties}>
+      <div className="stage-tile" data-mood={avatar.mood} data-app={desktopHost() ? "" : undefined} style={avatarTone(tone) as CSSProperties}>
         <div className="stage-canvas">
           <div className="stage-scene">
             <StageBackdrop seed={stage.threadId} tone={tone} />
-            {stage.mood === "offline" && <WantedPoster spec={spec} seed={stage.threadId} words={posterWords(t)} language={uiLanguage()} />}
-            <CharacterAvatar className="stage-agent" spec={spec} mood={mood} size="stage" unread={stage.unread} desk={mood === "working"} still={balloonUp} interaction={interaction}
-              mouth="playback" playbackThreadId={stage.threadId} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
+            {avatar.mood === "offline" && <WantedPoster spec={spec} seed={stage.threadId} words={posterWords(t)} language={uiLanguage()} />}
+            <CharacterAvatar className="stage-agent" spec={spec} state={avatar} size="stage" desk={avatar.mood === "working"}
+              mouth="playback" mouthLevel={avatars.mouth(stage.threadId)} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
             <StageDesk seed={stage.threadId} />
           </div>
         </div>
         <StageName stage={stage} className="stage-name" tone={tone} voice={voice} />
         <div className="stage-top">
           {/* Its own conversation's: another one on the stage starts with none of the replies before it. */}
-          <AgentBubbles key={stage.threadId} reply={reply} spokenTo={spokenTo} onUp={setBalloonUp} />
+          <AgentBubbles key={stage.threadId} reply={reply} spokenTo={spokenTo} onUp={holdStill} />
           {/* Working is said only to assistive tech here: the sidebar shows it. */}
           {stage.mood === "working" && <p className="sr-only" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden="true" />{t("stage.working")}</p>}
         </div>

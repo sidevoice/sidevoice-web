@@ -10,6 +10,7 @@ import { headerRowWidth } from "../../test/header-row";
 import { VARIANTS_KEY } from "../../lib/variants";
 import { AGENT_LINGER_MS, SENT_LEAVING_MS } from "./speech-reading";
 import { PAGE_MS } from "./PagedText";
+import { ENTER_MS } from "../avatar/engine/styles/bichos";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -22,6 +23,8 @@ const REPLY = "Okay. I'll start with the login and then look at the cart tests. 
 // Each row comes from the machine it runs on (`node`); the page knows it by machine and thread ("fp-1|t-login").
 const person = (thread_id: string, title: string, extra: Record<string, unknown> = {}) =>
   ({ thread_id, title, available: true, reach: { state: "listening" }, node: "fp-1", machine: { host: "Laptop", id: "m1" }, harness: "claude", ...extra });
+/** The room's reply in the transcript, already played: no balloon over the agent. */
+const played = { segment: "h-2", thread: "fp-1|t-login", role: "assistant" as const, text: REPLY, name: "Fix the slow login", time: 1, session: "s1", audio: "played" };
 const pairing = (fp: string, host: string | null) => ({ fp, host, urls: [], rv: null, device_id: "d", paired_at: 1, revoked: false });
 /** These conversations busy for as long as Working waits before it shows (the runtime's start and clock facts). */
 const lasted = (...keys: string[]) => ({ workingSince: Object.fromEntries(keys.map((key) => [key, 0])), now: WORKING_SHOWN_AFTER_MS });
@@ -149,6 +152,8 @@ test("the person has no picture on the stage, only a bubble of their own while t
   // The agent listens to the person meanwhile, and goes on listening while it is transcribed.
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "listening");
   expect(stageAgent()).toHaveAttribute("data-mood", "listening");
+  // Its thumbnail in the sidebar acts out the same mood (never the idle step it would otherwise keep).
+  expect(rowOf("Fix the slow login").querySelector(".sv-avatar")).toHaveAttribute("data-mood", "listening");
   patch(store, { userLive: false, pendingPhase: "transcribing" });
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "listening");
   // The transcript's live draft has the same button: this is the stage's.
@@ -253,7 +258,8 @@ test("the preview holds the stage avatar in a mood, with something unheard when 
 }, WHOLE_APP_MS);
 
 test("state dots and small avatars follow each conversation's state, grouped by machine", () => {
-  const store = room();
+  // Its reply already played: no balloon holds the agent still here (the stage's own test follows that).
+  const store = room({ history: [played] });
   const dot = (title: string) => rowOf(title).querySelector(".state-dot")!.getAttribute("data-state");
   const mood = (title: string) => rowOf(title).querySelector(".sv-avatar")!.getAttribute("data-avatar-state");
   // The dot says whether it hears you; the bicho is offline, working or resting.
@@ -282,6 +288,80 @@ test("state dots and small avatars follow each conversation's state, grouped by 
   patch(store, { harness: { "fp-1|t-pay": true, "fp-1|t-login": false } });
   expect(rowOf("Fix the slow login").querySelector(".sidebar-state-text")).toHaveTextContent(/^In call$/);
 });
+
+/* One creature in one state (#166): the stage's agent and every thumbnail of its conversation — its row in the list, its
+ * avatar in the header — render the same state, from one source, on one clock. */
+const SHOWN = ["data-avatar-state", "data-mood", "data-work", "data-idle", "data-enter", "data-offline", "data-unread"];
+const shown = (avatar: Element | null | undefined) => avatar ? SHOWN.map((name) => name + "=" + avatar.getAttribute(name)) : null;
+const headerAvatarOf = (title: string) =>
+  [...document.querySelectorAll(".room-header .header-avatar")].find((button) => button.getAttribute("aria-label")?.startsWith(title))?.querySelector(".sv-avatar");
+/** What the stage's agent shows, after checking that its row's and its header's avatars show exactly that. */
+function inStep(title: string) {
+  const stage = shown(stageAgent());
+  expect(shown(rowOf(title).querySelector(".sv-avatar"))).toEqual(stage);
+  expect(shown(headerAvatarOf(title))).toEqual(stage);
+  return stage!;
+}
+
+test("the stage's agent and its thumbnails are one creature in one state: rest and pastimes, startle, tool, balloon, offline (#166)", () => {
+  viewport({ narrow: true });
+  headerRowWidth(190);
+  vi.useFakeTimers();
+  const store = room({ history: [played] });
+  const login = "Fix the slow login";
+  const attr = (name: string) => stageAgent().getAttribute(name);
+  // Resting: quiet, then its steps, every copy on the same step at every moment.
+  expect(inStep(login)).toContain("data-idle=quiet");
+  const steps = new Set<string | null>();
+  for (let second = 0; second < 30; second += 1) {
+    tick(1000);
+    inStep(login);
+    steps.add(attr("data-idle"));
+  }
+  expect([...steps].some((step) => step && step !== "quiet")).toBe(true);
+  // The person speaks to it: startled into listening everywhere at once, and landing everywhere at once.
+  patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening" } as Partial<SessionFacts>);
+  expect(inStep(login)).toEqual(expect.arrayContaining(["data-avatar-state=listening", "data-enter=idle"]));
+  tick(ENTER_MS);
+  expect(inStep(login)).toContain("data-enter=null");
+  // It works: the same tool in every hand, swapped in every hand.
+  patch(store, { userLive: false, userTurn: null, pendingPhase: "", harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login") } as Partial<SessionFacts>);
+  expect(attr("data-work")).toMatch(/^(crank|hammer|read|type)$/);
+  inStep(login);
+  tick(31_000);
+  inStep(login);
+  // It replies; once its voice ends, it holds still under its balloon until the balloon goes: the thumbnails too.
+  patch(store, { botLive: true, karaokeState: { segment: "h-2", from: 0, to: 0 }, history: [{ ...played, audio: "playing" }] } as Partial<SessionFacts>);
+  expect(inStep(login)).toContain("data-avatar-state=speaking");
+  patch(store, { botLive: false, karaokeState: null, history: [played] } as Partial<SessionFacts>);
+  expect(stageBubbles()).toHaveLength(1);
+  expect(inStep(login)).toEqual(expect.arrayContaining(["data-avatar-state=speaking", "data-work=null"]));
+  tick(AGENT_LINGER_MS + SENT_LEAVING_MS);
+  expect(stageBubbles()).toHaveLength(0);
+  expect(inStep(login)).toContain("data-avatar-state=working");
+  // Its machine stops answering mid-reply: it says the reply to its end (#220), on the stage and in every thumbnail;
+  // then the stage hangs its wanted poster, and every copy sleeps.
+  patch(store, { botLive: true, karaokeState: { segment: "h-2", from: 0, to: 0 }, history: [{ ...played, audio: "playing" }],
+    machineLinks: { ...live("fp-2"), "fp-1": { reach: "offline", via: "node" } } } as Partial<SessionFacts>);
+  expect(document.querySelector(".wanted")).toBeNull();
+  expect(inStep(login)).toContain("data-avatar-state=speaking");
+  patch(store, { botLive: false, karaokeState: null, history: [played] } as Partial<SessionFacts>);
+  expect(document.querySelector(".wanted")).not.toBeNull();
+  expect(inStep(login)).toEqual(expect.arrayContaining(["data-avatar-state=offline", "data-offline=true", "data-idle=null", "data-work=null"]));
+}, WHOLE_APP_MS);
+
+test("a conversation coming on the stage brings its state: the stage shows what its thumbnails already showed, the same tool in hand (#166)", () => {
+  viewport({ narrow: true });
+  headerRowWidth(190);
+  const store = room({ history: [played] });
+  const pay = "Migrate the payments API";
+  const before = shown(rowOf(pay).querySelector(".sv-avatar"))!;
+  expect(before).toContain("data-avatar-state=working");
+  // Looked at, not called: it is still at work, on the stage as in its row (its harness says so, whoever it talks to).
+  patch(store, { viewedThread: "fp-1|t-pay" });
+  expect(inStep(pay)).toEqual(before);
+  expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "working");
+}, WHOLE_APP_MS);
 
 test("an offline conversation on the stage is a wanted poster, in the interface's language", () => {
   const store = room({ viewedThread: "fp-2|t-week" });

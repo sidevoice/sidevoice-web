@@ -1,16 +1,25 @@
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { act, render } from "@testing-library/react";
 import { playbackLevel } from "../../state/playback-level";
-import { avatarFor } from "./avatar-spec";
+import { avatarFor, type AvatarMood } from "./avatar-spec";
+import { createAvatarStates, type AvatarStates } from "./avatar-state";
 import { CharacterAvatar } from "./CharacterAvatar";
 import { smoothPlaybackLevel } from "./playback-mouth";
 
-afterEach(() => { playbackLevel.clear(); vi.useRealTimers(); });
+let states: AvatarStates;
+beforeEach(() => { states = createAvatarStates(); });
+afterEach(() => { states.clear(); playbackLevel.clear(); vi.useRealTimers(); vi.restoreAllMocks(); });
+
+const spec = avatarFor("fp|one");
+const speaker = (mood: AvatarMood, voice = "fp|one") => act(() => states.set("one", { spec, mood, voice }));
+/** One copy of the figure "one", drawn from its state. */
+const copy = () => <CharacterAvatar spec={spec} state={states.get("one")!} size="stage" mouth="playback" mouthLevel={states.mouth("one")} />;
 
 test("the stage mouth follows only its conversation's output, rests at zero and when it leaves", () => {
   vi.useFakeTimers();
   playbackLevel.clear();
-  const view = render(<CharacterAvatar spec={avatarFor("fp|one")} mood="speaking" size="stage" mouth="playback" playbackThreadId="fp|one" />);
+  speaker("speaking");
+  const view = render(copy());
   const avatar = view.container.firstElementChild as HTMLElement;
   expect(avatar).not.toHaveAttribute("data-mouth-active");
   expect(avatar).not.toHaveAttribute("data-beat");
@@ -25,16 +34,19 @@ test("the stage mouth follows only its conversation's output, rests at zero and 
   act(() => vi.advanceTimersByTime(300));
   expect(avatar).not.toHaveAttribute("data-mouth-active");
   act(() => playbackLevel.publish(0.7, "fp|one"));
-  view.rerender(<CharacterAvatar spec={avatarFor("fp|one")} mood="speaking" size="stage" mouth="playback" playbackThreadId="fp|two" />);
+  speaker("speaking", "fp|two");
   expect(avatar).not.toHaveAttribute("data-mouth-active");
   act(() => playbackLevel.publish(0.8, "fp|one"));
   expect(avatar).not.toHaveAttribute("data-mouth-active");
   act(() => playbackLevel.publish(0.7, "fp|two"));
   expect(avatar).toHaveAttribute("data-mouth-active");
-  view.rerender(<CharacterAvatar spec={avatarFor("fp|one")} mood="idle" size="stage" mouth="playback" playbackThreadId="fp|one" />);
+  speaker("idle", "fp|two");
   expect(avatar).not.toHaveAttribute("data-mouth-active");
+  speaker("speaking", "fp|two");
+  act(() => playbackLevel.publish(0.7, "fp|two"));
   view.unmount();
-  act(() => playbackLevel.publish(0.8, "fp|one"));
+  expect(avatar).not.toHaveAttribute("data-mouth-active");
+  act(() => playbackLevel.publish(0.8, "fp|two"));
   expect(avatar).not.toHaveAttribute("data-mouth-active");
 });
 
@@ -48,20 +60,57 @@ test("smoothing is bounded and silence is immediate", () => {
 test("a stale cached level stays silent across remount and mood changes", () => {
   vi.useFakeTimers();
   playbackLevel.clear();
-  const props = { spec: avatarFor("fp|one"), size: "stage" as const, mouth: "playback" as const, playbackThreadId: "fp|one" };
-  const view = render(<CharacterAvatar {...props} mood="speaking" />);
+  speaker("speaking");
+  const view = render(copy());
   act(() => playbackLevel.publish(0.8, "fp|one"));
   expect(view.container.firstElementChild).toHaveAttribute("data-mouth-active");
   act(() => vi.advanceTimersByTime(200));
   view.unmount();
-  const again = render(<CharacterAvatar {...props} mood="speaking" />);
+  const again = render(copy());
   expect(again.container.firstElementChild).toHaveAttribute("data-mouth-active");
   act(() => vi.advanceTimersByTime(100));
   expect(again.container.firstElementChild).not.toHaveAttribute("data-mouth-active");
   again.unmount();
-  const stale = render(<CharacterAvatar {...props} mood="speaking" />);
+  const stale = render(copy());
   expect(stale.container.firstElementChild).not.toHaveAttribute("data-mouth-active");
-  stale.rerender(<CharacterAvatar {...props} mood="idle" />);
-  stale.rerender(<CharacterAvatar {...props} mood="speaking" />);
+  speaker("idle");
+  speaker("speaking");
   expect(stale.container.firstElementChild).not.toHaveAttribute("data-mouth-active");
+});
+
+test("two copies of one figure open their mouths together, one drawn mid-word included", () => {
+  speaker("speaking");
+  const stage = render(copy()).container.firstElementChild as HTMLElement;
+  act(() => playbackLevel.publish(0.8, "fp|one"));
+  act(() => playbackLevel.publish(0.5, "fp|one"));
+  const thumbnail = render(<CharacterAvatar spec={spec} state={states.get("one")!} size="small" mouth="playback" mouthLevel={states.mouth("one")} />)
+    .container.firstElementChild as HTMLElement;
+  expect(thumbnail.style.getPropertyValue("--mouth")).toBe(stage.style.getPropertyValue("--mouth"));
+  expect(thumbnail).toHaveAttribute("data-mouth-active");
+  act(() => playbackLevel.publish(0.9, "fp|one"));
+  expect(thumbnail.style.getPropertyValue("--mouth")).toBe(stage.style.getPropertyValue("--mouth"));
+});
+
+test("every copy runs its animations from the moment its state last changed, whenever it was drawn", () => {
+  // The page's animations, one per element: what the engine's CSS would start on it.
+  const animations = new WeakMap<Element, { animationName: string; startTime: number | null }[]>();
+  const transition = { transitionProperty: "transform", startTime: 5 };
+  Object.defineProperty(HTMLElement.prototype, "getAnimations", { configurable: true, value(this: HTMLElement) {
+    if (!animations.has(this)) animations.set(this, [{ animationName: "bx-blink", startTime: null }]);
+    return [...animations.get(this)!, transition];
+  } });
+  try {
+    vi.spyOn(performance, "now").mockReturnValue(1000);
+    act(() => states.set("one", { spec, mood: "working" }));
+    const stage = render(copy()).container.firstElementChild!;
+    expect(animations.get(stage)![0].startTime).toBe(1000);
+    // Later, a thumbnail appears: its animations run from the same moment, not from its own drawing.
+    vi.mocked(performance.now).mockReturnValue(4000);
+    const thumbnail = render(<CharacterAvatar spec={spec} state={states.get("one")!} size="small" />).container.firstElementChild!;
+    expect(animations.get(thumbnail)![0].startTime).toBe(1000);
+    // A transition is left to itself.
+    expect(transition.startTime).toBe(5);
+  } finally {
+    delete (HTMLElement.prototype as { getAnimations?: unknown }).getAnimations;
+  }
 });

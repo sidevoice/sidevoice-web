@@ -91,6 +91,12 @@ function cached(spec: AvatarSpec, size: AvatarSize): Drawing {
 /** The main colour of `spec`'s figure (the same at every size). */
 export const avatarColor = (spec: AvatarSpec): string => cached(spec, "small").tone;
 
+/** The working styles and idle steps `spec`'s figure can take (the same at every size). */
+export function avatarRepertoire(spec: AvatarSpec): Pick<Drawing, "works" | "idles"> {
+  const { works, idles } = cached(spec, "small");
+  return { works, idles };
+}
+
 let copies = 0;
 /** The same markup with every id (and every reference to one) made unique to this copy. */
 export function withOwnIds(html: string): string {

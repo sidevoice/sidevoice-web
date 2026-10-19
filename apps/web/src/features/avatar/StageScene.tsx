@@ -5,6 +5,7 @@ import { DESK_TOPS, deskFromSeed, deskSvg } from "./engine/desk";
 import type { AvatarSpec } from "./avatar-spec";
 import { withOwnIds } from "./bicho-draw";
 import { usePageTheme } from "../../lib/theme";
+import { stillAvatar } from "./avatar-state";
 import { CharacterAvatar } from "./CharacterAvatar";
 
 /* The stage as the avatar lab draws it: a backdrop behind the agent, the desk it works at, and the wanted poster that
@@ -119,7 +120,7 @@ export function WantedPoster({ spec, seed, words, language }: { spec: AvatarSpec
   return (
     <div className="wanted" aria-hidden="true">
       <svg className="w-title" viewBox="0 0 180 44"><text x="90" y="40" textAnchor="middle" textLength="172" {...fit}>{words.title}</text></svg>
-      <div className="w-photo"><CharacterAvatar spec={spec} mood="speaking" size="stage" /></div>
+      <div className="w-photo"><CharacterAvatar spec={spec} state={stillAvatar("speaking")} size="stage" /></div>
       <svg className="w-lower" viewBox="0 0 180 64">
         <g transform="translate(2 6)"><Scroll /></g><g transform="translate(178 6) scale(-1 1)"><Scroll /></g>
         <text className="w-name" x="90" y="30" textAnchor="middle" textLength="150" {...fit}>{words.status}</text>

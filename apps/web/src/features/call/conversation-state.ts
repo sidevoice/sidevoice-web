@@ -4,13 +4,14 @@ import type { AvatarMood } from "../avatar/avatar-spec";
 import type { Translate } from "../../i18n/translator";
 
 /* What the call view says about a conversation, derived in one place from the room's own row (participantsView)
- * and whether this page is in the call: the light beside its avatar, the line under its title, and how its avatar moves.
- * Nothing here reads a clock or the DOM. */
+ * and whether this page is in the call: the light beside its avatar and the line under its title. How its avatar moves
+ * is one state per conversation, the same for every copy of it (conversation-avatars.ts). Nothing here reads a clock or
+ * the DOM. */
 
 export type { AvatarMood };
-/* Whether a conversation hears the person, and the stage's mood for it, are the room's own projections
- * (state/room-session-state.js): the desktop card's snapshot takes its avatar's mood from them too, so the stage and the
- * card never disagree (FLOATING-CARD-SPEC FC4). */
+/* Whether a conversation hears the person, and its agent's mood, are the room's own projections
+ * (state/room-session-state.js): the stage and every thumbnail take the mood from them (stage-view.ts agentMood), and so
+ * does the desktop card's snapshot, so none of them disagree (FLOATING-CARD-SPEC FC4). */
 export { canHear, stageMood } from "../../state/room-session-state.js";
 export type { StageFacts } from "../../state/room-session-state.js";
 
@@ -32,14 +33,6 @@ export function conversationState(row: ParticipantView, inCall: boolean): Conver
   if (!canHear(row)) return "idle";
   if (isCallRow(row, inCall)) return "in-call";
   return "waiting";
-}
-
-/** A small avatar (sidebar, rail, header, panel): offline while the room cannot reach it (it sleeps), working while
- *  its harness says so, idle otherwise — waiting for you included: the row's dot and line say that it hears you. A small
- *  one never speaks or listens; the stage, and the header's copy of it, do. */
-export function smallAvatarMood(row: Pick<ParticipantView, "reach" | "working">): AvatarMood {
-  if (row.reach === "offline") return "offline";
-  return row.working ? "working" : "idle";
 }
 
 /** The person in the picture-in-picture. */
