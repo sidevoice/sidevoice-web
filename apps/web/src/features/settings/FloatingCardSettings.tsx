@@ -55,7 +55,11 @@ export function FloatingCardSettings({ t }: { t: Translate }) {
         </div>
       </Row>
       <Row label={t("settings.floatingCard.size")} description={prefs.format === "pip" ? t("settings.floatingCard.sizeHint") : undefined}>
-        <Segmented size="sm" label={t("settings.floatingCard.size")} value={prefs.size} onChange={(size) => { setFloatingCard({ size }); changed(); }}
+        <Segmented size="sm" label={t("settings.floatingCard.size")} value={prefs.size} onChange={(size) => {
+          setFloatingCard({ size });
+          // A preset drops a size the person dragged the picture to; the card shows once the app has.
+          void Promise.resolve(bridge.clearSize?.()).catch(() => undefined).then(changed);
+        }}
           items={CARD_SIZES.map((size) => ({ value: size, label: t(`settings.floatingCard.size.${size}` as MessageKey) }))} />
       </Row>
       {bridge.setCorner && <CornerRow bridge={bridge} corner={app?.corner ?? "tr"} t={t}
@@ -63,7 +67,7 @@ export function FloatingCardSettings({ t }: { t: Translate }) {
       <DesktopCallSettings t={t} />
       {bridge.resetPlace && <Row label="">
         <Button variant="secondary" size="sm" disabled={app?.moved === false}
-          onClick={() => { void bridge.resetPlace!().then(() => setApp((now) => ({ ...now, moved: false }))); changed(); }}>
+          onClick={() => { void bridge.resetPlace!().then(() => { setApp((now) => ({ ...now, moved: false })); changed(); }); }}>
           {t("settings.floatingCard.reset")}
         </Button>
       </Row>}

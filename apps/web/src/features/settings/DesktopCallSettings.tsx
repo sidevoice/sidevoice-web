@@ -24,7 +24,7 @@ function AlwaysShownRow({ t }: { t: Translate }) {
   if (on === null) return null;
   const change = (next: boolean) => {
     setOn(next); setFailed(false);
-    void bridge.setAlwaysShown(next).then((value) => setOn(value.alwaysShown)).catch(() => { setOn(!next); setFailed(true); });
+    void bridge.setAlwaysShown(next).then((value) => { setOn(value.alwaysShown); bridge.preview?.(); }).catch(() => { setOn(!next); setFailed(true); });
   };
   return <Row label={t("settings.desktop.alwaysShown")} description={failed ? undefined : t("settings.desktop.alwaysShownHint")}>
     <Switch checked={on} aria-label={t("settings.desktop.alwaysShown")} onChange={change} />
