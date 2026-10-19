@@ -93,6 +93,28 @@ test("not asked yet: Allow microphone asks the browser, lets the microphone go a
   expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).microphone_done).toBe(true);
 }, WHOLE_APP_MS);
 
+test("the microphone's step is walked the same going on and Back, the machine paired: its pairing is passed both ways", async () => {
+  browser("prompt", () => Promise.resolve(stream()));
+  await setup();
+  expect(title()).toHaveTextContent("Permissions");
+  await act(async () => { fireEvent.click(action()!); });
+  await act(async () => { fireEvent.click(proceed()); });
+  expect(title()).toHaveTextContent("Set up transcription");
+  // Back lands on the step before the one it left, the pairing passed as going on passed it, then on the basics.
+  const steps = [title().textContent];
+  for (let back = document.querySelector<HTMLButtonElement>("#wizard .wizard-back"); back; back = document.querySelector<HTMLButtonElement>("#wizard .wizard-back")) {
+    await act(async () => { fireEvent.click(back); });
+    steps.push(title().textContent);
+  }
+  expect(steps).toEqual(["Set up transcription", "Permissions", "The basics"]);
+  // And on again: the microphone allowed still shows, saying so, and waits for Continue.
+  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Continue" })); });
+  expect(title()).toHaveTextContent("Permissions");
+  expect(badge()).toHaveTextContent("Allowed");
+  await act(async () => { fireEvent.click(proceed()); });
+  expect(title()).toHaveTextContent("Set up transcription");
+}, WHOLE_APP_MS);
+
 test("blocked: how to allow it for the site, Check again (still blocked, said so), and Check again once it is allowed in the browser says so and waits for Continue", async () => {
   const { granted, media } = browser("denied", () => Promise.reject(refused("NotAllowedError")));
   await setup();
