@@ -312,9 +312,12 @@ export function conversationView(s) {
         sounding += Number(r.role === 'assistant' && ['queued', 'synthesizing', 'waiting_for_turn', 'waiting_for_pause', 'playing'].includes(r.audio));
     }
     // A reply is said again through the call: one of another machine is not offered.
-    return { messages: records.map(r => ({ ...r, replayable: !!r.replayable && conversationOf(r.thread)?.node === s.callNode, cancellable: !!activeDraft && !s.cancelledInput && r.draft === true && r.segment === activeDraft,
+    const messages = records.map(r => ({ ...r, replayable: !!r.replayable && conversationOf(r.thread)?.node === s.callNode, cancellable: !!activeDraft && !s.cancelledInput && r.draft === true && r.segment === activeDraft,
             audioNote: audioNote(r, ahead.get(r)), deliveryNote: deliveryNote(r),
-            playback: playbackState(r, s), karaoke: saying(s, r) ? { from: s.karaokeState.from, to: s.karaokeState.to } : null })),
+            playback: playbackState(r, s), karaoke: saying(s, r) ? { from: s.karaokeState.from, to: s.karaokeState.to } : null }));
+    // The stage's balloon is the reply this page's voice is saying, where it has got to: playback alone, never a row's
+    // status nor a reply waiting its turn, so a reply that no longer plays leaves none behind (#221).
+    return { messages, saying: messages.find(m => m.karaoke) ?? null,
         pendingText: own ? s.pendingUserText : '', pendingPhase: own && !s.cancelledInput ? s.pendingPhase : '',
         pendingCancellable: own && !s.cancelledInput, working: working(s, id) };
 }
