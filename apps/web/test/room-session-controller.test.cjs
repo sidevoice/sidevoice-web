@@ -673,14 +673,18 @@ test('Somebody the room refuses reads the room\'s own reason, not the page\'s gu
  await tellJoined;
  assert.equal(told.run('roomStore.getState().join.text'),'The machine already has the maximum number of devices connected. Wait for one to leave and join again.');
 
- // A room that answers nothing at all is not a room that refused: the page says which it was.
+ // A room that answers nothing at all is not a room that refused, nor a reason for the call not to start: it goes on
+ // looking for it, as after a drop, until the person hangs up.
  const gone=setup({strictDOM:true});
  const away=joining(gone,{admission:'unreachable'});
  const awayJoined=away.tap();
  const lost=await firstSocket(away.sockets);
  lost.onerror();lost.onclose({code:1006});
  await awayJoined;
- assert.equal(gone.run('roomStore.getState().join.text'),'Could not connect to the machine.');
+ assert.equal(gone.run('roomStore.getState().call.joined'),true);
+ assert.equal(gone.run('state.reconnecting'),true);
+ assert.notEqual(gone.run('roomStore.getState().join?.failed'),true);
+ await gone.run('toggleCall')();
 
  // A refusal this page has no words for is the room refusing: what the room said is only behind Details, and a device
  // set to Spanish reads it in Spanish.
@@ -1257,6 +1261,79 @@ test('Within the grace a drop is not shown and holds no control; past it, one li
  assert.deepEqual([...new Set(voice.calls.slice(asked).map(([name])=>name))],['mute'],'the voice went on through the drop, told nothing but the mute');
  assert.equal(view().join,null);
  assert.equal(view().call.busy,false);
+});
+// ----- a call that does not wait for its machine -----
+// The call is on the conversation t-1 of a machine that does not answer; when the room is back, it binds t-1 as b-1.
+async function callWithMachineAway(){
+ const s=setup({strictDOM:true}),posts=[];s.run("RECONNECT_DELAYS_MS.splice(0,RECONNECT_DELAYS_MS.length,20,20)");
+ const {sockets,voice,tap}=joining(s);let ids=0;s.context.crypto={randomUUID:()=>'id-'+(++ids)};
+ s.context.fetch=async(path,options)=>{
+  if(options?.method==='POST'){posts.push([path,JSON.parse(options.body)]);return {ok:true,status:200,json:async()=>({accepted:true})}}
+  return {ok:true,status:200,json:async()=>path.includes('/participants')?{participants:[{thread_id:'t-1',title:'Astra',available:true,reach:{state:'listening'}}]}
+   :path.includes('/history')?{messages:[]}:{binding:{thread_id:'t-1',title:'Astra',binding_id:'b-1'},room:{revision:0},clients:[],call:null,participants:[]}}};
+ s.run("roomBinding=null;sessionId=null;settleLink('fp-mac',null,'away');viewedThread='fp-mac|t-1'");
+ await tap();
+ const back=async()=>{s.run("settleLink('fp-mac',{base:'',via:'node'},'ok');verified.set('',Date.now())");
+  const socket=await firstSocket(sockets);socket.readyState=1;socket.onopen();
+  socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'s1',resume:{token:'tok-a',seconds:60},resumed:false}})});return socket};
+ const write=async text=>{s.elements.get('text-message').value=text;await s.dispatch('submit',{target:s.elements.get('text-composer')})};
+ return {s,sockets,voice,posts,back,write};
+}
+test('A call starts with its machine away: it says so, what is written meanwhile waits as pending, and goes once the room is back',async()=>{
+ const {s,sockets,voice,posts,back,write}=await callWithMachineAway();
+ assert.equal(sockets.length,0,'no room to join yet');
+ assert.ok(voice.calls.some(([name])=>name==='start'),'but the voice is up');
+ assert.equal(s.run('roomStore.getState().call.joined'),true);
+ assert.match(s.run('roomStore.getState().join.text'),/macbook/,'the join line names the machine that cannot be reached');
+ assert.deepEqual(plain(s.run("roomStore.getState().participants.map(p=>[p.threadId,p.reach])")),[['fp-mac|t-1','offline']],'and its conversation is offline, which the stage shows as the wanted poster');
+ const box=s.elements.get('text-message');
+ assert.equal(box.disabled,false,'the text box is not held back by it');
+ assert.equal(box.placeholder,'Messages are kept until the agent is back');
+ await write('Hola');
+ assert.equal(box.value,'','the box is free for the next one');
+ assert.deepEqual(plain(s.run("roomStore.getState().conversation.messages.map(m=>[m.text,m.delivery])")),[['Hola','pending']],'its bubble is there, pending');
+ const id=s.run('queuedTexts()[0].id');
+ await write('¿Sigues ahí?');
+ assert.equal(s.run('queuedTexts().length'),2);
+ await back();
+ for(let i=0;i<500&&posts.length<2;i++)await settleSoon();
+ assert.deepEqual(posts.map(([path,body])=>[path,body.text,body.thread_id,body.session_id,body.binding_id]),
+  [['/api/presentation/text','Hola','t-1','s1','b-1'],['/api/presentation/text','¿Sigues ahí?','t-1','s1','b-1']],'oldest first, on the conversation they were written for');
+ assert.equal(posts[0][1].message_id,id,'under the id they were kept with, which the room takes once');
+ assert.equal(s.run('queuedTexts().length'),0);
+ assert.equal(s.run("history.some(r=>String(r.segment).startsWith('queued:'))"),false,'the room\'s own rows replace the bubbles');
+ await s.run('toggleCall')();
+});
+test('A machine that is not there is no banner: the room\'s frames about it are heard, not shown; any other refusal still is',()=>{
+ const s=setup(),shown=[],frame=data=>s.run(`message(${JSON.stringify(JSON.stringify({type:'error',data}))})`);
+ s.context.window.sidevoiceUI={setBootError:error=>shown.push(error)};
+ for(const reason of ['node_offline','node_unreachable','node_timeout','choose_node'])frame({reason,message:'Esa máquina no está conectada a la sala ahora mismo.'});
+ assert.equal(shown.length,0);
+ frame({reason:'room_is_full',message:'The room already has the maximum number of browsers connected.'});
+ assert.match(shown[0].text,/maximum number of devices/);
+});
+test('Text still waiting when the call ends is left as not sent',async()=>{
+ const {s,posts,write}=await callWithMachineAway();
+ await write('Nunca llegó');
+ await s.run('toggleCall')();
+ assert.deepEqual(plain(s.run("history.map(r=>[r.text,r.delivery])")),[['Nunca llegó','not_sent']]);
+ assert.equal(s.run('queuedTexts().length'),0);
+ assert.equal(posts.length,0);
+});
+test('An agent that is away does not keep the call from its conversation: choosing it selects it',async()=>{
+ const c=await callOnRoom();const {s}=c,posts=[],room=s.context.fetch;
+ s.context.fetch=async(path,options)=>{if(options?.method==='POST')posts.push([path,JSON.parse(options.body)]);return room(path,options)};
+ s.run("people=[...people,{node:'fp-mac',thread_id:'b',title:'B',available:false,reach:{state:'offline'}}]");
+ s.run("window.sidevoiceActions.selectParticipant('fp-mac|b')");
+ await settleSoon();
+ assert.deepEqual(posts.filter(([path])=>path.includes('/select')).map(([,body])=>body.thread_id),['b']);
+ await s.run('toggleCall')();
+});
+test('A joined room goes back to the conversation this tab was on, even when its agent is away',async()=>{
+ const s=setup();s.run("roomBinding=null;ws={};people=[{node:'fp-mac',thread_id:'b',available:false,reach:{state:'offline'}}];var chosen=null;select=async id=>{chosen=id}");
+ s.context.sessionStorage={getItem:key=>key==='sidevoice.selected'?'fp-mac|b':null,setItem(){},removeItem(){}};
+ assert.equal(await s.run('reselectRemembered()'),true);
+ assert.equal(s.run('chosen'),'fp-mac|b');
 });
 test('A reload takes the call back: the tab keeps the ticket, the next join sends it, and a hang-up forgets it',async()=>{
  const c=await callOnRoom();const {s,first}=c;

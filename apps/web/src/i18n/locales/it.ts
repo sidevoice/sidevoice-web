@@ -196,6 +196,7 @@ export const messages: Messages = {
   "transcript.close": "Chiudi la trascrizione",
   "transcript.message": "Messaggio scritto",
   "transcript.placeholder": "Invia un messaggio",
+  "transcript.placeholderWaits": "I messaggi vengono conservati finché l’agente non torna",
   "transcript.send": "Invia",
   "transcript.sendLabel": "Invia messaggio",
 

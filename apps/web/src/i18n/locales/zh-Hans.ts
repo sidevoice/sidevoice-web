@@ -189,6 +189,7 @@ export const messages: Messages = {
   "transcript.close": "关闭文字记录",
   "transcript.message": "书面消息",
   "transcript.placeholder": "发送消息",
+  "transcript.placeholderWaits": "消息会保留，待智能体恢复后再送出",
   "transcript.send": "发送",
   "transcript.sendLabel": "发送消息",
   "karaoke.playing": "正在播放这条回复",
