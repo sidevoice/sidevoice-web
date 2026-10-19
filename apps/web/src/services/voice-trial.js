@@ -1,29 +1,29 @@
 /* Trying this device's voice settings for real, through the call's own voice (@sidevoice/voice's `VoiceHost`, or the
  * desktop app's): the microphone and the chosen transcriber for words the person says, the chosen speaker for a
- * sentence they hear, the chosen end of turn for the turns they take. No room, no agent, no conversation: a try opens
- * the voice, waits for its result — one, or each turn as it comes until stopped — and stops it, whatever happens. A
- * try is cancellable, bounded in time, and fails by a stable code. */
+ * sentence they hear, the chosen end of turn for the turns they take. No room, no agent, no conversation: a try starts
+ * a call of its own, waits for its result — one, or each turn as it comes until stopped — and stops it, whatever
+ * happens. A try is cancellable, bounded in time, and fails by a stable code.
+ *
+ * A try asks the voice for its half alone: transcription and the end of turn only the input (the microphone, the
+ * detector, the transcriber, and Smart's model for the end of turn), the voice only the output (the speaker: no
+ * microphone is asked for, so a blocked one cannot fail it). A half that is not asked for is not loaded, and a model a
+ * call holds is not loaded again: a try after another, or a call after a try, finds what it needs in the voice. */
+
+import { voiceHalves, voiceInput } from './voice-settings.js';
 
 /** How long a try's phases took, in ms (null where the voice did not say). Transcription: `ready_ms`,
  * `recognition_ms`; voice: `ready_ms`, `first_sound_ms`.
  * @typedef {{ ready_ms: number | null, audio_ms?: number | null, endpoint_silence_ms?: number | null, recognition_ms?: number | null, first_sound_ms?: number | null }} TrialTimings */
 
-/* What no try can ask for (the voice's settings name both slots, and the voice loads what they name): a transcription
- * try also loads the voice slot's model, and a voice try the transcription slot's, and every try the detector. A
- * model of this device that is not on disk is downloaded by that load, with no progress said to the page: a first try
- * on a new device may download the model of the step after it, and a download that fails fails the try as
- * `download-failed`, whatever the step shows of its own model. */
 /** A transcription try records until Stop or its longest take, with no end of turn of its own: when a turn ends is End
- *  of turn's to choose and to try, not this one's (decided 2026-10-15). The voice has no end of turn that never ends one
- *  (`end_of_turn` is `silence` or `smart-turn`), so the try asks for silence — the detector alone, no end-of-turn model
- *  to load — at the ordinary pause (`normal`, 2.5 s): a pause that long ends the turn, and with it the take. Stop does
- *  not wait for it (`VoiceCallHost.endInput`). */
-const TAKE_ENDS = { end_of_turn: 'silence', patience: 'normal' };
-/** A voice try says a sentence and ends no turn, so it asks for no end-of-turn model: the voice loads every model its
- *  settings name, downloading what is not on disk, and with Smart it would fetch Smart's model behind the catalogue the
- *  page shows — End of turn would then offer to download a model already on disk, and this try's ready time would
- *  include that download. End of turn downloads its model, with progress, and tries it itself. */
-const SAY_ENDS = { end_of_turn: 'silence' };
+ *  of turn's to choose and to try, not this one's (decided 2026-10-15). The voice has no end of turn that never ends one,
+ *  so the try asks for silence — the detector alone, no end-of-turn model to load, which would be downloaded behind the
+ *  catalogue the page shows — at a pause of 1.5 s: a pause that long ends the turn, and with it the take. Stop does not
+ *  wait for it (`VoiceCallHost.endInput`). */
+const TAKE_SILENCE = { kind: 'silence', ms: 1500 };
+/** The patience it asks with whatever the person's is: it also sets how long a finished turn waits for the next to join
+ *  it, which a take that ends at its first turn must not depend on. */
+const TAKE_PATIENCE = 'normal';
 /** The longest take, from when the voice listens: past it, talking or not, the take ends there and what was said is
  *  transcribed — `VoiceCallHost.endInput` closes the open turn with what was said. */
 export const MAX_TAKE_MS = 10_000;
@@ -32,26 +32,23 @@ export const MAX_TAKE_MS = 10_000;
 const now = () => globalThis.performance?.now?.() ?? Date.now();
 
 /**
- * The take of a try: requested only when the UI wants it. A take from a retuned listening stretch is discarded;
- * the latest take is handed over after the voice stops.
- * @param {import('@sidevoice/voice').VoiceCallHost} voice
+ * The take of a try: requested only when the UI wants it (`options`, for the start of each call). A take from a retuned
+ * listening stretch is discarded; the latest take is handed over after the voice stops.
  * @param {((take: import('@sidevoice/voice').VoiceTake) => void) | undefined} onTake
  * @param {() => boolean} [dropping]
  */
-function takeOf(voice, onTake, dropping = () => false) {
-  const asked = !!onTake;
+function takeOf(onTake, dropping = () => false) {
   let latest = null;
-  const stop = asked ? voice.onTake((take) => { if (!dropping()) latest = take; }) : () => {};
   return {
-    listening: () => (asked ? voice.start({ take: true }) : voice.start()),
+    options: onTake ? { take: true } : undefined,
+    /** Listens to `call` for its take; returns how to stop. */
+    listen: (call) => (onTake ? call.onTake((take) => { if (!dropping()) latest = take; }) : () => {}),
     hand() { const take = latest; latest = null; if (take) onTake(take); },
-    stop,
   };
 }
 
-/** The call's voice with `endInput`, closing the open turn at once with what was captured (its transcription starts,
- *  `finished` follows; nothing without an open turn). TEMPORARY: the pinned package's types do not carry it yet.
- * @typedef {import('@sidevoice/voice').VoiceCallHost & {endInput(): Promise<void>}} TrialVoice */
+/** What a try starts calls on: the voice's host, or anything that starts a call as it does.
+ * @typedef {{start(settings: import('@sidevoice/voice').VoiceSettings, options?: {take?: boolean}): import('@sidevoice/voice').VoiceCallHost}} TrialHost */
 
 /** A step of the person's turns as a try of the end of turn tells it (`tryEndOfTurn`): `listening` once the voice
  * listens (`again` after other settings restarted it), `restarting` while they do; within a turn, `speaking` and
@@ -96,9 +93,9 @@ function bounded(promise, { signal, timeoutMs, timeoutCode = 'trial-silence' }) 
 }
 
 /**
- * Words the person says, through `settings`: the voice is set to them and listens, and the take goes on until Stop
- * (`finish` aborts), `maxTakeMs`, or the voice ending the person's turn on its own (a pause as long as `TAKE_ENDS`'s),
- * talking or not. Stop and the longest take end the turn open at once with what was said (`endInput`); the result is that
+ * Words the person says, through `settings`: a call of the input half alone listens (`TAKE_SILENCE`), and the take goes
+ * on until Stop (`finish` aborts), `maxTakeMs`, or the voice ending the person's turn on its own (a pause as long as
+ * `TAKE_SILENCE`'s), talking or not. Stop and the longest take end the turn open at once with what was said (`endInput`); the result is that
  * turn's words, and a take with none — nothing said, or a turn that
  * came to nothing — is `trial-silence`. Stop before the voice listens is a cancel (nothing recorded yet), as is Stop
  * once the take has ended; an error of the voice ends the try with it. Closing the take is one operation, done once
@@ -106,8 +103,8 @@ function bounded(promise, { signal, timeoutMs, timeoutCode = 'trial-silence' }) 
  * routes the microphone away), so speech after the take cannot join its words, then the open turn is closed
  * (`endInput`). A voice without `endInput`, or one that refuses, fails the try (`voice-module-unavailable`, or its own
  * code) instead of reporting silence; leaving a live take that way never keeps the voice from stopping.
- * @param {TrialVoice} voice
- * @param {import('@sidevoice/voice').VoiceSettings} settings
+ * @param {TrialHost} host
+ * @param {import('./voice-settings.js').DeviceVoiceSettings} settings
  * `onTimings`, once heard: how long the voice took to be ready, and how long transcribing took — not how the take
  * ended, which is End of turn's. As it goes: `onListening` once the voice hears the microphone (its models loaded, the
  * microphone open), and `onLevel`, the microphone's level from 0 to 1 as the voice measures it. `onTranscribing`, once,
@@ -117,13 +114,15 @@ function bounded(promise, { signal, timeoutMs, timeoutCode = 'trial-silence' }) 
  * @param {{signal?: AbortSignal, finish?: AbortSignal, timeoutMs?: number, maxTakeMs?: number, onState?: (state: import('@sidevoice/voice').VoiceCallState) => void, onTimings?: (timings: TrialTimings) => void, onListening?: () => void, onLevel?: (level: number) => void, onTranscribing?: (transcribing: boolean) => void, onTake?: (take: import('@sidevoice/voice').VoiceTake) => void, fence?: () => Promise<void>}} [options]
  * @returns {Promise<string>}
  */
-export async function tryTranscription(voice, settings, { signal, finish, timeoutMs = 20000, maxTakeMs = MAX_TAKE_MS, onState, onTimings, onListening, onLevel, onTranscribing, onTake, fence } = {}) {
+export async function tryTranscription(host, settings, { signal, finish, timeoutMs = 20000, maxTakeMs = MAX_TAKE_MS, onState, onTimings, onListening, onLevel, onTranscribing, onTake, fence } = {}) {
   const deadline = now() + timeoutMs;
   const stops = [];
   let readyMs = null;
   // Where the take ended, in Unix ms: the take handed stops there.
   let endedAt = null;
-  const recorder = takeOf(voice, onTake && ((take) => onTake(endedAt == null ? take : takeUpTo(take, endedAt))));
+  const recorder = takeOf(onTake && ((take) => onTake(endedAt == null ? take : takeUpTo(take, endedAt))));
+  // The try's call: made once the try begins (a start that throws leaves none).
+  let voice = null, stopTake = () => {};
   // Whether the voice listens for the try, and whether the try is over: a start that comes late tells nothing.
   let listening = false, closed = false;
   // Whether the take has ended, and whether a turn of the person's is in it, open or not told yet.
@@ -162,14 +161,15 @@ export async function tryTranscription(voice, settings, { signal, finish, timeou
   // The try over with a take live (a turn open, not ended): it closes like any other, whatever the end, and the
   // end's own result is kept.
   const leaveTake = async () => {
-    if (!listening || ended || !open) return;
+    if (!voice || !listening || ended || !open) return;
     ended = true;
     let timer;
     await Promise.race([closeTake().catch(() => {}), new Promise((done) => { timer = setTimeout(done, LEAVE_TAKE_MS); })]);
     clearTimeout(timer);
   };
   try {
-    await bounded(voice.setSettings({ ...settings, ...TAKE_ENDS }), { signal, timeoutMs, timeoutCode: 'trial-preparation-timeout' });
+    voice = host.start({ input: voiceInput({ ...settings, patience: TAKE_PATIENCE }, TAKE_SILENCE), idle_unload_minutes: settings.idle_unload_minutes }, recorder.options);
+    stopTake = recorder.listen(voice);
     const heard = new Promise((resolve, reject) => {
       nothing = () => reject(trialError('trial-silence'));
       fail = reject;
@@ -197,7 +197,7 @@ export async function tryTranscription(voice, settings, { signal, finish, timeou
     }));
     if (onLevel) stops.push(voice.onLevel(onLevel));
     const starting = now();
-    const listened = recorder.listening().then(() => {
+    const listened = voice.ready.then(() => {
       if (closed) return heard;
       readyMs = Math.round(now() - starting);
       listening = true;
@@ -218,8 +218,9 @@ export async function tryTranscription(voice, settings, { signal, finish, timeou
     if (stopped) finish?.removeEventListener('abort', stopped);
     for (const stop of stops) stop();
     await leaveTake();
-    await Promise.race([voice.stop().catch(() => {}), new Promise((done) => setTimeout(done, LEAVE_TAKE_MS))]);
-    recorder.stop();
+    await Promise.race([voice?.stop().catch(() => {}), new Promise((done) => setTimeout(done, LEAVE_TAKE_MS))]);
+    // The take is handed by the voice as it stops: its listener goes after.
+    stopTake();
     recorder.hand();
   }
 }
@@ -232,11 +233,11 @@ function takeUpTo(take, at) {
 }
 
 /**
- * `text` said through `settings`, in `language`: the voice is set to them (its end of turn aside: `SAY_ENDS`) and
- * started, says it, and the try succeeds once it was heard to its end. Cut short or not played, it fails with why (the
- * voice's own code when it failed).
- * @param {import('@sidevoice/voice').VoiceCallHost} voice
- * @param {import('@sidevoice/voice').VoiceSettings} settings
+ * `text` said through `settings`, in `language`: a call of the output half alone — no microphone is asked for, no
+ * detector, transcriber or end-of-turn model is loaded — says it, and the try succeeds once it was heard to its end.
+ * Cut short or not played, it fails with why (the voice's own code when it failed).
+ * @param {TrialHost} host
+ * @param {import('./voice-settings.js').DeviceVoiceSettings} settings
  * @param {string} text
  * `onTimings`, once heard: how long the voice took to be ready, and from asking it to speak to its first sound.
  * `onProgress`, from that first sound on: where the voice is in `text`, in the voice's own count of its characters —
@@ -244,13 +245,13 @@ function takeUpTo(take, at) {
  * sound is `{sounding: null, heard_chars: 0}`.
  * @param {{language?: string | null, signal?: AbortSignal, timeoutMs?: number, onTimings?: (timings: TrialTimings) => void, onProgress?: (progress: {sounding: [number, number] | null, heard_chars: number}) => void}} [options]
  */
-export async function tryVoice(voice, settings, text, { language = null, signal, timeoutMs = 60000, onTimings, onProgress } = {}) {
-  let saying = null;
+export async function tryVoice(host, settings, text, { language = null, signal, timeoutMs = 60000, onTimings, onProgress } = {}) {
+  let voice = null, saying = null;
   let readyMs = null, firstSoundMs = null;
   try {
-    await voice.setSettings({ ...settings, ...SAY_ENDS });
     const starting = now();
-    const outcome = await bounded(voice.start().then(() => {
+    voice = host.start(voiceHalves(settings, { input: false }));
+    const outcome = await bounded(voice.ready.then(() => {
       readyMs = Math.round(now() - starting);
       const asked = now();
       saying = voice.say(text, language ? { language } : undefined);
@@ -266,33 +267,33 @@ export async function tryVoice(voice, settings, text, { language = null, signal,
     saying?.cancel();
     throw error;
   } finally {
-    await voice.stop().catch(() => {});
+    await voice?.stop().catch(() => {});
   }
 }
 
 /**
- * The end of turn of `settings` as the person tries it: the voice is set to them and listens, and the turns the person
- * takes are told as they go (`onTurnStep`, TurnStep) — only the latest: a turn that starts drops whatever an earlier
+ * The end of turn of `settings` as the person tries it: a call of the input half alone — the end of turn and patience of
+ * `settings`, Smart's model among them — listens, and the turns the person takes are told as they go (`onTurnStep`, TurnStep) — only the latest: a turn that starts drops whatever an earlier
  * one tells late. A pause is the voice's state going from speaking back to listening within a turn; the end, its count
  * of turns in transcription rising (or the turn finishing, where that never shows). It listens until `signal` aborts
  * (`trial-cancelled`), `quietMs` pass with no speech (`trial-silence`) or the voice fails (its error); then the voice
  * stops, whatever happens. `onLevel`: the microphone's level from 0 to 1, as the voice measures it. `onTake`, once the
  * voice has stopped: what the microphone gave it since it last started to listen; what it heard before other settings is theirs, and goes with them.
  *
- * `retune` puts other settings in place while it runs: the voice takes a patience or an end of turn only as it starts,
- * so the turn in progress is dropped, the voice stops, takes them, and listens again. Asked again while it does, it
- * goes on with the latest; the same settings change nothing.
- * @param {import('@sidevoice/voice').VoiceCallHost} voice
- * @param {import('@sidevoice/voice').VoiceSettings} settings
+ * `retune` puts other settings in place while it runs: the turn in progress is dropped, its call stops, and another
+ * starts on them and listens again (the models it needs are the voice's already). Asked again while it does, it goes on
+ * with the latest; the same input half changes nothing.
+ * @param {TrialHost} host
+ * @param {import('./voice-settings.js').DeviceVoiceSettings} settings
  * @param {{signal?: AbortSignal, quietMs?: number, onLevel?: (level: number) => void, onTurnStep?: (step: TurnStep) => void, onTake?: (take: import('@sidevoice/voice').VoiceTake) => void}} [options]
- * @returns {{done: Promise<void>, retune: (settings: import('@sidevoice/voice').VoiceSettings) => Promise<void>}} `done`
+ * @returns {{done: Promise<void>, retune: (settings: import('./voice-settings.js').DeviceVoiceSettings) => Promise<void>}} `done`
  *   settles once the try is over and the voice stopped, rejecting with why it ended.
  */
-export function tryEndOfTurn(voice, settings, { signal, quietMs = 30000, onLevel, onTurnStep, onTake } = {}) {
+export function tryEndOfTurn(host, settings, { signal, quietMs = 30000, onLevel, onTurnStep, onTake } = {}) {
   const tell = (step) => onTurnStep?.(step);
   // While the voice stops for other settings: the take it hands then is theirs.
   let retuning = false;
-  const take = takeOf(voice, onTake, () => retuning);
+  const take = takeOf(onTake, () => retuning);
   /** @type {(reason: unknown) => void} */
   let end = () => {};
   const over = new Promise((_, reject) => { end = reject; });
@@ -310,75 +311,102 @@ export function tryEndOfTurn(voice, settings, { signal, quietMs = 30000, onLevel
   const wait = () => { hush(); quiet = setTimeout(() => end(trialError('trial-silence')), quietMs); };
   const told = (step) => { if (turn && turn.step !== step) { turn.step = step; tell({ step }); } };
 
-  const stops = [
-    voice.onState((state) => {
-      const was = listening, rose = state.recognising > recognising;
-      listening = state.listening;
-      recognising = state.recognising;
-      if (!live) return;
-      if (listening === 'speaking') hush();
-      else if (was === 'speaking') wait();
-      if (!turn || turn.decided) return;
-      if (rose) { turn.decided = true; told('ended'); }
-      else if (listening === 'speaking') told('speaking');
-      else if (was === 'speaking') told('pause');
-    }),
-    voice.onTurn((event) => {
-      if (!live) return;
-      if (event.phase === 'started') {
-        turn = { id: event.turn_id, decided: false, step: null };
-        hush();
-        told('speaking');
-        return;
-      }
-      if (event.turn_id !== turn?.id) return;
-      turn = null;
-      wait();
-      const text = event.phase === 'finished' ? String(event.text ?? '').trim() : '';
-      if (text) tell({ step: 'heard', text, endpoint_silence_ms: event.timings?.endpoint_silence_ms ?? null });
-      // Joined into the next turn, which tells it.
-      else if (!(event.phase === 'cancelled' && event.merged)) tell({ step: 'not-a-turn' });
-    }),
-    voice.onError((error) => end(error)),
-    ...(onLevel ? [voice.onLevel(onLevel)] : []),
-  ];
+  // The call now open, and what listens to it (its events, and its take apart: the voice hands the take as it stops).
+  let call = null, listeners = [], stopTake = () => {};
+  const attach = (opened) => {
+    call = opened;
+    stopTake = take.listen(opened);
+    listeners = [
+      opened.onState((state) => {
+        const was = listening, rose = state.recognising > recognising;
+        listening = state.listening;
+        recognising = state.recognising;
+        if (!live) return;
+        if (listening === 'speaking') hush();
+        else if (was === 'speaking') wait();
+        if (!turn || turn.decided) return;
+        if (rose) { turn.decided = true; told('ended'); }
+        else if (listening === 'speaking') told('speaking');
+        else if (was === 'speaking') told('pause');
+      }),
+      opened.onTurn((event) => {
+        if (!live) return;
+        if (event.phase === 'started') {
+          turn = { id: event.turn_id, decided: false, step: null };
+          hush();
+          told('speaking');
+          return;
+        }
+        if (event.turn_id !== turn?.id) return;
+        turn = null;
+        wait();
+        const text = event.phase === 'finished' ? String(event.text ?? '').trim() : '';
+        if (text) tell({ step: 'heard', text, endpoint_silence_ms: event.timings?.endpoint_silence_ms ?? null });
+        // Joined into the next turn, which tells it.
+        else if (!(event.phase === 'cancelled' && event.merged)) tell({ step: 'not-a-turn' });
+      }),
+      opened.onError((error) => end(error)),
+      ...(onLevel ? [opened.onLevel(onLevel)] : []),
+    ];
+  };
+  /** Stops the call open, if any, and lets go of what listens to it: its events first when `quietly` (the try is
+   *  over), after the stop otherwise (a retune). Its take, handed as it stops, is the try's unless it is retuned. */
+  async function closeCall(quietly = false) {
+    const closing = call, heard = listeners, handedTo = stopTake;
+    call = null;
+    listeners = [];
+    stopTake = () => {};
+    if (!closing) return;
+    if (quietly) for (const stop of heard) stop();
+    await closing.stop().catch(() => {});
+    if (!quietly) for (const stop of heard) stop();
+    handedTo();
+  }
 
   let current = settings;
-  /** @type {import('@sidevoice/voice').VoiceSettings | null} */
+  /** @type {import('./voice-settings.js').DeviceVoiceSettings | null} */
   let wanted = null;
   /** @type {Promise<void> | null} */
   let opening = null;
-  /** The voice started with `current` (stopped first when it ran: `again`), then with what was asked for meanwhile. */
+  // Whether a start under way still takes what `retune` asks for: until its loop ends, not until its promise settles.
+  let starting = false;
+  /** The voice started with `current` (the call before it stopped first: `again`), then with what was asked for meanwhile. */
   async function open(again) {
     live = false;
     turn = null;
     hush();
+    starting = true;
     for (;;) {
       if (again) {
         retuning = true;
-        await voice.stop().finally(() => { retuning = false; });
+        await closeCall().finally(() => { retuning = false; });
         if (finished) return;
       }
-      await voice.setSettings(current);
-      if (finished) return;
-      await take.listening();
+      attach(host.start({ input: voiceInput(current), idle_unload_minutes: current.idle_unload_minutes }, take.options));
+      await call.ready;
       if (finished) return;
       if (!wanted) break;
       current = wanted;
       wanted = null;
       again = true;
     }
+    starting = false;
     if (finished) return;
     live = true;
     wait();
     tell({ step: 'listening', again });
   }
-  const opened = (again) => (opening = open(again).catch(end).finally(() => { opening = null; }));
+  const opened = (again) => {
+    const mine = open(again).catch(end).finally(() => { if (opening === mine) opening = null; });
+    return (opening = mine);
+  };
 
-  /** @param {import('@sidevoice/voice').VoiceSettings} next */
+  /** The input half a call listens with, to tell whether other settings change it. */
+  const listeningWith = (settings) => JSON.stringify(voiceInput(settings));
+  /** @param {import('./voice-settings.js').DeviceVoiceSettings} next */
   function retune(next) {
-    if (finished || JSON.stringify(next) === JSON.stringify(wanted ?? current)) return opening ?? Promise.resolve();
-    if (opening) { wanted = next; return opening; }
+    if (finished || listeningWith(next) === listeningWith(wanted ?? current)) return opening ?? Promise.resolve();
+    if (starting) { wanted = next; return opening; }
     current = next;
     tell({ step: 'restarting' });
     return opened(true);
@@ -396,12 +424,10 @@ export function tryEndOfTurn(voice, settings, { signal, quietMs = 30000, onLevel
       live = false;
       hush();
       signal?.removeEventListener('abort', abort);
-      for (const stop of stops) stop();
       // A restart already in flight must settle before the final stop: otherwise it can reopen the microphone
       // after this try has reported cancellation and removed its take listener.
       await opening?.catch(() => {});
-      await voice.stop().catch(() => {});
-      take.stop();
+      await closeCall(true);
       take.hand();
     }
   })();

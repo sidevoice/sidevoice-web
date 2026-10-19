@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { defaultVoiceSettings, editVoiceSettings, readVoiceSettings, readyVoiceSettings, remoteProviders, voiceChoices, voiceSettingsToLoad, writeVoiceSettings, VOICE_SETTINGS_KEY } from "./voice-settings.js";
+import { defaultVoiceSettings, editVoiceSettings, readVoiceSettings, readyVoiceSettings, remoteProviders, voiceChoices, voiceEndOfTurn, voiceHalves, voiceInput, voiceOutput, voiceSettingsToLoad, writeVoiceSettings, VOICE_SETTINGS_KEY } from "./voice-settings.js";
 import type { CatalogView } from "./model-catalogs.js";
 
 /* The voice settings this device keeps, and the choices the pane offers from the engine's catalogues. */
@@ -146,4 +146,34 @@ test("a catalogue from a newer engine is read: a model without capabilities, or 
   const choices = voiceChoices(newer, defaultVoiceSettings(), ["es", "en"]);
   expect(choices.stt.options.map((option: { id: string }) => option.id)).toEqual(["whisper-base", "whisper-large", "moonshine-tiny"]);
   expect(choices.tts.options.map((option: { id: string }) => option.id)).toEqual(["kokoro-82m-v1.0"]);
+});
+
+test("a call is given its halves: the input where it listens, the output where it speaks, and the settings' own choices in each", () => {
+  const settings = {
+    ...defaultVoiceSettings(), patience: "calm" as const, idle_unload_minutes: 30,
+    stt: { catalog: "local", model: "whisper-base", language: "es", build: "whisper-base/int8" },
+    tts: { catalog: "local", model: "kokoro-82m-v1.0", voice: "ef_dora", speed: 1.1 },
+    end_of_turn: "silence" as const,
+  };
+  // Both halves: the transcriber with its language and build, a silence end of turn, the patience; the speaker with its
+  // voice and pace, and the person's language for what is said where no transcriber gives one.
+  expect(voiceHalves(settings)).toEqual({
+    input: { stt: { catalog: "local", model: "whisper-base", language: "es", build: "whisper-base/int8" }, endOfTurn: { kind: "silence" }, patience: "calm" },
+    output: { tts: { catalog: "local", model: "kokoro-82m-v1.0" }, voice: "ef_dora", speed: 1.1, language: "es" },
+    idle_unload_minutes: 30,
+  });
+  // A call that only speaks has no input half, a call that only listens no output half: nothing else of them is there.
+  expect(Object.keys(voiceHalves(settings, { input: false }))).toEqual(["output", "idle_unload_minutes"]);
+  expect(Object.keys(voiceHalves(settings, { output: false }))).toEqual(["input", "idle_unload_minutes"]);
+  expect(voiceOutput({ ...settings, tts: { ...settings.tts, build: "kokoro/fp16" } }).tts).toEqual({ catalog: "local", model: "kokoro-82m-v1.0", build: "kokoro/fp16" });
+});
+
+test("what ends a turn is the voice's: silence at the patience, or Smart with the model the settings chose", () => {
+  const settings = defaultVoiceSettings();
+  expect(voiceEndOfTurn({ ...settings, end_of_turn: "silence" })).toEqual({ kind: "silence" });
+  expect(voiceEndOfTurn({ ...settings, end_of_turn: "smart-turn" })).toEqual({ kind: "smart" });
+  expect(voiceEndOfTurn({ ...settings, end_of_turn: "smart-turn", turn_model: "smart-turn-v3" })).toEqual({ kind: "smart", model: { catalog: "local", model: "smart-turn-v3" } });
+  // A try of transcription asks for its own end of turn; the rest of the input half is the settings'.
+  expect(voiceInput({ ...settings, end_of_turn: "smart-turn" }, { kind: "silence", ms: 1500 }).endOfTurn).toEqual({ kind: "silence", ms: 1500 });
+  expect(voiceInput({ ...settings, end_of_turn: "smart-turn" }).endOfTurn).toEqual({ kind: "smart" });
 });
