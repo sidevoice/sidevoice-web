@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { installHarness } from "./harness.mjs";
 
-/* The desktop app's update. The room says it in a slim bar hanging from the window's top, over nothing of the stage (decided; a value
+/* The desktop app's update. The room says it in a pill hanging under the conversation's title, floating over the stage's tile (decided; a value
  * still stored for the gone update-notice variant changes nothing). Whatever it says — ready, available, a
  * download or an install that failed — in English or Spanish, with a long version, it stays in its place at a laptop's
  * widths, its words cut short, never its action, and the room never moves for it. In Updates, the app's row and its
@@ -93,8 +93,8 @@ const inPage = (element) => {
 };
 
 
-/** Where the room's notice sits: a bar across the window's top, clear above the stage's tile, inside the page, its × at its end and inside it,
- *  its action whole and its words cut short before it. */
+/** Where the room's notice sits: hanging just under the conversation's title and over the tile's top edge (a zero-height anchor, so it
+ *  moves nothing), inside the page, its × at its end and inside it, its action whole and its words cut short before it. */
 const noticeFits = (notice) => {
   const width = document.documentElement.clientWidth;
   const box = notice.getBoundingClientRect();
@@ -102,13 +102,14 @@ const noticeFits = (notice) => {
   const action = notice.querySelector(".update-notice-line > .ui-button");
   const text = notice.querySelector(".update-notice-text").getBoundingClientRect();
   const tile = document.querySelector(".stage-tile").getBoundingClientRect();
+  const title = document.querySelector(".stage-title")?.getBoundingClientRect();
   return {
     inside: box.left >= -0.5 && box.right <= width + 0.5,
     hideLast: notice.lastElementChild === hide,
     hideInside: hide.getBoundingClientRect().left >= box.left - 0.5 && hide.getBoundingClientRect().right <= box.right + 0.5,
     actionWhole: action.scrollWidth <= action.clientWidth + 1,
     wordsBeforeAction: text.right <= action.getBoundingClientRect().left + 0.5,
-    clear: box.bottom <= tile.top + 0.5,
+    hangs: box.top >= (title?.height ? title.bottom : 0) - 0.5 && box.top <= tile.top + 0.5,
     pageFits: document.documentElement.scrollWidth <= width + 1,
   };
 };
@@ -122,13 +123,13 @@ const roomBox = () => {
 for (const language of ["en", "es"]) {
   for (const width of [1024, 1280]) {
     for (const stored of [null, "title", "two-lines"]) {
-      test(`the bar at ${width}px in ${language}${stored ? ` (stored update-notice "${stored}")` : ""}: above the stage, its × at its end, its action whole, the room steady, whatever it says`, async ({ page }) => {
+      test(`the notice at ${width}px in ${language}${stored ? ` (stored update-notice "${stored}")` : ""}: under the title, its × at its end, its action whole, the room unmoved, whatever it says`, async ({ page }) => {
         await installHarness(page);
         await withUpdater(page, language, { state: "idle" }, stored);
         await page.setViewportSize({ width, height: 800 });
         await page.goto("/voice/");
         await expect(page.locator(".stage-tile")).toBeVisible();
-        let before = null;
+        const before = await page.evaluate(roomBox);
         const shown = page.locator(".update-notice:not([data-leaving])");
         for (const status of STATES) {
           await page.evaluate((next) => window.__pushUpdate(next), status);
@@ -136,9 +137,8 @@ for (const language of ["en", "es"]) {
           await expect(shown).toBeVisible();
           await expect(shown.locator(".update-notice-text")).toHaveAttribute("title", new RegExp(VERSION.replace(/[.+]/g, "\\$&")));
           expect(await shown.evaluate(noticeFits), label(status)).toEqual({ inside: true, hideLast: true, hideInside: true, actionWhole: true, wordsBeforeAction: true,
-            clear: true, pageFits: true });
-          // The bar takes its own row once; the room does not move again as what it says changes.
-          before ??= await page.evaluate(roomBox);
+            hangs: true, pageFits: true });
+          // It floats: the room does not move for it, nor as what it says changes.
           expect(await page.evaluate(roomBox), label(status)).toEqual(before);
         }
       });
