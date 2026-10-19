@@ -149,6 +149,8 @@ test("the person has no picture on the stage, only a bubble of their own while t
   // The agent listens to the person meanwhile, and goes on listening while it is transcribed.
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "listening");
   expect(stageAgent()).toHaveAttribute("data-mood", "listening");
+  // Its thumbnail in the sidebar acts out the same mood (never the idle step it would otherwise keep).
+  expect(rowOf("Fix the slow login").querySelector(".sv-avatar")).toHaveAttribute("data-mood", "listening");
   patch(store, { userLive: false, pendingPhase: "transcribing" });
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "listening");
   // The transcript's live draft has the same button: this is the stage's.

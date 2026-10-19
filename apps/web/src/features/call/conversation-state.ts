@@ -35,8 +35,8 @@ export function conversationState(row: ParticipantView, inCall: boolean): Conver
 }
 
 /** A small avatar (sidebar, rail, header, panel): offline while the room cannot reach it (it sleeps), working while
- *  its harness says so, idle otherwise — waiting for you included: the row's dot and line say that it hears you. A small
- *  one never speaks or listens; the stage, and the header's copy of it, do. */
+ *  its harness says so, idle otherwise — waiting for you included: the row's dot and line say that it hears you. The
+ *  conversation on the stage does not use this: its small avatar takes the stage's own mood (ConversationAvatar). */
 export function smallAvatarMood(row: Pick<ParticipantView, "reach" | "working">): AvatarMood {
   if (row.reach === "offline") return "offline";
   return row.working ? "working" : "idle";
