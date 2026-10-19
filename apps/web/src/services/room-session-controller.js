@@ -554,10 +554,10 @@ function finishReply(said,data){
  if(state.karaokeState?.segment===speechSegment(said.reply))state.karaokeState=null;
  if(!stoppingReplies)drainReplies();
 }
-function stopReplies(reason,onlyPlaying=false){
+function stopReplies(reason,stops=()=>true){
  stoppingReplies=true;
  for(const said of [...replies.values()]){
-  if(onlyPlaying&&!said.playing)continue;
+  if(!stops(said))continue;
   if(said.action!=='user_skipped')said.action=reason;
   if(said.saying)said.saying.cancel();
   else finishReply(said,{status:'unplayed',...(reason==='user_skipped'?{}:{reason})});
@@ -572,7 +572,7 @@ function drainReplies(){
   if(replies.get(said.reply.utterance_id)!==said){replyQueue.shift();continue}
   const reply=said.reply;
   const openHere=new Set([...openVoiceTurns.values(),...awaitingTurnAck.values()].filter(thread=>thread===reply.thread_id));
-  const eligibility=moving?'focus_changed':replyEligibility(reply,{sessionId:state.sessionId,threadId:targetThread(),focused:callInFocus(),epoch:threadEpochs.get(reply.thread_id),openTurns:openHere,output:speechOutput,connected:!!state.ws&&!state.reconnecting});
+  const eligibility=moving?'focus_changed':replyEligibility(reply,{sessionId:state.sessionId,threadId:targetThread(),focused:callInFocus(),epoch:threadEpochs.get(reply.thread_id),openTurns:openHere,output:speechOutput});
   if(eligibility==='hold')return;
   replyQueue.shift();
   if(eligibility!=='play'){finishReply(said,{status:'unplayed',reason:eligibility});continue}
@@ -685,12 +685,16 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
  const previousThread=targetId(),changed=state.roomBinding?.binding_id!==d.binding?.binding_id;roomStore.batch(()=>{state.roomBinding=d.binding;if(d.binding?.thread_id)rememberThread(targetId());
   if(d.binding?.thread_id)acceptEpoch(d.binding.thread_id,d.binding.epoch);
  if(changed){state.viewedThread=null;state.turns={};if(previousThread!==targetId())state.harness=Object.fromEntries(Object.entries(state.harness).filter(([id])=>id!==previousThread));
-  // A new binding on the same conversation is a rejoin, not a move: what is playing for it goes on.
-  state.pendingUserText='';state.userLive=state.botLive=false;markHistorySeen()}
+  // A new binding on the same conversation is a rejoin, not a move: what is playing for it goes on, and whether it
+  // plays is its voice's to say (`applyRoute`).
+  state.pendingUserText='';state.userLive=false;markHistorySeen()}
  updateComposer();
  const call=d.call?.id===state.sessionId?d.call:null;if(call?.error)setRoomError(roomError(call.error,'call'));});
  applyMicState();
- if(previousThread!==targetId())stopReplies('focus_changed');else drainReplies();
+ // Only the call moving to another conversation stops what it says. The room losing the conversation for a while (its
+ // machine restarting) or giving it back is no move: what the voice already says for it plays to its end (#220).
+ const now=targetId();
+ if(now&&previousThread!==now)stopReplies('focus_changed',said=>!(said.saying&&said.thread===now));else drainReplies();
  // The page follows the build of whoever serves it: this answer's only when the machine itself served the page.
  if(target===''&&linkBase(fp)==='')followServedBuild(d.room?.web_build);
  // The conversations (and each one's model and effort) come on a slower beat: the first answer asks for them at once, so
@@ -1526,9 +1530,9 @@ function routeConversation(node,thread_id,binding_id){
 }
 function applyRoute(entry){
  voice=entry?.call??null;
- // The focused call's state is the one shown: the last one it told, not the previous call's.
+ // The focused call's state is the one shown: the last one it told, not the previous call's; with none, nobody speaks.
  if(entry)voiceStateChanged(entry.state??null);
- else{voiceLevel(0);window.sidevoiceUI?.playbackLevel?.clear?.()}
+ else{voiceLevel(0);state.botLive=false;window.sidevoiceUI?.playbackLevel?.clear?.()}
 }
 async function disposeConversation(key){
  const entry=conversationCalls.get(key);if(!entry)return;
@@ -1920,10 +1924,10 @@ async function settleRejoin(epoch,hold){
 async function lostConnection(event,epoch,token=null){
  if(epoch!==connectEpoch||state.reconnecting)return;
  state.ws=null;keepTicket(true);
- stopReplies('connector_disconnected');
  window.sidevoiceTelemetry?.endCall?.('connection_lost');
- // Nothing the call is doing stops with its socket: the voice goes on hearing and speaking, and what it reports waits
- // in the outbox. The room parks the session meanwhile, so its turn and its history stay as they are here too.
+ // Nothing the call is doing stops with its socket: the voice goes on hearing and speaking — a reply already here plays
+ // to its end however long the room is away (#220) — and what it reports waits in the outbox. The room parks the
+ // session meanwhile, so its turn and its history stay as they are here too.
  if(event?.code===4401){void pairingRefused(state.callNode,{call:true,token}).catch(()=>{});return}
  if(!shouldReconnect(event)){const message=bundled('room.failure.closed');callEndedBy('failed',message.text);disconnect();failJoin(message);return}
  state.reconnecting=true;
