@@ -189,6 +189,7 @@ export const messages: Messages = {
   "transcript.close": "Fermer la transcription",
   "transcript.message": "Message écrit",
   "transcript.placeholder": "Envoyez un message",
+  "transcript.placeholderWaits": "Les messages sont conservés jusqu’au retour de l’agent",
   "transcript.send": "Envoyer",
   "transcript.sendLabel": "Envoyer le message",
   "karaoke.playing": "Lecture de cette réponse",

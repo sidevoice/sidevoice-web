@@ -467,10 +467,11 @@ function keepMessage(kind,type,data,id=crypto.randomUUID()){return outbox.add({i
 function flushOutbox(socket=state.ws){
  // A socket carries nothing until the room has answered its hello with the session it speaks for.
  if(outboxHold||!socket||socket.readyState!==WebSocket.OPEN||!state.sessionId||socket.session!==state.sessionId)return;
+ void flushTexts();
  for(let again=true;again;){
   again=false;
   for(const entry of outbox.list()){
-   if(entry.sentOn===socket)continue;
+   if(entry.sentOn===socket||entry.kind==='text')continue;
    if(entry.node!==state.callNode){outbox.remove(entry.id);continue}
    // What a reply of a replaced session became is that session's; the room ended its replies with it.
    if((entry.kind==='playback'||entry.kind==='hearing'||entry.kind==='speech')&&entry.session_id!==state.sessionId){outbox.remove(entry.id);continue}
@@ -610,8 +611,63 @@ function cancelCurrentInput(){if(!state.userTurn||state.cancelledInput)return;co
 function cancelDraft(turn){state.cancelledInput=true;state.history=state.history.filter(r=>!(r.segment===turn.segment&&r.thread===turn.thread));save();partial('');markHistorySeen()}
 function partial(text){state.pendingUserText=text||''}
 // The text box comes and goes with the call view: with none mounted there is nothing to update.
-function updateComposer(){const input=$('text-message'),send=$('text-send');if(!input||!send)return;const ready=!!(state.ws||state.reconnecting)&&!!state.sessionId&&!!targetId()&&historyThreadId()===targetId()&&!state.switching;input.disabled=!ready;send.disabled=!ready||state.textSending;const t=translator();input.placeholder=t(ready?'transcript.placeholder':'transcript.joinToWrite');}
-async function sendText(){personSignal();const input=$('text-message'),text=input?.value;if(text==null)return;if(state.textSending||!text.trim()||!state.sessionId||!targetId())return;const destination=targetThread(),key=JSON.stringify([state.sessionId,targetId(),text]);if(textAttempt?.key!==key)textAttempt={key,id:crypto.randomUUID()};const attempt=textAttempt;state.textSending=true;updateComposer();setRoomError('');try{await post('/api/presentation/text',{text,thread_id:destination,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:attempt.id});if(input.value===text)input.value='';if(textAttempt===attempt)textAttempt=null;await refreshHistory(state.callNode)}catch(e){setRoomError(roomError(e,'room',bundled('room.failure.textNotSent').text))}finally{state.textSending=false;updateComposer()}}
+/* The conversation the text box writes to, or none: the one in view while the call is up (even when the room is away, or
+ * the agent is, or no conversation has been chosen on the room yet) — never held back by whether anything answers. */
+function composerFor(){
+ const viewed=historyThreadId();
+ if(!(state.ws||state.reconnecting)||!viewed||state.switching)return null;
+ return (targetId()?viewed===targetId():conversationOf(viewed)?.node===state.callNode)?viewed:null;
+}
+const queuedTexts=()=>outbox.list().filter(entry=>entry.kind==='text');
+// Whether the room can take text now: the call is on it with this conversation chosen, its machine answers, and nothing older is waiting.
+function takesTextNow(viewed){return !!state.ws&&!!state.sessionId&&targetId()===viewed&&linkBase(state.callNode)!=null&&!queuedTexts().length}
+function updateComposer(){const input=$('text-message'),send=$('text-send');if(!input||!send)return;const viewed=composerFor(),ready=!!viewed;input.disabled=!ready;send.disabled=!ready||state.textSending;const t=translator(),waits=ready&&(!takesTextNow(viewed)||roomStore.getState().participants.find(p=>p.threadId===viewed)?.reach==='offline');input.placeholder=t(!ready?'transcript.joinToWrite':waits?'transcript.placeholderWaits':'transcript.placeholder');}
+/* Text the room cannot take now waits in the outbox under the id it will go with, its bubble pending, and goes once the room is
+ * back (`flushTexts`); a hang-up or a move first leaves it unsent (`failTexts`), the mark every message that never arrived has. */
+function queueText(viewed,text){
+ const entry=keepMessage('text','text',{thread:conversationOf(viewed).thread,text});
+ add('user',text,null,viewed,{history_id:'queued:'+entry.id,draft:false,delivery:'pending'});
+}
+function failTexts(which=()=>true){
+ const gone=queuedTexts().filter(which);
+ for(const entry of gone)outbox.remove(entry.id);
+ if(!gone.length)return;
+ const ids=new Set(gone.map(entry=>'queued:'+entry.id));
+ state.history=state.history.map(r=>ids.has(r.segment)?{...r,delivery:'not_sent'}:r);save();
+}
+// One queued text to the room, by its id (which the room takes once): 'sent', 'later' (the machine did not answer, or the call
+// changed under it, or the room is busy) or 'refused' (it said no, and will again).
+async function deliverText(entry){
+ const {thread,text}=entry.payload.data;
+ try{
+  const r=await request('/api/presentation/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,thread_id:thread,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:entry.id})},entry.node);
+  return r.ok?'sent':r.status>=500||[408,409,429].includes(r.status)?'later':'refused';
+ }catch{return 'later'}
+}
+// Oldest first, one at a time, and only on the conversation each was written for, once the call is on the room with it chosen.
+let flushingTexts=false;
+async function flushTexts(){
+ if(flushingTexts||!queuedTexts().length)return;
+ flushingTexts=true;
+ let sent=false;
+ try{
+  for(const entry of queuedTexts()){
+   const socket=state.ws;
+   if(!outbox.get(entry.id))continue;
+   if(entry.node!==state.callNode){failTexts(item=>item===entry);continue}
+   if(outboxHold||!socket||socket.readyState!==WebSocket.OPEN||socket.session!==state.sessionId||state.roomBinding?.thread_id!==entry.payload.data.thread)break;
+   const answer=await deliverText(entry);
+   if(answer==='later')break;
+   if(answer==='refused'){failTexts(item=>item===entry);continue}
+   outbox.remove(entry.id);sent=true;
+   // Its bubble gives way to the room's own row, which the history brings.
+   await refreshHistory(entry.node);
+   state.history=state.history.filter(r=>r.segment!=='queued:'+entry.id);save();
+  }
+ }finally{flushingTexts=false}
+ if(sent)flushOutbox();
+}
+async function sendText(){personSignal();const input=$('text-message'),text=input?.value;if(text==null)return;const viewed=composerFor();if(state.textSending||!text.trim()||!viewed)return;if(!takesTextNow(viewed)){queueText(viewed,text);input.value='';updateComposer();return}const destination=targetThread(),key=JSON.stringify([state.sessionId,targetId(),text]);if(textAttempt?.key!==key)textAttempt={key,id:crypto.randomUUID()};const attempt=textAttempt;state.textSending=true;updateComposer();setRoomError('');try{await post('/api/presentation/text',{text,thread_id:destination,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:attempt.id});if(input.value===text)input.value='';if(textAttempt===attempt)textAttempt=null;await refreshHistory(state.callNode)}catch(e){setRoomError(roomError(e,'room',bundled('room.failure.textNotSent').text))}finally{state.textSending=false;updateComposer()}}
 // Taken where they bubble to, not on the box itself, so a box mounted after this runs sends too.
 document.addEventListener('submit',event=>{if(event.target?.id!=='text-composer')return;event.preventDefault();return sendText()});
 document.addEventListener('keydown',event=>{if(event.target?.id==='text-message'&&event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();$('text-composer')?.requestSubmit()}});
@@ -862,7 +918,7 @@ function machinesBeat(){
   if(link?.base!=null){void refreshPeople(fp);if(fp!==state.callNode)void refreshHistory(fp)}
  }
 }
-function callBeat(){if(state.callNode==null)return;void refresh();void refreshHistory(state.callNode)}
+function callBeat(){if(state.callNode==null)return;void refresh();void refreshHistory(state.callNode);void flushTexts()}
 /* ----- pairing this device with a machine (`device-pairing.js`) ----- */
 function openPairing(note=''){roomStore.patch({pairingOpen:true,pairingNote:note})}
 function closePairing(){roomStore.patch({pairingOpen:false,pairingNote:''})}
@@ -1054,7 +1110,7 @@ async function reselectRemembered(){
  // After a reload or a reconnect this tab goes back to the conversation it was on, if it is still in the room.
  const wanted=rememberedThread();
  if(!wanted||targetId()||state.switching||!state.ws||conversationOf(wanted)?.node!==state.callNode)return false;
- if(!state.people.some(person=>personKey(person)===wanted&&person.available))return false;
+ if(!state.people.some(person=>personKey(person)===wanted))return false;
  await select(wanted);return true;
 }
 // Stats poll only while the modal is open; each opening owns its requests.
@@ -1694,7 +1750,8 @@ function disconnect() {
     // A deliberate hang-up is this app's not-heard choice for replies still pending. Offer the
     // semantic frames on the live socket before closing it; a lost frame remains unconfirmed.
     for(const said of replies.values())if(!said.terminal){if(said.action!=='user_skipped')said.action='call_ended';reportHearing(said,{status:'unplayed'})}
-    // A hang-up ends what the call still owed its session.
+    // A hang-up ends what the call still owed its session; text that never reached it is left as unsent.
+    failTexts();
     outbox.clear();
     writtenHearing.clear();
     clearTurnLifecycle();
@@ -1818,17 +1875,24 @@ async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){d
  const catalogue=state.voiceCatalogue.state==='ready'?null:loadVoiceCatalogue();
  try{
   const fp=await callMachine(epoch);if(epoch!==connectEpoch)return;
-  // From here the call is this machine's: what the voice reports is kept for it, and its reach is the one said.
+  // From here the call is this machine's: what the voice reports is kept for it, and its reach is the one said. A machine this
+  // device is not paired with (any more) is none to call; one that is merely away is not that (below).
   state.callNode=fp;
-  if(linkBase(fp)==null){const text=reachNote(state)||NO_MACHINE;reachFailure={text,node:fp};throw worded(text)}
+  const pairing=pairings.list.find(p=>p.fp===fp);
+  if(!pairing||pairing.revoked){const text=reachNote(state)||NO_MACHINE;reachFailure={text,node:fp};throw worded(text)}
   const owner=await voiceHost();if(epoch!==connectEpoch)return;voiceOwner=owner;
   await catalogue;handed=voiceSettingsToLoad(state.voiceSettings,state.voiceCatalogue.catalogs);
   if(epoch!==connectEpoch)return;
   if(rememberedOn(fp))await prepareConversationCall(fp,rememberedOn(fp),null);
   if(epoch!==connectEpoch)return;
   applyMicState();applyLockScreen(true);
-  joinStatus('room');
-  const session=await joinRoom(epoch,{resume:storedTicket(fp)});if(epoch!==connectEpoch||!session)return;
+  /* The call is the person's own audio, and no machine's: one that is away or does not answer yet does not keep it from
+   * starting. It goes on as after a drop (`lostConnection`) — the join line says why, what is written meanwhile waits —
+   * and joins the room when the machine is back. Only a room that answers and refuses this device ends the join. */
+  let session=null;
+  if(linkBase(fp)!=null){joinStatus('room');try{session=await joinRoom(epoch,{resume:storedTicket(fp)})}catch(e){if(refusedForGood(e))throw e}}
+  if(epoch!==connectEpoch)return;
+  if(!session){clearJoinStatus();void lostConnection(null,epoch);return}
   updateMic();
   const remembered=rememberedThread();if(rememberedOn(fp))joinStatus('conversation',{subject:conversationTitle(remembered)});
   await refresh();await refreshPeople(fp);
@@ -1992,6 +2056,7 @@ async function drainOutbox(node,ms,mine){
  if(mine())flushOutbox();
  while(mine()&&owed()&&Date.now()<until&&state.ws?.readyState===WebSocket.OPEN){await new Promise(resolve=>setTimeout(resolve,50));if(mine())flushOutbox()}
  if(!mine())return;
+ failTexts(entry=>entry.node===node);
  const left=outbox.list().filter(entry=>entry.node===node);
  for(const entry of left)outbox.remove(entry.id);
  if(left.length)reportClientError({kind:'move',message:'unacknowledged '+left.map(entry=>entry.kind).join(',')});
@@ -2299,11 +2364,12 @@ window.sidevoiceActions={
  // on its way to another machine, that join is left and the call joined afresh, inside the person's own tap.
  selectParticipant(key){
   window.sidevoiceUI?.playbackLevel?.clear?.();
-  const participant=state.people.find(item=>personKey(item)===key),to=conversationOf(key);
+  const to=conversationOf(key);
   state.viewedThread=key;markHistorySeen();acknowledgeDisplayedHistory();
   if(!state.sessionId)rememberThread(key);
-  // Only a machine that has proved where it is: one being looked for again is not reachable until it answers.
-  const hears=!!participant?.available&&state.machineLinks?.[to?.node]?.reach==='ok'&&linkBase(to?.node)!=null;
+  // Only a machine that has proved where it is: one being looked for again is not reachable until it answers. An agent that
+  // is away does not keep the call from its conversation: what is sent to it waits there until it is back.
+  const hears=state.machineLinks?.[to?.node]?.reach==='ok'&&linkBase(to?.node)!=null;
   if(state.connecting&&!state.sessionId&&to&&to.node!==state.callNode){if(hears){disconnect();state.viewedThread=key;void toggleCall()}}
   else if(hears)void select(key);
   updateComposer();

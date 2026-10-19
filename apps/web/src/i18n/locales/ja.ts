@@ -190,6 +190,7 @@ export const messages: Messages = {
   "transcript.close": "文字起こしを閉じる",
   "transcript.message": "テキストメッセージ",
   "transcript.placeholder": "メッセージを送信",
+  "transcript.placeholderWaits": "エージェントが戻るまでメッセージは保持されます",
   "transcript.send": "送信",
   "transcript.sendLabel": "メッセージを送信",
   "karaoke.playing": "この返答を再生中",

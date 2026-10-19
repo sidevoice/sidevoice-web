@@ -218,3 +218,14 @@ test('A delivery status not known yet has no mark and no words, never the warnin
  const {receiptView}=await moduleReady;
  for(const status of ['queued_offline','',undefined])assert.deepEqual(receiptView(status),{symbol:'',label:''},String(status));
 });
+test('A call whose machine is away still reads its conversation, and a message that never arrived says why',async()=>{
+ const api=await moduleReady;
+ api.speakWith(key=>key);
+ const row={segment:'queued:1',thread:'m|a',role:'user',text:'Hola',delivery:'pending',time:1};
+ const away=facts(api,{ws:null,reconnecting:true,sessionId:null,history:[row]});
+ assert.deepEqual(api.conversationView(away).messages.map(m=>m.text),['Hola'],'a call looking for its machine is still a call');
+ assert.deepEqual(api.conversationView(facts(api,{ws:null,sessionId:null,history:[row]})).messages,[],'one outside any call reads nothing');
+ assert.equal(api.deliveryNote(row),'');
+ assert.equal(api.deliveryNote({...row,delivery:'not_sent'}),'session.delivery.notReached');
+ assert.equal(api.deliveryNote({...row,delivery:'not_sent',audio_reason:'expired'}),'session.delivery.notReachedExpired');
+});

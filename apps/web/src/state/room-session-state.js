@@ -295,8 +295,9 @@ export function conversationView(s) {
     const id = viewedThread(s), own = s.userTurn?.thread === id, activeDraft = own ? s.userTurn.segment : null;
     // A browser outside the room reads no transcript. What was said belongs to the call, and showing it
     // to somebody who has not joined put the last thing they said, undelivered, on an empty page. The
-    // session, not the socket: a reconnection must not blank the transcript somebody is reading.
-    const records = s.sessionId ? orderedHistory(s, id) : [];
+    // session, not the socket: a reconnection must not blank the transcript somebody is reading. Nor a call that has
+    // not reached its machine yet: what is written meanwhile waits there, and says so.
+    const records = s.sessionId || inCall(s) ? orderedHistory(s, id) : [];
     const ahead = new Map();
     let sounding = 0;
     for (const r of records) {
@@ -446,7 +447,7 @@ export function createRoomSessionStore(seed = {}) {
 /** Input that never reached the conversation, said plainly under it. The tick beside the clock is for
  *  the ordinary path; a message that will never arrive is not a shade of delivered. */
 export function deliveryNote(r) {
-    if (r.role !== 'user' || r.status !== 'not_sent')
+    if (r.role !== 'user' || (r.delivery ?? r.status) !== 'not_sent')
         return '';
     return say(r.audio_reason === 'expired' ? 'session.delivery.notReachedExpired' : 'session.delivery.notReached');
 }
