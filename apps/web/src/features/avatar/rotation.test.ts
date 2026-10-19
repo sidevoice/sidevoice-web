@@ -1,9 +1,12 @@
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { IDLE_DEFS } from "./engine/bichos/idle";
 import { WORK_DURATION, type Work } from "./engine/bichos/work";
 import { holdRotation, rotationValue } from "./rotation";
 
-afterEach(() => { vi.useRealTimers(); });
+// Picks and spells are random: pin them near the top of their ranges, so a spell runs about as long as it can and a
+// test window never holds two swaps by chance (a short spell of one tool, then a short one of another: the flake).
+beforeEach(() => { vi.spyOn(Math, "random").mockReturnValue(0.99); });
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 test("a conversation's copies share one tool in hand, keep it for that tool's own spell, then pick up another", () => {
   vi.useFakeTimers();
