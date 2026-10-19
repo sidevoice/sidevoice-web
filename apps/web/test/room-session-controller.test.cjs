@@ -1285,6 +1285,7 @@ test('A call starts with its machine away: it says so, what is written meanwhile
  assert.ok(voice.calls.some(([name])=>name==='start'),'but the voice is up');
  assert.equal(s.run('roomStore.getState().call.joined'),true);
  assert.match(s.run('roomStore.getState().join.text'),/macbook/,'the join line names the machine that cannot be reached');
+ assert.deepEqual(plain(s.run("roomStore.getState().participants.map(p=>[p.threadId,p.reach])")),[['fp-mac|t-1','offline']],'and its conversation is offline, which the stage shows as the wanted poster');
  const box=s.elements.get('text-message');
  assert.equal(box.disabled,false,'the text box is not held back by it');
  assert.equal(box.placeholder,'Messages are kept until the agent is back');
@@ -1302,6 +1303,14 @@ test('A call starts with its machine away: it says so, what is written meanwhile
  assert.equal(s.run('queuedTexts().length'),0);
  assert.equal(s.run("history.some(r=>String(r.segment).startsWith('queued:'))"),false,'the room\'s own rows replace the bubbles');
  await s.run('toggleCall')();
+});
+test('A machine that is not there is no banner: the room\'s frames about it are heard, not shown; any other refusal still is',()=>{
+ const s=setup(),shown=[],frame=data=>s.run(`message(${JSON.stringify(JSON.stringify({type:'error',data}))})`);
+ s.context.window.sidevoiceUI={setBootError:error=>shown.push(error)};
+ for(const reason of ['node_offline','node_unreachable','node_timeout','choose_node'])frame({reason,message:'Esa máquina no está conectada a la sala ahora mismo.'});
+ assert.equal(shown.length,0);
+ frame({reason:'room_is_full',message:'The room already has the maximum number of browsers connected.'});
+ assert.match(shown[0].text,/maximum number of devices/);
 });
 test('Text still waiting when the call ends is left as not sent',async()=>{
  const {s,posts,write}=await callWithMachineAway();

@@ -711,7 +711,7 @@ async function select(key){
  if(to.node!==state.callNode)return moveCall(to.node,to.thread);
  state.switching=true;
  applyMicState();
- try{await post('/api/presentation/select',{thread_id:to.thread,session_id:state.sessionId});rememberThread(key);await refresh()}catch(e){setRoomError(roomError(e))}finally{state.switching=false;applyMicState()}
+ try{await post('/api/presentation/select',{thread_id:to.thread,session_id:state.sessionId});rememberThread(key);await refresh()}catch(e){if(!machineAway(e))setRoomError(roomError(e))}finally{state.switching=false;applyMicState()}
 }
 // Answers can arrive out of order, and one asked before this page had a session describes nobody: either
 // would read as the binding changing and cancel a reply just handed to this page.
@@ -1503,10 +1503,10 @@ function recordMessage(raw, socket) {
                 keepMessage('user-turn', 'voice-user-turn', words);
             flushOutbox();
             drainReplies();
-            if(!QUIET_REFUSALS.has(d.key))setRoomError(roomError(refusalError(d)));
+            if(!QUIET_REFUSALS.has(d.key)&&!machineAway(d))setRoomError(roomError(refusalError(d)));
             return;
         }
-        setRoomError(roomError(refusalError(d)));
+        if(!machineAway(d))setRoomError(roomError(refusalError(d)));
     }
 }
 /* ----- the voice's reports -----
@@ -1728,6 +1728,8 @@ function roomSocketUrl(fp){const base=linkBase(fp);if(base==null)throw worded(re
  * is a truthful answer to a question asked a moment too late, and it costs only the generic line. */
 async function roomRefusal(){try{const answer=await request('/api/presentation/admission',{cache:'no-store'});if(!answer.ok)return null;const admission=await answer.json();return admission&&typeof admission==='object'?admission:{}}catch{return null}}
 const NODE_AWAY=new Set(['node_offline','node_unreachable','node_timeout','choose_node']);
+// A machine that is not there is not a banner: its conversations show it, as the wanted poster, from its reach (participantsView).
+const machineAway=refusal=>NODE_AWAY.has(refusal?.reason||refusal?.key);
 // Why the room refused, in this page's words: its reason by its key; a refusal this page has no words for is the room
 // refusing, its own sentence behind Details.
 function admissionFailure(admission,broken){
