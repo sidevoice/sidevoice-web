@@ -1009,7 +1009,6 @@ export const messages: Messages = {
   "keys.where.browser": "Wird unverschlüsselt in diesem Browser gespeichert.",
   "keys.where.app": "Wird im Schlüsselbund des Systems gespeichert.",
   "keys.entry.rejected": "{provider} hat diesen Schlüssel nicht akzeptiert. Prüfe, ob du ihn vollständig kopiert hast.",
-  "keys.needsKey": "{provider} braucht einen Schlüssel",
   "keys.connected": "{provider} verbunden.",
   "keys.section.yours": "Deine Anbieter",
   "keys.section.yoursNone": "Noch keiner verbunden.",

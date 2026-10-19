@@ -450,6 +450,7 @@ for (const tried of [false, true]) {
     expect(title()).toHaveTextContent("Set up transcription");
     expect(document.querySelector("#wizard #stt-model")).toBeDisabled();
     expect(document.querySelector("#wizard #stt-model")).toHaveTextContent("Needs an API key");
+    expect(wizard().getByText("OpenAI API key").closest(".ui-row")).toHaveTextContent("Needs an API key");
     // Neither Continue nor Continue without trying: the try waits, saying why, and the quiet way out is the skip.
     expect(document.getElementById("wizard-stage-action")).toBeNull();
     expect(wizard().queryByRole("button", { name: "Continue" })).toBeNull();

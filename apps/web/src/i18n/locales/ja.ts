@@ -1007,7 +1007,6 @@ export const messages: Messages = {
   "keys.where.browser": "このブラウザに暗号化されずに保存されます。",
   "keys.where.app": "システムのキーチェーンに保存されます。",
   "keys.entry.rejected": "{provider} はこのキーを受け付けませんでした。キー全体をコピーしたか確認してください。",
-  "keys.needsKey": "{provider} にはキーが必要です",
   "keys.connected": "{provider} を接続しました。",
   "keys.section.yours": "あなたのプロバイダ",
   "keys.section.yoursNone": "まだ接続されていません。",

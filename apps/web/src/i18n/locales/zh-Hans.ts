@@ -1006,7 +1006,6 @@ export const messages: Messages = {
   "keys.where.browser": "以未加密形式保存在此浏览器中。",
   "keys.where.app": "保存在系统钥匙串中。",
   "keys.entry.rejected": "{provider} 不接受此密钥。请检查是否完整复制。",
-  "keys.needsKey": "{provider} 需要密钥",
   "keys.connected": "已连接 {provider}。",
   "keys.section.yours": "你的提供商",
   "keys.section.yoursNone": "尚未连接任何提供商。",

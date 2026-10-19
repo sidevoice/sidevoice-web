@@ -1021,7 +1021,6 @@ export const messages: Messages = {
   "keys.where.browser": "Se guarda en este navegador, sin cifrar.",
   "keys.where.app": "Se guarda en el llavero del sistema.",
   "keys.entry.rejected": "{provider} no aceptó esta clave. Comprueba que la copiaste entera.",
-  "keys.needsKey": "{provider} necesita una clave",
   "keys.connected": "{provider} conectado.",
   "keys.section.yours": "Tus proveedores",
   "keys.section.yoursNone": "Ninguno conectado todavía.",

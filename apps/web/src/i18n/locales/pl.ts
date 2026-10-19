@@ -1021,7 +1021,6 @@ export const messages: Messages = {
   "keys.where.browser": "Przechowywany w tej przeglądarce, bez szyfrowania.",
   "keys.where.app": "Przechowywany w pęku kluczy systemu.",
   "keys.entry.rejected": "{provider} nie przyjął tego klucza. Sprawdź, czy skopiowano go w całości.",
-  "keys.needsKey": "{provider} wymaga klucza",
   "keys.connected": "Połączono z {provider}.",
   "keys.section.yours": "Twoi dostawcy",
   "keys.section.yoursNone": "Żaden nie jest jeszcze połączony.",

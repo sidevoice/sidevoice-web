@@ -1032,7 +1032,6 @@ export const messages = {
   "keys.where.browser": "Kept in this browser, unencrypted.",
   "keys.where.app": "Kept in the system keychain.",
   "keys.entry.rejected": "{provider} didn't accept this key. Check you copied all of it.",
-  "keys.needsKey": "{provider} needs a key",
   "keys.connected": "{provider} connected.",
   "keys.section.yours": "Your providers",
   "keys.section.yoursNone": "None connected yet.",
