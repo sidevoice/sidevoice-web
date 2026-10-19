@@ -79,14 +79,24 @@ test("Shortcuts is hidden for now (sidevoice-web#148): not with a keyboard, not 
   expect(document.getElementById("pane-general")).not.toHaveAttribute("hidden");
 });
 
-test("in the desktop app Shortcuts is hidden too, and Call keeps only the call controls' setting", async () => {
+test("in the desktop app Shortcuts is hidden too, and the floating card has its own section after Call", async () => {
   inDesktopApp();
   open("whisper-base");
   expect(navLabels()).not.toContain("Shortcuts");
+  expect(navLabels().slice(3, 5)).toEqual(["Call", "Floating card"]);
   fireEvent.click(document.getElementById("settings-call")!);
   const call = document.getElementById("pane-call")!;
-  expect(await within(call).findByRole("switch", { name: "Always show the call controls" })).toBeInTheDocument();
   expect(call).not.toHaveTextContent("Mute shortcut");
+  expect(call).not.toHaveTextContent("Always show the call controls");
+  fireEvent.click(document.getElementById("settings-floating-card")!);
+  const card = document.getElementById("pane-floating-card")!;
+  // In the decided order: Style, Starting size, (Default position and Reset, where the app offers them,) Always show.
+  expect(within(card).getByRole("radio", { name: /Card/ })).toHaveAttribute("aria-checked", "true");
+  fireEvent.click(within(card).getByRole("radio", { name: /Picture in picture/ }));
+  expect(JSON.parse(localStorage.getItem("sidevoice.floatingCard")!)).toEqual({ format: "pip", size: "m" });
+  expect(within(card).getByRole("radio", { name: "Medium" })).toHaveAttribute("aria-checked", "true");
+  expect(await within(card).findByRole("switch", { name: "Always show the call controls" })).toBeInTheDocument();
+  localStorage.removeItem("sidevoice.floatingCard");
 });
 
 /** The desktop app that can reset its machine (macOS): `host.data` with deleteAll, and uninstall where it has it. */

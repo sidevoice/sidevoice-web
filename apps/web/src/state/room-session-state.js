@@ -162,6 +162,26 @@ function cardDevices(devices) {
     return { inputs: options(devices.inputs), outputs: options(devices.outputs), inputId: devices.input || '',
         outputId: outputAvailable ? devices.output || '' : '', available: true, outputAvailable, busy: false };
 }
+/** The facts the desktop's floating card draws the call from (sidevoice-web#229): the room's own components run in the card
+ *  on a store of their own, patched with these, so the card and the room project the call with the same code. Only what
+ *  the call needs, as plain data (the socket only as whether there is one); never what the person is browsing (the card
+ *  shows the call's conversation, `viewedThread` null). The history is the call's conversation's last CARD_HISTORY
+ *  records, and of the others only the replies not seen yet (their unread marks). */
+const CARD_FACTS = ['sessionId', 'roomRevision', 'roomInfo', 'connecting', 'reconnecting', 'reconnectShown', 'switching', 'roomBinding', 'people',
+    'roomSeen', 'inputReceipts', 'userLive', 'botLive', 'userTurn', 'pendingPhase', 'pendingUserText', 'cancelledInput', 'textSending', 'micEnabled',
+    'speechOutput', 'voiceState', 'holding', 'harness', 'turns', 'now', 'karaokeState', 'workingSince', 'pairings', 'machineLinks', 'callNode',
+    'audioDevices', 'movingTo', 'setupDone', 'callIdleWarning', 'callEnded', 'screenLock'];
+export const CARD_HISTORY = 40;
+export function cardFacts(s) {
+    const facts = { ws: !!s.ws, viewedThread: null };
+    for (const key of CARD_FACTS)
+        facts[key] = s[key];
+    const selected = selectedThread(s);
+    const own = s.history.filter(r => r.thread === selected);
+    const unseen = s.history.filter(r => r.thread !== selected && r.role === 'assistant' && r.seq > (s.roomSeen[r.thread] || 0));
+    facts.history = own.slice(-CARD_HISTORY).concat(unseen);
+    return facts;
+}
 /** What the desktop app's call controls card shows (sidevoice/sidevoice-desktop#4), projected from the facts: its whole
  *  snapshot (call-controls/host.ts CallSnapshot) but what its host stamps — `version`, `since`, and `devices.busy` while
  *  a device choice it carries is pending —, so the app and the preview pass it through and never map the room again
@@ -191,7 +211,9 @@ export function callCardView(s, participants = participantsView(s)) {
         idleWarning: !!s.callIdleWarning, ended: s.callEnded || null,
         busyReason, switchingTo: target ? participants.find(p => p.threadId === target)?.title || (target === selected ? title : '') : null,
         theme: s.pageTheme === 'dark' ? 'dark' : 'light', language: s.pageLanguage || 'en',
-        micSilent: !!s.ws && mic.enabled && s.voiceState?.microphone === 'muted' };
+        micSilent: !!s.ws && mic.enabled && s.voiceState?.microphone === 'muted',
+        // The floating card's formats draw the call with the room's own components from these (cardFacts).
+        facts: cardFacts(s) };
 }
 export function joinView(s) {
     if (s.joinFailure)

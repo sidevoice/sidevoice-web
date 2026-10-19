@@ -10,7 +10,7 @@ import {
   MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
   PanelLeftOpen, Pause, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
   Box, AudioWaveform, ArrowUp, ArrowLeft, ArrowRight, RefreshCcwDot, Pencil, Laptop, Server,
-  Timer, ScrollText, Link, Unlink, Search, ChevronLeft, ChevronRight, Eye, EyeOff, Square, Sparkle, ShieldCheck, Captions, CaptionsOff,
+  Timer, ScrollText, Link, Unlink, Search, ChevronLeft, ChevronRight, Eye, EyeOff, Square, Sparkle, ShieldCheck, Captions, CaptionsOff, PictureInPicture2,
 } from "lucide-react";
 import type { ComponentType } from "react";
 // Other products' own marks, from their brand kits (assets/logos/README.md: where each comes from and its rules).
@@ -130,6 +130,8 @@ export const ArrowLeftIcon = mark(ArrowLeft, 20);
 export const UpdateIcon = mark(RefreshCcwDot, 18);
 /** The call's own behaviour: your turn, the sound while the agent works, the screen. */
 export const CallSettingsIcon = mark(Phone, 16);
+/** The desktop app's floating call card, over the other apps. */
+export const FloatingCardIcon = mark(PictureInPicture2, 16);
 /** The keys for the microphone: the desktop app's global one, and those the room answers while it is in front. */
 export const ShortcutsIcon = mark(Keyboard, 16);
 /** What this device lets Sidevoice use (Settings › Permissions). */

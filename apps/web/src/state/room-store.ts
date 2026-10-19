@@ -4,6 +4,7 @@ import { translator } from "../i18n/translator";
 import { useStore } from "zustand";
 import { createMicLevelChannel } from "./mic-level";
 import { playbackLevel } from "./playback-level";
+import { openSettings } from "../features/settings/open-settings";
 
 export type RoomViewState = import('./room-session-state.js').SessionSnapshot;
 export type RoomStore = import('./room-session-state.js').SessionStore;
@@ -31,5 +32,7 @@ export function installRoomBridge(store: RoomStore) {
     setBootError: (value) => store.patch({ bootError: !value ? null : typeof value === "string" ? { text: value } : value }),
     micLevel: createMicLevelChannel(),
     playbackLevel,
+    // The desktop app opens Settings at a section from outside the page: its floating card's gear (Floating card).
+    openSettings: (section) => openSettings({ section }, store),
   };
 }

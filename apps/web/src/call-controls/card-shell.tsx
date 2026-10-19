@@ -1,7 +1,7 @@
 /* The desktop card's plumbing with its host (CallCard.tsx lays the card out around it): the host's state, the pointer's
  * nearness, the click guard, the drag, the window's size, and the two panels — the conversation picker and the
  * devices. */
-import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
+import { useEffect, useRef, useState, type ReactNode, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { ChevronIcon, HarnessIcon, MachinesIcon, MicrophoneIcon, SpeakerIcon } from "../components/ui/Icons";
 import { ConversationRows } from "../features/room/ConversationRows";
 import { hasUnread } from "../features/call/conversation-state";
@@ -79,7 +79,10 @@ export function useWave(level: number, muted: boolean): number[] {
 }
 
 export interface CardShell {
+  /** All the card shows (its body, and what opens from it): the window's size, its margin added. */
   card: RefObject<HTMLDivElement | null>;
+  /** The card's body, which the host keeps where it rests while the window grows around it; the whole card by default. */
+  body: RefObject<HTMLDivElement | null>;
   panel: Panel;
   setPanel(panel: Panel): void;
   /** The controls that wait for the pointer are shown. */
@@ -95,8 +98,10 @@ export interface CardShell {
 }
 
 /** The card's plumbing with its host. The click guard holds every command. */
-export function useCardShell(host: CallControlsHost, state: CallControlsState): CardShell {
+export function useCardShell(host: CallControlsHost, state: CallControlsState, resizable?: { minWidth: number; minHeight: number }): CardShell {
   const card = useRef<HTMLDivElement>(null);
+  const body = useRef<HTMLDivElement>(null);
+  const resizeRule = resizable ? resizable.minWidth + "x" + resizable.minHeight : "";
   const [domInside, setDomInside] = useState(false);
   const [panel, setPanel] = useState<Panel>(null);
   const guardUntil = useRef(0);
@@ -129,18 +134,23 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState): 
     const report = () => {
       const box = element.getBoundingClientRect();
       if (!box.width || !box.height) return;
+      const inner = body.current?.getBoundingClientRect();
+      const cardBox = inner && inner.width && inner.height
+        ? { x: Math.round(inner.left - box.left) + CARD_MARGIN, y: Math.round(inner.top - box.top) + CARD_MARGIN, width: Math.ceil(inner.width), height: Math.ceil(inner.height) }
+        : undefined;
       const size = { width: Math.ceil(box.width) + 2 * CARD_MARGIN, height: Math.ceil(box.height) + 2 * CARD_MARGIN };
-      const key = size.width + "x" + size.height;
+      const key = JSON.stringify([size, cardBox, resizeRule]);
       if (key === last) return;
       if (last) guardUntil.current = Date.now() + CLICK_GUARD_MS;
       last = key;
-      host.layout(size);
+      host.layout({ ...size, ...(cardBox ? { card: cardBox } : {}), ...(resizable ? { resizable } : {}) });
     };
     report();
     const observer = new ResizeObserver(report);
     observer.observe(element);
+    if (body.current && body.current !== element) observer.observe(body.current);
     return () => observer.disconnect();
-  }, [host]);
+  }, [host, resizeRule]); // eslint-disable-line react-hooks/exhaustive-deps
   // Appearing is a change too (the pointer may have just come onto the card).
   useEffect(() => { if (expanded) guardUntil.current = Math.max(guardUntil.current, Date.now() + CLICK_GUARD_MS); }, [expanded]);
 
@@ -153,9 +163,9 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState): 
       dragged.current = false;
       const target = event.target as Element;
       // A press anywhere in the card but in an open panel or on what opens it closes the panel.
-      if (panel && !target.closest(".card-panel, .card-title, .card-devices")) setPanel(null);
+      if (panel && !target.closest(".card-panel, .card-title, .card-devices, .card-conversations-button")) setPanel(null);
       // Dragging from anywhere but a button (the title counts as card): past the threshold it moves the window.
-      if (event.button > 0 || target.closest("button:not(.card-title)")) return;
+      if (event.button > 0 || target.closest("button:not(.card-title), .card-panel, .card-grip, .ui-popover")) return;
       drag.current = { x: event.screenX, y: event.screenY, moving: false, id: event.pointerId };
     },
     onPointerMove(event) {
@@ -185,7 +195,7 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState): 
       if (dragged.current) { event.stopPropagation(); event.preventDefault(); dragged.current = false; }
     },
   };
-  return { card, panel, setPanel, expanded, run, handlers };
+  return { card, body, panel, setPanel, expanded, run, handlers };
 }
 
 /** A device as the card words it: a real device keeps its own name; the system's choice, an unnamed device and a
@@ -256,7 +266,8 @@ function conversationSub(row: ParticipantView, t: Translate) {
 }
 
 /** The conversation picker: the room's rows. Which can be chosen is the caller's. */
-export function ConversationPicker({ call, disabled, onSelect, t }: { call: CallSnapshot; disabled(row: ParticipantView): boolean; onSelect(threadId: string): void; t: Translate }) {
+export function ConversationPicker({ call, disabled, onSelect, lead, t }: { call: CallSnapshot; disabled(row: ParticipantView): boolean; onSelect(threadId: string): void;
+  lead?(row: ParticipantView): ReactNode; t: Translate }) {
   return (
     <div className="card-panel conversations" aria-label={t("card.conversations")}>
       <ConversationRows
@@ -265,6 +276,7 @@ export function ConversationPicker({ call, disabled, onSelect, t }: { call: Call
         disabled={disabled}
         onSelect={onSelect}
         sub={(row) => conversationSub(row, t)}
+        lead={lead}
         aside={(row) => (hasUnread(row, null) ? <span className="card-unread" role="img" aria-label={t("state.unread")} /> : null)}
       />
     </div>

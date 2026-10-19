@@ -57,3 +57,25 @@ export function CallToolbar() {
     </footer>
   );
 }
+
+/* The call's controls alone, for the desktop app's floating card: the microphone with its level and devices, captions,
+ * skip and the call, the same components as above; no ⋮ (nothing of it belongs on a card), no join line, no transcript. */
+export function CardCallBar() {
+  const t = translator();
+  return (
+    <footer className="call-bar card-call-bar">
+      <div className="controls" id="call-controls">
+        <div className="call-actions">
+          <MicControl>
+            <span id="mic-level-meter" className="sr-only" role="meter" aria-label={t("toolbar.micLevel")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={0} />
+            <AudioDevices />
+            <MuteButton />
+          </MicControl>
+          <CaptionsButton />
+          <SkipButton />
+          <CallButton />
+        </div>
+      </div>
+    </footer>
+  );
+}

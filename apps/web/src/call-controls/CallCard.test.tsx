@@ -5,6 +5,17 @@ import type { CallControlsHost, CallControlsState, CallSnapshot } from "./host";
 import { translator } from "../i18n/translator";
 import { cardLanguage } from "./i18n";
 import { cardSnapshot } from "../test/call-card";
+import { RoomProvider } from "../app/RoomProvider";
+import { createRoomStore } from "../state/room-store";
+import { useState } from "react";
+
+vi.mock("../services/room-session-controller.js", () => ({}));
+
+/** The card as its page draws it: inside a room store of its own (card-room.ts), the title card by default. */
+function Card({ host }: { host: CallControlsHost }) {
+  const [store] = useState(createRoomStore);
+  return <RoomProvider store={store} runtime={false}><CallCard host={host} t={t} /></RoomProvider>;
+}
 
 const t = translator("en");
 
@@ -55,50 +66,68 @@ function hoverAndWait() {
 }
 const waveHeights = () => [...document.querySelectorAll(".your-wave i")].map((bar) => (bar as HTMLElement).style.height);
 
-test("at rest: the agent, the conversation, who is on it and for how long, and your wave — no controls", () => {
-  render(<CallCard host={fakeHost()} t={t} />);
-  expect(screen.getByRole("button", { name: /Sidevoice: mini call/ })).toBeInTheDocument();
+test("at rest: the agent, the conversation, where it runs, what is happening, and your wave — no controls, no clock", () => {
+  render(<Card host={fakeHost()} />);
+  expect(screen.getByText("Sidevoice: mini call")).toBeInTheDocument();
+  // The way to the other conversations: their mark, how many, ▾.
+  expect(screen.getByRole("button", { name: "Conversations (3)" })).toHaveAttribute("aria-expanded", "false");
   expect(screen.getByText("daimon")).toBeInTheDocument();
   // The harness is its mark, never its name in words.
   expect(screen.queryByText("Claude Code")).toBeNull();
   expect(document.querySelector(".card-harness .ui-logo")).toBeInTheDocument();
-  expect(screen.getByText("12:34")).toBeInTheDocument();
-  expect(screen.getByRole("img", { name: "The agent is idle" })).toBeInTheDocument();
+  expect(screen.queryByText("12:34")).toBeNull();
+  expect(screen.getByRole("img", { name: "Sidevoice: mini call · Resting" })).toBeInTheDocument();
+  expect(document.querySelector(".card-state")).toHaveTextContent("Resting");
   expect(screen.getByRole("img", { name: "Your microphone" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Hang up" })).not.toBeInTheDocument();
-  // "Open Sidevoice" and the title's chevron keep their places at rest, so nothing moves when they appear.
-  expect(document.querySelector(".card-open")).toBeInTheDocument();
-  expect(document.querySelector(".card-title-chevron")).toBeInTheDocument();
+  // × always; the gear and "open Sidevoice" are drawn at rest too, shown only near the pointer, so nothing moves.
+  expect(screen.getByRole("button", { name: "Hide for this call" })).toBeInTheDocument();
+  expect(document.querySelector(".card-actions-hover")).toBeInTheDocument();
+});
+
+test("×, the gear and open carry their commands; captions turn off from the controls, for the room too", () => {
+  localStorage.removeItem("sidevoice.captions");
+  const host = fakeHost({ alwaysExpanded: true });
+  render(<Card host={host} />);
+  act(() => { vi.advanceTimersByTime(CLICK_GUARD_MS + 10); });
+  fireEvent.click(screen.getByRole("button", { name: "Hide for this call" }));
+  fireEvent.click(screen.getByRole("button", { name: "Floating card settings" }));
+  fireEvent.click(screen.getByRole("button", { name: "Open Sidevoice" }));
+  expect(vi.mocked(host.run).mock.calls).toEqual([[{ command: "hide" }], [{ command: "open-settings" }], [{ command: "open-app" }]]);
+  fireEvent.click(screen.getByRole("button", { name: "Hide captions" }));
+  expect(localStorage.getItem("sidevoice.captions")).toBe("off");
+  expect(screen.getByRole("button", { name: "Show captions" })).toHaveAttribute("aria-pressed", "false");
+  localStorage.removeItem("sidevoice.captions");
 });
 
 test("the avatar shows only the agent, the wave only you: muted crosses the wave, not the avatar", () => {
   const host = fakeHost();
-  render(<CallCard host={host} t={t} />);
-  host.push({ call: snapshot({ agent: "speaking", micEnabled: false }) });
-  expect(screen.getByRole("img", { name: "The agent is speaking" })).toBeInTheDocument();
+  render(<Card host={host} />);
+  host.push({ call: snapshot({ agent: "speaking", mood: "speaking", micEnabled: false }) });
+  expect(screen.getByRole("img", { name: "Sidevoice: mini call · Speaking" })).toBeInTheDocument();
   expect(screen.getByRole("img", { name: "You are muted" })).toHaveAttribute("data-muted", "true");
-  expect(document.querySelector(".agent-mark")).toHaveAttribute("data-state", "speaking");
+  expect(document.querySelector(".card-state")).toHaveAttribute("data-mood", "muted");
 });
 
-test("an agent state this version does not know names the agent, never a raw key (core#112)", () => {
+test("a mood this version does not know reads as resting, never a raw key (core#112)", () => {
   const host = fakeHost();
-  render(<CallCard host={host} t={t} />);
-  host.push({ call: snapshot({ agent: "dreaming" as unknown as CallSnapshot["agent"] }) });
-  expect(screen.getByRole("img", { name: "The agent" })).toBeInTheDocument();
-  expect(document.body.innerHTML).not.toContain("card.agent.");
+  render(<Card host={host} />);
+  host.push({ call: snapshot({ mood: "dreaming" as unknown as CallSnapshot["mood"] }) });
+  expect(document.querySelector(".card-state")).toHaveTextContent("Resting");
+  expect(document.body.innerHTML).not.toContain("state.");
 });
 
 test("reconnecting overrides both and is written", () => {
   const host = fakeHost();
-  render(<CallCard host={host} t={t} />);
+  render(<Card host={host} />);
   host.push({ call: snapshot({ busy: true, agent: "working" }) });
   expect(screen.getAllByText("Reconnecting…").length).toBeGreaterThan(0);
-  expect(document.querySelector(".agent-mark")).toHaveAttribute("data-state", "reconnecting");
+  expect(document.querySelector(".card-state")).toHaveAttribute("data-mood", "reconnecting");
 });
 
 test("reconnecting is only said: muting and hanging up stay at hand", () => {
   const host = fakeHost({ alwaysExpanded: true, call: snapshot({ busy: true }) });
-  render(<CallCard host={host} t={t} />);
+  render(<Card host={host} />);
   act(() => { vi.advanceTimersByTime(CLICK_GUARD_MS + 10); });
   expect(screen.getByRole("button", { name: "Mute" })).toBeEnabled();
   expect(screen.getByRole("button", { name: "Hang up" })).toBeEnabled();
@@ -108,7 +137,7 @@ test("reconnecting is only said: muting and hanging up stay at hand", () => {
 
 test("the wave samples the level over time: silence drains it, muting flattens it", () => {
   const host = fakeHost();
-  render(<CallCard host={host} t={t} />);
+  render(<Card host={host} />);
   for (const level of [50, 60, 70, 80, 90]) {
     host.push({ level });
     act(() => { vi.advanceTimersByTime(WAVE_SAMPLE_MS); });
@@ -127,7 +156,7 @@ test("the wave samples the level over time: silence drains it, muting flattens i
 
 test("near the pointer the call controls appear; they carry the room's commands to the app", () => {
   const host = fakeHost({ call: snapshot({ canSkip: true }) });
-  render(<CallCard host={host} t={t} />);
+  render(<Card host={host} />);
   hoverAndWait();
   fireEvent.click(screen.getByRole("button", { name: "Mute" }));
   fireEvent.click(screen.getByRole("button", { name: "Skip what is playing" }));
@@ -139,7 +168,7 @@ test("near the pointer the call controls appear; they carry the room's commands 
 
 test("the app's own view of the pointer wins over the card's hover events", () => {
   const host = fakeHost({ pointerInside: false });
-  render(<CallCard host={host} t={t} />);
+  render(<Card host={host} />);
   fireEvent.pointerEnter(card());
   act(() => { vi.advanceTimersByTime(SHOW_DELAY_MS + 10); });
   expect(screen.queryByRole("button", { name: "Hang up" })).not.toBeInTheDocument();
@@ -151,7 +180,7 @@ test("the app's own view of the pointer wins over the card's hover events", () =
 test("right after the controls appear, and after any change of the card's size, buttons ignore a click", () => {
   const host = fakeHost();
   const box = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ width: 320, height: 54 } as DOMRect);
-  render(<CallCard host={host} t={t} />);
+  render(<Card host={host} />);
   fireEvent.pointerEnter(card());
   act(() => { vi.advanceTimersByTime(SHOW_DELAY_MS + 10); });
   fireEvent.click(screen.getByRole("button", { name: "Hang up" }));
@@ -163,15 +192,15 @@ test("right after the controls appear, and after any change of the card's size, 
 });
 
 test("always expanded: the controls stay without hover", () => {
-  render(<CallCard host={fakeHost({ alwaysExpanded: true })} t={t} />);
+  render(<Card host={fakeHost({ alwaysExpanded: true })} />);
   expect(screen.getByRole("button", { name: "Hang up" })).toBeInTheDocument();
 });
 
-test("the title opens the conversations below the controls, in the card's words; only one that is there can be chosen", () => {
+test("the conversations control opens them below the controls, in the card's words; only one that is there can be chosen", () => {
   const host = fakeHost();
-  render(<CallCard host={host} t={t} />);
+  render(<Card host={host} />);
   hoverAndWait();
-  fireEvent.click(screen.getByRole("button", { name: /Sidevoice: mini call/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Conversations (3)" }));
   const controls = document.querySelector(".card-controls")!;
   const panel = document.querySelector(".card-panel.conversations")!;
   expect(controls.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -187,11 +216,11 @@ test("the title opens the conversations below the controls, in the card's words;
 
 test("a panel closes on a press elsewhere in the card, on a click outside it, and after the pointer leaves", () => {
   const host = fakeHost({ outsideClicks: 0 });
-  render(<CallCard host={host} t={t} />);
+  render(<Card host={host} />);
   hoverAndWait();
-  const open = () => fireEvent.click(screen.getByRole("button", { name: /Sidevoice: mini call/ }));
+  const open = () => fireEvent.click(screen.getByRole("button", { name: "Conversations (3)" }));
   open();
-  fireEvent.pointerDown(document.querySelector(".card-avatar")!, { button: 0 });
+  fireEvent.pointerDown(document.querySelector(".card-face")!, { button: 0 });
   expect(screen.queryByText("brand/web")).not.toBeInTheDocument();
   open();
   host.push({ outsideClicks: 1 });
@@ -204,9 +233,9 @@ test("a panel closes on a press elsewhere in the card, on a click outside it, an
 
 test("a new call starts with a clean card: no panel left open from the last one", () => {
   const host = fakeHost();
-  render(<CallCard host={host} t={t} />);
+  render(<Card host={host} />);
   hoverAndWait();
-  fireEvent.click(screen.getByRole("button", { name: /Sidevoice: mini call/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Conversations (3)" }));
   expect(screen.getByText("brand/web")).toBeInTheDocument();
   host.push({ call: snapshot({ joined: false, since: null }) });
   host.push({ call: snapshot({ since: SINCE + 60_000 }) });
@@ -215,7 +244,7 @@ test("a new call starts with a clean card: no panel left open from the last one"
 
 test("the devices: the system's choice and unnamed or missing devices in the card's words; a refusal is said", () => {
   const host = fakeHost();
-  render(<CallCard host={host} t={t} />);
+  render(<Card host={host} />);
   hoverAndWait();
   fireEvent.click(screen.getByRole("button", { name: "Microphone and speaker" }));
   fireEvent.click(screen.getByRole("button", { name: /Microphone.*System default/ }));
@@ -234,7 +263,7 @@ test("devices the room cannot choose stay listed, disabled, with where to choose
   const host = fakeHost();
   const devices = { ...snapshot().devices!, outputAvailable: false };
   host.push({ call: snapshot({ devices }) });
-  render(<CallCard host={host} t={t} />);
+  render(<Card host={host} />);
   hoverAndWait();
   fireEvent.click(screen.getByRole("button", { name: "Microphone and speaker" }));
   expect(screen.getByRole("button", { name: /Speaker/ })).toBeDisabled();
@@ -242,9 +271,9 @@ test("devices the room cannot choose stay listed, disabled, with where to choose
 
 test("a press that moves is a drag of the window, not a click", () => {
   const host = fakeHost();
-  render(<CallCard host={host} t={t} />);
+  render(<Card host={host} />);
   hoverAndWait();
-  const title = screen.getByRole("button", { name: /Sidevoice: mini call/ });
+  const title = screen.getByText("Sidevoice: mini call");
   fireEvent.pointerDown(title, { button: 0, pointerId: 1, screenX: 100, screenY: 100 });
   fireEvent.pointerMove(title, { pointerId: 1, screenX: 110, screenY: 104 });
   fireEvent.pointerUp(title, { pointerId: 1, screenX: 120, screenY: 108 });
@@ -261,17 +290,18 @@ test("the window is sized to the card plus its margin, and never to nothing", ()
   const host = fakeHost();
   const box = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect");
   box.mockReturnValue({ width: 0, height: 0 } as DOMRect);
-  render(<CallCard host={host} t={t} />);
+  render(<Card host={host} />);
   expect(host.layout).not.toHaveBeenCalled();
   cleanup();
-  box.mockReturnValue({ width: 320, height: 54 } as DOMRect);
-  render(<CallCard host={host} t={t} />);
-  expect(host.layout).toHaveBeenCalledWith({ width: 344, height: 78 });
+  box.mockReturnValue({ left: 0, top: 0, width: 320, height: 54 } as DOMRect);
+  render(<Card host={host} />);
+  // The card's body is where the host keeps it as the window grows around it (captions, a list).
+  expect(host.layout).toHaveBeenCalledWith({ width: 344, height: 78, card: { x: 12, y: 12, width: 320, height: 54 } });
   box.mockRestore();
 });
 
 test("nothing outside a call", () => {
-  const { container } = render(<CallCard host={fakeHost({ call: snapshot({ joined: false }) })} t={t} />);
+  const { container } = render(<Card host={fakeHost({ call: snapshot({ joined: false }) })} />);
   expect(container).toBeEmptyDOMElement();
 });
 

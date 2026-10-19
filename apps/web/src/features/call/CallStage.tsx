@@ -117,22 +117,11 @@ function posterWords(t: Translate): PosterWords {
 export function CallStage() {
   const t = translator();
   const stage = useStageConversation();
-  const sceneRef = useSceneScale();
-  // The agent is its conversation's one state, the one its thumbnails show too (conversation-avatars.ts); the stage
-  // tells it when its balloon is up, for it to hold still under it.
-  const avatars = useConversationAvatars();
-  const avatar = useConversationAvatar(stage.threadId);
-  const holdStill = useCallback((up: boolean) => { if (stage.threadId) avatars.hold(stage.threadId, up); }, [avatars, stage.threadId]);
-  const conversation = useRoomStore((state) => state.conversation);
   const showConversations = useCallLayout((state) => state.showConversations);
-  const reply = stage.isTarget ? conversation.saying ?? null : null;
-  const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
   // A phone keeps the transcript's button in the tile's corner; a desktop has it at the bar's right (CallToolbar).
   const narrow = useMedia(NARROW_QUERY);
   // What the call runs on, behind the title (CallDetails); and whether a voice model needs something, for its dot.
   const voice = useVoiceModels();
-  // Captions off (the call bar's toggle): no balloons on the stage; the transcript keeps everything said.
-  const captions = useCaptions();
 
   if (!stage.threadId) {
     return (
@@ -147,19 +136,46 @@ export function CallStage() {
       </section>
     );
   }
-  const spec = avatarFor(stage.threadId);
-  const tone = avatarColor(spec);
+  const tone = avatarColor(avatarFor(stage.threadId));
   return (
     <section className="call-stage" aria-label={t("stage.label")}>
         <BootError />
       {/* Named above the tile where the room has no header (a desktop), in place of the tile's own name. */}
       <StageName stage={stage} className="stage-title" tone={tone} voice={voice} />
       <UpdateNotice />
-      {/* The tile keeps its form factor's shape, as a slide does: as large as the room allows, centred, the app's own
+      <StageTile />
+    </section>
+  );
+}
+
+/** The stage's tile in its slot: the conversation's agent on its scene, its balloons, its badge. The room's, and the
+ *  desktop's floating card's picture-in-picture (`card`: the tile alone, 16:9 whatever the window, without the name on
+ *  its corner or the transcript's button, which the card has elsewhere or not at all). */
+export function StageTile({ card = false }: { card?: boolean }) {
+  const t = translator();
+  const stage = useStageConversation();
+  const sceneRef = useSceneScale();
+  // The agent is its conversation's one state, the one its thumbnails show too (conversation-avatars.ts); the stage
+  // tells it when its balloon is up, for it to hold still under it.
+  const avatars = useConversationAvatars();
+  const avatar = useConversationAvatar(stage.threadId);
+  const holdStill = useCallback((up: boolean) => { if (stage.threadId) avatars.hold(stage.threadId, up); }, [avatars, stage.threadId]);
+  const conversation = useRoomStore((state) => state.conversation);
+  const reply = stage.isTarget ? conversation.saying ?? null : null;
+  const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
+  const narrow = useMedia(NARROW_QUERY);
+  const voice = useVoiceModels();
+  // Captions off (the call bar's toggle): no balloons on the stage; the transcript keeps everything said.
+  const captions = useCaptions();
+  if (!stage.threadId) return null;
+  const spec = avatarFor(stage.threadId);
+  const tone = avatarColor(spec);
+  return (
+      /* The tile keeps its form factor's shape, as a slide does: as large as the room allows, centred, the app's own
           background around it (useSceneScale fits it in its slot; call-view.css names the shapes). What the tile says —
-          the name, the voice models, the replies, the badge — is laid on the tile, at its corners. */}
+          the name, the voice models, the replies, the badge — is laid on the tile, at its corners. */
       <div ref={sceneRef} className="stage-slot">
-      <div className="stage-tile" data-mood={avatar.mood} data-app={desktopHost() ? "" : undefined} style={avatarTone(tone) as CSSProperties}>
+      <div className="stage-tile" data-mood={avatar.mood} data-app={desktopHost() ? "" : undefined} data-card={card || undefined} style={avatarTone(tone) as CSSProperties}>
         <div className="stage-canvas">
           <div className="stage-scene">
             <StageBackdrop seed={stage.threadId} tone={tone} />
@@ -169,7 +185,7 @@ export function CallStage() {
             <StageDesk seed={stage.threadId} />
           </div>
         </div>
-        <StageName stage={stage} className="stage-name" tone={tone} voice={voice} />
+        {!card && <StageName stage={stage} className="stage-name" tone={tone} voice={voice} />}
         <div className="stage-top">
           {/* Its own conversation's: another one on the stage starts with none of the replies before it. */}
           {captions && <AgentBubbles key={stage.threadId} reply={reply} spokenTo={spokenTo} onUp={holdStill} />}
@@ -179,9 +195,26 @@ export function CallStage() {
         {/* The agent's harness, model and effort, at the tile's foot (it gives the stage its touch: operator, 2026-10-15). */}
         <div className="stage-tags"><AgentBadge stage={stage} /></div>
         {captions && <PersonTurn conversation={conversation} t={t} />}
-        {narrow && <TranscriptEntry />}
+        {narrow && !card && <TranscriptEntry />}
       </div>
       </div>
-    </section>
   );
+}
+
+/** The call's conversation's balloons, the stage's own, apart from a tile: the desktop card's avatar format lays them
+ *  above or below the creature. The agent's (the reply sounding, followed as it is heard) and the person's (the voice's
+ *  bars and the room's Cancel sending, then what was sent). */
+export function StageBalloons() {
+  const t = translator();
+  const stage = useStageConversation();
+  const avatars = useConversationAvatars();
+  const holdStill = useCallback((up: boolean) => { if (stage.threadId) avatars.hold(stage.threadId, up); }, [avatars, stage.threadId]);
+  const conversation = useRoomStore((state) => state.conversation);
+  const reply = stage.isTarget ? conversation.saying ?? null : null;
+  const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
+  if (!stage.threadId) return null;
+  return <>
+    <div className="stage-top"><AgentBubbles key={stage.threadId} reply={reply} spokenTo={spokenTo} onUp={holdStill} /></div>
+    <PersonTurn conversation={conversation} t={t} />
+  </>;
 }

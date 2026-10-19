@@ -1,4 +1,5 @@
 import type { Pairing } from "./device-pairing.js";
+import type { CardCorner } from "../state/floating-card";
 
 export type LocalHostStatusName = "absent" | "installing" | "not-installed" | "stopped-by-person" | "starting" |
   "backoff" | "running" | "failed" | "service-failed" | "refused" | "incompatible";
@@ -176,10 +177,16 @@ export interface MuteShortcutBridge {
   set(accelerator: string | null): Promise<MuteShortcut>;
   subscribe?(listener: (shortcut: MuteShortcut) => void): () => void;
 }
-/** Whether the desktop app's call controls (the floating card) show always, or only while the app is minimised. */
+/** The desktop app's floating card, as the app keeps it: whether it shows always or only while the app is minimised; and
+ *  (where the app offers them) the corner a card first appears in, whether the person has moved or resized it
+ *  (`moved`), forgetting that, and showing the card a moment after a change in Settings. Its format and starting size
+ *  are this device's (state/floating-card.ts). */
 export interface CallControlsBridge {
-  settings(): Promise<{ alwaysShown: boolean }>;
+  settings(): Promise<{ alwaysShown: boolean; corner?: CardCorner; moved?: boolean }>;
   setAlwaysShown(enabled: boolean): Promise<{ alwaysShown: boolean }>;
+  setCorner?(corner: CardCorner): Promise<{ corner: CardCorner }>;
+  resetPlace?(): Promise<void>;
+  preview?(): void;
 }
 /** The app's mute shortcut and call controls settings, where it offers them (an app before them has neither). */
 export function muteShortcutBridge(): MuteShortcutBridge | null {
