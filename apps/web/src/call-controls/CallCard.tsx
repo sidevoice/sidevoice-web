@@ -1,43 +1,148 @@
-/* The desktop app's call controls card (sidevoice/sidevoice-desktop#4): a compact call surface that floats over the
- * person's other apps while the room's window is not in front.
+/* The desktop app's floating call card (sidevoice/sidevoice-desktop#4, redesigned in sidevoice-web#88): a call surface
+ * that floats over the person's other apps while the room's window is not in front. Three formats, picked in Settings →
+ * Floating card (state/floating-card.ts), as closed on 2026-10-19 (sidevoice-playground#131,
+ * briefs/UX-DECISIONS-2026-10-19.md "Call card: final"):
  *
- * The host's state and the plumbing are card-shell.tsx.
+ * - the title card (default): the conversation's avatar, its title, machine and model, what is happening, and your
+ *   wave; near the pointer, today's call controls. Its captions are plain lines, as a transcript reads.
+ * - the picture-in-picture: the room's own stage tile (StageTile) under the room's title block, and the room's call bar
+ *   (CardCallBar) under it. Its captions are the stage's balloons.
+ * - just the avatar: the conversation's creature, on nothing; the stage's balloons above or below it (their tails toward
+ *   it), and near the pointer a dock beside it (the picture's title bar and call bar, without the stage).
  *
- * Today's card, at rest, is one row: the agent (the avatar, which shows only what the agent is doing), the conversation
- * the call is on and who is on it, and your microphone (the wave, which shows only you). Near the pointer, without
- * growing wider and without moving anything, it offers the rest: the title becomes the conversation picker, "open
- * Sidevoice" appears in the slot kept for it beside your wave, and the room's call controls appear below. Panels open
- * below the controls and close by themselves. */
-import { ChevronIcon, HangupIcon, HarnessIcon, MachinesIcon, MicrophoneIcon, MicrophoneOffIcon, OpenAppIcon, SkipIcon } from "../components/ui/Icons";
-import { ConversationPicker, DevicePicker, duration, useCardShell, useHostState, useNow, useWave } from "./card-shell";
-import { hasUnread } from "../features/call/conversation-state";
+ * Every format: the conversations control (their mark, how many, ▾) right after the title, whose list drops from it; ×
+ * always (hidden for this call), the gear and "open Sidevoice" near the pointer; captions on the card's own toggle
+ * (state/captions.ts, shared with the room's call bar). What opens from the card (captions, lists) opens toward the
+ * screen's middle (`place`). The room's components draw on the card's own store (card-room.ts); the host's state and the
+ * plumbing are card-shell.tsx. */
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { CaptionsIcon, CaptionsOffIcon, ChevronIcon, CloseIcon, ConversationsIcon, HangupIcon, HarnessIcon, MachinesIcon, MicrophoneIcon,
+  MicrophoneOffIcon, OpenAppIcon, SettingsIcon, SkipIcon } from "../components/ui/Icons";
+import { Button } from "../components/ui/Button";
+import { ConversationPicker, DevicePicker, useCardShell, useHostState, useWave, type CardShell } from "./card-shell";
+import { hasUnread, moodText } from "../features/call/conversation-state";
+import { ConversationAvatar } from "../features/call/ConversationAvatar";
+import { useConversationAvatar, useConversationAvatars } from "../features/call/conversation-avatars";
+import { CharacterAvatar } from "../features/avatar/CharacterAvatar";
+import { avatarFor, avatarTone, SIDEVOICE_MASCOT, type AvatarSpec } from "../features/avatar/avatar-spec";
+import { avatarColor } from "../features/avatar/bicho-draw";
+import { StageBalloons, StageTile } from "../features/call/CallStage";
+import { CardCallBar } from "../features/call/CallToolbar";
+import { KaraokeText } from "../features/conversation/KaraokeText";
+import { VoiceWaveform } from "../features/conversation/VoiceWaveform";
+import { DeliveryMark } from "../features/conversation/MessageBubble";
+import { PagedText, PAGE_MS } from "../features/call/PagedText";
+import { SENT_LEAVING_MS, useAgentTurns, useSentTurns, useSpokenTo } from "../features/call/speech-reading";
+import { useStageConversation } from "../features/call/stage-view";
+import { useRoomStore } from "../state/room-store";
+import { receiptView } from "../state/room-session-state.js";
+import { setCaptions, useCaptions } from "../state/captions";
+import { CARD_WIDTHS, PIP_MIN_WIDTH, useFloatingCard, type CardFormat, type CardSize } from "../state/floating-card";
+import type { ParticipantView } from "../state/room-types";
 import type { CallControlsHost, CallControlsState } from "./host";
 import type { Translate } from "../i18n/translator";
 
 export { CARD_MARGIN, CLICK_GUARD_MS, DRAG_THRESHOLD_PX, HIDE_DELAY_MS, PANEL_CLOSE_MS, SHOW_DELAY_MS, WAVE_SAMPLE_MS, duration } from "./card-shell";
+import { CARD_MARGIN } from "./card-shell";
 
-/** What the avatar says of the agent: its state's words, or — a state this version does not know (sidevoice-core#112) —
- *  only that it is the agent, never the raw key. */
-function agentLabel(agent: unknown) {
-  return agent === "idle" ? "card.agent.idle" as const : agent === "working" ? "card.agent.working" as const
-    : agent === "speaking" ? "card.agent.speaking" as const : "card.agent.unknown" as const;
+type Place = NonNullable<CallControlsState["place"]>;
+const UPPER_RIGHT: Place = { vertical: "upper", horizontal: "right" };
+
+export function CallCard({ host, t }: { host: CallControlsHost; t: Translate }) {
+  const state = useHostState(host);
+  const prefs = useFloatingCard();
+  if (!state || !state.call.joined) return null;
+  // Each call gets a card of its own: nothing of the last one (a panel, the wave, a drag) carries over; nor of another
+  // format.
+  return <FloatingCard key={(state.call.since ?? "call") + prefs.format} host={host} state={state} format={prefs.format} size={prefs.size} t={t} />;
 }
 
-/** The brand mark, whose bars move with what the agent does (the mustard fourth bar is the agent's voice). */
-function AgentMark({ state }: { state: string }) {
+/** Who the card shows: the call's conversation; else the first in the list; else Sidevoice's own mascot. */
+function useCardAgent(state: CallControlsState): { threadId: string | null; spec: AvatarSpec } {
+  const threadId = state.call.conversation ?? state.call.participants[0]?.threadId ?? null;
+  return { threadId, spec: threadId ? avatarFor(threadId) : SIDEVOICE_MASCOT };
+}
+
+function FloatingCard({ host, state, format, size, t }: { host: CallControlsHost; state: CallControlsState; format: CardFormat; size: CardSize; t: Translate }) {
+  const custom = format === "pip" && state.size ? state.size : null;
+  const shell = useCardShell(host, state, format === "pip" && host.resize ? { minWidth: PIP_MIN_WIDTH + 2 * CARD_MARGIN, minHeight: 0 } : undefined);
+  const place = state.place ?? UPPER_RIGHT;
+  const captions = useCaptions();
+  const width = custom ? custom.width - 2 * CARD_MARGIN : CARD_WIDTHS[format][size];
+  const style = { "--card-w": width + "px", ...(custom ? { "--card-h": custom.height - 2 * CARD_MARGIN + "px" } : {}) } as CSSProperties;
+  const body = format === "card" ? <TitleCard state={state} shell={shell} t={t} />
+    : format === "pip" ? <PictureCard host={host} state={state} shell={shell} place={place} sized={!!custom} t={t} />
+      : <AvatarCard state={state} shell={shell} t={t} />;
   return (
-    <svg className="agent-mark" data-state={state} viewBox="0 0 24 24" aria-hidden="true">
-      <rect className="b1" x="1.5" y="9" width="3" height="6" rx="1.5" />
-      <rect className="b2" x="6" y="6" width="3" height="12" rx="1.5" />
-      <rect className="b3" x="10.5" y="1.5" width="3" height="21" rx="1.5" />
-      <rect className="b4" x="15" y="6" width="3" height="12" rx="1.5" />
-      <rect className="b5" x="19.5" y="9" width="3" height="6" rx="1.5" />
-    </svg>
+    <div ref={shell.card} className="floating-card" data-format={format} data-size={custom ? "custom" : size} data-open={place.vertical === "upper" ? "down" : "up"}
+      data-side={place.horizontal} data-expanded={shell.expanded || undefined} data-captions={captions ? "on" : "off"} style={style} {...shell.handlers}>
+      {body}
+      {shell.panel && <div className="call-card card-panel-card">
+        {shell.panel === "conversations" && <Conversations state={state} shell={shell} t={t} />}
+        {shell.panel === "devices" && <DevicePicker call={state.call} run={shell.run} t={t} />}
+      </div>}
+      {format === "card" && captions && <CaptionLines state={state} t={t} />}
+    </div>
   );
 }
 
-/** Your microphone: the last samples of its level, as the room's own meter draws them; flat and crossed out when
- *  muted, flat while reconnecting. */
+// ---------- what every format has ----------
+
+/** The way to the other conversations: their mark, how many, and ▾ (▴ while the list is down), right after the title. */
+function ConversationsButton({ state, shell, t }: { state: CallControlsState; shell: CardShell; t: Translate }) {
+  const count = state.call.participants.length;
+  const open = shell.panel === "conversations";
+  const unread = state.call.participants.some((row) => hasUnread(row, null));
+  return (
+    <button type="button" className="card-conversations-button" aria-expanded={open} aria-haspopup="dialog"
+      aria-label={t("card.conversationsCount", { n: count })} title={t("card.switchConversation")} onClick={() => shell.setPanel(open ? null : "conversations")}>
+      <ConversationsIcon size={14} /><span>{count}</span><ChevronIcon size={12} className="card-conversations-chevron" />
+      {unread && <span className="card-unread" aria-label={t("state.unread")} />}
+    </button>
+  );
+}
+
+function Conversations({ state, shell, t }: { state: CallControlsState; shell: CardShell; t: Translate }) {
+  return (
+    <ConversationPicker call={state.call} t={t}
+      // The call can only go to a conversation that is there; the room browses the others.
+      disabled={(row) => row.switching || !row.available || row.reach === "offline"}
+      lead={(row: ParticipantView) => <ConversationAvatar row={row} />}
+      onSelect={(threadId) => { shell.setPanel(null); shell.run({ command: "select-participant", threadId }); }} />
+  );
+}
+
+/** × (always), and near the pointer the gear (Settings → Floating card) and "open Sidevoice". */
+function CardActions({ shell, t, close = true }: { shell: CardShell; t: Translate; close?: boolean }) {
+  return (
+    <span className="card-actions">
+      <span className="card-actions-hover">
+        <button type="button" className="card-action" title={t("card.openApp")} aria-label={t("card.openApp")} onClick={() => shell.run({ command: "open-app" })}>
+          <OpenAppIcon size={15} />
+        </button>
+        <button type="button" className="card-action" title={t("card.settings")} aria-label={t("card.settings")} onClick={() => shell.run({ command: "open-settings" })}>
+          <SettingsIcon size={15} />
+        </button>
+      </span>
+      {close && <button type="button" className="card-action card-hide" title={t("card.hide")} aria-label={t("card.hide")} onClick={() => shell.run({ command: "hide" })}>
+        <CloseIcon size={15} />
+      </button>}
+    </span>
+  );
+}
+
+/** The agent's creature, as the stage draws it for its conversation, in the same state as every copy of it. */
+function CardFigure({ state, size, label }: { state: CallControlsState; size: "small" | "stage"; label?: string }) {
+  const agent = useCardAgent(state);
+  const avatars = useConversationAvatars();
+  const avatar = useConversationAvatar(agent.threadId);
+  return <CharacterAvatar spec={agent.spec} state={avatar} size={size} mouth="playback" label={label}
+    mouthLevel={agent.threadId ? avatars.mouth(agent.threadId) : undefined} />;
+}
+
+// ---------- A1: the title card ----------
+
+/** Your microphone: the last samples of its level; flat and crossed out when muted, flat while reconnecting. */
 function YourWave({ levels, muted, still, t }: { levels: number[]; muted: boolean; still: boolean; t: Translate }) {
   return (
     <span className="your-wave" data-muted={muted || undefined} data-still={still || undefined} role="img"
@@ -47,56 +152,39 @@ function YourWave({ levels, muted, still, t }: { levels: number[]; muted: boolea
   );
 }
 
-export function CallCard({ host, t }: { host: CallControlsHost; t: Translate }) {
-  const state = useHostState(host);
-  if (!state) return null;
-  if (!state.call.joined) return null;
-  // Each call gets a card of its own: nothing of the last one (a panel, the wave, a drag) carries over.
-  return <TodayCard key={state.call.since ?? "call"} host={host} state={state} t={t} />;
-}
-
-function TodayCard({ host, state, t }: { host: CallControlsHost; state: CallControlsState; t: Translate }) {
+function TitleCard({ state, shell, t }: { state: CallControlsState; shell: CardShell; t: Translate }) {
   const call = state.call;
-  const now = useNow(1000);
-  const shell = useCardShell(host, state);
   const { panel, setPanel, expanded, run } = shell;
-
   const muted = !call.micEnabled;
   const reconnecting = call.busy;
   const levels = useWave(state.level, muted);
-
+  const captions = useCaptions();
   const selected = call.participants.find((participant) => participant.selected);
-  const agent = reconnecting ? "reconnecting" : call.agent;
+  const agent = useCardAgent(state);
   const muteLabel = muted ? t("card.unmute") : t("card.mute");
-  const unreadElsewhere = call.participants.some((row) => hasUnread(row, null));
-
+  // What is happening, in one line: you muted, the call reconnecting, else what the agent acts out.
+  const line = reconnecting ? t("card.reconnecting") : muted ? t("card.youAreMuted") : moodText(call.mood, t);
+  const tone = agent.threadId ? avatarColor(agent.spec) : undefined;
   return (
-    <div ref={shell.card} className="call-card" data-expanded={expanded || undefined} {...shell.handlers}>
+    <div ref={shell.body} className="call-card title-card" data-expanded={expanded || undefined}>
       <div className="card-row">
-        <span className="card-avatar" data-state={agent} role="img" aria-label={reconnecting ? t("card.reconnecting") : t(agentLabel(call.agent))}>
-          <AgentMark state={agent} />
+        <span className="card-face" style={tone ? avatarTone(tone) as CSSProperties : undefined}>
+          <CardFigure state={state} size="small" label={t("stage.agentState", { title: call.title, state: moodText(call.mood, t) })} />
         </span>
         <div className="card-who">
-          <button type="button" className="card-title" aria-expanded={panel === "conversations"} title={t("card.switchConversation")}
-            onClick={() => setPanel(panel === "conversations" ? null : "conversations")}>
-            <span className="card-title-text">{call.title}</span>
-            <span className="card-title-chevron" aria-hidden="true"><ChevronIcon size={13} /></span>
-            {unreadElsewhere && <span className="card-unread" aria-label={t("state.unread")} />}
-          </button>
-          {reconnecting
-            ? <span className="card-sub reconnecting">{t("card.reconnecting")}</span>
-            : <span className="card-sub">{[
-                selected?.machine && <span key="machine" className="card-machine"><MachinesIcon size={11} /> <span>{selected.machine}</span></span>,
-                (selected?.harness || selected?.model) && <span key="harness" className="card-harness">{selected?.harness && <HarnessIcon harness={selected.harness} size={11} />} <span>{[selected?.model, selected?.effort].filter(Boolean).join(" · ")}</span></span>,
-                call.since && <span key="clock" className="card-clock">{duration(call.since, now)}</span>,
-              ].filter(Boolean).flatMap((part, i) => (i ? [<span key={"dot" + i} aria-hidden="true">·</span>, part] : [part]))}</span>}
+          <span className="card-title">
+            <span className="card-title-text" title={call.title} translate="no">{call.title}</span>
+            <ConversationsButton state={state} shell={shell} t={t} />
+          </span>
+          <span className="card-sub">{[
+            selected?.machine && <span key="machine" className="card-machine"><MachinesIcon size={11} /> <span>{selected.machine}</span></span>,
+            (selected?.harness || selected?.model) && <span key="harness" className="card-harness">{selected?.harness && <HarnessIcon harness={selected.harness} size={11} />} <span>{[selected?.model, selected?.effort].filter(Boolean).join(" · ")}</span></span>,
+          ].filter(Boolean).flatMap((part, i) => (i ? [<span key={"dot" + i} aria-hidden="true">·</span>, part] : [part]))}</span>
+          <span className="card-state" data-mood={reconnecting ? "reconnecting" : muted ? "muted" : call.mood}><i aria-hidden="true" />{line}</span>
         </div>
-        <button type="button" className="card-open" title={t("card.openApp")} aria-label={t("card.openApp")} tabIndex={expanded ? 0 : -1}
-          onClick={() => run({ command: "open-app" })}>
-          <OpenAppIcon size={15} />
-        </button>
         <YourWave levels={levels} muted={muted} still={reconnecting} t={t} />
       </div>
+      <span className="card-corner"><CardActions shell={shell} t={t} /></span>
 
       {expanded && (
         <div className="card-controls">
@@ -111,6 +199,10 @@ function TodayCard({ host, state, t }: { host: CallControlsHost; state: CallCont
               {muted ? <MicrophoneOffIcon size={17} /> : <MicrophoneIcon size={17} />}
             </button>
           </span>
+          <button type="button" className="card-captions" aria-pressed={captions} title={t(captions ? "toolbar.captionsHide" : "toolbar.captionsShow")}
+            aria-label={t(captions ? "toolbar.captionsHide" : "toolbar.captionsShow")} onClick={() => setCaptions(!captions)}>
+            {captions ? <CaptionsIcon size={17} /> : <CaptionsOffIcon size={17} />}
+          </button>
           <button type="button" className="card-skip" disabled={!call.canSkip} title={t("card.skip")} aria-label={t("card.skip")} onClick={() => run({ command: "skip-reply" })}>
             <SkipIcon size={17} />
           </button>
@@ -119,15 +211,130 @@ function TodayCard({ host, state, t }: { host: CallControlsHost; state: CallCont
           </button>
         </div>
       )}
+    </div>
+  );
+}
 
-      {panel === "conversations" && (
-        <ConversationPicker call={call} t={t}
-          // The call can only go to a conversation that is there; the room browses the others.
-          disabled={(row) => row.switching || !row.available || row.reach === "offline"}
-          onSelect={(threadId) => { setPanel(null); run({ command: "select-participant", threadId }); }} />
+/** The title card's captions: what is being said, as a transcript reads — a line per speaker, its name over it. The
+ *  agent's reply lit as it is heard, a few lines at a time; yours, the voice's bars (and the room's Cancel sending) while
+ *  you speak and it is transcribed, then what was sent, for its moment. */
+function CaptionLines({ state, t }: { state: CallControlsState; t: Translate }) {
+  const stage = useStageConversation();
+  const conversation = useRoomStore((store) => store.conversation);
+  const reply = stage.isTarget ? conversation.saying ?? null : null;
+  const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
+  const said = useAgentTurns(reply, spokenTo).filter((turn) => !turn.leaving).at(-1) ?? null;
+  const { turns, done } = useSentTurns(conversation);
+  const sent = turns.filter((turn) => turn.thread === conversation.thread).at(-1) ?? null;
+  useEffect(() => {
+    if (!sent) return;
+    const timer = window.setTimeout(() => done(sent.key), PAGE_MS + SENT_LEAVING_MS);
+    return () => window.clearTimeout(timer);
+  }, [sent, done]);
+  const pending = !!conversation.pendingPhase;
+  const delivery = sent ? conversation.messages.find((message) => message.role === "user" && (message.segment ?? String(message.time)) === sent.key)?.delivery : undefined;
+  const receipt = delivery && receiptView(delivery).label ? delivery : null;
+  const lines: ReactNode[] = [];
+  if (said) lines.push(
+    <p key="agent" className="caption-line" data-role="assistant">
+      <b translate="no">{state.call.title}</b>
+      <PagedText measure={said.text} follow=".karaoke-played" lines={2} turn="page" fixed>
+        <KaraokeText text={said.text} playback="playing" range={said.spoken > 0 ? { from: 0, to: Math.min(said.spoken, said.text.length) } : null} />
+      </PagedText>
+    </p>);
+  if (pending) lines.push(
+    <p key="you" className="caption-line" data-role="user">
+      <b>{t("card.you")}</b>
+      <span className="caption-live">
+        <VoiceWaveform phase={conversation.pendingPhase === "transcribing" ? "transcribing" : "listening"} />
+        {conversation.pendingCancellable && <Button variant="ghost" tone="neutral" size="sm" className="cancel-input"
+          onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("stage.cancelTurn")}</Button>}
+      </span>
+    </p>);
+  else if (sent) lines.push(
+    <p key={sent.key} className="caption-line" data-role="user">
+      <b>{t("card.you")}</b>
+      <span>{sent.text}{receipt && <span className="receipt" data-state={receipt} role="status" aria-label={receiptView(receipt).label}><DeliveryMark state={receipt} /></span>}</span>
+    </p>);
+  if (!lines.length) return null;
+  return <div className="call-card card-captions-lines" aria-live="off">{lines}</div>;
+}
+
+// ---------- B1: the picture-in-picture ----------
+
+/** The room's title block for the call's conversation: its title, then its machine on the line under it (`machine`). */
+function CardHeading({ state, shell, t, machine = true }: { state: CallControlsState; shell: CardShell; t: Translate; machine?: boolean }) {
+  const stage = useStageConversation();
+  const title = stage.title || state.call.title;
+  const host = stage.row?.machine ?? state.call.participants.find((row) => row.selected)?.machine ?? null;
+  return (
+    <header className="card-heading" translate="no">
+      <span className="card-heading-name">
+        <span className="card-heading-title" title={title}>{title}</span>
+        <ConversationsButton state={state} shell={shell} t={t} />
+      </span>
+      {machine && host && <span className="stage-machine"><MachinesIcon size={12} /><span>{host}</span></span>}
+      <CardActions shell={shell} t={t} />
+    </header>
+  );
+}
+
+/** The resize grip, in the corner toward the screen's middle: the host follows the pointer and keeps the size. */
+function ResizeGrip({ host, place }: { host: CallControlsHost; place: Place }) {
+  const edge = ((place.vertical === "upper" ? "s" : "n") + (place.horizontal === "right" ? "w" : "e")) as "nw" | "ne" | "sw" | "se";
+  const active = useRef<number | null>(null);
+  if (!host.resize) return null;
+  return <span className="card-grip" data-edge={edge} aria-hidden="true"
+    onPointerDown={(event) => { if (event.button > 0) return; active.current = event.pointerId; event.currentTarget.setPointerCapture?.(event.pointerId); host.resize!("start", edge); }}
+    onPointerMove={(event) => { if (active.current === event.pointerId) host.resize!("move", edge); }}
+    onPointerUp={(event) => { if (active.current !== event.pointerId) return; active.current = null; host.resize!("end", edge); }}
+    onPointerCancel={() => { if (active.current === null) return; active.current = null; host.resize!("end", edge); }} />;
+}
+
+function PictureCard({ host, state, shell, place, sized, t }: { host: CallControlsHost; state: CallControlsState; shell: CardShell; place: Place; sized: boolean; t: Translate }) {
+  return (
+    <div ref={shell.body} className="picture-card" data-sized={sized || undefined}>
+      <CardHeading state={state} shell={shell} t={t} />
+      <div className="picture-stage"><StageTile card /></div>
+      <CardCallBar />
+      <ResizeGrip host={host} place={place} />
+    </div>
+  );
+}
+
+// ---------- C1: just the avatar ----------
+
+function AvatarCard({ state, shell, t }: { state: CallControlsState; shell: CardShell; t: Translate }) {
+  const captions = useCaptions();
+  const opensDown = (state.place ?? UPPER_RIGHT).vertical === "upper";
+  const [balloonsUp, setBalloonsUp] = useState(false);
+  const balloons = useRef<HTMLDivElement>(null);
+  // Whether a balloon is out, for the stack to take room only then (the window is the creature's box at rest).
+  useEffect(() => {
+    const node = balloons.current;
+    if (!node) return;
+    const read = () => setBalloonsUp(!!node.querySelector(".speech-bubble"));
+    read();
+    const observer = new MutationObserver(read);
+    observer.observe(node, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [captions]);
+  return (
+    // A grid: the creature, its balloons on the side toward the screen's middle (above or below), and the dock beside it,
+    // level with it, on its open side (call-card.css). All of it in the window's flow, so the window holds what shows.
+    <div className="avatar-card" data-balloons={balloonsUp || undefined}>
+      <div ref={shell.body} className="avatar-figure">
+        <CardFigure state={state} size="stage" label={t("stage.agentState", { title: state.call.title, state: moodText(state.call.mood, t) })} />
+      </div>
+      {captions && <div ref={balloons} className={"avatar-balloons" + (opensDown ? " balloon--tail-up" : "")}>
+        <StageBalloons />
+      </div>}
+      {shell.expanded && (
+        <div className="avatar-dock">
+          <CardHeading state={state} shell={shell} t={t} machine={false} />
+          <CardCallBar />
+        </div>
       )}
-
-      {panel === "devices" && <DevicePicker call={call} run={run} t={t} />}
     </div>
   );
 }

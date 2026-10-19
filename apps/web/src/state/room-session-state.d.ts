@@ -169,7 +169,13 @@ export interface CallCardView {
  theme: 'light' | 'dark'; language: string;
  /** FC13: the microphone gives no sound though it is not muted (another app holds it). */
  micSilent: boolean;
+ /** The facts the floating card's formats draw the call from, with the room's own components (cardFacts). */
+ facts: CardFacts;
 }
+/** The facts a card's store is patched with: plain data, the socket only as whether there is one (sidevoice-web#229). */
+export type CardFacts = Partial<Omit<SessionFacts, 'ws'>> & { ws: boolean; viewedThread: null; history: ChatMessage[] };
+export const CARD_HISTORY: number;
+export function cardFacts(s: SessionFacts): CardFacts;
 export function callCardView(s: SessionFacts, participants?: ParticipantView[]): CallCardView;
 /** The conversation hears the person right now. */
 export function canHear(row: Pick<ParticipantView, 'available' | 'reach'>): boolean;

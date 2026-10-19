@@ -1,7 +1,7 @@
 import { Fragment, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { OverlayPortalProvider, Tooltip } from "../../components/ui/Tooltip";
-import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ShortcutsIcon, PermissionsIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon, UpdateIcon, WarningIcon } from "../../components/ui/Icons";
+import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, FloatingCardIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ShortcutsIcon, PermissionsIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon, UpdateIcon, WarningIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { Select } from "../../components/ui/Select";
 import { LanguagePicker } from "../../components/ui/LanguagePicker";
@@ -18,7 +18,7 @@ import { DeleteUnusedChoice, DownloadedModels } from "./DownloadedModels";
 import { DangerZone } from "./DangerZone";
 import { AudioDeviceRows } from "../call/AudioDevices";
 import { DeviceNameField } from "./DeviceNameField";
-import { DesktopCallSettings } from "./DesktopCallSettings";
+import { FloatingCardSettings, useFloatingCardSection } from "./FloatingCardSettings";
 import { desktopHost } from "../../services/desktop-host";
 import { PermissionsSettings } from "./PermissionsSettings";
 import { useMicrophoneAccess } from "../permissions/permission-view";
@@ -52,6 +52,7 @@ const SECTIONS: { id: string; label: MessageKey; icon: (size?: number) => ReactN
   { id: "transcription", label: "settings.section.transcription", icon: (size) => <TranscriptionIcon size={size} /> },
   { id: "voice", label: "settings.section.voice", icon: (size) => <VoicesIcon size={size} /> },
   { id: "call", label: "settings.section.call", icon: (size) => <CallSettingsIcon size={size} /> },
+  { id: "floating-card", label: "settings.section.floatingCard", icon: (size) => <FloatingCardIcon size={size} /> },
   // What the call needs this device to allow (the microphone), next to where its devices are chosen.
   { id: "permissions", label: "settings.section.permissions", icon: (size) => <PermissionsIcon size={size} /> },
   // The keys for the microphone: in the desktop app, or wherever there is a keyboard (ShortcutsSettings).
@@ -127,7 +128,6 @@ function CallSettings({ t, microphone }: { t: Translate; microphone: MicrophoneS
         <Segmented size="sm" label={t("settings.call.presence")} value={prefs.presence} onChange={(value) => set({ presence: value })}
           items={presence.map((option) => ({ value: option.value, label: t(option.label) }))} />
       </Row>
-      <DesktopCallSettings t={t} />
     </Group>
     {/* The desktop app keeps its computer awake as any app does; holding the screen on is for a browser or a phone. */}
     {!desktopHost() && <Group title={t("settings.call.device")}>
@@ -266,8 +266,10 @@ export function SettingsDialog() {
   // something to ask (not in an app that asks for itself when its call opens, nor a page with no microphone).
   const mic = useMicrophoneAccess();
   const permissionsShown = mic.microphone?.state !== "none";
+  const floatingCardShown = useFloatingCardSection();
   const sections = SECTIONS.filter((section) => (section.id !== "this-computer" || ownComputer) && (section.id !== "updates" || updatesShown)
-    && (section.id !== "shortcuts" || shortcutsShown) && (section.id !== "permissions" || permissionsShown));
+    && (section.id !== "shortcuts" || shortcutsShown) && (section.id !== "permissions" || permissionsShown)
+    && (section.id !== "floating-card" || floatingCardShown));
   // Updates shown as the last machine behind is updated (a browser, a phone), or Shortcuts as the mouse or trackpad
   // goes (a tablet's keyboard taken off): General.
   useEffect(() => {
@@ -346,6 +348,7 @@ export function SettingsDialog() {
                 <Pane id="transcription" current={current}><SlotSection id="transcription" t={t} /></Pane>
                 <Pane id="voice" current={current}><SlotSection id="voice" t={t} /></Pane>
                 <Pane id="call" current={current}><CallSettings t={t} microphone={mic.microphone} /></Pane>
+                {floatingCardShown && <Pane id="floating-card" current={current}><FloatingCardSettings t={t} /></Pane>}
                 {permissionsShown && <Pane id="permissions" current={current}><PermissionsSettings t={t} access={mic.access} microphone={mic.microphone} /></Pane>}
                 {shortcutsShown && <Pane id="shortcuts" current={current}><ShortcutsSettings t={t} /></Pane>}
                 <Pane id="providers" current={current}><ProviderKeys /></Pane>

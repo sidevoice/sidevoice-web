@@ -45,6 +45,12 @@ function renderShot(shot: Shot) {
       status: async () => status, settings: async () => ({ mode }), setMode: async () => ({ mode }), subscribe: () => noop,
       check: async () => status, download: async () => status, cancel: async () => undefined, restart: later } } };
   }
+  if (shot.floatingCard) {
+    const host = (window as unknown as { __sidevoiceDesktop?: { host: Record<string, unknown> } }).__sidevoiceDesktop?.host ?? {};
+    (window as unknown as { __sidevoiceDesktop: unknown }).__sidevoiceDesktop = { host: { ...host, callControls: {
+      settings: async () => ({ alwaysShown: false, corner: "tr", moved: true }), setAlwaysShown: async (alwaysShown: boolean) => ({ alwaysShown }),
+      setCorner: async (corner: string) => ({ corner }), resetPlace: later, preview: noop } } };
+  }
   if (shot.desktop) {
     const status = shot.desktop.state as Record<string, unknown>;
     const host = (window as unknown as { __sidevoiceDesktop?: { host: Record<string, unknown> } }).__sidevoiceDesktop?.host ?? {};
