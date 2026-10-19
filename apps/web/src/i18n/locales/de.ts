@@ -786,7 +786,6 @@ export const messages: Messages = {
   "voice.prepare.download": "Herunterladen",
   "voice.prepare.cancel": "Abbrechen",
   "voice.prepare.retry": "Erneut versuchen",
-  "voice.prepare.addKey": "Schlüssel hinzufügen",
   "voice.prepare.downloading": "Wird heruntergeladen…",
   "voice.prepare.downloadingAt": "Download… {percent} %",
   "voice.prepare.progress": "{done} von {size}",

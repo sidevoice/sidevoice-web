@@ -398,6 +398,35 @@ test("a provider chosen without its key asks for it in the setup as Settings doe
   expect(document.querySelector("#wizard[open]")).toBe(wizard);
 }, WHOLE_APP_MS);
 
+// A remote provider without its key (sidevoice-web#206): its model cannot be chosen, and the step's own way on is not
+// offered either — settings tried while the key was there included. Skipping the step, or adding the key, are the ways on.
+for (const tried of [false, true]) {
+  test(`a provider without its key holds the voice step${tried ? ", settings tried while the key was there too" : ""}: no Continue, its model disabled, only skipping goes on`, async () => {
+    const openai = { id: "openai", name: "OpenAI", status: { stale: false, reason: { code: "credential-missing", params: {} } }, models: [] };
+    const slot = { catalog: "openai", model: "", language: null };
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "remote", ...(tried ? { trials: { stt: trialKey(slot) } } : {}) }));
+    const store = room();
+    act(() => store.patch({ voiceCatalogue: { state: "ready", catalogs: [...CATALOGS, openai] as unknown as CatalogView[], error: "" },
+      voiceSettings: { ...defaultVoiceSettings(), stt: slot }, providerKeys: { openai: false } }));
+    paired(store);
+    // Tried, the step is settled: the setup comes back to it with Back.
+    if (tried) await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Back" })); });
+    expect(title()).toHaveTextContent("Set up transcription");
+    expect(document.querySelector("#wizard #stt-model")).toBeDisabled();
+    expect(document.querySelector("#wizard #stt-model")).toHaveTextContent("Needs an API key");
+    // Neither Continue nor Continue without trying: the try waits, saying why, and the quiet way out is the skip.
+    expect(document.getElementById("wizard-stage-action")).toBeNull();
+    expect(wizard().queryByRole("button", { name: "Continue" })).toBeNull();
+    expect(tryButton()).toHaveAttribute("aria-disabled", "true");
+    await act(async () => { fireEvent.click(tryButton()); });
+    expect(actions.tryVoiceSettings).not.toHaveBeenCalled();
+    expect(title()).toHaveTextContent("Set up transcription");
+    await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Continue without transcription" })); });
+    expect(title()).toHaveTextContent("Set up voice");
+    expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).stt_skipped).toBe(true);
+  }, WHOLE_APP_MS);
+}
+
 /** Back pressed from wherever the setup stands to its first step: each step it lands on, read again once everything
  *  pending has run — a step that moved on by itself would read as the next one. */
 async function walkBack() {

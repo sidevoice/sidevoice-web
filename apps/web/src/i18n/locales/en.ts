@@ -800,7 +800,6 @@ export const messages = {
   "voice.prepare.download": "Download",
   "voice.prepare.cancel": "Cancel",
   "voice.prepare.retry": "Retry",
-  "voice.prepare.addKey": "Add key",
   "voice.prepare.downloading": "Downloading…",
   "voice.prepare.downloadingAt": "Downloading… {percent}%",
   "voice.prepare.progress": "{done} of {size}",

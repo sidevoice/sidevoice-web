@@ -10,6 +10,7 @@ import type { CatalogView } from "../../services/model-catalogs.js";
 import type { ModelBuild } from "@sidevoice/engine";
 import { chooseOption, listOptions } from "../../test/select";
 import { setUiLanguage } from "../../i18n/translator";
+import { VARIANTS_KEY } from "../../lib/variants";
 
 afterEach(() => { cleanup(); localStorage.removeItem("sidevoice.variants"); });
 
@@ -638,4 +639,62 @@ test("a provider chosen without its key says so in a row with Connect, which ope
     expect(screen.getByText("OpenAI connected.")).toHaveAttribute("role", "status");
     expect(document.activeElement).toBe(document.getElementById("stt-source"));
   }
+});
+
+/* A remote provider without its key (sidevoice-web#206): nothing of its models can be chosen or tried, so the Model
+ * dropdown is disabled, and the key is the one way on. Two looks are open (the `keylessProvider` variant). */
+const keyless = (model = "") => ({ voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "openai", model, language: null } } });
+const modelBox = () => document.getElementById("stt-model") as HTMLButtonElement;
+
+test("a provider without its key: the Model dropdown stays, disabled, saying 'Needs an API key' — the key's row asks for it, and nothing else repeats it", () => {
+  renderPane(keyless());
+  expect(modelBox()).toBeDisabled();
+  expect(modelBox()).toHaveTextContent("Needs an API key");
+  expect(screen.getByText("OpenAI needs a key")).toBeInTheDocument();
+  // Said once, in the dropdown: no badge under it, and no "Add key" beside one.
+  expect(screen.getAllByText("Needs an API key")).toHaveLength(1);
+  expect(document.getElementById("stt-model-card")!.querySelector(".model-prepare-status")).toBeNull();
+});
+
+test("a model kept from when the key was there is not offered either: the dropdown says what it needs, not the model", () => {
+  renderPane(keyless("gpt-4o-transcribe"));
+  expect(modelBox()).toBeDisabled();
+  expect(modelBox()).toHaveTextContent("Needs an API key");
+  expect(modelBox()).not.toHaveTextContent("gpt-4o-transcribe");
+  // The note about that model has nothing to say while the whole provider is without its key.
+  expect(document.getElementById("stt-model-card")!.querySelector(".model-prepare-meta")).toBeNull();
+});
+
+test("the other look: the key's own line carries the badge ('OpenAI API key', Needs an API key, Connect), and the Model dropdown is disabled and empty", () => {
+  localStorage.setItem(VARIANTS_KEY, JSON.stringify({ keylessProvider: "key" }));
+  renderPane(keyless());
+  const row = screen.getByText("OpenAI API key").closest(".ui-row") as HTMLElement;
+  expect(within(row).getByText("Needs an API key")).toBeInTheDocument();
+  expect(within(row).getByRole("button", { name: "Connect OpenAI" })).toBeInTheDocument();
+  expect(screen.queryByText("OpenAI needs a key")).toBeNull();
+  expect(screen.getAllByText("Needs an API key")).toHaveLength(1);
+  expect(modelBox()).toBeDisabled();
+  expect(modelBox()).not.toHaveTextContent("Needs an API key");
+});
+
+test("a provider with its key, and this device, keep the Model dropdown usable; connecting the key gives it back", async () => {
+  for (const look of ["model", "key"]) {
+    localStorage.setItem(VARIANTS_KEY, JSON.stringify({ keylessProvider: look }));
+    const { actions, store } = renderPane(keyless());
+    expect(modelBox()).toBeDisabled();
+    actions.saveProviderKey.mockImplementation(async (provider: string) => store.patch({ providerKeys: { openai: true, elevenlabs: true },
+      voiceCatalogue: { state: "ready", error: "", catalogs: catalogs.map((catalog) => catalog.id === provider ? { ...catalog, status: { stale: false }, models: [{ id: "gpt-4o-transcribe", capabilities: ["stt"], languages: [], voices: [] }] } : catalog) } }));
+    fireEvent.click(screen.getByRole("button", { name: "Connect OpenAI" }));
+    const field = within(screen.getByRole("dialog", { name: "Connect OpenAI" })).getByLabelText("API key");
+    fireEvent.change(field, { target: { value: "sk-test-1234" } });
+    await act(async () => { fireEvent.keyDown(field, { key: "Enter" }); });
+    expect(modelBox()).not.toBeDisabled();
+    cleanup();
+  }
+  renderPane({ voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "elevenlabs", model: "scribe_v2", language: null } } });
+  expect(modelBox()).not.toBeDisabled();
+  expect(modelBox()).toHaveTextContent("scribe_v2");
+  cleanup();
+  renderPane();
+  expect(modelBox()).not.toBeDisabled();
 });

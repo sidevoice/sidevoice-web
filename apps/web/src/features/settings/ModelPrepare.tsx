@@ -11,13 +11,13 @@ import "./model-prepare.css";
 /* A chosen model made ready on this device, the same block wherever a model is chosen (the first-run setup, Settings):
  * the pickers on top, a line about the choice, then where it stands — to download (its size, said before anything is
  * fetched), downloading (how far, and cancel), being checked and loaded, ready (and its try, all of it in the block),
- * failed (why, and retry), or a provider's model without its key. The status area keeps its height across states, so
+ * failed (why, and retry). The status area keeps its height across states, so
  * nothing below it jumps.
  *
  * It only draws a state; what moves it on is the caller's. In Settings a model chosen before it is ready waits, the one in
  * use staying (`pending` says so) and switching once it is; the first-run setup's Continue waits for it. */
 
-export type PrepareStatus = "absent" | "downloading" | "verifying" | "loading" | "ready" | "failed" | "needs-key";
+export type PrepareStatus = "absent" | "downloading" | "verifying" | "loading" | "ready" | "failed";
 
 export interface ModelPrepareProps {
   /** A line under the status: here, that the model in use stays until this one is ready ("Will switch when ready"). */
@@ -46,13 +46,12 @@ export interface ModelPrepareProps {
   onDownload?: () => void;
   onCancel?: () => void;
   onRetry?: () => void;
-  onAddKey?: () => void;
   id?: string;
   /** Its actions' ids: `<prefix>-download`, `-cancel`, `-retry`. */
   actionIds?: string;
 }
 
-export function ModelPrepare({ pending, runtime, status, model, pickers, meta, size = null, fraction = null, error, errorDetails, readyAction, readyPanel, onDownload, onCancel, onRetry, onAddKey, id, actionIds }: ModelPrepareProps) {
+export function ModelPrepare({ pending, runtime, status, model, pickers, meta, size = null, fraction = null, error, errorDetails, readyAction, readyPanel, onDownload, onCancel, onRetry, id, actionIds }: ModelPrepareProps) {
   const actionId = (name: string) => actionIds ? actionIds + "-" + name : undefined;
   const t = translator();
   const hintId = useId();
@@ -90,10 +89,6 @@ export function ModelPrepare({ pending, runtime, status, model, pickers, meta, s
             <span className="model-prepare-note">{sized ? t("voice.prepare.onDevice", { size: sized }) : t("voice.prepare.noDownload")}</span>
           </div>
           {readyAction}
-        </>}
-        {status === "needs-key" && <>
-          <div className="model-prepare-state"><Badge tone="warning" dot>{t("voice.prepare.badge.needsKey")}</Badge></div>
-          {onAddKey && <Button size="sm" variant="ghost" onClick={onAddKey}>{t("voice.prepare.addKey")}</Button>}
         </>}
         {status === "failed" && <Alert tone="danger" live className="model-prepare-alert" title={t("voice.prepare.failed", { model })}
           details={errorDetails}

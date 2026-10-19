@@ -793,7 +793,6 @@ export const messages: Messages = {
   "voice.prepare.download": "Scarica",
   "voice.prepare.cancel": "Annulla",
   "voice.prepare.retry": "Riprova",
-  "voice.prepare.addKey": "Aggiungi chiave",
   "voice.prepare.downloading": "Download…",
   "voice.prepare.downloadingAt": "Download… {percent}%",
   "voice.prepare.progress": "{done} di {size}",

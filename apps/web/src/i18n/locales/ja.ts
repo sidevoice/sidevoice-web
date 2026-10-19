@@ -784,7 +784,6 @@ export const messages: Messages = {
   "voice.prepare.download": "ダウンロード",
   "voice.prepare.cancel": "キャンセル",
   "voice.prepare.retry": "再試行",
-  "voice.prepare.addKey": "キーを追加",
   "voice.prepare.downloading": "ダウンロード中…",
   "voice.prepare.downloadingAt": "ダウンロード中… {percent}%",
   "voice.prepare.progress": "{done} / {size}",

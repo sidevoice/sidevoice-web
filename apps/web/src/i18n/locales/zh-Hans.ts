@@ -783,7 +783,6 @@ export const messages: Messages = {
   "voice.prepare.download": "下载",
   "voice.prepare.cancel": "取消",
   "voice.prepare.retry": "重试",
-  "voice.prepare.addKey": "添加密钥",
   "voice.prepare.downloading": "正在下载…",
   "voice.prepare.downloadingAt": "正在下载… {percent}%",
   "voice.prepare.progress": "{done} / {size}",
