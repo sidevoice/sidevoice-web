@@ -22,7 +22,7 @@ interface LanguagePickerProps {
 const fold = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase();
 
 /** Searchable language choices, shared by interface, transcription and voice filtering. */
-export function LanguagePicker({ id, value, onValueChange, options, label, showLanguageIcon = true, size = "md", className }: LanguagePickerProps) {
+export function LanguagePicker({ id, value, onValueChange, options, label, showLanguageIcon = false, size = "md", className }: LanguagePickerProps) {
   const t = translator();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
