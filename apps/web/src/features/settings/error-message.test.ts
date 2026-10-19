@@ -91,3 +91,26 @@ test("deleting a model: one still downloading, and one that could not be deleted
   expect(said.text).not.toContain("EBUSY");
   expect(said.said).toBeUndefined();
 });
+
+test("what a provider refuses with is five distinct sentences, each followed by the provider's own words", () => {
+  // The engine's codes for ElevenLabs' answers (sidevoice-engine's provider/api.rs): a key it does not know, a spent
+  // quota, a scoped key without a permission, a plan without the voice or model, and too many requests at once. All
+  // but the first used to read as the first, a key "revoked or mistyped".
+  const refusals = [
+    ["voice.failure.credential-rejected", "credential-rejected", "invalid_api_key: Invalid API key"],
+    ["voice.failure.provider-quota", "provider-quota", "quota_exceeded: This request exceeds your quota of 10000."],
+    ["voice.failure.permission-missing", "permission-missing", "missing_permissions: The API key you used is missing the permission text_to_speech to execute this operation."],
+    ["voice.failure.plan-not-allowed", "plan-not-allowed", "voice_access_denied: You have no access to this voice."],
+    ["voice.failure.rate-limited", "rate-limited", "too_many_concurrent_requests: Too many concurrent requests."],
+  ] as const;
+  for (const t of [en, es]) {
+    const texts = refusals.map(([key, code, said]) => {
+      const message = voiceFailure(engine(code, said), { t });
+      expect(message).toEqual({ text: t(key), said });
+      return message.text;
+    });
+    expect(new Set(texts).size).toBe(refusals.length);
+  }
+  expect(en("voice.failure.permission-missing")).toMatch(/missing a permission.*text to speech/);
+  expect(en("voice.failure.plan-not-allowed")).toMatch(/plan doesn't allow/);
+});

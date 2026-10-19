@@ -19,7 +19,7 @@ type Failure = { code?: unknown; key?: unknown; name?: unknown; message?: unknow
 
 /** The engine's codes for a remote provider's refusal: their `detail` is what the provider said, to show as it is
  *  (@sidevoice/engine's EngineError). Any other code's detail is raw, and goes behind Details. */
-const PROVIDER_CODES = new Set(["credential-rejected", "listing-not-permitted", "provider-quota", "rate-limited", "provider-unreachable", "listing-failed", "provider-refused"]);
+const PROVIDER_CODES = new Set(["credential-rejected", "listing-not-permitted", "permission-missing", "plan-not-allowed", "provider-quota", "rate-limited", "provider-unreachable", "listing-failed", "provider-refused"]);
 
 const hasHostKey = (key: string): key is MessageKey => Object.hasOwn(en, key);
 
