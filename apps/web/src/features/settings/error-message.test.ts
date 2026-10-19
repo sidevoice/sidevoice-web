@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { errorLine, errorMessage, roomFailure, voiceFailure, worded } from "./error-message";
-import { translator } from "../../i18n/translator";
+import { translator, UI_LANGUAGES } from "../../i18n/translator";
 
 /* A failure as people read it (AGENTS.md): a known code in the bundle's words, in English and in Spanish; any other a
  * generic line about what failed, its code and its own text behind Details; a raw text never the sentence. */
@@ -29,6 +29,27 @@ test("the same failure under another name, and a build that does not fit, say wh
   expect(en("voice.failure.model-load-failed")).not.toContain("smaller");
   expect(voiceFailure({ code: "model-needs-memory" }, { t: en }).text).toBe(en("voice.failure.memory"));
   expect(voiceFailure(new DOMException("The operation is insecure.", "SecurityError"), { t: en }).text).toBe(en("storage.blocked"));
+});
+
+test("a try is no call: its device failures say to try again, never to join, in every language; a call's keep their words", () => {
+  const device = ["microphone-denied", "microphone-unavailable", "speaker-unavailable", "audio-device-unavailable", "audio-device-failed"] as const;
+  for (const language of UI_LANGUAGES) {
+    const t = translator(language);
+    for (const code of device) {
+      const trial = voiceFailure({ code }, { what: "try", t }).text;
+      expect(trial, language + " " + code).toBe(t(`wizard.trial.${code}`));
+      expect(trial, language + " " + code).not.toBe(t(`voice.failure.${code}`));
+    }
+    const app = voiceFailure({ code: "microphone-denied" }, { what: "try", inApp: true, t }).text;
+    expect(app, language).toBe(t("wizard.trial.microphoneDeniedApp"));
+    expect(app, language).not.toBe(t("voice.microphoneDeniedApp"));
+  }
+  // The same failure under the desktop app's other names.
+  expect(voiceFailure({ code: "audio-device-unknown" }, { what: "try", t: en }).text).toBe(en("wizard.trial.audio-device-unavailable"));
+  expect(voiceFailure({ code: "audio-device-failed" }, { what: "try", t: es }).text).toBe(es("wizard.trial.audio-device-failed"));
+  // The call still tells to join again; a code the try has no words of its own for keeps the voice's.
+  expect(voiceFailure({ code: "audio-device-failed" }, { what: "call", t: en }).text).toBe("The call's audio device failed. Connect it again and join again.");
+  expect(voiceFailure({ code: "transcription-failed" }, { what: "try", t: en }).text).toBe(en("voice.failure.transcription-failed"));
 });
 
 test("an unknown code is the generic line about what failed; its code and its own text go to the details", () => {
