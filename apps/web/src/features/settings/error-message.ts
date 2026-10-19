@@ -85,7 +85,7 @@ export function voiceFailure(error: unknown, { what = "voice", inApp = false, t 
   // which one it was, and what it said, are details.
   const code = failureParts(error).code;
   const generic = /^[A-Z][A-Za-z]*Error$/.test(code) && !BUILT_IN.test(code) ? t("voice.error.browser") : undefined;
-  return errorMessage(error, { what, generic, t, known: (known) => voiceFailureKnown(known, inApp, t) });
+  return errorMessage(error, { what, generic, t, known: (known) => voiceFailureKnown(known, inApp, what === "try", t) });
 }
 
 /** The language's own errors: a bug or a failed request, not the browser refusing anything. */
@@ -131,14 +131,17 @@ const VOICE_ALIASES: Record<string, string> = {
   "audio-format-unsupported": "audio-failed", "io-failed": "audio-failed",
 };
 
-function voiceFailureKnown(code: string, inApp: boolean, t: Translate): string | null {
+function voiceFailureKnown(code: string, inApp: boolean, trying: boolean, t: Translate): string | null {
   if (code === "storage-blocked" || code === "SecurityError") return t("storage.blocked");
-  if (code === "microphone-denied" && inApp) return t("voice.microphoneDeniedApp");
+  if (code === "microphone-denied" && inApp) return t(trying ? "wizard.trial.microphoneDeniedApp" : "voice.microphoneDeniedApp");
   if (code.startsWith("trial-")) {
     const trial = keyFor("wizard.trial.", code.slice(6));
     return trial ? t(trial) : null;
   }
   const said = code.startsWith("host-capabilities") ? "host-capabilities" : VOICE_ALIASES[code] ?? code;
+  // A try is no call: where the call's sentence tells to join again, the try has its own, which tells to try again.
+  const own = trying ? keyFor("wizard.trial.", said) : null;
+  if (own) return t(own);
   const key = keyFor("voice.failure.", said);
   if (key) return t(key);
   // A build that does not fit this device (the engine's build reasons), with why.
