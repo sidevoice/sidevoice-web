@@ -8,6 +8,11 @@
  * `recognition_ms`; voice: `ready_ms`, `first_sound_ms`.
  * @typedef {{ ready_ms: number | null, audio_ms?: number | null, endpoint_silence_ms?: number | null, recognition_ms?: number | null, first_sound_ms?: number | null }} TrialTimings */
 
+/* What no try can ask for (the voice's settings name both slots, and the voice loads what they name): a transcription
+ * try also loads the voice slot's model, and a voice try the transcription slot's, and every try the detector. A
+ * model of this device that is not on disk is downloaded by that load, with no progress said to the page: a first try
+ * on a new device may download the model of the step after it, and a download that fails fails the try as
+ * `download-failed`, whatever the step shows of its own model. */
 /** A transcription try records until Stop or its longest take, with no end of turn of its own: when a turn ends is End
  *  of turn's to choose and to try, not this one's (decided 2026-10-15). The voice has no end of turn that never ends one
  *  (`end_of_turn` is `silence` or `smart-turn`), so the try asks for silence — the detector alone, no end-of-turn model

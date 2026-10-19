@@ -124,12 +124,13 @@ export function useVoiceTry(task: Task | null, { keep = true, onTried }: { keep?
   const level = useMemo(createMicLevelChannel, []);
   const slot = JSON.stringify(task && draft ? draft[task] : null);
   // A setting of the model under try changed: the try running stops (what it would say describes the old one), and
-  // what the last one said goes.
+  // what the last one said goes. A new attempt number starts the model's trial clean: whatever the old try still tells
+  // (its failure, a result) is no longer this one's, and is not shown or counted as tried.
   const tried = useRef(slot);
   useEffect(() => {
     if (tried.current !== slot && trialRef.current.phase === "running") window.sidevoiceActions?.cancelVoiceTry?.();
     tried.current = slot;
-    setTrial({ ...IDLE, attempt: attempt.current });
+    setTrial({ ...IDLE, attempt: ++attempt.current });
   }, [slot, task]);
   useEffect(() => () => window.sidevoiceActions?.cancelVoiceTry?.(), [task]);
   const cancel = () => window.sidevoiceActions?.cancelVoiceTry?.();

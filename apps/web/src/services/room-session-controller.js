@@ -1,4 +1,4 @@
-import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,noMachine,reachNote,conversationKey,conversationOf,personKey,displayTitle} from '../state/room-session-state.js';
+import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,noMachine,reachNote,conversationKey,conversationOf,personKey,displayTitle,focusedThread} from '../state/room-session-state.js';
 import {pageTarget,targetAnswers,routeUrl,callSocketUrl,isNodePath,askTarget,askRoomNode} from './rendezvous.js';
 import {readPairingState,projectPairings,writePairings,withPairing,withoutPairing,revokedPairing,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {localHostBridge,desktopDataBridge,normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
@@ -503,6 +503,13 @@ function nameOfflineRow(turnId,id){
  state.history=state.history.map(r=>mine(r)?{...r,segment:id,offline:true,delivery:takeReceipt(id)||r.delivery}:r);save();markHistorySeen();
 }
 
+/* Refusals of one of this page's own messages that give the person nothing to do, so they raise no banner: the room
+ * keeps the message for later (`room.turns_full`, `room.input_ended`), or has nothing to apply it to. The latter is
+ * `room.stale_utterance`: a report of how a reply played or was heard (`voice-playback`, `reply-hearing`), about a reply
+ * the room no longer knows — it restarted, or the reply's call or row is gone. Expected, and a second try would be
+ * refused the same way. */
+const QUIET_REFUSALS=new Set(['room.turns_full','room.input_ended','room.stale_utterance']);
+
 /* ----- the replies being said -----
  * The voice says a reply as something of its own (a handle); the room names it by its `utterance_id`. While a reply
  * lives the page keeps one for the other: the room may withdraw it (`voice-reply-withdrawn`), and how it ended is the
@@ -523,6 +530,12 @@ function clearTurnLifecycle(){
 }
 let speechOutput='on';
 let stoppingReplies=false;
+// Only the conversation in focus sounds, connected or not: with the window shown the one on screen, minimised the one
+// selected on the call card (`focusedThread`). The call's voice is its conversation's, so it sounds only while the
+// call is on the one in focus; the focus leaving it, by a pick or by the window going away, stops what it says at once.
+function callInFocus(){return focusedThread(state,document.hidden)===targetId()}
+let inFocus=true;
+function followFocus(){const now=callInFocus(),lost=inFocus&&!now;inFocus=now;if(lost)stopReplies('focus_changed')}
 function reportPlayback(said,data){
  if(said.terminal)return;
  if(data.status!=='playing')said.terminal=true;
@@ -560,7 +573,7 @@ function drainReplies(){
   if(replies.get(said.reply.utterance_id)!==said){replyQueue.shift();continue}
   const reply=said.reply;
   const openHere=new Set([...openVoiceTurns.values(),...awaitingTurnAck.values()].filter(thread=>thread===reply.thread_id));
-  const eligibility=moving?'focus_changed':replyEligibility(reply,{sessionId:state.sessionId,threadId:targetThread(),epoch:threadEpochs.get(reply.thread_id),openTurns:openHere,output:speechOutput,connected:!!state.ws&&!state.reconnecting});
+  const eligibility=moving?'focus_changed':replyEligibility(reply,{sessionId:state.sessionId,threadId:targetThread(),focused:callInFocus(),epoch:threadEpochs.get(reply.thread_id),openTurns:openHere,output:speechOutput,connected:!!state.ws&&!state.reconnecting});
   if(eligibility==='hold')return;
   replyQueue.shift();
   if(eligibility!=='play'){finishReply(said,{status:'unplayed',reason:eligibility});continue}
@@ -719,7 +732,8 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
  const d=await api(roomQuery('/api/presentation',fp),undefined,fp);
  if(asked<refreshApplied||session!==state.sessionId||fp!==state.callNode)return;
  const nextThread=d.binding?.thread_id||null;
- if(nextThread!==targetThread()||d.binding?.binding_id!==state.roomBinding?.binding_id||nextThread&&voice!==conversationCalls.get(conversationKey(fp,nextThread))?.call){
+ const onCall=nextThread?conversationCalls.get(conversationKey(fp,nextThread)):null;
+ if(nextThread!==targetThread()||d.binding?.binding_id!==state.roomBinding?.binding_id||nextThread&&(voice!==onCall?.call||stoppedByVoice(onCall))){
   try{await routeConversation(fp,nextThread,d.binding?.binding_id)}catch(error){voiceFailed(error)}
   if(asked<refreshApplied||session!==state.sessionId||fp!==state.callNode)return;
  }
@@ -1489,7 +1503,7 @@ function recordMessage(raw, socket) {
                 keepMessage('user-turn', 'voice-user-turn', words);
             flushOutbox();
             drainReplies();
-            if(d.key!=='room.turns_full'&&d.key!=='room.input_ended')setRoomError(roomError(refusalError(d)));
+            if(!QUIET_REFUSALS.has(d.key))setRoomError(roomError(refusalError(d)));
             return;
         }
         setRoomError(roomError(refusalError(d)));
@@ -1502,14 +1516,20 @@ function recordMessage(raw, socket) {
 // machine (its words, transcribed late; its cancellation) is that machine's no longer, and goes nowhere.
 const turnNodes=new Map();
 let routing=Promise.resolve(),routeVersion=0,desiredRouteKey=null;
+/* A call the voice stopped by itself: started once, it says it is idle again because its microphone or speaker failed
+ * (a microphone track that ended, a capture that broke), and it hears nothing until it is started again. The page
+ * starts it again whenever it gives it the microphone, and the call beat does so for the conversation the call is on:
+ * the person is heard again without hanging up (web#190, web#192). */
+function stoppedByVoice(entry){return !!entry?.started&&entry.state?.listening==='idle'}
 async function prepareConversationCall(node,thread_id,binding_id){
  if(!thread_id)return null;
  const key=conversationKey(node,thread_id);
  let entry=conversationCalls.get(key);
+ if(stoppedByVoice(entry))await entry.call.start();
  if(!entry){
   const owner=voiceOwner??await voiceHost();
   const call=owner.createCall();
-  entry={call,key,node,thread_id,activations:[],generation:callGeneration,listeners:[]};
+  entry={call,key,node,thread_id,activations:[],generation:callGeneration,listeners:[],started:false};
   conversationCalls.set(key,entry);
   entry.listeners.push(call.onTurn(turn=>voiceTurn(turn,entry)),call.onState(next=>{entry.state=next;if(voice===call)voiceStateChanged(next)}),
    call.onLevel(level=>{if(voice===call)voiceLevel(level)}),call.onError(voiceFailed),
@@ -1519,6 +1539,7 @@ async function prepareConversationCall(node,thread_id,binding_id){
    await call.setSettings(handed??voiceSettingsToLoad(state.voiceSettings,state.voiceCatalogue.catalogs));
    if(conversationCalls.get(key)!==entry||entry.generation!==callGeneration)return null;
    await call.start();
+   entry.started=true;
   }
   catch(error){conversationCalls.delete(key);for(const stop of entry.listeners)stop();await call.dispose().catch(()=>{});throw error}
  }
@@ -2167,7 +2188,9 @@ async function tryVoiceSettings(task,{text='',language=null,keep=true,onListenin
   // What each phase took, for the try to say how quick it was.
   let timings=null;const onTimings=value=>{timings=value};
   const result=task==='stt'?{text:await tryTranscription(routedTrial(host,trial),settings,{signal:abort.signal,finish:finish.signal,timeoutMs:Math.max(1,preparationDeadline-Date.now()),onTimings,onListening,onLevel,onTranscribing,onTake,fence:()=>unroute(host,trial)})}
-   :(await tryVoice(routedTrial(host,trial),settings,text,{language,signal:abort.signal,onTimings,onProgress:onProgress&&(progress=>onProgress(sayingRange(progress,text)))}),{});
+   // A voice try only listens: its call is never given the microphone (an unrouted call hears silence), so nothing on the
+   // microphone — the room, the speaker's own echo — can take a turn over the sentence and cut it short as a barge-in.
+   :(await tryVoice(trial,settings,text,{language,signal:abort.signal,onTimings,onProgress:onProgress&&(progress=>onProgress(sayingRange(progress,text)))}),{});
   result.timings=timings;
   if(keep){writeVoiceSettings(pageStorage(),settings);roomStore.patch({voiceSettings:settings})}
   return result;
@@ -2574,6 +2597,8 @@ function publishSessionView(view = roomStore.getState()) {
     updateComposer();
 }
 roomStore.subscribe(reconcileSession);
+roomStore.subscribe(followFocus);
+document.addEventListener('visibilitychange',followFocus);
 reconcileSession(roomStore.getState());
 // Working shows once a conversation has been busy for a while (WORKING_SHOWN_AFTER_MS): this keeps its start and clock.
 followWorking(roomStore);

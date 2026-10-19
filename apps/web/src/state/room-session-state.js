@@ -76,6 +76,9 @@ export function selectedThread(s) { return conversationKey(s.callNode, s.roomBin
 // A call whose socket is being reopened is still a call: the person is not told otherwise until the grace is over.
 function inCall(s) { return !!(s.ws || s.reconnecting); }
 export function viewedThread(s) { return s.viewedThread || selectedThread(s); }
+/** The conversation in focus, the only one that may sound: with the window shown, the one on screen (`viewedThread`);
+ *  minimised (`hidden`), the one selected on the call card, which is the one the call is on. */
+export function focusedThread(s, hidden = false) { return hidden ? selectedThread(s) : viewedThread(s); }
 export function speechSegment(speech) { return speech.history_id || speech.session_id + ':voice:' + speech.utterance_id; }
 /** Whether the conversation is working on what this browser said, as soon as that is known: the harness's own report,
  *  else the turn's receipts. Shown only once it has lasted (working). */
