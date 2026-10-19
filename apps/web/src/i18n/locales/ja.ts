@@ -793,6 +793,7 @@ export const messages: Messages = {
   "voice.prepare.retry": "再試行",
   "voice.prepare.downloading": "ダウンロード中…",
   "voice.prepare.downloadingAt": "ダウンロード中… {percent}%",
+  "voice.prepare.stalled": "データが届いていません",
   "voice.prepare.progress": "{done} / {size}",
   "voice.prepare.verifying": "モデルを確認しています…",
   "voice.prepare.loading": "モデルを読み込んでいます…",

@@ -802,6 +802,7 @@ export const messages: Messages = {
   "voice.prepare.retry": "Reintentar",
   "voice.prepare.downloading": "Descargando…",
   "voice.prepare.downloadingAt": "Descargando… {percent}%",
+  "voice.prepare.stalled": "No llegan datos",
   "voice.prepare.progress": "{done} de {size}",
   "voice.prepare.verifying": "Comprobando el modelo…",
   "voice.prepare.loading": "Cargando el modelo…",

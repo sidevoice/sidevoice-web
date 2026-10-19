@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -18,6 +18,23 @@ import "./model-prepare.css";
  * use staying (`pending` says so) and switching once it is; the first-run setup's Continue waits for it. */
 
 export type PrepareStatus = "absent" | "downloading" | "verifying" | "loading" | "ready" | "failed";
+
+/** How long a download may show no new bytes before it reads as stalled. The engine gives up on its own after a minute
+ * without bytes (sidevoice-engine's download-failed), so this comes first. */
+export const STALL_AFTER_MS = 15_000;
+
+/** True once a running download's `fraction` has not moved for STALL_AFTER_MS. Any movement, or the download ending,
+ * clears it. */
+export function useStalled(running: boolean, fraction: number | null): boolean {
+  const [stalled, setStalled] = useState(false);
+  useEffect(() => {
+    setStalled(false);
+    if (!running) return;
+    const timer = setTimeout(() => setStalled(true), STALL_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [running, fraction]);
+  return stalled;
+}
 
 export interface ModelPrepareProps {
   /** A line under the status: here, that the model in use stays until this one is ready ("Will switch when ready"). */
@@ -57,6 +74,7 @@ export function ModelPrepare({ pending, runtime, status, model, pickers, meta, s
   const hintId = useId();
   const sized = size ? sizeText(size) : "";
   const locked = status === "downloading";
+  const stalled = useStalled(locked, fraction);
   const percent = fraction == null ? null : Math.round(fraction * 100);
   return (
     <div className="model-prepare" id={id} data-status={status}>
@@ -73,7 +91,8 @@ export function ModelPrepare({ pending, runtime, status, model, pickers, meta, s
           <div className="model-prepare-progress">
             <div className="model-prepare-progress-line">
               <strong>{percent == null ? t("voice.prepare.downloading") : t("voice.prepare.downloadingAt", { percent })}</strong>
-              {size && fraction != null && <span className="model-prepare-note">{t("voice.prepare.progress", { done: sizeText(size * fraction), size: sized })}</span>}
+              {stalled ? <span className="model-prepare-note model-prepare-stalled">{t("voice.prepare.stalled")}</span>
+                : size && fraction != null && <span className="model-prepare-note">{t("voice.prepare.progress", { done: sizeText(size * fraction), size: sized })}</span>}
             </div>
             <ProgressBar value={fraction} label={t("voice.prepare.downloading")} />
           </div>
