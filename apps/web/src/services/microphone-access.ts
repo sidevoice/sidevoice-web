@@ -63,6 +63,24 @@ function refusal(error: unknown): "missing" | "denied" {
   return "denied";
 }
 
+/** A prompt closed without an answer, where the browser says so (Chromium: "Permission dismissed"); any other refusal
+ *  is one. The permission's query cannot tell: iPhone Safari keeps it at "prompt" through the person's Don't Allow. */
+function dismissed(error: unknown) {
+  const { name, message } = (error ?? {}) as { name?: string; message?: string };
+  return name === "NotAllowedError" && /dismissed/i.test(message ?? "");
+}
+
+/** What the page's own `getUserMedia` last answered, shared by every reader of the page (the call's, Settings', the
+ *  device list's): the browser's word on the microphone, which its permission query is not (iPhone Safari keeps that at
+ *  "prompt", with no change event, once allowed; web#231). Kept per page, by its media devices. */
+interface PageAnswer { answer: "granted" | "denied" | "missing" | null; readers: Set<() => void> }
+const pageAnswers = new WeakMap<MediaDevices, PageAnswer>();
+function pageAnswer(media: MediaDevices): PageAnswer {
+  let page = pageAnswers.get(media);
+  if (!page) pageAnswers.set(media, page = { answer: null, readers: new Set() });
+  return page;
+}
+
 export function createMicrophoneAccess(win: Window & typeof globalThis = window): MicrophoneAccess {
   const listeners = new Set<() => void>();
   const bridge = microphoneBridge();
@@ -75,8 +93,7 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
   let snapshot: MicrophoneSnapshot = { state: askable ? "checking" : "none", asker, known: !!bridge, dismissed: false, unchanged: false, from: null };
   let status: PermissionView | null = null;
   // A browser permission query is a hint. WebKit can report denied after getUserMedia has opened a stream.
-  let verified = false;
-  let lastRequestFailure: "denied" | "missing" | null = null;
+  const page = askable && !bridge ? pageAnswer(media!) : null;
   let disposed = false;
   // Only the newest read or request writes the state: a slow one never overwrites a later answer.
   let run = 0;
@@ -99,7 +116,9 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
 
   // A change while the prompt is open is its answer: the request says it, with what only it knows (none found, closed).
   const onChange = () => { if (snapshot.state !== "requesting") void check(); };
-  const onDeviceChange = () => { verified = false; lastRequestFailure = null; onChange(); };
+  // A microphone plugged in or out reads the list again. The list also changes as a stream opens and is let go (WebKit,
+  // iPhone Safari's audio session): an opened stream stays the page's answer; only a failure is asked again.
+  const onDeviceChange = () => { if (page && page.answer !== "granted") page.answer = null; onChange(); };
 
   async function start() {
     if (!askable) return;
@@ -136,10 +155,9 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
     } else {
       const plugged = await devices();
       if (mine !== run) return;
-      if (verified) state = "granted";
-      else if (plugged === false) state = "missing";
-      else if (lastRequestFailure) state = lastRequestFailure;
-      else state = "prompt";
+      // An opened stream is the browser's word, over a device list that may list none once it is let go (iPhone Safari).
+      const answer = page!.answer;
+      state = answer === "granted" ? answer : plugged === false ? "missing" : answer ?? "prompt";
     }
     set({ state, unchanged: state === before && snapshot.unchanged, dismissed: state === "prompt" && snapshot.dismissed });
   }
@@ -150,10 +168,12 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
     const before = snapshot.state;
     set({ state: "requesting", dismissed: false, unchanged: false, from: before });
     let answer: "granted" | "denied" | "missing";
+    let closed = false;
     if (bridge) {
       try { answer = await bridge.request() === "granted" ? "granted" : "denied"; } catch { answer = "denied"; }
     } else {
       try {
+        // Called in the tap itself, before any await: iPhone Safari asks only from a gesture.
         const stream = await media!.getUserMedia({ audio: true });
         const audio = stream.getAudioTracks?.() ?? stream.getTracks();
         if (!audio.length || audio.every((track) => track.readyState === "ended")) {
@@ -163,18 +183,15 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
         // Only the permission was wanted: the microphone is let go at once.
         for (const track of stream.getTracks()) track.stop();
         answer = "granted";
-      } catch (error) { answer = refusal(error); }
+      } catch (error) { answer = refusal(error); closed = dismissed(error); }
     }
     if (mine !== run) return;
-    // A refusal the browser's permission still calls "prompt" was the prompt closed without an answer.
-    if (answer === "denied" && status) {
-      let now: Awaited<ReturnType<typeof read>> = null;
-      try { now = await read(); } catch { /* as answered */ }
-      if (mine !== run) return;
-      if (now === "prompt") { set({ state: "prompt", dismissed: true, from: null }); return; }
+    if (page) {
+      // The page's answer, for every reader: a prompt closed without one is not a block.
+      page.answer = closed ? null : answer;
+      for (const reader of page.readers) if (reader !== onChange) reader();
     }
-    verified = answer === "granted";
-    lastRequestFailure = answer === "granted" ? null : answer;
+    if (closed) { set({ state: "prompt", dismissed: true, from: null }); return; }
     set({ state: answer, unchanged: answer === before, from: null });
   }
 
@@ -186,6 +203,8 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
     win.document?.addEventListener?.("visibilitychange", onReturn);
     // A microphone plugged in or out.
     media?.addEventListener?.("devicechange", onDeviceChange);
+    // Another reader of the page asked: its answer is this page's too.
+    page?.readers.add(onChange);
     // The app says when the system's answer changes, where it can.
     unwatchBridge = bridge?.onChange?.(onChange);
     void start();
@@ -201,6 +220,7 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
       disposed = true;
       status?.removeEventListener?.("change", onChange);
       media?.removeEventListener?.("devicechange", onDeviceChange);
+      page?.readers.delete(onChange);
       unwatchBridge?.();
       win.removeEventListener?.("focus", onReturn);
       win.document?.removeEventListener?.("visibilitychange", onReturn);

@@ -20,3 +20,11 @@ test("searches a long language list by name or code, with accents ignored, and c
   expect(change).toHaveBeenCalledWith("es");
   expect(trigger).toHaveAttribute("aria-expanded", "false");
 });
+
+test("shows no language icon unless asked to", () => {
+  const options = [{ value: "", label: "Automatic" }];
+  const { rerender } = render(<LanguagePicker id="language" value="" onValueChange={() => {}} options={options} label="Language" />);
+  expect(document.querySelector("#language .lucide-languages")).toBeNull();
+  rerender(<LanguagePicker id="language" value="" onValueChange={() => {}} options={options} label="Language" showLanguageIcon />);
+  expect(document.querySelector("#language .lucide-languages")).toBeInTheDocument();
+});

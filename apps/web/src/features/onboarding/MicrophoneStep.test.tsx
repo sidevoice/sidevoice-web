@@ -160,7 +160,7 @@ test("Continue without microphone is kept, a reload goes on from there, and allo
 }, WHOLE_APP_MS);
 
 test("the request closed without an answer is not a block: Allow microphone again", async () => {
-  browser("prompt", () => Promise.reject(refused("NotAllowedError")));
+  browser("prompt", () => Promise.reject(Object.assign(new Error("Permission dismissed"), { name: "NotAllowedError" })));
   await setup();
   await act(async () => { fireEvent.click(action()!); });
   expect(said()).toBe("The request was closed without an answer. Allow microphone asks again.");

@@ -44,7 +44,10 @@ test("working is the conversation's own: it works whoever it talks to, in the ca
 
 test("the stage's agent, by priority: offline, speaking, listening, working, idle", () => {
   const call = { inCall: true, isTarget: true, canHear: true, reach: "listening" as const, speaking: false, personSpeaking: false, working: false };
-  expect(stageMood({ ...call, reach: "offline", canHear: false, speaking: true, personSpeaking: true, working: true })).toBe("offline");
+  expect(stageMood({ ...call, reach: "offline", canHear: false, personSpeaking: true, working: true })).toBe("offline");
+  // A reply it is saying plays to its end whatever happens to the link: the poster waits for it (#220).
+  expect(stageMood({ ...call, reach: "offline", canHear: false, speaking: true, personSpeaking: true, working: true })).toBe("speaking");
+  expect(stageMood({ ...call, reach: "offline", canHear: false, isTarget: false, speaking: true })).toBe("offline");
   expect(stageMood({ ...call, speaking: true, personSpeaking: true, working: true })).toBe("speaking");
   expect(stageMood({ ...call, personSpeaking: true, working: true })).toBe("listening");
   expect(stageMood({ ...call, working: true })).toBe("working");
