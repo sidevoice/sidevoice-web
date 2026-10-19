@@ -1,5 +1,6 @@
-import { useContext, useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useContext, useEffect, useState, type CSSProperties } from "react";
 import { Alert } from "../../components/ui/Alert";
+import { UpdateNotice } from "../updates/UpdateNotice";
 import { Button } from "../../components/ui/Button";
 import { CloseIcon, HarnessIcon, MachinesIcon } from "../../components/ui/Icons";
 import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
@@ -110,9 +111,8 @@ function posterWords(t: Translate): PosterWords {
   return { title: t("stage.poster.title"), status: t("stage.poster.status"), fine: [t("stage.poster.fine1"), t("stage.poster.fine2"), t("stage.poster.fine3")] };
 }
 
-/** The stage; `notice`, what the room says over it (App: where an update waits), at the tile's top, taking no room of
- *  its own. */
-export function CallStage({ notice }: { notice?: ReactNode } = {}) {
+/** The stage. */
+export function CallStage() {
   const t = translator();
   const stage = useStageConversation();
   const sceneRef = useSceneScale();
@@ -136,8 +136,8 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
     return (
       <section className="call-stage" aria-label={t("stage.label")}>
         <BootError />
+        <UpdateNotice />
         <div className="stage-tile stage-empty">
-          <div className="stage-notice">{notice}</div>
           <p>{t("stage.empty")}</p>
           <Button className="stage-choose" onClick={showConversations}>{t("stage.chooseConversation")}</Button>
           {narrow && <TranscriptEntry />}
@@ -152,12 +152,12 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
         <BootError />
       {/* Named above the tile where the room has no header (a desktop), in place of the tile's own name. */}
       <StageName stage={stage} className="stage-title" tone={tone} voice={voice} />
+      <UpdateNotice />
       {/* The tile keeps its form factor's shape, as a slide does: as large as the room allows, centred, the app's own
           background around it (useSceneScale fits it in its slot; call-view.css names the shapes). What the tile says —
           the name, the voice models, the replies, the badge — is laid on the tile, at its corners. */}
       <div ref={sceneRef} className="stage-slot">
       <div className="stage-tile" data-mood={mood} data-app={desktopHost() ? "" : undefined} style={avatarTone(tone) as CSSProperties}>
-        <div className="stage-notice">{notice}</div>
         <div className="stage-canvas">
           <div className="stage-scene">
             <StageBackdrop seed={stage.threadId} tone={tone} />

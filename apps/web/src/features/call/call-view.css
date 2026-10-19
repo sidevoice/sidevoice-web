@@ -326,17 +326,6 @@
   .room-shell .stage-name { display: none; }
 }
 
-/* What the room says over the stage (CallStage's `notice`: where an update waits, the pill):
- * a pill floating at the tile's top centre, in the band kept clear above the agent's replies; it takes no room of its
- * own. */
-.stage-notice { position: absolute; z-index: 4; top: var(--stage-inset); left: 50%; display: flex; justify-content: center; width: max-content;
-  max-width: calc(100% - 2 * var(--stage-inset)); transform: translateX(-50%); pointer-events: none; }
-.stage-notice:empty { display: none; }
-/* Its words and buttons keep the interface's size (they are acted on); its place follows the tile. */
-.stage-notice > * { pointer-events: auto; padding: calc(4 * var(--u)) calc(4 * var(--u)) calc(4 * var(--u)) calc(12 * var(--u)); border: 1px solid var(--sv-border);
-  border-radius: var(--sv-radius-pill); background: var(--sv-accent-soft); box-shadow: var(--sv-shadow-md); }
-
-
 /* The way into the transcript, in the tile's corner (TranscriptEntry): round, opaque for contrast over the tile's glow,
  * 44px to touch on the phone's slide (--entry: with the tile, never under 36px). The person's bubble and the agent's
  * badge keep clear of it. */
