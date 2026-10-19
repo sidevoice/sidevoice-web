@@ -2247,6 +2247,13 @@ test('A voice try only listens, whichever voice says it: the microphone is never
  assert.match(key.words.text,/didn.t accept the key/);
  const quota=await said({catalog:'openai',model:'tts-1',voice:null,speed:1},{status:'not-played',reason:'failed',code:'provider-quota'}).then(()=>null,error=>plain(error));
  assert.match(quota.words.text,/out of credit/);
+ // A key without a permission, and a plan without the voice, are not "the key was not accepted" either.
+ const permission=await said({catalog:'elevenlabs',model:'eleven_flash_v2_5',voice:null,speed:1},{status:'not-played',reason:'failed',code:'permission-missing'}).then(()=>null,error=>plain(error));
+ assert.equal(permission.code,'permission-missing');
+ assert.match(permission.words.text,/missing a permission/);
+ const plan=await said({catalog:'elevenlabs',model:'eleven_flash_v2_5',voice:null,speed:1},{status:'not-played',reason:'failed',code:'plan-not-allowed'}).then(()=>null,error=>plain(error));
+ assert.equal(plan.code,'plan-not-allowed');
+ assert.match(plan.words.text,/plan doesn.t allow/);
  // Cut short by the voice itself, it is the try's own sentence.
  const cut=await said({catalog:'openai',model:'tts-1',voice:null,speed:1},{status:'heard-up-to',heard_chars:2,reason:'barge-in'}).then(()=>null,error=>plain(error));
  assert.equal(cut.code,'trial-not-heard');
