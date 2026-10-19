@@ -1,7 +1,7 @@
 import { useRef, type SyntheticEvent } from "react";
 import { JoinStatus } from "./JoinStatus";
 import { AudioDevices } from "./AudioDevices";
-import { CallButton, MicControl, MuteButton, SkipButton } from "./CallIndicators";
+import { CallButton, CaptionsButton, MicControl, MuteButton, SkipButton } from "./CallIndicators";
 import { Button } from "../../components/ui/Button";
 import { MoreVerticalIcon } from "../../components/ui/Icons";
 import { NARROW_QUERY, useMedia } from "../../state/call-layout";
@@ -31,7 +31,7 @@ function CallMenu() {
   );
 }
 
-/* The call's controls in the middle — the microphone with its level, skip, the call, and ⋮ — in one tray under the
+/* The call's controls in the middle — the microphone with its level, captions, skip, the call, and ⋮ — in one tray under the
  * join's line, and the transcript's button at the right edge. */
 export function CallToolbar() {
   const t = translator();
@@ -46,6 +46,7 @@ export function CallToolbar() {
             <AudioDevices />
             <MuteButton />
           </MicControl>
+          <CaptionsButton />
           <SkipButton />
           <CallButton />
           <CallMenu />

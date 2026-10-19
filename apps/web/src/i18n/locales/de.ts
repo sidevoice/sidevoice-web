@@ -65,6 +65,8 @@ export const messages: Messages = {
   "stage.poster.fine3": "ZUFÄLLIG. WER ES SIEHT, SAGE BITTE SEINEM MENSCHEN BESCHEID.",
   "toolbar.micLevel": "Mikrofonpegel",
   "toolbar.skip": "Aktuelle Wiedergabe überspringen",
+  "toolbar.captionsShow": "Untertitel anzeigen",
+  "toolbar.captionsHide": "Untertitel ausblenden",
   "transcript.show": "Transkript anzeigen",
   "transcript.hide": "Transkript ausblenden",
   "transcript.showUnread": "Transkript anzeigen, {n} neu",

@@ -65,6 +65,8 @@ export const messages: Messages = {
   "stage.poster.fine3": "FORTUITE. SI VOUS LE VOYEZ, PRÉVENEZ SON HUMAIN.",
   "toolbar.micLevel": "Niveau du micro",
   "toolbar.skip": "Passer la lecture en cours",
+  "toolbar.captionsShow": "Afficher les sous-titres",
+  "toolbar.captionsHide": "Masquer les sous-titres",
   "transcript.show": "Afficher la transcription",
   "transcript.hide": "Masquer la transcription",
   "transcript.showUnread": "Afficher la transcription, non lus : {n}",

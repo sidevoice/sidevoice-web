@@ -2,7 +2,8 @@ import { useContext } from "react";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { openSettings } from "../settings/open-settings";
 import { Button } from "../../components/ui/Button";
-import { CallIcon, HangupIcon, MicrophoneIcon, MicrophoneOffIcon, SkipIcon, WarningIcon } from "../../components/ui/Icons";
+import { CallIcon, CaptionsIcon, CaptionsOffIcon, HangupIcon, MicrophoneIcon, MicrophoneOffIcon, SkipIcon, WarningIcon } from "../../components/ui/Icons";
+import { setCaptions, useCaptions } from "../../state/captions";
 import { translator, type MessageKey } from "../../i18n/translator";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { shortcutTip } from "../../components/ui/Keycaps";
@@ -36,6 +37,22 @@ export function SkipButton() {
       <Button id="skip-reply" variant="ghost" className="call-button" disabled={!playing} aria-label={t("toolbar.skip")} aria-keyshortcuts={ariaKeyShortcuts("skip")}
         onClick={() => window.sidevoiceActions?.skipReply()}>
         <SkipIcon size={22} />
+      </Button>
+    </Tooltip>
+  );
+}
+
+
+/* Captions: what is said, in balloons on the stage. On unless turned off; the same choice as the desktop app's floating
+ * card (state/captions.ts, sidevoice-web#239). */
+export function CaptionsButton() {
+  const t = translator();
+  const on = useCaptions();
+  const label = t(on ? "toolbar.captionsHide" : "toolbar.captionsShow");
+  return (
+    <Tooltip action content={label}>
+      <Button id="captions-toggle" variant="ghost" className="call-button" aria-label={label} aria-pressed={on} onClick={() => setCaptions(!on)}>
+        {on ? <CaptionsIcon size={22} /> : <CaptionsOffIcon size={22} />}
       </Button>
     </Tooltip>
   );

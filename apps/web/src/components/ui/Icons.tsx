@@ -10,7 +10,7 @@ import {
   MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
   PanelLeftOpen, Pause, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
   Box, AudioWaveform, ArrowUp, ArrowLeft, ArrowRight, RefreshCcwDot, Pencil, Laptop, Server,
-  Timer, ScrollText, Link, Unlink, Search, ChevronLeft, ChevronRight, Eye, EyeOff, Square, Sparkle, ShieldCheck,
+  Timer, ScrollText, Link, Unlink, Search, ChevronLeft, ChevronRight, Eye, EyeOff, Square, Sparkle, ShieldCheck, Captions, CaptionsOff,
 } from "lucide-react";
 import type { ComponentType } from "react";
 // Other products' own marks, from their brand kits (assets/logos/README.md: where each comes from and its rules).
@@ -97,6 +97,9 @@ export const PauseRecordingIcon = mark(Pause, 16);
 export const KeyboardIcon = mark(Keyboard, 20);
 /** The record of what was said: unlike the conversations' bubbles, a scroll of text. */
 export const TranscriptIcon = mark(ScrollText, 22);
+/** What is said, shown on the stage as it is said: on, or turned off. */
+export const CaptionsIcon = mark(Captions, 22);
+export const CaptionsOffIcon = mark(CaptionsOff, 22);
 /** Sends what was written. */
 export const SendIcon = mark(ArrowUp, 18);
 

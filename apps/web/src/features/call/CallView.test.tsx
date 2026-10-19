@@ -10,6 +10,7 @@ import { headerRowWidth } from "../../test/header-row";
 import { VARIANTS_KEY } from "../../lib/variants";
 import { AGENT_LINGER_MS, SENT_LEAVING_MS } from "./speech-reading";
 import { PAGE_MS } from "./PagedText";
+import { CAPTIONS_KEY } from "../../state/captions";
 import { ENTER_MS } from "../avatar/engine/styles/bichos";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
@@ -939,4 +940,20 @@ test("each machine's group in the conversations wears the connected mark Machine
   expect(dot("Laptop")).not.toBeNull();
   expect(dot("Home server")).toBeNull();
   expect(group("Home server")).toHaveAttribute("aria-label", "Home server, Offline");
+});
+
+test("captions off in the call bar takes the balloons off the stage, for this device, and back on brings them (#239)", () => {
+  localStorage.removeItem(CAPTIONS_KEY);
+  room({ botLive: true, karaokeState: { segment: "h-2", from: 57, to: 57 } });
+  const toggle = () => screen.getByRole("button", { name: /captions$/ });
+  expect(toggle()).toHaveAccessibleName("Hide captions");
+  expect(toggle()).toHaveAttribute("aria-pressed", "true");
+  expect(document.querySelector(".stage-bubble")).not.toBeNull();
+  act(() => { toggle().click(); });
+  expect(toggle()).toHaveAccessibleName("Show captions");
+  expect(document.querySelector(".stage-bubble")).toBeNull();
+  expect(localStorage.getItem(CAPTIONS_KEY)).toBe("off");
+  act(() => { toggle().click(); });
+  expect(document.querySelector(".stage-bubble")).not.toBeNull();
+  expect(localStorage.getItem(CAPTIONS_KEY)).toBeNull();
 });

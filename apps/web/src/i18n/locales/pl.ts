@@ -69,6 +69,8 @@ export const messages: Messages = {
 
   "toolbar.micLevel": "Poziom mikrofonu",
   "toolbar.skip": "Pomiń to, co gra",
+  "toolbar.captionsShow": "Pokaż napisy",
+  "toolbar.captionsHide": "Ukryj napisy",
 
   "transcript.show": "Pokaż transkrypcję",
   "transcript.hide": "Ukryj transkrypcję",
