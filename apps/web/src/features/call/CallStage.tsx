@@ -122,6 +122,8 @@ export function CallStage() {
   const narrow = useMedia(NARROW_QUERY);
   // What the call runs on, behind the title (CallDetails); and whether a voice model needs something, for its dot.
   const voice = useVoiceModels();
+  // Captions off (the call bar's toggle): no balloons on the stage; the transcript keeps everything said.
+  const captions = useCaptions();
 
   if (!stage.threadId) {
     return (
