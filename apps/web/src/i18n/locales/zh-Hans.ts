@@ -792,6 +792,7 @@ export const messages: Messages = {
   "voice.prepare.retry": "重试",
   "voice.prepare.downloading": "正在下载…",
   "voice.prepare.downloadingAt": "正在下载… {percent}%",
+  "voice.prepare.stalled": "没有收到数据",
   "voice.prepare.progress": "{done} / {size}",
   "voice.prepare.verifying": "正在检查模型…",
   "voice.prepare.loading": "正在加载模型…",
