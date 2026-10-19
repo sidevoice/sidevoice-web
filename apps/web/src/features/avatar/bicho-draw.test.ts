@@ -35,6 +35,30 @@ test("a conversation's bicho is the same drawing on every device; its tone tints
   expect(engineSize("pip")).toBe("sidebar");
 });
 
+/** Where in the drawing the body's gloss stroke and each arm's group start, from the figure's fills on. */
+function paintOrder(seed: string) {
+  const html = drawAvatar(avatarFor(seed), "stage").html;
+  const fills = html.slice(html.indexOf('<g class="fills">'));
+  return { gloss: fills.indexOf('class="shine"'), left: fills.indexOf('class="pg-arm-l"'), right: fills.indexOf('class="pg-arm-r"') };
+}
+
+test("a robot's arm is painted over the body's gloss, so the highlight is never drawn across it, at rest or swinging", () => {
+  // The robots' highlights run where the arms join (a can's down its side, a tv's round its corner): their bodies, with
+  // any arms, and the clamp arm on any body, take the gloss under them.
+  const robots = [...["can", "tv", "orb", "stack", "domehead"].flatMap((body) => ["bot", "nubs"].map((arms) => [body, arms])),
+    ...["box", "pill", "dome", "wide"].map((body) => [body, "bot"])];
+  for (const [body, arms] of robots) {
+    const { gloss, left, right } = paintOrder(`bicho:bots/robot:t?body=${body}&arms=${arms}`);
+    expect(gloss, `${body} ${arms}`).toBeGreaterThan(-1);
+    expect(left, `${body} ${arms}`).toBeGreaterThan(gloss);
+    expect(right, `${body} ${arms}`).toBeGreaterThan(gloss);
+  }
+  // Every other bicho keeps its gloss on top of its arms, as it always was.
+  const { gloss, left, right } = paintOrder("7f3c2a91-thread");
+  expect(left).toBeGreaterThan(-1);
+  expect(gloss).toBeGreaterThan(Math.max(left, right));
+});
+
 test("the person is a bicho too, and keeps the old sleep: no working style, no pastime", () => {
   const drawing = drawAvatar(PERSON_AVATAR, "pip");
   expect(drawing.html).toContain('data-kind="round"');

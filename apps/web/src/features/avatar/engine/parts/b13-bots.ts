@@ -433,7 +433,8 @@ const BOT_COLORS: ColorRule[] = [
 
 export default batch({
   label: "B13 Robots",
-  bodies: BODIES,
+  // The robots' highlights run where the arms join (a can's down its side, a tv's round its corner): under the arms.
+  bodies: BODIES.map((body) => ({ ...body, glossUnder: true })),
 
   parts: [
     /* ---------- tops (drawn on the reference body; the crown socket is (60, 42)) ---------- */
@@ -580,6 +581,8 @@ export default batch({
           { d: ellipse(33.4, 74.2, 4.2, 4.2), c: "dark" },
         ],
         emits: { handL: { x: 18.6, y: 90 } },
+        // The joint sits on the body's edge, where a can's or a tv's highlight runs: the gloss goes under the arm.
+        glossUnder: true,
       },
     },
 
