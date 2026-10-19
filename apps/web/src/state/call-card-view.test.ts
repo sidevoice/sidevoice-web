@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { createRoomSessionStore, WORKING_SHOWN_AFTER_MS } from "./room-session-state.js";
+import { createRoomSessionStore, focusedThread, WORKING_SHOWN_AFTER_MS } from "./room-session-state.js";
 
 // The card's view comes from the room's own facts (the desktop bridge relays it as is): these drive the real store.
 // The page knows a conversation by its machine and thread ("n|a"); the room's binding keeps the bare thread.
@@ -85,4 +85,11 @@ test("FC11: what busy is — reconnecting, or switching and to whom", () => {
 test("FC13: the microphone silent though not muted — another app holds it", () => {
   expect(card({ voiceState: { listening: "listening", recognising: 0, playback: "idle", microphone: "muted" } }).micSilent).toBe(true);
   expect(card({ micEnabled: false, voiceState: { listening: "muted", recognising: 0, playback: "idle", microphone: "muted" } }).micSilent).toBe(false);
+});
+
+test("focus: the window shows the conversation on screen, minimised the one selected on the card", () => {
+  const facts = { callNode: "n", roomBinding: { thread_id: "a" } } as never;
+  const browsing = { callNode: "n", roomBinding: { thread_id: "a" }, viewedThread: "n|b" } as never;
+  expect([focusedThread(facts), focusedThread(facts, true)]).toEqual(["n|a", "n|a"]);
+  expect([focusedThread(browsing), focusedThread(browsing, true)]).toEqual(["n|b", "n|a"]);
 });

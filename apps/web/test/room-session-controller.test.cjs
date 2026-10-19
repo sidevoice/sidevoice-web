@@ -1697,6 +1697,38 @@ test('T06b–c/T07 output, focus and disconnect choices report not_heard indepen
   c.s.run('disconnect()');
  }
 });
+// Only the conversation in focus sounds (#200): the one on screen, or, minimised, the one selected on the call card.
+const sayTo=(c,id,thread='a')=>c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:thread,revision:1,reply_revision:1,epoch:0,history_id:'s1:voice:'+id,text:'Hola mundo'}});
+const browseB="state.people.push({node:'fp-mac',thread_id:'b',title:'B',available:false});window.sidevoiceActions.selectParticipant('fp-mac|b')";
+test('#200 picking another conversation cuts the one the call is on at once, and nothing of it sounds until it is picked again',async()=>{
+ const c=await callOnRoom();
+ sayTo(c,'one');sayTo(c,'two');
+ const playing=c.voice.said[0];playing.step({type:'playing'});
+ c.s.run(browseB);
+ assert.equal(c.s.run('state.roomBinding.thread_id'),'a','B cannot be heard, so the call stays on A');
+ assert.equal(playing.cancelled,true,'what A was saying is cut by the pick, not when the call goes over');
+ playing.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'cancelled'}});
+ sayTo(c,'three');
+ assert.equal(c.voice.said.length,1,'what A says from now on is not said');
+ const ended=sentOf(c,c.first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.utterance_id,d.reason]).sort();
+ assert.deepEqual(plain(ended),[['one','focus_changed'],['three','focus_changed'],['two','focus_changed']]);
+ assert.deepEqual(plain(sentOf(c,c.first,'reply-hearing').map(d=>d.outcome)),['not_heard','not_heard','not_heard'],'they stay unheard, to be read, never replayed later');
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");
+ sayTo(c,'four');
+ assert.equal(c.voice.said.length,2,'A sounds again once it is the one in focus');
+ c.s.run('disconnect()');
+});
+test('#200 minimised, the conversation selected on the call card sounds even if another is on screen behind it; the window back in front cuts it',async()=>{
+ const c=await callOnRoom();
+ c.s.context.document.hidden=true;await c.s.dispatch('visibilitychange',{});
+ c.s.run(browseB);
+ sayTo(c,'one');
+ const playing=c.voice.said[0];playing.step({type:'playing'});
+ assert.equal(playing.cancelled,false,'the card still has A selected');
+ c.s.context.document.hidden=false;await c.s.dispatch('visibilitychange',{});
+ assert.equal(playing.cancelled,true,'the window shows B again: A is not the one in focus');
+ c.s.run('disconnect()');
+});
 test('T07 deliberate hang-up offers a not_heard decision for a pending reply before closing',async()=>{
  const c=await callOnRoom();
  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'hangup',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'s1:voice:hangup',text:'Answer'}});

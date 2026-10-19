@@ -224,5 +224,7 @@ export function conversationKey(node: string | null | undefined, thread: string 
 export function conversationOf(key: string | null | undefined): { node: string; thread: string } | null;
 export function personKey(person: { node?: string | null; thread_id?: string | null } | null | undefined): string | null;
 export function selectedThread(s: SessionFacts): string | null;
+/** The conversation in focus, the only one that may sound: the one on screen, or, minimised, the call card's. */
+export function focusedThread(s: SessionFacts, hidden?: boolean): string | null;
 export function reachNote(s: SessionFacts): string;
 export function joinView(s: SessionFacts): JoinStatusView | null;
