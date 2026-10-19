@@ -412,6 +412,47 @@ test("a try that failed says why in its block, and offers it again", async () =>
 });
 
 
+test("a try belongs to the model and provider it was made for: another one starts clean, and what the old try tells late is nobody's", async () => {
+  const openai = { id: "openai", name: "OpenAI", status: { stale: false }, models: [
+    { id: "tts-1", capabilities: ["tts"], languages: [], voices: [] }, { id: "tts-1-hd", capabilities: ["tts"], languages: [], voices: [] }] };
+  const settings = (tts: Record<string, unknown>) => ({ ...defaultVoiceSettings(), tts: { ...defaultVoiceSettings().tts, ...tts } });
+  const { actions, store } = renderPane({ providerKeys: { openai: true, elevenlabs: true }, voiceSettings: settings({ catalog: "openai", model: "tts-1" }),
+    voiceCatalogue: { state: "ready", catalogs: catalogs.map((catalog) => catalog.id === "openai" ? openai : catalog), error: "" } });
+  const block = () => document.getElementById("tts-try-block")!;
+  const failure = () => Object.assign(new Error("trial-not-heard"), { code: "trial-not-heard", detail: "barge-in" });
+  const clean = () => {
+    expect(within(block()).queryByRole("alert")).toBeNull();
+    expect(document.getElementById("tts-try")).toHaveTextContent(/^Try it: listen$/);
+  };
+  // OpenAI's voice fails; the person tries another of its models, and then this device's: each starts clean.
+  actions.tryVoiceSettings.mockRejectedValueOnce(failure());
+  await act(async () => { fireEvent.click(document.getElementById("tts-try")!); });
+  expect(within(block()).getByRole("alert")).toHaveTextContent("The sentence did not play to its end. Try again.");
+  act(() => store.patch({ voiceSettings: settings({ catalog: "openai", model: "tts-1-hd" }) }));
+  clean();
+  actions.tryVoiceSettings.mockRejectedValueOnce(failure());
+  await act(async () => { fireEvent.click(document.getElementById("tts-try")!); });
+  expect(within(block()).getByRole("alert")).toBeInTheDocument();
+  act(() => store.patch({ voiceSettings: settings({ catalog: "local", model: "kokoro-82m-v1.0" }) }));
+  clean();
+  // A try under way when the model changes is stopped, and what it tells after that is not shown for the new one.
+  const running = pendingTry(actions);
+  await act(async () => { fireEvent.click(document.getElementById("tts-try")!); });
+  expect(document.getElementById("tts-try")).toHaveTextContent("Stop");
+  act(() => store.patch({ voiceSettings: settings({ catalog: "openai", model: "tts-1" }) }));
+  expect(actions.cancelVoiceTry).toHaveBeenCalled();
+  clean();
+  await act(async () => { running.finish(Promise.reject(failure())); });
+  clean();
+  // And one that comes back as it was stopped is not a try of the new model either.
+  const late = pendingTry(actions);
+  await act(async () => { fireEvent.click(document.getElementById("tts-try")!); });
+  act(() => store.patch({ voiceSettings: settings({ catalog: "local", model: "kokoro-82m-v1.0" }) }));
+  await act(async () => { late.finish({ timings: { ready_ms: 300, first_sound_ms: 250 } }); });
+  clean();
+  expect(block().querySelector("#tts-timing")).toBeNull();
+});
+
 test("a transcription try that stopped shows its take in its try block, in the level's place and outside what is read out as it comes, with no turn marked in it; stopped by the person, it goes", async () => {
   const { actions } = renderPane();
   const block = document.getElementById("stt-try-block")!;

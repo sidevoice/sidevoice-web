@@ -59,12 +59,44 @@ export function localStorageCredentials(storage = globalThis.localStorage) {
 /** A cancelled install, whoever ran it, by one code. */
 const cancelled = () => Object.assign(new Error('install-cancelled'), { code: 'install-cancelled' });
 
-/** The web engine's progress (files done of all, and the bytes of the one downloading) as a share of the install. */
-export function webInstallProgress(progress) {
-  const files = progress?.files || 0;
-  if (!files) return { fraction: null, done: null, total: null };
-  const current = progress.size ? Math.min(1, (progress.received || 0) / progress.size) : 0;
-  return { fraction: Math.min(1, ((progress.done || 0) + current) / files), done: null, total: null };
+/**
+ * One install's progress, as the share of the bytes it downloads. The web engine tells files done of all and the bytes
+ * of the file being downloaded, which are not a share: a 1 GB model and a 1 kB config count as one file each, so a
+ * share of the files crawls where the large file is and leaps where the small ones are. The bytes are summed instead:
+ * those received of the files finished and of the one downloading, over the `total` the catalogue says the build
+ * downloads (`ModelBuild.downloadBytes`). Both only grow and `total` does not change, so the share never decreases;
+ * without a `total` there is no share, and the bar stays indeterminate. A file the engine finds already stored is
+ * downloaded no more and tells no bytes, so after one the share ends short of 1 and the end of the install completes it.
+ * One reporter per install: it keeps what the install has finished.
+ * @param {number} total The bytes the install downloads, 0 when unknown.
+ * @returns {(progress: import('@sidevoice/engine').Progress) => InstallProgress}
+ */
+export function webInstallProgress(total) {
+  let finished = 0;
+  let filesDone = 0;
+  let current = 0;
+  return (progress) => {
+    // A file is finished once the engine counts it done; the bytes it had received are then the whole file's.
+    if ((progress?.done || 0) > filesDone) {
+      finished += current;
+      filesDone = progress.done;
+    }
+    current = progress?.received || 0;
+    if (!(total > 0) || !progress?.files) return { fraction: null, done: null, total: null };
+    const done = Math.min(total, finished + current);
+    return { fraction: done / total, done, total };
+  };
+}
+
+/** What installing the build of `model` downloads, in bytes, as the engine's catalogue says: the build named, else the
+ *  one it recommends. 0 when it does not say, which leaves the install's progress without a share. */
+async function downloadBytes(engine, model, build) {
+  const local = engine.localCatalog();
+  // Every capability at once, as the listing of the catalogues does.
+  const list = /** @type {() => Promise<CatalogModel[]>} */ (/** @type {unknown} */ (local.models.bind(local)));
+  const listed = await list();
+  const info = listed.find((candidate) => candidate.id === model);
+  return info?.builds?.find((candidate) => candidate.id === (build ?? info.recommendedBuild))?.downloadBytes ?? 0;
 }
 
 /** What a catalogue that failed to answer stands as: its error as the reason it is not current. */
@@ -91,9 +123,13 @@ export function engineCatalogs(engine, credentials) {
       return { id: catalog.id, name: catalog.name ?? null, status: failure && !status.reason ? failed(failure) : status, models };
     })),
     // On this device, in its private storage: the build named, or the one the engine recommends.
-    install: (model, { build = null, onProgress, signal } = {}) =>
-      engine.install(model, build ?? undefined, (progress) => onProgress?.(webInstallProgress(progress)), signal)
-        .catch((error) => { throw signal?.aborted || error?.code === 'cancelled' ? cancelled() : error; }),
+    install: async (model, { build = null, onProgress, signal } = {}) => {
+      // The size of the build is asked before the download starts, and only for a progress to show; a catalogue that
+      // cannot say leaves the bar indeterminate rather than failing the install, whose own errors are the engine's.
+      const report = onProgress && webInstallProgress(await downloadBytes(engine, model, build).catch(() => 0));
+      return engine.install(model, build ?? undefined, (progress) => report && onProgress(report(progress)), signal)
+        .catch((error) => { throw signal?.aborted || error?.code === 'cancelled' ? cancelled() : error; });
+    },
     // Off this device, every build; refused `model-in-use` while one is loaded.
     uninstall: (model) => engine.uninstall(model),
     async setCredential(provider, key) {
