@@ -66,6 +66,8 @@ export const messages: Messages = {
   "stage.poster.fine3": "偶然です。見かけたら、その持ち主の人間に知らせてください。",
   "toolbar.micLevel": "マイクの入力レベル",
   "toolbar.skip": "再生中の音声をスキップ",
+  "toolbar.captionsShow": "字幕を表示",
+  "toolbar.captionsHide": "字幕を非表示",
   "transcript.show": "文字起こしを表示",
   "transcript.hide": "文字起こしを隠す",
   "transcript.showUnread": "文字起こしを表示（未読 {n} 件）",

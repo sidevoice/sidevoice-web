@@ -129,6 +129,10 @@
   overflow: visible; pointer-events: none; }
 .balloon-tail .tail-fill { fill: var(--balloon-fill); }
 .balloon-tail .tail-ink { fill: none; stroke: var(--balloon-ink); stroke-width: var(--balloon-line); stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+/* A balloon drawn under whoever speaks (the desktop card's avatar, its balloons opening below it): its tail leaves the
+ * top edge and points up at them, the same tail turned over (sidevoice-web#240). On the balloon or on what holds it. */
+.balloon--tail-up .balloon-tail { top: auto; bottom: calc(100% - var(--balloon-line) - 1px); transform: scaleY(-1); }
+.balloon--tail-up .stage-bubble .balloon-tail, .stage-bubble.balloon--tail-up .balloon-tail { transform: scale(-1, -1); }
 .balloon-shine { position: absolute; z-index: -1; left: calc(14 * var(--u)); top: calc(8 * var(--u)); width: calc(40 * var(--u)); height: calc(20 * var(--u)); overflow: visible; pointer-events: none; }
 .balloon-shine path { fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; opacity: .75; }
 

@@ -65,6 +65,8 @@ export const messages: Messages = {
   "stage.poster.fine3": "纯属巧合。如有发现，请告知它的人类。",
   "toolbar.micLevel": "麦克风音量",
   "toolbar.skip": "跳过正在播放的内容",
+  "toolbar.captionsShow": "显示字幕",
+  "toolbar.captionsHide": "隐藏字幕",
   "transcript.show": "显示文字记录",
   "transcript.hide": "隐藏文字记录",
   "transcript.showUnread": "显示文字记录，{n} 条未读",

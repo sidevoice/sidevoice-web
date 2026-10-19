@@ -69,6 +69,8 @@ export const messages: Messages = {
 
   "toolbar.micLevel": "Nivel de micrófono",
   "toolbar.skip": "Saltar lo que está sonando",
+  "toolbar.captionsShow": "Mostrar subtítulos",
+  "toolbar.captionsHide": "Ocultar subtítulos",
 
   "transcript.show": "Ver la transcripción",
   "transcript.hide": "Ocultar la transcripción",

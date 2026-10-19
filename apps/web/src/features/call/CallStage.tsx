@@ -25,6 +25,7 @@ import { useConversationAvatar, useConversationAvatars } from "./conversation-av
 import { Tooltip } from "../../components/ui/Tooltip";
 import { errorLine } from "../settings/error-message";
 import { desktopHost } from "../../services/desktop-host";
+import { useCaptions } from "../../state/captions";
 
 import "./call-view.css";
 
@@ -130,6 +131,8 @@ export function CallStage() {
   const narrow = useMedia(NARROW_QUERY);
   // What the call runs on, behind the title (CallDetails); and whether a voice model needs something, for its dot.
   const voice = useVoiceModels();
+  // Captions off (the call bar's toggle): no balloons on the stage; the transcript keeps everything said.
+  const captions = useCaptions();
 
   if (!stage.threadId) {
     return (
@@ -169,13 +172,13 @@ export function CallStage() {
         <StageName stage={stage} className="stage-name" tone={tone} voice={voice} />
         <div className="stage-top">
           {/* Its own conversation's: another one on the stage starts with none of the replies before it. */}
-          <AgentBubbles key={stage.threadId} reply={reply} spokenTo={spokenTo} onUp={holdStill} />
+          {captions && <AgentBubbles key={stage.threadId} reply={reply} spokenTo={spokenTo} onUp={holdStill} />}
           {/* Working is said only to assistive tech here: the sidebar shows it. */}
           {stage.mood === "working" && <p className="sr-only" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden="true" />{t("stage.working")}</p>}
         </div>
         {/* The agent's harness, model and effort, at the tile's foot (it gives the stage its touch: operator, 2026-10-15). */}
         <div className="stage-tags"><AgentBadge stage={stage} /></div>
-        <PersonTurn conversation={conversation} t={t} />
+        {captions && <PersonTurn conversation={conversation} t={t} />}
         {narrow && <TranscriptEntry />}
       </div>
       </div>
