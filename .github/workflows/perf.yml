@@ -46,3 +46,7 @@ jobs:
           SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site-base" PERF_LABEL="Base ($(git -C ../../base rev-parse --short HEAD))" node perf/idle-cpu.mjs
           SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="This change ($(git rev-parse --short HEAD))" node perf/idle-cpu.mjs
           SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="This change, every animation stopped (the floor)" PERF_NO_ANIMATIONS=1 node perf/idle-cpu.mjs
+          export PERF_ONLY=speaking SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site"
+          PERF_LABEL="Speaking, no mic bars" PERF_STYLE=".mic-wave{display:none!important}" node perf/idle-cpu.mjs
+          PERF_LABEL="Speaking, no live balloon wave" PERF_STYLE=".voice-wave{display:none!important}" node perf/idle-cpu.mjs
+          PERF_LABEL="Speaking, mic bars without transition" PERF_STYLE=".mic-wave i{transition:none!important}" node perf/idle-cpu.mjs
