@@ -9,6 +9,7 @@ import { RoomProvider } from "../app/RoomProvider";
 import { createRoomStore } from "../state/room-store";
 import { useState } from "react";
 import { FLOATING_CARD_KEY } from "../state/floating-card";
+import { useWave } from "./card-shell";
 
 vi.mock("../services/room-session-controller.js", () => ({}));
 
@@ -157,6 +158,25 @@ test("the wave samples the level over time: silence drains it, muting flattens i
   host.push({ call: snapshot({ micEnabled: false }) });
   host.push({ call: snapshot({ micEnabled: true }), level: 0 });
   expect(waveHeights()).toEqual(["3px", "3px", "3px", "3px", "3px"]); // unmuting never shows old peaks
+});
+
+test("in silence, once drained, the wave holds its samples: no render ten times a second for nothing (desktop#149)", () => {
+  let renders = 0;
+  function Wave({ level }: { level: number }) {
+    renders += 1;
+    useWave(level, false);
+    return null;
+  }
+  // One sample at a time, as the card lives them (one act would batch them into one render).
+  const samples = (count: number) => { for (let i = 0; i < count; i += 1) act(() => { vi.advanceTimersByTime(WAVE_SAMPLE_MS); }); };
+  const { rerender } = render(<Wave level={40} />);
+  samples(3);
+  rerender(<Wave level={0} />);
+  samples(10);
+  const drained = renders;
+  samples(20);
+  // React may render once more to find nothing changed; never once a sample.
+  expect(renders - drained).toBeLessThanOrEqual(1);
 });
 
 test("near the pointer the call controls appear; they carry the room's commands to the app", () => {
