@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
+import { TURN_TUNING } from "./voice-settings.js";
 import { tryEndOfTurn, tryTranscription, tryVoice, type TurnStep } from "./voice-trial.js";
 
 /* A try of the device's voice settings, through a voice that records what it was asked: the halves of each call it
@@ -8,12 +9,14 @@ afterEach(() => { vi.useRealTimers(); });
 
 const SETTINGS = {
   stt: { catalog: "local", model: "whisper-base", language: null }, tts: { catalog: "local", model: "kokoro-82m-v1.0", voice: null, speed: 1 },
-  patience: "normal", end_of_turn: "silence", idle_unload_minutes: 10,
+  patience: "normal", end_of_turn: "silence", idle_unload_minutes: 10, turn: TURN_TUNING,
 };
+/** The turn numbers the app hands the voice with the input half. */
+const TURNS = { listening_bar: TURN_TUNING.listening_bar, barge_in_min_speech: 0.6, barge_in_window: 2.5, vad_confidence: 0.6, speech_start_ms: 400, pre_roll_ms: 1000 };
 /** The halves a transcription try asks for: the input alone, with its own end of turn. */
-const LISTENING = { input: { stt: SETTINGS.stt, endOfTurn: { kind: "silence", ms: 1500 }, patience: "normal" }, idle_unload_minutes: 10 };
+const LISTENING = { input: { stt: SETTINGS.stt, endOfTurn: { kind: "silence", ms: 1500 }, patience: "normal", ...TURNS }, idle_unload_minutes: 10 };
 /** The halves a voice try asks for: the output alone. */
-const SPEAKING = { output: { tts: { catalog: "local", model: "kokoro-82m-v1.0" }, voice: null, speed: 1, language: null }, idle_unload_minutes: 10 };
+const SPEAKING = { output: { tts: { catalog: "local", model: "kokoro-82m-v1.0" }, voice: null, speed: 1, fade_ms: 30, language: null }, audio_grace_ms: 1000, idle_unload_minutes: 10 };
 
 /** The voice, as a host and as the one call it starts: `start` records the halves and answers the call, whose `ready`
  *  resolves (or rejects with `startFails`) at once. */
@@ -159,7 +162,7 @@ test("a voice try asks for the output half alone: no microphone, detector, trans
   // The person's chosen voice, pace and build are the speaker's; the language they hear in is what is said by default.
   const chosen = fakeVoice();
   await tryVoice(chosen as unknown as Host, { ...SETTINGS, stt: { ...SETTINGS.stt, language: "es" }, tts: { ...SETTINGS.tts, voice: "ef_dora", speed: 1.2, build: "kokoro/fp16" } } as never, "Hola");
-  expect(chosen.calls[0]).toEqual(["start", { output: { tts: { catalog: "local", model: "kokoro-82m-v1.0", build: "kokoro/fp16" }, voice: "ef_dora", speed: 1.2, language: "es" }, idle_unload_minutes: 10 }]);
+  expect(chosen.calls[0]).toEqual(["start", { output: { tts: { catalog: "local", model: "kokoro-82m-v1.0", build: "kokoro/fp16" }, voice: "ef_dora", speed: 1.2, fade_ms: 30, language: "es" }, audio_grace_ms: 1000, idle_unload_minutes: 10 }]);
 });
 
 test("a transcription try asks for the input half alone, with its own end of turn and the ordinary patience, whatever the person's are", async () => {
@@ -338,7 +341,7 @@ test("while it runs a try tells how it goes: the voice listening and the microph
 /* The end of turn tried: the voice listens until stopped, and tells the latest of the person's turns step by step. */
 
 /** The halves a try of the end of turn asks for: the input alone, with the person's end of turn and patience. */
-const HEARING = { input: { stt: SETTINGS.stt, endOfTurn: { kind: "silence" }, patience: "normal" }, idle_unload_minutes: 10 };
+const HEARING = { input: { stt: SETTINGS.stt, endOfTurn: { kind: "silence" }, patience: "normal", ...TURNS }, idle_unload_minutes: 10 };
 
 /** The voice's state as it tells it: whether it hears speech, and how many turns wait for or are in transcription. */
 const callState = (listening: string, recognising = 0) => ({ listening, recognising, playback: "idle", microphone: "live" });
