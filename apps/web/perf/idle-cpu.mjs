@@ -12,7 +12,8 @@
  *   PERF_ONLY=<text>                             only the scenarios whose name contains it
  *
  * Scenarios: idle with one conversation and with six, no call; idle in a call (listening, nobody speaking) with six; the
- * same call while its conversation and two others work (the operator's usual room, desktop#149). Each row lists the
+ * same call while its conversation and two others work (the operator's usual room, desktop#149); the person speaking
+ * in that call, the microphone's level arriving as the app hands it (about 30 readings a second). Each row lists the
  * animations still running, by name and element. */
 
 import { execFileSync, spawn } from "node:child_process";
@@ -127,6 +128,33 @@ const SCENARIOS = [
           harness: Object.fromEntries(keys.map((k) => [k, true])),
           workingSince: Object.fromEntries(keys.map((k) => [k, 0])),
         });
+      });
+    },
+  },
+  {
+    name: "in a call, 6 conversations, the person speaking",
+    run: async (page) => {
+      await room(page, several);
+      await joinCall(page);
+      await page.evaluate(() => {
+        const { store, micLevel } = window.sidevoiceUI;
+        const thread = store.getState().facts.people.find((p) => p.thread_id === "t1");
+        const key = `${thread.node}|t1`;
+        store.patch({ callNode: thread.node, userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: key }, pendingPhase: "listening",
+          voiceState: { listening: "speaking", recognising: 0, playback: "idle", microphone: "live" } });
+        // The level as the room's runtime writes it on each reading (room-session-controller.js voiceLevel): a voice
+        // rising and falling, a reading every 32 ms, only the whole-percent changes (desktop#150).
+        let level = 0, last = -1;
+        window.sidevoiceAudio = { ...window.sidevoiceAudio, level: () => level / 100 };
+        setInterval(() => {
+          const t = performance.now() / 1000;
+          level = Math.round(Math.max(0, 40 + 35 * Math.sin(t * 7) + 15 * Math.sin(t * 23)));
+          if (level === last) return;
+          last = level;
+          document.getElementById("mic-control")?.style.setProperty("--mic-fill", level + "%");
+          document.getElementById("mic-level-meter")?.setAttribute("aria-valuenow", String(level));
+          micLevel?.publish?.(level);
+        }, 32);
       });
     },
   },
