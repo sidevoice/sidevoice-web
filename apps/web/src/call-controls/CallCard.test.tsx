@@ -287,6 +287,21 @@ test("the devices: the system's choice and unnamed or missing devices in the car
   host.push({ call: snapshot({ devices: { ...devices, busy: true, inputId: "mbp" } }) });
   host.push({ call: snapshot({ devices: { ...devices, busy: false, inputId: "default" } }) });
   expect(screen.getByRole("status")).toHaveTextContent("The call kept the previous device");
+  expect(screen.getByRole("group", { name: "Microphone and speaker" })).toBeInTheDocument();
+});
+
+test("the devices panel closes once the room confirms the chosen device", () => {
+  const host = fakeHost();
+  render(<Card host={host} />);
+  hoverAndWait();
+  fireEvent.click(screen.getByRole("button", { name: "Microphone and speaker" }));
+  fireEvent.click(screen.getByRole("button", { name: /Microphone.*System default/ }));
+  fireEvent.click(screen.getByRole("option", { name: /MacBook Pro Microphone/ }));
+  const devices = snapshot().devices!;
+  host.push({ call: snapshot({ devices: { ...devices, busy: true, inputId: "default" } }) });
+  expect(screen.getByRole("group", { name: "Microphone and speaker" })).toBeInTheDocument();
+  host.push({ call: snapshot({ devices: { ...devices, busy: false, inputId: "mbp" } }) });
+  expect(screen.queryByRole("group", { name: "Microphone and speaker" })).not.toBeInTheDocument();
 });
 
 test("devices the room cannot choose stay listed, disabled, with where to choose them", () => {

@@ -279,12 +279,19 @@ function deviceName(option: AudioDeviceOption, kind: "input" | "output", t: Tran
   return option.label;
 }
 
-export function DevicePicker({ call, run, t }: { call: CallSnapshot; run: (command: CallCommand) => void; t: Translate }) {
+export function DevicePicker({ call, run, onDone, t }: { call: CallSnapshot; run: (command: CallCommand) => void; onDone(): void; t: Translate }) {
   const [open, setOpen] = useState<"input" | "output" | null>(null);
   const [asked, setAsked] = useState<{ kind: "input" | "output"; id: string } | null>(null);
   const devices = call.devices;
   // The room changes devices and says no by keeping the one it had: the card says so once the room has answered.
   const failed = !!asked && !!devices && !devices.busy && (asked.kind === "input" ? devices.inputId : devices.outputId) !== asked.id;
+  // Once the room has confirmed the choice (it now has the device that was asked), the panel is done; a refusal keeps it open.
+  const confirmed = !!asked && !!devices && !devices.busy && (asked.kind === "input" ? devices.inputId : devices.outputId) === asked.id;
+  useEffect(() => {
+    if (!confirmed) return;
+    setAsked(null);
+    onDone();
+  }, [confirmed, onDone]);
   if (!devices) return null;
   const rows = [
     { kind: "input" as const, label: t("card.microphone"), Icon: MicrophoneIcon, options: devices.inputs, current: devices.inputId, usable: devices.available },

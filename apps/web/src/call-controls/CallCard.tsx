@@ -114,7 +114,7 @@ function PanelCard({ state, shell, t }: { state: CallControlsState; shell: CardS
   return (
     <div className="call-card card-panel-card">
       {shell.panel === "conversations" && <Conversations state={state} shell={shell} t={t} />}
-      {shell.panel === "devices" && <DevicePicker call={state.call} run={shell.run} t={t} />}
+      {shell.panel === "devices" && <DevicePicker call={state.call} run={shell.run} onDone={() => shell.setPanel(null)} t={t} />}
     </div>
   );
 }
