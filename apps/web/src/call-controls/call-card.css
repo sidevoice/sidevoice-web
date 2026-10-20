@@ -275,7 +275,8 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .floating-card[data-open=up][data-side=left] .avatar-card { grid-template-areas: "balloons ." "figure dock"; }
 .avatar-figure { grid-area: figure; width: var(--card-w); height: var(--card-w); }
 .avatar-figure .sv-avatar { display: block; width: 100%; height: 100%; }
-.avatar-dock { grid-area: dock; display: grid; gap: 6px; width: 346px; margin: 0 8px; padding: 8px 8px 0; border: 1px solid var(--sv-border);
+.avatar-side { grid-area: dock; position: relative; }
+.avatar-dock { display: grid; gap: 6px; width: 346px; margin: 0 8px; padding: 8px 8px 0; border: 1px solid var(--sv-border);
   border-radius: var(--sv-radius-2xl, 20px); background: var(--sv-bg); color: var(--sv-text); --card-bg: var(--sv-bg); font-family: var(--sv-font-sans);
   box-shadow: 0 12px 34px rgb(0 0 0 / 45%); }
 .avatar-dock .card-call-bar { --sv-call-button: 34px; }
@@ -294,6 +295,51 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 /* Close to the creature: its box has room under its feet for its shadow, and over its head for its antics. */
 .floating-card[data-open=down] .avatar-balloons { margin-top: calc(var(--card-w) * -.1); }
 .floating-card[data-open=up] .avatar-balloons { margin-bottom: calc(var(--card-w) * -.04); }
+
+/* ---------- C1: its controls behind a handle (operator, 2026-10-20; briefs/UX-DECISIONS-2026-10-20.md) ----------
+ * .floating-card carries data-handle (the handle is out: the pointer on the creature), data-expanded (the card is out: the
+ * pointer on the handle or the card, or focus in it) and, for a moment, data-folding (the card folding back into the handle).
+ * The handle sits on the card's leading edge, level with its middle: the card unfolds out of it. The window keeps the card's
+ * box from the moment the handle shows, so only the clip and the opacities move: nothing reflows mid-morph. */
+.avatar-card { --handle-w: 46px; --handle-h: 28px; }
+/* The handle: a small pill in the card's own chrome (its surface, line and shadow), the more mark and a chevron toward where
+ * it opens: it reads "this unfolds". */
+.avatar-handle { position: absolute; z-index: 6; top: 50%; display: inline-flex; align-items: center; justify-content: center; gap: 1px;
+  width: var(--handle-w); height: var(--handle-h); padding: 0 4px 0 6px; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-pill, 999px);
+  background: var(--sv-bg); color: var(--sv-text-muted, var(--sv-muted)); box-shadow: 0 6px 18px rgb(0 0 0 / 35%); font: inherit; cursor: pointer;
+  translate: 0 -50%; opacity: 0; scale: .8; pointer-events: none; transition: opacity .12s ease-out, scale .12s ease-out; }
+.floating-card[data-side=left] .avatar-handle { left: 8px; transform-origin: left center; }
+.floating-card[data-side=right] .avatar-handle { right: 8px; transform-origin: right center; }
+.floating-card[data-handle]:not([data-expanded]) .avatar-handle, .floating-card:not([data-expanded]) .avatar-handle:focus-visible { opacity: 1; scale: 1; pointer-events: auto; }
+.avatar-handle:hover { color: var(--sv-text); background: color-mix(in srgb, var(--sv-text) 8%, var(--sv-bg)); }
+.avatar-handle:focus-visible { outline: 2px solid var(--sv-focus, var(--accent)); outline-offset: 2px; }
+.avatar-handle svg { display: block; flex: none; }
+.floating-card[data-side=left] .avatar-handle-chevron { rotate: -90deg; }
+.floating-card[data-side=right] .avatar-handle-chevron { rotate: 90deg; }
+.floating-card[data-expanded] .avatar-handle-chevron { rotate: 0deg; }
+/* The morph: the handle becomes the card. Open, the card's surface grows out of the handle's own box (its clip, from the
+ * pill's rect on the card's leading edge to the whole card, .22s) while the handle hands over to it (.06s) and the card's
+ * contents fade in as the card always has (.15s from .07s); folding, the reverse: the contents fade (.08s), the surface
+ * shrinks back into the pill's rect (.22s), and the handle shows again as it lands (from .16s, .08s). */
+.avatar-dock { pointer-events: none; visibility: hidden; transition: clip-path .22s cubic-bezier(.3, .7, .2, 1), visibility 0s linear .22s; }
+.floating-card[data-side=left] .avatar-dock { clip-path: inset(calc(50% - var(--handle-h) / 2) calc(100% - var(--handle-w)) calc(50% - var(--handle-h) / 2) 0 round calc(var(--handle-h) / 2)); }
+.floating-card[data-side=right] .avatar-dock { clip-path: inset(calc(50% - var(--handle-h) / 2) 0 calc(50% - var(--handle-h) / 2) calc(100% - var(--handle-w)) round calc(var(--handle-h) / 2)); }
+.floating-card[data-expanded] .avatar-dock {
+  clip-path: inset(-40px round calc(var(--sv-radius-2xl, 20px) + 40px)) !important; pointer-events: auto; visibility: visible;
+  transition: clip-path .22s cubic-bezier(.2, .8, .2, 1), visibility 0s; }
+.avatar-dock > * { opacity: 0; transition: opacity .08s linear; }
+.floating-card[data-expanded] .avatar-dock > * { opacity: 1; transition: opacity .15s linear .07s; }
+.floating-card[data-expanded] .avatar-handle { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .06s linear, visibility 0s linear .06s; }
+.floating-card[data-folding]:not([data-expanded]) .avatar-handle { scale: 1; transition: opacity .08s linear .16s; }
+/* Reduced motion: no morph; the card is simply there, then the handle again. */
+@media (prefers-reduced-motion: reduce) { .avatar-handle, .avatar-dock, .avatar-dock > * { transition: none !important; } }
+
+/* Cursors (operator, 2026-10-20): buttons show the hand, the handle and "Cancel sending" too; C1's creature is what you drag:
+ * the open hand over it, the closed hand while it is pressed or dragged. A1 and B1 keep the plain pointer (their whole card
+ * drags); balloons stay plain (a press on one moves nothing). */
+.avatar-handle:not(:disabled), .cancel-input:not(:disabled) { cursor: pointer; }
+.avatar-figure, .avatar-figure * { cursor: grab; }
+.avatar-figure:active, .avatar-figure:active * { cursor: grabbing; }
 
 /* Sized freely (the person resized the picture): the header and the bar take their room, the rest is the stage's, its 16:9
  * tile centred on the room's stage background (as the room's slot around a tile of another shape; the tile is fitted by

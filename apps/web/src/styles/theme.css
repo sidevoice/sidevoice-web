@@ -119,7 +119,7 @@
   --sv-bubble-edge: #c5b9d5; --sv-bubble-shadow: 0 3px 8px rgb(42 26 64 / 10%), 0 16px 36px -18px rgb(74 47 107 / 45%);
   --sv-chat-agent-bg: #ffffff; --sv-chat-agent-fg: #1b1d24; --sv-chat-agent-subtle: #686b7a;
   --sv-chat-person-bg: #4a2f6b; --sv-chat-person-fg: #ffffff; --sv-chat-person-subtle: #d9cfe8;
-  --sv-chat-person-mark: #ffffff; --sv-chat-person-quiet: #ab9bc8; --sv-chat-person-danger: #ffb4ab; --sv-chat-person-wash: rgb(255 255 255 / 14%);
+  --sv-chat-person-mark: #ffffff; --sv-chat-person-quiet: #ab9bc8; --sv-chat-person-danger: #ffb4ab; --sv-chat-person-wash: rgb(255 255 255 / 14%); --sv-chat-person-wash-hover: rgb(255 255 255 / 20%); --sv-chat-person-wash-pressed: rgb(255 255 255 / 30%);
   --sv-stage-bg: radial-gradient(ellipse at 12% 0%, #eee4fa 0, transparent 50%), linear-gradient(145deg, #faf8fd, #f7f2e9);
   --sv-shadow-xs: 0 1px 2px rgb(42 26 64 / 8%);
   --sv-shadow-sm: 0 1px 2px rgb(42 26 64 / 5%), 0 8px 20px -14px rgb(42 26 64 / 22%);
@@ -149,7 +149,7 @@
   --sv-bubble-edge: #4b4756; --sv-bubble-shadow: 0 12px 32px rgb(0 0 0 / 60%);
   --sv-chat-agent-bg: #212125; --sv-chat-agent-fg: #fafafa; --sv-chat-agent-subtle: #93939c;
   --sv-chat-person-bg: #46366a; --sv-chat-person-fg: #ffffff; --sv-chat-person-subtle: #d9cfe8;
-  --sv-chat-person-mark: #ffffff; --sv-chat-person-quiet: #b3a4ce; --sv-chat-person-danger: #ffb4ab; --sv-chat-person-wash: rgb(255 255 255 / 14%);
+  --sv-chat-person-mark: #ffffff; --sv-chat-person-quiet: #b3a4ce; --sv-chat-person-danger: #ffb4ab; --sv-chat-person-wash: rgb(255 255 255 / 14%); --sv-chat-person-wash-hover: rgb(255 255 255 / 20%); --sv-chat-person-wash-pressed: rgb(255 255 255 / 30%);
   --sv-stage-bg: radial-gradient(ellipse at 12% 0%, rgb(201 182 236 / 14%) 0, transparent 50%), linear-gradient(145deg, #161518, #111113);
   --sv-shadow-xs: 0 1px 2px rgb(0 0 0 / 60%); --sv-shadow-sm: none; --sv-shadow-md: 0 16px 34px rgb(0 0 0 / 55%); --sv-shadow-lg: 0 30px 80px rgb(0 0 0 / 70%);
   /* Buttons: a 1px inner highlight on fills, a hairline raise, and the secondary's own fill. */

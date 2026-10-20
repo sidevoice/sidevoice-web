@@ -1334,6 +1334,7 @@ export const messages: Messages = {
   "card.agent.unknown": "エージェント",
   "card.reconnecting": "再接続中…",
   "card.switchConversation": "会話を切り替える",
+  "card.controls": "通話コントロール",
   "card.conversations": "会話",
   "card.openApp": "Sidevoice を開く",
   "card.mute": "ミュート",

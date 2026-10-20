@@ -58,7 +58,7 @@ test("just the avatar: its balloons below it in the screen's upper half point th
   page("avatar");
   expect(document.querySelector(".avatar-balloons")).toHaveClass("balloon--tail-up");
   expect(document.querySelector(".avatar-balloons .stage-bubble")).not.toBeNull();
-  // The dock comes near the pointer only.
+  // Its controls come out of a handle, shown by the pointer on the creature only.
   expect(document.querySelector(".avatar-dock")).toBeNull();
 });
 
@@ -93,4 +93,49 @@ test("the picture has no working badge over the creature: the stage's working li
   expect(document.querySelector(".picture-card .stage-tile[data-card]")).toHaveAttribute("data-mood", "working");
   expect(screen.queryByText("Working…")).toBeNull();
   expect(document.querySelector(".picture-card [role=status]")).toBeNull();
+});
+
+test("just the avatar: the pointer on the creature shows a handle, on the handle it unfolds into the card, away it folds back", () => {
+  vi.useFakeTimers();
+  page("avatar");
+  expect(document.querySelector(".avatar-handle")).toBeNull();
+  // A balloon is not the creature: it brings nothing out.
+  fireEvent.pointerOver(document.querySelector(".avatar-balloons")!);
+  act(() => { vi.advanceTimersByTime(700); });
+  expect(document.querySelector(".avatar-handle")).toBeNull();
+  fireEvent.pointerOver(document.querySelector(".avatar-figure")!);
+  act(() => { vi.advanceTimersByTime(130); });
+  const handle = screen.getByRole("button", { name: "Call controls" });
+  expect(document.querySelector(".floating-card")).toHaveAttribute("data-handle");
+  expect(document.querySelector(".floating-card")).not.toHaveAttribute("data-expanded");
+  expect(handle).toHaveAttribute("aria-expanded", "false");
+  fireEvent.pointerOver(handle);
+  act(() => { vi.advanceTimersByTime(130); });
+  expect(document.querySelector(".floating-card")).toHaveAttribute("data-expanded");
+  expect(handle).toHaveAttribute("aria-expanded", "true");
+  expect(document.querySelector(".avatar-dock")).not.toBeNull();
+  // Away: the card folds into the handle after the usual delay, and the handle goes once the pointer has left.
+  fireEvent.pointerOver(document.querySelector(".avatar-figure")!);
+  act(() => { vi.advanceTimersByTime(520); });
+  expect(document.querySelector(".floating-card")).not.toHaveAttribute("data-expanded");
+  expect(document.querySelector(".floating-card")).toHaveAttribute("data-folding");
+  fireEvent.pointerLeave(document.querySelector(".avatar-card")!);
+  act(() => { vi.advanceTimersByTime(800); });
+  expect(document.querySelector(".avatar-handle")).toBeNull();
+});
+
+test("just the avatar: Enter on the handle opens the card with focus on its first control; Escape folds it back, focus on the handle", () => {
+  vi.useFakeTimers();
+  page("avatar");
+  fireEvent.pointerOver(document.querySelector(".avatar-figure")!);
+  act(() => { vi.advanceTimersByTime(130); });
+  fireEvent.click(screen.getByRole("button", { name: "Call controls" }));
+  act(() => { vi.advanceTimersByTime(10); });
+  expect(document.querySelector(".floating-card")).toHaveAttribute("data-expanded");
+  const first = document.querySelector<HTMLElement>(".avatar-dock button:not(:disabled)")!;
+  expect(document.activeElement).toBe(first);
+  fireEvent.keyDown(first, { key: "Escape" });
+  act(() => { vi.advanceTimersByTime(10); });
+  expect(document.querySelector(".floating-card")).not.toHaveAttribute("data-expanded");
+  expect(document.activeElement).toBe(screen.getByRole("button", { name: "Call controls" }));
 });

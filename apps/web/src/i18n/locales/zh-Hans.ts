@@ -1333,6 +1333,7 @@ export const messages: Messages = {
   "card.agent.unknown": "智能体",
   "card.reconnecting": "正在重新连接…",
   "card.switchConversation": "切换对话",
+  "card.controls": "通话控件",
   "card.conversations": "对话",
   "card.openApp": "打开 Sidevoice",
   "card.mute": "静音",
