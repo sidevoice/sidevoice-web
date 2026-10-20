@@ -33,3 +33,22 @@ test("an app without clearSize or preview still takes a starting size", async ()
   fireEvent.click(screen.getByRole("radio", { name: "Small" }));
   expect(JSON.parse(localStorage.getItem("sidevoice.floatingCard")!).size).toBe("s");
 });
+
+test("the first row turns the card off: the rest stays in view, disabled, and nothing previews", async () => {
+  const bridge = { ...base(), settings: vi.fn(async () => ({ alwaysShown: false, enabled: true })), setEnabled: vi.fn(async (enabled: boolean) => ({ enabled })),
+    setCorner: vi.fn(), resetPlace: vi.fn(), preview: vi.fn() };
+  inApp(bridge);
+  render(<RoomProvider store={createRoomStore()}><FloatingCardSettings t={translator("en")} /></RoomProvider>);
+  const master = await screen.findByRole("switch", { name: "Show the floating card" });
+  expect(master).toBeChecked();
+  expect(screen.getByRole("radio", { name: /Card/ })).toBeEnabled();
+  fireEvent.click(master);
+  await waitFor(() => expect(bridge.setEnabled).toHaveBeenCalledWith(false));
+  await waitFor(() => expect(screen.getByRole("radio", { name: /Picture in picture/ })).toBeDisabled());
+  expect(screen.getByRole("radio", { name: "Large" })).toBeDisabled();
+  expect(screen.getByRole("radio", { name: "Top left" })).toBeDisabled();
+  expect(screen.getByRole("switch", { name: "Always show the call controls" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Reset size and position" })).toBeDisabled();
+  expect(screen.getByText(/No card during calls/)).toBeInTheDocument();
+  expect(bridge.preview).not.toHaveBeenCalled();
+});

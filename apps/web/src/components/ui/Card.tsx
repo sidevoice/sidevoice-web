@@ -1,4 +1,4 @@
-import type { HTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
 import { cn } from "../../lib/cn";
 import { CheckIcon } from "./Icons";
 
@@ -9,7 +9,7 @@ export function Card({ className, padded = true, ...props }: HTMLAttributes<HTML
 
 /* A whole card that is one choice of a few (inside a `role="radiogroup"`): selected, it is outlined in the accent and
  * carries a check, so the choice never rests on colour alone. */
-export function ChoiceCard({ selected, onSelect, className, children, ...props }: Omit<HTMLAttributes<HTMLButtonElement>, "onSelect"> & { selected: boolean; onSelect: () => void }) {
+export function ChoiceCard({ selected, onSelect, className, children, ...props }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onSelect"> & { selected: boolean; onSelect: () => void }) {
   return (
     <button type="button" role="radio" aria-checked={selected} className={cn("ui-card ui-card--padded ui-card--interactive", className)} data-selected={selected || undefined}
       onClick={onSelect} {...props}>

@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { Button } from "../../components/ui/Button";
 import { ChoiceCard, Group, Row, Section } from "../../components/ui/Card";
 import { Segmented } from "../../components/ui/Tabs";
+import { Switch } from "../../components/ui/Switch";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
 import { stillAvatar } from "../avatar/avatar-state";
 import { avatarFor, avatarTone, SIDEVOICE_MASCOT } from "../avatar/avatar-spec";
@@ -31,21 +32,24 @@ export function useFloatingCardSection(): boolean {
 export function FloatingCardSettings({ t }: { t: Translate }) {
   const bridge = callControlsBridge();
   const prefs = useFloatingCard();
-  const [app, setApp] = useState<{ corner?: CardCorner; moved?: boolean } | null>(null);
+  const [app, setApp] = useState<{ corner?: CardCorner; moved?: boolean; enabled?: boolean } | null>(null);
   useEffect(() => {
     let gone = false;
-    void bridge?.settings().then((value) => { if (!gone) setApp({ corner: value.corner, moved: value.moved }); }).catch(() => undefined);
+    void bridge?.settings().then((value) => { if (!gone) setApp({ corner: value.corner, moved: value.moved, enabled: value.enabled }); }).catch(() => undefined);
     return () => { gone = true; };
   }, [bridge]);
   if (!bridge) return null;
   // A change shows the real card for a moment, where the app offers it.
-  const changed = () => bridge.preview?.();
+  // Off: no card shows (not even the moment a change shows it), and the rest of the section stays, disabled.
+  const off = app?.enabled === false;
+  const changed = () => { if (!off) bridge.preview?.(); };
   return <Section id="floating-card" title={t("settings.section.floatingCard")} description={t("settings.floatingCard.description")}>
+    {bridge.setEnabled && <Group><EnabledRow bridge={bridge} on={!off} t={t} onChange={(enabled) => setApp((now) => ({ ...now, enabled }))} /></Group>}
     <Group>
       <Row label={t("settings.floatingCard.style")} block>
         <div className="floating-card-choices" role="radiogroup" aria-label={t("settings.floatingCard.style")}>
           {CARD_FORMATS.map((format) => (
-            <ChoiceCard key={format} className="floating-card-choice" selected={prefs.format === format}
+            <ChoiceCard key={format} className="floating-card-choice" selected={prefs.format === format} disabled={off}
               onSelect={() => { setFloatingCard({ format }); changed(); }}>
               <CardPreview format={format} />
               <strong>{t(FORMAT_WORDS[format].name)}</strong>
@@ -60,13 +64,13 @@ export function FloatingCardSettings({ t }: { t: Translate }) {
           // A preset drops a size the person dragged the picture to; the card shows once the app has.
           void Promise.resolve(bridge.clearSize?.()).catch(() => undefined).then(changed);
         }}
-          items={CARD_SIZES.map((size) => ({ value: size, label: t(`settings.floatingCard.size.${size}` as MessageKey) }))} />
+          items={CARD_SIZES.map((size) => ({ value: size, disabled: off, label: t(`settings.floatingCard.size.${size}` as MessageKey) }))} />
       </Row>
-      {bridge.setCorner && <CornerRow bridge={bridge} corner={app?.corner ?? "tr"} t={t}
+      {bridge.setCorner && <CornerRow bridge={bridge} corner={app?.corner ?? "tr"} t={t} disabled={off}
         onChange={(corner) => { setApp((now) => ({ ...now, corner })); changed(); }} />}
-      <DesktopCallSettings t={t} />
+      <DesktopCallSettings t={t} disabled={off} />
       {bridge.resetPlace && <Row label="">
-        <Button variant="secondary" size="sm" disabled={app?.moved === false}
+        <Button variant="secondary" size="sm" disabled={off || app?.moved === false}
           onClick={() => { void bridge.resetPlace!().then(() => { setApp((now) => ({ ...now, moved: false })); changed(); }); }}>
           {t("settings.floatingCard.reset")}
         </Button>
@@ -76,13 +80,13 @@ export function FloatingCardSettings({ t }: { t: Translate }) {
 }
 
 /** Where a card first appears: four spots on a small screen. */
-function CornerRow({ bridge, corner, onChange, t }: { bridge: CallControlsBridge; corner: CardCorner; onChange(corner: CardCorner): void; t: Translate }) {
+function CornerRow({ bridge, corner, onChange, t, disabled }: { bridge: CallControlsBridge; corner: CardCorner; onChange(corner: CardCorner): void; t: Translate; disabled: boolean }) {
   return <Row label={t("settings.floatingCard.corner")} description={t("settings.floatingCard.cornerHint")}>
     <div className="floating-card-corners" role="radiogroup" aria-label={t("settings.floatingCard.corner")}>
       {CARD_CORNERS.map((each) => {
         const label = t(`settings.floatingCard.corner.${each}` as MessageKey);
         return <button key={each} type="button" role="radio" className="floating-card-corner" data-corner={each} aria-checked={each === corner}
-          aria-label={label} title={label} onClick={() => { void bridge.setCorner!(each).then((value) => onChange(value.corner)); }} />;
+          aria-label={label} title={label} disabled={disabled} onClick={() => { void bridge.setCorner!(each).then((value) => onChange(value.corner)); }} />;
       })}
     </div>
   </Row>;
@@ -104,3 +108,17 @@ function CardPreview({ format }: { format: CardFormat }) {
 }
 
 const STILL = stillAvatar("idle");
+
+/** The master switch, first in the section: on by default; off, no card shows during a call and the rest stays in view,
+ *  disabled, with this row's line saying what turns it back on (decided 2026-10-20). */
+function EnabledRow({ bridge, on, onChange, t }: { bridge: CallControlsBridge; on: boolean; onChange(enabled: boolean): void; t: Translate }) {
+  const [failed, setFailed] = useState(false);
+  const change = (next: boolean) => {
+    onChange(next); setFailed(false);
+    void bridge.setEnabled!(next).then((value) => { onChange(value.enabled); if (value.enabled) bridge.preview?.(); }).catch(() => { onChange(!next); setFailed(true); });
+  };
+  return <Row label={t("settings.callCard.enabled")} description={failed ? undefined : t(on ? "settings.callCard.enabledOnHint" : "settings.callCard.enabledOffHint")}>
+    <Switch checked={on} aria-label={t("settings.callCard.enabled")} onChange={change} />
+    {failed && <span className="desktop-shortcut-error" role="alert">{t("settings.desktop.changeFailed")}</span>}
+  </Row>;
+}
