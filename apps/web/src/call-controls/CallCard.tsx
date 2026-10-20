@@ -16,7 +16,7 @@
  * (state/captions.ts, shared with the room's call bar). What opens from the card (captions, lists) opens toward the
  * screen's middle (`place`). The room's components draw on the card's own store (card-room.ts); the host's state and the
  * plumbing are card-shell.tsx. */
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from "react";
 import { CaptionsIcon, CaptionsOffIcon, ChevronIcon, CloseIcon, ConversationsIcon, HangupIcon, HarnessIcon, MachinesIcon, MicrophoneIcon,
   MicrophoneOffIcon, MoreIcon, OpenAppIcon, SettingsIcon, SkipIcon } from "../components/ui/Icons";
 import { Button } from "../components/ui/Button";
@@ -38,7 +38,7 @@ import { useStageConversation } from "../features/call/stage-view";
 import { useRoomStore } from "../state/room-store";
 import { receiptView } from "../state/room-session-state.js";
 import { setCaptions, useCaptions } from "../state/captions";
-import { CARD_WIDTHS, PIP_MIN_WIDTH, useFloatingCard, type CardFormat, type CardSize } from "../state/floating-card";
+import { CARD_WIDTHS, PIP_MIN_HEIGHT, PIP_MIN_WIDTH, useFloatingCard, type CardFormat, type CardSize } from "../state/floating-card";
 import type { ParticipantView } from "../state/room-types";
 import type { CallControlsHost, CallControlsState } from "./host";
 import type { Translate } from "../i18n/translator";
@@ -66,7 +66,7 @@ function useCardAgent(state: CallControlsState): { threadId: string | null; spec
 
 function FloatingCard({ host, state, format, size, t }: { host: CallControlsHost; state: CallControlsState; format: CardFormat; size: CardSize; t: Translate }) {
   const custom = format === "pip" && state.size ? state.size : null;
-  const shell = useCardShell(host, state, format === "pip" && host.resize ? { minWidth: PIP_MIN_WIDTH + 2 * CARD_MARGIN, minHeight: 0 } : undefined, format === "avatar");
+  const shell = useCardShell(host, state, format === "pip" && host.resize ? { minWidth: PIP_MIN_WIDTH + 2 * CARD_MARGIN, minHeight: PIP_MIN_HEIGHT + 2 * CARD_MARGIN } : undefined, format === "avatar");
   const place = state.place ?? UPPER_RIGHT;
   const captions = useCaptions();
   const width = custom ? custom.width - 2 * CARD_MARGIN : CARD_WIDTHS[format][size];
@@ -299,11 +299,37 @@ function ResizeGrip({ host, place }: { host: CallControlsHost; place: Place }) {
     onPointerCancel={() => { if (active.current === null) return; active.current = null; host.resize!("end", edge); }} />;
 }
 
+/** A label of an icon and words never shows as its icon alone (playground callcard.mjs `noStubs`): with fewer than about three
+ *  characters of its words in view, the stage's model badge goes whole. Read again as the stage is resized. */
+function useNoStubs(stage: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const node = stage.current;
+    if (!node) return;
+    const read = () => {
+      for (const label of node.querySelectorAll<HTMLElement>(".stage-badge")) {
+        label.style.visibility = "";
+        const text = label.querySelector<HTMLElement>(":scope > span:last-child");
+        if (!text || getComputedStyle(label).display === "none") continue;
+        const least = parseFloat(getComputedStyle(text).fontSize) * 0.55 * 3;
+        if (text.clientWidth < Math.min(least, text.scrollWidth)) label.style.visibility = "hidden";
+      }
+    };
+    read();
+    const observer = new ResizeObserver(read);
+    observer.observe(node);
+    const tile = node.querySelector(".stage-tile");
+    if (tile) observer.observe(tile);
+    return () => observer.disconnect();
+  }, [stage]);
+}
+
 function PictureCard({ host, state, shell, place, sized, t }: { host: CallControlsHost; state: CallControlsState; shell: CardShell; place: Place; sized: boolean; t: Translate }) {
+  const stage = useRef<HTMLDivElement>(null);
+  useNoStubs(stage);
   return (
     <div ref={shell.body} className="picture-card" data-sized={sized || undefined}>
       <CardHeading state={state} shell={shell} t={t} />
-      <div className="picture-stage"><StageTile card /></div>
+      <div ref={stage} className="picture-stage"><StageTile card /></div>
       <CardCallBar />
       <ResizeGrip host={host} place={place} />
     </div>

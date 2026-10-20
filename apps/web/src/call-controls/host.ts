@@ -74,8 +74,8 @@ export interface CallControlsHost {
   subscribe(listener: (state: CallControlsState) => void): () => void;
   run(command: CallCommand): void;
   /** The card's size in CSS pixels, its window's margin included: the app sizes the window to it. `card`: where the
-   *  card's body is in it, kept where it rests on screen as the window grows. `resizable`: the picture-in-picture, which
-   *  the person may resize (`resize`) down to `minWidth` (the window's, margin included). */
+   *  card's body is in it, kept where it rests on screen as the window grows. `resizable`: the picture-in-picture, which the person may resize (`resize`) freely in both directions, down
+   *  to `minWidth` and `minHeight` (the window's, margin included); its stage keeps 16:9 inside whatever shape the window takes. */
   layout(size: { width: number; height: number; card?: CardBox; resizable?: { minWidth: number; minHeight: number } }): void;
   /** Resizing the picture-in-picture by its grip, as `drag`: the host follows the pointer, resizes the window, keeps the
    *  size, and tells the card (`size`). Optional: a host without it offers the preset sizes only. */
