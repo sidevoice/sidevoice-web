@@ -28,18 +28,18 @@ test("transcribing bars keep 3:1 contrast at the pulse minimum and with reduced 
     const host = document.createElement("div");
     host.className = "call-layout";
     host.innerHTML = `<div class="person-bubble">
-      <span class="voice-wave" data-phase="transcribing"><canvas></canvas></span>
+      <span class="voice-wave" data-phase="transcribing"><span class="voice-wave-bars"></span></span>
       <span class="voice-bars" data-phase="transcribing"><i></i></span></div>`;
     document.body.append(host);
   });
   const paint = async (reduced) => {
     await page.emulateMedia({ reducedMotion: reduced ? "reduce" : "no-preference" });
     return page.evaluate((reduced) => {
-      const canvas = document.querySelector(".person-bubble .voice-wave canvas");
+      const waveBars = document.querySelector(".person-bubble .voice-wave .voice-wave-bars");
       const bar = document.querySelector(".person-bubble .voice-bars i");
-      const wave = canvas.parentElement, bars = bar.parentElement;
-      if (canvas.getAnimations().length) {
-        const animation = canvas.getAnimations()[0];
+      const wave = waveBars.parentElement, bars = bar.parentElement;
+      if (waveBars.getAnimations().length) {
+        const animation = waveBars.getAnimations()[0];
         animation.currentTime = 950;
         animation.pause();
       }
@@ -48,7 +48,7 @@ test("transcribing bars keep 3:1 contrast at the pulse minimum and with reduced 
         opacity: Number(getComputedStyle(element).opacity),
         surface: getComputedStyle(surface).backgroundColor,
       });
-      return reduced ? colors(bar, bars) : colors(canvas, wave);
+      return reduced ? colors(bar, bars) : colors(waveBars, wave);
     }, reduced);
   };
   const ratio = ({ ink, opacity, surface }) => {
@@ -83,7 +83,7 @@ test("the stage's own voice-note bars keep 3:1 on the person's balloon, at the t
     const host = document.createElement("div");
     host.className = "call-layout";
     host.innerHTML = `<div class="stage-tile" style="width: 100%; height: 640px"><div class="person-turns"><div class="speech-bubble person-bubble" data-live="">
-      <span class="voice-wave" data-phase="transcribing"><canvas></canvas></span>
+      <span class="voice-wave" data-phase="transcribing"><span class="voice-wave-bars"></span></span>
       <span class="voice-bars" data-phase="transcribing"><i></i></span><div class="person-live-actions"></div></div></div></div>`;
     document.body.replaceChildren(host);
   });
@@ -91,7 +91,7 @@ test("the stage's own voice-note bars keep 3:1 on the person's balloon, at the t
     const paint = await page.evaluate((theme) => {
       document.documentElement.dataset.theme = theme;
       const bubble = document.querySelector(".person-bubble");
-      return { canvas: getComputedStyle(document.querySelector(".voice-wave canvas")).color, bar: getComputedStyle(document.querySelector(".voice-bars i")).backgroundColor,
+      return { bars: getComputedStyle(document.querySelector(".voice-wave .voice-wave-bars")).color, bar: getComputedStyle(document.querySelector(".voice-bars i")).backgroundColor,
         wave: getComputedStyle(document.querySelector(".voice-wave")).backgroundColor, fill: getComputedStyle(bubble, "::before").backgroundColor,
         size: [bubble.offsetWidth, bubble.offsetHeight] };
     }, theme);
@@ -99,7 +99,7 @@ test("the stage's own voice-note bars keep 3:1 on the person's balloon, at the t
     expect(paint.wave, theme).toBe("rgba(0, 0, 0, 0)");
     // The shimmer dims the bars to 55% at its darkest (call-view.css person-wave-think's mask).
     const channels = (value) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number).map((v) => value.startsWith("color(srgb ") ? v * 255 : v);
-    const dimmed = channels(paint.canvas).map((v, i) => v * .55 + channels(paint.fill)[i] * .45);
+    const dimmed = channels(paint.bars).map((v, i) => v * .55 + channels(paint.fill)[i] * .45);
     expect(contrast(`rgb(${dimmed.join(", ")})`, paint.fill), `${theme} shimmer`).toBeGreaterThanOrEqual(3);
     expect(contrast(paint.bar, paint.fill), `${theme} still`).toBeGreaterThanOrEqual(3);
   }

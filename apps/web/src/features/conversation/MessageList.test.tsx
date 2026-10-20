@@ -141,7 +141,7 @@ test("keeps the active transcribed draft cancellable after listening text disapp
 test("the open turn is the stage's person balloon, with cancelling in its own row inside it", () => {
   const { container } = render(<MessageList conversation={{ messages: [], pendingText: "", pendingCancellable: true, pendingPhase: "listening" }} />);
   const bubble = container.querySelector(".person-turns[data-inline] > .speech-bubble.person-bubble[data-live]");
-  expect(bubble?.querySelector(".voice-wave canvas")).toBeInTheDocument();
+  expect(bubble?.querySelector(".voice-wave .voice-wave-bars")).toBeInTheDocument();
   expect(bubble?.querySelector(".person-live-actions .cancel-input")?.textContent).toBe("Cancel sending");
   expect(bubble?.querySelector(".balloon-tail")).toBeInTheDocument();
   expect(container.querySelector(".chat-bubble")).toBeNull();

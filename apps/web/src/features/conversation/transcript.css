@@ -178,10 +178,20 @@
 
 /* ----- the conversation's pieces, wherever they show (the call's stage shows the first two, at its own size and
  * colour): the open turn's waveform, the karaoke of a reply, the thinking dots */
-.voice-wave { display: block; width: min(13rem, 44vw); height: 2.15rem; }
-.voice-wave canvas { display: block; width: 100%; height: 100%; }
+.voice-wave { position: relative; display: block; width: min(13rem, 44vw); height: 2.15rem; }
+/* The bars (VoiceWaveform): per column, a fully rounded bar made of two round ends (<i>) and a middle (<u>), all anchored at
+ * the wave's right edge and each on a layer of its own. VoiceWaveform writes their transforms (barTransforms) and nothing
+ * else changes, so a new height is composited: nothing is laid out or repainted. `--w` is the bar's width and `--mid` the
+ * middle's length at its tallest (px, bare numbers, set once). No transition: the bars follow the voice as it is read. The
+ * ink is the wave's own colour, so a theme switch needs no code. The middle is a <u>, never a <b>: the card's captions
+ * colour every <b> in a line (call-card.css .caption-line b, the speaker's name), and the bars take their ink from their
+ * own colour. */
+.voice-wave-bars { position: absolute; inset: 0; }
+.voice-wave-bars :is(i, u) { position: absolute; right: 0; top: 50%; width: calc(var(--w) * 1px); background: currentColor; will-change: transform; }
+.voice-wave-bars i { height: calc(var(--w) * 1px); margin-top: calc(var(--w) * -.5px); border-radius: 50%; }
+.voice-wave-bars u { height: calc(var(--mid) * 1px); margin-top: calc(var(--mid) * -.5px); }
 /* Transcribing keeps the turn's last frame, breathing: quieter, and 3:1 still at its faintest. */
-.voice-wave[data-phase="transcribing"] canvas { animation: voice-wave-rest 1.9s ease-in-out infinite; }
+.voice-wave[data-phase="transcribing"] .voice-wave-bars { animation: voice-wave-rest 1.9s ease-in-out infinite; }
 @keyframes voice-wave-rest { 0%, 100% { opacity: 1; } 50% { opacity: .8; } }
 /* What a device that asks for less motion sees instead: still bars, dimmer while transcribing. */
 .voice-bars { display: inline-flex; align-items: center; gap: 3px; height: 20px; padding: 0 2px; }
@@ -202,7 +212,7 @@
 @keyframes thinking-dot { 0%, 60%, 100% { opacity: .7; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .voice-wave[data-phase="transcribing"] canvas { animation: none; opacity: .8; }
+  .voice-wave[data-phase="transcribing"] .voice-wave-bars { animation: none; opacity: .8; }
   .thinking-dots i { animation: none; opacity: .7; }
 }
 
