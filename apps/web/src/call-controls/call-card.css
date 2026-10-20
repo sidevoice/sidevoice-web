@@ -75,9 +75,17 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .call-card .card-open:hover { background: var(--btn); color: var(--fg); }
 
 .your-wave { position: relative; display: flex; align-items: center; gap: 2.4px; height: 18px; flex: none; padding: 0 1px; }
-.your-wave i { width: 2.6px; height: 3px; border-radius: 2px; background: var(--accent); transition: height 70ms linear; }
+/* A bar is 3px to 16px tall (--h) and fully rounded: a middle that scales and two round ends that slide with it, so
+   every moving part is a transform. */
+.your-wave i { --h: 3; position: relative; width: 2.6px; height: 16px; }
+.your-wave i::before, .your-wave i::after, .your-wave b { content: ""; position: absolute; left: 0; top: 50%; width: 2.6px; background: var(--accent); transition: transform 70ms linear; will-change: transform; }
+.your-wave i::before, .your-wave i::after { height: 2.6px; margin-top: -1.3px; border-radius: 50%; }
+.your-wave i::before { transform: translateY(calc((var(--h) - 2.6) * -.5px)); }
+.your-wave i::after { transform: translateY(calc((var(--h) - 2.6) * .5px)); }
+.your-wave b { height: 13.4px; margin-top: -6.7px; transform: scaleY(calc((var(--h) - 2.6) / 13.4)); }
 .your-wave[data-still] i { opacity: .4; }
-.your-wave[data-muted] i { background: var(--mu); opacity: .5; }
+.your-wave[data-muted] i { opacity: .5; }
+.your-wave[data-muted] i::before, .your-wave[data-muted] i::after, .your-wave[data-muted] b { background: var(--mu); }
 .your-wave[data-muted]::after { content: ""; position: absolute; left: -2px; right: -2px; top: 50%; height: 1.6px; border-radius: 1px; background: var(--cross); transform: rotate(-32deg); }
 
 /* Near the pointer: the room's call controls, edge to edge. */

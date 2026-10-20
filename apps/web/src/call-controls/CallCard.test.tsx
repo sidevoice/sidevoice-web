@@ -66,7 +66,8 @@ function hoverAndWait() {
   act(() => { vi.advanceTimersByTime(SHOW_DELAY_MS + 10); });
   act(() => { vi.advanceTimersByTime(CLICK_GUARD_MS + 10); });
 }
-const waveHeights = () => [...document.querySelectorAll(".your-wave i")].map((bar) => (bar as HTMLElement).style.height);
+/** Each bar's drawn height (--h, 3 at rest). */
+const waveHeights = () => [...document.querySelectorAll(".your-wave i")].map((bar) => `${(bar as HTMLElement).style.getPropertyValue("--h") || 3}px`);
 
 test("at rest: the agent, the conversation, where it runs, what is happening, and your wave — no controls, no clock", () => {
   render(<Card host={fakeHost()} />);
