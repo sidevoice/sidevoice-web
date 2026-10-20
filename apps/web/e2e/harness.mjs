@@ -99,15 +99,18 @@ export async function installHarness(page, { onboarding = { version: 1, choice: 
   // The setup no longer takes the permission's word (web#188): an allowed microphone is one a stream opened, which only
   // the person's click does. So an allowed harness has nothing to ask (no getUserMedia: the setup's "none"), as a
   // browser without the API is.
+  // Set on the prototypes: WebKit can hand the page a new MediaDevices object after this script ran, which an own property
+  // set on the first one would miss (the setup then asked for the microphone, about one load in ten).
   await page.addInitScript((state) => {
     const permissions = navigator.permissions;
     if (!permissions) return;
-    const query = permissions.query.bind(permissions);
     const status = Object.assign(new EventTarget(), { name: "microphone", state, onchange: null });
-    permissions.query = (descriptor) => descriptor?.name === "microphone" ? Promise.resolve(status) : query(descriptor);
+    const asked = Object.getPrototypeOf(permissions);
+    const query = asked.query;
+    asked.query = function (descriptor) { return descriptor?.name === "microphone" ? Promise.resolve(status) : query.call(this, descriptor); };
     // A computer with a microphone plugged in: the setup reads an allowed permission with no input device as "none found",
     // and a headless browser lists none.
-    const devices = navigator.mediaDevices;
+    const devices = navigator.mediaDevices && Object.getPrototypeOf(navigator.mediaDevices);
     if (devices && state === "granted") Object.defineProperty(devices, "getUserMedia", { value: undefined, configurable: true });
     if (devices) devices.enumerateDevices = async () => [{ kind: "audioinput", deviceId: "default", groupId: "e2e", label: "", toJSON() { return this; } }];
   }, microphone);

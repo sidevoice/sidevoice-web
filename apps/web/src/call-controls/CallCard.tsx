@@ -23,7 +23,7 @@ import { Button } from "../components/ui/Button";
 import { ConversationPicker, DevicePicker, useCardShell, useHostState, useWave, type CardShell } from "./card-shell";
 import { hasUnread, moodText } from "../features/call/conversation-state";
 import { ConversationAvatar } from "../features/call/ConversationAvatar";
-import { useConversationAvatar, useConversationAvatars } from "../features/call/conversation-avatars";
+import { useConversationAvatar, useConversationAvatars, useMovingCopy } from "../features/call/conversation-avatars";
 import { CharacterAvatar } from "../features/avatar/CharacterAvatar";
 import { avatarFor, avatarTone, SIDEVOICE_MASCOT, type AvatarSpec } from "../features/avatar/avatar-spec";
 import { avatarColor } from "../features/avatar/bicho-draw";
@@ -148,12 +148,14 @@ function CardActions({ shell, t, close = true }: { shell: CardShell; t: Translat
   );
 }
 
-/** The agent's creature, as the stage draws it for its conversation, in the same state as every copy of it. */
+/** The agent's creature, as the stage draws it for its conversation, in the same state as every copy of it; moving, as the
+ *  stage's does (where the GPU moves it). */
 function CardFigure({ state, size, label }: { state: CallControlsState; size: "small" | "stage"; label?: string }) {
   const agent = useCardAgent(state);
   const avatars = useConversationAvatars();
   const avatar = useConversationAvatar(agent.threadId);
-  return <CharacterAvatar spec={agent.spec} state={avatar} size={size} mouth="playback" label={label}
+  useMovingCopy(agent.threadId);
+  return <CharacterAvatar spec={agent.spec} state={avatar} size={size} mouth="playback" label={label} live
     mouthLevel={agent.threadId ? avatars.mouth(agent.threadId) : undefined} />;
 }
 

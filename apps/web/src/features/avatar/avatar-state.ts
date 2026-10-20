@@ -13,7 +13,10 @@ import { holdRotation, rotationValue, subscribeRotation } from "./rotation";
  * own, and the timers that move the figure (its rest before a pastime, its entrance, its steps, its mouth) run once, on
  * one clock (operator, 2026-10-19, #166). CharacterAvatar only draws a state.
  *
- * Under reduced motion the state still changes and CSS keeps every copy still (styles/call.css). */
+ * Only a figure drawn moving takes up pastimes (`pastimes`: on the stage or the card, with the GPU on, lib/motion.ts);
+ * the others rest quiet. Every copy that does not move (a thumbnail, any copy without the GPU or under reduced motion)
+ * shows the same state as a still drawing (styles/call.css), at rest: quiet while a moving copy plays a pastime, never a
+ * pastime frozen mid-way (operator, 2026-10-20; CharacterAvatar). */
 
 export type EngineMood = "idle" | "speaking" | "listening" | "working";
 /** The engine's mood for an app state. Offline sleeps (the engine's idle with no step: the old sleep); present (the
@@ -34,6 +37,8 @@ export interface AvatarInputs {
   still?: boolean;
   /** What last happened with it: a change restarts its rest before a pastime (BORED_AFTER_MS). */
   interaction?: string;
+  /** It is drawn moving (web#278): resting, it takes up pastimes; without it, it rests quiet however long. */
+  pastimes?: boolean;
   /** It has said something this browser has not seen yet. */
   unread?: boolean;
   /** The conversation whose voice its mouth follows while it speaks (the output channel, state/playback-level.ts). */
@@ -107,7 +112,7 @@ export interface AvatarStates {
 }
 
 const sameInputs = (a: AvatarInputs, b: AvatarInputs) => a.mood === b.mood && !!a.still === !!b.still && a.interaction === b.interaction
-  && !!a.unread === !!b.unread && (a.voice ?? null) === (b.voice ?? null) && avatarKey(a.spec) === avatarKey(b.spec);
+  && !!a.pastimes === !!b.pastimes && !!a.unread === !!b.unread && (a.voice ?? null) === (b.voice ?? null) && avatarKey(a.spec) === avatarKey(b.spec);
 const sameState = (a: Omit<AvatarState, "since">, b: AvatarState) => a.mood === b.mood && a.work === b.work && a.idle === b.idle
   && a.enter === b.enter && !!a.unread === !!b.unread;
 
@@ -234,8 +239,8 @@ export function createAvatarStates(): AvatarStates {
       entry.acts = acts;
       restartEnter(id, entry);
     }
-    // Idle steps while idle: offline sleeps instead, and held still it stays quiet until its balloon goes.
-    const resting = inputs.mood === "idle" && !inputs.still;
+    // Idle steps while idle and drawn moving: offline sleeps instead, and held still it stays quiet until its balloon goes.
+    const resting = inputs.mood === "idle" && !inputs.still && !!inputs.pastimes;
     if (fresh || resting !== entry.resting || inputs.interaction !== before.interaction) {
       entry.resting = resting;
       restartBored(id, entry);

@@ -35,7 +35,8 @@ export function renderMascot(kind: Harness, size: Size): Drawn {
 
 /* What every figure shares: the frame, the moods, the sizes and the shared animation groups (pg-arm, pg-ear,
  * pg-sprout, pg-tail, pg-bulb, pg-leg-a/b, the mascots' groups, wing/flick/float/spin for the catalogue, and hang and
- * upright from fw3). */
+ * upright from fw3). A pivot (transform-box, transform-origin) is set outside any state, so that it can be measured once
+ * on a still drawing. */
 const BASE_CSS = `
     .ground { fill: rgb(0 0 0 / .16) }
     .shine { fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; opacity: .7 }
@@ -266,7 +267,8 @@ const BASE_CSS = `
        The "!" takes the top-right corner (render.ts keeps it clear of the figure, and draws it as a bigger badge in the
        sidebar and the rail): the zz give way, and the cogs move to the other corner (--cogs-alt, placed the same way).
        The rail holds the badge still. */
-    &[data-unread] .bang { animation: bx-pop 1.3s cubic-bezier(.3,1.8,.5,1) infinite; transform-box: fill-box; transform-origin: 50% 100% }
+    .bang { transform-box: fill-box; transform-origin: 50% 100% }
+    &[data-unread] .bang { animation: bx-pop 1.3s cubic-bezier(.3,1.8,.5,1) infinite }
     &[data-size=rail] .bang { animation: none }
     &[data-unread]:is([data-mood=idle], [data-mood=working]) .fig { animation: bx-hop 1.3s cubic-bezier(.3,1.6,.5,1) infinite }
     &[data-unread] .zz { display: none }
@@ -276,9 +278,9 @@ const BASE_CSS = `
        The figure squashes, springs up and lands in the listening lean, the eyes pop wide, the brows jump, a burst
        flashes over the head, whatever it had going drops away (the work props and the cogs fall; so do the idle
        pastime's), and the listening waves come in as it lands. */
-    .enter-burst { display: none }
+    .enter-burst { display: none; transform-box: fill-box; transform-origin: 50% 100% }
     .enter-burst path { fill: none; stroke: #1b1428; stroke-width: 3.2; stroke-linecap: round }
-    &[data-mood=listening][data-enter] .enter-burst { display: inline; transform-box: fill-box; transform-origin: 50% 100%; animation: bx-burst .42s ease-out both }
+    &[data-mood=listening][data-enter] .enter-burst { display: inline; animation: bx-burst .42s ease-out both }
     &[data-mood=listening][data-enter] .squash { animation: bx-startle .42s cubic-bezier(.3,1.3,.5,1) both }
     &[data-mood=listening][data-enter] .fig { animation: bx-startle-tilt .42s ease-out both }
     &[data-mood=listening][data-enter] .eyes { animation: bx-eyes-pop .42s ease-out both }

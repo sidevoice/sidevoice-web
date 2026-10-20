@@ -1,4 +1,5 @@
-import { useContext, useSyncExternalStore } from "react";
+import { useContext, useEffect, useSyncExternalStore } from "react";
+import { motion, subscribeMotion } from "../../lib/motion";
 import { RoomStoreContext, type RoomStore, type RoomViewState } from "../../state/room-store";
 import { avatarFor } from "../avatar/avatar-spec";
 import { createAvatarStates, stillAvatar, type AvatarInputs, type AvatarState, type MouthLevel } from "../avatar/avatar-state";
@@ -9,11 +10,15 @@ import { agentMood, moodFacts } from "./stage-view";
  * or the rail, the header — and the thumbnails are that creature at a smaller size (operator, 2026-10-19, #166). Its
  * state is worked out here, once per conversation, from the room's store and the stage's balloon, and moved on one clock
  * (avatar-state.ts): its mood, its rest and its pastimes, the tool in its hand, its startle, its mouth, its offline
- * sleep (the stage's wanted poster). Every copy renders that state; none works out anything of its own. */
+ * sleep (the stage's wanted poster). Every copy renders that state; none works out anything of its own. It takes up
+ * pastimes while a copy of it is drawn moving (the stage's, the card's: useMovingCopy) and the GPU moves it (web#278);
+ * meanwhile the still copies show it at rest (CharacterAvatar). */
 
 /** What every conversation's agent is given, from the room's store: its mood (agentMood, the same projection for all of
- *  them), held still while the stage's balloon is up over it (`held`), its unread mark, what last happened with it. */
-function agentInputs(state: RoomViewState, held: string | null): Map<string, AvatarInputs> {
+ *  them), held still while the stage's balloon is up over it (`held`), its unread mark, what last happened with it,
+ *  and whether a copy of it is drawn moving (`moving`, counted). */
+function agentInputs(state: RoomViewState, held: string | null, moving: ReadonlyMap<string, number>): Map<string, AvatarInputs> {
+  const gpu = motion() === "gpu";
   const facts = moodFacts(state);
   const viewed = facts.viewed;
   const all = new Map<string, AvatarInputs>();
@@ -30,7 +35,7 @@ function agentInputs(state: RoomViewState, held: string | null): Map<string, Ava
     // coming on the stage, the person speaking, a balloon, its mood (operator, 2026-10-15).
     const interaction = onStage ? ["stage", state.call.joined, state.conversation.pendingPhase, still, mood].join("|") : "";
     const unread = onStage && facts.preview ? !!facts.preview.unread : !!row && hasUnread(row, viewed);
-    all.set(thread, { spec: avatarFor(thread), mood, still, interaction, unread, voice: thread });
+    all.set(thread, { spec: avatarFor(thread), mood, still, interaction, pastimes: gpu && !!moving.get(thread), unread, voice: thread });
   }
   return all;
 }
@@ -42,6 +47,8 @@ interface ConversationAvatars {
   mouth(threadId: string): MouthLevel;
   /** The stage's balloon is up over `threadId`'s agent, or has gone. */
   hold(threadId: string, still: boolean): void;
+  /** A copy of `threadId`'s agent is drawn moving, until what this returns is called. */
+  moving(threadId: string): () => void;
 }
 
 const NOBODY = stillAvatar("idle");
@@ -53,13 +60,15 @@ function conversationAvatars(store: RoomStore): ConversationAvatars {
   if (known) return known;
   const states = createAvatarStates();
   let held: string | null = null;
+  const moving = new Map<string, number>();
   let copies = 0;
   let unfollow: (() => void) | null = null;
-  const sync = () => states.sync(agentInputs(store.getState(), held));
+  const sync = () => states.sync(agentInputs(store.getState(), held, moving));
   // Followed as soon as a copy asks, so the first frame already shows the state (and the pick in hand).
   const follow = () => {
     if (unfollow) return;
-    unfollow = store.subscribe(sync);
+    const stopStore = store.subscribe(sync), stopMotion = subscribeMotion(sync);
+    unfollow = () => { stopStore(); stopMotion(); };
     sync();
   };
   const avatars: ConversationAvatars = {
@@ -86,6 +95,16 @@ function conversationAvatars(store: RoomStore): ConversationAvatars {
       held = next;
       if (unfollow) sync();
     },
+    moving(threadId) {
+      moving.set(threadId, (moving.get(threadId) ?? 0) + 1);
+      if (unfollow) sync();
+      return () => {
+        const left = (moving.get(threadId) ?? 1) - 1;
+        if (left > 0) moving.set(threadId, left);
+        else moving.delete(threadId);
+        if (unfollow) sync();
+      };
+    },
   };
   perStore.set(store, avatars);
   return avatars;
@@ -95,6 +114,12 @@ export function useConversationAvatars(): ConversationAvatars {
   const store = useContext(RoomStoreContext);
   if (!store) throw new Error("useConversationAvatars must be used inside RoomProvider");
   return conversationAvatars(store);
+}
+
+/** Says that this copy of `threadId`'s agent is drawn moving (the stage's, the card's), for as long as it is there. */
+export function useMovingCopy(threadId: string | null) {
+  const avatars = useConversationAvatars();
+  useEffect(() => (threadId ? avatars.moving(threadId) : undefined), [avatars, threadId]);
 }
 
 /** The state of `threadId`'s agent: the same object for the stage and every thumbnail of it. */

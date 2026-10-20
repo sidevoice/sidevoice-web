@@ -5,9 +5,9 @@ import { BORED_AFTER_MS, createAvatarStates, type AvatarInputs, type AvatarState
 import { avatarRepertoire } from "./bicho-draw";
 import { ENTER_MS } from "./engine/styles/bichos";
 
-// A figure with pastimes and tools to pick from.
+// A figure with pastimes and tools to pick from, drawn moving (on the stage, with the GPU: web#278).
 const spec = avatarFor("fp-1|t-login");
-const inputs = (extra: Partial<AvatarInputs> = {}): AvatarInputs => ({ spec, mood: "idle", ...extra });
+const inputs = (extra: Partial<AvatarInputs> = {}): AvatarInputs => ({ spec, mood: "idle", pastimes: true, ...extra });
 let states: AvatarStates;
 
 beforeEach(() => {
@@ -35,6 +35,18 @@ test("resting, it is quiet for BORED_AFTER_MS, then goes in steps on its one clo
   const pastime = states.get("a")!.idle;
   expect(avatarRepertoire(spec).idles).toContain(pastime);
   expect(pastime).not.toBe("quiet");
+});
+
+test("a figure no copy draws moving rests quiet however long; drawn moving again, it starts its rest over", () => {
+  states.set("a", inputs({ pastimes: false }));
+  vi.advanceTimersByTime(120_000);
+  expect(states.get("a")).toMatchObject({ mood: "idle", idle: "quiet" });
+  states.set("a", inputs());
+  vi.advanceTimersByTime(BORED_AFTER_MS + 11_000);
+  expect(states.get("a")!.idle).not.toBe("quiet");
+  // No longer drawn moving: back to quiet at once.
+  states.set("a", inputs({ pastimes: false }));
+  expect(states.get("a")!.idle).toBe("quiet");
 });
 
 test("whatever happens with it restarts its rest; held still it stays quiet and takes nothing in hand", () => {

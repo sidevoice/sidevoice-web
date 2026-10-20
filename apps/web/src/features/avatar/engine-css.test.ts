@@ -44,3 +44,12 @@ test("the stylesheet loads after the app's own avatar rules, and nothing of an a
   // Its theme inks are the design tokens', so they follow the light theme and the dark one.
   expect(call).toMatch(/\.sv-avatar\[data-style=bichos\] \{ --bx-sv:var\(--sv-accent\);--bx-sv-face:var\(--sv-on-accent\)/);
 });
+
+test("a pivot is set outside any state: a layered drawing measures it once, on the still drawing (layers.ts)", () => {
+  const css = bichosStylesheet().replace(/\/\*[\s\S]*?\*\//g, "").replace(/@keyframes[^{]*\{(?:[^{}]*\{[^}]*\})*[^}]*\}/g, "");
+  const stateful = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter(([, , body]) => /transform-(origin|box)/.test(body))
+    .flatMap(([, selectors]) => splitSelectors(selectors.replace(/^[\s\S]*\{/, "")))
+    .filter((selector) => /\[data-/.test(selector.replace(BICHOS_SCOPE, "")));
+  expect(stateful).toEqual([]);
+});
