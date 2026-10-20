@@ -25,7 +25,7 @@ export const CARD_WIDTHS: Record<CardFormat, Record<CardSize, number>> = {
 export const PIP_MIN_WIDTH = 350;
 
 export interface FloatingCardPrefs { format: CardFormat; size: CardSize }
-export const FLOATING_CARD_DEFAULTS: FloatingCardPrefs = { format: "card", size: "m" };
+export const FLOATING_CARD_DEFAULTS: FloatingCardPrefs = { format: "pip", size: "m" };
 export const FLOATING_CARD_KEY = "sidevoice.floatingCard";
 
 const listeners = new Set<() => void>();
