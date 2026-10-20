@@ -1372,6 +1372,7 @@ export const messages: Messages = {
   "card.devicesInSystem": "Scegli questo dispositivo nelle impostazioni di sistema.",
   "card.youAreMuted": "Microfono silenziato",
   "card.conversationsCount": "Conversazioni ({n})",
+  "card.conversationsCountUnread": "Conversazioni ({n}), {unread} con risposte non lette",
   "card.settings": "Impostazioni della scheda mobile",
   "card.hide": "Nascondi per questa chiamata",
   "card.you": "Tu",

@@ -1352,6 +1352,7 @@ export const messages: Messages = {
   "card.devicesInSystem": "このデバイスはシステム設定で選択してください。",
   "card.youAreMuted": "ミュート中です",
   "card.conversationsCount": "会話（{n}）",
+  "card.conversationsCountUnread": "会話（{n}）、未読の返信がある会話：{unread}",
   "card.settings": "フローティングカードの設定",
   "card.hide": "この通話中は非表示",
   "card.you": "あなた",

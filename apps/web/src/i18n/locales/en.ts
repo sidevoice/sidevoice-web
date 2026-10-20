@@ -1393,6 +1393,7 @@ export const messages = {
   "card.devicesInSystem": "Choose this device in the system's settings.",
   "card.youAreMuted": "You are muted",
   "card.conversationsCount": "Conversations ({n})",
+  "card.conversationsCountUnread": "Conversations ({n}), {unread} with unread replies",
   "card.settings": "Floating card settings",
   "card.hide": "Hide for this call",
   "card.you": "You",

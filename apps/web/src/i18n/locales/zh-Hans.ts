@@ -1351,6 +1351,7 @@ export const messages: Messages = {
   "card.devicesInSystem": "请在系统设置中选择此设备。",
   "card.youAreMuted": "你已静音",
   "card.conversationsCount": "对话（{n}）",
+  "card.conversationsCountUnread": "对话（{n}），其中 {unread} 个有未读回复",
   "card.settings": "浮动卡片设置",
   "card.hide": "本次通话中隐藏",
   "card.you": "你",

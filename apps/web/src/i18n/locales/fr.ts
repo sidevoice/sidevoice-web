@@ -1351,6 +1351,7 @@ export const messages: Messages = {
   "card.devicesInSystem": "Choisissez cet appareil dans les réglages du système.",
   "card.youAreMuted": "Votre micro est coupé",
   "card.conversationsCount": "Conversations ({n})",
+  "card.conversationsCountUnread": "Conversations ({n}), dont {unread} avec des réponses non lues",
   "card.settings": "Réglages de la carte flottante",
   "card.hide": "Masquer pendant cet appel",
   "card.you": "Vous",
