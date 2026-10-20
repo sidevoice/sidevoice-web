@@ -953,7 +953,7 @@ export const messages: Messages = {
   "settings.floatingCard.size.l": "Grande",
   "settings.floatingCard.sizeHint": "Ou redimensionnez l’image par son coin : elle garde la taille que vous lui laissez.",
   "settings.floatingCard.corner": "Position préférée",
-  "settings.floatingCard.cornerHint": "Là où la carte apparaît la première fois. Ensuite, déplacez-la où vous voulez : elle reste là où vous la laissez, sur chaque écran.",
+  "settings.floatingCard.cornerHint": "Choisissez votre coin préféré : la carte s’y déplace immédiatement. Vous pouvez ensuite la faire glisser ailleurs.",
   "settings.floatingCard.corner.tl": "En haut à gauche",
   "settings.floatingCard.corner.tr": "En haut à droite",
   "settings.floatingCard.corner.bl": "En bas à gauche",

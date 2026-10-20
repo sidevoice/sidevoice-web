@@ -976,7 +976,7 @@ export const messages = {
   "settings.floatingCard.size.l": "Large",
   "settings.floatingCard.sizeHint": "Or resize the picture by its corner: it keeps the size you leave it at.",
   "settings.floatingCard.corner": "Preferred position",
-  "settings.floatingCard.cornerHint": "Where the card first appears. After that, drag it anywhere: it stays where you leave it on each screen.",
+  "settings.floatingCard.cornerHint": "Choose your preferred corner: the card moves there immediately. You can still drag it elsewhere afterwards.",
   "settings.floatingCard.corner.tl": "Top left",
   "settings.floatingCard.corner.tr": "Top right",
   "settings.floatingCard.corner.bl": "Bottom left",

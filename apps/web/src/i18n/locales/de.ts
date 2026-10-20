@@ -956,7 +956,7 @@ export const messages: Messages = {
   "settings.floatingCard.size.l": "Groß",
   "settings.floatingCard.sizeHint": "Oder ändere die Größe des Bilds an seiner Ecke: Es behält die Größe, die du ihm gibst.",
   "settings.floatingCard.corner": "Bevorzugte Position",
-  "settings.floatingCard.cornerHint": "Wo die Karte zuerst erscheint. Danach zieh sie, wohin du willst: Sie bleibt auf jedem Bildschirm dort, wo du sie lässt.",
+  "settings.floatingCard.cornerHint": "Wähle deine bevorzugte Ecke: Die Karte wird sofort dorthin verschoben. Danach kannst du sie weiterhin an eine andere Stelle ziehen.",
   "settings.floatingCard.corner.tl": "Oben links",
   "settings.floatingCard.corner.tr": "Oben rechts",
   "settings.floatingCard.corner.bl": "Unten links",

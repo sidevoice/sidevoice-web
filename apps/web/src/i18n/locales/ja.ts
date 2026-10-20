@@ -954,7 +954,7 @@ export const messages: Messages = {
   "settings.floatingCard.size.l": "大",
   "settings.floatingCard.sizeHint": "角をドラッグしてサイズを変えることもできます。変えたサイズが保たれます。",
   "settings.floatingCard.corner": "希望の位置",
-  "settings.floatingCard.cornerHint": "カードが最初に表示される場所。その後は好きな場所へドラッグできます。画面ごとに置いた場所に残ります。",
+  "settings.floatingCard.cornerHint": "カードを表示したい角を選ぶと、すぐにそこへ移動します。その後も別の場所へドラッグできます。",
   "settings.floatingCard.corner.tl": "左上",
   "settings.floatingCard.corner.tr": "右上",
   "settings.floatingCard.corner.bl": "左下",

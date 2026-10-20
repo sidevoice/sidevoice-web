@@ -967,7 +967,7 @@ export const messages: Messages = {
   "settings.floatingCard.size.l": "Grande",
   "settings.floatingCard.sizeHint": "Oppure ridimensiona l’immagine dal suo angolo: resta della dimensione in cui la lasci.",
   "settings.floatingCard.corner": "Posizione preferita",
-  "settings.floatingCard.cornerHint": "Dove compare la scheda la prima volta. Poi trascinala dove vuoi: resta dove la lasci su ogni schermo.",
+  "settings.floatingCard.cornerHint": "Scegli l’angolo che preferisci: la scheda si sposta subito lì. Puoi comunque trascinarla altrove in seguito.",
   "settings.floatingCard.corner.tl": "In alto a sinistra",
   "settings.floatingCard.corner.tr": "In alto a destra",
   "settings.floatingCard.corner.bl": "In basso a sinistra",

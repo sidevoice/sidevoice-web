@@ -967,7 +967,7 @@ export const messages: Messages = {
   "settings.floatingCard.size.l": "Grande",
   "settings.floatingCard.sizeHint": "O cambia el tamaño de la imagen desde su esquina: se queda como la dejes.",
   "settings.floatingCard.corner": "Posición preferida",
-  "settings.floatingCard.cornerHint": "Dónde aparece la tarjeta la primera vez. Luego arrástrala a donde quieras: se queda donde la dejes en cada pantalla.",
+  "settings.floatingCard.cornerHint": "Elige tu esquina preferida: la tarjeta se mueve allí al instante. Después puedes arrastrarla a otro lugar.",
   "settings.floatingCard.corner.tl": "Arriba a la izquierda",
   "settings.floatingCard.corner.tr": "Arriba a la derecha",
   "settings.floatingCard.corner.bl": "Abajo a la izquierda",

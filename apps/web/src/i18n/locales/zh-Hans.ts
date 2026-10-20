@@ -953,7 +953,7 @@ export const messages: Messages = {
   "settings.floatingCard.size.l": "大",
   "settings.floatingCard.sizeHint": "也可以拖动画面的角来调整大小：会保持你调整后的大小。",
   "settings.floatingCard.corner": "首选位置",
-  "settings.floatingCard.cornerHint": "卡片第一次出现的位置。之后可以把它拖到任意位置：在每个屏幕上它都会留在你放下的地方。",
+  "settings.floatingCard.cornerHint": "选择首选的屏幕角落，卡片会立即移到那里。之后仍可将它拖到其他位置。",
   "settings.floatingCard.corner.tl": "左上",
   "settings.floatingCard.corner.tr": "右上",
   "settings.floatingCard.corner.bl": "左下",
