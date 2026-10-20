@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, createEvent, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { CallCard, CLICK_GUARD_MS } from "./CallCard";
 import { createCardRoom } from "./card-room";
@@ -139,3 +139,34 @@ test("just the avatar: Enter on the handle opens the card with focus on its firs
   expect(document.querySelector(".floating-card")).not.toHaveAttribute("data-expanded");
   expect(document.activeElement).toBe(screen.getByRole("button", { name: "Call controls" }));
 });
+
+test("just the avatar: once open, the card holds while the pointer is within 16px of the handle and the card, and folds after leaving that", () => {
+  vi.useFakeTimers();
+  page("avatar");
+  fireEvent.pointerOver(document.querySelector(".avatar-figure")!);
+  act(() => { vi.advanceTimersByTime(130); });
+  fireEvent.pointerOver(screen.getByRole("button", { name: "Call controls" }));
+  act(() => { vi.advanceTimersByTime(130); });
+  expect(document.querySelector(".floating-card")).toHaveAttribute("data-expanded");
+  const rect = (left: number, right: number) => ({ left, right, top: 0, bottom: 100, width: right - left, height: 100 }) as DOMRect;
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    return this.classList.contains("avatar-dock") ? rect(100, 400) : this.classList.contains("avatar-handle") ? rect(108, 154) : rect(0, 0);
+  });
+  // On the creature but within the hull's 16px margin of the card: still on the card, so it holds.
+  overAt(document.querySelector(".avatar-figure")!, 90, 50);
+  act(() => { vi.advanceTimersByTime(700); });
+  expect(document.querySelector(".floating-card")).toHaveAttribute("data-expanded");
+  // Beyond it: it folds after the usual delay.
+  overAt(document.querySelector(".avatar-figure")!, 60, 50);
+  act(() => { vi.advanceTimersByTime(520); });
+  expect(document.querySelector(".floating-card")).not.toHaveAttribute("data-expanded");
+  vi.restoreAllMocks();
+});
+
+/** A pointerover at a point (jsdom has no PointerEvent, so the coordinates are put on the event). */
+function overAt(node: Element, clientX: number, clientY: number) {
+  const event = createEvent.pointerOver(node);
+  Object.defineProperty(event, "clientX", { value: clientX });
+  Object.defineProperty(event, "clientY", { value: clientY });
+  fireEvent(node, event);
+}
