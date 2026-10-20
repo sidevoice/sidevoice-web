@@ -295,6 +295,11 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .floating-card[data-open=down] .avatar-balloons { margin-top: calc(var(--card-w) * -.1); }
 .floating-card[data-open=up] .avatar-balloons { margin-bottom: calc(var(--card-w) * -.04); }
 
+/* Sized freely (the person resized the picture): the header and the bar take their room, the rest is the stage's, its 16:9
+ * tile centred on the room's stage background (as the room's slot around a tile of another shape; the tile is fitted by
+ * the room's useSceneScale). */
+.picture-card[data-sized] .picture-stage { background: var(--sv-stage-bg); border-radius: var(--sv-radius-xl, 14px); overflow: hidden; }
+
 /* ---------- The title line (operator, 2026-10-20; briefs/UX-DECISIONS-2026-10-20.md), in every format ----------
  * One line holds three pieces. The fixed ones always keep their room: the conversations control (flex none) and, on the
  * right, the three actions (open, settings, ×: 2px apart), with 8px of breathing room before the first. Open and settings
