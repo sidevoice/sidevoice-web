@@ -19,7 +19,8 @@ import { useLayers } from "./layers";
  *   data-mood          what the drawing acts out, in the engine's words: idle | speaking | listening | working
  *   data-size          the engine's size (stage | sidebar)
  *   data-beat          a | b for legacy voice animation; data-mouth=playback follows the speaker's output level
- *   data-work          the working style in hand (rotation.ts); data-idle, the idle step (quiet, or a pastime)
+ *   data-work          the working style in hand (rotation.ts); data-idle, the idle step (quiet, or a pastime: only on
+ *                      a copy that moves; a still one shows it at rest, quiet, never a frozen pastime)
  *   data-enter         for a moment after it starts listening, the state it left (the engine's startle), with what it
  *                      had in hand still on so it can drop away
  *   data-unread        it said something this browser has not seen yet: the "!" cue
@@ -75,6 +76,8 @@ export function CharacterAvatar({ spec, state, size, mouth = "voice", mouthKey, 
   const drawing = useMemo(() => drawAvatar(spec, size), [key, size]);
   const layered = useMotion() === "gpu" && !!live;
   useLayers(avatar, layered, drawing.html);
+  // A copy that holds still shows the creature at rest while the moving one plays a pastime (operator, 2026-10-20).
+  const idle = layered || state.idle === undefined ? state.idle : "quiet";
   const acts = ENGINE_MOOD[state.mood];
   const beat = useBeat(state.mood === "speaking" && mouth === "voice" ? mouthKey : undefined);
   // One clock for every copy: its animations run from the moment its state last changed, not from when this copy
@@ -87,7 +90,7 @@ export function CharacterAvatar({ spec, state, size, mouth = "voice", mouthKey, 
   }, [state, drawing, desk, layered]);
   return (
     <span ref={(element) => { avatar.current = element; if (typeof ref === "function") ref(element); else if (ref) ref.current = element; }} className={cn("sv-avatar", className)} data-style="bichos" data-avatar-state={state.mood} data-mood={acts}
-      data-size={engineSize(size)} data-mouth={mouth} data-beat={beat} data-work={state.work} data-idle={state.idle} data-enter={state.enter}
+      data-size={engineSize(size)} data-mouth={mouth} data-beat={beat} data-work={state.work} data-idle={idle} data-enter={state.enter}
       data-unread={state.unread || undefined} data-desk={desk || undefined} data-offline={state.mood === "offline" || undefined}
       style={avatarTone(drawing.tone) as CSSProperties}
       role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true}

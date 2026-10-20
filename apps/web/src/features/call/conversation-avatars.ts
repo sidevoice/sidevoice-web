@@ -11,7 +11,8 @@ import { agentMood, moodFacts } from "./stage-view";
  * state is worked out here, once per conversation, from the room's store and the stage's balloon, and moved on one clock
  * (avatar-state.ts): its mood, its rest and its pastimes, the tool in its hand, its startle, its mouth, its offline
  * sleep (the stage's wanted poster). Every copy renders that state; none works out anything of its own. It takes up
- * pastimes while a copy of it is drawn moving (the stage's, the card's: useMovingCopy) and the GPU moves it (web#278). */
+ * pastimes while a copy of it is drawn moving (the stage's, the card's: useMovingCopy) and the GPU moves it (web#278);
+ * meanwhile the still copies show it at rest (CharacterAvatar). */
 
 /** What every conversation's agent is given, from the room's store: its mood (agentMood, the same projection for all of
  *  them), held still while the stage's balloon is up over it (`held`), its unread mark, what last happened with it,

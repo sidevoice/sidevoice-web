@@ -348,16 +348,18 @@ test("state dots and small avatars follow each conversation's state, grouped by 
 });
 
 /* One creature in one state (#166): the stage's agent and every thumbnail of its conversation — its row in the list, its
- * avatar in the header — render the same state, from one source, on one clock. */
+ * avatar in the header — render the same state, from one source, on one clock; a thumbnail holds still, so it shows a
+ * pastime at rest, quiet (operator, 2026-10-20). */
 const SHOWN = ["data-avatar-state", "data-mood", "data-work", "data-idle", "data-enter", "data-offline", "data-unread"];
 const shown = (avatar: Element | null | undefined) => avatar ? SHOWN.map((name) => name + "=" + avatar.getAttribute(name)) : null;
 const headerAvatarOf = (title: string) =>
   [...document.querySelectorAll(".room-header .header-avatar")].find((button) => button.getAttribute("aria-label")?.startsWith(title))?.querySelector(".sv-avatar");
-/** What the stage's agent shows, after checking that its row's and its header's avatars show exactly that. */
+/** What the stage's agent shows, after checking that its row's and its header's avatars show exactly that, at rest. */
 function inStep(title: string) {
   const stage = shown(stageAgent());
-  expect(shown(rowOf(title).querySelector(".sv-avatar"))).toEqual(stage);
-  expect(shown(headerAvatarOf(title))).toEqual(stage);
+  const atRest = stage?.map((attr) => (attr.startsWith("data-idle=") && attr !== "data-idle=null" ? "data-idle=quiet" : attr));
+  expect(shown(rowOf(title).querySelector(".sv-avatar"))).toEqual(atRest);
+  expect(shown(headerAvatarOf(title))).toEqual(atRest);
   return stage!;
 }
 
@@ -373,7 +375,8 @@ test("the stage's agent and its thumbnails are one creature in one state: rest a
   expect(inStep(login)).toContain("data-idle=quiet");
   tick(30_000);
   expect(inStep(login)).toContain("data-idle=quiet");
-  // With it the stage's agent moves (web#278): quiet, then its steps, every copy on the same step at every moment.
+  // With it the stage's agent moves (web#278): quiet, then its steps, every copy in step at every moment (the thumbnails
+  // at rest meanwhile).
   motion("gpu");
   expect(inStep(login)).toContain("data-idle=quiet");
   const steps = new Set<string | null>();

@@ -15,7 +15,8 @@ import { holdRotation, rotationValue, subscribeRotation } from "./rotation";
  *
  * Only a figure drawn moving takes up pastimes (`pastimes`: on the stage or the card, with the GPU on, lib/motion.ts);
  * the others rest quiet. Every copy that does not move (a thumbnail, any copy without the GPU or under reduced motion)
- * shows the same state as a still drawing (styles/call.css). */
+ * shows the same state as a still drawing (styles/call.css), at rest: quiet while a moving copy plays a pastime, never a
+ * pastime frozen mid-way (operator, 2026-10-20; CharacterAvatar). */
 
 export type EngineMood = "idle" | "speaking" | "listening" | "working";
 /** The engine's mood for an app state. Offline sleeps (the engine's idle with no step: the old sleep); present (the
