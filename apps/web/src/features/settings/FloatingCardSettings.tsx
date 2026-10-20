@@ -97,7 +97,7 @@ function CornerRow({ bridge, corner, onChange, t, disabled }: { bridge: CallCont
 /** A still, simplified picture of a format where it first sits, on a corner of a screen in the page's theme: shapes for
  *  its words and controls, and the creature it would show (the call's conversation's; else the first; else Sidevoice's
  *  own), still. `controls`: "Always show the call controls" is on, so each format is drawn with its controls out, as they will
- *  appear: the title card's row of buttons, the picture's header actions, the avatar's card beside it. */
+ *  appear: the title card's row of buttons, the picture's header actions, the avatar's compact card right under the creature. */
 function CardPreview({ format, controls }: { format: CardFormat; controls: boolean }) {
   const threadId = useRoomStore((state) => state.session.selected ?? state.participants[0]?.threadId ?? null);
   const spec = threadId ? avatarFor(threadId) : SIDEVOICE_MASCOT;
@@ -107,7 +107,7 @@ function CardPreview({ format, controls }: { format: CardFormat; controls: boole
     {format === "card" && <span className="fcp-card"><span className="fcp-face">{figure}</span><span className="fcp-lines"><i /><i /><i /></span>{controls && <span className="fcp-card-controls"><i /><i /><i /><i /></span>}</span>}
     {format === "pip" && <span className="fcp-pip"><span className="fcp-lines"><i />{controls && <b className="fcp-actions"><i /><i /><i /></b>}</span><span className="fcp-stage">{figure}</span><span className="fcp-bar"><i /><i /><i /><i /></span></span>}
     {format === "avatar" && <span className="fcp-avatar">{figure}</span>}
-    {format === "avatar" && controls && <span className="fcp-avatar-card"><span className="fcp-lines"><i /><b className="fcp-actions"><i /><i /><i /></b></span><span className="fcp-bar"><i /><i /><i /><i /></span></span>}
+    {format === "avatar" && controls && <span className="fcp-card fcp-compact" data-out><span className="fcp-lines"><i /></span><span className="fcp-bar"><i /><i /><i /><i /></span></span>}
   </span>;
 }
 

@@ -62,8 +62,13 @@ test("Always show the call controls sits right under Style, and the previews dra
   expect(rows.findIndex((text) => text.includes("Always show the call controls"))).toBe(rows.findIndex((text) => text.includes("Style")) + 1);
   expect(document.querySelector(".fcp-card-controls")).toBeNull();
   fireEvent.click(await screen.findByRole("switch", { name: "Always show the call controls" }));
-  await waitFor(() => expect(document.querySelectorAll(".fcp-card-controls, .fcp-avatar-card")).toHaveLength(2));
+  await waitFor(() => expect(document.querySelectorAll(".fcp-card-controls, .fcp-compact")).toHaveLength(2));
   expect(document.querySelectorAll(".fcp-pip .fcp-actions")).toHaveLength(1);
+  // Just the avatar: the compact card right under the creature, one title line over the four controls.
+  const compact = document.querySelector(".fcp-compact")!;
+  expect(compact.previousElementSibling).toHaveClass("fcp-avatar");
+  expect(compact.querySelectorAll(".fcp-lines i")).toHaveLength(1);
+  expect(compact.querySelectorAll(".fcp-bar i")).toHaveLength(4);
   // Off again: the card stays up as a preview first (it would otherwise leave the screen), then shows its new state.
   fireEvent.click(screen.getByRole("switch", { name: "Always show the call controls" }));
   await waitFor(() => expect(bridge.setAlwaysShown).toHaveBeenLastCalledWith(false));

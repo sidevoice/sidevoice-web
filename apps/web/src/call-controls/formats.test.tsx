@@ -95,71 +95,139 @@ test("the picture has no working badge over the creature: the stage's working li
   expect(document.querySelector(".picture-card [role=status]")).toBeNull();
 });
 
-test("just the avatar: the pointer on the creature shows a handle, on the handle it unfolds into the card, away it folds back", () => {
+const expanded = () => document.querySelector(".floating-card")!.hasAttribute("data-expanded");
+
+test("just the avatar: no handle; the compact card is there for Tab, with A1's first row and controls row only", () => {
+  page("avatar");
+  expect(document.querySelector(".avatar-handle, .avatar-dock")).toBeNull();
+  const card = document.querySelector(".avatar-compact .call-card.title-card.compact-card")!;
+  expect(card).not.toBeNull();
+  expect(expanded()).toBe(false);
+  expect(card.querySelector(".card-face, .card-sub, .card-state, .your-wave")).toBeNull();
+  expect(card.querySelector(".card-row > .card-who > .card-title > .card-title-text")).not.toBeNull();
+  expect(card.querySelector(".card-conversations-button")).not.toBeNull();
+  expect([...card.querySelectorAll(".card-actions button")].map((button) => button.getAttribute("aria-label"))).toEqual(["Open Sidevoice", "Floating card settings", "Hide for this call"]);
+  expect([...card.querySelectorAll(".card-controls > *")].map((node) => node.className)).toEqual(["card-mic", "card-captions", "card-skip", "card-hangup"]);
+});
+
+test("just the avatar: the pointer on the creature opens the card after 120ms, away it folds after 500ms; a balloon is not the creature", () => {
   vi.useFakeTimers();
   page("avatar");
-  expect(document.querySelector(".avatar-handle")).toBeNull();
-  // A balloon is not the creature: it brings nothing out.
   fireEvent.pointerOver(document.querySelector(".avatar-balloons")!);
   act(() => { vi.advanceTimersByTime(700); });
-  expect(document.querySelector(".avatar-handle")).toBeNull();
+  expect(expanded()).toBe(false);
   fireEvent.pointerOver(document.querySelector(".avatar-figure")!);
-  act(() => { vi.advanceTimersByTime(130); });
-  const handle = screen.getByRole("button", { name: "Call controls" });
-  expect(document.querySelector(".floating-card")).toHaveAttribute("data-handle");
-  expect(document.querySelector(".floating-card")).not.toHaveAttribute("data-expanded");
-  expect(handle).toHaveAttribute("aria-expanded", "false");
-  fireEvent.pointerOver(handle);
-  act(() => { vi.advanceTimersByTime(130); });
-  expect(document.querySelector(".floating-card")).toHaveAttribute("data-expanded");
-  expect(handle).toHaveAttribute("aria-expanded", "true");
-  expect(document.querySelector(".avatar-dock")).not.toBeNull();
-  // Away: the card folds into the handle after the usual delay, and the handle goes once the pointer has left.
-  fireEvent.pointerOver(document.querySelector(".avatar-figure")!);
-  act(() => { vi.advanceTimersByTime(520); });
-  expect(document.querySelector(".floating-card")).not.toHaveAttribute("data-expanded");
-  expect(document.querySelector(".floating-card")).toHaveAttribute("data-folding");
+  act(() => { vi.advanceTimersByTime(110); });
+  expect(expanded()).toBe(false);
+  act(() => { vi.advanceTimersByTime(20); });
+  expect(expanded()).toBe(true);
+  expect(document.querySelector(".floating-card")).toHaveAttribute("data-flow");
+  // Away: it folds after the usual delay and, once faded, its box leaves the window's flow.
   fireEvent.pointerLeave(document.querySelector(".avatar-card")!);
-  act(() => { vi.advanceTimersByTime(800); });
-  expect(document.querySelector(".avatar-handle")).toBeNull();
+  act(() => { vi.advanceTimersByTime(480); });
+  expect(expanded()).toBe(true);
+  act(() => { vi.advanceTimersByTime(40); });
+  expect(expanded()).toBe(false);
+  act(() => { vi.advanceTimersByTime(300); });
+  expect(document.querySelector(".floating-card")).not.toHaveAttribute("data-flow");
 });
 
-test("just the avatar: Enter on the handle opens the card with focus on its first control; Escape folds it back, focus on the handle", () => {
+test("just the avatar: a control clicked with the pointer holds nothing; the keyboard's focus does, and Tab opens, Escape folds", () => {
   vi.useFakeTimers();
   page("avatar");
   fireEvent.pointerOver(document.querySelector(".avatar-figure")!);
   act(() => { vi.advanceTimersByTime(130); });
-  fireEvent.click(screen.getByRole("button", { name: "Call controls" }));
-  act(() => { vi.advanceTimersByTime(10); });
-  expect(document.querySelector(".floating-card")).toHaveAttribute("data-expanded");
-  const first = document.querySelector<HTMLElement>(".avatar-dock button:not(:disabled)")!;
-  expect(document.activeElement).toBe(first);
-  fireEvent.keyDown(first, { key: "Escape" });
-  act(() => { vi.advanceTimersByTime(10); });
-  expect(document.querySelector(".floating-card")).not.toHaveAttribute("data-expanded");
-  expect(document.activeElement).toBe(screen.getByRole("button", { name: "Call controls" }));
-});
-
-test("just the avatar: once open, the card holds while the pointer is within 16px of the handle and the card, and folds after leaving that", () => {
-  vi.useFakeTimers();
-  page("avatar");
-  fireEvent.pointerOver(document.querySelector(".avatar-figure")!);
-  act(() => { vi.advanceTimersByTime(130); });
-  fireEvent.pointerOver(screen.getByRole("button", { name: "Call controls" }));
-  act(() => { vi.advanceTimersByTime(130); });
-  expect(document.querySelector(".floating-card")).toHaveAttribute("data-expanded");
-  const rect = (left: number, right: number) => ({ left, right, top: 0, bottom: 100, width: right - left, height: 100 }) as DOMRect;
-  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
-    return this.classList.contains("avatar-dock") ? rect(100, 400) : this.classList.contains("avatar-handle") ? rect(108, 154) : rect(0, 0);
-  });
-  // On the creature but within the hull's 16px margin of the card: still on the card, so it holds.
-  overAt(document.querySelector(".avatar-figure")!, 90, 50);
+  const captions = document.querySelector<HTMLElement>(".avatar-compact .card-captions")!;
+  act(() => { vi.advanceTimersByTime(CLICK_GUARD_MS + 10); });
+  // Focus from the mouse is not :focus-visible.
+  const matches = Element.prototype.matches;
+  const visible = vi.spyOn(Element.prototype, "matches").mockImplementation(function (this: Element, selector: string) { return selector === ":focus-visible" ? false : matches.call(this, selector); });
+  act(() => captions.focus());
+  fireEvent.pointerLeave(document.querySelector(".avatar-card")!);
   act(() => { vi.advanceTimersByTime(700); });
-  expect(document.querySelector(".floating-card")).toHaveAttribute("data-expanded");
+  expect(expanded()).toBe(false);
+  visible.mockRestore();
+  // Tab: focus-visible inside the folded card opens it at once.
+  vi.spyOn(Element.prototype, "matches").mockImplementation(function (this: Element, selector: string) { return selector === ":focus-visible" ? true : matches.call(this, selector); });
+  act(() => document.querySelector<HTMLElement>(".avatar-compact .card-mute")!.focus());
+  expect(expanded()).toBe(true);
+  // It holds as long as that focus stays, whatever the pointer does.
+  act(() => { vi.advanceTimersByTime(900); });
+  expect(expanded()).toBe(true);
+  fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+  expect(expanded()).toBe(false);
+  expect(document.activeElement).toBe(document.body);
+  vi.restoreAllMocks();
+});
+
+test("just the avatar: dragging puts the card away at once and keeps its box until the drop; dropped on the creature it returns after 120ms", () => {
+  vi.useFakeTimers();
+  const host = page("avatar");
+  const figure = document.querySelector(".avatar-figure")!;
+  fireEvent.pointerOver(figure);
+  act(() => { vi.advanceTimersByTime(130); });
+  expect(expanded()).toBe(true);
+  fireEvent.pointerDown(figure, { button: 0, pointerId: 1, screenX: 100, screenY: 100 });
+  fireEvent.pointerMove(figure, { pointerId: 1, screenX: 120, screenY: 110 });
+  expect(host.drag).toHaveBeenCalledWith("start");
+  expect(expanded()).toBe(false);
+  expect(document.querySelector(".floating-card")).toHaveAttribute("data-dragging");
+  // Nothing opens it mid-drag; its box stays in the flow.
+  fireEvent.pointerOver(figure);
+  act(() => { vi.advanceTimersByTime(700); });
+  expect(expanded()).toBe(false);
+  expect(document.querySelector(".floating-card")).toHaveAttribute("data-flow");
+  // Dropped on the creature (jsdom has no layout: the creature is what is under the point).
+  document.elementFromPoint = vi.fn().mockReturnValue(figure);
+  const under = vi.mocked(document.elementFromPoint);
+  fireEvent.pointerUp(figure, { pointerId: 1, screenX: 120, screenY: 110 });
+  expect(host.drag).toHaveBeenLastCalledWith("end");
+  expect(document.querySelector(".floating-card")).not.toHaveAttribute("data-dragging");
+  act(() => { vi.advanceTimersByTime(130); });
+  expect(expanded()).toBe(true);
+  // Dropped elsewhere: folded, the box out of the flow.
+  fireEvent.pointerDown(figure, { button: 0, pointerId: 2, screenX: 100, screenY: 100 });
+  fireEvent.pointerMove(figure, { pointerId: 2, screenX: 140, screenY: 110 });
+  under.mockReturnValue(document.body);
+  fireEvent.pointerUp(figure, { pointerId: 2, screenX: 140, screenY: 110 });
+  act(() => { vi.advanceTimersByTime(300); });
+  expect(expanded()).toBe(false);
+  expect(document.querySelector(".floating-card")).not.toHaveAttribute("data-flow");
+  vi.restoreAllMocks();
+  delete (document as { elementFromPoint?: unknown }).elementFromPoint;
+});
+
+test("just the avatar: with the controls always shown the card is out, and comes back on the drop", () => {
+  vi.useFakeTimers();
+  const host = page("avatar", { alwaysExpanded: true });
+  expect(expanded()).toBe(true);
+  const figure = document.querySelector(".avatar-figure")!;
+  fireEvent.pointerDown(figure, { button: 0, pointerId: 1, screenX: 100, screenY: 100 });
+  fireEvent.pointerMove(figure, { pointerId: 1, screenX: 120, screenY: 110 });
+  expect(expanded()).toBe(false);
+  fireEvent.pointerUp(figure, { pointerId: 1, screenX: 120, screenY: 110 });
+  expect(host.drag).toHaveBeenLastCalledWith("end");
+  expect(expanded()).toBe(true);
+});
+
+test("just the avatar: once open, the card holds while the pointer is within 16px of the creature and the card, and folds after leaving that", () => {
+  vi.useFakeTimers();
+  page("avatar");
+  fireEvent.pointerOver(document.querySelector(".avatar-figure")!);
+  act(() => { vi.advanceTimersByTime(130); });
+  expect(expanded()).toBe(true);
+  const rect = (left: number, right: number, top: number, bottom: number) => ({ left, right, top, bottom, width: right - left, height: bottom - top }) as DOMRect;
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    return this.classList.contains("compact-card") ? rect(100, 400, 150, 230) : this.classList.contains("avatar-figure") ? rect(180, 320, 0, 140) : rect(0, 0, 0, 0);
+  });
+  // Between them, and within the hull's 16px of the card: still on the card, so it holds.
+  overAt(document.querySelector(".avatar-balloons")!, 90, 200);
+  act(() => { vi.advanceTimersByTime(700); });
+  expect(expanded()).toBe(true);
   // Beyond it: it folds after the usual delay.
-  overAt(document.querySelector(".avatar-figure")!, 60, 50);
+  overAt(document.querySelector(".avatar-balloons")!, 60, 200);
   act(() => { vi.advanceTimersByTime(520); });
-  expect(document.querySelector(".floating-card")).not.toHaveAttribute("data-expanded");
+  expect(expanded()).toBe(false);
   vi.restoreAllMocks();
 });
 

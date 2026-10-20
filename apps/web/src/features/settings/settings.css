@@ -345,8 +345,10 @@
 .fcp-card-controls i:last-child { width: 12px; border-radius: 4px; background: var(--sv-danger, #dc362e); }
 .fcp-pip .fcp-lines { display: flex; align-items: center; justify-content: space-between; }
 .fcp-pip .fcp-lines .fcp-actions { flex: none; }
-.fcp-avatar-card { position: absolute; top: 20px; right: 82px; display: grid; gap: 5px; width: 46%; padding: 6px; border: 1px solid var(--sv-border);
-  border-radius: 10px; background: var(--sv-bg); box-shadow: 0 6px 16px rgb(0 0 0 / 30%); }
-.fcp-avatar-card .fcp-lines { display: flex; align-items: center; justify-content: space-between; }
-.fcp-avatar-card .fcp-lines i:first-child { width: 50%; }
+/* Just the avatar with its controls out: the compact card, A1's title line over its controls row spread across (mic left, hang-up
+ * right), 120px wide (the real card's 300px for a 160px creature, at the tile's 64px), 2px under the creature (64px at top 6px in
+ * a 104px tile), 8px from the tile's edge as the card is from the screen's, and ending 2px above the tile's bottom. */
+.floating-card-preview .fcp-card.fcp-compact { top: 72px; right: 8px; width: 120px; padding: 5px 6px; row-gap: 5px; }
+.fcp-compact > .fcp-lines i { width: 62%; }
+.fcp-compact > .fcp-bar { flex-basis: 100%; justify-content: space-between; }
 .fcp-lines .fcp-actions i { width: 8px; height: 8px; border-radius: 50%; opacity: 1; background: color-mix(in srgb, var(--sv-text) 25%, transparent); }
