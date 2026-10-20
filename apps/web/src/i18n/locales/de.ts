@@ -1354,6 +1354,7 @@ export const messages: Messages = {
   "card.devicesInSystem": "Wähle dieses Gerät in den Systemeinstellungen.",
   "card.youAreMuted": "Du bist stummgeschaltet",
   "card.conversationsCount": "Unterhaltungen ({n})",
+  "card.conversationsCountUnread": "Unterhaltungen ({n}), {unread} mit ungelesenen Antworten",
   "card.settings": "Einstellungen der schwebenden Karte",
   "card.hide": "Für diesen Anruf ausblenden",
   "card.you": "Du",

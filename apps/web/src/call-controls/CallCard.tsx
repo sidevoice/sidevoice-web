@@ -88,16 +88,23 @@ function FloatingCard({ host, state, format, size, t }: { host: CallControlsHost
 
 // ---------- what every format has ----------
 
+/** The header's unread cue: the list's own "!" (the avatars' tag, bichos .bang) on the control's corner. Decorative: the
+ *  control's name says how many conversations have unread replies. */
+function UnreadBang() {
+  return <span className="card-unread-bang" aria-hidden="true"><svg viewBox="-10.5 -13.5 21 27"><rect x="-9" y="-12" width="18" height="24" rx="6" /><text y="7" textAnchor="middle">!</text></svg></span>;
+}
+
 /** The way to the other conversations: their mark, how many, and ▾ (▴ while the list is down), right after the title. */
 function ConversationsButton({ state, shell, t }: { state: CallControlsState; shell: CardShell; t: Translate }) {
   const count = state.call.participants.length;
   const open = shell.panel === "conversations";
-  const unread = state.call.participants.some((row) => hasUnread(row, null));
+  const unread = state.call.participants.filter((row) => hasUnread(row, null)).length;
+  const name = unread ? t("card.conversationsCountUnread", { n: count, unread }) : t("card.conversationsCount", { n: count });
   return (
     <button type="button" className="card-conversations-button" aria-expanded={open} aria-haspopup="dialog"
-      aria-label={t("card.conversationsCount", { n: count })} title={t("card.switchConversation")} onClick={() => shell.setPanel(open ? null : "conversations")}>
+      aria-label={name} title={unread ? name : t("card.switchConversation")} onClick={() => shell.setPanel(open ? null : "conversations")}>
       <ConversationsIcon size={14} /><span>{count}</span><ChevronIcon size={12} className="card-conversations-chevron" />
-      {unread && <span className="card-unread" aria-label={t("state.unread")} />}
+      {unread > 0 && <UnreadBang />}
     </button>
   );
 }

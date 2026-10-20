@@ -1372,6 +1372,7 @@ export const messages: Messages = {
   "card.devicesInSystem": "Elige este dispositivo en los ajustes del sistema.",
   "card.youAreMuted": "Estás silenciado",
   "card.conversationsCount": "Conversaciones ({n})",
+  "card.conversationsCountUnread": "Conversaciones ({n}), {unread} con respuestas sin leer",
   "card.settings": "Ajustes de la tarjeta flotante",
   "card.hide": "Ocultar durante esta llamada",
   "card.you": "Tú",

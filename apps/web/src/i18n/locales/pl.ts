@@ -1372,6 +1372,7 @@ export const messages: Messages = {
   "card.devicesInSystem": "Wybierz to urządzenie w ustawieniach systemu.",
   "card.youAreMuted": "Mikrofon wyciszony",
   "card.conversationsCount": "Rozmowy ({n})",
+  "card.conversationsCountUnread": "Rozmowy ({n}), z nieprzeczytanymi odpowiedziami: {unread}",
   "card.settings": "Ustawienia pływającej karty",
   "card.hide": "Ukryj na czas tego połączenia",
   "card.you": "Ty",
