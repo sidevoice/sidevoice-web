@@ -43,6 +43,9 @@ jobs:
           PERF_SECONDS: "20"
           PERF_SUMMARY: ${{ github.step_summary }}
         run: |
-          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site-base" PERF_LABEL="Base ($(git -C ../../base rev-parse --short HEAD))" node perf/idle-cpu.mjs
-          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="This change ($(git rev-parse --short HEAD))" node perf/idle-cpu.mjs
-          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="This change, every animation stopped (the floor)" PERF_NO_ANIMATIONS=1 node perf/idle-cpu.mjs
+          PERF_ONLY=speaking SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site-base" PERF_LABEL="Base ($(git -C ../../base rev-parse --short HEAD))" node perf/idle-cpu.mjs
+          PERF_ONLY=speaking SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="This change ($(git rev-parse --short HEAD))" node perf/idle-cpu.mjs
+          export PERF_ONLY=speaking SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site"
+          PERF_LABEL="Speaking, bars fixed, balloon wave hidden" PERF_STYLE=".voice-wave{display:none!important}" node perf/idle-cpu.mjs
+          PERF_LABEL="Speaking, bars fixed, bars and wave hidden" PERF_STYLE=".mic-wave,.voice-wave{display:none!important}" node perf/idle-cpu.mjs
+          PERF_LABEL="Speaking, bars fixed, again" node perf/idle-cpu.mjs
