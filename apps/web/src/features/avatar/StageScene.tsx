@@ -4,15 +4,18 @@ import { rng } from "./engine/core";
 import { DESK_TOPS, deskFromSeed, deskSvg } from "./engine/desk";
 import type { AvatarSpec } from "./avatar-spec";
 import { withOwnIds } from "./bicho-draw";
+import { useMotion } from "../../lib/motion";
 import { usePageTheme } from "../../lib/theme";
 import { stillAvatar } from "./avatar-state";
 import { CharacterAvatar } from "./CharacterAvatar";
+import { useLayers } from "./layers";
 
 /* The stage as the avatar lab draws it: a backdrop behind the agent, the desk it works at, and the wanted poster that
  * stands in for it while it is offline. All three come from the conversation's seed, like the bicho. The lab lays the
  * stage out on a tile 440px tall, and the backdrops' mounts (the post, the tree, the balloons a poster hangs from) are
  * drawn in its pixels; so the scene keeps that frame and scales it to the tile's height (styles/call.css,
- * `.stage-scene`), and the poster, the desk and the agent meet where the lab put them. */
+ * `.stage-scene`), and the poster, the desk and the agent meet where the lab put them. A `live` backdrop or desk (the
+ * stage's) moves where the GPU moves it, drawn in layers like the agent (layers.ts); anywhere else it holds still. */
 
 /** The height of the lab's stage, in its pixels. */
 export const SCENE_HEIGHT = 440;
@@ -70,24 +73,27 @@ export function useSceneScale() {
 
 /** The seed's backdrop, in the theme it is drawn in (its light and dark drawings are the engine's): the nearest one
  *  above it — the page's, or a part of a page shown in the other theme (the design system's columns). */
-export function StageBackdrop({ seed, tone }: { seed: string; tone: string }) {
+export function StageBackdrop({ seed, tone, live }: { seed: string; tone: string; live?: boolean }) {
   const page = usePageTheme();
   const ref = useRef<HTMLDivElement>(null);
   const [theme, setTheme] = useState(page);
   useLayoutEffect(() => { setTheme(ref.current?.closest("[data-theme]")?.getAttribute("data-theme") === "dark" ? "dark" : "light"); }, [page]);
   const html = useMemo(() => backdropSvg(backdropFromSeed(seed), tone, theme), [seed, tone, theme]);
+  useLayers(ref, useMotion() === "gpu" && !!live, html);
   return <div ref={ref} className="stage-backdrop" aria-hidden="true" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 /** The seed's desk, in front of the agent; it slides in while the agent works (styles/call.css). Beside the drawing, the
  *  desk's top and front run on to the tile's edges in the same colours, so a wide stage gets a whole desk at the
  *  drawing's scale instead of a stretched one. */
-export function StageDesk({ seed }: { seed: string }) {
+export function StageDesk({ seed, live }: { seed: string; live?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
   const desk = useMemo(() => deskFromSeed(seed), [seed]);
   const html = useMemo(() => withOwnIds(deskSvg(desk)), [desk]);
+  useLayers(ref, useMotion() === "gpu" && !!live, html);
   const [, top, topDeep, front, frontDeep] = DESK_TOPS[desk.top] ?? DESK_TOPS.wood;
   const colours = { "--desk-top": top, "--desk-top-deep": topDeep, "--desk-front": front, "--desk-front-deep": frontDeep } as CSSProperties;
-  return <div className="stage-desk" aria-hidden="true" style={colours} dangerouslySetInnerHTML={{ __html: html }} />;
+  return <div ref={ref} className="stage-desk" aria-hidden="true" style={colours} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 /** The poster's words, in the interface's language (i18n/locales). */

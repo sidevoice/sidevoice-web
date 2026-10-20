@@ -15,6 +15,7 @@ import { ErrorDetails } from "./components/ui/ErrorText";
 import { translator } from "./i18n/translator";
 
 import { startPageTheme } from "./lib/theme";
+import { startMotion } from "./lib/motion";
 
 // Uncaught errors are reported to the room before anything else is loaded: the controller owns the
 // socket, so until it exists the reports wait here.
@@ -32,6 +33,8 @@ window.addEventListener("unhandledrejection", (event) => {
 
 // The theme this device chose in Settings, else the system's (lib/theme.ts).
 startPageTheme();
+// Whether its drawings move: only where the GPU moves them (lib/motion.ts).
+startMotion();
 
 const root = createRoot(document.getElementById("root")!);
 

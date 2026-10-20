@@ -21,7 +21,7 @@ import { PersonTurn } from "./PersonTurn";
 import { TranscriptEntry } from "./TranscriptEntry";
 import { useVoiceModels } from "./VoiceModels";
 import { harnessName, StageHeading } from "./CallDetails";
-import { useConversationAvatar, useConversationAvatars } from "./conversation-avatars";
+import { useConversationAvatar, useConversationAvatars, useMovingCopy } from "./conversation-avatars";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { errorLine } from "../settings/error-message";
 import { desktopHost } from "../../services/desktop-host";
@@ -162,6 +162,8 @@ export function StageTile({ card = false }: { card?: boolean }) {
   const avatars = useConversationAvatars();
   const avatar = useConversationAvatar(stage.threadId);
   const holdStill = useCallback((up: boolean) => { if (stage.threadId) avatars.hold(stage.threadId, up); }, [avatars, stage.threadId]);
+  // The stage's agent moves (where the GPU moves it): it takes up its pastimes.
+  useMovingCopy(stage.threadId);
   const conversation = useRoomStore((state) => state.conversation);
   const reply = stage.isTarget ? conversation.saying ?? null : null;
   const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
@@ -180,11 +182,11 @@ export function StageTile({ card = false }: { card?: boolean }) {
       <div className="stage-tile" data-mood={avatar.mood} data-app={desktopHost() ? "" : undefined} data-card={card || undefined} style={avatarTone(tone) as CSSProperties}>
         <div className="stage-canvas">
           <div className="stage-scene">
-            <StageBackdrop seed={stage.threadId} tone={tone} />
+            <StageBackdrop seed={stage.threadId} tone={tone} live />
             {avatar.mood === "offline" && <WantedPoster spec={spec} seed={stage.threadId} words={posterWords(t)} language={uiLanguage()} />}
-            <CharacterAvatar className="stage-agent" spec={spec} state={avatar} size="stage" desk={avatar.mood === "working"}
+            <CharacterAvatar className="stage-agent" spec={spec} state={avatar} size="stage" desk={avatar.mood === "working"} live
               mouth="playback" mouthLevel={avatars.mouth(stage.threadId)} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
-            <StageDesk seed={stage.threadId} />
+            <StageDesk seed={stage.threadId} live />
           </div>
         </div>
         {!card && <StageName stage={stage} className="stage-name" tone={tone} voice={voice} />}

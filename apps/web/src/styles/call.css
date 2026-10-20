@@ -120,11 +120,24 @@
    room with a few conversations kept the app's GPU process and page busy and the fans on (desktop#149). The state
    reads from the still drawing (its pose, what it holds, the desk while it works), the dot beside it and the words.
    What moves carries state: the mouth while it speaks, the "!" popping when something new arrives (twice, as on the
-   card), the moment it changes state (transitions), and outside the figures the working dots and lights. */
-:is(.sv-avatar,.stage-scene) :not(.m-open,.m-rest) { animation:none !important }
+   card), the moment it changes state (transitions), and outside the figures the working dots and lights.
+   Except where the GPU moves them (web#278, lib/motion.ts: data-motion=gpu): the creature on the stage and on the call
+   card, and the stage's backdrop and desk, are drawn in layers ([data-layers], features/avatar/layers.ts) and move as
+   they were made to, every loop, pastime and "!"; and the poster sways. */
+:is(.sv-avatar,.stage-scene) :not(.m-open,.m-rest,[data-layers] *,[data-motion=gpu] .wanted) { animation:none !important }
 @media (prefers-reduced-motion:no-preference) {
-  .sv-avatar[data-style=bichos][data-unread]:not([data-size=rail]) .bang { animation:bx-pop 1.3s cubic-bezier(.3,1.8,.5,1) 2 !important }
+  .sv-avatar[data-style=bichos][data-unread]:not([data-size=rail]) .bang:not([data-layers] *) { animation:bx-pop 1.3s cubic-bezier(.3,1.8,.5,1) 2 !important }
 }
+/* A layered drawing: twins (HTML stand-ins of what moves, which the drawing's rules move) and slices (the still rest, in
+   SVG). A twin takes its element's transform and opacity attributes under every author rule, as an SVG element has
+   them; what a slice draws holds still whatever a rule says (important in a layer: that wins over important rules
+   outside one), since its twin moves for it. The mouth is a layer of its own all along, so speaking repaints nothing. */
+@layer sv-layers {
+  [data-lyr-t] { transform:var(--lyr-t) }
+  [data-lyr-o] { opacity:var(--lyr-o) }
+  [data-clone] { animation:none !important;transition:none !important;transform:none !important;translate:none !important;rotate:none !important;scale:none !important;opacity:1 !important;filter:none !important }
+}
+.sv-avatar [data-twin]:is(.m-open,.m-rest) { will-change:transform,opacity }
 
 /* Under reduced motion nothing here moves: the state stays readable from the still drawing (its pose, its eyes, what it
    holds), from the scene, and from the dot and the words beside it. Speaking shows a still, open mouth. */

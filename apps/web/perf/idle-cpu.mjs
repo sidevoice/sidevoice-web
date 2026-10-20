@@ -7,6 +7,8 @@
  *   node apps/web/perf/idle-cpu.mjs            the site assembled at SIDEVOICE_STATIC_SITE (or .playwright-static-web)
  *   PERF_SECONDS=20 PERF_HEADED=1 …            a longer window, a visible window (macOS CI runs headed)
  *   PERF_NO_ANIMATIONS=1                         the floor: every CSS animation and transition stopped
+ *   PERF_MOTION=gpu|still                        the drawings moving as GPU layers, or still, whatever the page decides
+                                                (web#278, lib/motion.ts: a runner without a GPU decides still)
  *   PERF_WEBKIT=<path>                           another WebKit executable (a rootless wrapper, an older build)
  *
  * Scenarios: idle with one conversation and with six, no call; idle in a call (listening, nobody speaking) with six. */
@@ -114,14 +116,16 @@ try {
     const browser = await webkit.launch({ headless: !process.env.PERF_HEADED, executablePath: process.env.PERF_WEBKIT || undefined });
     try {
       const page = await browser.newPage({ baseURL: BASE, viewport: { width: 1280, height: 800 } });
+      if (process.env.PERF_MOTION) await page.addInitScript((how) => localStorage.setItem("sidevoice.motion", how), process.env.PERF_MOTION);
       await scenario.run(page);
       // The floor, for comparison: the same page with every CSS animation and transition stopped.
       if (process.env.PERF_NO_ANIMATIONS) await page.addStyleTag({ content: "*, *::before, *::after { animation: none !important; transition: none !important }" });
       const mood = await page.locator(".stage-tile[data-mood]").first().getAttribute("data-mood");
+      const motion = await page.evaluate(() => document.documentElement.dataset.motion);
       await page.waitForTimeout(SETTLE_MS);
       const moving = await animations(page);
       const cpu = await sample(SECONDS);
-      rows.push({ scenario: `${scenario.name} [stage: ${mood}]`, ...cpu, ...moving });
+      rows.push({ scenario: `${scenario.name} [stage: ${mood}, motion: ${motion}]`, ...cpu, ...moving });
     } finally {
       await browser.close();
     }

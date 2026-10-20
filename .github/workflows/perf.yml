@@ -45,4 +45,6 @@ jobs:
         run: |
           SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site-base" PERF_LABEL="Base ($(git -C ../../base rev-parse --short HEAD))" node perf/idle-cpu.mjs
           SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="This change ($(git rev-parse --short HEAD))" node perf/idle-cpu.mjs
+          # The drawings moving as GPU layers (web#278) whatever the runner's GPU makes the page decide.
+          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="This change, the drawings moving as GPU layers" PERF_MOTION=gpu node perf/idle-cpu.mjs
           SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="This change, every animation stopped (the floor)" PERF_NO_ANIMATIONS=1 node perf/idle-cpu.mjs

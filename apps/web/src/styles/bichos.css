@@ -217,7 +217,8 @@
    The "!" takes the top-right corner (render.ts keeps it clear of the figure, and draws it as a bigger badge in the
    sidebar and the rail): the zz give way, and the cogs move to the other corner (--cogs-alt, placed the same way).
    The rail holds the badge still. */
-.sv-avatar[data-style=bichos][data-unread] .bang { animation: bx-pop 1.3s cubic-bezier(.3,1.8,.5,1) infinite; transform-box: fill-box; transform-origin: 50% 100% }
+.sv-avatar[data-style=bichos] .bang { transform-box: fill-box; transform-origin: 50% 100% }
+.sv-avatar[data-style=bichos][data-unread] .bang { animation: bx-pop 1.3s cubic-bezier(.3,1.8,.5,1) infinite }
 .sv-avatar[data-style=bichos][data-size=rail] .bang { animation: none }
 .sv-avatar[data-style=bichos][data-unread]:is(:is([data-mood=idle], [data-mood=waiting]), [data-mood=working]) .fig { animation: bx-hop 1.3s cubic-bezier(.3,1.6,.5,1) infinite }
 .sv-avatar[data-style=bichos][data-unread] .zz { display: none }
@@ -226,9 +227,9 @@
    The figure squashes, springs up and lands in the listening lean, the eyes pop wide, the brows jump, a burst
    flashes over the head, whatever it had going drops away (the work props and the cogs fall; so do the idle
    pastime's), and the listening waves come in as it lands. */
-.sv-avatar[data-style=bichos] .enter-burst { display: none }
+.sv-avatar[data-style=bichos] .enter-burst { display: none; transform-box: fill-box; transform-origin: 50% 100% }
 .sv-avatar[data-style=bichos] .enter-burst path { fill: none; stroke: #1b1428; stroke-width: 3.2; stroke-linecap: round }
-.sv-avatar[data-style=bichos][data-mood=listening][data-enter] .enter-burst { display: inline; transform-box: fill-box; transform-origin: 50% 100%; animation: bx-burst .42s ease-out both }
+.sv-avatar[data-style=bichos][data-mood=listening][data-enter] .enter-burst { display: inline; animation: bx-burst .42s ease-out both }
 .sv-avatar[data-style=bichos][data-mood=listening][data-enter] .squash { animation: bx-startle .42s cubic-bezier(.3,1.3,.5,1) both }
 .sv-avatar[data-style=bichos][data-mood=listening][data-enter] .fig { animation: bx-startle-tilt .42s ease-out both }
 .sv-avatar[data-style=bichos][data-mood=listening][data-enter] .eyes { animation: bx-eyes-pop .42s ease-out both }

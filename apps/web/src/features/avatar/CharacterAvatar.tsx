@@ -1,14 +1,18 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type Ref } from "react";
 import { cn } from "../../lib/cn";
+import { useMotion } from "../../lib/motion";
 import { avatarKey, avatarTone, type AvatarSpec } from "./avatar-spec";
 import { ENGINE_MOOD, type AvatarState, type MouthLevel } from "./avatar-state";
 import { drawAvatar, engineSize, type AvatarSize } from "./bicho-draw";
+import { useLayers } from "./layers";
 
 /* An avatar is a drawing and a state. The drawing is the bichos engine's SVG, made once per figure and size; the state
  * (avatar-state.ts) is a handful of attributes on its root that CSS keys on (src/styles/bichos.css, the engine's;
  * styles/call.css, the app's), so React touches it once per state and never per frame. This component only draws: the
  * state is one object per figure, worked out and moved on in avatar-state.ts, so every copy of a figure (the stage, a
- * thumbnail) shows the same thing at the same moment. Under reduced motion none of it moves.
+ * thumbnail) shows the same thing at the same moment. Only a `live` copy moves (the stage's, the card's), and only with
+ * the GPU (lib/motion.ts): it is drawn in layers (layers.ts), which WebKit composites without painting them again. Every
+ * other copy is one still SVG (styles/call.css).
  *
  * Root attributes:
  *   data-avatar-state  the app's state (AvatarMood): offline | speaking | listening | working | idle | present
@@ -36,6 +40,8 @@ export interface CharacterAvatarProps {
   mouthLevel?: MouthLevel;
   /** A desk stands in front of it (the stage scene, while it works). */
   desk?: boolean;
+  /** It moves, where the GPU moves it (the stage's agent, the card's creature); every other copy holds still. */
+  live?: boolean;
   /** Said for the avatar; without one it is decoration. */
   label?: string;
   className?: string;
@@ -53,7 +59,7 @@ function useBeat(key: string | number | undefined): "a" | "b" | undefined {
   return key === undefined ? undefined : beat;
 }
 
-export function CharacterAvatar({ spec, state, size, mouth = "voice", mouthKey, mouthLevel, desk, label, className, ref }: CharacterAvatarProps) {
+export function CharacterAvatar({ spec, state, size, mouth = "voice", mouthKey, mouthLevel, desk, live, label, className, ref }: CharacterAvatarProps) {
   const avatar = useRef<HTMLSpanElement | null>(null);
   useEffect(() => {
     const element = avatar.current;
@@ -67,6 +73,8 @@ export function CharacterAvatar({ spec, state, size, mouth = "voice", mouthKey, 
   const key = avatarKey(spec);
   // The key names the figure: a new spec object for the same conversation is the same drawing.
   const drawing = useMemo(() => drawAvatar(spec, size), [key, size]);
+  const layered = useMotion() === "gpu" && !!live;
+  useLayers(avatar, layered, drawing.html);
   const acts = ENGINE_MOOD[state.mood];
   const beat = useBeat(state.mood === "speaking" && mouth === "voice" ? mouthKey : undefined);
   // One clock for every copy: its animations run from the moment its state last changed, not from when this copy
@@ -76,7 +84,7 @@ export function CharacterAvatar({ spec, state, size, mouth = "voice", mouthKey, 
     if (state.since === undefined || !element || typeof element.getAnimations !== "function") return;
     for (const animation of element.getAnimations({ subtree: true }))
       if ("animationName" in animation) animation.startTime = state.since;
-  }, [state, drawing, desk]);
+  }, [state, drawing, desk, layered]);
   return (
     <span ref={(element) => { avatar.current = element; if (typeof ref === "function") ref(element); else if (ref) ref.current = element; }} className={cn("sv-avatar", className)} data-style="bichos" data-avatar-state={state.mood} data-mood={acts}
       data-size={engineSize(size)} data-mouth={mouth} data-beat={beat} data-work={state.work} data-idle={state.idle} data-enter={state.enter}

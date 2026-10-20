@@ -8,6 +8,7 @@ import { WORKING_SHOWN_AFTER_MS, type SessionFacts } from "../../state/room-sess
 import { markSetUp } from "../../test/onboarding";
 import { headerRowWidth } from "../../test/header-row";
 import { VARIANTS_KEY } from "../../lib/variants";
+import { MOTION_KEY, startMotion } from "../../lib/motion";
 import { AGENT_LINGER_MS, SENT_LEAVING_MS } from "./speech-reading";
 import { PAGE_MS } from "./PagedText";
 import { CAPTIONS_KEY } from "../../state/captions";
@@ -64,7 +65,9 @@ beforeEach(() => {
   window.sidevoiceActions = { selectParticipant, cancelInput: vi.fn().mockResolvedValue(undefined), closeParticipant: vi.fn(),
     loadVoiceCatalogue: vi.fn().mockResolvedValue(undefined) } as unknown as typeof window.sidevoiceActions;
 });
-afterEach(() => { delete window.sidevoiceActions; localStorage.clear(); vi.restoreAllMocks(); vi.useRealTimers(); });
+/** The page's drawings move as GPU layers (or hold still), as lib/motion.ts decides it by hand. */
+function motion(how: "gpu" | "still") { localStorage.setItem(MOTION_KEY, how); act(() => startMotion()); }
+afterEach(() => { motion("still"); delete window.sidevoiceActions; localStorage.clear(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 /** A window of a given kind: a phone, a compact desktop window, or a desktop too narrow for the open sidebar beside the
  *  docked transcript. */
@@ -358,17 +361,28 @@ function inStep(title: string) {
   return stage!;
 }
 
-test("the stage's agent and its thumbnails are one creature in one state: rest, startle, tool, balloon, offline (#166)", () => {
+test("the stage's agent and its thumbnails are one creature in one state: rest and pastimes, startle, tool, balloon, offline (#166)", () => {
   viewport({ narrow: true });
   headerRowWidth(190);
   vi.useFakeTimers();
   const store = room({ history: [played] });
   const login = "Fix the slow login";
   const attr = (name: string) => stageAgent().getAttribute(name);
-  // Resting: quiet, every copy, however long it rests (no pastimes: web#272).
+  // Without the GPU nothing on the stage moves: resting, it is quiet however long (web#272).
+  motion("still");
   expect(inStep(login)).toContain("data-idle=quiet");
   tick(30_000);
   expect(inStep(login)).toContain("data-idle=quiet");
+  // With it the stage's agent moves (web#278): quiet, then its steps, every copy on the same step at every moment.
+  motion("gpu");
+  expect(inStep(login)).toContain("data-idle=quiet");
+  const steps = new Set<string | null>();
+  for (let second = 0; second < 30; second += 1) {
+    tick(1000);
+    inStep(login);
+    steps.add(attr("data-idle"));
+  }
+  expect([...steps].some((step) => step && step !== "quiet")).toBe(true);
   // The person speaks to it: startled into listening everywhere at once, and landing everywhere at once.
   patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening" } as Partial<SessionFacts>);
   expect(inStep(login)).toEqual(expect.arrayContaining(["data-avatar-state=listening", "data-enter=idle"]));

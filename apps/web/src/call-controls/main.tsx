@@ -15,6 +15,7 @@ import { createCardRoom } from "./card-room";
 import { RoomProvider } from "../app/RoomProvider";
 import { SETTINGS_STORAGE_KEY, setUiLanguage, translator } from "../i18n/translator";
 import { applyTheme, readThemePreference, THEME_KEY } from "../lib/theme";
+import { startMotion } from "../lib/motion";
 import { cardLanguage } from "./i18n";
 
 const host = callControlsHost();
@@ -27,6 +28,8 @@ if (host) {
   // The theme and the language this device's Settings chose (the room keeps both in this origin's storage), again when
   // either changes there.
   let stopTheme = applyTheme(readThemePreference());
+  // Whether its creature moves: only where the GPU moves it (lib/motion.ts).
+  startMotion();
   const render = () => {
     const language = cardLanguage();
     setUiLanguage(language);

@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { playbackLevel } from "../../state/playback-level";
 import { avatarFor } from "./avatar-spec";
-import { createAvatarStates, type AvatarInputs, type AvatarStates } from "./avatar-state";
+import { BORED_AFTER_MS, createAvatarStates, type AvatarInputs, type AvatarStates } from "./avatar-state";
 import { avatarRepertoire } from "./bicho-draw";
 import { ENTER_MS } from "./engine/styles/bichos";
 
-// A figure with pastimes (the engine's, never picked) and tools to pick from.
+// A figure with pastimes and tools to pick from, drawn moving (on the stage, with the GPU: web#278).
 const spec = avatarFor("fp-1|t-login");
-const inputs = (extra: Partial<AvatarInputs> = {}): AvatarInputs => ({ spec, mood: "idle", ...extra });
+const inputs = (extra: Partial<AvatarInputs> = {}): AvatarInputs => ({ spec, mood: "idle", pastimes: true, ...extra });
 let states: AvatarStates;
 
 beforeEach(() => {
@@ -23,14 +23,45 @@ test("the figure this test draws has pastimes and tools to pick from", () => {
   expect(avatarRepertoire(spec).works.length).toBeGreaterThan(0);
 });
 
-test("resting, it stays quiet however long it rests: no pastime (web#272)", () => {
+test("resting, it is quiet for BORED_AFTER_MS, then goes in steps on its one clock: quiet, then a pastime", () => {
   states.set("a", inputs());
   expect(states.get("a")).toMatchObject({ mood: "idle", idle: "quiet" });
-  vi.advanceTimersByTime(120_000);
-  expect(states.get("a")).toMatchObject({ mood: "idle", idle: "quiet" });
+  vi.advanceTimersByTime(BORED_AFTER_MS - 1);
+  expect(states.get("a")!.idle).toBe("quiet");
+  // Bored: its steps start, quiet first (4–10 s), then a pastime.
+  vi.advanceTimersByTime(1);
+  expect(states.get("a")!.idle).toBe("quiet");
+  vi.advanceTimersByTime(11_000);
+  const pastime = states.get("a")!.idle;
+  expect(avatarRepertoire(spec).idles).toContain(pastime);
+  expect(pastime).not.toBe("quiet");
 });
 
-test("held still it takes nothing in hand until it is let go", () => {
+test("a figure no copy draws moving rests quiet however long; drawn moving again, it starts its rest over", () => {
+  states.set("a", inputs({ pastimes: false }));
+  vi.advanceTimersByTime(120_000);
+  expect(states.get("a")).toMatchObject({ mood: "idle", idle: "quiet" });
+  states.set("a", inputs());
+  vi.advanceTimersByTime(BORED_AFTER_MS + 11_000);
+  expect(states.get("a")!.idle).not.toBe("quiet");
+  // No longer drawn moving: back to quiet at once.
+  states.set("a", inputs({ pastimes: false }));
+  expect(states.get("a")!.idle).toBe("quiet");
+});
+
+test("whatever happens with it restarts its rest; held still it stays quiet and takes nothing in hand", () => {
+  states.set("a", inputs({ interaction: "1" }));
+  vi.advanceTimersByTime(BORED_AFTER_MS - 1000);
+  states.set("a", inputs({ interaction: "2" }));
+  // Left alone it would be at a pastime by now (bored at 10 s, quiet for under 10 s more); its rest started again.
+  vi.advanceTimersByTime(12_000);
+  expect(states.get("a")!.idle).toBe("quiet");
+  vi.advanceTimersByTime(9_000);
+  expect(states.get("a")!.idle).not.toBe("quiet");
+  states.set("a", inputs({ still: true }));
+  vi.advanceTimersByTime(60_000);
+  expect(states.get("a")!.idle).toBe("quiet");
+  // Working, held still: no tool until it is let go.
   states.set("a", inputs({ mood: "working", still: true }));
   expect(states.get("a")!.work).toBeUndefined();
   states.set("a", inputs({ mood: "working" }));
@@ -63,8 +94,8 @@ test("its moment moves with what it shows, and only then; the same object until 
   const first = states.get("a")!;
   expect(first.since).toBe(100);
   vi.mocked(performance.now).mockReturnValue(200);
-  // The same state again changes nothing it shows.
-  states.set("a", inputs());
+  // An interaction restarts its rest but changes nothing it shows.
+  states.set("a", inputs({ interaction: "x" }));
   expect(states.get("a")).toBe(first);
   states.set("a", inputs({ mood: "working" }));
   expect(states.get("a")!.since).toBe(200);
