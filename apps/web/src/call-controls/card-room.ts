@@ -48,8 +48,8 @@ export function createCardRoom(run: (command: CallCommand) => void): CardRoom {
         store.patch(facts as unknown as Partial<SessionFacts>);
       }
       level = state.level;
-      // The room's runtime writes the level on its microphone's pill (call-view.css .mic-wave reads --mic-fill).
-      const fill = () => document.getElementById("mic-control")?.style.setProperty("--mic-fill", Math.round(level) + "%");
+      // The room's runtime writes the level on its microphone's pill (call-view.css .mic-wave reads --mic-level).
+      const fill = () => document.getElementById("mic-control")?.style.setProperty("--mic-level", String(Math.round(level) / 100));
       fill();
       // A bar drawn by this very state (the card appearing, the controls coming near the pointer) gets it too.
       requestAnimationFrame(fill);
