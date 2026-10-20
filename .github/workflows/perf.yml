@@ -1,0 +1,48 @@
+name: perf
+
+# What the room costs while nothing happens, on macOS's WebKit (desktop#149): apps/web/perf/idle-cpu.mjs on the base
+# and on the change, side by side in the step summary. A measurement, not a gate: it fails only when a scenario cannot be
+# set up. Runs on pull requests that touch the page, on pushes to perf/** branches (a measurement without a pull
+# request; the base is main), and by hand.
+on:
+  pull_request:
+    branches: [main]
+    paths: ["apps/web/src/**", "apps/web/perf/**", ".github/workflows/perf.yml"]
+  push:
+    branches: ["perf/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  idle-cpu:
+    name: Idle CPU (macOS WebKit)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.base.sha || 'main' }}
+          path: base
+      - uses: ./.github/actions/setup
+      - name: The change's site
+        run: npm run build && node scripts/assemble-static-web.mjs "$RUNNER_TEMP/site"
+      - name: The base's site
+        working-directory: base
+        run: npm ci && npm run build && node scripts/assemble-static-web.mjs "$RUNNER_TEMP/site-base"
+      - run: npx playwright install webkit
+      - name: Measure
+        working-directory: apps/web
+        env:
+          PERF_HEADED: "1"
+          PERF_SECONDS: "20"
+          PERF_SUMMARY: ${{ github.step_summary }}
+        run: |
+          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site-base" PERF_LABEL="Base ($(git -C ../../base rev-parse --short HEAD))" node perf/idle-cpu.mjs
+          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="This change ($(git rev-parse --short HEAD))" node perf/idle-cpu.mjs
+          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="This change, every animation stopped (the floor)" PERF_NO_ANIMATIONS=1 node perf/idle-cpu.mjs

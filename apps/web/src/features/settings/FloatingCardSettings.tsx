@@ -33,6 +33,8 @@ export function FloatingCardSettings({ t }: { t: Translate }) {
   const bridge = callControlsBridge();
   const prefs = useFloatingCard();
   const [app, setApp] = useState<{ corner?: CardCorner; moved?: boolean; enabled?: boolean; alwaysShown?: boolean } | null>(null);
+  // Leaving Settings ends a preview showing at once.
+  useEffect(() => () => { bridge?.endPreview?.(); }, [bridge]);
   useEffect(() => {
     let gone = false;
     void bridge?.settings().then((value) => { if (!gone) setApp({ corner: value.corner, moved: value.moved, enabled: value.enabled, alwaysShown: value.alwaysShown }); }).catch(() => undefined);
@@ -70,7 +72,7 @@ export function FloatingCardSettings({ t }: { t: Translate }) {
       {bridge.setCorner && <CornerRow bridge={bridge} corner={app?.corner ?? "tr"} t={t} disabled={off}
         onChange={(corner) => { setApp((now) => ({ ...now, corner })); changed(); }} />}
       {bridge.resetPlace && <Row label="">
-        <Button variant="secondary" size="sm" disabled={off || app?.moved === false}
+        <Button variant="secondary" size="sm" disabled={off}
           onClick={() => { void bridge.resetPlace!().then(() => { setApp((now) => ({ ...now, moved: false })); changed(); }); }}>
           {t("settings.floatingCard.reset")}
         </Button>

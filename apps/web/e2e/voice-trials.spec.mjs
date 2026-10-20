@@ -160,7 +160,8 @@ test("a recorded settings try delivers the package take through the real trial a
     window.__sidevoiceDesktop = { host: { voice: host } };
     const model = (id, capability) => ({ id, family: "fake", capabilities: [capability], languages: ["en"], voices: [], installed: true,
       builds: [{ id: id + "/test", backend: "test", precision: "test", accelerator: "cpu", available: true, installed: true, reasons: [] }] });
-    const settings = { stt: { catalog: "local", model: "fake-stt", language: null }, tts: { catalog: "local", model: "fake-tts", voice: null, speed: 1 }, end_of_turn: "silence", patience: "normal", idle_unload_minutes: 10 };
+    const settings = { stt: { catalog: "local", model: "fake-stt", language: null }, tts: { catalog: "local", model: "fake-tts", voice: null, speed: 1 }, end_of_turn: "silence", patience: "normal", idle_unload_minutes: 10,
+      turn: { listening_bar: { quiet: 0.5, playing: 0.65 }, barge_in_min_speech: 0.6, barge_in_window: 2.5, vad_confidence: 0.6, speech_start_ms: 400, pre_roll_ms: 1000, audio_grace_ms: 1000, fade_ms: 30 } };
     window.__trialSettings = settings;
     window.__trialCatalogue = { state: "ready", catalogs: [
       { id: "local", name: null, status: { stale: false }, models: [model("fake-stt", "stt"), model("fake-tts", "tts")] },
