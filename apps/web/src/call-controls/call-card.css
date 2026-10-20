@@ -353,3 +353,17 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .compact-card .card-row { padding-left: 6px; }       /* the title starts where the mic does */
 .compact-card .card-who { padding-right: 0; }          /* no wave column: the title's column ends at the padding */
 .compact-card .card-controls { margin-top: 8px; }
+
+/* ---------- The list and the devices panel, against the control that opened it ----------
+ * A1 and the picture at a preset size: after the card in the flow (above it in the lower half), as always. A resized picture in the upper
+ * half: right under its header (the card is tall, the header is where the control is). The avatar: under the compact card, in the flow,
+ * as wide as it; in the lower half, over it, ending 6px above it. */
+.card-heading { position: relative; }
+.card-heading > .card-panel-card { position: absolute; z-index: 2; top: calc(100% + 6px); left: -14px; right: -10px; width: auto; max-height: calc(var(--card-h, 100%) - 70px); overflow: auto; }
+.avatar-compact .card-panel-card { box-sizing: border-box; width: 100%; margin-top: 6px; }
+.floating-card[data-open=up] .avatar-compact .card-panel-card { position: absolute; left: 0; bottom: 100%; margin: 0 0 6px; }
+
+/* The compact card never moves the creature sideways: the creature keeps its place in the window and the card sits off-centre toward the
+ * screen's middle (the creature's own side stays flush), so the window grows only on the side away from the screen's edge. */
+.floating-card[data-side=left] .avatar-card { justify-items: start; }
+.floating-card[data-side=right] .avatar-card { justify-items: end; }

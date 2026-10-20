@@ -78,10 +78,8 @@ function FloatingCard({ host, state, format, size, t }: { host: CallControlsHost
     <div ref={shell.card} className="floating-card" data-format={format} data-size={custom ? "custom" : size} data-open={place.vertical === "upper" ? "down" : "up"}
       data-side={place.horizontal} data-expanded={shell.expanded || undefined} data-flow={shell.flow || undefined} data-dragging={shell.dragging || undefined} data-captions={captions ? "on" : "off"} style={style} {...shell.handlers}>
       {body}
-      {shell.panel && <div className="call-card card-panel-card">
-        {shell.panel === "conversations" && <Conversations state={state} shell={shell} t={t} />}
-        {shell.panel === "devices" && <DevicePicker call={state.call} run={shell.run} t={t} />}
-      </div>}
+      {shell.panel && format === "card" && <PanelCard state={state} shell={shell} t={t} />}
+      {shell.panel && format === "pip" && (!custom || place.vertical === "lower") && <PanelCard state={state} shell={shell} t={t} />}
       {format === "card" && captions && <CaptionLines state={state} t={t} />}
     </div>
   );
@@ -107,6 +105,17 @@ function ConversationsButton({ state, shell, t }: { state: CallControlsState; sh
       <ConversationsIcon size={14} /><span>{count}</span><ChevronIcon size={12} className="card-conversations-chevron" />
       {unread > 0 && <UnreadBang />}
     </button>
+  );
+}
+
+/** The open list or devices panel. It sits against the control that opened it: after the card (A1, the picture at a preset size), under the
+ *  header of a resized picture (CardHeading), or under/over the avatar's compact card (AvatarCard). */
+function PanelCard({ state, shell, t }: { state: CallControlsState; shell: CardShell; t: Translate }) {
+  return (
+    <div className="call-card card-panel-card">
+      {shell.panel === "conversations" && <Conversations state={state} shell={shell} t={t} />}
+      {shell.panel === "devices" && <DevicePicker call={state.call} run={shell.run} t={t} />}
+    </div>
   );
 }
 
@@ -273,7 +282,7 @@ function CaptionLines({ state, t }: { state: CallControlsState; t: Translate }) 
 // ---------- B1: the picture-in-picture ----------
 
 /** The room's title block for the call's conversation: its title, then its machine on the line under it (`machine`). */
-function CardHeading({ state, shell, t }: { state: CallControlsState; shell: CardShell; t: Translate }) {
+function CardHeading({ state, shell, t, panelBelow = false }: { state: CallControlsState; shell: CardShell; t: Translate; panelBelow?: boolean }) {
   const stage = useStageConversation();
   const title = stage.title || state.call.title;
   const host = stage.row?.machine ?? state.call.participants.find((row) => row.selected)?.machine ?? null;
@@ -285,6 +294,7 @@ function CardHeading({ state, shell, t }: { state: CallControlsState; shell: Car
       </span>
       {host && <span className="stage-machine"><MachinesIcon size={12} /><span>{host}</span></span>}
       <CardActions shell={shell} t={t} />
+      {panelBelow && shell.panel && <PanelCard state={state} shell={shell} t={t} />}
     </header>
   );
 }
@@ -330,7 +340,7 @@ function PictureCard({ host, state, shell, place, sized, t }: { host: CallContro
   useNoStubs(stage);
   return (
     <div ref={shell.body} className="picture-card" data-sized={sized || undefined}>
-      <CardHeading state={state} shell={shell} t={t} />
+      <CardHeading state={state} shell={shell} t={t} panelBelow={sized && place.vertical === "upper"} />
       <div ref={stage} className="picture-stage"><StageTile card /></div>
       <CardCallBar />
       <ResizeGrip host={host} place={place} />
@@ -346,7 +356,7 @@ function PictureCard({ host, state, shell, place, sized, t }: { host: CallContro
 const HULL_PX = 16;
 function inHull(root: HTMLElement | null, event: { clientX: number; clientY: number }): boolean {
   if (!root) return false;
-  const boxes = [...root.querySelectorAll(".avatar-figure, .avatar-compact .compact-card")].map((node) => node.getBoundingClientRect()).filter((box) => box.width && box.height);
+  const boxes = [...root.querySelectorAll(".avatar-figure, .avatar-compact .compact-card, .avatar-compact .card-panel-card")].map((node) => node.getBoundingClientRect()).filter((box) => box.width && box.height);
   if (!boxes.length) return false;
   return event.clientX >= Math.min(...boxes.map((box) => box.left)) - HULL_PX && event.clientX <= Math.max(...boxes.map((box) => box.right)) + HULL_PX
     && event.clientY >= Math.min(...boxes.map((box) => box.top)) - HULL_PX && event.clientY <= Math.max(...boxes.map((box) => box.bottom)) + HULL_PX;
@@ -403,10 +413,11 @@ function AvatarCard({ state, shell, t }: { state: CallControlsState; shell: Card
       {captions && <div ref={balloons} className={"avatar-balloons" + (opensDown ? " balloon--tail-up" : "")} onPointerOver={(event) => zone.aim(zoneAt(event, "none"))}>
         <StageBalloons />
       </div>}
-      <div className="avatar-compact" onPointerOver={(event) => { if ((event.target as Element).closest(".compact-card")) zone.aim("card"); }}
+      <div className="avatar-compact" onPointerOver={(event) => { if ((event.target as Element).closest(".compact-card, .card-panel-card")) zone.aim("card"); }}
         onFocus={(event) => { if ((event.target as Element).matches(":focus-visible")) zone.focusWithin(true); }}
         onBlur={(event) => { if (!(event.relatedTarget as Element | null)?.closest?.(".avatar-compact")) zone.focusWithin(false); }}>
         <TitleCard state={state} shell={shell} t={t} compact />
+        {shell.panel && <PanelCard state={state} shell={shell} t={t} />}
       </div>
     </div>
   );
