@@ -165,7 +165,9 @@ function YourWave({ level, muted, still, t }: { level: number; muted: boolean; s
   return (
     <span className="your-wave" data-muted={muted || undefined} data-still={still || undefined} role="img"
       aria-label={muted ? t("card.youAreMuted") : t("card.yourMicrophone")}>
-      {levels.map((level, i) => <i key={i} style={{ height: muted || still ? undefined : Math.max(3, Math.round(level * 0.16)) + "px" }} />)}
+      {/* Each bar scales (transform) from its full 16px instead of changing height: WebKit composites a scale, while a
+          height per sample laid out and repainted the card 10 times a second (desktop#149). */}
+      {levels.map((level, i) => <i key={i} style={{ transform: muted || still ? undefined : `scaleY(${Math.max(3, Math.round(level * 0.16)) / 16})` }} />)}
     </span>
   );
 }
