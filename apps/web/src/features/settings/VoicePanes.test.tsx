@@ -242,7 +242,7 @@ test("a try is all in its block — getting ready, listening with the level, wha
   expect(document.getElementById("stt-try")).toHaveTextContent("Stop");
   act(() => running.told.onListening!());
   expect(block).toHaveTextContent("Listening… say a short sentence");
-  expect(block.querySelector(".voice-wave canvas")).toBeInTheDocument();
+  expect(block.querySelector(".voice-wave .voice-wave-bars")).toBeInTheDocument();
   // The take's bar fills to its longest (10 s) while it listens.
   expect(block.querySelector(".model-try-take")).toHaveStyle({ animationDuration: "10000ms" });
   expect(block.querySelector(".model-try-take")).toHaveAccessibleName("Records up to 10 s");
@@ -296,19 +296,19 @@ test("the transcription try is one steady layout: the button and the level first
   const area = () => block.querySelector(".stt-try-area")!;
   // Before any try: the button beside the level, in the first row; no row of its own.
   expect(head()).toContainElement(document.getElementById("stt-try"));
-  expect(head().querySelector(".voice-wave canvas")).toBeInTheDocument();
+  expect(head().querySelector(".voice-wave .voice-wave-bars")).toBeInTheDocument();
   expect(block.querySelector(".turn-try-main")).toBeNull();
   expect(area()).toHaveAttribute("aria-live", "polite");
   expect(block.querySelector(".model-try-take")).toBeNull();
   const running = pendingTry(actions);
   await act(async () => { fireEvent.click(document.getElementById("stt-try")!); });
   expect(area()).toHaveTextContent("Getting ready…");
-  expect(head().querySelector(".voice-wave canvas")).toBeInTheDocument();
+  expect(head().querySelector(".voice-wave .voice-wave-bars")).toBeInTheDocument();
   // Listening: what to do and the take's bar, in the area; the level still in the first row, with the button (Stop).
   act(() => running.told.onListening!());
   expect(area()).toHaveTextContent("Listening…");
   expect(area().querySelector(".model-try-take")).toBeInTheDocument();
-  expect(head().querySelector(".voice-wave canvas")).toBeInTheDocument();
+  expect(head().querySelector(".voice-wave .voice-wave-bars")).toBeInTheDocument();
   expect(head()).toContainElement(document.getElementById("stt-try"));
   expect(document.getElementById("stt-try")).toHaveTextContent("Stop");
   const shown = area();
@@ -319,7 +319,7 @@ test("the transcription try is one steady layout: the button and the level first
   expect(area().querySelector("#stt-timing")).toHaveTextContent("Transcribed in 0.4 s");
   expect(area()).not.toHaveTextContent("Listening…");
   expect(block.querySelector(".model-try-take")).toBeNull();
-  expect(head().querySelector(".voice-wave canvas")).toBeInTheDocument();
+  expect(head().querySelector(".voice-wave .voice-wave-bars")).toBeInTheDocument();
   expect(head()).toContainElement(document.getElementById("stt-try"));
   expect(document.getElementById("stt-try")).toHaveTextContent("Speak again");
   // A failure with no words here: the generic line, never what it said, which is behind Details.
@@ -349,7 +349,7 @@ test("the voice's try: the button and the sentence on its first row, the sentenc
   const head = block.querySelector(".stt-try-head")!;
   expect(head).toContainElement(document.getElementById("tts-try"));
   // The sentence takes the level's place: no waveform.
-  expect(head.querySelector(".voice-wave canvas")).toBeNull();
+  expect(head.querySelector(".voice-wave .voice-wave-bars")).toBeNull();
   expect(head).toContainElement(block.querySelector("button.tts-try-said") as HTMLElement);
   expect(block.querySelector(".turn-try-main")).toBeNull();
   expect(block.querySelector(".stt-try-area.tts-try-area .model-try-live")).toHaveAttribute("aria-live", "polite");
@@ -383,7 +383,7 @@ test("the voice's try: Play says the sentence edited, lit while it speaks; then 
   expect(area().querySelector(".model-try-live")).toHaveTextContent("Getting ready…");
   expect(document.getElementById("tts-try")).toHaveTextContent("Stop");
   expect(head()).toContainElement(document.getElementById("tts-try"));
-  expect(head().querySelector(".voice-wave canvas")).toBeNull();
+  expect(head().querySelector(".voice-wave .voice-wave-bars")).toBeNull();
   // Speaking: the sentence lit as heard, not editable.
   act(() => { running.told.onProgress!({ from: 0, to: 0 }); running.told.onProgress!({ from: 4, to: 4 }); });
   expect(head().querySelector(".tts-try-sentence .model-try-said")).toHaveTextContent(/^Otra$/);

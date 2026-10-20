@@ -40,15 +40,9 @@ Object.defineProperty(globalThis, "ResizeObserver", {
   value: TestResizeObserver,
 });
 
-// jsdom has neither media queries nor a canvas: the waveform bubble needs both present, not real.
+// jsdom has no media queries: the waveform bubble needs them present, not real.
 Object.defineProperty(window, "matchMedia", {
   configurable: true,
   writable: true,
   value: (media: string) => ({ media, matches: false, onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false }),
-});
-
-Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
-  configurable: true,
-  writable: true,
-  value: () => ({ fillStyle: "", setTransform() {}, clearRect() {}, beginPath() {}, roundRect() {}, rect() {}, fill() {} }),
 });

@@ -2,10 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { translator } from "../../i18n/translator";
 import "./transcript.css";
 
-/* The bubble of the turn being recorded is the microphone itself: a canvas that pulls the meter's analyser
- * once per animation frame and paints its own pixels. React renders this element once per phase, never per
- * frame, and the runtime keeps owning the audio graph. Where there is no call (a voice try), `level` is where the
- * microphone's level comes from instead, 0 to 1, read the same way each frame. */
+/* The bubble of the turn being recorded is the microphone itself: a row of bars that pulls the meter's analyser once
+ * per animation frame and sets their heights. React renders this element once per phase, never per frame, and the
+ * runtime keeps owning the audio graph. Where there is no call (a voice try), `level` is where the microphone's level
+ * comes from instead, 0 to 1, read the same way each frame.
+ *
+ * The bars are DOM and move only by transform (transcript.css `.voice-wave-bars`): one slot per column, each a fully
+ * rounded bar drawn by three composited parts (two round ends and a middle) whose transforms are all that changes. The
+ * canvas this replaced was cleared and redrawn every frame while there was sound, and WebKit rasterises a 2D canvas on the
+ * CPU, in its GPU process: about 38 % of a core with the person speaking (desktop#149). */
 
 const COLUMN_MS = 55; // one column of history per ~55 ms, so the scroll follows time and not the frame rate
 /** Below this level the microphone hears silence: the waveform waits instead of scrolling it in. */
@@ -19,6 +24,27 @@ const FLOOR = 2; // a silent column is still a line, never a gap
 export function waveformBrush(node: HTMLElement): { pitch: number; width: number } {
   if (node.closest(".person-turns")) return { pitch: 6, width: 3 };
   return node.closest(".call-layout") ? { pitch: 8, width: 5 } : { pitch: CELL, width: BAR };
+}
+
+/** The three transforms that draw a bar `height` tall and `width` wide, `x` px from the right edge (negative: to its left),
+ *  as the canvas drew it: a rounded rectangle whose corners never exceed half its height. Two round ends, of the bar's own
+ *  width, and a middle, `middle` px long before it is scaled. Taller than wide, the ends sit apart on the vertical and the
+ *  middle scales between them; shorter, the bar is a flat pill: the ends shrink to its height and slide apart sideways, and
+ *  the middle (a rectangle of the width that is left) fills the gap. Written as inline transforms, not as custom properties
+ *  that CSS works out: resolving those cost WebKit about five times the style time per column (desktop#149). */
+export function barTransforms(height: number, width: number, middle: number, x: number): [top: string, bottom: string, middle: string] {
+  const lift = Math.max(0, height - width) / 2;
+  const slide = Math.max(0, width - height) / 2;
+  const end = Math.min(1, height / width);
+  const tall = height > width;
+  const across = tall ? 1 : (width - height) / width;
+  const along = (tall ? height - width : height) / middle;
+  const n = (value: number) => Math.round(value * 1000) / 1000;
+  return [
+    `translate(${n(x - slide)}px,${n(-lift)}px) scale(${n(end)})`,
+    `translate(${n(x + slide)}px,${n(lift)}px) scale(${n(end)})`,
+    `translate(${n(x)}px,0) scale(${n(across)},${n(along)})`,
+  ];
 }
 
 export type WaveformPhase = "listening" | "transcribing";
@@ -57,67 +83,75 @@ function usePrefersReducedMotion(): boolean {
 
 export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: () => number }) {
   const reduced = usePrefersReducedMotion();
-  const canvas = useRef<HTMLCanvasElement>(null);
+  const bars = useRef<HTMLSpanElement>(null);
   const columns = useRef<number[]>([]);
+  // Sets the bars to the columns as they stand: made by the bars' effect, called by the tick.
+  const paint = useRef<() => void>(() => {});
   // Read at each frame: a new function on a render changes nothing drawn.
   const ownLevel = useRef(level);
   ownLevel.current = level;
 
+  // One slot per column that fits, the newest at the right. A bar is written only when its height changed: a new column
+  // shifts the history by one, which touches the bars whose column differs; between columns only the newest moves.
   useEffect(() => {
-    const node = canvas.current;
-    const context = node?.getContext?.("2d");
-    if (!node || !context) return;
-    let frame = 0;
-    let lastColumn = 0;
-    let width = 1;
-    let height = 1;
-    let ink = "currentColor";
+    const node = bars.current;
+    if (!node) return;
     const brush = waveformBrush(node);
+    // A slot's parts: its two ends and its middle.
+    const slots: HTMLElement[][] = [];
+    const drawn: number[] = [];
+    let span = FLOOR;
+    let middle = 1;
+    node.style.setProperty("--w", String(brush.width));
 
     const size = () => {
-      const ratio = window.devicePixelRatio || 1;
       // Its layout size, not its box on screen: a balloon popping in (scaled) must not make the bars smaller for good.
       const box = node.getBoundingClientRect();
-      width = Math.max(1, Math.round(node.clientWidth || box.width || 0));
-      height = Math.max(1, Math.round(node.clientHeight || box.height || 0));
-      node.width = Math.round(width * ratio);
-      node.height = Math.round(height * ratio);
-      context.setTransform?.(ratio, 0, 0, ratio, 0, 0);
-      ink = window.getComputedStyle?.(node).color || ink;
-    };
-
-    // Newest column at the right: the turn scrolls away to the left as a recorder does.
-    const paint = () => {
+      const width = Math.max(1, Math.round(node.clientWidth || box.width || 0));
+      const height = Math.max(1, Math.round(node.clientHeight || box.height || 0));
       const capacity = Math.max(1, Math.floor(width / brush.pitch));
-      const values = columns.current;
-      while (values.length > capacity) values.shift();
-      const middle = height / 2;
-      const span = Math.max(FLOOR, height - 2);
-      context.clearRect(0, 0, width, height);
-      context.fillStyle = ink;
-      context.beginPath();
-      for (let slot = 0; slot < capacity; slot += 1) {
-        const value = values[values.length - 1 - slot] ?? 0;
-        const bar = Math.max(FLOOR, value * span);
-        const x = width - brush.width - slot * brush.pitch;
-        const y = middle - bar / 2;
-        if (context.roundRect) context.roundRect(x, y, brush.width, bar, brush.width / 2);
-        else context.rect(x, y, brush.width, bar);
+      span = Math.max(FLOOR, height - 2);
+      // The middle's own length at its tallest (a bar's span less its two round ends): it scales from there.
+      const longest = Math.max(1, span - brush.width);
+      if (longest !== middle) { middle = longest; node.style.setProperty("--mid", String(middle)); drawn.fill(NaN); }
+      while (slots.length > capacity) { slots.pop()!.forEach((part) => part.remove()); drawn.pop(); }
+      while (slots.length < capacity) {
+        // The ends are <i>, the middle a <u>: never a <b>, which the card's captions colour (call-card.css .caption-line b).
+        const parts = [document.createElement("i"), document.createElement("i"), document.createElement("u")];
+        node.append(...parts);
+        slots.push(parts);
+        drawn.push(NaN);
       }
-      context.fill();
     };
 
-    const observer = new ResizeObserver(() => { size(); paint(); });
-    observer.observe(node);
-    // A theme switch repaints the samples in the new ink, even when transcribing has frozen them.
-    const refresh = () => { ink = window.getComputedStyle?.(node).color || ink; paint(); };
-    const mutation = new MutationObserver(refresh);
-    mutation.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    size();
-    paint();
+    paint.current = () => {
+      const values = columns.current;
+      while (values.length > slots.length) values.shift();
+      for (let slot = 0; slot < slots.length; slot += 1) {
+        const value = values[values.length - 1 - slot] ?? 0;
+        // Hundredths of a pixel, finer than any screen shows, so a column that did not change is not written.
+        const bar = Math.round(Math.max(FLOOR, value * span) * 100) / 100;
+        if (bar === drawn[slot]) continue;
+        drawn[slot] = bar;
+        // The slot's place is a fixed distance from the right edge, where the bars are anchored (transcript.css).
+        const moves = barTransforms(bar, brush.width, middle, -slot * brush.pitch);
+        slots[slot].forEach((part, index) => part.style.setProperty("transform", moves[index]));
+      }
+    };
 
+    const observer = new ResizeObserver(() => { size(); paint.current(); });
+    observer.observe(node);
+    size();
+    paint.current();
+    return () => { observer.disconnect(); paint.current = () => {}; node.replaceChildren(); };
+  }, [reduced]);
+
+  useEffect(() => {
+    const node = bars.current;
     // Transcribing keeps the last frame: nothing is read, nothing is scheduled, the pulse is CSS.
-    if (reduced || phase !== "listening") return () => { observer.disconnect(); mutation.disconnect(); };
+    if (!node || reduced || phase !== "listening") return;
+    let frame = 0;
+    let lastColumn = 0;
 
     const tick = () => {
       // The level now, as the meter measures it (0 to 1): the call's, or the try's own. Only a host without it falls back to
@@ -133,7 +167,7 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
       if (!values.length || now - lastColumn >= COLUMN_MS) { values.push(value); lastColumn = now; }
       // Between columns the newest one keeps the loudest instant it covers, so a peak is never skipped.
       else values[values.length - 1] = Math.max(values[values.length - 1], value);
-      paint();
+      paint.current();
       frame = requestAnimationFrame(tick);
     };
     // Only while it can be seen: a waveform mounted out of sight (a Settings or setup page not shown, a hidden tab) reads
@@ -149,11 +183,11 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
     });
     sight?.observe(node);
     start();
-    return () => { stop(); sight?.disconnect(); observer.disconnect(); mutation.disconnect(); document.removeEventListener("visibilitychange", visibility); };
+    return () => { stop(); sight?.disconnect(); document.removeEventListener("visibilitychange", visibility); };
   }, [phase, reduced]);
 
   const t = translator();
   const label = { aria: t(LABELS[phase].aria), title: t(LABELS[phase].title) };
   if (reduced) return <span className="voice-bars" data-phase={phase} role="status" aria-label={label.aria} title={label.title}><i /><i /><i /><i /><i /></span>;
-  return <span className="voice-wave" data-phase={phase} role="status" aria-label={label.aria} title={label.title}><canvas ref={canvas} aria-hidden="true" /></span>;
+  return <span className="voice-wave" data-phase={phase} role="status" aria-label={label.aria} title={label.title}><span ref={bars} className="voice-wave-bars" aria-hidden="true" /></span>;
 }

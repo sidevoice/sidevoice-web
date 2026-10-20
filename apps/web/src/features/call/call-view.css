@@ -186,7 +186,7 @@
 .person-turns .person-bubble[data-live] .voice-bars i { height: calc(20 * var(--u)); }
 .person-turns .person-bubble[data-live] .voice-bars i:nth-child(even) { height: calc(10 * var(--u)); }
 /* Transcribing, the bars stay exactly as the turn closed on them, and only blink there (operator, 2026-10-15). */
-.person-turns .person-bubble[data-live] .voice-wave[data-phase="transcribing"] canvas { animation: person-wave-blink 1s ease-in-out infinite; }
+.person-turns .person-bubble[data-live] .voice-wave[data-phase="transcribing"] .voice-wave-bars { animation: person-wave-blink 1s ease-in-out infinite; }
 @keyframes person-wave-blink { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 .person-live-actions { display: flex; justify-content: flex-end; min-height: max(28px, calc(32 * var(--u))); }
 .person-live-actions .ui-button.cancel-input { margin-inline-end: calc(-8 * var(--u)); }
@@ -211,7 +211,6 @@
 }
 /* The waveform elsewhere (transcript.css, shared with the transcript's open turn) is sized here. */
 .person-bubble .voice-wave { display: block; flex: none; width: calc(160 * var(--u)); height: calc(28 * var(--u)); color: var(--sv-accent); }
-.person-bubble .voice-wave canvas { display: block; width: 100%; height: 100%; }
 /* The bars stand in for the waveform where the device asks for less motion: still, at rest heights. */
 .person-bubble .voice-bars { display: inline-flex; flex: none; align-items: center; gap: calc(3 * var(--u)); height: calc(20 * var(--u)); }
 .person-bubble .voice-bars i { display: block; width: calc(3 * var(--u)); height: calc(12 * var(--u)); border-radius: calc(2 * var(--u)); background: currentColor; }
@@ -324,7 +323,7 @@
 
 /* Nothing here moves for a device that asks for less motion: the dot, the call and the waveform hold still. */
 @media (prefers-reduced-motion: reduce) {
-  .join-status-dot, #call-controls #connect.reconnecting, .person-bubble .voice-wave canvas { animation: none; }
+  .join-status-dot, #call-controls #connect.reconnecting, .person-bubble .voice-wave-bars { animation: none; }
   .join-status-dot { opacity: .8; }
 }
 
