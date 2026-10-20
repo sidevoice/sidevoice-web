@@ -16,7 +16,7 @@
  * (state/captions.ts, shared with the room's call bar). What opens from the card (captions, lists) opens toward the
  * screen's middle (`place`). The room's components draw on the card's own store (card-room.ts); the host's state and the
  * plumbing are card-shell.tsx. */
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
 import { CaptionsIcon, CaptionsOffIcon, ChevronIcon, CloseIcon, ConversationsIcon, HangupIcon, HarnessIcon, MachinesIcon, MicrophoneIcon,
   MicrophoneOffIcon, MoreIcon, OpenAppIcon, SettingsIcon, SkipIcon } from "../components/ui/Icons";
 import { Button } from "../components/ui/Button";
@@ -338,6 +338,18 @@ function PictureCard({ host, state, shell, place, sized, t }: { host: CallContro
 
 // ---------- C1: just the avatar ----------
 
+/** Once open, the avatar's controls hold while the pointer is anywhere in their hull: the box around the handle and what it
+ *  opened, and the gaps between them, HULL_PX wider all round. Crossing a gap, or resting where the handle was (it is hidden
+ *  while the card is out), never folds them; leaving the hull does, after the usual delay (operator, 2026-10-20). */
+const HULL_PX = 16;
+function inHull(side: HTMLElement | null, event: { clientX: number; clientY: number }): boolean {
+  if (!side) return false;
+  const boxes = [...side.querySelectorAll(".avatar-handle, .avatar-dock")].map((node) => node.getBoundingClientRect()).filter((box) => box.width && box.height);
+  if (!boxes.length) return false;
+  return event.clientX >= Math.min(...boxes.map((box) => box.left)) - HULL_PX && event.clientX <= Math.max(...boxes.map((box) => box.right)) + HULL_PX
+    && event.clientY >= Math.min(...boxes.map((box) => box.top)) - HULL_PX && event.clientY <= Math.max(...boxes.map((box) => box.bottom)) + HULL_PX;
+}
+
 function AvatarCard({ state, shell, t }: { state: CallControlsState; shell: CardShell; t: Translate }) {
   const captions = useCaptions();
   const place = state.place ?? UPPER_RIGHT;
@@ -346,6 +358,8 @@ function AvatarCard({ state, shell, t }: { state: CallControlsState; shell: Card
   const balloons = useRef<HTMLDivElement>(null);
   const side = useRef<HTMLDivElement>(null);
   const { handle } = shell;
+  // What the pointer is on: inside an open card's hull it is on the card; else what is under it.
+  const zoneAt = (event: ReactPointerEvent, under: "none" | "creature" | "card") => (shell.expanded && inHull(side.current, event) ? "card" : under);
   // Whether a balloon is out, for the stack to take room only then (the window is the creature's box at rest).
   useEffect(() => {
     const node = balloons.current;
@@ -374,11 +388,12 @@ function AvatarCard({ state, shell, t }: { state: CallControlsState; shell: Card
     // A grid: the creature, its balloons on the side toward the screen's middle (above or below), and the handle with the card
     // it opens into beside it, level with it, on its open side (call-card.css). All of it in the window's flow, so the window
     // holds what shows: the card's box is kept from the moment the handle shows, and only its clip and opacities move.
-    <div className="avatar-card" data-balloons={balloonsUp || undefined} onPointerLeave={() => handle.aim("none")}>
-      <div ref={shell.body} className="avatar-figure" onPointerOver={() => handle.aim("creature")}>
+    <div className="avatar-card" data-balloons={balloonsUp || undefined} onPointerLeave={(event) => handle.aim(zoneAt(event, "none"))}
+      onPointerMove={(event) => { if (shell.expanded && event.pointerType === "mouse") handle.aim(zoneAt(event, "none") === "card" ? "card" : (event.target as Element).closest(".avatar-figure") ? "creature" : (event.target as Element).closest(".avatar-handle, .avatar-dock") ? "card" : "none"); }}>
+      <div ref={shell.body} className="avatar-figure" onPointerOver={(event) => handle.aim(zoneAt(event, "creature"))}>
         <CardFigure state={state} size="stage" label={t("stage.agentState", { title: state.call.title, state: moodText(state.call.mood, t) })} />
       </div>
-      {captions && <div ref={balloons} className={"avatar-balloons" + (opensDown ? " balloon--tail-up" : "")} onPointerOver={() => handle.aim("none")}>
+      {captions && <div ref={balloons} className={"avatar-balloons" + (opensDown ? " balloon--tail-up" : "")} onPointerOver={(event) => handle.aim(zoneAt(event, "none"))}>
         <StageBalloons />
       </div>}
       {(handle.out || handle.folding) && (
