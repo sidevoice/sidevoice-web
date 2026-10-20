@@ -8,17 +8,17 @@
  * - the picture-in-picture (default): the room's own stage tile (StageTile) under the room's title block, and the room's call bar
  *   (CardCallBar) under it. Its captions are the stage's balloons.
  * - just the avatar: the conversation's creature, on nothing; the stage's balloons above or below it (their tails toward
- *   it); the pointer on the creature shows a handle beside it, and the pointer on the handle unfolds it into a card (the
- *   picture's title bar and call bar, without the stage) that folds back into it.
+ *   it); the pointer on the creature shows, right under it (past its balloons where they open below), a compact card: the
+ *   title card's first row and its controls row, nothing between (sidevoice-playground#131, "C1: the compact card").
  *
  * Every format: the conversations control (their mark, how many, ▾) right after the title, whose list drops from it; ×
  * always (hidden for this call), the gear and "open Sidevoice" near the pointer; captions on the card's own toggle
  * (state/captions.ts, shared with the room's call bar). What opens from the card (captions, lists) opens toward the
  * screen's middle (`place`). The room's components draw on the card's own store (card-room.ts); the host's state and the
  * plumbing are card-shell.tsx. */
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
 import { CaptionsIcon, CaptionsOffIcon, ChevronIcon, CloseIcon, ConversationsIcon, HangupIcon, HarnessIcon, MachinesIcon, MicrophoneIcon,
-  MicrophoneOffIcon, MoreIcon, OpenAppIcon, SettingsIcon, SkipIcon } from "../components/ui/Icons";
+  MicrophoneOffIcon, OpenAppIcon, SettingsIcon, SkipIcon } from "../components/ui/Icons";
 import { Button } from "../components/ui/Button";
 import { ConversationPicker, DevicePicker, useCardShell, useHostState, useWave, type CardShell } from "./card-shell";
 import { hasUnread, moodText } from "../features/call/conversation-state";
@@ -76,7 +76,7 @@ function FloatingCard({ host, state, format, size, t }: { host: CallControlsHost
       : <AvatarCard state={state} shell={shell} t={t} />;
   return (
     <div ref={shell.card} className="floating-card" data-format={format} data-size={custom ? "custom" : size} data-open={place.vertical === "upper" ? "down" : "up"}
-      data-side={place.horizontal} data-expanded={shell.expanded || undefined} data-handle={shell.handle.out || undefined} data-folding={shell.handle.folding || undefined} data-captions={captions ? "on" : "off"} style={style} {...shell.handlers}>
+      data-side={place.horizontal} data-expanded={shell.expanded || undefined} data-flow={shell.flow || undefined} data-dragging={shell.dragging || undefined} data-captions={captions ? "on" : "off"} style={style} {...shell.handlers}>
       {body}
       {shell.panel && <div className="call-card card-panel-card">
         {shell.panel === "conversations" && <Conversations state={state} shell={shell} t={t} />}
@@ -151,7 +151,8 @@ function CardFigure({ state, size, label }: { state: CallControlsState; size: "s
 // ---------- A1: the title card ----------
 
 /** Your microphone: the last samples of its level; flat and crossed out when muted, flat while reconnecting. */
-function YourWave({ levels, muted, still, t }: { levels: number[]; muted: boolean; still: boolean; t: Translate }) {
+function YourWave({ level, muted, still, t }: { level: number; muted: boolean; still: boolean; t: Translate }) {
+  const levels = useWave(level, muted);
   return (
     <span className="your-wave" data-muted={muted || undefined} data-still={still || undefined} role="img"
       aria-label={muted ? t("card.youAreMuted") : t("card.yourMicrophone")}>
@@ -160,12 +161,13 @@ function YourWave({ levels, muted, still, t }: { levels: number[]; muted: boolea
   );
 }
 
-function TitleCard({ state, shell, t }: { state: CallControlsState; shell: CardShell; t: Translate }) {
+/** A1's two rows; `compact` (just the avatar's card) keeps A1's first row without the face, the machine, the state and your
+ *  wave, over A1's controls row, which is always out. */
+function TitleCard({ state, shell, t, compact = false }: { state: CallControlsState; shell: CardShell; t: Translate; compact?: boolean }) {
   const call = state.call;
   const { panel, setPanel, expanded, run } = shell;
   const muted = !call.micEnabled;
   const reconnecting = call.busy;
-  const levels = useWave(state.level, muted);
   const captions = useCaptions();
   const selected = call.participants.find((participant) => participant.selected);
   const agent = useCardAgent(state);
@@ -174,27 +176,27 @@ function TitleCard({ state, shell, t }: { state: CallControlsState; shell: CardS
   const line = reconnecting ? t("card.reconnecting") : muted ? t("card.youAreMuted") : moodText(call.mood, t);
   const tone = agent.threadId ? avatarColor(agent.spec) : undefined;
   return (
-    <div ref={shell.body} className="call-card title-card" data-expanded={expanded || undefined}>
+    <div ref={compact ? undefined : shell.body} className={"call-card title-card" + (compact ? " compact-card" : "")} data-expanded={expanded || undefined}>
       <div className="card-row">
-        <span className="card-face" style={tone ? avatarTone(tone) as CSSProperties : undefined}>
+        {!compact && <span className="card-face" style={tone ? avatarTone(tone) as CSSProperties : undefined}>
           <CardFigure state={state} size="small" label={t("stage.agentState", { title: call.title, state: moodText(call.mood, t) })} />
-        </span>
+        </span>}
         <div className="card-who">
           <span className="card-title">
             <span className="card-title-text" title={call.title} translate="no">{call.title}</span>
             <ConversationsButton state={state} shell={shell} t={t} />
           </span>
-          <span className="card-sub">{[
+          {!compact && <span className="card-sub">{[
             selected?.machine && <span key="machine" className="card-machine"><MachinesIcon size={11} /> <span>{selected.machine}</span></span>,
             (selected?.harness || selected?.model) && <span key="harness" className="card-harness">{selected?.harness && <HarnessIcon harness={selected.harness} size={11} />} <span>{[selected?.model, selected?.effort].filter(Boolean).join(" · ")}</span></span>,
-          ].filter(Boolean).flatMap((part, i) => (i ? [<span key={"dot" + i} aria-hidden="true">·</span>, part] : [part]))}</span>
-          <span className="card-state" data-mood={reconnecting ? "reconnecting" : muted ? "muted" : call.mood}><i aria-hidden="true" />{line}</span>
+          ].filter(Boolean).flatMap((part, i) => (i ? [<span key={"dot" + i} aria-hidden="true">·</span>, part] : [part]))}</span>}
+          {!compact && <span className="card-state" data-mood={reconnecting ? "reconnecting" : muted ? "muted" : call.mood}><i aria-hidden="true" />{line}</span>}
         </div>
-        <YourWave levels={levels} muted={muted} still={reconnecting} t={t} />
+        {!compact && <YourWave level={state.level} muted={muted} still={reconnecting} t={t} />}
       </div>
       <span className="card-corner"><CardActions shell={shell} t={t} /></span>
 
-      {expanded && (
+      {(expanded || compact) && (
         <div className="card-controls">
           <span className="card-mic" data-muted={muted || undefined}>
             <button type="button" className="card-devices" aria-expanded={panel === "devices"} title={t("card.devices")} aria-label={t("card.devices")}
@@ -271,7 +273,7 @@ function CaptionLines({ state, t }: { state: CallControlsState; t: Translate }) 
 // ---------- B1: the picture-in-picture ----------
 
 /** The room's title block for the call's conversation: its title, then its machine on the line under it (`machine`). */
-function CardHeading({ state, shell, t, machine = true }: { state: CallControlsState; shell: CardShell; t: Translate; machine?: boolean }) {
+function CardHeading({ state, shell, t }: { state: CallControlsState; shell: CardShell; t: Translate }) {
   const stage = useStageConversation();
   const title = stage.title || state.call.title;
   const host = stage.row?.machine ?? state.call.participants.find((row) => row.selected)?.machine ?? null;
@@ -281,7 +283,7 @@ function CardHeading({ state, shell, t, machine = true }: { state: CallControlsS
         <span className="card-heading-title" title={title}>{title}</span>
         <ConversationsButton state={state} shell={shell} t={t} />
       </span>
-      {machine && host && <span className="stage-machine"><MachinesIcon size={12} /><span>{host}</span></span>}
+      {host && <span className="stage-machine"><MachinesIcon size={12} /><span>{host}</span></span>}
       <CardActions shell={shell} t={t} />
     </header>
   );
@@ -338,13 +340,13 @@ function PictureCard({ host, state, shell, place, sized, t }: { host: CallContro
 
 // ---------- C1: just the avatar ----------
 
-/** Once open, the avatar's controls hold while the pointer is anywhere in their hull: the box around the handle and what it
- *  opened, and the gaps between them, HULL_PX wider all round. Crossing a gap, or resting where the handle was (it is hidden
- *  while the card is out), never folds them; leaving the hull does, after the usual delay (operator, 2026-10-20). */
+/** Once open, the compact card holds while the pointer is anywhere in its hull: the box around the creature and the card, and the
+ *  gaps between them, HULL_PX wider all round. Crossing the gap never folds it; leaving the hull does, after the usual delay
+ *  (operator, 2026-10-20). */
 const HULL_PX = 16;
-function inHull(side: HTMLElement | null, event: { clientX: number; clientY: number }): boolean {
-  if (!side) return false;
-  const boxes = [...side.querySelectorAll(".avatar-handle, .avatar-dock")].map((node) => node.getBoundingClientRect()).filter((box) => box.width && box.height);
+function inHull(root: HTMLElement | null, event: { clientX: number; clientY: number }): boolean {
+  if (!root) return false;
+  const boxes = [...root.querySelectorAll(".avatar-figure, .avatar-compact .compact-card")].map((node) => node.getBoundingClientRect()).filter((box) => box.width && box.height);
   if (!boxes.length) return false;
   return event.clientX >= Math.min(...boxes.map((box) => box.left)) - HULL_PX && event.clientX <= Math.max(...boxes.map((box) => box.right)) + HULL_PX
     && event.clientY >= Math.min(...boxes.map((box) => box.top)) - HULL_PX && event.clientY <= Math.max(...boxes.map((box) => box.bottom)) + HULL_PX;
@@ -356,61 +358,56 @@ function AvatarCard({ state, shell, t }: { state: CallControlsState; shell: Card
   const opensDown = place.vertical === "upper";
   const [balloonsUp, setBalloonsUp] = useState(false);
   const balloons = useRef<HTMLDivElement>(null);
-  const side = useRef<HTMLDivElement>(null);
-  const { handle } = shell;
+  const root = useRef<HTMLDivElement>(null);
+  const { zone } = shell;
   // What the pointer is on: inside an open card's hull it is on the card; else what is under it.
-  const zoneAt = (event: ReactPointerEvent, under: "none" | "creature" | "card") => (shell.expanded && inHull(side.current, event) ? "card" : under);
-  // Whether a balloon is out, for the stack to take room only then (the window is the creature's box at rest).
+  const zoneAt = (event: ReactPointerEvent, under: "none" | "creature" | "card") => (shell.expanded && inHull(root.current, event) ? "card" : under);
+  // Whether a balloon is out, for the stack to take room only then (the window is the creature's box at rest), and, where the
+  // balloons open below, how far they reach (--balloon-reach, from the creature's feet): the card goes just past them while the
+  // window counts their whole room (call-card.css), so a balloon coming or going never moves the creature.
   useEffect(() => {
-    const node = balloons.current;
-    if (!node) return;
-    const read = () => setBalloonsUp(!!node.querySelector(".speech-bubble"));
+    const node = balloons.current, card = root.current;
+    if (!node || !card) return;
+    const read = () => {
+      const out = !!node.querySelector(".speech-bubble");
+      setBalloonsUp(out);
+      const figure = card.querySelector<HTMLElement>(".avatar-figure");
+      card.style.setProperty("--balloon-reach", out ? node.offsetHeight - 0.1 * (figure?.offsetHeight ?? 0) + "px" : "0px");
+    };
     read();
-    const observer = new MutationObserver(read);
-    observer.observe(node, { childList: true, subtree: true });
-    return () => observer.disconnect();
+    const mutations = new MutationObserver(read), sizes = new ResizeObserver(read);
+    mutations.observe(node, { childList: true, subtree: true });
+    sizes.observe(node);
+    return () => { mutations.disconnect(); sizes.disconnect(); };
   }, [captions]);
-  // Enter on the handle unfolds it into the card with focus on its first control.
-  const focusCard = useRef(false);
+  // Tab reaching the card (it is there while folded) opens it; Escape, with focus in it or nowhere, folds it and blurs.
   useEffect(() => {
-    if (!shell.expanded || !focusCard.current) return;
-    focusCard.current = false;
-    side.current?.querySelector<HTMLElement>(".avatar-dock button:not(:disabled)")?.focus();
-  }, [shell.expanded]);
-  const onKeyDown = (event: ReactKeyboardEvent) => {
-    // Escape folds the card back into the handle, focus on it.
-    if (event.key !== "Escape" || !(event.target as Element).closest(".avatar-dock")) return;
-    event.preventDefault();
-    handle.fold();
-    side.current?.querySelector<HTMLElement>(".avatar-handle")?.focus();
-  };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || shell.panel || !shell.expanded) return;
+      const active = document.activeElement;
+      if (active && active !== document.body && !active.closest(".avatar-compact")) return;
+      event.preventDefault();
+      zone.fold();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [shell.panel, shell.expanded, zone]);
   return (
-    // A grid: the creature, its balloons on the side toward the screen's middle (above or below), and the handle with the card
-    // it opens into beside it, level with it, on its open side (call-card.css). All of it in the window's flow, so the window
-    // holds what shows: the card's box is kept from the moment the handle shows, and only its clip and opacities move.
-    <div className="avatar-card" data-balloons={balloonsUp || undefined} onPointerLeave={(event) => handle.aim(zoneAt(event, "none"))}
-      onPointerMove={(event) => { if (shell.expanded && event.pointerType === "mouse") handle.aim(zoneAt(event, "none") === "card" ? "card" : (event.target as Element).closest(".avatar-figure") ? "creature" : (event.target as Element).closest(".avatar-handle, .avatar-dock") ? "card" : "none"); }}>
-      <div ref={shell.body} className="avatar-figure" onPointerOver={(event) => handle.aim(zoneAt(event, "creature"))}>
+    // A grid in one column: the creature, its balloons on the side toward the screen's middle (above or below), and under both
+    // the compact card (call-card.css). The card is in the window's flow only while it shows, so the window holds what shows.
+    <div ref={root} className="avatar-card" data-balloons={balloonsUp || undefined} onPointerLeave={(event) => zone.aim((event.relatedTarget as Element | null)?.closest?.(".floating-card") ? zoneAt(event, "none") : "none")}
+      onPointerMove={(event) => { if (shell.expanded && event.pointerType === "mouse") zone.aim(zoneAt(event, "none") === "card" ? "card" : (event.target as Element).closest(".avatar-figure") ? "creature" : (event.target as Element).closest(".avatar-compact") ? "card" : "none"); }}>
+      <div ref={shell.body} className="avatar-figure" onPointerOver={(event) => zone.aim(zoneAt(event, "creature"))}>
         <CardFigure state={state} size="stage" label={t("stage.agentState", { title: state.call.title, state: moodText(state.call.mood, t) })} />
       </div>
-      {captions && <div ref={balloons} className={"avatar-balloons" + (opensDown ? " balloon--tail-up" : "")} onPointerOver={(event) => handle.aim(zoneAt(event, "none"))}>
+      {captions && <div ref={balloons} className={"avatar-balloons" + (opensDown ? " balloon--tail-up" : "")} onPointerOver={(event) => zone.aim(zoneAt(event, "none"))}>
         <StageBalloons />
       </div>}
-      {(handle.out || handle.folding) && (
-        <div ref={side} className="avatar-side" onKeyDown={onKeyDown}
-          onPointerOver={(event) => { if ((event.target as Element).closest(".avatar-handle, .avatar-dock")) handle.aim("card"); }}
-          onFocus={(event) => { if ((event.target as Element).closest(".avatar-dock") && (event.target as Element).matches(":focus-visible")) handle.focusWithin(true); }}
-          onBlur={(event) => { if (!(event.relatedTarget as Element | null)?.closest?.(".avatar-dock")) handle.focusWithin(false); }}>
-          <button type="button" className="avatar-handle" aria-expanded={shell.expanded} aria-controls="avatar-controls" aria-label={t("card.controls")} title={t("card.controls")}
-            onClick={(event) => { focusCard.current = event.detail === 0; handle.open(event.detail === 0 ? "keyboard" : "pointer"); }}>
-            <MoreIcon size={16} /><ChevronIcon size={12} className="avatar-handle-chevron" />
-          </button>
-          <div id="avatar-controls" className="avatar-dock">
-            <CardHeading state={state} shell={shell} t={t} machine={false} />
-            <CardCallBar />
-          </div>
-        </div>
-      )}
+      <div className="avatar-compact" onPointerOver={(event) => { if ((event.target as Element).closest(".compact-card")) zone.aim("card"); }}
+        onFocus={(event) => { if ((event.target as Element).matches(":focus-visible")) zone.focusWithin(true); }}
+        onBlur={(event) => { if (!(event.relatedTarget as Element | null)?.closest?.(".avatar-compact")) zone.focusWithin(false); }}>
+        <TitleCard state={state} shell={shell} t={t} compact />
+      </div>
     </div>
   );
 }

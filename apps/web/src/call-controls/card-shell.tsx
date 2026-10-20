@@ -14,8 +14,8 @@ export const CARD_MARGIN = 12;
 /** Before the controls show on hover, and before they hide once the pointer leaves. */
 export const SHOW_DELAY_MS = 120;
 export const HIDE_DELAY_MS = 500;
-/** The avatar's handle unfolding into its card, and the card folding back into it (call-card.css). */
-export const FOLD_MS = 240;
+/** The avatar's compact card fades out this long before it leaves the window's flow (call-card.css). */
+export const FADE_MS = 160;
 /** A panel left open closes this long after the pointer leaves. */
 export const PANEL_CLOSE_MS = 2500;
 /** Right after the card changes size (the app may move its window under the pointer), its buttons ignore clicks. */
@@ -92,10 +92,13 @@ export interface CardShell {
   setPanel(panel: Panel): void;
   /** The controls that wait for the pointer are shown. */
   expanded: boolean;
-  /** The avatar's controls (zones): the handle is out (the pointer on the creature, or the card open), and the card is
-   *  folding back into it (for as long as its fold takes). */
-  handle: { out: boolean; folding: boolean; aim(zone: "none" | "creature" | "card"): void; open(by: "pointer" | "keyboard"): void;
-    fold(): void; focusWithin(within: boolean): void };
+  /** The avatar's compact card (zones): its box is in the window's flow (shown, fading out, or kept while the creature is
+   *  dragged), and the creature is being dragged (the card is put away, whatever else holds it out). */
+  flow: boolean;
+  dragging: boolean;
+  /** What the pointer is on (the card opens after SHOW_DELAY_MS on the creature or the card, folds after HIDE_DELAY_MS off
+   *  both), the keyboard's focus in the card, and Escape. */
+  zone: { aim(zone: "none" | "creature" | "card"): void; fold(): void; focusWithin(within: boolean): void };
   /** Runs a command unless the click guard holds it. */
   run(command: CallCommand): void;
   handlers: {
@@ -119,38 +122,48 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState, r
 
   const inside = state.pointerInside ?? domInside;
   const hovered = useDelayed(inside, SHOW_DELAY_MS, HIDE_DELAY_MS);
-  // The avatar's controls come out in steps, by what the pointer is on, never by the pointer nearing the window: on the
-  // creature (the handle), then on the handle (the card, which the handle becomes). Both step up after SHOW_DELAY_MS and
-  // down after HIDE_DELAY_MS. Held by a list open, the app's "always", and focus in the card from the keyboard.
+  // The avatar's compact card comes out by what the pointer is on, never by the pointer nearing the window: the creature or
+  // the card opens it after SHOW_DELAY_MS, leaving both folds it after HIDE_DELAY_MS. Held out by a panel open, the app's
+  // "always" and the keyboard's focus in the card (:focus-visible, never a control clicked with the pointer); those fold
+  // HIDE_DELAY_MS after they let go. Escape folds at once. A drag puts it away (its box stays in the window's flow until the
+  // drop: a size report mid-drag makes the app place the window).
   const [aim, setAim] = useState<"none" | "creature" | "card">("none");
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [opened, setOpened] = useState(false);
   const [focusIn, setFocusIn] = useState(false);
-  const peeked = useDelayed(aim !== "none", SHOW_DELAY_MS, HIDE_DELAY_MS);
-  const opened = useDelayed(aim === "card", SHOW_DELAY_MS, HIDE_DELAY_MS);
-  const held = state.alwaysExpanded || panel !== null || focusIn;
-  const open = zones ? held || opened || keyboardOpen : false;
-  const out = zones && (open || peeked || keyboardOpen);
-  const expanded = zones ? open : state.alwaysExpanded || hovered || panel !== null;
-  // Folding back into the handle takes FOLD_MS: the handle shows again as it lands.
-  const [folding, setFolding] = useState(false);
-  const wasOpen = useRef(false);
+  const [escaped, setEscaped] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [dragBox, setDragBox] = useState(false);
+  const draggingNow = useRef(false);
+  const wantOpen = aim !== "none";
   useEffect(() => {
-    if (wasOpen.current && !open) {
-      setFolding(true);
-      const timer = setTimeout(() => setFolding(false), FOLD_MS);
-      wasOpen.current = open;
-      return () => clearTimeout(timer);
-    }
-    wasOpen.current = open;
-  }, [open]);
-  const handle = {
-    out, folding,
-    aim: useCallback((zone: "none" | "creature" | "card") => setAim(zone), []),
-    // The pointer opens at once (a click just after the hover opened it must not shut it); the keyboard holds it open.
-    open: useCallback((by: "pointer" | "keyboard") => { setAim("card"); if (by === "keyboard") setKeyboardOpen(true); }, []),
-    fold: useCallback(() => { setKeyboardOpen(false); setFocusIn(false); setAim("creature"); }, []),
-    focusWithin: useCallback((within: boolean) => { setFocusIn(within); if (!within) setKeyboardOpen(false); }, []),
+    if (!zones || dragging || wantOpen === opened) return;
+    const timer = setTimeout(() => setOpened(wantOpen), wantOpen ? SHOW_DELAY_MS : HIDE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [zones, dragging, wantOpen, opened]);
+  const held = useDelayed(zones && (state.alwaysExpanded || panel !== null), 0, HIDE_DELAY_MS);
+  const open = zones && !dragging && !escaped && (held || opened || focusIn);
+  const expanded = zones ? open : state.alwaysExpanded || hovered || panel !== null;
+  const lingering = useDelayed(open, 0, FADE_MS);
+  const flow = zones && (open || lingering || dragBox);
+  // Dropped: the box leaves the flow once the card is back out, or at once if it is not coming back.
+  useEffect(() => {
+    if (!dragging && dragBox && (open || aim === "none")) setDragBox(false);
+  }, [dragging, dragBox, open, aim]);
+  const zone = {
+    aim: useCallback((next: "none" | "creature" | "card") => {
+      if (draggingNow.current) return;
+      if (next !== "none") setEscaped(false);
+      setAim(next);
+    }, []),
+    fold: useCallback(() => {
+      setEscaped(true); setFocusIn(false); setAim("none"); setOpened(false);
+      const active = document.activeElement as HTMLElement | null;
+      if (active?.closest(".avatar-compact")) active.blur();
+    }, []),
+    focusWithin: useCallback((within: boolean) => { setFocusIn(within); if (within) setEscaped(false); }, []),
   };
+  // The app says the pointer is not in the window: nothing is on the creature or the card.
+  useEffect(() => { if (zones && state.pointerInside === false) setAim("none"); }, [zones, state.pointerInside]);
 
   // A panel left open closes once the pointer has been away a while; a click outside the card closes it at once (the
   // app tells the card about clicks elsewhere, which a window that is never focused does not see itself).
@@ -198,9 +211,21 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState, r
   const keyboardClick = useRef(false);
   const run = (command: CallCommand) => { if (keyboardClick.current || Date.now() >= guardUntil.current) host.run(command); };
 
+  // Dropped: the card comes back (after SHOW_DELAY_MS) if the pointer is on the creature, or at once if it is always shown.
+  const endDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d?.moving) return;
+    host.drag("end");
+    if (!zones) return;
+    draggingNow.current = false;
+    setDragging(false);
+    if (document.elementFromPoint?.(event.clientX, event.clientY)?.closest(".avatar-figure")) { setEscaped(false); setAim("creature"); }
+  };
+
   const handlers: CardShell["handlers"] = {
     onPointerEnter: () => setDomInside(true),
-    onPointerLeave: () => setDomInside(false),
+    onPointerLeave: () => { setDomInside(false); if (zones) setAim("none"); },
     onPointerDown(event) {
       dragged.current = false;
       const target = event.target as Element;
@@ -219,21 +244,17 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState, r
         d.moving = true;
         dragged.current = true;
         setPanel(null);
+        if (zones) {
+          draggingNow.current = true;
+          setDragBox(open); setDragging(true); setAim("none"); setOpened(false); setFocusIn(false);
+        }
         event.currentTarget.setPointerCapture?.(event.pointerId);
         host.drag("start");
       }
       host.drag("move");
     },
-    onPointerUp() {
-      const d = drag.current;
-      drag.current = null;
-      if (d?.moving) host.drag("end");
-    },
-    onPointerCancel() {
-      const d = drag.current;
-      drag.current = null;
-      if (d?.moving) host.drag("end");
-    },
+    onPointerUp: (event) => endDrag(event),
+    onPointerCancel: (event) => endDrag(event),
     onClickCapture(event) {
       keyboardClick.current = event.detail === 0;
       // After "Cancel sending" (its balloon goes with it) nothing of the card keeps focus, which would hold the controls out; from the
@@ -246,7 +267,7 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState, r
       if (dragged.current) { event.stopPropagation(); event.preventDefault(); dragged.current = false; }
     },
   };
-  return { card, body, panel, setPanel, expanded, handle, run, handlers };
+  return { card, body, panel, setPanel, expanded, flow, dragging, zone, run, handlers };
 }
 
 /** A device as the card words it: a real device keeps its own name; the system's choice, an unnamed device and a
