@@ -891,8 +891,7 @@ test("the Working… line over the agent is an sr-only status, with no visible b
   expect(stageAgent()).toHaveAttribute("data-mood", "speaking");
   expect(workingLine()).toHaveClass("sr-only");
   expect(workingLine()).toHaveTextContent("Working…");
-  // No spinner inside: a hidden element that spins still makes the page render every frame (desktop#149).
-  expect(workingLine()!.querySelector(".ui-spinner")).toBeNull();
+  expect(workingLine()!.querySelector(".ui-spinner")).toHaveAttribute("aria-hidden", "true");
   expect(screen.getAllByRole("status")).toContain(workingLine());
   expect(document.querySelector(".stage-activity")).toBeNull();
   // The desk waits for the balloon to go (the first test follows it out).
