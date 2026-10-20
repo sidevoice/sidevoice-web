@@ -8,10 +8,11 @@ import { cardSnapshot } from "../test/call-card";
 import { RoomProvider } from "../app/RoomProvider";
 import { createRoomStore } from "../state/room-store";
 import { useState } from "react";
+import { FLOATING_CARD_KEY } from "../state/floating-card";
 
 vi.mock("../services/room-session-controller.js", () => ({}));
 
-/** The card as its page draws it: inside a room store of its own (card-room.ts), the title card by default. */
+/** The card as its page draws it: inside a room store of its own (card-room.ts), the title card (these tests choose it: the picture is the default). */
 function Card({ host }: { host: CallControlsHost }) {
   const [store] = useState(createRoomStore);
   return <RoomProvider store={store} runtime={false}><CallCard host={host} t={t} /></RoomProvider>;
@@ -55,8 +56,8 @@ function fakeHost(initial: Partial<CallControlsState> = {}) {
 
 // One call's start for the whole test: the card is the same card for as long as the call (its `since`) is the same.
 let SINCE = 0;
-beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: false }); SINCE = Date.now() - 754_000; });
-afterEach(() => { vi.useRealTimers(); });
+beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: false }); SINCE = Date.now() - 754_000; localStorage.setItem(FLOATING_CARD_KEY, JSON.stringify({ format: "card", size: "m" })); });
+afterEach(() => { vi.useRealTimers(); localStorage.removeItem(FLOATING_CARD_KEY); });
 
 const card = () => document.querySelector(".call-card")!;
 function hoverAndWait() {

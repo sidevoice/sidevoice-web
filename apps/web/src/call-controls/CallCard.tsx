@@ -3,9 +3,9 @@
  * Floating card (state/floating-card.ts), as closed on 2026-10-19 (sidevoice-playground#131,
  * briefs/UX-DECISIONS-2026-10-19.md "Call card: final"):
  *
- * - the title card (default): the conversation's avatar, its title, machine and model, what is happening, and your
+ * - the title card: the conversation's avatar, its title, machine and model, what is happening, and your
  *   wave; near the pointer, today's call controls. Its captions are plain lines, as a transcript reads.
- * - the picture-in-picture: the room's own stage tile (StageTile) under the room's title block, and the room's call bar
+ * - the picture-in-picture (default): the room's own stage tile (StageTile) under the room's title block, and the room's call bar
  *   (CardCallBar) under it. Its captions are the stage's balloons.
  * - just the avatar: the conversation's creature, on nothing; the stage's balloons above or below it (their tails toward
  *   it), and near the pointer a dock beside it (the picture's title bar and call bar, without the stage).
