@@ -975,7 +975,7 @@ export const messages: Messages = {
   "settings.floatingCard.reset": "Ripristina dimensione e posizione",
   "settings.callCard.enabled": "Mostra la scheda mobile",
   "settings.callCard.enabledOnHint": "Durante una chiamata, sopra le altre app.",
-  "settings.callCard.enabledOffHint": "Nessuna scheda durante le chiamate: i controlli della chiamata restano in Sidevoice e nella sua icona nella barra. Attivala per scegliere come appare.",
+  "settings.callCard.enabledOffHint": "Nessuna scheda durante le chiamate: i controlli restano in Sidevoice e sono accessibili dalla sua icona nell’area di notifica. Attiva la scheda per sceglierne l’aspetto.",
   "settings.section.shortcuts": "Scorciatoie",
   "settings.shortcuts.description": "Tasti per la chiamata: il microfono, saltare, ritirare quello che hai detto, la chiamata stessa e i suoi pannelli.",
   "settings.shortcuts.global": "Ovunque su questo computer",

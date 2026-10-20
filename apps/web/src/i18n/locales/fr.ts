@@ -961,7 +961,7 @@ export const messages: Messages = {
   "settings.floatingCard.reset": "Réinitialiser la taille et la position",
   "settings.callCard.enabled": "Afficher la carte flottante",
   "settings.callCard.enabledOnHint": "Pendant un appel, au-dessus de vos autres applications.",
-  "settings.callCard.enabledOffHint": "Pas de carte pendant les appels : les commandes de l'appel restent dans Sidevoice et son icône de la barre d'état. Activez-la pour choisir son apparence.",
+  "settings.callCard.enabledOffHint": "Pas de carte pendant les appels : les commandes restent accessibles dans Sidevoice et via son icône dans la zone de notification. Activez la carte pour choisir son apparence.",
   "settings.section.shortcuts": "Raccourcis",
   "settings.shortcuts.description": "Des touches pour l’appel : le micro, passer, retirer ce que vous avez dit, l’appel lui-même et ses panneaux.",
   "settings.shortcuts.global": "Partout sur cet ordinateur",

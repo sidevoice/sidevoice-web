@@ -959,7 +959,7 @@ export const messages: Messages = {
   "settings.floatingCard.corner.bl": "左下",
   "settings.floatingCard.corner.br": "右下",
   "settings.floatingCard.reset": "重置大小和位置",
-  "settings.callCard.enabled": "显示悬浮卡片",
+  "settings.callCard.enabled": "显示浮动卡片",
   "settings.callCard.enabledOnHint": "通话期间显示在其他应用之上。",
   "settings.callCard.enabledOffHint": "通话期间不显示卡片：通话控制仍在 Sidevoice 及其托盘图标中。开启后可选择其外观。",
   "settings.section.shortcuts": "快捷键",
