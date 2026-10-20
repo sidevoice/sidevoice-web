@@ -10,7 +10,7 @@ import { holdRotation, rotationValue, subscribeRotation } from "./rotation";
  * working style, an idle step), the entrance it is making, its unread mark, how far its mouth is open, and the moment
  * what it shows last changed. A figure drawn in several places — a conversation's agent on the stage, in the sidebar, in
  * the header — is one entry here, and every copy renders that entry at its own size: no copy works out anything of its
- * own, and the timers that move the figure (its entrance, its working steps, its mouth) run once, on
+ * own, and the timers that move the figure (its rest before a pastime, its entrance, its steps, its mouth) run once, on
  * one clock (operator, 2026-10-19, #166). CharacterAvatar only draws a state.
  *
  * Under reduced motion the state still changes and CSS keeps every copy still (styles/call.css). */
@@ -22,12 +22,18 @@ export const ENGINE_MOOD: Record<AvatarMood, EngineMood> = {
   offline: "idle", speaking: "speaking", listening: "listening", working: "working", idle: "idle", present: "idle",
 };
 
+/** How long it rests, quiet, after anything happened (it spoke, listened, held still under its balloon) before a pastime
+ *  starts (operator, 2026-10-15): it never seems to busy itself the moment you are done with it. */
+export const BORED_AFTER_MS = 10_000;
+
 /** What decides a figure's state, given by whoever owns the figure (for a conversation's agent, conversation-avatars.ts). */
 export interface AvatarInputs {
   spec: AvatarSpec;
   mood: AvatarMood;
-  /** Held still (on the stage: while its balloon is up): no work in hand. */
+  /** Held still (on the stage: while its balloon is up): no idle pastime and no work in hand; quiet instead. */
   still?: boolean;
+  /** What last happened with it: a change restarts its rest before a pastime (BORED_AFTER_MS). */
+  interaction?: string;
   /** It has said something this browser has not seen yet. */
   unread?: boolean;
   /** The conversation whose voice its mouth follows while it speaks (the output channel, state/playback-level.ts). */
@@ -39,8 +45,7 @@ export interface AvatarState {
   mood: AvatarMood;
   /** The working style in hand (data-work). */
   work?: string;
-  /** The idle step (data-idle): quiet while it rests, none while it sleeps or is busy. No pastimes: a resting creature
-   *  stays still (web#272). */
+  /** The idle step (data-idle): quiet, or a pastime; none while it sleeps or is busy. */
   idle?: string;
   /** For ENTER_MS after it starts listening, the mood it left (data-enter: the engine's startle), with what it had in
    *  hand still on so it can drop away. */
@@ -70,12 +75,15 @@ function timeline(): number {
   return typeof now === "number" ? now : performance.now();
 }
 
-type Kind = "work";
+type Kind = "work" | "idle";
 interface Entry {
   inputs: AvatarInputs;
   spec: string;
-  pools: { work: readonly string[] };
+  pools: { work: readonly string[]; idle: readonly string[] };
   acts: EngineMood;
+  resting: boolean;
+  bored: boolean;
+  boredTimer?: ReturnType<typeof setTimeout>;
   enter: "idle" | "working" | null;
   enterTimer?: ReturnType<typeof setTimeout>;
   holds: Partial<Record<Kind, () => void>>;
@@ -98,7 +106,7 @@ export interface AvatarStates {
   subscribe(listener: () => void): () => void;
 }
 
-const sameInputs = (a: AvatarInputs, b: AvatarInputs) => a.mood === b.mood && !!a.still === !!b.still
+const sameInputs = (a: AvatarInputs, b: AvatarInputs) => a.mood === b.mood && !!a.still === !!b.still && a.interaction === b.interaction
   && !!a.unread === !!b.unread && (a.voice ?? null) === (b.voice ?? null) && avatarKey(a.spec) === avatarKey(b.spec);
 const sameState = (a: Omit<AvatarState, "since">, b: AvatarState) => a.mood === b.mood && a.work === b.work && a.idle === b.idle
   && a.enter === b.enter && !!a.unread === !!b.unread;
@@ -129,15 +137,18 @@ export function createAvatarStates(): AvatarStates {
     quiet += 1;
     try {
       hold(id, entry, "work", entry.acts === "working" && !still && entry.pools.work.length > 0);
+      hold(id, entry, "idle", entry.bored && entry.pools.idle.length > 0);
     } finally { quiet -= 1; }
     const working = entry.holds.work ? rotationValue("work", prefix + id) : undefined;
+    const resting = entry.holds.idle ? rotationValue("idle", prefix + id) : undefined;
     if (working) entry.last.work = working;
+    if (resting) entry.last.idle = resting;
     const next = {
       mood,
       // During the entrance, what it had in hand stays on so it can drop away.
       work: working ?? (entry.enter === "working" ? entry.last.work : undefined),
-      // Resting is quiet: awake, nothing in hand. Offline sleeps: no step.
-      idle: mood === "present" || mood === "idle" ? "quiet" : undefined,
+      // Resting before it is bored (or held still) is quiet: awake, nothing in hand. Offline sleeps: no step.
+      idle: mood === "present" || (mood === "idle" && !entry.bored) ? "quiet" : resting ?? (entry.enter === "idle" ? entry.last.idle : undefined),
       enter: entry.enter ?? undefined,
       unread: unread || undefined,
     };
@@ -146,6 +157,18 @@ export function createAvatarStates(): AvatarStates {
     if (changed) entry.state = { ...next, since: timeline() };
     followMouth(id, entry);
     return changed;
+  }
+
+  function restartBored(id: string, entry: Entry) {
+    entry.bored = false;
+    clearTimeout(entry.boredTimer);
+    entry.boredTimer = undefined;
+    if (!entry.resting) return;
+    entry.boredTimer = setTimeout(() => {
+      entry.boredTimer = undefined;
+      entry.bored = true;
+      if (settle(id, entry)) notify();
+    }, BORED_AFTER_MS);
   }
 
   function restartEnter(id: string, entry: Entry) {
@@ -192,13 +215,14 @@ export function createAvatarStates(): AvatarStates {
 
   function put(id: string, inputs: AvatarInputs): boolean {
     let entry = entries.get(id);
+    const fresh = !entry;
     if (entry && sameInputs(entry.inputs, inputs)) return false;
     const spec = avatarKey(inputs.spec);
     if (!entry || entry.spec !== spec) {
       if (entry) release(id, entry);
-      const { works } = avatarRepertoire(inputs.spec);
+      const { works, idles } = avatarRepertoire(inputs.spec);
       // A first mood makes no entrance.
-      entry = { inputs, spec, pools: { work: works }, acts: ENGINE_MOOD[inputs.mood], enter: null,
+      entry = { inputs, spec, pools: { work: works, idle: idles }, acts: ENGINE_MOOD[inputs.mood], resting: false, bored: false, enter: null,
         holds: {}, last: {}, state: stillAvatar(inputs.mood), mouth: { shown: 0 } };
       entries.set(id, entry);
     }
@@ -210,13 +234,21 @@ export function createAvatarStates(): AvatarStates {
       entry.acts = acts;
       restartEnter(id, entry);
     }
+    // Idle steps while idle: offline sleeps instead, and held still it stays quiet until its balloon goes.
+    const resting = inputs.mood === "idle" && !inputs.still;
+    if (fresh || resting !== entry.resting || inputs.interaction !== before.interaction) {
+      entry.resting = resting;
+      restartBored(id, entry);
+    }
     if (inputs.voice !== before.voice && entry.mouth.stop) stopMouth(id, entry);
     return settle(id, entry);
   }
 
   function release(id: string, entry: Entry) {
+    clearTimeout(entry.boredTimer);
     clearTimeout(entry.enterTimer);
     hold(id, entry, "work", false);
+    hold(id, entry, "idle", false);
     stopMouth(id, entry);
   }
 

@@ -8,7 +8,7 @@ import { agentMood, moodFacts } from "./stage-view";
 /* A conversation's agent is one creature in one state, however many places draw it — the stage, its row in the sidebar
  * or the rail, the header — and the thumbnails are that creature at a smaller size (operator, 2026-10-19, #166). Its
  * state is worked out here, once per conversation, from the room's store and the stage's balloon, and moved on one clock
- * (avatar-state.ts): its mood, the tool in its hand, its startle, its mouth, its offline
+ * (avatar-state.ts): its mood, its rest and its pastimes, the tool in its hand, its startle, its mouth, its offline
  * sleep (the stage's wanted poster). Every copy renders that state; none works out anything of its own. */
 
 /** What every conversation's agent is given, from the room's store: its mood (agentMood, the same projection for all of
@@ -26,8 +26,11 @@ function agentInputs(state: RoomViewState, held: string | null): Map<string, Ava
     // Under its balloon it holds still (operator, 2026-10-15): work that starts meanwhile waits for it to go.
     const mood = still && base === "working" ? "speaking" : base;
     const onStage = thread === viewed;
+    // Anything that happens with the agent on the stage restarts its rest before a pastime: the call starting, its
+    // coming on the stage, the person speaking, a balloon, its mood (operator, 2026-10-15).
+    const interaction = onStage ? ["stage", state.call.joined, state.conversation.pendingPhase, still, mood].join("|") : "";
     const unread = onStage && facts.preview ? !!facts.preview.unread : !!row && hasUnread(row, viewed);
-    all.set(thread, { spec: avatarFor(thread), mood, still, unread, voice: thread });
+    all.set(thread, { spec: avatarFor(thread), mood, still, interaction, unread, voice: thread });
   }
   return all;
 }
