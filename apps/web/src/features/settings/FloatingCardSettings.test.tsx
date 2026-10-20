@@ -52,3 +52,12 @@ test("the first row turns the card off: the rest stays in view, disabled, and no
   expect(screen.getByText(/No card during calls/)).toBeInTheDocument();
   expect(bridge.preview).not.toHaveBeenCalled();
 });
+
+test("Reset size and position is always there to press, and leaving Settings ends a preview showing", async () => {
+  const bridge = { ...base(), settings: vi.fn(async () => ({ alwaysShown: false, moved: false })), resetPlace: vi.fn(async () => undefined), preview: vi.fn(), endPreview: vi.fn() };
+  inApp(bridge);
+  const view = render(<RoomProvider store={createRoomStore()}><FloatingCardSettings t={translator("en")} /></RoomProvider>);
+  expect(screen.getByRole("button", { name: "Reset size and position" })).toBeEnabled();
+  view.unmount();
+  expect(bridge.endPreview).toHaveBeenCalledTimes(1);
+});
