@@ -179,7 +179,8 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .title-card .card-title:hover { background: none; }
 .floating-card[data-size=l] .title-card .card-title { font-size: 15px; }
 .floating-card[data-size=l] .title-card .card-sub { font-size: 12px; }
-.title-card .card-title-text { min-width: 0; }
+.title-card .card-title { padding-right: 8px; }
+.title-card .card-title-text { flex: 0 1 auto; min-width: 0; }
 .card-state { display: inline-flex; align-items: center; gap: 5px; margin-top: 2px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .card-state i { width: 7px; height: 7px; border-radius: 50%; background: var(--mu); }
 .card-state[data-mood=listening] i { background: var(--accent); }
@@ -233,8 +234,11 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .floating-card .stage-tile[data-card] .person-turns .person-bubble { max-width: 100%; }
 /* The room's title block: the title and the conversations control, the machine on the line under it; × at the right. */
 .card-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; align-items: start; padding: 0 0 0 4px; }
-.card-heading-name { display: flex; align-items: center; gap: 6px; min-width: 0; height: 26px; }
-.card-heading-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 15px; font-weight: 650; }
+/* The title is the only flexible piece: the conversations control and the actions keep their room always (the gear and "open"
+ * lie over the end of this line near the pointer: their width plus a little air is reserved, so the title never runs under
+ * them); the title takes what is left and ends in an ellipsis. */
+.card-heading-name { --hover-actions: 54px; display: flex; align-items: center; gap: 6px; min-width: 0; height: 26px; padding-right: calc(var(--hover-actions) + 8px); }
+.card-heading-title { flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 15px; font-weight: 650; }
 .card-heading .stage-machine { grid-column: 1; justify-self: start; margin-top: 2px; font-size: 12px; }
 .card-heading .card-actions { grid-column: 2; grid-row: 1; }
 .floating-card .card-heading { --fg: var(--sv-text); --mu: var(--sv-text-muted, var(--sv-muted)); }
