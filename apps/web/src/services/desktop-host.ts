@@ -182,7 +182,9 @@ export interface MuteShortcutBridge {
  *  (`moved`), forgetting that, and showing the card a moment after a change in Settings. Its format and starting size
  *  are this device's (state/floating-card.ts). */
 export interface CallControlsBridge {
-  settings(): Promise<{ alwaysShown: boolean; corner?: CardCorner; moved?: boolean }>;
+  settings(): Promise<{ alwaysShown: boolean; corner?: CardCorner; moved?: boolean; enabled?: boolean }>;
+  /** Whether the card shows at all during a call (on by default); an app before it has neither this nor `enabled`. */
+  setEnabled?(enabled: boolean): Promise<{ enabled: boolean }>;
   setAlwaysShown(enabled: boolean): Promise<{ alwaysShown: boolean }>;
   setCorner?(corner: CardCorner): Promise<{ corner: CardCorner }>;
   resetPlace?(): Promise<void>;

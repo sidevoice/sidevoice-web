@@ -71,7 +71,11 @@ test("at rest: the agent, the conversation, where it runs, what is happening, an
   render(<Card host={fakeHost()} />);
   expect(screen.getByText("Sidevoice: mini call")).toBeInTheDocument();
   // The way to the other conversations: their mark, how many, ▾.
-  expect(screen.getByRole("button", { name: "Conversations (3)" })).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByRole("button", { name: "Conversations (3), 1 with unread replies" })).toHaveAttribute("aria-expanded", "false");
+  // The unread cue is the list's "!", decorative; its meaning is in the control's name (and tooltip).
+  expect(document.querySelector(".card-conversations-button .card-unread-bang")).toHaveAttribute("aria-hidden", "true");
+  expect(document.querySelector(".card-conversations-button")).toHaveAttribute("title", "Conversations (3), 1 with unread replies");
+  expect(document.querySelector(".card-conversations-button .card-unread")).toBeNull();
   expect(screen.getByText("daimon")).toBeInTheDocument();
   // The harness is its mark, never its name in words.
   expect(screen.queryByText("Claude Code")).toBeNull();
@@ -205,7 +209,7 @@ test("the conversations control opens them below the controls, in the card's wor
   const host = fakeHost();
   render(<Card host={host} />);
   hoverAndWait();
-  fireEvent.click(screen.getByRole("button", { name: "Conversations (3)" }));
+  fireEvent.click(screen.getByRole("button", { name: "Conversations (3), 1 with unread replies" }));
   const controls = document.querySelector(".card-controls")!;
   const panel = document.querySelector(".card-panel.conversations")!;
   expect(controls.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -223,7 +227,7 @@ test("a panel closes on a press elsewhere in the card, on a click outside it, an
   const host = fakeHost({ outsideClicks: 0 });
   render(<Card host={host} />);
   hoverAndWait();
-  const open = () => fireEvent.click(screen.getByRole("button", { name: "Conversations (3)" }));
+  const open = () => fireEvent.click(screen.getByRole("button", { name: "Conversations (3), 1 with unread replies" }));
   open();
   fireEvent.pointerDown(document.querySelector(".card-face")!, { button: 0 });
   expect(screen.queryByText("brand/web")).not.toBeInTheDocument();
@@ -240,7 +244,7 @@ test("a new call starts with a clean card: no panel left open from the last one"
   const host = fakeHost();
   render(<Card host={host} />);
   hoverAndWait();
-  fireEvent.click(screen.getByRole("button", { name: "Conversations (3)" }));
+  fireEvent.click(screen.getByRole("button", { name: "Conversations (3), 1 with unread replies" }));
   expect(screen.getByText("brand/web")).toBeInTheDocument();
   host.push({ call: snapshot({ joined: false, since: null }) });
   host.push({ call: snapshot({ since: SINCE + 60_000 }) });

@@ -150,7 +150,16 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .floating-card .card-conversations-button svg { display: block; flex: none; }
 .card-conversations-chevron { transition: transform .15s; }
 .card-conversations-button[aria-expanded=true] .card-conversations-chevron { transform: rotate(180deg); }
-.card-conversations-button .card-unread { position: absolute; top: -2px; right: -2px; margin: 0; }
+/* The header's unread cue (operator, 2026-10-20): the list's own "!" on the control's top-right corner, pops twice as it
+ * appears and holds still (a floating card over your work never keeps moving). Nothing clips it. */
+.card-heading-name, .title-card .card-who, .title-card .card-title { overflow: visible; }
+.card-unread-bang { position: absolute; top: -6px; right: -4px; width: 12px; height: 15px; pointer-events: none; transform-origin: 50% 100%;
+  animation: card-bang-pop 1.3s cubic-bezier(.3, 1.8, .5, 1) 2; }
+.card-unread-bang svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.card-unread-bang rect { fill: #ffd23f; stroke: #1b1428; stroke-width: 2.6; }
+.card-unread-bang text { font: 900 18px system-ui, sans-serif; fill: #1b1428; }
+@keyframes card-bang-pop { 0%, 100% { transform: scale(1) rotate(6deg) } 50% { transform: scale(1.15) rotate(-6deg) } }
+@media (prefers-reduced-motion: reduce) { .card-unread-bang { animation: none; } }
 .card-actions { position: relative; display: inline-flex; flex: none; gap: 2px; }
 /* The gear and "open" lie over what is beside ×, near the pointer or with focus in the card: nothing moves. */
 .card-actions-hover { position: absolute; top: 0; right: 100%; display: flex; gap: 2px; visibility: hidden; }
@@ -233,7 +242,7 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .floating-card .stage-tile[data-card] .person-turns .person-bubble { max-width: 100%; }
 /* The room's title block: the title and the conversations control, the machine on the line under it; × at the right. */
 .card-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; align-items: start; padding: 0 0 0 4px; }
-.card-heading-name { display: flex; align-items: center; gap: 6px; min-width: 0; height: 26px; }
+.card-heading-name { display: flex; align-items: center; gap: 4px; min-width: 0; height: 28px; }
 .card-heading-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 15px; font-weight: 650; }
 .card-heading .stage-machine { grid-column: 1; justify-self: start; margin-top: 2px; font-size: 12px; }
 .card-heading .card-actions { grid-column: 2; grid-row: 1; }
@@ -331,3 +340,28 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .avatar-handle:not(:disabled), .cancel-input:not(:disabled) { cursor: pointer; }
 .avatar-figure, .avatar-figure * { cursor: grab; }
 .avatar-figure:active, .avatar-figure:active * { cursor: grabbing; }
+
+/* ---------- The title line (operator, 2026-10-20; briefs/UX-DECISIONS-2026-10-20.md), in every format ----------
+ * One line holds three pieces. The fixed ones always keep their room: the conversations control (flex none) and, on the
+ * right, the three actions (open, settings, ×: 2px apart), with 8px of breathing room before the first. Open and settings
+ * show only near the pointer or with focus, but are hidden with `visibility`, never `display`, so their room is kept at rest
+ * and nothing ever lies under them. The title is the only flexible piece: `flex: 0 1 auto`, up to 24em, ending in an
+ * ellipsis; a short title shows whole. */
+.floating-card { --tl-breath: 8px; --tl-gap: 2px; --tl-title-max: 24em; }
+.card-heading-title, .card-title-text { flex: 0 1 auto; min-width: 0; max-width: var(--tl-title-max); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.card-conversations-button { flex: none; }
+/* B1 and C1: the actions are in the line's own flow after the title block (the grid's second column, --tl-breath away); the
+ * hidden ones keep their room. B1's icons are 28px, 26px under 440px wide and 24px under 300px; C1's 24px. */
+.card-heading { column-gap: var(--tl-breath); }
+.card-heading .card-actions { gap: var(--tl-gap); }
+.card-heading .card-actions-hover { position: static; }
+.card-heading .card-action { width: 28px; height: 28px; }
+@container picture (max-width: 439px) { .card-heading .card-action { width: 26px; height: 26px; } }
+@container picture (max-width: 299px) { .card-heading .card-action { width: 24px; height: 24px; } }
+.avatar-dock .card-heading .card-action { width: 24px; height: 24px; }
+/* A1: the actions keep their place in the card's top-right corner (26px icons, 9px in from the card's outer edge: its 1px
+ * border and 8px inset), over the end of the title's column; the title's row ends the actions' room plus the breathing room
+ * before that corner. The column ends --tl-column-end before the card's edge: border and padding 13px, the wave's 24.6px
+ * (5 bars of 2.6px, 4 gaps of 2.4px, 1px each side), the row's 12px gap and the column's own 24px padding. */
+.title-card { --tl-actions: calc(3 * 26px + 2 * var(--tl-gap)); --tl-corner-inset: 9px; --tl-column-end: calc(13px + 24.6px + 12px + 24px); }
+.title-card .card-title { padding-right: max(0px, calc(var(--tl-corner-inset) + var(--tl-actions) + var(--tl-breath) - var(--tl-column-end))); }
