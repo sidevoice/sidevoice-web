@@ -5,7 +5,7 @@ import { createCardRoom } from "./card-room";
 import type { CallControlsHost, CallControlsState } from "./host";
 import { RoomProvider } from "../app/RoomProvider";
 import { createRoomStore } from "../state/room-store";
-import { cardFacts, type SessionFacts } from "../state/room-session-state.js";
+import { cardFacts, WORKING_SHOWN_AFTER_MS, type SessionFacts } from "../state/room-session-state.js";
 import { FLOATING_CARD_KEY } from "../state/floating-card";
 import { CARD_MARGIN } from "./card-shell";
 import { translator } from "../i18n/translator";
@@ -86,4 +86,11 @@ test("the picture may be resized freely: a resized window of any shape is laid o
   expect(card.style.getPropertyValue("--card-w")).toBe(700 - 2 * CARD_MARGIN + "px");
   expect(card.style.getPropertyValue("--card-h")).toBe(420 - 2 * CARD_MARGIN + "px");
   expect(document.querySelector(".picture-card")).toHaveAttribute("data-sized");
+});
+
+test("the picture has no working badge over the creature: the stage's working line is the room's, not the card's", () => {
+  page("pip", {}, { harness: { "fp-1|t-login": true }, history: [], karaokeState: null, botLive: false, workingSince: { "fp-1|t-login": 0 }, now: WORKING_SHOWN_AFTER_MS });
+  expect(document.querySelector(".picture-card .stage-tile[data-card]")).toHaveAttribute("data-mood", "working");
+  expect(screen.queryByText("Working…")).toBeNull();
+  expect(document.querySelector(".picture-card [role=status]")).toBeNull();
 });
