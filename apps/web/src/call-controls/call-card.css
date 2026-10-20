@@ -359,7 +359,7 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
  * half: right under its header (the card is tall, the header is where the control is). The avatar: under the compact card, in the flow,
  * as wide as it; in the lower half, over it, ending 6px above it. */
 .card-heading { position: relative; }
-.card-heading > .card-panel-card { position: absolute; z-index: 2; top: calc(100% + 6px); left: -14px; right: -10px; width: auto; max-height: calc(var(--card-h, 100%) - 70px); overflow: auto; }
+.card-heading > .card-panel-card { position: absolute; z-index: 2; top: calc(100% + 6px); left: -10px; right: -10px; width: auto; max-height: calc(var(--card-h, 100%) - 70px); overflow: auto; }
 .avatar-compact .card-panel-card { box-sizing: border-box; width: 100%; margin-top: 6px; }
 .floating-card[data-open=up] .avatar-compact .card-panel-card { position: absolute; left: 0; bottom: 100%; margin: 0 0 6px; }
 
