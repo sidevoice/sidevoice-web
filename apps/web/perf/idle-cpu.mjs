@@ -151,7 +151,7 @@ const SCENARIOS = [
           level = Math.round(Math.max(0, 40 + 35 * Math.sin(t * 7) + 15 * Math.sin(t * 23)));
           if (level === last) return;
           last = level;
-          document.getElementById("mic-control")?.style.setProperty("--mic-fill", level + "%");
+          document.getElementById("mic-control")?.style.setProperty("--mic-level", String(level / 100));
           document.getElementById("mic-level-meter")?.setAttribute("aria-valuenow", String(level));
           micLevel?.publish?.(level);
         }, 32);
