@@ -66,11 +66,8 @@ function hoverAndWait() {
   act(() => { vi.advanceTimersByTime(SHOW_DELAY_MS + 10); });
   act(() => { vi.advanceTimersByTime(CLICK_GUARD_MS + 10); });
 }
-/** Each bar's drawn height: it scales from 16px. */
-const waveHeights = () => [...document.querySelectorAll(".your-wave i")].map((bar) => {
-  const scale = /scaleY\(([\d.]+)\)/.exec((bar as HTMLElement).style.transform)?.[1];
-  return `${Math.round(Number(scale ?? 3 / 16) * 16)}px`;
-});
+/** Each bar's drawn height (--h, 3 at rest). */
+const waveHeights = () => [...document.querySelectorAll(".your-wave i")].map((bar) => `${(bar as HTMLElement).style.getPropertyValue("--h") || 3}px`);
 
 test("at rest: the agent, the conversation, where it runs, what is happening, and your wave — no controls, no clock", () => {
   render(<Card host={fakeHost()} />);
