@@ -44,12 +44,12 @@ jobs:
           PERF_SUMMARY: ${{ github.step_summary }}
         run: |
           export PERF_ONLY=speaking
-          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site-base" PERF_LABEL="Base, mic bars hidden" PERF_STYLE=".mic-wave{display:none!important}" node perf/idle-cpu.mjs
-          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="Waveform as DOM bars, mic bars hidden" PERF_STYLE=".mic-wave{display:none!important}" node perf/idle-cpu.mjs
-          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site-base" PERF_LABEL="Base, mic bars hidden, run 2" PERF_STYLE=".mic-wave{display:none!important}" node perf/idle-cpu.mjs
-          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="Waveform as DOM bars, mic bars hidden, run 2" PERF_STYLE=".mic-wave{display:none!important}" node perf/idle-cpu.mjs
-          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="Waveform as DOM bars, everything shown (mic bars moving)" node perf/idle-cpu.mjs
-          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="Both hidden (floor)" PERF_STYLE=".mic-wave,.voice-wave{display:none!important}" node perf/idle-cpu.mjs
+          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site-base" PERF_LABEL="Base, mic bars hidden" PERF_STYLE=".mic-wave{display:none!important} .sv-avatar *,.stage-scene *{animation:none!important}" node perf/idle-cpu.mjs
+          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="Waveform as DOM bars, mic bars hidden" PERF_STYLE=".mic-wave{display:none!important} .sv-avatar *,.stage-scene *{animation:none!important}" node perf/idle-cpu.mjs
+          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site-base" PERF_LABEL="Base, mic bars hidden, run 2" PERF_STYLE=".mic-wave{display:none!important} .sv-avatar *,.stage-scene *{animation:none!important}" node perf/idle-cpu.mjs
+          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="Waveform as DOM bars, mic bars hidden, run 2" PERF_STYLE=".mic-wave{display:none!important} .sv-avatar *,.stage-scene *{animation:none!important}" node perf/idle-cpu.mjs
+          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="Waveform as DOM bars, mic bars moving" PERF_STYLE=".sv-avatar *,.stage-scene *{animation:none!important}" node perf/idle-cpu.mjs
+          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="Both hidden (floor)" PERF_STYLE=".mic-wave,.voice-wave{display:none!important} .sv-avatar *,.stage-scene *{animation:none!important}" node perf/idle-cpu.mjs
           exit 0
           SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="This change ($(git rev-parse --short HEAD))" node perf/idle-cpu.mjs
           SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="This change, every animation stopped (the floor)" PERF_NO_ANIMATIONS=1 node perf/idle-cpu.mjs
