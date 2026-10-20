@@ -23,6 +23,10 @@ export const CARD_WIDTHS: Record<CardFormat, Record<CardSize, number>> = {
 };
 /** The picture's least width when the person resizes it: a stage tall enough for two readable lines of a balloon. */
 export const PIP_MIN_WIDTH = 350;
+/** The picture's least height when the person resizes it (its card, margin excluded): with the title block and the call bar,
+ *  the least that still shows the creature on its stage. The window is free in both directions above both least: the stage
+ *  keeps 16:9 inside whatever shape it takes. */
+export const PIP_MIN_HEIGHT = 330;
 
 export interface FloatingCardPrefs { format: CardFormat; size: CardSize }
 export const FLOATING_CARD_DEFAULTS: FloatingCardPrefs = { format: "card", size: "m" };

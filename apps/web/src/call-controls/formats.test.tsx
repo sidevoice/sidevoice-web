@@ -7,6 +7,7 @@ import { RoomProvider } from "../app/RoomProvider";
 import { createRoomStore } from "../state/room-store";
 import { cardFacts, type SessionFacts } from "../state/room-session-state.js";
 import { FLOATING_CARD_KEY } from "../state/floating-card";
+import { CARD_MARGIN } from "./card-shell";
 import { translator } from "../i18n/translator";
 
 vi.mock("../services/room-session-controller.js", () => ({}));
@@ -24,13 +25,13 @@ const ROOM: Partial<SessionFacts> = {
   history: [{ segment: "h-2", thread: LOGIN, role: "assistant", text: REPLY, name: "Fix the slow login", time: 1, session: "s1", audio: "playing" }] as never,
 };
 
-function page(format: string, extra: Partial<CallControlsState> = {}) {
+function page(format: string, extra: Partial<CallControlsState> = {}, roomExtra: Record<string, unknown> = {}, hostExtra: Partial<CallControlsHost> = {}) {
   localStorage.setItem(FLOATING_CARD_KEY, JSON.stringify({ format, size: "m" }));
   const room = createRoomStore();
-  act(() => room.patch(ROOM));
+  act(() => room.patch({ ...ROOM, ...roomExtra }));
   const state: CallControlsState = { call: { ...room.getState().callCard, version: 2, since: 1 }, level: 0, pointerInside: null, alwaysExpanded: false,
     muteShortcut: "", ...extra };
-  const host: CallControlsHost = { subscribe: (listener) => { listener(state); return () => undefined; }, run: vi.fn(), layout: vi.fn(), drag: vi.fn() };
+  const host: CallControlsHost = { subscribe: (listener) => { listener(state); return () => undefined; }, run: vi.fn(), layout: vi.fn(), drag: vi.fn(), ...hostExtra };
   const card = createCardRoom((command) => host.run(command));
   const wrapped: CallControlsHost = { ...host, subscribe: (listener) => host.subscribe((next) => { card.apply(next); listener(next); }) };
   render(<RoomProvider store={card.store} runtime={false}><CallCard host={wrapped} t={translator("en")} /></RoomProvider>);
@@ -75,4 +76,14 @@ test("the facts relayed are plain data: the socket as whether there is one, noth
   expect(facts.viewedThread).toBeNull();
   expect(facts.history.map((record) => record.segment)).toEqual(["h-2", "o-2"]);
   expect(() => JSON.stringify(facts)).not.toThrow();
+});
+
+test("the picture may be resized freely: a resized window of any shape is laid out as it is", () => {
+  const resize = vi.fn();
+  page("pip", { size: { width: 700, height: 420 } }, {}, { resize });
+  // Width and height both come from the window: not 16:9 of the width.
+  const card = document.querySelector<HTMLElement>(".floating-card")!;
+  expect(card.style.getPropertyValue("--card-w")).toBe(700 - 2 * CARD_MARGIN + "px");
+  expect(card.style.getPropertyValue("--card-h")).toBe(420 - 2 * CARD_MARGIN + "px");
+  expect(document.querySelector(".picture-card")).toHaveAttribute("data-sized");
 });
