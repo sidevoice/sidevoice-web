@@ -46,3 +46,7 @@ jobs:
           SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site-base" PERF_LABEL="Base ($(git -C ../../base rev-parse --short HEAD))" node perf/idle-cpu.mjs
           SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="This change ($(git rev-parse --short HEAD))" node perf/idle-cpu.mjs
           SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="This change, every animation stopped (the floor)" PERF_NO_ANIMATIONS=1 node perf/idle-cpu.mjs
+          export PERF_ONLY=working SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site"
+          PERF_LABEL="Working, state-dot blink stopped" PERF_STYLE=".state-dot{animation:none!important}" node perf/idle-cpu.mjs
+          PERF_LABEL="Working, spinner stopped" PERF_STYLE=".ui-spinner{animation:none!important}" node perf/idle-cpu.mjs
+          PERF_LABEL="Working, spinner only" PERF_STYLE=".state-dot{animation:none!important}" node perf/idle-cpu.mjs
