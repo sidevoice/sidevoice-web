@@ -982,6 +982,9 @@ export const messages = {
   "settings.floatingCard.corner.bl": "Bottom left",
   "settings.floatingCard.corner.br": "Bottom right",
   "settings.floatingCard.reset": "Reset size and position",
+  "settings.callCard.enabled": "Show the floating card",
+  "settings.callCard.enabledOnHint": "During a call, over your other apps.",
+  "settings.callCard.enabledOffHint": "No card during calls: the call's controls stay in Sidevoice and its tray icon. Turn it on to choose how it looks.",
   // Shortcuts, a section of their own (ShortcutsSettings): where each works, and the keys the room answers. The desktop
   // app's mute shortcut keeps its settings.desktop.* words above.
   "settings.section.shortcuts": "Shortcuts",

@@ -7,12 +7,12 @@ import type { Translate } from "../../i18n/translator";
 /* The desktop app's own call setting, a row among Call's others, inside the app only and where the app offers it:
  * whether the call controls — the floating card — show always, or only while the app is minimised. Its global mute
  * shortcut is in Shortcuts (ShortcutsSettings.tsx). */
-export function DesktopCallSettings({ t }: { t: Translate }) {
+export function DesktopCallSettings({ t, disabled = false }: { t: Translate; disabled?: boolean }) {
   if (!callControlsBridge()) return null;
-  return <AlwaysShownRow t={t} />;
+  return <AlwaysShownRow t={t} disabled={disabled} />;
 }
 
-function AlwaysShownRow({ t }: { t: Translate }) {
+function AlwaysShownRow({ t, disabled }: { t: Translate; disabled: boolean }) {
   const bridge = callControlsBridge()!;
   const [on, setOn] = useState<boolean | null>(null);
   const [failed, setFailed] = useState(false);
@@ -27,7 +27,7 @@ function AlwaysShownRow({ t }: { t: Translate }) {
     void bridge.setAlwaysShown(next).then((value) => { setOn(value.alwaysShown); bridge.preview?.(); }).catch(() => { setOn(!next); setFailed(true); });
   };
   return <Row label={t("settings.desktop.alwaysShown")} description={failed ? undefined : t("settings.desktop.alwaysShownHint")}>
-    <Switch checked={on} aria-label={t("settings.desktop.alwaysShown")} onChange={change} />
+    <Switch checked={on} disabled={disabled} aria-label={t("settings.desktop.alwaysShown")} onChange={change} />
     {failed && <span className="desktop-shortcut-error" role="alert">{t("settings.desktop.changeFailed")}</span>}
   </Row>;
 }

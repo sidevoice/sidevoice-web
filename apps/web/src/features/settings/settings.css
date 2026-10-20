@@ -328,3 +328,11 @@
 .floating-card-corner { width: 28px; height: 18px; padding: 0; border: 1.5px solid var(--sv-border-strong, var(--sv-border)); border-radius: 4px; background: none; cursor: pointer; }
 .floating-card-corner[aria-checked="true"] { border-color: var(--sv-accent); background: color-mix(in srgb, var(--sv-accent) 35%, transparent); }
 .floating-card-corner:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+
+/* The floating card switched off: the section's other controls stay in view, faded, their words in the disabled ink and out of
+ * the Tab order (the app's pattern for a control that cannot act now; decided 2026-10-20). */
+.floating-card-choice:disabled, .floating-card-corner:disabled { opacity: .45; cursor: not-allowed; }
+.floating-card-choice:disabled { color: var(--sv-disabled-text); }
+.floating-card-choice:disabled strong, .floating-card-choice:disabled small { color: var(--sv-disabled-text); }
+.floating-card-choice[data-selected]:disabled { box-shadow: none; border-color: var(--sv-border); }
+.floating-card-corner:disabled { pointer-events: none; }
