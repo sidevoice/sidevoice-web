@@ -205,7 +205,6 @@ export const messages: Messages = {
   "messages.cancel": "Annuler l’envoi",
   "messages.thinking": "La conversation traite votre message",
   "messages.new": "Nouveaux messages",
-  "messages.latest": "Aller à la fin",
   "messages.toLatest": "Aller à la fin de la conversation",
   "wave.listening": "Écoute",
   "wave.listeningTitle": "Écoute…",

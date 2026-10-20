@@ -207,7 +207,6 @@ export const messages: Messages = {
   "messages.cancel": "Senden abbrechen",
   "messages.thinking": "Die Unterhaltung arbeitet an deiner Nachricht",
   "messages.new": "Neue Nachrichten",
-  "messages.latest": "Zum Ende",
   "messages.toLatest": "Zum Ende der Unterhaltung",
 
   "wave.listening": "Hört zu",

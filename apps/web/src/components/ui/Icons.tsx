@@ -9,7 +9,7 @@ import {
   Download, Trash2, Activity, Check, CheckCheck, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, ExternalLink, Keyboard, KeyRound,
   MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
   PanelLeftOpen, Pause, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
-  Box, AudioWaveform, ArrowUp, ArrowLeft, ArrowRight, RefreshCcwDot, Pencil, Laptop, Server,
+  Box, AudioWaveform, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RefreshCcwDot, Pencil, Laptop, Server,
   Timer, ScrollText, Link, Unlink, Search, ChevronLeft, ChevronRight, Eye, EyeOff, Square, Sparkle, ShieldCheck, Captions, CaptionsOff, PictureInPicture2,
 } from "lucide-react";
 import type { ComponentType } from "react";
@@ -102,6 +102,7 @@ export const CaptionsIcon = mark(Captions, 22);
 export const CaptionsOffIcon = mark(CaptionsOff, 22);
 /** Sends what was written. */
 export const SendIcon = mark(ArrowUp, 18);
+export const ToLatestIcon = mark(ArrowDown, 18);
 
 // ----- a message's delivery, drawn like the play mark beside it so both sit on the time's line at one size
 export const SentIcon = mark(Check, 12);

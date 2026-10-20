@@ -205,7 +205,6 @@ export const messages: Messages = {
   "messages.cancel": "取消发送",
   "messages.thinking": "对话正在处理你的消息",
   "messages.new": "新消息",
-  "messages.latest": "转到末尾",
   "messages.toLatest": "转到对话末尾",
   "wave.listening": "正在听",
   "wave.listeningTitle": "正在听…",

@@ -108,7 +108,7 @@
 /* The conversation is working on your turn: three dots in the agent's bubble. */
 .chat-bubble.thinking { display: inline-flex; align-items: center; height: 36px; padding: 0 var(--sv-space-4); color: var(--sv-text-muted); }
 
-/* Away from the end, a way back to it: centred above the text box, where it covers least. It floats over the
+/* Away from the end, a way back to it, a down arrow with no text (its name is the label): centred above the text box, where it covers least. It floats over the
  * messages, so the secondary's tint (see-through in the dark theme) lies over an opaque surface. */
 .message-viewport-wrap .ui-button.latest-jump {
   position: absolute; z-index: 2; left: 0; right: 0; bottom: var(--sv-space-3); width: max-content; margin-inline: auto; box-shadow: var(--sv-shadow-md);
