@@ -1372,6 +1372,7 @@ export const messages = {
   "card.agent.unknown": "The agent",
   "card.reconnecting": "Reconnecting…",
   "card.switchConversation": "Switch conversation",
+  "card.controls": "Call controls",
   "card.conversations": "Conversations",
   "card.openApp": "Open Sidevoice",
   "card.mute": "Mute",

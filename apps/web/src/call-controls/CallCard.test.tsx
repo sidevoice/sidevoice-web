@@ -184,10 +184,14 @@ test("right after the controls appear, and after any change of the card's size, 
   render(<Card host={host} />);
   fireEvent.pointerEnter(card());
   act(() => { vi.advanceTimersByTime(SHOW_DELAY_MS + 10); });
-  fireEvent.click(screen.getByRole("button", { name: "Hang up" }));
+  fireEvent.click(screen.getByRole("button", { name: "Hang up" }), { detail: 1 });
   expect(host.run).not.toHaveBeenCalled();
-  act(() => { vi.advanceTimersByTime(CLICK_GUARD_MS + 10); });
+  // The guard is for a pointer landing on controls that just appeared: a key press (detail 0) is never that.
   fireEvent.click(screen.getByRole("button", { name: "Hang up" }));
+  expect(host.run).toHaveBeenCalledTimes(1);
+  vi.mocked(host.run).mockClear();
+  act(() => { vi.advanceTimersByTime(CLICK_GUARD_MS + 10); });
+  fireEvent.click(screen.getByRole("button", { name: "Hang up" }), { detail: 1 });
   expect(host.run).toHaveBeenCalledWith({ command: "hang-up" });
   box.mockRestore();
 });

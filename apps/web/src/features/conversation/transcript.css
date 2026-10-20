@@ -70,7 +70,7 @@
   --sv-text-muted: var(--sv-chat-person-subtle); --sv-border-strong: var(--sv-chat-person-subtle); --sv-border: var(--sv-chat-person-bg);
   --sv-accent: var(--sv-chat-person-mark); --sv-accent-text: var(--sv-chat-person-mark); --sv-focus: var(--sv-chat-person-mark);
   --sv-danger: var(--sv-chat-person-danger); --sv-disabled-text: var(--sv-chat-person-quiet);
-  --sv-hover: var(--sv-chat-person-wash); --sv-pressed: var(--sv-chat-person-wash); --sv-accent-soft: var(--sv-chat-person-wash); --sv-danger-soft: var(--sv-chat-person-wash);
+  --sv-hover: var(--sv-chat-person-wash-hover); --sv-pressed: var(--sv-chat-person-wash-pressed); --sv-accent-soft: var(--sv-chat-person-wash); --sv-danger-soft: var(--sv-chat-person-wash);
 }
 .chat-bubble[data-role="assistant"]:is([data-position="last"], [data-position="only"]) { border-bottom-left-radius: var(--sv-radius-sm); }
 .chat-bubble[data-role="user"]:is([data-position="last"], [data-position="only"]) { border-bottom-right-radius: var(--sv-radius-sm); }

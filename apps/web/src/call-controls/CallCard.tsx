@@ -8,16 +8,17 @@
  * - the picture-in-picture (default): the room's own stage tile (StageTile) under the room's title block, and the room's call bar
  *   (CardCallBar) under it. Its captions are the stage's balloons.
  * - just the avatar: the conversation's creature, on nothing; the stage's balloons above or below it (their tails toward
- *   it), and near the pointer a dock beside it (the picture's title bar and call bar, without the stage).
+ *   it); the pointer on the creature shows a handle beside it, and the pointer on the handle unfolds it into a card (the
+ *   picture's title bar and call bar, without the stage) that folds back into it.
  *
  * Every format: the conversations control (their mark, how many, ▾) right after the title, whose list drops from it; ×
  * always (hidden for this call), the gear and "open Sidevoice" near the pointer; captions on the card's own toggle
  * (state/captions.ts, shared with the room's call bar). What opens from the card (captions, lists) opens toward the
  * screen's middle (`place`). The room's components draw on the card's own store (card-room.ts); the host's state and the
  * plumbing are card-shell.tsx. */
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { CaptionsIcon, CaptionsOffIcon, ChevronIcon, CloseIcon, ConversationsIcon, HangupIcon, HarnessIcon, MachinesIcon, MicrophoneIcon,
-  MicrophoneOffIcon, OpenAppIcon, SettingsIcon, SkipIcon } from "../components/ui/Icons";
+  MicrophoneOffIcon, MoreIcon, OpenAppIcon, SettingsIcon, SkipIcon } from "../components/ui/Icons";
 import { Button } from "../components/ui/Button";
 import { ConversationPicker, DevicePicker, useCardShell, useHostState, useWave, type CardShell } from "./card-shell";
 import { hasUnread, moodText } from "../features/call/conversation-state";
@@ -65,7 +66,7 @@ function useCardAgent(state: CallControlsState): { threadId: string | null; spec
 
 function FloatingCard({ host, state, format, size, t }: { host: CallControlsHost; state: CallControlsState; format: CardFormat; size: CardSize; t: Translate }) {
   const custom = format === "pip" && state.size ? state.size : null;
-  const shell = useCardShell(host, state, format === "pip" && host.resize ? { minWidth: PIP_MIN_WIDTH + 2 * CARD_MARGIN, minHeight: 0 } : undefined);
+  const shell = useCardShell(host, state, format === "pip" && host.resize ? { minWidth: PIP_MIN_WIDTH + 2 * CARD_MARGIN, minHeight: 0 } : undefined, format === "avatar");
   const place = state.place ?? UPPER_RIGHT;
   const captions = useCaptions();
   const width = custom ? custom.width - 2 * CARD_MARGIN : CARD_WIDTHS[format][size];
@@ -75,7 +76,7 @@ function FloatingCard({ host, state, format, size, t }: { host: CallControlsHost
       : <AvatarCard state={state} shell={shell} t={t} />;
   return (
     <div ref={shell.card} className="floating-card" data-format={format} data-size={custom ? "custom" : size} data-open={place.vertical === "upper" ? "down" : "up"}
-      data-side={place.horizontal} data-expanded={shell.expanded || undefined} data-captions={captions ? "on" : "off"} style={style} {...shell.handlers}>
+      data-side={place.horizontal} data-expanded={shell.expanded || undefined} data-handle={shell.handle.out || undefined} data-folding={shell.handle.folding || undefined} data-captions={captions ? "on" : "off"} style={style} {...shell.handlers}>
       {body}
       {shell.panel && <div className="call-card card-panel-card">
         {shell.panel === "conversations" && <Conversations state={state} shell={shell} t={t} />}
@@ -306,9 +307,12 @@ function PictureCard({ host, state, shell, place, sized, t }: { host: CallContro
 
 function AvatarCard({ state, shell, t }: { state: CallControlsState; shell: CardShell; t: Translate }) {
   const captions = useCaptions();
-  const opensDown = (state.place ?? UPPER_RIGHT).vertical === "upper";
+  const place = state.place ?? UPPER_RIGHT;
+  const opensDown = place.vertical === "upper";
   const [balloonsUp, setBalloonsUp] = useState(false);
   const balloons = useRef<HTMLDivElement>(null);
+  const side = useRef<HTMLDivElement>(null);
+  const { handle } = shell;
   // Whether a balloon is out, for the stack to take room only then (the window is the creature's box at rest).
   useEffect(() => {
     const node = balloons.current;
@@ -319,20 +323,44 @@ function AvatarCard({ state, shell, t }: { state: CallControlsState; shell: Card
     observer.observe(node, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, [captions]);
+  // Enter on the handle unfolds it into the card with focus on its first control.
+  const focusCard = useRef(false);
+  useEffect(() => {
+    if (!shell.expanded || !focusCard.current) return;
+    focusCard.current = false;
+    side.current?.querySelector<HTMLElement>(".avatar-dock button:not(:disabled)")?.focus();
+  }, [shell.expanded]);
+  const onKeyDown = (event: ReactKeyboardEvent) => {
+    // Escape folds the card back into the handle, focus on it.
+    if (event.key !== "Escape" || !(event.target as Element).closest(".avatar-dock")) return;
+    event.preventDefault();
+    handle.fold();
+    side.current?.querySelector<HTMLElement>(".avatar-handle")?.focus();
+  };
   return (
-    // A grid: the creature, its balloons on the side toward the screen's middle (above or below), and the dock beside it,
-    // level with it, on its open side (call-card.css). All of it in the window's flow, so the window holds what shows.
-    <div className="avatar-card" data-balloons={balloonsUp || undefined}>
-      <div ref={shell.body} className="avatar-figure">
+    // A grid: the creature, its balloons on the side toward the screen's middle (above or below), and the handle with the card
+    // it opens into beside it, level with it, on its open side (call-card.css). All of it in the window's flow, so the window
+    // holds what shows: the card's box is kept from the moment the handle shows, and only its clip and opacities move.
+    <div className="avatar-card" data-balloons={balloonsUp || undefined} onPointerLeave={() => handle.aim("none")}>
+      <div ref={shell.body} className="avatar-figure" onPointerOver={() => handle.aim("creature")}>
         <CardFigure state={state} size="stage" label={t("stage.agentState", { title: state.call.title, state: moodText(state.call.mood, t) })} />
       </div>
-      {captions && <div ref={balloons} className={"avatar-balloons" + (opensDown ? " balloon--tail-up" : "")}>
+      {captions && <div ref={balloons} className={"avatar-balloons" + (opensDown ? " balloon--tail-up" : "")} onPointerOver={() => handle.aim("none")}>
         <StageBalloons />
       </div>}
-      {shell.expanded && (
-        <div className="avatar-dock">
-          <CardHeading state={state} shell={shell} t={t} machine={false} />
-          <CardCallBar />
+      {(handle.out || handle.folding) && (
+        <div ref={side} className="avatar-side" onKeyDown={onKeyDown}
+          onPointerOver={(event) => { if ((event.target as Element).closest(".avatar-handle, .avatar-dock")) handle.aim("card"); }}
+          onFocus={(event) => { if ((event.target as Element).closest(".avatar-dock") && (event.target as Element).matches(":focus-visible")) handle.focusWithin(true); }}
+          onBlur={(event) => { if (!(event.relatedTarget as Element | null)?.closest?.(".avatar-dock")) handle.focusWithin(false); }}>
+          <button type="button" className="avatar-handle" aria-expanded={shell.expanded} aria-controls="avatar-controls" aria-label={t("card.controls")} title={t("card.controls")}
+            onClick={(event) => { focusCard.current = event.detail === 0; handle.open(event.detail === 0 ? "keyboard" : "pointer"); }}>
+            <MoreIcon size={16} /><ChevronIcon size={12} className="avatar-handle-chevron" />
+          </button>
+          <div id="avatar-controls" className="avatar-dock">
+            <CardHeading state={state} shell={shell} t={t} machine={false} />
+            <CardCallBar />
+          </div>
         </div>
       )}
     </div>
