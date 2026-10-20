@@ -336,3 +336,17 @@
 .floating-card-choice:disabled strong, .floating-card-choice:disabled small { color: var(--sv-disabled-text); }
 .floating-card-choice[data-selected]:disabled { box-shadow: none; border-color: var(--sv-border); }
 .floating-card-corner:disabled { pointer-events: none; }
+
+/* "Always show the call controls" on: each preview draws its format with its controls out, still like the rest. */
+.fcp-card { flex-wrap: wrap; }
+.fcp-card-controls, .fcp-actions { display: flex; gap: 3px; }
+.fcp-card-controls { flex-basis: 100%; justify-content: center; }
+.fcp-card-controls i, .fcp-actions i { width: 8px; height: 8px; border-radius: 50%; background: color-mix(in srgb, var(--sv-text) 25%, transparent); }
+.fcp-card-controls i:last-child { width: 12px; border-radius: 4px; background: var(--sv-danger, #dc362e); }
+.fcp-pip .fcp-lines { display: flex; align-items: center; justify-content: space-between; }
+.fcp-pip .fcp-lines .fcp-actions { flex: none; }
+.fcp-avatar-card { position: absolute; top: 20px; right: 82px; display: grid; gap: 5px; width: 46%; padding: 6px; border: 1px solid var(--sv-border);
+  border-radius: 10px; background: var(--sv-bg); box-shadow: 0 6px 16px rgb(0 0 0 / 30%); }
+.fcp-avatar-card .fcp-lines { display: flex; align-items: center; justify-content: space-between; }
+.fcp-avatar-card .fcp-lines i:first-child { width: 50%; }
+.fcp-lines .fcp-actions i { width: 8px; height: 8px; border-radius: 50%; opacity: 1; background: color-mix(in srgb, var(--sv-text) 25%, transparent); }

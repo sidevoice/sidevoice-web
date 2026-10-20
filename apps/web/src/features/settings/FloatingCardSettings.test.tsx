@@ -53,6 +53,24 @@ test("the first row turns the card off: the rest stays in view, disabled, and no
   expect(bridge.preview).not.toHaveBeenCalled();
 });
 
+test("Always show the call controls sits right under Style, and the previews draw their controls only when it is on", async () => {
+  const bridge = { ...base(), settings: vi.fn(async () => ({ alwaysShown: false })), preview: vi.fn() };
+  inApp(bridge);
+  render(<RoomProvider store={createRoomStore()}><FloatingCardSettings t={translator("en")} /></RoomProvider>);
+  await screen.findByRole("switch", { name: "Always show the call controls" });
+  const rows = [...document.querySelectorAll(".ui-row")].map((row) => row.textContent ?? "");
+  expect(rows.findIndex((text) => text.includes("Always show the call controls"))).toBe(rows.findIndex((text) => text.includes("Style")) + 1);
+  expect(document.querySelector(".fcp-card-controls")).toBeNull();
+  fireEvent.click(await screen.findByRole("switch", { name: "Always show the call controls" }));
+  await waitFor(() => expect(document.querySelectorAll(".fcp-card-controls, .fcp-avatar-card")).toHaveLength(2));
+  expect(document.querySelectorAll(".fcp-pip .fcp-actions")).toHaveLength(1);
+  // Off again: the card stays up as a preview first (it would otherwise leave the screen), then shows its new state.
+  fireEvent.click(screen.getByRole("switch", { name: "Always show the call controls" }));
+  await waitFor(() => expect(bridge.setAlwaysShown).toHaveBeenLastCalledWith(false));
+  expect(bridge.preview.mock.invocationCallOrder[bridge.preview.mock.calls.length - 2]).toBeLessThan(bridge.setAlwaysShown.mock.invocationCallOrder[1]);
+  expect(document.querySelector(".fcp-card-controls")).toBeNull();
+});
+
 test("Reset size and position is always there to press, and leaving Settings ends a preview showing", async () => {
   const bridge = { ...base(), settings: vi.fn(async () => ({ alwaysShown: false, moved: false })), resetPlace: vi.fn(async () => undefined), preview: vi.fn(), endPreview: vi.fn() };
   inApp(bridge);

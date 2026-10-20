@@ -32,12 +32,12 @@ export function useFloatingCardSection(): boolean {
 export function FloatingCardSettings({ t }: { t: Translate }) {
   const bridge = callControlsBridge();
   const prefs = useFloatingCard();
-  const [app, setApp] = useState<{ corner?: CardCorner; moved?: boolean; enabled?: boolean } | null>(null);
+  const [app, setApp] = useState<{ corner?: CardCorner; moved?: boolean; enabled?: boolean; alwaysShown?: boolean } | null>(null);
   // Leaving Settings ends a preview showing at once.
   useEffect(() => () => { bridge?.endPreview?.(); }, [bridge]);
   useEffect(() => {
     let gone = false;
-    void bridge?.settings().then((value) => { if (!gone) setApp({ corner: value.corner, moved: value.moved, enabled: value.enabled }); }).catch(() => undefined);
+    void bridge?.settings().then((value) => { if (!gone) setApp({ corner: value.corner, moved: value.moved, enabled: value.enabled, alwaysShown: value.alwaysShown }); }).catch(() => undefined);
     return () => { gone = true; };
   }, [bridge]);
   if (!bridge) return null;
@@ -53,13 +53,14 @@ export function FloatingCardSettings({ t }: { t: Translate }) {
           {CARD_FORMATS.map((format) => (
             <ChoiceCard key={format} className="floating-card-choice" selected={prefs.format === format} disabled={off}
               onSelect={() => { setFloatingCard({ format }); changed(); }}>
-              <CardPreview format={format} />
+              <CardPreview format={format} controls={app?.alwaysShown === true} />
               <strong>{t(FORMAT_WORDS[format].name)}</strong>
               <small>{t(FORMAT_WORDS[format].hint)}</small>
             </ChoiceCard>
           ))}
         </div>
       </Row>
+      <DesktopCallSettings t={t} disabled={off} onChange={(alwaysShown) => setApp((now) => ({ ...now, alwaysShown }))} />
       <Row label={t("settings.floatingCard.size")} description={prefs.format === "pip" ? t("settings.floatingCard.sizeHint") : undefined}>
         <Segmented size="sm" label={t("settings.floatingCard.size")} value={prefs.size} onChange={(size) => {
           setFloatingCard({ size });
@@ -70,7 +71,6 @@ export function FloatingCardSettings({ t }: { t: Translate }) {
       </Row>
       {bridge.setCorner && <CornerRow bridge={bridge} corner={app?.corner ?? "tr"} t={t} disabled={off}
         onChange={(corner) => { setApp((now) => ({ ...now, corner })); changed(); }} />}
-      <DesktopCallSettings t={t} disabled={off} />
       {bridge.resetPlace && <Row label="">
         <Button variant="secondary" size="sm" disabled={off}
           onClick={() => { void bridge.resetPlace!().then(() => { setApp((now) => ({ ...now, moved: false })); changed(); }); }}>
@@ -96,16 +96,18 @@ function CornerRow({ bridge, corner, onChange, t, disabled }: { bridge: CallCont
 
 /** A still, simplified picture of a format where it first sits, on a corner of a screen in the page's theme: shapes for
  *  its words and controls, and the creature it would show (the call's conversation's; else the first; else Sidevoice's
- *  own), still. */
-function CardPreview({ format }: { format: CardFormat }) {
+ *  own), still. `controls`: "Always show the call controls" is on, so each format is drawn with its controls out, as they will
+ *  appear: the title card's row of buttons, the picture's header actions, the avatar's card beside it. */
+function CardPreview({ format, controls }: { format: CardFormat; controls: boolean }) {
   const threadId = useRoomStore((state) => state.session.selected ?? state.participants[0]?.threadId ?? null);
   const spec = threadId ? avatarFor(threadId) : SIDEVOICE_MASCOT;
   const tone = avatarTone(threadId ? avatarColor(spec) : "#c9b6ec") as CSSProperties;
   const figure = <CharacterAvatar spec={spec} state={STILL} size={format === "avatar" ? "stage" : "small"} />;
   return <span className="floating-card-preview" data-format={format} aria-hidden="true" style={tone}>
-    {format === "card" && <span className="fcp-card"><span className="fcp-face">{figure}</span><span className="fcp-lines"><i /><i /><i /></span></span>}
-    {format === "pip" && <span className="fcp-pip"><span className="fcp-lines"><i /></span><span className="fcp-stage">{figure}</span><span className="fcp-bar"><i /><i /><i /><i /></span></span>}
+    {format === "card" && <span className="fcp-card"><span className="fcp-face">{figure}</span><span className="fcp-lines"><i /><i /><i /></span>{controls && <span className="fcp-card-controls"><i /><i /><i /><i /></span>}</span>}
+    {format === "pip" && <span className="fcp-pip"><span className="fcp-lines"><i />{controls && <b className="fcp-actions"><i /><i /><i /></b>}</span><span className="fcp-stage">{figure}</span><span className="fcp-bar"><i /><i /><i /><i /></span></span>}
     {format === "avatar" && <span className="fcp-avatar">{figure}</span>}
+    {format === "avatar" && controls && <span className="fcp-avatar-card"><span className="fcp-lines"><i /><b className="fcp-actions"><i /><i /><i /></b></span><span className="fcp-bar"><i /><i /><i /><i /></span></span>}
   </span>;
 }
 
