@@ -1,15 +1,12 @@
-import { nextIdle, type Idle, type IdleStep } from "./engine/bichos/idle";
 import { nextWork, workTurn, type Work } from "./engine/bichos/work";
 
-/* What a bicho does with its hands is the client's, not the bicho's: a working style while it works (work.ts), an idle
- * step while it rests (idle.ts). One pick per figure, held by its state (avatar-state.ts) while it is in that state and
+/* What a bicho does with its hands is the client's, not the bicho's: a working style while it works (work.ts). Resting,
+ * it holds nothing and stays still (web#272: no pastimes). One pick per figure, held by its state (avatar-state.ts) while it is in that state and
  * dropped when it leaves it: the next time it starts afresh. Every copy of the figure shows that one pick; the engine
- * reads it from the root (`data-work`, `data-idle`).
+ * reads it from the root (`data-work`).
  *
  *   work  a random tool when work starts, swapped for another after that tool's own spell (hammering comes in short
- *         bursts, reading goes on: WORK_DURATION)
- *   idle  steps: quiet for a few seconds, then one pastime for its own spell, then quiet again, then another pastime
- *         (never the last one), and so on (nextIdle) */
+ *         bursts, reading goes on: WORK_DURATION) */
 
 /** A pick, how long it lasts, and what the next pick is made from. */
 interface Step<S> { value: string; ms: number; state: S }
@@ -22,12 +19,7 @@ const work: Kind<Work> = {
   next: (prev, pool) => workStep(nextWork(prev, pool as readonly Work[])),
 };
 const workStep = (value: Work): Step<Work> => ({ value, ms: workTurn(value), state: value });
-const idle: Kind<IdleStep> = {
-  first: (pool) => idleStep(nextIdle(null, pool as readonly Idle[])),
-  next: (prev, pool) => idleStep(nextIdle(prev, pool as readonly Idle[])),
-};
-const idleStep = (step: IdleStep): Step<IdleStep> => ({ value: step.idle, ms: step.ms, state: step });
-const KINDS = { work, idle } as Record<"work" | "idle", Kind<unknown>>;
+const KINDS = { work } as Record<"work", Kind<unknown>>;
 export type RotationKind = keyof typeof KINDS;
 
 interface Entry { kind: RotationKind; step: Step<unknown>; pool: readonly string[]; until: number; holders: number }

@@ -19,9 +19,20 @@ import { LOCAL_CATALOG } from './model-catalogs.js';
  *   patience: NonNullable<VoiceInputSettings['patience']>,
  *   end_of_turn: 'silence' | 'smart-turn',
  *   idle_unload_minutes: number,
+ *   turn: TurnTuning,
  *   turn_model?: string,
  * }} DeviceVoiceSettings The settings this device keeps: every field filled. The voice is given them as the halves of
  *   a call (`voiceHalves`).
+ * @typedef {{
+ *   listening_bar: {quiet: number, playing: number},
+ *   barge_in_min_speech: number,
+ *   barge_in_window: number,
+ *   vad_confidence: number,
+ *   speech_start_ms: number,
+ *   pre_roll_ms: number,
+ *   audio_grace_ms: number,
+ *   fade_ms: number,
+ * }} TurnTuning The numbers that decide when a turn starts, when speech cuts a reply and how a reply is cut.
  * @typedef {{key: string, params?: Record<string, string | number>, reasons?: string[], detail?: string}} Note What the pane
  *   says about a choice: a message key and its params, the codes of why a model does not run here, and a provider's own
  *   words.
@@ -32,6 +43,36 @@ export const PATIENCE = ['fast', 'normal', 'calm'];
 export const END_OF_TURN = ['silence', 'smart-turn'];
 /** How long models stay loaded with nothing to do, in minutes, as Settings offers it; the voice's own default is 10. */
 export const IDLE_UNLOAD_MINUTES = [5, 10, 30, 60];
+/**
+ * The numbers of a turn and of cutting a reply, with the bounds the voice accepts: this app owns the values it runs with
+ * (the voice's own defaults are only what it does when told nothing), so they are tuned here without a voice release.
+ * `listening_bar` is a volume from 0 to 1 (BS.1770 loudness, −110 LUFS to −10 LUFS) while nothing plays and while
+ * something does; `barge_in_min_speech` the seconds of speech that cut a reply, counted within `barge_in_window` times as
+ * much; `vad_confidence` the detector's confidence from which a window is speech; `speech_start_ms` how long speech goes
+ * on before it starts a turn; `pre_roll_ms` the audio kept before it; `audio_grace_ms` how long a reply waits after a
+ * turn ends; `fade_ms` the speaker's fade when a reply is cut.
+ */
+export const TURN_TUNING = {
+  listening_bar: { quiet: 0.5, playing: 0.65 },
+  barge_in_min_speech: 0.6,
+  barge_in_window: 2.5,
+  vad_confidence: 0.6,
+  speech_start_ms: 400,
+  pre_roll_ms: 1000,
+  audio_grace_ms: 1000,
+  fade_ms: 30,
+};
+/** @type {Record<string, {min: number, max: number, above?: boolean}>} What each number may be; the voice refuses outside. */
+export const TURN_BOUNDS = {
+  quiet: { min: 0, max: 1 }, playing: { min: 0, max: 1 },
+  barge_in_min_speech: { min: 0, max: 60, above: true },
+  barge_in_window: { min: 1, max: 10 },
+  vad_confidence: { min: 0, max: 1, above: true },
+  speech_start_ms: { min: 0, max: 5000 },
+  pre_roll_ms: { min: 0, max: 5000 },
+  audio_grace_ms: { min: 0, max: 60000 },
+  fade_ms: { min: 0, max: 1000 },
+};
 /** The normal pace, and the step the pane moves a speed by. */
 export const SPEED = { normal: 1, step: 0.05 };
 
@@ -48,6 +89,34 @@ export function defaultVoiceSettings() {
     // The model that hears when you have finished, where it runs; silence where it does not (voiceSettingsHere).
     end_of_turn: 'smart-turn',
     idle_unload_minutes: 10,
+    turn: { ...TURN_TUNING, listening_bar: { ...TURN_TUNING.listening_bar } },
+  };
+}
+
+/** `value` as the number `name` may be, or `fallback`. */
+function bounded(name, value, fallback) {
+  const { min, max, above } = TURN_BOUNDS[name];
+  return typeof value === 'number' && Number.isFinite(value) && value <= max && (above ? value > min : value >= min) ? value : fallback;
+}
+
+/**
+ * `value` as turn numbers, each kept when in bounds and otherwise `defaults`'.
+ * @param {any} value
+ * @param {TurnTuning} defaults
+ * @returns {TurnTuning}
+ */
+export function normaliseTurnTuning(value, defaults) {
+  const bar = value?.listening_bar;
+  const number = (name) => bounded(name, value?.[name], defaults[name]);
+  return {
+    listening_bar: { quiet: bounded('quiet', bar?.quiet, defaults.listening_bar.quiet), playing: bounded('playing', bar?.playing, defaults.listening_bar.playing) },
+    barge_in_min_speech: number('barge_in_min_speech'),
+    barge_in_window: number('barge_in_window'),
+    vad_confidence: number('vad_confidence'),
+    speech_start_ms: number('speech_start_ms'),
+    pre_roll_ms: number('pre_roll_ms'),
+    audio_grace_ms: number('audio_grace_ms'),
+    fade_ms: number('fade_ms'),
   };
 }
 
@@ -81,6 +150,7 @@ export function normaliseVoiceSettings(value, defaults) {
     patience: PATIENCE.includes(value?.patience) ? value.patience : defaults.patience,
     end_of_turn: END_OF_TURN.includes(value?.end_of_turn) ? value.end_of_turn : defaults.end_of_turn,
     idle_unload_minutes: IDLE_UNLOAD_MINUTES.includes(value?.idle_unload_minutes) ? value.idle_unload_minutes : defaults.idle_unload_minutes,
+    turn: normaliseTurnTuning(value?.turn, defaults.turn),
     ...(text(value?.turn_model) ? { turn_model: value.turn_model } : {}),
   };
 }
@@ -119,11 +189,12 @@ function speedFor(model, speed) {
  * `settings` with `patch` applied. Another source takes that source's first model for the slot; another model drops
  * the voice and a language it does not have, and brings the speed within its range.
  * @param {DeviceVoiceSettings} settings
- * @param {{stt?: Partial<DeviceVoiceSettings["stt"]>, tts?: Partial<DeviceVoiceSettings["tts"]>, patience?: DeviceVoiceSettings["patience"], end_of_turn?: DeviceVoiceSettings["end_of_turn"]}} patch
+ * @param {{stt?: Partial<DeviceVoiceSettings["stt"]>, tts?: Partial<DeviceVoiceSettings["tts"]>, patience?: DeviceVoiceSettings["patience"], end_of_turn?: DeviceVoiceSettings["end_of_turn"], turn?: Partial<Omit<TurnTuning, "listening_bar">> & {listening_bar?: Partial<TurnTuning["listening_bar"]>}}} patch
  * @param {CatalogView[]} [catalogs]
  * @returns {DeviceVoiceSettings}
  */
 export function editVoiceSettings(settings, patch, catalogs = []) {
+  const turn = patch.turn ? normaliseTurnTuning({ ...settings.turn, ...patch.turn, listening_bar: { ...settings.turn.listening_bar, ...patch.turn.listening_bar } }, settings.turn) : settings.turn;
   const stt = { ...settings.stt, ...patch.stt }, tts = { ...settings.tts, ...patch.tts };
   for (const [slot, capability, before] of [[stt, 'stt', settings.stt], [tts, 'tts', settings.tts]]) {
     if (slot.catalog !== before.catalog && !(patch[capability]?.model)) {
@@ -143,7 +214,7 @@ export function editVoiceSettings(settings, patch, catalogs = []) {
     tts.voice = null;
     tts.speed = speedFor(findModel(catalogs, tts.catalog, tts.model), tts.speed);
   }
-  return { ...settings, ...patch, stt, tts };
+  return { ...settings, ...patch, stt, tts, turn };
 }
 
 const sameLanguage = (a, b) => a.toLowerCase().split('-')[0] === b.toLowerCase().split('-')[0];
@@ -278,7 +349,11 @@ export function voiceEndOfTurn(settings) {
  * @returns {VoiceInputSettings}
  */
 export function voiceInput(settings, endOfTurn = voiceEndOfTurn(settings)) {
-  return { stt: { ...settings.stt }, endOfTurn, patience: settings.patience };
+  const { listening_bar, barge_in_min_speech, barge_in_window, vad_confidence, speech_start_ms, pre_roll_ms } = settings.turn;
+  return {
+    stt: { ...settings.stt }, endOfTurn, patience: settings.patience,
+    listening_bar: { ...listening_bar }, barge_in_min_speech, barge_in_window, vad_confidence, speech_start_ms, pre_roll_ms,
+  };
 }
 
 /**
@@ -289,12 +364,12 @@ export function voiceInput(settings, endOfTurn = voiceEndOfTurn(settings)) {
  */
 export function voiceOutput(settings) {
   const { catalog, model, build, voice, speed } = settings.tts;
-  return { tts: { catalog, model, ...(build ? { build } : {}) }, voice, speed, language: settings.stt.language };
+  return { tts: { catalog, model, ...(build ? { build } : {}) }, voice, speed, fade_ms: settings.turn.fade_ms, language: settings.stt.language };
 }
 
 /**
  * `settings` as the halves of a call: the input where `input` says the call listens, the output where `output` says it
- * speaks, and how long its models stay loaded with no call holding them.
+ * speaks, how long a reply waits after a turn ends, and how long its models stay loaded with no call holding them.
  * @param {DeviceVoiceSettings} settings
  * @param {{input?: boolean, output?: boolean}} [halves] Both by default.
  * @returns {VoiceSettings}
@@ -303,6 +378,7 @@ export function voiceHalves(settings, { input = true, output = true } = {}) {
   return {
     ...(input ? { input: voiceInput(settings) } : {}),
     ...(output ? { output: voiceOutput(settings) } : {}),
+    audio_grace_ms: settings.turn.audio_grace_ms,
     idle_unload_minutes: settings.idle_unload_minutes,
   };
 }

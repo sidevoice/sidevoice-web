@@ -136,12 +136,20 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
       paint();
       frame = requestAnimationFrame(tick);
     };
-    const start = () => { if (!frame && !document.hidden) { lastColumn = performance.now(); frame = requestAnimationFrame(tick); } };
+    // Only while it can be seen: a waveform mounted out of sight (a Settings or setup page not shown, a hidden tab) reads
+    // and schedules nothing. A loop of frames that never stops keeps the page rendering every frame (desktop#149).
+    let shown = typeof IntersectionObserver === "undefined";
+    const start = () => { if (!frame && shown && !document.hidden) { lastColumn = performance.now(); frame = requestAnimationFrame(tick); } };
     const stop = () => { if (frame) { cancelAnimationFrame(frame); frame = 0; } };
     const visibility = () => { if (document.hidden) stop(); else start(); };
     document.addEventListener("visibilitychange", visibility);
+    const sight = typeof IntersectionObserver === "undefined" ? null : new IntersectionObserver((entries) => {
+      shown = entries[entries.length - 1].isIntersecting;
+      if (shown) start(); else stop();
+    });
+    sight?.observe(node);
     start();
-    return () => { stop(); observer.disconnect(); mutation.disconnect(); document.removeEventListener("visibilitychange", visibility); };
+    return () => { stop(); sight?.disconnect(); observer.disconnect(); mutation.disconnect(); document.removeEventListener("visibilitychange", visibility); };
   }, [phase, reduced]);
 
   const t = translator();

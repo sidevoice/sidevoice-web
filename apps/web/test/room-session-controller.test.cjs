@@ -192,6 +192,8 @@ test('The controller publishes serializable snapshots through the React store br
 });
 // What the page holds lives in its own realm; compared by value.
 const plain=value=>JSON.parse(JSON.stringify(value));
+// The turn numbers the app hands the voice with the input half: the settings' own.
+const turnInput=({turn:{listening_bar,barge_in_min_speech,barge_in_window,vad_confidence,speech_start_ms,pre_roll_ms}})=>({listening_bar,barge_in_min_speech,barge_in_window,vad_confidence,speech_start_ms,pre_roll_ms});
 test('Toggling the mic and holding space restores mute on release or loss of focus',()=>{
  const s=setup();const voice=fakeVoice();s.context.__voice=voice;s.run("voice=__voice;ws={};conversationCalls.set('test',{call:__voice})");
  const key=code=>({code,target:new s.Element(),preventDefault(){}});
@@ -1463,8 +1465,9 @@ test('A call starts its voice with the halves of the settings, and only then joi
  assert.deepEqual(voice.calls.map(([name])=>name).slice(0,3),['start','mute','mute']);
  const settings=plain(c.s.run('voiceSettings'));
  assert.deepEqual(plain(voice.calls[0][1]),{
-  input:{stt:settings.stt,endOfTurn:{kind:'silence'},patience:settings.patience},
-  output:{tts:{catalog:settings.tts.catalog,model:settings.tts.model},voice:settings.tts.voice,speed:settings.tts.speed,language:settings.stt.language},
+  input:{stt:settings.stt,endOfTurn:{kind:'silence'},patience:settings.patience,...turnInput(settings)},
+  output:{tts:{catalog:settings.tts.catalog,model:settings.tts.model},voice:settings.tts.voice,speed:settings.tts.speed,fade_ms:settings.turn.fade_ms,language:settings.stt.language},
+  audio_grace_ms:settings.turn.audio_grace_ms,
   idle_unload_minutes:settings.idle_unload_minutes,
  },'the settings this device keeps, as the two halves of the call; Smart as silence when its model is unavailable');
  assert.equal(firstHello.type,'client-ready');
@@ -2639,7 +2642,7 @@ test('Voice settings apply as they change: kept on this device, a model just cho
  const warmed=voice.calls.filter(([name])=>name==='preload');
  assert.equal(warmed.length,1);
  const settings=plain(s.run('voiceDraft'));
- assert.deepEqual(plain(warmed[0][1]),{input:{stt:settings.stt,endOfTurn:{kind:'silence'},patience:'calm'},idle_unload_minutes:settings.idle_unload_minutes});
+ assert.deepEqual(plain(warmed[0][1]),{input:{stt:settings.stt,endOfTurn:{kind:'silence'},patience:'calm',...turnInput(settings)},idle_unload_minutes:settings.idle_unload_minutes});
  const kept=JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')"));
  assert.deepEqual([kept.stt.catalog,kept.stt.model,kept.patience],['openai','gpt-4o-transcribe','calm']);
  assert.equal(s.run('voiceSettings.stt.model'),'gpt-4o-transcribe');
@@ -2750,7 +2753,7 @@ test('A call joins without the microphone where this device is known to have non
   const c=await callOnRoom({microphone,voice});
   const halves=plain(voice.calls[0][1]);
   assert.equal(halves.input,undefined,`${microphone}: no input half, so no microphone is asked for`);
-  assert.deepEqual(Object.keys(halves).sort(),['idle_unload_minutes','output'],'the call speaks');
+  assert.deepEqual(Object.keys(halves).sort(),['audio_grace_ms','idle_unload_minutes','output'],'the call speaks');
   assert.equal(voice.routed,voice.created[0],'its lane is the routed one all the same');
   assert.equal(c.s.run('state.voiceState.listening'),'off','the page shows what the voice says: it hears nothing');
   assert.equal(c.firstHello.type,'client-ready','and it joins the room as any call');
@@ -2780,7 +2783,7 @@ test('A call that joined without its microphone takes the input half when the mi
  s.run("microphone.getSnapshot=()=>({state:'granted'});microphoneChanged()");
  await settleSoon();
  const settings=plain(s.run('voiceSettings'));
- assert.deepEqual(plain(voice.calls.filter(([name])=>name==='update').map(([,change])=>change)),[{input:{stt:settings.stt,endOfTurn:{kind:'silence'},patience:settings.patience}}]);
+ assert.deepEqual(plain(voice.calls.filter(([name])=>name==='update').map(([,change])=>change)),[{input:{stt:settings.stt,endOfTurn:{kind:'silence'},patience:settings.patience,...turnInput(settings)}}]);
  assert.equal(voice.calls.filter(([name])=>name==='start').length,0,'the call was not started again');
  assert.deepEqual(voice.calls.filter(([name])=>name==='mute').at(-1),['mute',true],'the microphone is muted as the person left it');
  // Once it listens, a later answer of the same kind adds nothing.
@@ -2813,7 +2816,7 @@ test('A call that lost its microphone is given it again at the next beat, where 
  assert.equal(voice.calls.filter(([name])=>name==='update').length,0,'none can be had: nothing to try');
  s.run("microphone.getSnapshot=()=>({state:'granted'})");
  await s.run('refresh()');await settleSoon();
- assert.deepEqual(voice.calls.filter(([name])=>name==='update').map(([,change])=>Object.keys(change.input).sort()),[['endOfTurn','patience','stt']],'the input half is added to the call');
+ assert.deepEqual(voice.calls.filter(([name])=>name==='update').map(([,change])=>Object.keys(change.input).sort()),[['barge_in_min_speech','barge_in_window','endOfTurn','listening_bar','patience','pre_roll_ms','speech_start_ms','stt','vad_confidence']],'the input half is added to the call');
  assert.equal(voice.calls.filter(([name])=>name==='start').length,0,'the call is not started again');
  a.emit('state',{listening:'listening',recognising:0,playback:'idle',microphone:'live'});
  await s.run('refresh()');await settleSoon();
@@ -2852,7 +2855,7 @@ test('The settings reach the calls running as changes: both halves where a call 
  voice.calls.length=0;
  await s.run('applyVoiceSettings()');await settleSoon();
  const change=plain(voice.calls.find(([name])=>name==='update')[1]);
- assert.deepEqual(Object.keys(change).sort(),['idle_unload_minutes','output'],'a call without its microphone stays without it');
+ assert.deepEqual(Object.keys(change).sort(),['audio_grace_ms','idle_unload_minutes','output'],'a call without its microphone stays without it');
  assert.deepEqual([change.output.voice,change.output.speed],['ef_dora',1.25]);
  assert.equal(voice.calls.filter(([name])=>name==='start').length,0,'no call restarts for it');
  voice.created[0].emit('state',{listening:'listening',recognising:0,playback:'idle',microphone:'live'});
@@ -2860,7 +2863,7 @@ test('The settings reach the calls running as changes: both halves where a call 
  voice.calls.length=0;
  await s.run('applyVoiceSettings()');await settleSoon();
  const both=plain(voice.calls.find(([name])=>name==='update')[1]);
- assert.deepEqual(Object.keys(both).sort(),['idle_unload_minutes','input','output'],'a call that listens takes both');
+ assert.deepEqual(Object.keys(both).sort(),['audio_grace_ms','idle_unload_minutes','input','output'],'a call that listens takes both');
  assert.equal(both.input.patience,'calm');
  s.run('disconnect()');
 });
