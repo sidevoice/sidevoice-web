@@ -74,7 +74,10 @@ export function useWave(level: number, muted: boolean): number[] {
       setLevels(Array(WAVE_BARS).fill(0));
       return;
     }
-    const timer = setInterval(() => setLevels((previous) => [...previous.slice(1), latest.current]), WAVE_SAMPLE_MS);
+    // Drained flat and still silent: the same samples, so the card does not render again ten times a second for
+    // nothing (desktop#149).
+    const timer = setInterval(() => setLevels((previous) =>
+      latest.current === 0 && previous.every((value) => value === 0) ? previous : [...previous.slice(1), latest.current]), WAVE_SAMPLE_MS);
     return () => clearInterval(timer);
   }, [muted]);
   return levels;

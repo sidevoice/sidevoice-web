@@ -194,7 +194,7 @@ export interface SidevoiceActions {
   skipReply(): void;
   setSpeechOutput?(output: "on" | "agents_muted" | "voice_off"): void;
   /** Changes the voice settings the settings pane is editing; Save keeps them. */
-  editVoice(patch: { stt?: Partial<DeviceVoiceSettings["stt"]> & { build?: string | null }; tts?: Partial<DeviceVoiceSettings["tts"]> & { build?: string | null }; patience?: DeviceVoiceSettings["patience"]; end_of_turn?: DeviceVoiceSettings["end_of_turn"]; idle_unload_minutes?: number; turn_model?: string }): void;
+  editVoice(patch: { stt?: Partial<DeviceVoiceSettings["stt"]> & { build?: string | null }; tts?: Partial<DeviceVoiceSettings["tts"]> & { build?: string | null }; patience?: DeviceVoiceSettings["patience"]; end_of_turn?: DeviceVoiceSettings["end_of_turn"]; idle_unload_minutes?: number; turn?: Partial<Omit<DeviceVoiceSettings["turn"], "listening_bar">> & { listening_bar?: Partial<DeviceVoiceSettings["turn"]["listening_bar"]> }; turn_model?: string }): void;
   /** Keeps `key` for a remote provider with the voice, or removes it with null. Rejects `{code}` or with the sentence. */
   saveProviderKey(provider: string, key: string | null): Promise<void>;
   /** A key tried with the provider and kept only when it takes it; a refusal throws its `code` and `detail`. */
