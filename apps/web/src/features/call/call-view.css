@@ -259,14 +259,23 @@
 .call-bar-end #transcript-toggle[aria-expanded="true"], #call-menu[open] > summary { background: var(--sv-accent-soft); color: var(--sv-accent-text); }
 
 /* The microphone: one pill — the devices' button at its left showing the level, then the microphone (as Meet, and the
- * room's v0.6.0). The runtime writes the level as `--mic-fill` (0%–100%) on #mic-control on every reading
- * (room-session-controller.js voiceLevel); each bar grows from it, so the wave draws itself with no render. On hover, on
+ * room's v0.6.0). The runtime writes the level as `--mic-level` (0 to 1) on #mic-control on every reading
+ * (room-session-controller.js voiceLevel); each bar scales from it, so the wave draws itself with no render. The bars
+ * scale (transform) instead of changing height: a height per reading laid out and repainted the call bar about 30 times a
+ * second while the person spoke, which cost the page and WebKit's GPU process about 45 % of a core (desktop#149). On hover, on
  * focus, with the bar open or muted, the bars give way to the chevron. Muted, the pill turns danger; held to talk while
  * muted, it turns positive. */
 #call-controls .mic-control { display: flex; align-items: center; gap: 0; border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken); isolation: isolate; }
 #call-controls #mute { border-radius: var(--sv-radius-pill); }
 .mic-wave { display: flex; align-items: center; gap: 2.4px; height: 22px; transition: opacity var(--sv-dur-fast) var(--sv-ease); }
-.mic-wave i { display: block; width: 2.6px; height: calc(3px + var(--mic-fill, 0%) * var(--bar) * .86); max-height: 22px; border-radius: 2px; background: var(--sv-accent); transition: height 70ms linear; }
+/* A bar is 3px to 22px tall and fully rounded: a middle that scales and two round ends that slide with it, so every
+   moving part is a transform (the middle spans its height less the ends, 2.6px). */
+.mic-wave i { --h: calc(3 + var(--mic-level, 0) * var(--bar) * 18.92); position: relative; display: block; width: 2.6px; height: 22px; }
+.mic-wave i::before, .mic-wave i::after, .mic-wave b { content: ""; position: absolute; left: 0; top: 50%; width: 2.6px; background: var(--sv-accent); transition: transform 70ms linear; will-change: transform; }
+.mic-wave i::before, .mic-wave i::after { height: 2.6px; margin-top: -1.3px; border-radius: 50%; }
+.mic-wave i::before { transform: translateY(calc((var(--h) - 2.6) * -.5px)); }
+.mic-wave i::after { transform: translateY(calc((var(--h) - 2.6) * .5px)); }
+.mic-wave b { height: 19.4px; margin-top: -9.7px; transform: scaleY(calc((var(--h) - 2.6) / 19.4)); }
 .mic-wave i:nth-child(1) { --bar: .45; }
 .mic-wave i:nth-child(2) { --bar: .8; }
 .mic-wave i:nth-child(3) { --bar: 1; }
@@ -434,7 +443,7 @@
 .audio-devices-choice { display: grid; gap: var(--sv-space-1); min-width: 0; }
 .audio-devices-lost { color: var(--sv-text); }
 .audio-devices-error { flex-direction: column; align-items: flex-start; gap: 0; color: var(--sv-danger); }
-@media (prefers-reduced-motion: reduce) { .audio-devices-toggle, .audio-devices-toggle .audio-chevron, .mic-wave, .mic-wave i { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .audio-devices-toggle, .audio-devices-toggle .audio-chevron, .mic-wave, .mic-wave i::before, .mic-wave i::after, .mic-wave b { transition: none; } }
 
 /* The microphone gives no sound though the person has not muted it (another app holds it): said above it, and the
  * button wears the warning. */

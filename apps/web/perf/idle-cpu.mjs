@@ -7,11 +7,16 @@
  *   node apps/web/perf/idle-cpu.mjs            the site assembled at SIDEVOICE_STATIC_SITE (or .playwright-static-web)
  *   PERF_SECONDS=20 PERF_HEADED=1 …            a longer window, a visible window (macOS CI runs headed)
  *   PERF_NO_ANIMATIONS=1                         the floor: every CSS animation and transition stopped
- *   PERF_MOTION=gpu|still                        the drawings moving as GPU layers, or still, whatever the page decides
-                                                (web#278, lib/motion.ts: a runner without a GPU decides still)
+ *   PERF_MOTION=gpu|still                        the drawings moving as GPU layers, or held still, whatever the page
+ *                                                would decide itself (web#278, lib/motion.ts)
  *   PERF_WEBKIT=<path>                           another WebKit executable (a rootless wrapper, an older build)
+ *   PERF_STYLE='<css>'                           extra CSS on the page, to isolate one animation's cost
+ *   PERF_ONLY=<text>                             only the scenarios whose name contains it
  *
- * Scenarios: idle with one conversation and with six, no call; idle in a call (listening, nobody speaking) with six. */
+ * Scenarios: idle with one conversation and with six, no call; idle in a call (listening, nobody speaking) with six; the
+ * same call while its conversation and two others work (the operator's usual room, desktop#149); the person speaking
+ * in that call, the microphone's level arriving as the app hands it (about 30 readings a second). Each row lists the
+ * animations still running, by name and element. */
 
 import { execFileSync, spawn } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
@@ -74,10 +79,18 @@ async function sample(seconds) {
   return Object.fromEntries(Object.entries(total).map(([k, v]) => [k, (100 * v) / elapsed]));
 }
 
-/** What the page keeps moving: its running animations, and how many of them are on SVG (repainted, never composited). */
+/** What the page keeps moving: its running animations, how many of them are on SVG (repainted, never composited), and
+ *  which they are: the animation's name on its element (tag and first class), counted. */
 const animations = (page) => page.evaluate(() => {
   const running = document.getAnimations().filter((a) => a.playState === "running");
-  return { running: running.length, svg: running.filter((a) => a.effect?.target instanceof SVGElement).length };
+  const names = {};
+  for (const a of running) {
+    const target = a.effect?.target;
+    const element = `${target?.localName ?? "?"}${target?.classList?.[0] ? "." + target.classList[0] : ""}${a.effect?.pseudoElement ?? ""}`;
+    const name = `${a.animationName || a.transitionProperty || "script"} on ${element}${target instanceof SVGElement ? " (SVG)" : ""}`;
+    names[name] = (names[name] ?? 0) + 1;
+  }
+  return { running: running.length, svg: running.filter((a) => a.effect?.target instanceof SVGElement).length, names };
 });
 
 async function room(page, participants) {
@@ -87,20 +100,64 @@ async function room(page, participants) {
   await page.locator(".stage-tile[data-mood]").waitFor();
 }
 
+/** The call as the room's runtime reports it once joined: the conversation bound, the microphone open, nobody speaking.
+ *  Patched over the store: the harness has no core to call. */
+const joinCall = (page) => page.evaluate(() => window.sidevoiceUI.store.patch({
+  ws: { readyState: 1, send() {}, close() {}, addEventListener() {}, removeEventListener() {} },
+  roomBinding: { thread_id: "t1", title: "project-1" }, sessionId: "perf", micEnabled: true, userLive: false, botLive: false,
+  voiceState: { listening: "listening", recognising: 0, playback: "idle", microphone: "live" },
+}));
+
 const SCENARIOS = [
   { name: "no call, 1 conversation", run: (page) => room(page, [conversation(1)]) },
   { name: "no call, 6 conversations", run: (page) => room(page, several) },
   {
     name: "in a call, 6 conversations (listening)",
+    run: async (page) => { await room(page, several); await joinCall(page); },
+  },
+  {
+    name: "in a call, 6 conversations, 3 working",
     run: async (page) => {
       await room(page, several);
-      // The call as the room's runtime reports it once joined: the conversation bound, the microphone open, nobody
-      // speaking. Patched over the store: the harness has no core to call.
-      await page.evaluate(() => window.sidevoiceUI.store.patch({
-        ws: { readyState: 1, send() {}, close() {}, addEventListener() {}, removeEventListener() {} },
-        roomBinding: { thread_id: "t1", title: "project-1" }, sessionId: "perf", micEnabled: true, userLive: false, botLive: false,
-        voiceState: { listening: "listening", recognising: 0, playback: "idle", microphone: "live" },
-      }));
+      await joinCall(page);
+      // Busy as the harness reports it, since long enough ago to show as working: the call's own and two more.
+      await page.evaluate(() => {
+        const { store } = window.sidevoiceUI;
+        const people = store.getState().facts.people.filter((p) => ["t1", "t2", "t3"].includes(p.thread_id));
+        const keys = people.map((p) => `${p.node}|${p.thread_id}`);
+        store.patch({
+          callNode: people.find((p) => p.thread_id === "t1")?.node,
+          harness: Object.fromEntries(keys.map((k) => [k, true])),
+          workingSince: Object.fromEntries(keys.map((k) => [k, 0])),
+        });
+      });
+    },
+  },
+  {
+    name: "in a call, 6 conversations, the person speaking",
+    run: async (page) => {
+      await room(page, several);
+      await joinCall(page);
+      await page.evaluate(() => {
+        const { store, micLevel } = window.sidevoiceUI;
+        const thread = store.getState().facts.people.find((p) => p.thread_id === "t1");
+        const key = `${thread.node}|t1`;
+        store.patch({ callNode: thread.node, userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: key }, pendingPhase: "listening",
+          voiceState: { listening: "speaking", recognising: 0, playback: "idle", microphone: "live" } });
+        // The level as the room's runtime writes it on each reading (room-session-controller.js voiceLevel): a voice
+        // rising and falling, a reading every 32 ms, only the whole-percent changes (desktop#150).
+        let level = 0, last = -1;
+        window.sidevoiceAudio = { ...window.sidevoiceAudio, level: () => level / 100 };
+        setInterval(() => {
+          const t = performance.now() / 1000;
+          level = Math.round(Math.max(0, 40 + 35 * Math.sin(t * 7) + 15 * Math.sin(t * 23)));
+          if (level === last) return;
+          last = level;
+          document.getElementById("mic-control")?.style.setProperty("--mic-fill", level + "%");
+          document.getElementById("mic-level-meter")?.setAttribute("aria-valuenow", String(level));
+          micLevel?.publish?.(level);
+        }, 32);
+      });
     },
   },
 ];
@@ -112,7 +169,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
   const rows = [];
-  for (const scenario of SCENARIOS) {
+  for (const scenario of SCENARIOS.filter((s) => !process.env.PERF_ONLY || s.name.includes(process.env.PERF_ONLY))) {
     const browser = await webkit.launch({ headless: !process.env.PERF_HEADED, executablePath: process.env.PERF_WEBKIT || undefined });
     try {
       const page = await browser.newPage({ baseURL: BASE, viewport: { width: 1280, height: 800 } });
@@ -120,9 +177,10 @@ try {
       await scenario.run(page);
       // The floor, for comparison: the same page with every CSS animation and transition stopped.
       if (process.env.PERF_NO_ANIMATIONS) await page.addStyleTag({ content: "*, *::before, *::after { animation: none !important; transition: none !important }" });
+      if (process.env.PERF_STYLE) await page.addStyleTag({ content: process.env.PERF_STYLE });
+      await page.waitForTimeout(SETTLE_MS);
       const mood = await page.locator(".stage-tile[data-mood]").first().getAttribute("data-mood");
       const motion = await page.evaluate(() => document.documentElement.dataset.motion);
-      await page.waitForTimeout(SETTLE_MS);
       const moving = await animations(page);
       const cpu = await sample(SECONDS);
       rows.push({ scenario: `${scenario.name} [stage: ${mood}, motion: ${motion}]`, ...cpu, ...moving });
@@ -135,8 +193,9 @@ try {
   const lines = [header, "|---|---:|---:|---:|---:|---:|---:|",
     ...rows.map((r) => `| ${r.scenario} | ${pct(r.web)} | ${pct(r.gpu)} | ${pct(r.ui)} | ${pct(r.net)} | ${pct(r.web + r.gpu + r.ui + r.net)} | ${r.running} (${r.svg}) |`)];
   const table = `WebKit idle CPU, ${SECONDS}s per scenario, ${process.platform}/${process.arch}, ${process.env.PERF_HEADED ? "headed" : "headless"}\n\n${lines.join("\n")}\n`;
-  console.log(table);
-  if (process.env.PERF_SUMMARY) appendFileSync(process.env.PERF_SUMMARY, `${process.env.PERF_LABEL ? `### ${process.env.PERF_LABEL}\n\n` : ""}${table}\n`);
+  const moving = rows.map((r) => `- ${r.scenario}: ${Object.entries(r.names).map(([n, c]) => `${n} ×${c}`).join(", ") || "none"}`).join("\n");
+  console.log(table + "\nRunning animations:\n" + moving + "\n");
+  if (process.env.PERF_SUMMARY) appendFileSync(process.env.PERF_SUMMARY, `${process.env.PERF_LABEL ? `### ${process.env.PERF_LABEL}\n\n` : ""}${table}\n<details><summary>Running animations</summary>\n\n${moving}\n\n</details>\n\n`);
 } finally {
   server.kill();
 }

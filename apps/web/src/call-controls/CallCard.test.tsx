@@ -66,7 +66,8 @@ function hoverAndWait() {
   act(() => { vi.advanceTimersByTime(SHOW_DELAY_MS + 10); });
   act(() => { vi.advanceTimersByTime(CLICK_GUARD_MS + 10); });
 }
-const waveHeights = () => [...document.querySelectorAll(".your-wave i")].map((bar) => (bar as HTMLElement).style.height);
+/** Each bar's drawn height (--h, 3 at rest). */
+const waveHeights = () => [...document.querySelectorAll(".your-wave i")].map((bar) => `${(bar as HTMLElement).style.getPropertyValue("--h") || 3}px`);
 
 test("at rest: the agent, the conversation, where it runs, what is happening, and your wave — no controls, no clock", () => {
   render(<Card host={fakeHost()} />);
@@ -353,4 +354,18 @@ test("the call's duration reads like a clock", () => {
   expect(duration(1_000, 1_000 + 65_000)).toBe("1:05");
   expect(duration(0, 5_000)).toBe("");
   expect(duration(1_000, 1_000 + 3_725_000)).toBe("1:02:05");
+});
+
+test("the conversations list is inside the avatar's compact card, against its control, and in a resized picture under its header", () => {
+  localStorage.setItem(FLOATING_CARD_KEY, JSON.stringify({ format: "avatar", size: "m" }));
+  const host = fakeHost({ alwaysExpanded: true });
+  const { unmount } = render(<Card host={host} />);
+  fireEvent.click(screen.getByRole("button", { name: "Conversations (3), 1 with unread replies" }));
+  expect(document.querySelector(".avatar-compact > .card-panel-card .card-panel.conversations")).not.toBeNull();
+  unmount();
+  localStorage.setItem(FLOATING_CARD_KEY, JSON.stringify({ format: "pip", size: "m" }));
+  const sized = fakeHost({ size: { width: 700, height: 600 } });
+  render(<Card host={sized} />);
+  fireEvent.click(screen.getByRole("button", { name: "Conversations (3), 1 with unread replies" }));
+  expect(document.querySelector(".card-heading > .card-panel-card")).not.toBeNull();
 });

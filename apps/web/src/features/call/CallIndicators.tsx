@@ -59,10 +59,10 @@ export function CaptionsButton() {
 }
 
 /* The microphone's level, as five bars on the devices' button at the left of the microphone (as Meet, and the room
- * before): the runtime writes it as `--mic-fill` on #mic-control on every reading, and the bars take their height from
+ * before): the runtime writes it as `--mic-level` on #mic-control on every reading, and the bars take their height from
  * it in CSS (call-view.css), so no render happens per reading. */
 export function MicWave() {
-  return <span className="mic-wave" aria-hidden="true"><i /><i /><i /><i /><i /></span>;
+  return <span className="mic-wave" aria-hidden="true"><i><b /></i><i><b /></i><i><b /></i><i><b /></i><i><b /></i></span>;
 }
 
 /** The microphone gives no sound though the person has not muted it: its device is held elsewhere (another app, the

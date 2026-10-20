@@ -37,6 +37,7 @@ import { remoteProviders } from "../../services/voice-settings.js";
 import { useDialogFocusReturn } from "../../lib/focus-return";
 import { motionOf, SettingsLevelsProvider, useSectionShown, useSettingsLevelsOf } from "./settings-levels";
 import { MenuRow } from "./SettingsMenu";
+import { TurnTuningDev, turnTuningDevEnabled } from "./TurnTuningDev";
 import { UpdatesSettings, useUpdatesSection } from "./UpdatesSettings";
 import "./settings.css";
 
@@ -149,8 +150,10 @@ function RestartNote({ t }: { t: Translate }) {
 function AdvancedSettings({ t }: { t: Translate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const build = (window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev";
+  const turnTuningDev = turnTuningDevEnabled();
   return <Section id="advanced" title={t("settings.section.advanced")} description={t("settings.advanced.description")}>
     {draft && <Group title={t("settings.advanced.models")}><IdleUnloadChoice draft={draft} /><DeleteUnusedChoice /><DownloadedModels /></Group>}
+    {turnTuningDev && <TurnTuningDev />}
     <Group title={t("settings.general.device")}>
       <Row label={t("settings.general.reset")} description={<>{t("settings.general.deviceHint")} <span id="reset-settings-note" role="status" /></>}>
         <Button id="reset-settings" variant="ghost" tone="danger" size="sm" aria-label={t("settings.general.reset")}>{t("settings.general.resetShort")}</Button>

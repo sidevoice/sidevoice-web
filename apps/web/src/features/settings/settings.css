@@ -322,7 +322,7 @@
 .fcp-bar { display: flex; justify-content: center; gap: 4px; }
 .fcp-bar i { width: 9px; height: 9px; border-radius: 50%; background: color-mix(in srgb, var(--sv-text) 25%, transparent); }
 .fcp-bar i:last-child { width: 13px; border-radius: 5px; background: var(--sv-danger, #dc362e); }
-.fcp-avatar { position: absolute; top: 6px; right: 10px; width: 64px; height: 64px; }
+.fcp-avatar { position: absolute; top: 10px; right: 26px; width: 48px; height: 48px; }
 .floating-card-corners { display: grid; grid-template-columns: repeat(2, 28px); grid-template-rows: repeat(2, 18px); gap: 4px 34px; padding: 6px 8px;
   border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); }
 .floating-card-corner { width: 28px; height: 18px; padding: 0; border: 1.5px solid var(--sv-border-strong, var(--sv-border)); border-radius: 4px; background: none; cursor: pointer; }
@@ -337,6 +337,14 @@
 .floating-card-choice[data-selected]:disabled { box-shadow: none; border-color: var(--sv-border); }
 .floating-card-corner:disabled { pointer-events: none; }
 
+/* The previews hold still (decided 2026-10-19, briefs/UX-DECISIONS-2026-10-19.md: "Simplified static previews"): nothing in a
+ * tile moves — no creature, no idle step, no transition on the tile itself. */
+.floating-card-choice { transition: none; }
+.floating-card-preview, .floating-card-preview *, .floating-card-preview *::before, .floating-card-preview *::after { animation: none !important; transition: none !important; }
+/* The chosen tile's check lies over its preview (which comes later in the tile and would paint over it): on a small chip of the
+ * tile's own surface, above the preview. */
+.floating-card-choice .ui-card-check { z-index: 2; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--sv-surface); box-shadow: 0 0 0 1px var(--sv-accent); }
+
 /* "Always show the call controls" on: each preview draws its format with its controls out, still like the rest. */
 .fcp-card { flex-wrap: wrap; }
 .fcp-card-controls, .fcp-actions { display: flex; gap: 3px; }
@@ -345,10 +353,11 @@
 .fcp-card-controls i:last-child { width: 12px; border-radius: 4px; background: var(--sv-danger, #dc362e); }
 .fcp-pip .fcp-lines { display: flex; align-items: center; justify-content: space-between; }
 .fcp-pip .fcp-lines .fcp-actions { flex: none; }
-/* Just the avatar with its controls out: the compact card, A1's title line over its controls row spread across (mic left, hang-up
- * right), 120px wide (the real card's 300px for a 160px creature, at the tile's 64px), 2px under the creature (64px at top 6px in
- * a 104px tile), 8px from the tile's edge as the card is from the screen's, and ending 2px above the tile's bottom. */
-.floating-card-preview .fcp-card.fcp-compact { top: 72px; right: 8px; width: 120px; padding: 5px 6px; row-gap: 5px; }
+/* Just the avatar with its controls out: the compact card, small (the creature 48px at top 10px in a 104px tile; the card 2px under it,
+ * 84px wide, A1's title line over its controls row spread across: mic left, hang-up right), well short of the tile's foot. */
+.floating-card-preview .fcp-card.fcp-compact { top: 60px; right: 8px; width: 84px; padding: 3px 5px; row-gap: 3px; border-radius: 8px; }
+.fcp-compact > .fcp-bar i { width: 6px; height: 6px; }
+.fcp-compact > .fcp-bar i:last-child { width: 9px; border-radius: 3px; }
 .fcp-compact > .fcp-lines i { width: 62%; }
 .fcp-compact > .fcp-bar { flex-basis: 100%; justify-content: space-between; }
 .fcp-lines .fcp-actions i { width: 8px; height: 8px; border-radius: 50%; opacity: 1; background: color-mix(in srgb, var(--sv-text) 25%, transparent); }

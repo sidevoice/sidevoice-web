@@ -196,7 +196,7 @@ export function StageTile({ card = false }: { card?: boolean }) {
           {/* Working is said only to assistive tech here: the sidebar shows it. Not in the floating card (FLOATING-CARD-SPEC, "What
               the card leaves out"): its page has no .sr-only rule, so it would show over the creature; its figure label and state
               line carry it. */}
-          {!card && stage.mood === "working" && <p className="sr-only" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden="true" />{t("stage.working")}</p>}
+          {!card && stage.mood === "working" && <p className="sr-only" role="status">{t("stage.working")}</p>}
         </div>
         {/* The agent's harness, model and effort, at the tile's foot (it gives the stage its touch: operator, 2026-10-15). */}
         <div className="stage-tags"><AgentBadge stage={stage} /></div>
