@@ -68,6 +68,29 @@ test("a hidden page stops the animation and a visible one resumes it", async () 
   expect(readWaveform.mock.calls.length).toBeGreaterThan(paused);
 });
 
+test("out of sight it reads and schedules nothing; in sight it moves again (desktop#149)", async () => {
+  const readWaveform = microphone(0.3);
+  let report: (entries: { isIntersecting: boolean }[]) => void = () => {};
+  vi.stubGlobal("IntersectionObserver", class { constructor(callback: typeof report) { report = callback; } observe() {} disconnect() {} });
+  try {
+    render(<VoiceWaveform phase="listening" />);
+    // Mounted where nothing shows it (a page of Settings not open): not a frame until it is seen.
+    await frames();
+    expect(readWaveform).not.toHaveBeenCalled();
+    report([{ isIntersecting: true }]);
+    await frames();
+    const seen = readWaveform.mock.calls.length;
+    expect(seen).toBeGreaterThan(0);
+    report([{ isIntersecting: false }]);
+    await frames();
+    const gone = readWaveform.mock.calls.length;
+    await frames();
+    expect(readWaveform.mock.calls.length).toBe(gone);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 test("a device that asks for less motion gets the bars back and no canvas", async () => {
   const readWaveform = microphone(0.3);
   reducedMotion(true);

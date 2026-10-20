@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { defaultVoiceSettings, editVoiceSettings, readVoiceSettings, readyVoiceSettings, remoteProviders, voiceChoices, voiceEndOfTurn, voiceHalves, voiceInput, voiceOutput, voiceSettingsToLoad, writeVoiceSettings, VOICE_SETTINGS_KEY } from "./voice-settings.js";
+import { TURN_TUNING, defaultVoiceSettings, editVoiceSettings, readVoiceSettings, readyVoiceSettings, remoteProviders, voiceChoices, voiceEndOfTurn, voiceHalves, voiceInput, voiceOutput, voiceSettingsToLoad, writeVoiceSettings, VOICE_SETTINGS_KEY } from "./voice-settings.js";
 import type { CatalogView } from "./model-catalogs.js";
 
 /* The voice settings this device keeps, and the choices the pane offers from the engine's catalogues. */
@@ -37,7 +37,7 @@ test("with nothing kept, the defaults on this device's catalogue, the language h
   expect(readVoiceSettings(storage)).toEqual({
     stt: { catalog: "elevenlabs", model: "scribe_v2", language: null },
     tts: { catalog: "local", model: "kokoro-82m-v1.0", voice: null, speed: 1.1 },
-    patience: "normal", end_of_turn: "smart-turn", idle_unload_minutes: 10,
+    patience: "normal", end_of_turn: "smart-turn", idle_unload_minutes: 10, turn: TURN_TUNING,
   });
   expect(readVoiceSettings(memory({ [VOICE_SETTINGS_KEY]: "{broken" }))).toEqual(defaultVoiceSettings());
   writeVoiceSettings(storage, defaultVoiceSettings());
@@ -158,13 +158,17 @@ test("a call is given its halves: the input where it listens, the output where i
   // Both halves: the transcriber with its language and build, a silence end of turn, the patience; the speaker with its
   // voice and pace, and the person's language for what is said where no transcriber gives one.
   expect(voiceHalves(settings)).toEqual({
-    input: { stt: { catalog: "local", model: "whisper-base", language: "es", build: "whisper-base/int8" }, endOfTurn: { kind: "silence" }, patience: "calm" },
-    output: { tts: { catalog: "local", model: "kokoro-82m-v1.0" }, voice: "ef_dora", speed: 1.1, language: "es" },
+    input: {
+      stt: { catalog: "local", model: "whisper-base", language: "es", build: "whisper-base/int8" }, endOfTurn: { kind: "silence" }, patience: "calm",
+      listening_bar: { quiet: 0.5, playing: 0.65 }, barge_in_min_speech: 0.6, barge_in_window: 2.5, vad_confidence: 0.6, speech_start_ms: 400, pre_roll_ms: 1000,
+    },
+    output: { tts: { catalog: "local", model: "kokoro-82m-v1.0" }, voice: "ef_dora", speed: 1.1, fade_ms: 30, language: "es" },
+    audio_grace_ms: 1000,
     idle_unload_minutes: 30,
   });
   // A call that only speaks has no input half, a call that only listens no output half: nothing else of them is there.
-  expect(Object.keys(voiceHalves(settings, { input: false }))).toEqual(["output", "idle_unload_minutes"]);
-  expect(Object.keys(voiceHalves(settings, { output: false }))).toEqual(["input", "idle_unload_minutes"]);
+  expect(Object.keys(voiceHalves(settings, { input: false }))).toEqual(["output", "audio_grace_ms", "idle_unload_minutes"]);
+  expect(Object.keys(voiceHalves(settings, { output: false }))).toEqual(["input", "audio_grace_ms", "idle_unload_minutes"]);
   expect(voiceOutput({ ...settings, tts: { ...settings.tts, build: "kokoro/fp16" } }).tts).toEqual({ catalog: "local", model: "kokoro-82m-v1.0", build: "kokoro/fp16" });
 });
 
@@ -176,4 +180,27 @@ test("what ends a turn is the voice's: silence at the patience, or Smart with th
   // A try of transcription asks for its own end of turn; the rest of the input half is the settings'.
   expect(voiceInput({ ...settings, end_of_turn: "smart-turn" }, { kind: "silence", ms: 1500 }).endOfTurn).toEqual({ kind: "silence", ms: 1500 });
   expect(voiceInput({ ...settings, end_of_turn: "smart-turn" }).endOfTurn).toEqual({ kind: "smart" });
+});
+
+test("the app owns the turn numbers: its defaults equal the voice's documented ones, and every one reaches the voice", () => {
+  // The voice's own defaults today (sidevoice-voice README): what the app runs with unless it tunes them.
+  expect(defaultVoiceSettings().turn).toEqual({
+    listening_bar: { quiet: 0.5, playing: 0.65 }, barge_in_min_speech: 0.6, barge_in_window: 2.5, vad_confidence: 0.6,
+    speech_start_ms: 400, pre_roll_ms: 1000, audio_grace_ms: 1000, fade_ms: 30,
+  });
+  const tuned = { ...defaultVoiceSettings(), turn: { listening_bar: { quiet: 0.4, playing: 0.9 }, barge_in_min_speech: 0.3, barge_in_window: 4, vad_confidence: 0.75, speech_start_ms: 250, pre_roll_ms: 500, audio_grace_ms: 300, fade_ms: 80 } };
+  const halves = voiceHalves(tuned);
+  expect(halves.input).toMatchObject({ listening_bar: { quiet: 0.4, playing: 0.9 }, barge_in_min_speech: 0.3, barge_in_window: 4, vad_confidence: 0.75, speech_start_ms: 250, pre_roll_ms: 500 });
+  expect(halves.output).toMatchObject({ fade_ms: 80 });
+  expect(halves.audio_grace_ms).toBe(300);
+});
+
+test("kept turn numbers survive normalising; one out of the voice's bounds takes the default, and an edit merges into them", () => {
+  const storage = memory({ [VOICE_SETTINGS_KEY]: JSON.stringify({ turn: { barge_in_min_speech: 0.35, listening_bar: { playing: 0.8 }, vad_confidence: 0, pre_roll_ms: -5, fade_ms: "slow", barge_in_window: 11 } }) });
+  expect(readVoiceSettings(storage).turn).toEqual({ ...TURN_TUNING, barge_in_min_speech: 0.35, listening_bar: { quiet: 0.5, playing: 0.8 } });
+  const settings = defaultVoiceSettings();
+  const edited = editVoiceSettings(settings, { turn: { barge_in_min_speech: 1.2, listening_bar: { quiet: 0.45 } } });
+  expect(edited.turn).toEqual({ ...TURN_TUNING, barge_in_min_speech: 1.2, listening_bar: { quiet: 0.45, playing: 0.65 } });
+  expect(editVoiceSettings(settings, { turn: { speech_start_ms: 99999 } }).turn).toEqual(TURN_TUNING);
+  expect(settings.turn).toEqual(TURN_TUNING);
 });

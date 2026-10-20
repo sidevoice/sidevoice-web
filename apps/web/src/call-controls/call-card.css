@@ -266,20 +266,16 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .card-grip[data-edge=nw] { left: 2px; top: 2px; transform: scale(-1, -1); }
 
 /* ---------- C1: just the avatar ---------- */
-/* The creature on nothing; its balloons toward the screen's middle (above or below it); the dock beside it, level with
- * it, on its open side. A grid, so the window holds whatever shows and the creature never moves. */
-.avatar-card { display: grid; grid-template-columns: auto auto; justify-items: center; align-items: center; }
-.floating-card[data-open=down][data-side=right] .avatar-card { grid-template-areas: "dock figure" ". balloons"; }
-.floating-card[data-open=down][data-side=left] .avatar-card { grid-template-areas: "figure dock" "balloons ."; }
-.floating-card[data-open=up][data-side=right] .avatar-card { grid-template-areas: ". balloons" "dock figure"; }
-.floating-card[data-open=up][data-side=left] .avatar-card { grid-template-areas: "balloons ." "figure dock"; }
+/* The creature on nothing; its balloons toward the screen's middle (above or below it); under both, the compact card. A grid in
+ * one column, so the window holds whatever shows and the creature never moves. */
+.floating-card { --balloon-zone: 150px; }
+.floating-card[data-size=s] { --balloon-zone: 130px; }
+.floating-card[data-size=l] { --balloon-zone: 180px; }
+.avatar-card { position: relative; display: grid; grid-template-columns: auto; justify-items: center; align-items: center; }
+.floating-card[data-open=down] .avatar-card { grid-template-areas: "figure" "balloons" "compact"; }
+.floating-card[data-open=up] .avatar-card { grid-template-areas: "balloons" "figure" "compact"; }
 .avatar-figure { grid-area: figure; width: var(--card-w); height: var(--card-w); }
 .avatar-figure .sv-avatar { display: block; width: 100%; height: 100%; }
-.avatar-dock { grid-area: dock; display: grid; gap: 6px; width: 346px; margin: 0 8px; padding: 8px 8px 0; border: 1px solid var(--sv-border);
-  border-radius: var(--sv-radius-2xl, 20px); background: var(--sv-bg); color: var(--sv-text); --card-bg: var(--sv-bg); font-family: var(--sv-font-sans);
-  box-shadow: 0 12px 34px rgb(0 0 0 / 45%); }
-.avatar-dock .card-call-bar { --sv-call-button: 34px; }
-.avatar-dock .audio-devices-toggle { display: none; }
 /* Its balloons: the room's, the creature's width, their tails toward it (.balloon--tail-up when they open below). */
 .avatar-balloons { grid-area: balloons; display: grid; gap: 6px; width: var(--card-w); container-type: inline-size; pointer-events: auto;
   --k: .5; --u: calc(var(--k) * 440px / 600); --stage-inset: 0px; --bubble-fs: 14px; --person-fs: 13px; --bubble-lh: 1.375; --bubble-pad: 24; --peek: 20;
@@ -293,7 +289,36 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .floating-card[data-open=down] .avatar-balloons .speech-bubble { margin-top: var(--tail-h); }
 /* Close to the creature: its box has room under its feet for its shadow, and over its head for its antics. */
 .floating-card[data-open=down] .avatar-balloons { margin-top: calc(var(--card-w) * -.1); }
+.floating-card[data-open=down] .avatar-balloons { align-self: start; }
 .floating-card[data-open=up] .avatar-balloons { margin-bottom: calc(var(--card-w) * -.04); }
+
+/* ---------- C1: its controls, the compact card (operator, 2026-10-20; briefs/UX-DECISIONS-2026-10-20.md "App spec") ----------
+ * .floating-card carries data-expanded (the card shows: the pointer on the creature or the card, or the keyboard's focus in it),
+ * data-flow (its box is in the window's flow: shown, fading out, or kept while the creature is dragged) and data-dragging.
+ * Folded it is still there for Tab (not display: none, not inert), clipped inside the creature's box and out of the flow; shown
+ * it is a row under the creature, centred on its column, 6px from it or from the balloons. The window is only as big as what
+ * shows, so the creature stays where it rests and the app moves the window in just by what does not fit. Where the balloons open
+ * below, the window counts their whole room (--balloon-zone) while the card is out, and the card goes just past the balloon
+ * showing (--balloon-reach, set by the card), gliding as a balloon grows or goes: a balloon never moves the creature. */
+.avatar-compact { grid-area: compact; position: absolute; inset: 0; overflow: clip; opacity: 0; pointer-events: none; transition: opacity .15s linear; }
+.floating-card[data-flow] .avatar-compact { position: relative; inset: auto; overflow: visible; margin-top: 6px; }
+.floating-card[data-flow][data-open=down] .avatar-card { grid-template-rows: auto minmax(var(--balloon-zone), auto) auto; }
+.floating-card[data-flow][data-open=down] .avatar-compact { translate: 0 min(0px, calc(var(--balloon-reach, 0px) - var(--balloon-zone))); transition: opacity .15s linear, translate .2s ease; }
+.floating-card[data-expanded] .avatar-compact, .avatar-compact:has(:focus-visible) { opacity: 1; pointer-events: auto; }
+.floating-card[data-dragging] .avatar-compact { opacity: 0; pointer-events: none; transition: none; }
+@media (prefers-reduced-motion: reduce) { .avatar-compact { transition: none !important; } }
+
+/* Cursors (operator, 2026-10-20): buttons show the hand, "Cancel sending" too; C1's creature is what you drag:
+ * the open hand over it, the closed hand while it is pressed or dragged. A1 and B1 keep the plain pointer (their whole card
+ * drags); balloons stay plain (a press on one moves nothing). */
+.cancel-input:not(:disabled) { cursor: pointer; }
+.avatar-figure, .avatar-figure * { cursor: grab; }
+.avatar-figure:active, .avatar-figure:active * { cursor: grabbing; }
+
+/* Sized freely (the person resized the picture): the header and the bar take their room, the rest is the stage's, its 16:9
+ * tile centred on the room's stage background (as the room's slot around a tile of another shape; the tile is fitted by
+ * the room's useSceneScale). */
+.picture-card[data-sized] .picture-stage { background: var(--sv-stage-bg); border-radius: var(--sv-radius-xl, 14px); overflow: hidden; }
 
 /* ---------- The title line (operator, 2026-10-20; briefs/UX-DECISIONS-2026-10-20.md), in every format ----------
  * One line holds three pieces. The fixed ones always keep their room: the conversations control (flex none) and, on the
@@ -312,10 +337,19 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .card-heading .card-action { width: 28px; height: 28px; }
 @container picture (max-width: 439px) { .card-heading .card-action { width: 26px; height: 26px; } }
 @container picture (max-width: 299px) { .card-heading .card-action { width: 24px; height: 24px; } }
-.avatar-dock .card-heading .card-action { width: 24px; height: 24px; }
 /* A1: the actions keep their place in the card's top-right corner (26px icons, 9px in from the card's outer edge: its 1px
  * border and 8px inset), over the end of the title's column; the title's row ends the actions' room plus the breathing room
  * before that corner. The column ends --tl-column-end before the card's edge: border and padding 13px, the wave's 24.6px
  * (5 bars of 2.6px, 4 gaps of 2.4px, 1px each side), the row's 12px gap and the column's own 24px padding. */
-.title-card { --tl-actions: calc(3 * 26px + 2 * var(--tl-gap)); --tl-corner-inset: 9px; --tl-column-end: calc(13px + 24.6px + 12px + 24px); }
-.title-card .card-title { padding-right: max(0px, calc(var(--tl-corner-inset) + var(--tl-actions) + var(--tl-breath) - var(--tl-column-end))); }
+.title-card { --tl-breath: 16px; --tl-bang: 4px; --tl-actions: calc(3 * 26px + var(--tl-gap)); --tl-corner-inset: 9px; --tl-column-end: calc(13px + 24.6px + 12px + 24px); }
+.title-card .card-title { padding-right: max(0px, calc(var(--tl-corner-inset) + var(--tl-actions) + var(--tl-bang) + var(--tl-breath) - var(--tl-column-end))); }
+/* A1 only has 16px from the "!" (--tl-bang: how far .card-unread-bang overhangs the conversations button) to the first action;
+ * B1's and C1's headings keep the 8px. */
+
+/* ---------- The avatar's compact card: A1's first row and its controls row, narrower and tighter ---------- */
+.compact-card { --card-w: 300px; --tl-column-end: 13px; padding-bottom: 8px; }
+.floating-card[data-size=s] .compact-card { --card-w: 264px; }
+.floating-card[data-size=l] .compact-card { --card-w: 344px; }
+.compact-card .card-row { padding-left: 6px; }       /* the title starts where the mic does */
+.compact-card .card-who { padding-right: 0; }          /* no wave column: the title's column ends at the padding */
+.compact-card .card-controls { margin-top: 8px; }

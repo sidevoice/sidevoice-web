@@ -9,6 +9,7 @@ import { RoomProvider } from "../app/RoomProvider";
 import { createRoomStore } from "../state/room-store";
 import { useState } from "react";
 import { FLOATING_CARD_KEY } from "../state/floating-card";
+import { useWave } from "./card-shell";
 
 vi.mock("../services/room-session-controller.js", () => ({}));
 
@@ -159,6 +160,25 @@ test("the wave samples the level over time: silence drains it, muting flattens i
   expect(waveHeights()).toEqual(["3px", "3px", "3px", "3px", "3px"]); // unmuting never shows old peaks
 });
 
+test("in silence, once drained, the wave holds its samples: no render ten times a second for nothing (desktop#149)", () => {
+  let renders = 0;
+  function Wave({ level }: { level: number }) {
+    renders += 1;
+    useWave(level, false);
+    return null;
+  }
+  // One sample at a time, as the card lives them (one act would batch them into one render).
+  const samples = (count: number) => { for (let i = 0; i < count; i += 1) act(() => { vi.advanceTimersByTime(WAVE_SAMPLE_MS); }); };
+  const { rerender } = render(<Wave level={40} />);
+  samples(3);
+  rerender(<Wave level={0} />);
+  samples(10);
+  const drained = renders;
+  samples(20);
+  // React may render once more to find nothing changed; never once a sample.
+  expect(renders - drained).toBeLessThanOrEqual(1);
+});
+
 test("near the pointer the call controls appear; they carry the room's commands to the app", () => {
   const host = fakeHost({ call: snapshot({ canSkip: true }) });
   render(<Card host={host} />);
@@ -188,10 +208,14 @@ test("right after the controls appear, and after any change of the card's size, 
   render(<Card host={host} />);
   fireEvent.pointerEnter(card());
   act(() => { vi.advanceTimersByTime(SHOW_DELAY_MS + 10); });
-  fireEvent.click(screen.getByRole("button", { name: "Hang up" }));
+  fireEvent.click(screen.getByRole("button", { name: "Hang up" }), { detail: 1 });
   expect(host.run).not.toHaveBeenCalled();
-  act(() => { vi.advanceTimersByTime(CLICK_GUARD_MS + 10); });
+  // The guard is for a pointer landing on controls that just appeared: a key press (detail 0) is never that.
   fireEvent.click(screen.getByRole("button", { name: "Hang up" }));
+  expect(host.run).toHaveBeenCalledTimes(1);
+  vi.mocked(host.run).mockClear();
+  act(() => { vi.advanceTimersByTime(CLICK_GUARD_MS + 10); });
+  fireEvent.click(screen.getByRole("button", { name: "Hang up" }), { detail: 1 });
   expect(host.run).toHaveBeenCalledWith({ command: "hang-up" });
   box.mockRestore();
 });

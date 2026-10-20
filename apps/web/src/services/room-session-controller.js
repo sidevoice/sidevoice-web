@@ -2330,7 +2330,7 @@ function finishVoiceTry(){if(voiceTryFinish)voiceTryFinish.abort();else cancelVo
 // restarts it with the change; the smart one without its model ready stops it, and never starts: the voice would
 // download its model, which only End of turn's Download does (the try's button says why it waits). It keeps nothing:
 // settings apply as they change.
-const TURN_FIELDS=['patience','end_of_turn','turn_model'];
+const TURN_FIELDS=['patience','end_of_turn','turn_model','turn'];
 let turnTry=null;
 const turnTrySettings=()=>voiceSettingsHere(state.voiceDraft||state.voiceSettings,state.voiceCatalogue.catalogs);
 async function tryTurnSettings({onLevel,onTurnStep,onTake}={}){

@@ -191,6 +191,8 @@ export interface CallControlsBridge {
   /** Drops only a remembered custom picture-in-picture size (all displays), keeping the places: a starting size was picked. */
   clearSize?(): Promise<void>;
   preview?(): void;
+  /** Leaving Settings: a preview showing goes at once. */
+  endPreview?(): void;
 }
 /** The app's mute shortcut and call controls settings, where it offers them (an app before them has neither). */
 export function muteShortcutBridge(): MuteShortcutBridge | null {
