@@ -90,7 +90,7 @@ test("in the desktop app Shortcuts is hidden too, and the floating card has its 
   expect(call).not.toHaveTextContent("Always show the call controls");
   fireEvent.click(document.getElementById("settings-floating-card")!);
   const card = document.getElementById("pane-floating-card")!;
-  // In the decided order: Style, Starting size, (Default position and Reset, where the app offers them,) Always show.
+  // In the decided order: Style, Size, (Preferred position and Reset, where the app offers them,) Always show.
   expect(within(card).getByRole("radio", { name: /Picture in picture/ })).toHaveAttribute("aria-checked", "true");
   fireEvent.click(within(card).getByRole("radio", { name: /Card/ }));
   expect(JSON.parse(localStorage.getItem("sidevoice.floatingCard")!)).toEqual({ format: "card", size: "m" });
