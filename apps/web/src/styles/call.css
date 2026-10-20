@@ -121,7 +121,7 @@
    reads from the still drawing (its pose, what it holds, the desk while it works), the dot beside it and the words.
    What moves carries state: the mouth while it speaks, the "!" popping when something new arrives (twice, as on the
    card), the moment it changes state (transitions), and outside the figures the working dots and lights. */
-:is(.sv-avatar,.stage-scene) :not(.m-open,.m-rest) { animation:none !important }
+:is(.sv-avatar:not(.stage-agent),.stage-scene) :not(.m-open,.m-rest) { animation:none !important }
 @media (prefers-reduced-motion:no-preference) {
   .sv-avatar[data-style=bichos][data-unread]:not([data-size=rail]) .bang { animation:bx-pop 1.3s cubic-bezier(.3,1.8,.5,1) 2 !important }
 }

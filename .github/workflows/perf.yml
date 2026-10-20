@@ -46,3 +46,5 @@ jobs:
           SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site-base" PERF_LABEL="Base ($(git -C ../../base rev-parse --short HEAD))" node perf/idle-cpu.mjs
           SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="This change ($(git rev-parse --short HEAD))" node perf/idle-cpu.mjs
           SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="This change, every animation stopped (the floor)" PERF_NO_ANIMATIONS=1 node perf/idle-cpu.mjs
+          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="Stage creature on its own layer (will-change)" PERF_STYLE=".stage-agent{will-change:transform}" node perf/idle-cpu.mjs
+          SIDEVOICE_STATIC_SITE="$RUNNER_TEMP/site" PERF_LABEL="Stage creature moving, state lights and spinner stopped" PERF_STYLE=".state-dot,.ui-spinner{animation:none!important}" node perf/idle-cpu.mjs
