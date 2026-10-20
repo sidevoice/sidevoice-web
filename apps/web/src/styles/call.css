@@ -116,16 +116,6 @@
 .stage-tile[data-mood=offline] .stage-scene:has(.backdrop[data-hang=pin])::before { content:"";position:absolute;z-index:1;left:calc(50% - 78.1px);top:48.4px;width:15px;height:15px;margin:-7.5px 0 0 -7.5px;border-radius:50%;
   background:radial-gradient(circle at 36% 32%, #fff4ee 0 14%, #f0675a 32%, #a8291f);box-shadow:0 0 0 2.5px #1b1428,2px 4px 4px rgb(0 0 0 / .35) }
 
-/* The creatures and their scene stay still (web#272): WebKit repaints a moving SVG on the CPU every frame, so an idle
-   room with a few conversations kept the app's GPU process and page busy and the fans on (desktop#149). The state
-   reads from the still drawing (its pose, what it holds, the desk while it works), the dot beside it and the words.
-   What moves carries state: the mouth while it speaks, the "!" popping when something new arrives (twice, as on the
-   card), the moment it changes state (transitions), and outside the figures the working dots and lights. */
-:is(.sv-avatar,.stage-scene) :not(.m-open,.m-rest) { animation:none !important }
-@media (prefers-reduced-motion:no-preference) {
-  .sv-avatar[data-style=bichos][data-unread]:not([data-size=rail]) .bang { animation:bx-pop 1.3s cubic-bezier(.3,1.8,.5,1) 2 !important }
-}
-
 /* Under reduced motion nothing here moves: the state stays readable from the still drawing (its pose, its eyes, what it
    holds), from the scene, and from the dot and the words beside it. Speaking shows a still, open mouth. */
 @media (prefers-reduced-motion:reduce) {
