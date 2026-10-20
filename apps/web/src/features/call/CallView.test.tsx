@@ -358,22 +358,17 @@ function inStep(title: string) {
   return stage!;
 }
 
-test("the stage's agent and its thumbnails are one creature in one state: rest and pastimes, startle, tool, balloon, offline (#166)", () => {
+test("the stage's agent and its thumbnails are one creature in one state: rest, startle, tool, balloon, offline (#166)", () => {
   viewport({ narrow: true });
   headerRowWidth(190);
   vi.useFakeTimers();
   const store = room({ history: [played] });
   const login = "Fix the slow login";
   const attr = (name: string) => stageAgent().getAttribute(name);
-  // Resting: quiet, then its steps, every copy on the same step at every moment.
+  // Resting: quiet, every copy, however long it rests (no pastimes: web#272).
   expect(inStep(login)).toContain("data-idle=quiet");
-  const steps = new Set<string | null>();
-  for (let second = 0; second < 30; second += 1) {
-    tick(1000);
-    inStep(login);
-    steps.add(attr("data-idle"));
-  }
-  expect([...steps].some((step) => step && step !== "quiet")).toBe(true);
+  tick(30_000);
+  expect(inStep(login)).toContain("data-idle=quiet");
   // The person speaks to it: startled into listening everywhere at once, and landing everywhere at once.
   patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening" } as Partial<SessionFacts>);
   expect(inStep(login)).toEqual(expect.arrayContaining(["data-avatar-state=listening", "data-enter=idle"]));
