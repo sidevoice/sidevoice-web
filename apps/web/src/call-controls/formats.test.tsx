@@ -5,7 +5,7 @@ import { createCardRoom } from "./card-room";
 import type { CallControlsHost, CallControlsState } from "./host";
 import { RoomProvider } from "../app/RoomProvider";
 import { createRoomStore } from "../state/room-store";
-import { cardFacts, type SessionFacts } from "../state/room-session-state.js";
+import { cardFacts, WORKING_SHOWN_AFTER_MS, type SessionFacts } from "../state/room-session-state.js";
 import { FLOATING_CARD_KEY } from "../state/floating-card";
 import { translator } from "../i18n/translator";
 
@@ -24,10 +24,10 @@ const ROOM: Partial<SessionFacts> = {
   history: [{ segment: "h-2", thread: LOGIN, role: "assistant", text: REPLY, name: "Fix the slow login", time: 1, session: "s1", audio: "playing" }] as never,
 };
 
-function page(format: string, extra: Partial<CallControlsState> = {}) {
+function page(format: string, extra: Partial<CallControlsState> = {}, roomExtra: Record<string, unknown> = {}) {
   localStorage.setItem(FLOATING_CARD_KEY, JSON.stringify({ format, size: "m" }));
   const room = createRoomStore();
-  act(() => room.patch(ROOM));
+  act(() => room.patch({ ...ROOM, ...roomExtra }));
   const state: CallControlsState = { call: { ...room.getState().callCard, version: 2, since: 1 }, level: 0, pointerInside: null, alwaysExpanded: false,
     muteShortcut: "", ...extra };
   const host: CallControlsHost = { subscribe: (listener) => { listener(state); return () => undefined; }, run: vi.fn(), layout: vi.fn(), drag: vi.fn() };
@@ -75,4 +75,11 @@ test("the facts relayed are plain data: the socket as whether there is one, noth
   expect(facts.viewedThread).toBeNull();
   expect(facts.history.map((record) => record.segment)).toEqual(["h-2", "o-2"]);
   expect(() => JSON.stringify(facts)).not.toThrow();
+});
+
+test("the picture has no working badge over the creature: the stage's working line is the room's, not the card's", () => {
+  page("pip", {}, { harness: { "fp-1|t-login": true }, history: [], karaokeState: null, botLive: false, workingSince: { "fp-1|t-login": 0 }, now: WORKING_SHOWN_AFTER_MS });
+  expect(document.querySelector(".picture-card .stage-tile[data-card]")).toHaveAttribute("data-mood", "working");
+  expect(screen.queryByText("Working…")).toBeNull();
+  expect(document.querySelector(".picture-card [role=status]")).toBeNull();
 });
