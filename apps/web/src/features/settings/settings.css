@@ -336,3 +336,11 @@
 .floating-card-choice:disabled strong, .floating-card-choice:disabled small { color: var(--sv-disabled-text); }
 .floating-card-choice[data-selected]:disabled { box-shadow: none; border-color: var(--sv-border); }
 .floating-card-corner:disabled { pointer-events: none; }
+
+/* The previews hold still (decided 2026-10-19, briefs/UX-DECISIONS-2026-10-19.md: "Simplified static previews"): nothing in a
+ * tile moves — no creature, no idle step, no transition on the tile itself. */
+.floating-card-choice { transition: none; }
+.floating-card-preview, .floating-card-preview *, .floating-card-preview *::before, .floating-card-preview *::after { animation: none !important; transition: none !important; }
+/* The chosen tile's check lies over its preview (which comes later in the tile and would paint over it): on a small chip of the
+ * tile's own surface, above the preview. */
+.floating-card-choice .ui-card-check { z-index: 2; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--sv-surface); box-shadow: 0 0 0 1px var(--sv-accent); }
