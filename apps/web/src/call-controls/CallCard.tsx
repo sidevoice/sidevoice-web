@@ -29,9 +29,9 @@ import { avatarFor, avatarTone, SIDEVOICE_MASCOT, type AvatarSpec } from "../fea
 import { avatarColor } from "../features/avatar/bicho-draw";
 import { StageBalloons, StageTile } from "../features/call/CallStage";
 import { CardCallBar } from "../features/call/CallToolbar";
-import { KaraokeText } from "../features/conversation/KaraokeText";
 import { VoiceWaveform } from "../features/conversation/VoiceWaveform";
 import { DeliveryMark } from "../features/conversation/MessageBubble";
+import { LitText } from "../features/call/LitText";
 import { PagedText, PAGE_MS } from "../features/call/PagedText";
 import { SENT_LEAVING_MS, useAgentTurns, useSentTurns, useSpokenTo } from "../features/call/speech-reading";
 import { useStageConversation } from "../features/call/stage-view";
@@ -261,8 +261,8 @@ function CaptionLines({ state, t }: { state: CallControlsState; t: Translate }) 
   if (said) lines.push(
     <p key="agent" className="caption-line" data-role="assistant">
       <b translate="no">{state.call.title}</b>
-      <PagedText measure={said.text} follow=".karaoke-played" lines={2} turn="page" fixed>
-        <KaraokeText text={said.text} playback="playing" range={said.spoken > 0 ? { from: 0, to: Math.min(said.spoken, said.text.length) } : null} />
+      <PagedText measure={said.text} follow=".lit-heard" lines={2} turn="page" fixed>
+        <LitText text={said.text} spoken={said.spoken} />
       </PagedText>
     </p>);
   if (pending) lines.push(

@@ -13,6 +13,7 @@ import { AGENT_LINGER_MS, SENT_LEAVING_MS } from "./speech-reading";
 import { PAGE_MS } from "./PagedText";
 import { CAPTIONS_KEY } from "../../state/captions";
 import { ENTER_MS } from "../avatar/engine/styles/bichos";
+import { litPart } from "./lit-part";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -90,9 +91,9 @@ test("the stage plays what the agent says as a karaoke bubble, the whole reply i
   expect(bubble).toHaveAttribute("data-visible");
   expect(bubble).not.toHaveAttribute("data-leaving");
   // The whole reply, lit as far as it was heard, in a window of three lines (PagedText): no chunk, nothing dim above.
-  expect(bubble.querySelector(".paged-text > .paged-text-run > .karaoke-text")).not.toBeNull();
-  expect(bubble.querySelector(".karaoke-played")?.textContent).toBe("Okay. I'll start with the login and then look at the cart");
-  expect(bubble.querySelector(".karaoke-upcoming")?.textContent).toBe(" tests. I'll tell you as soon as I have something.");
+  expect(bubble.querySelector(".paged-text > .paged-text-run > .lit-text")).not.toBeNull();
+  expect(litPart(bubble).played).toBe("Okay. I'll start with the login and then look at the cart");
+  expect(litPart(bubble).upcoming).toBe(" tests. I'll tell you as soon as I have something.");
   expect(document.querySelectorAll(".stage-bubble")).toHaveLength(1);
   // Karaoke progress never makes the mouth move without a speaker level.
   expect(stageAgent()).toHaveAttribute("data-mouth", "playback");
@@ -109,7 +110,7 @@ test("the stage plays what the agent says as a karaoke bubble, the whole reply i
   vi.useFakeTimers();
   patch(store, { botLive: false, karaokeState: null, harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login"),
     history: [{ ...store.getState().facts.history[0], audio: "played" }] } as Partial<SessionFacts>);
-  expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe(REPLY);
+  expect(litPart(document.querySelector(".stage-bubble")!).played).toBe(REPLY);
   expect(document.querySelector(".stage-bubble")).not.toHaveAttribute("data-leaving");
   // The balloon is the decided look: its place is the stored one (centre by default), always three lines.
   expect(document.querySelector(".stage-bubble")).not.toHaveAttribute("data-lines");
@@ -587,8 +588,8 @@ test("two machines with the same name, or none, are two groups, each with its ow
 test("the bubble lights whole words, and its tooltip speaks the interface's language", () => {
   room({ botLive: true, karaokeState: { segment: "h-2", from: 42, to: 42 } });
   // What was heard ends inside "look": the word lights whole.
-  expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe("Okay. I'll start with the login and then look");
-  expect(document.querySelector(".stage-bubble .karaoke-text")).toHaveAttribute("title", "Playing this reply");
+  expect(litPart(document.querySelector(".stage-bubble")!).played).toBe("Okay. I'll start with the login and then look");
+  expect(document.querySelector(".stage-bubble .lit-text")).toHaveAttribute("title", "Playing this reply");
 });
 
 test("a whole sentence sounding is read at a speaking pace, never past its end", () => {
@@ -596,14 +597,14 @@ test("a whole sentence sounding is read at a speaking pace, never past its end",
   // The voice's chunk is the reply's first sentence and a half: "Okay. I'll start with the login".
   room({ botLive: true, karaokeState: { segment: "h-2", from: 0, to: 31 } });
   // The sentence has just started: the whole reply is up, nothing lit yet.
-  expect(document.querySelector(".stage-bubble .karaoke-upcoming")?.textContent).toBe(REPLY);
-  expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe("");
+  expect(litPart(document.querySelector(".stage-bubble")!).upcoming).toBe(REPLY);
+  expect(litPart(document.querySelector(".stage-bubble")!).played).toBe("");
   act(() => { vi.advanceTimersByTime(1000); });
-  expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent?.length).toBeGreaterThan(0);
+  expect(litPart(document.querySelector(".stage-bubble")!).played.length).toBeGreaterThan(0);
   // Long after the voice would have got there, the bubble waits at the end of the part sounding.
   act(() => { vi.advanceTimersByTime(20000); });
-  expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe("Okay. I'll start with the login");
-  expect(document.querySelector(".stage-bubble .karaoke-upcoming")?.textContent).toBe(REPLY.slice("Okay. I'll start with the login".length));
+  expect(litPart(document.querySelector(".stage-bubble")!).played).toBe("Okay. I'll start with the login");
+  expect(litPart(document.querySelector(".stage-bubble")!).upcoming).toBe(REPLY.slice("Okay. I'll start with the login".length));
 });
 
 const stageBubbles = () => [...document.querySelectorAll<HTMLElement>(".stage-bubble")];
@@ -637,7 +638,7 @@ test("its last words said, a reply stays whole AGENT_LINGER_MS, then lifts away;
   vi.useFakeTimers();
   patch(store, { botLive: false, karaokeState: null, history: [reply("h-2", REPLY, "played", 1)] } as Partial<SessionFacts>);
   expect(stageBubbles()).toHaveLength(1);
-  expect(stageBubbles()[0].querySelector(".karaoke-played")?.textContent).toBe(REPLY);
+  expect(litPart(stageBubbles()[0]).played).toBe(REPLY);
   tick(AGENT_LINGER_MS - 1);
   expect(stageBubbles()[0]).not.toHaveAttribute("data-leaving");
   tick(1);
@@ -651,9 +652,9 @@ test("its last words said, a reply stays whole AGENT_LINGER_MS, then lifts away;
     history: [reply("h-2", REPLY, "played", 1), reply("h-3", "Okay.", "played", 2), reply("h-4", NEXT, "playing", 3)] } as Partial<SessionFacts>);
   const [before, now] = stageBubbles();
   expect(before).toHaveAttribute("data-leaving");
-  expect(before).toHaveTextContent(/^Okay\.$/);
+  expect(before.querySelector(".lit-base")).toHaveTextContent(/^Okay\.$/);
   expect(now).not.toHaveAttribute("data-leaving");
-  expect(now.querySelector(".karaoke-upcoming")?.textContent).toBe(NEXT);
+  expect(litPart(now).upcoming).toBe(NEXT);
   tick(SENT_LEAVING_MS);
   expect(stageBubbles()).toEqual([now]);
 }, WHOLE_APP_MS);
