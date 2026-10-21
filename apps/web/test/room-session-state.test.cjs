@@ -180,6 +180,49 @@ test('One store transition publishes one coherent projection, without calls from
  store.facts.userLive=false;assert.equal(seen[1].session.speaker,'nobody');
  assert.equal(seen[0].facts.userLive,true,'prior snapshots do not change');
 });
+test('A projection that did not change is the same object, wherever the data is equal: the room\'s beats and the voice\'s cues draw only what they change',async()=>{
+ const api=await moduleReady;
+ const person=(thread_id)=>({node:'m',thread_id,title:'T '+thread_id,available:true,reach:{state:'listening'}});
+ const history=[{segment:'h',thread:'m|a',role:'assistant',text:'Okay. Then more.',name:'T a',time:1,session:'s',seq:1,audio:'playing'}];
+ const store=api.createRoomSessionStore(facts(api,{people:[person('a'),person('b')],history,botLive:true,roomBinding:{thread_id:'a',binding_id:'b1'},machinesReady:true}));
+ const first=store.getState(),seen=[];store.subscribe(s=>seen.push(s));
+ // The beats: the same binding, the same conversations and activity, each answer a new object.
+ store.patch({roomBinding:{...store.facts.roomBinding},machinesAt:5,people:store.facts.people.map(p=>({...p,reach:{...p.reach}})),harness:{...store.facts.harness}});
+ const beat=store.getState();
+ assert.equal(seen.length,1,'it is still published');
+ assert.notEqual(beat.facts,first.facts);
+ for(const key of ['session','conversation','participants','join','mic','call','callCard','enginePanel','machines','pairing'])assert.equal(beat[key],first[key],key+' is what it was');
+ // A cue moves the words of the one reply: the conversation is new, the rest is not.
+ store.patch({karaokeState:{segment:'h',from:0,to:5}});
+ const cue=store.getState();
+ assert.notEqual(cue.conversation,beat.conversation);assert.deepEqual(cue.conversation.saying.karaoke,{from:0,to:5});
+ assert.equal(cue.conversation.messages[0]!==beat.conversation.messages[0],true);
+ for(const key of ['session','participants','machines','mic','call','pairing'])assert.equal(cue[key],beat[key],key+' is what it was');
+ // A change to one conversation keeps the others\' rows.
+ store.patch({people:[{...person('a'),title:'Renamed'},person('b')]});
+ const renamed=store.getState();
+ assert.notEqual(renamed.participants,cue.participants);assert.equal(renamed.participants[1],cue.participants[1]);assert.equal(renamed.participants[0].title,'Renamed');
+ assert.equal(cue.participants[0].title,'T a','earlier snapshots do not change');
+});
+test('keepEqual keeps what is equal at any depth and never changes what it is given',async()=>{
+ const api=await moduleReady;const same=api.keepEqual;
+ const a={x:[{y:1},{y:2}],z:{w:'t'},n:null,u:undefined};
+ assert.equal(same(a,{x:[{y:1},{y:2}],z:{w:'t'},n:null,u:undefined}),a);
+ const b=same(a,{x:[{y:1},{y:3}],z:{w:'t'},n:null,u:undefined});
+ assert.notEqual(b,a);assert.equal(b.z,a.z);assert.equal(b.x[0],a.x[0]);assert.deepEqual(b.x,[{y:1},{y:3}]);
+ assert.deepEqual(a.x,[{y:1},{y:2}]);
+ // A longer, a shorter and a reordered list; a key gone, a key new, a key that is undefined on one side only.
+ const list=[{k:1},{k:2}];
+ assert.deepEqual(same(list,[{k:1},{k:2},{k:3}]),[{k:1},{k:2},{k:3}]);assert.equal(same(list,[{k:1},{k:2},{k:3}])[0],list[0]);
+ assert.deepEqual(same(list,[{k:1}]),[{k:1}]);assert.equal(same(list,[{k:1}])[0],list[0]);
+ assert.deepEqual(same(list,[{k:2},{k:1}]),[{k:2},{k:1}]);
+ assert.deepEqual(same({p:1,q:2},{p:1}),{p:1});assert.deepEqual(same({p:1},{p:1,q:2}),{p:1,q:2});
+ assert.notEqual(same({p:undefined},{q:undefined}),undefined);assert.deepEqual(Object.keys(same({p:undefined},{q:undefined})),['q']);
+ // Anything that is not plain data is the same only as the same object.
+ const socket=new Map(),later=new Map();
+ assert.equal(same({ws:socket},{ws:socket}).ws,socket);assert.equal(same({ws:socket},{ws:later}).ws,later);
+ assert.equal(same(1,1),1);assert.equal(same([1],{0:1}) instanceof Array,false);
+});
 
 // ----- what a newer room or machine sends (sidevoice-core#112): extra fields, values not known yet, fields left out -----
 test('A participant from a newer machine is listed: extra fields ignored, an unknown reach read by availability, capabilities of any shape',async()=>{
