@@ -366,15 +366,14 @@
   font-size: .6em; line-height: 1.3333em; font-weight: var(--sv-weight-semibold); white-space: nowrap; color: var(--sv-text-muted); }
 .stage-machine > svg { flex: none; width: 1em; height: 1em; }
 .stage-machine > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-/* Two rows, the name over its machine, as one quiet button that opens what the call runs on (CallDetails): a soft wash
- * round both rows on hover, the accent's while its details are open, a chevron after the name, and the warning dot
+/* Two rows, the name over its machine, as one quiet button that opens what the call runs on (CallDetails): no wash on hover,
+ * a wash in the accent while its details are open, a chevron after the name, and the warning dot
  * while a voice model needs something (said in words to assistive tech). The stage carries nothing else of the models
  * (operator, 2026-10-15); the agent's badge keeps the tile's foot. */
 .stage-name { display: grid; gap: .3em; justify-items: start; }
 .stage-heading { display: grid; justify-items: start; gap: .25em; min-width: 0; max-width: calc(100% + .7em); margin: -.2em -.35em; padding: .2em .35em; border: 0;
   border-radius: var(--sv-radius-md); background: none; color: inherit; font: inherit; letter-spacing: inherit; text-align: start; cursor: pointer;
   transition: background-color var(--sv-dur-fast) var(--sv-ease); }
-@media (hover: hover) { .stage-heading:hover { background: color-mix(in srgb, var(--sv-text) 7%, transparent); } }
 .stage-heading:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
 .stage-heading[aria-expanded="true"] { background: var(--sv-accent-soft); }
 .stage-heading-name { display: flex; align-items: center; gap: .3em; min-width: 0; max-width: 100%; }
