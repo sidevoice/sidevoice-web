@@ -179,3 +179,24 @@ test("held still, a playback mouth stays at rest whatever the output does", () =
   expect(avatar).not.toHaveAttribute("data-mouth-active");
   expect(mouthOf(avatar).style.getPropertyValue("--mouth")).toBe("");
 });
+
+test("a copy with no box does not follow the voice, and does as it gets one", () => {
+  vi.useFakeTimers();
+  playbackLevel.clear();
+  let size: (width: number) => void = () => {};
+  vi.stubGlobal("ResizeObserver", class { constructor(callback: ResizeObserverCallback) { size = (width) => callback([{ contentRect: { width, height: width } } as ResizeObserverEntry], this as unknown as ResizeObserver); } observe() {} disconnect() {} unobserve() {} });
+  speaker("speaking");
+  const view = render(copy());
+  const avatar = view.container.firstElementChild as HTMLElement;
+  act(() => size(0));
+  act(() => playbackLevel.publish(0.8, "fp|one"));
+  act(() => { vi.advanceTimersByTime(100); });
+  expect(avatar).not.toHaveAttribute("data-mouth-active");
+  expect(Number(mouthOf(avatar).style.getPropertyValue("--mouth"))).toBe(0);
+  act(() => size(40));
+  act(() => playbackLevel.publish(0.8, "fp|one"));
+  act(() => { vi.advanceTimersByTime(100); });
+  expect(avatar).toHaveAttribute("data-mouth-active");
+  expect(Number(mouthOf(avatar).style.getPropertyValue("--mouth"))).toBeGreaterThan(0.5);
+  vi.unstubAllGlobals();
+});
