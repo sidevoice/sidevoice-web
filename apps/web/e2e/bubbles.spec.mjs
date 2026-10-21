@@ -129,7 +129,7 @@ test("what is said on the stage is big and clear, the agent's bigger, three line
       host.className = "call-layout";
       host.innerHTML = `<div class="stage-tile" data-mood="listening" style="width: 100%; height: 640px; --k: ${k}">
         <div class="stage-top"><div class="speech-bubble stage-bubble" data-visible="" aria-hidden="true"><span class="paged-text">
-          <span class="paged-text-run"><span class="karaoke-text" data-playback="playing" data-progress="true"><span class="karaoke-played">${said.slice(0, 90)}</span><span class="karaoke-upcoming">${said.slice(90)}</span></span></span>
+          <span class="paged-text-run"><span class="lit-text"><span class="lit-base">${said}</span><span class="lit-copy" aria-hidden="true"><span class="lit-clip lit-above"><span class="lit-words">${said}</span></span></span></span></span>
         </span></div></div>
         <div class="person-turns"><div class="speech-bubble person-bubble" data-sent=""><span class="person-said"><span class="paged-text">
           <span class="paged-text-run">${said}</span></span></span></div></div></div>`;
@@ -158,8 +158,8 @@ test("what is said on the stage is big and clear, the agent's bigger, three line
               bubble.dataset.balloon = balloon;
               tile.style.setProperty("--av-color", tone);
               const fill = getComputedStyle(bubble, "::before").backgroundColor, as = `${balloon} ${tone || "no tone"}`;
-              found[`${as} played`] = [style(".karaoke-played").color, fill];
-              found[`${as} upcoming`] = [style(".karaoke-upcoming").color, fill];
+              found[`${as} played`] = [style(".lit-words").color, fill];
+              found[`${as} upcoming`] = [style(".lit-base").color, fill];
             }
             delete bubble.dataset.balloon;
             tile.style.removeProperty("--av-color");
