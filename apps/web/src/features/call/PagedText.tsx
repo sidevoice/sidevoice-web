@@ -81,7 +81,7 @@ export function PagedText({ children, measure, onPages, follow, lines = 3, turn 
     const mark = run.current.querySelector(follow);
     if (!mark) return;
     const rects = mark.getClientRects();
-    const last = mark.textContent && rects.length ? rects[rects.length - 1] : null;
+    const last = (mark.textContent || mark.hasAttribute("data-mark")) && rects.length ? rects[rects.length - 1] : null;
     // Measured from the run's own top: the transform moves the run and the words in it alike, mid-turn too.
     const current = !last ? 0 : Math.floor((last.bottom - run.current.getBoundingClientRect().top - 1) / layout.line);
     const at = topFor(Math.max(0, Math.min(layout.total - 1, current)), layout.total, lines, turn, fixed);

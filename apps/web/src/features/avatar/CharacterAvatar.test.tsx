@@ -5,10 +5,13 @@ import { avatarFor, type AvatarMood } from "./avatar-spec";
 import { createAvatarStates, type AvatarStates } from "./avatar-state";
 import { CharacterAvatar } from "./CharacterAvatar";
 import { smoothPlaybackLevel } from "./playback-mouth";
+import { MOTION_KEY, startMotion } from "../../lib/motion";
 
 let states: AvatarStates;
-beforeEach(() => { states = createAvatarStates(); });
-afterEach(() => { states.clear(); playbackLevel.clear(); vi.useRealTimers(); vi.restoreAllMocks(); });
+const motion = (how: "gpu" | "still") => { localStorage.setItem(MOTION_KEY, how); act(() => startMotion()); };
+// The mouth follows the voice where the drawings move as GPU layers; held still, it does not.
+beforeEach(() => { states = createAvatarStates(); motion("gpu"); });
+afterEach(() => { motion("still"); localStorage.clear(); states.clear(); playbackLevel.clear(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 const spec = avatarFor("fp|one");
 const speaker = (mood: AvatarMood, voice = "fp|one") => act(() => states.set("one", { spec, mood, voice }));
@@ -164,6 +167,17 @@ test("a still mouth follows nothing: a thumbnail rests while its agent speaks", 
   expect(thumbnail).toHaveAttribute("data-mouth", "still");
   expect(thumbnail).not.toHaveAttribute("data-mouth-active");
   expect(mouthOf(thumbnail).style.getPropertyValue("--mouth")).toBe("");
+});
+
+test("held still, a playback mouth stays at rest whatever the output does", () => {
+  motion("still");
+  speaker("speaking");
+  const view = render(copy());
+  const avatar = view.container.firstElementChild as HTMLElement;
+  expect(avatar).toHaveAttribute("data-mouth", "still");
+  act(() => playbackLevel.publish(0.8, "fp|one"));
+  expect(avatar).not.toHaveAttribute("data-mouth-active");
+  expect(mouthOf(avatar).style.getPropertyValue("--mouth")).toBe("");
 });
 
 test("a copy with no box does not follow the voice, and does as it gets one", () => {

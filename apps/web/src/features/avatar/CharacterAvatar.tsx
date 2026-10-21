@@ -61,8 +61,12 @@ function useBeat(key: string | number | undefined): "a" | "b" | undefined {
   return key === undefined ? undefined : beat;
 }
 
-export function CharacterAvatar({ spec, state, size, mouth = "voice", mouthKey, mouthLevel, desk, live, label, className, ref }: CharacterAvatarProps) {
+export function CharacterAvatar({ spec, state, size, mouth: asked = "voice", mouthKey, mouthLevel, desk, live, label, className, ref }: CharacterAvatarProps) {
   const avatar = useRef<HTMLSpanElement | null>(null);
+  const motion = useMotion();
+  // Held still means still (operator, 2026-10-21): where the drawings do not move as GPU layers, the mouth does not follow the
+  // voice either (an SVG mouth written thirty times a second is repainted on the CPU each time).
+  const mouth = asked === "playback" && motion === "still" ? "still" : asked;
   useEffect(() => {
     const element = avatar.current;
     if (mouth !== "playback" || !mouthLevel || !element) return;
@@ -98,7 +102,7 @@ export function CharacterAvatar({ spec, state, size, mouth = "voice", mouthKey, 
   const key = avatarKey(spec);
   // The key names the figure: a new spec object for the same conversation is the same drawing.
   const drawing = useMemo(() => drawAvatar(spec, size), [key, size]);
-  const layered = useMotion() === "gpu" && !!live;
+  const layered = motion === "gpu" && !!live;
   useLayers(avatar, layered, drawing.html);
   // A copy that holds still shows the creature at rest while the moving one plays a pastime (operator, 2026-10-20).
   const idle = layered || state.idle === undefined ? state.idle : "quiet";

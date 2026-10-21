@@ -10,11 +10,11 @@ import { avatarFor, avatarTone } from "../avatar/avatar-spec";
 import { avatarColor } from "../avatar/bicho-draw";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
 import { StageBackdrop, StageDesk, useSceneScale, WantedPoster, type PosterWords } from "../avatar/StageScene";
-import { KaraokeText } from "../conversation/KaraokeText";
 import { uiLanguage, translator, type Translate } from "../../i18n/translator";
 import { moodText } from "./conversation-state";
 import { useAgentTurns, useReadingClock, useSpokenFrom, type AgentTurn } from "./speech-reading";
 import type { Reading } from "./speech-chunks";
+import { LitText } from "./LitText";
 import { PagedText } from "./PagedText";
 import { useStageConversation, type StageConversation } from "./stage-view";
 import { BalloonTail } from "./BalloonTail";
@@ -49,8 +49,8 @@ import "./call-view.css";
 function AgentBubble({ turn }: { turn: AgentTurn }) {
   return (
     <div className="speech-bubble stage-bubble" data-visible="" data-leaving={turn.leaving || undefined} aria-hidden="true" translate="no">
-      <PagedText measure={turn.text} follow=".karaoke-played" lines={3} turn="page" fixed>
-        <KaraokeText text={turn.text} playback="playing" range={turn.spoken > 0 ? { from: 0, to: Math.min(turn.spoken, turn.text.length) } : null} />
+      <PagedText measure={turn.text} follow=".lit-heard" lines={3} turn="page" fixed>
+        <LitText text={turn.text} spoken={turn.spoken} />
       </PagedText>
       {/* The bichos' gloss, as on their skin. */}
       <svg className="balloon-shine" viewBox="0 0 40 20" aria-hidden="true"><path d="M3 17Q5 4 24 3" /></svg>

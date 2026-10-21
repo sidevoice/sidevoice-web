@@ -115,9 +115,7 @@
 .stage-bubble[data-leaving] { animation: stage-bubble-out 500ms var(--sv-ease) forwards; pointer-events: none; }
 @keyframes stage-bubble-out { to { opacity: 0; transform: translateY(calc(-28 * var(--u))) scale(.94); } }
 @media (prefers-reduced-motion: reduce) { .stage-bubble[data-leaving] { animation: person-sent-fade 500ms linear forwards !important; } }
-.stage-bubble .karaoke-text { white-space: pre-wrap; }
-.stage-bubble .karaoke-text .karaoke-played { color: var(--balloon-said); opacity: 1; }
-.stage-bubble .karaoke-text .karaoke-upcoming { color: var(--balloon-unsaid); opacity: 1; }
+.stage-bubble .lit-words { color: var(--balloon-said); }
 
 /* A balloon's skin, the agent's and the person's: under its words, leaning and cornered as its --balloon-* say. Its
  * tail and the bichos' gloss sit on it, under the words too (BalloonTail: the tail's ink as heavy as the edge's, on
