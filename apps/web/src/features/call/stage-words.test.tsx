@@ -5,6 +5,7 @@ import type { SessionFacts } from "../../state/room-session-state.js";
 import { CAPTIONS_KEY, setCaptions } from "../../state/captions";
 import { PACE } from "./speech-chunks";
 import { StageTile } from "./CallStage";
+import { litPart } from "./lit-part";
 
 /* The words go on five times a second while the voice says them (speech-reading.ts): that draws the balloon, never the
  * tile around it (its title, its badge, the creature, which hold Radix popovers and tooltips) — desktop#149. */
@@ -35,7 +36,7 @@ function tile(extra: Partial<SessionFacts> = {}) {
   render(<RoomStoreContext.Provider value={store}><StageTile /></RoomStoreContext.Provider>);
   return store;
 }
-const lit = () => document.querySelector(".stage-bubble .karaoke-played")?.textContent ?? "";
+const lit = () => litPart(document.querySelector(".stage-bubble")!).played ?? "";
 
 test("the balloon's words go on and the tile around it is not drawn again", () => {
   tile();

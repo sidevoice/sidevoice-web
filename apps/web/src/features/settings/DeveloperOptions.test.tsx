@@ -202,3 +202,19 @@ test("the switch is back at once if the app throws before answering", async () =
   expect(toggle("Compositing borders")).toHaveAttribute("aria-checked", "false");
   expect(screen.getByRole("alert")).toHaveTextContent("The app could not change it.");
 });
+
+test("Animate conversation thumbnails: shown while developer mode is on, off by default, kept on the device", () => {
+  withDebug();
+  mount();
+  expect(screen.queryByRole("switch", { name: "Animate conversation thumbnails" })).toBeNull();
+  cleanup();
+  localStorage.setItem("sidevoiceDeveloperMode", "1");
+  mount();
+  expect(groups()).toContain("Conversations");
+  expect(toggle("Animate conversation thumbnails")).toHaveAttribute("aria-checked", "false");
+  act(() => { fireEvent.click(toggle("Animate conversation thumbnails")); });
+  expect(toggle("Animate conversation thumbnails")).toHaveAttribute("aria-checked", "true");
+  expect(localStorage.getItem("sidevoiceAnimatedThumbnails")).toBe("1");
+  act(() => { fireEvent.click(toggle("Animate conversation thumbnails")); });
+  expect(localStorage.getItem("sidevoiceAnimatedThumbnails")).toBeNull();
+});

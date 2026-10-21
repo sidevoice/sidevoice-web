@@ -10,11 +10,11 @@ import { avatarFor, avatarTone } from "../avatar/avatar-spec";
 import { avatarColor } from "../avatar/bicho-draw";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
 import { StageBackdrop, StageDesk, useSceneScale, WantedPoster, type PosterWords } from "../avatar/StageScene";
-import { KaraokeText } from "../conversation/KaraokeText";
 import { uiLanguage, translator, type Translate } from "../../i18n/translator";
 import { moodText } from "./conversation-state";
 import { useAgentTurns, useReadingClock, useSpokenFrom, type AgentTurn } from "./speech-reading";
 import type { Reading } from "./speech-chunks";
+import { LitText } from "./LitText";
 import { PagedText } from "./PagedText";
 import { useStageConversation, type StageConversation } from "./stage-view";
 import { BalloonTail } from "./BalloonTail";
@@ -27,6 +27,7 @@ import { Tooltip } from "../../components/ui/Tooltip";
 import { errorLine } from "../settings/error-message";
 import { desktopHost } from "../../services/desktop-host";
 import { useCaptions } from "../../state/captions";
+import { useStageRef } from "./stage-visibility";
 
 import "./call-view.css";
 
@@ -48,8 +49,8 @@ import "./call-view.css";
 function AgentBubble({ turn }: { turn: AgentTurn }) {
   return (
     <div className="speech-bubble stage-bubble" data-visible="" data-leaving={turn.leaving || undefined} aria-hidden="true" translate="no">
-      <PagedText measure={turn.text} follow=".karaoke-played" lines={3} turn="page" fixed>
-        <KaraokeText text={turn.text} playback="playing" range={turn.spoken > 0 ? { from: 0, to: Math.min(turn.spoken, turn.text.length) } : null} />
+      <PagedText measure={turn.text} follow=".lit-heard" lines={3} turn="page" fixed>
+        <LitText text={turn.text} spoken={turn.spoken} />
       </PagedText>
       {/* The bichos' gloss, as on their skin. */}
       <svg className="balloon-shine" viewBox="0 0 40 20" aria-hidden="true"><path d="M3 17Q5 4 24 3" /></svg>
@@ -178,6 +179,8 @@ export function StageTile({ card = false }: { card?: boolean }) {
   const voice = useVoiceModels();
   // Captions off (the call bar's toggle): no balloons on the stage; the transcript keeps everything said.
   const captions = useCaptions();
+  // The room's stage, for the desktop app's floating card (stage-visibility.ts): not the card's own picture of it.
+  const stageRef = useStageRef<HTMLDivElement>(!card);
   if (!stage.threadId) return null;
   const spec = avatarFor(stage.threadId);
   const tone = avatarColor(spec);
@@ -186,7 +189,7 @@ export function StageTile({ card = false }: { card?: boolean }) {
           background around it (useSceneScale fits it in its slot; call-view.css names the shapes). What the tile says —
           the name, the voice models, the replies, the badge — is laid on the tile, at its corners. */
       <div ref={sceneRef} className="stage-slot">
-      <div className="stage-tile" data-mood={avatar.mood} data-app={desktopHost() ? "" : undefined} data-card={card || undefined} style={avatarTone(tone) as CSSProperties}>
+      <div ref={stageRef} className="stage-tile" data-mood={avatar.mood} data-app={desktopHost() ? "" : undefined} data-card={card || undefined} style={avatarTone(tone) as CSSProperties}>
         <div className="stage-canvas">
           <div className="stage-scene">
             <StageBackdrop seed={stage.threadId} tone={tone} live />

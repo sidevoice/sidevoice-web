@@ -125,7 +125,9 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
         {/* The brand at the column's head, where the room has no header (VARIANTS layout "meet"); hidden otherwise. */}
         <div className="sidebar-brand"><SidevoiceMark size={22} /><span translate="no">Sidevoice</span></div>
         <div className="sidebar-head">
-          <h2><ConversationsIcon />{t("sidebar.title")}{!blocked && <span className="conversations-count" aria-hidden="true">{participants.length}</span>}</h2>
+          {/* Icon and count are one face, as the call card's switcher wears them (call-card.css .card-conversations-button);
+              no chevron: the list is already open here. */}
+          <h2>{blocked ? <ConversationsIcon /> : <span className="conversations-chip" aria-hidden="true"><ConversationsIcon size={14} /><span className="conversations-count">{participants.length}</span></span>}{t("sidebar.title")}</h2>
           <Tooltip action content={rail ? t("sidebar.expand") : t("sidebar.collapse")}>
             <Button variant="ghost" tone="neutral" size="icon-sm" className="sidebar-collapse" aria-controls="conversations" aria-expanded={!rail}
               aria-label={rail ? t("sidebar.expand") : t("sidebar.collapse")}

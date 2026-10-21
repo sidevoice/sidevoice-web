@@ -228,3 +228,14 @@ test("\"+\" opens what a new conversation needs, below it; with the list down, t
   expect(within(panel).getByText("Tell your agent to connect")).toBeInTheDocument();
   expect(panel).toHaveAttribute("data-side", "bottom");
 });
+
+test("the sidebar wears the count inside the conversations icon, as the card's switcher, not beside the title", () => {
+  phone(284);
+  room();
+  const head = document.querySelector(".sidebar-head h2")!;
+  const chip = head.querySelector(".conversations-chip")!;
+  expect(chip.querySelector("svg")).not.toBeNull();
+  expect(chip.querySelector(".conversations-count")).toHaveTextContent(/^4$/);
+  expect(head.querySelectorAll(".conversations-count")).toHaveLength(1);
+  expect(chip.nextSibling).toHaveTextContent("Conversations");
+});
