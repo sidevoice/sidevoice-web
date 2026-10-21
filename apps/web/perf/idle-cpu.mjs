@@ -15,8 +15,10 @@
  *
  * Scenarios: idle with one conversation and with six, no call; idle in a call (listening, nobody speaking) with six; the
  * same call while its conversation and two others work (the operator's usual room, desktop#149); the person speaking
- * in that call, the microphone's level arriving as the app hands it (about 30 readings a second). Each row lists the
- * animations still running, by name and element. */
+ * in that call, the microphone's level arriving as the app hands it (about 30 readings a second); and the agent speaking in
+ * it: a long reply said sentence by sentence, its words lit as the page paces them, the speaker's level arriving the same
+ * way (desktop#150) and the room's beats writing what has not changed. Each row lists the animations still running, by
+ * name and element. */
 
 import { execFileSync, spawn } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
@@ -34,11 +36,29 @@ const TICK = 100; // Linux /proc clock ticks per second (sysconf CLK_TCK on ever
 const conversation = (n) => ({ thread_id: `t${n}`, title: `project-${n}`, available: true, reach: { state: "listening" }, harness: "claude-code" });
 const several = Array.from({ length: 6 }, (_, i) => conversation(i + 1));
 
+/** This process and everything it started, on Linux: a machine that runs other WebKit browsers at the same time (a pod
+ *  with several agents) must not have their CPU counted as the page's. */
+function ownProcesses() {
+  const parent = new Map();
+  for (const pid of execFileSync("ls", ["/proc"], { encoding: "utf8" }).split("\n").filter((p) => /^\d+$/.test(p))) {
+    try {
+      const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+      parent.set(pid, stat.slice(stat.lastIndexOf(")") + 2).split(" ")[1]);
+    } catch { /* gone meanwhile */ }
+  }
+  const mine = new Set([String(process.pid)]);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const [pid, ppid] of parent) if (!mine.has(pid) && mine.has(ppid)) { mine.add(pid); grew = true; }
+  }
+  return mine;
+}
+
 /** The CPU seconds each of the browser's processes has spent so far, by pid. */
 function cpuTimes() {
   const out = new Map();
   if (process.platform === "linux") {
-    for (const pid of execFileSync("ls", ["/proc"], { encoding: "utf8" }).split("\n").filter((p) => /^\d+$/.test(p))) {
+    for (const pid of ownProcesses()) {
       try {
         const command = readFileSync(`/proc/${pid}/cmdline`, "utf8").replaceAll("\0", " ");
         if (!command.includes("ms-playwright/webkit") && !command.includes("/wk/")) continue;
@@ -157,6 +177,57 @@ const SCENARIOS = [
           document.getElementById("mic-level-meter")?.setAttribute("aria-valuenow", String(level));
           micLevel?.publish?.(level);
         }, 32);
+      });
+    },
+  },
+  {
+    name: "in a call, 6 conversations, the agent speaking",
+    run: async (page) => {
+      await room(page, several);
+      await joinCall(page);
+      // The room's beat asks the machine how the call stands once the page names its machine, and a harness that answers
+      // "no call" would end this one: those two questions are left unanswered, so the call stays as patched (the beat's own
+      // writes are made below, as they come when nothing has changed).
+      await page.route((url) => /^\/api\/presentation(\/history)?$/.test(url.pathname), () => {});
+      await page.evaluate(() => {
+        const { store, playbackLevel } = window.sidevoiceUI;
+        const thread = store.getState().facts.people.find((p) => p.thread_id === "t1");
+        const key = `${thread.node}|t1`;
+        // A long reply, said sentence by sentence (the voice's cue, `karaokeState`, moves from one to the next as the
+        // voice reaches it); within a sentence the page's words go on at their own pace (speech-reading.ts).
+        const reply = "I looked at the failing check first. The setting was being read before the page had written it, so the first start of every session saw the old value. "
+          + "I moved the read after the write and added a test that flips the setting and reloads the page. The whole suite passes now, on both engines. "
+          + "There is one more thing worth saying: the same ordering shows up in the sidebar, where the unread marks are counted before the history is loaded. "
+          + "I left that alone, because it is a different change with its own risk. Shall I open the pull request for this one, and write the other one down as an issue?";
+        const sentences = reply.match(/[^.?]+[.?]\s*/g);
+        const segment = "voice:perf-1";
+        const VOICE = 14; // characters a second the voice says, a little under the page's pace for words (PACE in speech-reading.ts)
+        const started = performance.now();
+        store.patch({
+          callNode: thread.node, botLive: true,
+          voiceState: { listening: "listening", recognising: 0, playback: "playing", microphone: "live" },
+          history: [{ segment, thread: key, role: "assistant", text: reply, name: "project-1", time: Date.now(), session: "perf", seq: 1, audio: "playing" }],
+          karaokeState: { segment, from: 0, to: 0 },
+        });
+        // The cue as the voice gives it: the sentence sounding, then the next one.
+        let begin = 0;
+        for (const sentence of sentences) {
+          const from = begin, to = begin + sentence.length;
+          setTimeout(() => store.patch({ karaokeState: { segment, from, to } }), Math.max(0, (from / VOICE) * 1000 - (performance.now() - started)));
+          begin = to;
+        }
+        // What the room's beats write while a call stands as it was (room-session-controller.js callBeat, machinesBeat): the
+        // same binding every 1.5 s and the same conversations every 6 s, each answer a new object.
+        setInterval(() => store.patch({ roomBinding: { ...store.getState().facts.roomBinding } }), 1500);
+        setInterval(() => { const facts = store.getState().facts; store.patch({ machinesAt: Date.now(), people: [...facts.people], harness: { ...facts.harness } }); }, 6000);
+        // The speaker's level as the desktop app relays it (desktop#150): a reading about every 33 ms while a window
+        // sounds, a voice's syllables (about 5 a second) with a pause between phrases.
+        setInterval(() => {
+          const t = performance.now() / 1000;
+          const syllable = Math.max(0, Math.sin(t * 2 * Math.PI * 5.2)) ** 0.6;
+          const phrase = Math.sin(t * 2 * Math.PI * 0.35) > -0.8 ? 1 : 0;
+          playbackLevel.publish(Math.min(1, phrase * (0.15 + 0.7 * syllable * (0.7 + 0.3 * Math.sin(t * 17)))), key);
+        }, 33);
       });
     },
   },
