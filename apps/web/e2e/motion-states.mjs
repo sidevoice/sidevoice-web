@@ -55,8 +55,14 @@ export function applyState({ id }) {
     const history = store.getState().facts.history;
     store.patch({ botLive: true, history: [...history, reply("playing")], karaokeState: { segment: "h-2", from: 0, to: 0 },
       voiceState: { listening: "listening", recognising: 0, playback: "playing", microphone: "live" } });
-    let to = 0;
-    timers.setInterval(() => { to = to >= REPLY.length ? 0 : Math.min(REPLY.length, to + 6); store.patch({ karaokeState: { segment: "h-2", from: 0, to } }); }, 250);
+    // The voice's cue names the sentence sounding, as the voice reaches it (14 characters a second); the page's words go on
+    // inside it at their own pace (speech-reading.ts).
+    let begin = 0;
+    for (const sentence of REPLY.match(/[^.?]+[.?]\s*/g)) {
+      const from = begin, to = begin + sentence.length;
+      timers.setTimeout(() => store.patch({ karaokeState: { segment: "h-2", from, to } }), (from / 14) * 1000);
+      begin = to;
+    }
     timers.setInterval(() => playbackLevel.publish(0.3 + 0.4 * Math.abs(Math.sin(performance.now() / 120)), KEY), 33);
   };
   switch (id) {
@@ -101,6 +107,9 @@ export async function openRoom(page, { people = MIXED, state = "not-in-call", mo
   await installHarness(page, { participants: { first: people } });
   await page.goto("/voice/");
   await choose(page);
+  // The room's beat asks the machine how the call stands once the page names its machine, and a harness that answers "no call"
+  // ends the one patched in: those two questions stay unanswered while the agent speaks, so the reply goes on being said.
+  if (state === "agent-speaking") await page.route((url) => /^\/api\/presentation(\/history)?$/.test(url.pathname), () => {});
   await page.evaluate(applyState, { id: state });
   if (after === "transcript") await page.locator("#transcript-toggle").click();
   if (after?.startsWith("settings")) {

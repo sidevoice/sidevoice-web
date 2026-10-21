@@ -1,7 +1,8 @@
 /* What moves on a page, and whether it should (desktop#149, web#278): the probe and the rules that the motion guard
  * (motion-guard.spec.mjs) and the audit (perf/animation-audit.mjs) share.
  *
- * The rule: everything that moves is a compositable animation, transform or opacity on an HTML layer, never a per-frame
+ * The rule (script that moves things — loops of writes to style, class, attributes and content — is read as an animation too, `inspect`):
+ * everything that moves is a compositable animation, transform or opacity on an HTML layer, never a per-frame
  * repaint or layout, never an animation inside an SVG (WebKit repaints the whole drawing on the CPU every frame), and
  * nothing keeps running where nobody can see it. The page-side half (`probe`, `inspect`) is plain functions, sent to the
  * page whole (page.evaluate / addInitScript), so it runs unchanged in WebKit and in Chromium. */
@@ -23,10 +24,12 @@ export function probe() {
     timers: original,
     on: false, startedAt: 0, raf: 0, timeouts: 0, intervalTicks: 0, mutations: 0, blocks: [], longTasks: [],
     sites: new Map(), mutationSites: new Map(), events: new Map(), intervals: new Map(),
+    // What the page's script writes to the DOM, per site (see `written`): which elements, what the writes changed.
+    writes: new Map(),
     start() {
       state.raf = state.timeouts = state.intervalTicks = state.mutations = 0;
       state.blocks = []; state.longTasks = [];
-      state.sites = new Map(); state.mutationSites = new Map(); state.events = new Map();
+      state.sites = new Map(); state.mutationSites = new Map(); state.events = new Map(); state.writes = new Map();
       state.startedAt = performance.now(); state.on = true; last = performance.now(); watch();
     },
     stop() {
@@ -39,6 +42,8 @@ export function probe() {
         seconds: +seconds.toFixed(2), windowSeconds: Math.max(1, Math.floor(seconds)), rafPerSecond: +(state.raf / seconds).toFixed(2), timeoutsPerSecond: +(state.timeouts / seconds).toFixed(2),
         intervalTicksPerSecond: +(state.intervalTicks / seconds).toFixed(2), mutationsPerSecond: +(state.mutations / seconds).toFixed(2),
         scheduled: top(state.sites), mutated: top(state.mutationSites), started: top(state.events),
+        // Per site of script writes (style, class, attributes, content): how often, and in how many of the window's seconds.
+        written: [...state.writes.entries()].map(([key, { count, seconds: active }]) => ({ key, perSecond: +(count / seconds).toFixed(2), activeSeconds: active.size })),
         // Intervals still registered: a timer that never stops is a loop for the page's whole life.
         intervals: [...state.intervals.values()].map((entry) => ({ ...entry })), blocks: state.blocks.slice(), longTasks: state.longTasks.slice(),
       };
@@ -82,15 +87,44 @@ export function probe() {
     const classes = typeof node.className === "string" ? node.className : node.className?.baseVal ?? "";
     return node.localName + (node.id ? "#" + node.id : "") + classes.split(/\s+/).filter(Boolean).slice(0, 2).map((c) => "." + c).join("");
   };
+  /** The element and the two above it, outermost first: enough to find it in the markup. */
+  const where = (node) => { const path = []; for (let n = node; n && n.nodeType === 1 && path.length < 3; n = n.parentElement) path.unshift(named(n)); return path.join(" > "); };
+  /** The declarations of a style attribute, by property. */
+  const declared = (css) => new Map([...String(css ?? "").matchAll(/([\w-]+)\s*:\s*([^;]+)/g)].map((m) => [m[1], m[2].trim()]));
+  /** What a record changed: `what` (style, class, another attribute, or the element's content) and its `details` (the style
+   *  properties or the classes that differ). */
+  const change = (record) => {
+    if (record.type !== "attributes") return { what: "content", details: [] };
+    const now = record.target.getAttribute(record.attributeName);
+    if (record.attributeName === "style") {
+      const before = declared(record.oldValue), after = declared(now);
+      return { what: "style", details: [...new Set([...before.keys(), ...after.keys()])].filter((p) => before.get(p) !== after.get(p)) };
+    }
+    if (record.attributeName === "class") {
+      const before = new Set(String(record.oldValue ?? "").split(/\s+/)), after = new Set(String(now ?? "").split(/\s+/));
+      return { what: "class", details: [...before, ...after].filter((c) => c && before.has(c) !== after.has(c)) };
+    }
+    return { what: record.attributeName, details: [] };
+  };
   const observer = new MutationObserver((records) => {
     if (!state.on) return;
     state.mutations += records.length;
     for (const record of records) {
       const target = record.type === "characterData" ? record.target.parentElement : record.target;
       bump(state.mutationSites, `${record.type}${record.attributeName ? ":" + record.attributeName : ""} on ${named(target)}`);
+      if (!target || target.nodeType !== 1 || !target.isConnected) continue;
+      const { what, details } = change(record);
+      // A style write that changed nothing a reader could see (the same value again) is not a write.
+      if (what === "style" && !details.length) continue;
+      const key = `${what} on ${where(target)}`;
+      bump(state.writes, key);
+      const entry = state.writes.get(key);
+      entry.what = what; entry.details ??= new Set(); entry.refs ??= [];
+      for (const detail of details) entry.details.add(detail);
+      if (entry.refs.length < 4 && !entry.refs.some((ref) => ref.deref() === target)) entry.refs.push(new WeakRef(target));
     }
   });
-  const attach = () => observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true, characterData: true });
+  const attach = () => observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeOldValue: true, characterData: true });
   if (document.documentElement) attach(); else document.addEventListener("DOMContentLoaded", attach, { once: true });
 
   // A transition or an animation starting, however often: the cost of a thing restarted on every reading.
@@ -125,7 +159,7 @@ export function probe() {
 
 /** Reads the animations running on the page right now, with what they animate, where, and whether anybody can see it. Runs
  *  in the page. */
-export function inspect(compositable) {
+export function inspect({ compositable, writes = [] }) {
   const allowed = new Set(compositable);
   // Keys of a keyframe that are not a property.
   const notProperty = new Set(["offset", "computedOffset", "easing", "composite"]);
@@ -181,7 +215,71 @@ export function inspect(compositable) {
     return null;
   };
 
-  return document.getAnimations().map((animation) => {
+  /* What a script's writes move. A style write names its properties; a custom property, a class and an attribute move what
+   * the page's stylesheets (and inline styles) make of them: the properties declared where the selector names the class or the
+   * attribute, and the ones a custom property is read by (var(), through the custom properties that read it in turn). */
+  const declared = (css) => [...String(css ?? "").matchAll(/([\w-]+)\s*:\s*([^;]+)/g)].map((m) => [m[1], m[2]]);
+  const rules = [];
+  const collect = (list) => {
+    for (const rule of list ?? []) {
+      if (rule.style && rule.selectorText !== undefined) rules.push({ selector: rule.selectorText, declarations: declared(rule.style.cssText) });
+      if (rule.cssRules) collect(rule.cssRules);
+    }
+  };
+  for (const sheet of document.styleSheets) { try { collect(sheet.cssRules); } catch { /* a sheet from another origin */ } }
+  const readers = new Map();
+  const readBy = (name) => {
+    if (readers.has(name)) return readers.get(name);
+    const found = new Set();
+    readers.set(name, found);
+    const add = (property) => { if (property.startsWith("--")) for (const further of readBy(property)) found.add(further); else found.add(property); };
+    const uses = new RegExp(`var\\(\\s*${name}\\b`);
+    for (const rule of rules) for (const [property, value] of rule.declarations) if (uses.test(value)) add(property);
+    for (const node of document.querySelectorAll(`[style*="${name}"]`)) for (const [property, value] of declared(node.getAttribute("style"))) if (uses.test(value)) add(property);
+    return found;
+  };
+  /** The properties the declarations of the rules whose selector holds `needle` set, custom properties by what reads them. */
+  const declaredWhere = (needle) => {
+    const found = new Set();
+    for (const rule of rules) if (rule.selector.includes(needle)) for (const [property] of rule.declarations) {
+      if (property.startsWith("--")) for (const further of readBy(property)) found.add(further); else found.add(property);
+    }
+    return found;
+  };
+  /** What a site of writes moves, as property names: none when it moves nothing a reader sees (aria-valuenow). */
+  const movedBy = (entry, onSvg) => {
+    if (entry.what === "content") return ["content"];
+    if (entry.what === "style") {
+      const moved = new Set();
+      for (const property of entry.details) {
+        if (!property.startsWith("--")) moved.add(property);
+        else if (readBy(property).size) for (const read of readBy(property)) moved.add(read); else moved.add(property);
+      }
+      return [...moved];
+    }
+    if (entry.what === "class") return [...new Set([...entry.details].flatMap((name) => [...declaredWhere("." + name)]))];
+    const styled = [...declaredWhere(`[${entry.what}`)];
+    // The drawing's own attributes (d, transform, fill, x) are what is painted.
+    return styled.length || !onSvg || /^(data|aria)-/.test(entry.what) ? styled : [entry.what];
+  };
+  const written = [];
+  for (const key of writes) {
+    const entry = window.__motion.writes.get(key);
+    const nodes = (entry?.refs ?? []).map((ref) => ref.deref()).filter((node) => node?.isConnected);
+    if (!nodes.length) continue;
+    const props = movedBy(entry, nodes[0] instanceof SVGElement);
+    if (!props.length) continue;
+    const reasons = nodes.map((node) => hiddenReason(node, props.includes("opacity")));
+    const hidden = reasons.every(Boolean) ? reasons[0] : null;
+    written.push({
+      kind: "ScriptWrite", name: entry.what + (entry.details.size ? ":" + [...entry.details].join("+") : ""), target: where(nodes[0]), pseudo: null,
+      svg: nodes[0].ownerSVGElement ? "inside" : nodes[0] instanceof SVGElement ? "root" : null, playState: "running", props,
+      nonCompositable: props.filter((p) => !allowed.has(p)), infinite: true, iterations: "infinite", duration: null, easing: null, direction: null,
+      hidden, visible: hidden === null,
+    });
+  }
+
+  return [...written, ...document.getAnimations().map((animation) => {
     const effect = animation.effect;
     const target = effect?.target;
     const kind = animation.constructor.name;
@@ -199,8 +297,12 @@ export function inspect(compositable) {
       iterations: timing.iterations === Infinity ? "infinite" : timing.iterations, duration: typeof timing.duration === "number" ? Math.round(timing.duration) : null,
       easing: effect.getTiming().easing, direction: timing.direction, hidden, visible: hidden === null,
     };
-  });
+  })];
 }
+
+/** Whether something that happens `perSecond` times, in `activeSeconds` of a window of `window` seconds, is a loop: in every second of
+ *  it, and more than twice a second (a one-off, or a burst on a change of state, is not). */
+const loops = (s, window) => window >= 2 && s.activeSeconds >= window && s.perSecond > 2;
 
 /** One running animation's identity: the same thing seen twice is one thing. */
 const identity = (a) => [a.kind, a.name, a.target, a.pseudo ?? "", a.svg ?? "", a.props?.join("+")].join(" | ");
@@ -216,7 +318,7 @@ export async function observe(page, { settle = 1500, duration = 3000, samples = 
   await page.evaluate(() => window.__motion.start());
   const found = new Map();
   for (let i = 0; i < samples; i += 1) {
-    const now = await page.evaluate(inspect, [...COMPOSITABLE]);
+    const now = (await page.evaluate(inspect, { compositable: [...COMPOSITABLE] })).filter((a) => a.kind !== "ScriptWrite");
     const here = new Map();
     for (const a of now) {
       if (a.playState !== "running" && a.playState !== "pending") continue;
@@ -228,6 +330,13 @@ export async function observe(page, { settle = 1500, duration = 3000, samples = 
     await page.waitForTimeout(duration / samples);
   }
   const counted = await page.evaluate(() => window.__motion.stop());
+  // What the page's script writes in a loop moves things as an animation would: held to the same rules.
+  const writes = counted.written.filter((w) => loops(w, counted.windowSeconds)).map((w) => w.key);
+  if (writes.length) {
+    for (const a of await page.evaluate(inspect, { compositable: [...COMPOSITABLE], writes })) {
+      if (a.kind === "ScriptWrite") found.set(identity(a), { ...a, seen: samples, elements: 1 });
+    }
+  }
   return { animations: [...found.values()], samples, counted };
 }
 
@@ -252,7 +361,7 @@ export function violations(seen, allowed = ALLOWED) {
   }
   const window = seen.counted?.windowSeconds ?? 0;
   for (const s of seen.counted?.started ?? []) {
-    if (window >= 2 && s.activeSeconds >= window && s.perSecond > 2) add("restarted", `restarted: ${s.key} starts ${s.perSecond} times a second`, { key: s.key });
+    if (loops(s, window)) add("restarted", `restarted: ${s.key} starts ${s.perSecond} times a second`, { key: s.key });
   }
   return found;
 }
@@ -301,3 +410,19 @@ export const ALLOWED = [
     why: "The title card's wave: 5 bars ease their transform over 70 ms to each of 10 readings a second (call-card.css). Without the ease it steps at 10 fps; the look is the operator's call (audit 2026-10-21, to decide).",
   },
 ];
+
+/**
+ * How often Chromium paints a settled page (Chromium only: WebKit has no trace to read). Records a DevTools trace for `ms`
+ * and counts the frames it painted: a page where nothing is happening paints nothing, and anything that paints on a loop
+ * (a colour, a text, a size, an SVG, the properties the compositor cannot move) shows here whatever moved it. A frame is a
+ * run of `Paint` events (one per painted layer and element) with no gap of a frame's length.
+ * `browser`: the Playwright Browser the page is in.
+ */
+export async function paints(browser, page, ms = 3000) {
+  await browser.startTracing(page, { categories: ["devtools.timeline"] });
+  await page.waitForTimeout(ms);
+  const trace = JSON.parse((await browser.stopTracing()).toString());
+  const times = (trace.traceEvents ?? trace).filter((event) => event.name === "Paint").map((event) => event.ts).sort((a, b) => a - b);
+  const frames = times.filter((time, i) => i === 0 || time - times[i - 1] > 12_000).length;
+  return { frames, perSecond: +(frames / (ms / 1000)).toFixed(2) };
+}

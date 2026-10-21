@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { observe, violations } from "./motion-audit.mjs";
+import { observe, paints, violations } from "./motion-audit.mjs";
 import { MIXED, openCard, openRoom } from "./motion-states.mjs";
 
 /* Everything that moves is a compositable animation on an HTML layer, and nothing moves where nobody sees it (desktop#149,
@@ -13,10 +13,21 @@ import { MIXED, openCard, openRoom } from "./motion-states.mjs";
  *              opaque page, behind opacity 0)
  *   restarted  no transition or animation starts again in every second of the window (one retargeted on each reading)
  *
- * and a room where nothing is happening holds still: no animation, no animation-frame loop. The intended exceptions are
+ * What script moves is held to the same three rules: a loop of writes to an element's style, class, attributes or content (in
+ * every second of the window, more than twice a second) is read as an animation of what it moves (a custom property, a class
+ * or an attribute: the properties the page's CSS makes of it) — so a `--level` that drives a transform is fine, one that drives
+ * a width, or a text rewritten four times a second, or anything written inside an SVG or where nobody sees it, is not.
+ *
+ * Besides, a room where nothing is happening holds still: no animation, no animation-frame loop, and in Chromium (whose trace tells)
+ * no loop of painted frames (PAINT_BUDGET). The intended exceptions are
  * the allowlist in motion-audit.mjs, each with its reason. A failure names the animation, its element and the rule. */
 
 /** The room, in a call or not. `quiet`: with the drawings held still and nothing happening, nothing runs at all. */
+// Review rule: these are written by hand (a state is a patch of the room's store, applyState in motion-states.mjs), not
+// generated from the app's model: the moods (AvatarMood, features/avatar/avatar-spec.ts) and the call's phases are TypeScript,
+// which this plain-JS spec cannot import, and a state needs a patch that makes it true, which only a person can write. So a
+// change that adds a mood, a call phase, a conversation state, or anything that animates or is rewritten on a timer, adds its
+// state here (and to CARDS when the floating card shows it) in the same PR. A reviewer asks for it.
 const STATES = [
   { id: "six conversations, no call", state: "not-in-call", quiet: true },
   { id: "the machine does not answer", state: "offline-machine", quiet: true },
@@ -34,6 +45,9 @@ const STATES = [
 ];
 /** Those that also run on a phone, where the conversations and the transcript wait off screen. */
 const ON_A_PHONE = ["in a call, the agent and two others working", "in a call, the person speaking, transcript open", "in a call, Settings open over it"];
+
+/** Frames a second Chromium may paint on a page where nothing is happening: a one-off (a row settling) is not a loop. */
+const PAINT_BUDGET = 1;
 
 /** The desktop app's card, by format: the states that move it. */
 const CARDS = {
@@ -53,14 +67,16 @@ for (const mode of ["gpu", "still"]) {
   test.describe(`drawings ${mode === "gpu" ? "move as GPU layers" : "hold still"}`, () => {
     test.describe("desktop", () => {
       for (const spec of STATES) {
-        test(spec.id, async ({ page }) => {
+        test(spec.id, async ({ page, browser, browserName }) => {
           await openRoom(page, { people: MIXED, state: spec.state, mode, after: spec.after });
           const seen = await watch(page);
           expect(broken(seen)).toEqual([]);
-          // Held still, with nothing happening: nothing runs, and nothing asks for a frame.
+          // Held still, with nothing happening: nothing runs, nothing asks for a frame, and the browser paints nothing
+          // (Chromium's trace tells; WebKit has none).
           if (spec.quiet && mode === "still") {
             expect(running(seen)).toEqual([]);
             expect(seen.counted.rafPerSecond).toBe(0);
+            if (browserName === "chromium") expect((await paints(browser, page)).perSecond).toBeLessThanOrEqual(PAINT_BUDGET);
           }
         });
       }
