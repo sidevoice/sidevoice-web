@@ -72,7 +72,17 @@ export function CharacterAvatar({ spec, state, size, mouth = "voice", mouthKey, 
     let open: HTMLElement | SVGElement | null = null;
     let shown: number | null = null;
     let active = false;
-    return mouthLevel((level) => {
+    // A copy with no box (display none: the phone's header list on a desktop, a closed panel) does not follow the voice:
+    // nobody sees it, and a drawing that was never laid out is never cut into layers, so its mouth would be an SVG written
+    // thirty times a second for nothing. Told by its size, as it appears and goes.
+    let boxed = true;
+    const watch = typeof ResizeObserver === "undefined" ? null : new ResizeObserver((entries) => {
+      const box = entries[entries.length - 1]?.contentRect;
+      boxed = !!box && (box.width > 0 || box.height > 0);
+    });
+    watch?.observe(element);
+    const unsubscribe = mouthLevel((level) => {
+      if (!boxed) return;
       // The mouth that moves: a layered drawing keeps a clone of it holding still in a slice (styles/call.css [data-clone]).
       // Found again when the drawing was cut into layers, or put back, since it was.
       if (!open?.isConnected) { open = element.querySelector<HTMLElement | SVGElement>(".m-open:not([data-clone])"); shown = null; }
@@ -83,6 +93,7 @@ export function CharacterAvatar({ spec, state, size, mouth = "voice", mouthKey, 
       if (active) element.setAttribute("data-mouth-active", "");
       else element.removeAttribute("data-mouth-active");
     });
+    return () => { watch?.disconnect(); unsubscribe(); };
   }, [mouth, mouthLevel]);
   const key = avatarKey(spec);
   // The key names the figure: a new spec object for the same conversation is the same drawing.
