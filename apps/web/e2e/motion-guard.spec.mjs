@@ -30,6 +30,7 @@ const STATES = [
   { id: "in a call, reconnecting", state: "reconnecting" },
   { id: "in a call, its conversation offline", state: "own-offline" },
   { id: "in a call, Settings open over it", state: "listening", after: "settings" },
+  { id: "Settings at Transcription, its level in view, nothing happening", state: "listening", after: "settings:transcription", quiet: true },
 ];
 /** Those that also run on a phone, where the conversations and the transcript wait off screen. */
 const ON_A_PHONE = ["in a call, the agent and two others working", "in a call, the person speaking, transcript open", "in a call, Settings open over it"];

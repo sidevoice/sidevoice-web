@@ -75,6 +75,7 @@ const LIVE = [
   { id: "call: the idle warning", people: MIXED, state: "idle-warning" },
   { id: "call: an unread reply in another conversation", people: MIXED, state: "unread-in-call" },
   { id: "call: working, Settings (General) open over it", people: MIXED, state: "working", after: "settings" },
+  { id: "call: Settings at Transcription, its level in view, nothing happening", people: MIXED, state: "listening", after: "settings:transcription" },
 ];
 /** Which of them also run on a phone. */
 const PHONE = new Set(["room: one conversation, no call", "room: six conversations, one with an unread reply", "call: listening, nobody speaking", "call: the agent and two others working",

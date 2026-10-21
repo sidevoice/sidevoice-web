@@ -94,7 +94,7 @@ export async function choose(page) {
 }
 
 /** The room on `page` (a fresh page of a fresh context), motion `mode` (gpu | still), the probe installed, the conversation
- *  chosen, then the state. `after`: "transcript" opens the transcript, "settings" opens Settings (General) over the room. */
+ *  chosen, then the state. `after`: "transcript" opens the transcript, "settings" (or "settings:<section>") opens Settings over the room. */
 export async function openRoom(page, { people = MIXED, state = "not-in-call", mode = "still", after = null } = {}) {
   await page.addInitScript(probe);
   await page.addInitScript((how) => localStorage.setItem("sidevoice.motion", how), mode);
@@ -103,15 +103,18 @@ export async function openRoom(page, { people = MIXED, state = "not-in-call", mo
   await choose(page);
   await page.evaluate(applyState, { id: state });
   if (after === "transcript") await page.locator("#transcript-toggle").click();
-  if (after === "settings") {
+  if (after?.startsWith("settings")) {
     // Opened on a room that has settled: the room's animations are under way (a browser pausing animations in the same
-    // task as it starts them leaves some running, which no person's click does).
+    // task as it starts them leaves some running, which no person's click does). `settings:voice` opens that section.
+    const section = after.split(":")[1] ?? "general";
     await page.waitForTimeout(1000);
-    await page.evaluate(() => {
-      window.sidevoiceUI.store.patch({ settingsSection: "general", settingsLevel: "page" });
+    await page.evaluate((section) => {
+      window.sidevoiceUI.store.patch({ settingsSection: section, settingsLevel: "page" });
       const dialog = document.getElementById("language-settings");
       if (dialog && !dialog.open) dialog.showModal();
-    });
+    }, section);
+    // The transcription's try keeps the microphone's level in view: a waveform that is flat until it listens.
+    if (section === "transcription") await page.locator(".model-try-wave").first().scrollIntoViewIfNeeded();
   }
 }
 
