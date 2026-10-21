@@ -69,17 +69,22 @@ export function useWave(level: number, muted: boolean): number[] {
   const latest = useRef(level);
   latest.current = muted ? 0 : level;
   const [levels, setLevels] = useState<number[]>(() => Array(WAVE_BARS).fill(0));
+  // Drained flat and still silent there is nothing to sample: no render ten times a second for nothing, and no timer
+  // either (desktop#149). A level arriving wakes it.
+  const resting = muted || (level === 0 && levels.every((value) => value === 0));
   useEffect(() => {
     if (muted) {
       setLevels(Array(WAVE_BARS).fill(0));
       return;
     }
-    // Drained flat and still silent: the same samples, so the card does not render again ten times a second for
-    // nothing (desktop#149).
-    const timer = setInterval(() => setLevels((previous) =>
-      latest.current === 0 && previous.every((value) => value === 0) ? previous : [...previous.slice(1), latest.current]), WAVE_SAMPLE_MS);
+    if (resting) return;
+    const sample = () => setLevels((previous) =>
+      latest.current === 0 && previous.every((value) => value === 0) ? previous : [...previous.slice(1), latest.current]);
+    // The level that woke it shows at once, not a sample's wait later.
+    sample();
+    const timer = setInterval(sample, WAVE_SAMPLE_MS);
     return () => clearInterval(timer);
-  }, [muted]);
+  }, [muted, resting]);
   return levels;
 }
 
