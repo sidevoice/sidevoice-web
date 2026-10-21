@@ -41,11 +41,12 @@ const CONTROLS: Control[] = [
   { id: "fade_ms", label: "Fade", unit: "ms", bound: "fade_ms", step: 5, read: (t) => t.fade_ms, patch: (v) => ({ fade_ms: v }) },
 ];
 
-/** The barge-in lab's presets (playground web/turn-lab-barge.mjs); A is the defaults. */
+/** The panel's presets: A is the defaults (tuned by the operator in real calls, 2026-10-21); B more eager and C more
+ *  tolerant than A, each around it. */
 export const TURN_PRESETS: Record<"A" | "B" | "C", { name: string; turn: NonNullable<Patch["turn"]> }> = {
-  A: { name: "A (defaults)", turn: { listening_bar: { ...TURN_TUNING.listening_bar }, barge_in_min_speech: 0.6, barge_in_window: 2.5, vad_confidence: 0.6, speech_start_ms: 400, pre_roll_ms: 1000, audio_grace_ms: 1000, fade_ms: 30 } },
-  B: { name: "B (eager)", turn: { listening_bar: { quiet: 0.45, playing: 0.55 }, barge_in_min_speech: 0.3, barge_in_window: 3, vad_confidence: 0.5, speech_start_ms: 300, pre_roll_ms: 1000, audio_grace_ms: 600, fade_ms: 15 } },
-  C: { name: "C (tolerant)", turn: { listening_bar: { quiet: 0.5, playing: 0.75 }, barge_in_min_speech: 1, barge_in_window: 2, vad_confidence: 0.7, speech_start_ms: 500, pre_roll_ms: 1000, audio_grace_ms: 1200, fade_ms: 60 } },
+  A: { name: "A (defaults)", turn: { ...TURN_TUNING, listening_bar: { ...TURN_TUNING.listening_bar } } },
+  B: { name: "B (eager)", turn: { listening_bar: { quiet: 0.45, playing: 0.55 }, barge_in_min_speech: 0.3, barge_in_window: 2.5, vad_confidence: 0.6, speech_start_ms: 100, pre_roll_ms: 1000, audio_grace_ms: 200, fade_ms: 15 } },
+  C: { name: "C (tolerant)", turn: { listening_bar: { quiet: 0.55, playing: 0.7 }, barge_in_min_speech: 0.8, barge_in_window: 2, vad_confidence: 0.7, speech_start_ms: 300, pre_roll_ms: 1000, audio_grace_ms: 800, fade_ms: 60 } },
 };
 
 export function TurnTuningDev() {

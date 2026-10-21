@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.10.0](https://github.com/sidevoice/sidevoice-web/compare/v0.9.0...v0.10.0) (2026-10-21)
+
+
+### Features
+
+* **call:** tell the desktop app whether the room shows the stage ([#314](https://github.com/sidevoice/sidevoice-web/issues/314)) ([fcadcae](https://github.com/sidevoice/sidevoice-web/commit/fcadcae47e1f81832ee7212629db27177ef11186))
+* **settings:** a developer option to animate conversation thumbnails ([#318](https://github.com/sidevoice/sidevoice-web/issues/318)) ([310b8f4](https://github.com/sidevoice/sidevoice-web/commit/310b8f4e1653ca6e8d695a67ce5bab4fe5c4e4f5))
+* **settings:** developer options on nightly builds ([#307](https://github.com/sidevoice/sidevoice-web/issues/307)) ([ca164e7](https://github.com/sidevoice/sidevoice-web/commit/ca164e7ce64f9d9243a52a0fc575364a643f1ca0))
+* **voice:** turn defaults tuned in real calls ([#320](https://github.com/sidevoice/sidevoice-web/issues/320)) ([077d9e1](https://github.com/sidevoice/sidevoice-web/commit/077d9e1884fd6b1e447d418cfa8dcae95b61f10f))
+
+
+### Bug Fixes
+
+* **call-card:** the picture card's grid column cannot outgrow the card ([#306](https://github.com/sidevoice/sidevoice-web/issues/306)) ([4658dc7](https://github.com/sidevoice/sidevoice-web/commit/4658dc7955253f0cbc860f084e70f3c726236b65))
+* **room:** the conversation count lives inside the conversations icon ([#312](https://github.com/sidevoice/sidevoice-web/issues/312)) ([dfc0b6b](https://github.com/sidevoice/sidevoice-web/commit/dfc0b6be772adb051c74ee22d65e909dacac3c13)), closes [#309](https://github.com/sidevoice/sidevoice-web/issues/309)
+
+
+### Performance Improvements
+
+* **conversation:** a closed transcript does not light the words the voice says ([#316](https://github.com/sidevoice/sidevoice-web/issues/316)) ([f1f8974](https://github.com/sidevoice/sidevoice-web/commit/f1f897499e8efe47cc343fca9d4c2f1044bcd252))
+* **conversation:** the text box measures itself only when its state changes ([#315](https://github.com/sidevoice/sidevoice-web/issues/315)) ([bdec082](https://github.com/sidevoice/sidevoice-web/commit/bdec0820e40814afe725e5999026f9f0362e5234))
+* **room:** conversation thumbnails keep their mouth still ([#310](https://github.com/sidevoice/sidevoice-web/issues/310)) ([324fdbe](https://github.com/sidevoice/sidevoice-web/commit/324fdbeaa67e14dd8ee988ad57ef6dc4cbce0352))
+
 ## [0.9.0](https://github.com/sidevoice/sidevoice-web/compare/v0.8.3...v0.9.0) (2026-10-21)
 
 

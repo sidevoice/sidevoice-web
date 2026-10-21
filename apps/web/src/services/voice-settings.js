@@ -53,13 +53,13 @@ export const IDLE_UNLOAD_MINUTES = [5, 10, 30, 60];
  * turn ends; `fade_ms` the speaker's fade when a reply is cut.
  */
 export const TURN_TUNING = {
-  listening_bar: { quiet: 0.5, playing: 0.65 },
-  barge_in_min_speech: 0.6,
+  listening_bar: { quiet: 0.5, playing: 0.6 },
+  barge_in_min_speech: 0.5,
   barge_in_window: 2.5,
-  vad_confidence: 0.6,
-  speech_start_ms: 400,
+  vad_confidence: 0.65,
+  speech_start_ms: 150,
   pre_roll_ms: 1000,
-  audio_grace_ms: 1000,
+  audio_grace_ms: 350,
   fade_ms: 30,
 };
 /** @type {Record<string, {min: number, max: number, above?: boolean}>} What each number may be; the voice refuses outside. */
