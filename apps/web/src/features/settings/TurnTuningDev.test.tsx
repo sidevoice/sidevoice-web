@@ -48,7 +48,7 @@ test("a control, a preset and the reset reach the stored turn settings", () => {
   expect(turn().fade_ms).toBe(TURN_TUNING.fade_ms);
   fireEvent.click(screen.getByRole("button", { name: /Preset B/ }));
   expect(turn()).toMatchObject({ ...TURN_PRESETS.B.turn, listening_bar: { quiet: 0.45, playing: 0.55 } });
-  expect(screen.getByLabelText("Audio grace")).toHaveValue(600);
+  expect(screen.getByLabelText("Audio grace")).toHaveValue(TURN_PRESETS.B.turn.audio_grace_ms);
   fireEvent.click(screen.getByRole("button", { name: "Reset to defaults" }));
   expect(turn()).toEqual(TURN_TUNING);
 });
