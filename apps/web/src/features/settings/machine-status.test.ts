@@ -25,8 +25,8 @@ test("a remote machine: the first that holds of not paired, checking, connected,
   expect(said(machineStatus(machine({ state: "revoked", reach: "revoked" }), running, false, en))[0]).toBe("unpaired");
   expect(said(machineStatus(machine({ state: "checking", reach: "checking" }), running, false, en)))
     .toEqual(["checking", "neutral", "Checking…", "Checking…", undefined]);
-  // Connected, however it is reached (directly, through the room, another way): the how is never said.
-  for (const reach of ["direct", "room", "away"] as const) {
+  // Connected, however it is reached (directly, another way): the how is never said.
+  for (const reach of ["direct", "away"] as const) {
     expect(said(machineStatus(machine({ reach }), running, false, en)), reach).toEqual(["direct", "positive", "Online", "Online", undefined]);
   }
   // Not connected is grey, not red: a machine asleep is not something to fix.
@@ -81,7 +81,7 @@ test("no state is ever the accent, and every short form fits a nav entry (17 cha
 
 test("no state says how a machine is reached, in English or Spanish", () => {
   for (const t of [en, es]) {
-    for (const reach of ["direct", "room", "away", "offline", "checking"] as const) {
+    for (const reach of ["direct", "away", "offline", "checking"] as const) {
       for (const state of ["connected", "checking", "offline"] as const) {
         const value = machineStatus(machine({ reach, state }), running, false, t);
         expect([value.short, value.long].join(" "), `${reach} ${state}`).not.toMatch(/room|directly|sala|directamente/i);
@@ -91,7 +91,7 @@ test("no state says how a machine is reached, in English or Spanish", () => {
 });
 
 test("in Spanish, the words the spec gives", () => {
-  for (const reach of ["direct", "room"] as const) {
+  for (const reach of ["direct"] as const) {
     expect(said(machineStatus(machine({ reach }), running, false, es)).slice(2, 4)).toEqual(["En línea", "En línea"]);
   }
   expect(said(machineStatus(machine({ state: "offline" }), running, false, es)).slice(2, 5)).toEqual(["Sin conexión", "Sin conexión", "Ahora no se llega desde aquí"]);

@@ -27,7 +27,7 @@ const person = (thread_id: string, title: string, extra: Record<string, unknown>
   ({ thread_id, title, available: true, reach: { state: "listening" }, node: "fp-1", machine: { host: "Laptop", id: "m1" }, harness: "claude", ...extra });
 /** The room's reply in the transcript, already played: no balloon over the agent. */
 const played = { segment: "h-2", thread: "fp-1|t-login", role: "assistant" as const, text: REPLY, name: "Fix the slow login", time: 1, session: "s1", audio: "played" };
-const pairing = (fp: string, host: string | null) => ({ fp, host, urls: [], rv: null, device_id: "d", paired_at: 1, revoked: false });
+const pairing = (fp: string, host: string | null) => ({ fp, host, urls: [], device_id: "d", paired_at: 1, revoked: false });
 /** These conversations busy for as long as Working waits before it shows (the runtime's start and clock facts). */
 const lasted = (...keys: string[]) => ({ workingSince: Object.fromEntries(keys.map((key) => [key, 0])), now: WORKING_SHOWN_AFTER_MS });
 const live = (...fps: string[]) => Object.fromEntries(fps.map((fp) => [fp, { reach: "ok" as const, via: "node" as const }]));

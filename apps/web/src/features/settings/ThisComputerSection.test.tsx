@@ -15,10 +15,10 @@ afterEach(() => { cleanup(); localStorage.removeItem("sidevoice.settings"); loca
  * Machines is Remote machines; anywhere else (a browser, even one talking to a local Sidevoice, or a phone) neither. */
 
 const paired = (extra: Partial<PairingSummary> = {}): PairingSummary => ({
-  fp: "fp-nuc", host: "NUC", urls: ["https://nuc.example"], rv: { url: "https://room.example", node: "nuc-1" },
+  fp: "fp-nuc", host: "NUC", urls: ["https://nuc.example"],
   device_id: "d-nuc", paired_at: 1_700_000_000, revoked: false, ...extra,
 });
-const local = paired({ fp: "fp-local", host: "MacBook", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d-local" });
+const local = paired({ fp: "fp-local", host: "MacBook", local: true, urls: ["http://127.0.0.1:45781"], device_id: "d-local" });
 const running: LocalHostStatus = { state: "running", reachable: true, installed: true, service: "launchd", core: { version: "0.1.0", api: 1 }, calls: 0 };
 
 function open(pairings: PairingSummary[], facts: Record<string, unknown> = {}) {

@@ -18,11 +18,11 @@ afterEach(() => { cleanup(); localStorage.removeItem(VARIANTS_KEY); localStorage
  * device is never "Running" or "Starting…" in the nav. */
 
 const paired = (extra: Partial<PairingSummary> = {}): PairingSummary => ({
-  fp: "fp-nuc", host: "NUC", urls: ["https://nuc.example"], rv: { url: "https://room.example", node: "nuc-1" },
+  fp: "fp-nuc", host: "NUC", urls: ["https://nuc.example"],
   device_id: "d-nuc", paired_at: 1_700_000_000, revoked: false, ...extra,
 });
-const local = paired({ fp: "fp-local", host: "MacBook", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d-local" });
-const lab = paired({ fp: "fp-lab", host: "Lab box", insecure: true, urls: ["http://192.168.1.20:8768"], rv: null, device_id: "d-lab" });
+const local = paired({ fp: "fp-local", host: "MacBook", local: true, urls: ["http://127.0.0.1:45781"], device_id: "d-local" });
+const lab = paired({ fp: "fp-lab", host: "Lab box", insecure: true, urls: ["http://192.168.1.20:8768"], device_id: "d-lab" });
 const old = paired({ fp: "fp-old", host: "Old laptop", device_id: "d-old" });
 const running: LocalHostStatus = { state: "running", reachable: true, installed: true, service: "launchd", core: { version: "0.1.0", api: 1 }, calls: 0 };
 const links = { "fp-nuc": { reach: "ok", via: "node" }, "fp-lab": { reach: "ok", via: "node" }, "fp-old": { reach: "offline", via: "" } } as const;

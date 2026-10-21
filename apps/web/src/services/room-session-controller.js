@@ -1,5 +1,5 @@
 import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,noMachine,reachNote,conversationKey,conversationOf,personKey,displayTitle,focusedThread} from '../state/room-session-state.js';
-import {pageTarget,targetAnswers,routeUrl,callSocketUrl,isNodePath,askTarget,askRoomNode} from './rendezvous.js';
+import {pageTarget,targetAnswers,routeUrl,callSocketUrl,isNodePath,askTarget} from './rendezvous.js';
 import {readPairingState,projectPairings,writePairings,withPairing,withoutPairing,revokedPairing,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {localHostBridge,desktopDataBridge,normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
 import {createHostAgentsController} from './host-agents.ts';
@@ -319,14 +319,12 @@ async function locate(fp,{move=!(fp===state.callNode&&inCallNow()),fresh=false,h
   const about=await describeTarget();
   if(about)targetAbout=about;
   found=await firstProven(candidateBases(pairing,{target,about,origin:location.origin}),pairing,deps,started);
-  // With nothing proven, the room the machine links with says whether it is there at all.
-  if(!found&&pairing.rv&&await askRoomNode(pairing.rv.url,pairing.rv.node,fetch)===false)reach='offline';
  }catch{}
  if(asked<link.applied||links.get(fp)!==link||pairings.list.find(p=>p.fp===fp)!==pairing)return;
  link.applied=asked;
- // The page follows the build of whoever serves it: a room serving this page says which (or a server of a kind this
- // version does not know yet, when it says it).
- if(target===''&&(targetAbout?.kind==='room'||targetAbout?.kind==='unknown'))followServedBuild(targetAbout.build);
+ // The page follows the build of whoever serves it: a server of a kind this
+ // version does not know yet serving this page says which, when it says it.
+ if(target===''&&targetAbout?.kind==='unknown')followServedBuild(targetAbout.build);
  if(found){
   verified.set(found.base,Date.now());hostAgentBases.set(fp,found.base);if(link.doubted===found.base)link.doubted=null;
   // A call keeps the address its socket is on.
@@ -338,7 +336,7 @@ async function locate(fp,{move=!(fp===state.callNode&&inCallNow()),fresh=false,h
 }
 function settleLink(fp,found,reach){
  const link=linkOf(fp),base=found?.base??null,moved=base!==link.base;
- link.base=base;link.reach=found?'ok':reach;link.via=found?(found.via==='room'?'room':'node'):'';
+ link.base=base;link.reach=found?'ok':reach;link.via=found?'node':'';
  if(found&&reachFailure&&(reachFailure.node==null||reachFailure.node===fp)&&state.joinFailure===reachFailure.text){roomStore.patch({joinFailure:'',joinFailureDetails:''});reachFailure=null}
  publishLinks();
  if(moved&&base!=null){if(fp===state.callNode)void refresh();void refreshPeople(fp);void refreshHistory(fp)}
@@ -1014,8 +1012,8 @@ async function writePendingRevokes(list){
  try{if(list.length)pageStorage()?.setItem(PENDING_REVOKES_KEY,JSON.stringify(list));else pageStorage()?.removeItem(PENDING_REVOKES_KEY)}catch{}
 }
 async function keepPendingRevoke(pairing){
- const {fp,device_id,token,urls,rv,public_key,host,insecure}=pairing;
- await writePendingRevokes(previous=>[...previous.filter(p=>p.fp!==fp),{fp,device_id,token,urls,rv,public_key,host,...(insecure?{insecure}:{})}]);
+ const {fp,device_id,token,urls,public_key,host,insecure}=pairing;
+ await writePendingRevokes(previous=>[...previous.filter(p=>p.fp!==fp),{fp,device_id,token,urls,public_key,host,...(insecure?{insecure}:{})}]);
 }
 /** Tells a machine this device is gone (its token revoked there), at an address that proves it is that machine. */
 async function revokeOn(pairing,knownBase=null){

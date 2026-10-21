@@ -1,7 +1,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),test=require('node:test'),{mock}=require('node:test'),assert=require('node:assert/strict');
 // This device's pairing, as the page keeps it, for every test that does not say otherwise: the machine proved itself
 // at the page's own origin a moment ago, so requests go where they always went and carry its token.
-const PAIRED={fp:'fp-mac',public_key:'pk',host:'macbook',urls:['http://127.0.0.1:8768'],rv:{url:'https://room.example',node:'mac'},device_id:'dev-1',token:'tok-1',paired_at:1};
+const PAIRED={fp:'fp-mac',public_key:'pk',host:'macbook',urls:['http://127.0.0.1:8768'],device_id:'dev-1',token:'tok-1',paired_at:1};
 function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,siteData=null,localHost=null,nativeData=null,indexedDB=null,outboxScope=null,readingMode=false}={}){
  const sourceRoot=__dirname+'/../src'; const uiSource=fs.readdirSync(sourceRoot,{recursive:true}).filter(file=>String(file).endsWith('.tsx')).map(file=>fs.readFileSync(sourceRoot+'/'+file,'utf8')).join('\n');
  class Element{constructor(id){this.id=id;this.children=[];this.dataset={};this.style={setProperty(){}};this.classList={add(){},remove(){}};this.parentElement=this;this.listeners={};this.attributes={}}addEventListener(name,fn){this.listeners[name]=fn}showModal(){this.open=true}close(){this.open=false;this.listeners.close?.()}contains(node){return node===this||this.children.includes(node)}removeAttribute(){}closest(){return null}querySelector(){return null}append(...children){this.children.push(...children)}replaceChildren(...children){this.children=[...children]}remove(){}setAttribute(name,value){this.attributes[name]=value}getAttribute(name){return this.attributes[name]}click(){this.onclick?.()}}
@@ -801,15 +801,14 @@ async function fakeNode(host='macbook'){
  return {host,public_key:spki.toString('base64'),fp:Buffer.from(await subtle.digest('SHA-256',spki)).toString('base64url'),tokens:new Set(),
   sign:async nonce=>Buffer.from(await subtle.sign({name:'ECDSA',hash:'SHA-256'},keys.privateKey,Buffer.from('sidevoice-node-identity:'+nonce))).toString('base64url')};
 }
-const pairingOf=(node,extra={})=>({fp:node.fp,public_key:node.public_key,host:node.host,urls:['http://127.0.0.1:8768'],rv:{url:'https://room.example',node:'mac'},device_id:'dev-1',token:'tok-1',paired_at:1,...extra});
+const pairingOf=(node,extra={})=>({fp:node.fp,public_key:node.public_key,host:node.host,urls:['http://127.0.0.1:8768'],device_id:'dev-1',token:'tok-1',paired_at:1,...extra});
 /** The network the page sees: which machine answers at which address, what the target and the room say, and every request. */
-function network({at={},target=null,roomSays=null,refuse=false}={}){
+function network({at={},target=null,refuse=false}={}){
  const asked=[];
  const reply=(status,body)=>({ok:status>=200&&status<300,status,json:async()=>body});
  const get=async(url,init={})=>{
   const auth=init.headers?.Authorization||null;asked.push({method:init.method||'GET',url,auth,init});
   if(url==='/api/rendezvous')return target?reply(200,target):reply(404,{detail:'Not Found'});
-  if(url.startsWith('https://room.example/api/rendezvous?nodes='))return roomSays==null?reply(502,{}):reply(200,{kind:'room',nodes:[{id:'mac',connected:roomSays}]});
   const base=Object.keys(at).find(prefix=>url.startsWith(prefix+'/api/'));
   if(base==null)throw new TypeError('Failed to fetch');
   const node=at[base],path=url.slice(base.length);
@@ -821,7 +820,7 @@ function network({at={},target=null,roomSays=null,refuse=false}={}){
  return {get,asked};
 }
 function codeFor(node,extra={}){
- return 'SV1.'+Buffer.from(JSON.stringify({v:1,fp:node.fp,host:node.host,urls:['http://127.0.0.1:8768'],rv:{url:'https://room.example',node:'mac'},secret:'fresh',exp:Math.floor(Date.now()/1000)+600,...extra})).toString('base64url');
+ return 'SV1.'+Buffer.from(JSON.stringify({v:1,fp:node.fp,host:node.host,urls:['http://127.0.0.1:8768'],secret:'fresh',exp:Math.floor(Date.now()/1000)+600,...extra})).toString('base64url');
 }
 function socketsOf(s){
  const sockets=[];
@@ -833,22 +832,22 @@ const stored=s=>JSON.parse(s.saved['sidevoice.pairings']||'null');
 
 test('A machine is reached at the first of its addresses that proves it is that machine, and the token goes nowhere else',async()=>{
  const node=await fakeNode(),squatter=await fakeNode('squatter');node.tokens.add('tok-1');
- const s=setup({paired:false,stored:{pairings:[pairingOf(node)]}});s.context.__fp=node.fp;s.run('callNode=__fp');
- // The loopback URL answers as someone else; the machine is behind its room.
- const net=network({at:{'http://127.0.0.1:8768':squatter,'https://room.example/nodes/mac':node}});s.context.fetch=net.get;
+ const s=setup({paired:false,stored:{pairings:[pairingOf(node,{urls:['http://127.0.0.1:8768','https://mac.example']})]}});s.context.__fp=node.fp;s.run('callNode=__fp');
+ // The loopback URL answers as someone else; the machine is at its other address.
+ const net=network({at:{'http://127.0.0.1:8768':squatter,'https://mac.example':node}});s.context.fetch=net.get;
  await s.run('locate(__fp,{move:true,fresh:true})');
- assert.equal(s.run('linkBase(__fp)'),'https://room.example/nodes/mac');
- assert.equal(s.run('state.machineLinks[__fp].via'),'room');
+ assert.equal(s.run('linkBase(__fp)'),'https://mac.example');
+ assert.equal(s.run('state.machineLinks[__fp].via'),'node');
  assert.equal(s.run('roomStore.getState().machines[0].state'),'connected');
  assert.equal(s.run('roomStore.getState().machines[0].reachLabel'),undefined,'normal host rows do not expose the route');
  await s.run('refresh()');
- assert.ok(net.asked.some(r=>r.url==='https://room.example/nodes/mac/api/presentation?session_id=s'&&r.auth==='Bearer tok-1'));
+ assert.ok(net.asked.some(r=>r.url==='https://mac.example/api/presentation?session_id=s'&&r.auth==='Bearer tok-1'));
  assert.equal(net.asked.filter(r=>r.url.startsWith('http://127.0.0.1')&&r.auth).length,0,'nothing carrying the token went to the address that could not prove itself');
  // Within a few minutes a proven address is not asked to prove itself again.
  net.asked.length=0;await s.run('locate(__fp)');
  assert.equal(net.asked.length,0);
  // Once the machine answers directly, a fresh look prefers it: the contract's order, not the fastest.
- const direct=network({at:{'http://127.0.0.1:8768':node,'https://room.example/nodes/mac':node}});s.context.fetch=direct.get;
+ const direct=network({at:{'http://127.0.0.1:8768':node,'https://mac.example':node}});s.context.fetch=direct.get;
  await s.run('locate(__fp,{move:true,fresh:true})');
  assert.equal(s.run('linkBase(__fp)'),'http://127.0.0.1:8768');
  assert.equal(s.run('roomStore.getState().machines[0].state'),'connected');
@@ -856,7 +855,7 @@ test('A machine is reached at the first of its addresses that proves it is that 
 });
 
 test('The native local pairing is one more machine, listed first, and uses only its per-launch proxy',async()=>{
- const local={fp:'fp-local',public_key:'pk-local',host:'MacBook',device_id:'local-device',token:'local-session-secret',urls:['http://127.0.0.1:43127'],rv:null};
+ const local={fp:'fp-local',public_key:'pk-local',host:'MacBook',device_id:'local-device',token:'local-session-secret',urls:['http://127.0.0.1:43127']};
  const bridge={state:()=>({state:'running',reachable:true,installed:true,service:'launchd',core:{version:'1.0',api:1}}),subscribe:()=>()=>{},pairing:()=>local};
  const s=setup({paired:false,stored:{pairings:[PAIRED]},localHost:bridge}),asked=[];
  s.context.fetch=async(url,options={})=>{asked.push([String(url),options]);return {ok:true,status:200,json:async()=>({participants:[],messages:[],binding:null,call:null}),text:async()=>''}};
@@ -891,7 +890,7 @@ test('A local row survives reload with no native pairing',async()=>{
 });
 
 test('An external uninstall projects absent and removes the former local machine',async()=>{
- const local={fp:'fp-local',public_key:'pk-local',host:'MacBook',device_id:'local-device',token:'local-session-secret',urls:['http://127.0.0.1:43127'],rv:null};
+ const local={fp:'fp-local',public_key:'pk-local',host:'MacBook',device_id:'local-device',token:'local-session-secret',urls:['http://127.0.0.1:43127']};
  let onStatus;
  const bridge={state:()=>({state:'running',reachable:true,installed:true,service:'launchd'}),subscribe:listener=>{onStatus=listener;return()=>{}},pairing:()=>local};
  const s=setup({paired:false,stored:{pairings:[PAIRED]},localHost:bridge});
@@ -906,7 +905,7 @@ test('An external uninstall projects absent and removes the former local machine
 });
 
 test('In the desktop app, this device\'s agents are asked for in This device and another machine\'s under Remote machines; in a browser, all under Machines',async()=>{
- const local={fp:'fp-local',public_key:'pk-local',host:'MacBook',device_id:'local-device',token:'local-session-secret',urls:['http://127.0.0.1:43127'],rv:null};
+ const local={fp:'fp-local',public_key:'pk-local',host:'MacBook',device_id:'local-device',token:'local-session-secret',urls:['http://127.0.0.1:43127']};
  const bridge={state:()=>({state:'running',reachable:true,installed:true,service:'launchd',core:{version:'1.0',api:1}}),subscribe:()=>()=>{},pairing:()=>local};
  const s=setup({paired:false,stored:{pairings:[PAIRED]},localHost:bridge});
  s.context.fetch=async()=>({ok:true,status:200,json:async()=>({participants:[],messages:[],binding:null,call:null}),text:async()=>''});
@@ -941,7 +940,7 @@ test('A native status event that wins the initial state read still completes mac
 });
 
 test('A lost local pairing clears its per-launch locator and a reachable non-running core restores routing with fresh credentials',async()=>{
- const oldLocal={fp:'fp-local',public_key:'pk-local',host:'MacBook',device_id:'local-device',token:'old-launch-secret',urls:['http://127.0.0.1:43127'],rv:null};
+ const oldLocal={fp:'fp-local',public_key:'pk-local',host:'MacBook',device_id:'local-device',token:'old-launch-secret',urls:['http://127.0.0.1:43127']};
  const nextLocal={...oldLocal,token:'new-launch-secret',urls:['http://127.0.0.1:43218']};
  let status={state:'running',reachable:true,installed:true,service:'launchd'},pairing=oldLocal,onStatus=()=>{},pendingPairing=null;
  const bridge={state:()=>status,subscribe:listener=>{onStatus=listener;return()=>{}},pairing:()=>pendingPairing||pairing};
@@ -1024,7 +1023,7 @@ test('Every paired machine at once: each at its own address with its own token, 
  // The same thread name on both machines is two conversations.
  mac.people=[{thread_id:'t',title:'Mac',available:true,reach:{state:'listening'}}];pc.people=[{thread_id:'t',title:'PC',available:true,reach:{state:'listening'}}];
  pc.messages=[{id:'pc:voice:1',thread:'t',role:'assistant',text:'Hecho en el PC',time:1,seq:3,status:'text_only'}];
- const s=setup({paired:false,stored:{pairings:[pairingOf(mac,{rv:null}),pairingOf(pc,{token:'tok-pc',urls:['https://pc.example'],rv:null})]}});
+ const s=setup({paired:false,stored:{pairings:[pairingOf(mac,{}),pairingOf(pc,{token:'tok-pc',urls:['https://pc.example']})]}});
  const net=network({at:{'http://127.0.0.1:8768':mac,'https://pc.example':pc}});s.context.fetch=net.get;
  s.run('sessionId=null;roomBinding=null');
  await s.run('Promise.all(liveMachines().map(fp=>locate(fp,{fresh:true})))');
@@ -1044,7 +1043,7 @@ test('Every paired machine at once: each at its own address with its own token, 
 
 test('A paired machine keeps its remembered conversation card after page restart while unreachable',async()=>{
  const node=await fakeNode();node.tokens.add('tok-1');node.people=[{thread_id:'old',title:'Old conversation',available:true}];
- const first=setup({paired:false,stored:{pairings:[pairingOf(node,{rv:null})]}});
+ const first=setup({paired:false,stored:{pairings:[pairingOf(node,{})]}});
  first.context.__fp=node.fp;
  first.run("const link=linkOf(__fp);link.base='http://127.0.0.1:8768';link.reach='ok';publishLinks()");
  first.context.fetch=network({at:{'http://127.0.0.1:8768':node}}).get;
@@ -1057,7 +1056,7 @@ test('A paired machine keeps its remembered conversation card after page restart
 
 test('Desktop native pairing hydration restores only card metadata after restart',async()=>{
  const node=await fakeNode();node.tokens.add('tok-1');node.people=[{thread_id:'old',title:'Old conversation',available:true}];
- const pairing=pairingOf(node,{rv:null});
+ const pairing=pairingOf(node,{});
  const data={pairings:{read:async()=>({pairings:[pairing],pendingRevokes:[]}),write:async()=>{}}};
  const first=setup({paired:false,nativeData:data});first.context.__fp=node.fp;
  await new Promise(resolve=>setTimeout(resolve,0));
@@ -1074,7 +1073,7 @@ test('Desktop native pairing hydration restores only card metadata after restart
 
 test('A temporary empty machine inventory does not erase a remembered conversation',async()=>{
  const node=await fakeNode();node.tokens.add('tok-1');node.people=[];
- const s=setup({paired:false,stored:{pairings:[pairingOf(node,{rv:null})]}});
+ const s=setup({paired:false,stored:{pairings:[pairingOf(node,{})]}});
  s.context.__fp=node.fp;
  s.run("const link=linkOf(__fp);link.base='http://127.0.0.1:8768';link.reach='ok';link.people=[{node:__fp,thread_id:'old',title:'Old conversation',available:true}];publishLinks();mergePeople()");
  s.context.fetch=network({at:{'http://127.0.0.1:8768':node}}).get;
@@ -1085,7 +1084,7 @@ test('A temporary empty machine inventory does not erase a remembered conversati
 
 test('A paired machine returning at its saved address restores the same card without a duplicate',async()=>{
  const node=await fakeNode();node.tokens.add('tok-1');node.people=[{thread_id:'old',title:'Old conversation',available:true}];
- const first=setup({paired:false,stored:{pairings:[pairingOf(node,{rv:null})]}});
+ const first=setup({paired:false,stored:{pairings:[pairingOf(node,{})]}});
  first.context.__fp=node.fp;
  first.run("const link=linkOf(__fp);link.base='http://127.0.0.1:8768';link.reach='ok';publishLinks()");
  first.context.fetch=network({at:{'http://127.0.0.1:8768':node}}).get;
@@ -1105,7 +1104,7 @@ test('A paired machine returning at its saved address restores the same card wit
 
 test('A network return wakes the saved-address probe without waiting for a suspended WebView timer',async()=>{
  const node=await fakeNode();node.tokens.add('tok-1');node.people=[{thread_id:'old',title:'Old conversation',available:true}];
- const s=setup({paired:false,stored:{pairings:[pairingOf(node,{rv:null})]}});
+ const s=setup({paired:false,stored:{pairings:[pairingOf(node,{})]}});
  s.context.__fp=node.fp;
  s.context.fetch=network({at:{'http://127.0.0.1:8768':node}}).get;
  assert.equal(typeof s.handlers.online,'function');
@@ -1118,7 +1117,7 @@ test('A network return wakes the saved-address probe without waiting for a suspe
 
 test('Repeated offline beats coalesce one identity probe per machine until it settles',async()=>{
  const node=await fakeNode();node.tokens.add('tok-1');
- const s=setup({paired:false,stored:{pairings:[pairingOf(node,{rv:null})]}});
+ const s=setup({paired:false,stored:{pairings:[pairingOf(node,{})]}});
  const replies=network({at:{'http://127.0.0.1:8768':node}});
  let release,identityCalls=0;
  s.context.fetch=(url,init)=>{
@@ -1138,7 +1137,7 @@ test('Repeated offline beats coalesce one identity probe per machine until it se
 
 test('An explicit agent leave retires the card across restart; a new explicit join can show it again',async()=>{
  const node=await fakeNode();node.tokens.add('tok-1');node.people=[{thread_id:'old',title:'Old conversation',available:true}];
- const first=setup({paired:false,stored:{pairings:[pairingOf(node,{rv:null})]}});first.context.__fp=node.fp;
+ const first=setup({paired:false,stored:{pairings:[pairingOf(node,{})]}});first.context.__fp=node.fp;
  first.run("const link=linkOf(__fp);link.base='http://127.0.0.1:8768';link.reach='ok';publishLinks()");
  first.context.fetch=network({at:{'http://127.0.0.1:8768':node}}).get;
  await first.run('refreshPeople(__fp)');
@@ -1158,7 +1157,7 @@ test('An explicit agent leave retires the card across restart; a new explicit jo
 
 test('A failed user close leaves the remembered card until Core accepts explicit leave',async()=>{
  const node=await fakeNode();node.tokens.add('tok-1');node.people=[{thread_id:'old',title:'Old conversation',available:true}];
- const s=setup({paired:false,stored:{pairings:[pairingOf(node,{rv:null})]}});s.context.__fp=node.fp;
+ const s=setup({paired:false,stored:{pairings:[pairingOf(node,{})]}});s.context.__fp=node.fp;
  s.run("const link=linkOf(__fp);link.base='http://127.0.0.1:8768';link.reach='ok';publishLinks()");
  const net=network({at:{'http://127.0.0.1:8768':node}});s.context.fetch=net.get;
  await s.run('refreshPeople(__fp)');
@@ -1171,7 +1170,7 @@ test('A failed user close leaves the remembered card until Core accepts explicit
 
 test('Olvidar forgets the machine here at once, and asks it to revoke this device only where it proves itself',async()=>{
  const mac=await fakeNode('macbook'),pc=await fakeNode('linux'),squatter=await fakeNode('squatter');
- const s=setup({stored:{pairings:[pairingOf(mac),pairingOf(pc,{token:'tok-pc',device_id:'dev-pc',urls:['http://10.0.0.9:8768'],rv:null})]}});
+ const s=setup({stored:{pairings:[pairingOf(mac),pairingOf(pc,{token:'tok-pc',device_id:'dev-pc',urls:['http://10.0.0.9:8768']})]}});
  // A call on the Mac, and conversations of both machines listed.
  s.context.__pc=pc.fp;s.run(`ws={readyState:1,close(){}};var hungUp=0;const hangUp=disconnect;disconnect=()=>{hungUp++;hangUp()};people=[{node:callNode,thread_id:'a',title:'A',available:true},{node:__pc,thread_id:'b',title:'B',available:true}];history=[{thread:callNode+'|a',role:'assistant',text:'x',seq:1},{thread:__pc+'|b',role:'assistant',text:'y',seq:1}]`);
  const net=network({at:{'':mac,'http://10.0.0.9:8768':squatter}});s.context.fetch=net.get;
@@ -3008,7 +3007,7 @@ test('Storage the browser refuses is found once at start and said on top',async(
 
 test('A server of a kind this page does not know yet is used for what it says: its fingerprint, and the build it serves (core#112)',async()=>{
  const node=await fakeNode();node.tokens.add('tok-1');
- const s=setup({paired:false,stored:{pairings:[pairingOf(node,{urls:[],rv:null})]}});s.context.__fp=node.fp;
+ const s=setup({paired:false,stored:{pairings:[pairingOf(node,{urls:[]})]}});s.context.__fp=node.fp;
  const replaced=[];Object.assign(s.context.location,{origin:'http://127.0.0.1:8768',pathname:'/voice/',search:'',replace:url=>replaced.push(url)});
  s.context.window.sidevoiceBuildId='page-old';
  const net=network({at:{'':node},target:{kind:'node+room',fingerprint:node.fp,web_build:'page-new',nodes:[]}});s.context.fetch=net.get;
@@ -3228,7 +3227,7 @@ test('Outside a call, Smart without its model on disk is not given to the voice 
 });
 
 // ----- several machines at once: the call follows the conversation picked -----
-const PC={...PAIRED,fp:'fp-pc',host:'pc',urls:['https://pc.example'],rv:null,device_id:'dev-pc',token:'tok-pc'};
+const PC={...PAIRED,fp:'fp-pc',host:'pc',urls:['https://pc.example'],device_id:'dev-pc',token:'tok-pc'};
 // A call on the Mac, the PC answering at its own address, and a conversation of each listed.
 async function callWithTwoMachines(){
  const c=await callOnRoom({stored:{pairings:[PAIRED,PC]}});

@@ -51,7 +51,7 @@ test("the line goes away once the call is up", () => {
   expect(document.getElementById("join-status")).not.toBeVisible();
 });
 
-const pairing = { fp: "fp-mac", host: "mac", urls: ["http://127.0.0.1:8768"], rv: { url: "https://room.example", node: "m-1" }, device_id: "d-1", paired_at: null, revoked: false };
+const pairing = { fp: "fp-mac", host: "mac", urls: ["http://127.0.0.1:8768"], device_id: "d-1", paired_at: null, revoked: false };
 
 test("with no machine to talk to the line says why before any tap, as a note, and goes when it answers", () => {
   const store = renderJoin(null);
@@ -71,7 +71,7 @@ test("with no machine to talk to the line says why before any tap, as a note, an
   // A join that found no machine says it as an alert; the machine answering takes both away.
   act(() => store.patch({ joinFailure: "“mac” cannot be reached." }));
   expect(screen.getByRole("alert")).toBeInTheDocument();
-  act(() => store.patch({ joinFailure: "", ...link("ok", "room") }));
+  act(() => store.patch({ joinFailure: "", ...link("ok", "node") }));
   expect(line).not.toBeVisible();
 });
 

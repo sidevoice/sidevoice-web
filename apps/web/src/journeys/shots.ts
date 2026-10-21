@@ -61,10 +61,10 @@ export const CATALOGS = [
   { id: "openai", name: "OpenAI", status: { stale: false, reason: { code: "credential-missing", params: {} } }, models: [] },
 ] as unknown as CatalogView[];
 
-const NUC: PairingSummary = { fp: "fp-nuc", host: "NUC", urls: ["https://nuc.example"], rv: null, device_id: "d-nuc", paired_at: 1_700_000_000, revoked: false };
-const WORKSTATION: PairingSummary = { fp: "fp-ws", host: "Workstation", urls: [], rv: { url: "https://room.example", node: "ws-1" }, device_id: "d-ws", paired_at: 1_700_000_000, revoked: false };
-const LAPTOP: PairingSummary = { fp: "fp-old", host: "Old laptop", urls: ["https://laptop.example"], rv: null, device_id: "d-old", paired_at: 1_690_000_000, revoked: false };
-const THIS: PairingSummary = { fp: "fp-local", host: "MacBook", urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d-local", paired_at: 1_700_000_000, revoked: false, local: true };
+const NUC: PairingSummary = { fp: "fp-nuc", host: "NUC", urls: ["https://nuc.example"], device_id: "d-nuc", paired_at: 1_700_000_000, revoked: false };
+const WORKSTATION: PairingSummary = { fp: "fp-ws", host: "Workstation", urls: [], device_id: "d-ws", paired_at: 1_700_000_000, revoked: false };
+const LAPTOP: PairingSummary = { fp: "fp-old", host: "Old laptop", urls: ["https://laptop.example"], device_id: "d-old", paired_at: 1_690_000_000, revoked: false };
+const THIS: PairingSummary = { fp: "fp-local", host: "MacBook", urls: ["http://127.0.0.1:45781"], device_id: "d-local", paired_at: 1_700_000_000, revoked: false, local: true };
 
 const person = (thread_id: string, title: string, extra: Record<string, unknown> = {}) =>
   ({ thread_id, title, available: true, reach: { state: "listening" }, node: "fp-nuc", machine: { host: "NUC", id: "connector-nuc" }, harness: "claude-code", engine: { model: "claude-opus-5-5", effort: "high" }, ...extra });

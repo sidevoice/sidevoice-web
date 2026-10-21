@@ -34,7 +34,7 @@ const listing = (ids: string[]): HostAgentsState => ({
   status: "ready", value: { agents: ids.map(agent), scanned_at: "2026-10-02T10:00:00Z", custom: { command: "c", snippet: "{}", version: "1" } },
   error: null, busy: {}, actionErrors: {},
 });
-const pairing = (fp: string): PairingSummary => ({ fp, host: fp.toUpperCase(), urls: [`https://${fp}.example`], rv: null,
+const pairing = (fp: string): PairingSummary => ({ fp, host: fp.toUpperCase(), urls: [`https://${fp}.example`],
   device_id: `device-${fp}`, paired_at: 1_700_000_000, revoked: false });
 
 const seen = () => JSON.parse(localStorage.getItem("sidevoice.highlights") || "{}") as Record<string, { shownAt: number; seenAt?: number }>;

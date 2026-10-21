@@ -1,16 +1,9 @@
-/** Where the node that issued a code (or that this device paired with) links to a room. */
-export interface PairingRoom {
-  url: string;
-  /** The node's id in that room: `/nodes/<node>/…`. */
-  node: string;
-}
 /** What a pairing code says, once decoded and checked. */
 export interface PairingCodePayload {
   v: 1;
   fp: string;
   host: string | null;
   urls: string[];
-  rv: PairingRoom | null;
   secret: string;
   exp: number;
 }
@@ -20,7 +13,6 @@ export interface Pairing {
   public_key: string;
   host: string | null;
   urls: string[];
-  rv: PairingRoom | null;
   device_id: string;
   token: string;
   /** Seconds since the epoch. */
@@ -41,12 +33,12 @@ export interface Pairings {
 }
 export interface CandidateBase {
   base: string;
-  via: "direct" | "room";
+  via: "direct";
 }
 /** What the target's `GET /api/rendezvous` said it is. */
 export interface TargetAbout {
   /** `unknown`: a kind this version does not know yet (rendezvous.js `describeTarget`). */
-  kind: "node" | "room" | "unknown";
+  kind: "node" | "unknown";
   fingerprint?: string | null;
 }
 export interface IdentityDeps {
@@ -94,7 +86,7 @@ export function newNonce(random?: (bytes: Uint8Array) => Uint8Array): string;
 export function verifyIdentitySignature(proof: { publicKey: string; nonce: string; signature: string }, subtle?: SubtleCrypto): Promise<boolean>;
 export function proveIdentity(base: string, expected: { fp: string; public_key?: string | null }, deps?: IdentityDeps):
   Promise<{ ok: true; publicKey: string } | { ok: false; reason: "unreachable" | "impostor" }>;
-export function candidateBases(pairing: { fp: string; urls: string[]; rv: PairingRoom | null; insecure?: boolean },
+export function candidateBases(pairing: { fp: string; urls: string[]; insecure?: boolean },
   context?: { target?: string; about?: TargetAbout | null; origin?: string }): CandidateBase[];
 export function firstProven(candidates: CandidateBase[], expected: { fp: string; public_key?: string | null }, deps?: IdentityDeps,
   started?: Map<string, Promise<unknown>>): Promise<(CandidateBase & { publicKey: string }) | null>;

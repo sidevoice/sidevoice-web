@@ -66,7 +66,7 @@ test("keeps local setup visible through native projection, and puts it away once
   expect(chooseMachine).not.toHaveBeenCalled();
 
   act(() => store.patch({
-    pairings: [{ fp: "fp-local", device_id: "device-local", urls: ["http://127.0.0.1:45781"], rv: null,
+    pairings: [{ fp: "fp-local", device_id: "device-local", urls: ["http://127.0.0.1:45781"],
       host: "This computer", local: true, paired_at: 1_700_000_000, revoked: false }],
     localHostAvailable: true, localHostStatus: { state: "running", reachable: true, installed: true },
   }));
@@ -95,7 +95,7 @@ test("remote room controls stay available when remote pairing succeeds during lo
   expect(document.querySelector("#pane-this-computer .local-install-panel")).toHaveAttribute("data-phase", "installing");
 
   act(() => store.patch({
-    pairings: [{ fp: "fp-remote", device_id: "device-remote", urls: ["https://remote.example"], rv: null,
+    pairings: [{ fp: "fp-remote", device_id: "device-remote", urls: ["https://remote.example"],
       host: "Remote computer", paired_at: 1_700_000_000, revoked: false }],
     localHostStatus: { state: "installing", installed: false },
   }));
@@ -127,7 +127,7 @@ test("a failed local host projected during setup returns to the normal room and 
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Prepare this computer" })); });
   act(() => store.patch({ localHostStatus: { state: "installing", installed: false } }));
   act(() => store.patch({
-    pairings: [{ fp: "fp-local", device_id: "device-local", urls: ["http://127.0.0.1:45781"], rv: null,
+    pairings: [{ fp: "fp-local", device_id: "device-local", urls: ["http://127.0.0.1:45781"],
       host: "This computer", local: true, paired_at: 1_700_000_000, revoked: false }],
     localHostAvailable: true,
     localHostStatus: { state: "failed", installed: true, service: "launchd", reachable: false, failure: { key: "start.failed" } },

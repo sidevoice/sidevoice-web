@@ -60,15 +60,13 @@ export function callSocketUrl(nodeBase, location) {
     return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + path;
 }
 /** What a `GET /api/rendezvous` answer says the server is: a node (and which, by its fingerprint — all a node
- *  tells a caller without a token), a room (and the web build it serves), a kind of server this version does not
- *  know yet (`unknown`: what it says of the two, all the same — sidevoice-core#112), or — no kind at all, a 404, a
+ *  tells a caller without a token), a kind of server this version does not
+ *  know yet (`unknown`: what it says, all the same — sidevoice-core#112), or — no kind at all, a 404, a
  *  static server's page — neither. */
 export function describeTarget(answer) {
     const text = value => typeof value === 'string' && value ? value : null;
     if (answer?.kind === 'node')
         return { kind: 'node', fingerprint: text(answer.fingerprint), build: null };
-    if (answer?.kind === 'room')
-        return { kind: 'room', fingerprint: null, build: text(answer.web_build) };
     if (text(answer?.kind))
         return { kind: 'unknown', fingerprint: text(answer.fingerprint), build: text(answer.web_build) };
     return null;
@@ -80,27 +78,11 @@ export function patiently(promise, ms = 4000) {
     return Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(Error('timeout')), ms); })])
         .finally(() => clearTimeout(timer));
 }
-/** Ask the target what it is. `null` when it is neither a node nor a room, or could not answer. */
+/** Ask the target what it is. `null` when it is not a node, or could not answer. */
 export async function askTarget(target, get = globalThis.fetch, timeoutMs = 4000) {
     try {
         const response = await patiently(get(target + '/api/rendezvous', { headers: { accept: 'application/json' }, cache: 'no-store' }), timeoutMs);
         return response.ok ? describeTarget(await response.json()) : null;
-    }
-    catch {
-        return null;
-    }
-}
-/** Whether a room says the node `id` is connected to it now. A room lists nodes to nobody: it answers only
- *  for the ids a page already knows (from its pairing). `null` is no answer. */
-export async function askRoomNode(room, id, get = globalThis.fetch, timeoutMs = 4000) {
-    try {
-        const response = await patiently(get(room + '/api/rendezvous?nodes=' + encodeURIComponent(id), { headers: { accept: 'application/json' }, cache: 'no-store' }), timeoutMs);
-        if (!response.ok)
-            return null;
-        const answer = await response.json();
-        const nodes = Array.isArray(answer) ? answer : Array.isArray(answer?.nodes) ? answer.nodes : [];
-        const node = nodes.find(entry => entry?.id === id);
-        return node ? !!node.connected : null;
     }
     catch {
         return null;

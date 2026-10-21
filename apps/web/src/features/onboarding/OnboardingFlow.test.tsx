@@ -20,7 +20,7 @@ const models = (installed: boolean) => [{ id: "local", name: null, status: { sta
   { id: "whisper-base", family: "whisper", capabilities: ["stt"], languages: ["es", "en"], voices: [], parametersM: 1, license: "MIT", installed, builds: [{ id: "whisper-base/int8", available: true, reasons: [] }] },
   { id: "kokoro-82m-v1.0", family: "kokoro", capabilities: ["tts"], languages: ["es"], voices: [{ id: "ef_dora", languages: ["es"] }], speed: { min: 0.5, max: 2 }, parametersM: 1, license: "MIT", installed, builds: [{ id: "kokoro/int8", available: true, reasons: [] }] },
 ] }] as unknown as CatalogView[];
-const NUC = { fp: "fp-nuc", device_id: "d-1", urls: ["https://nuc.example"], rv: null, host: "NUC", paired_at: 1_700_000_000, revoked: false };
+const NUC = { fp: "fp-nuc", device_id: "d-1", urls: ["https://nuc.example"], host: "NUC", paired_at: 1_700_000_000, revoked: false };
 
 let actions: Record<string, ReturnType<typeof vi.fn>>;
 beforeEach(() => {

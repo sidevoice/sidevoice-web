@@ -25,7 +25,7 @@ const CATALOGS = [{ id: "local", name: null, status: { stale: false }, models: [
   { id: "moonshine-tiny", family: "moonshine", capabilities: ["stt"], languages: ["en"], voices: [], parametersM: 1, license: "MIT", installed: true, builds: [{ id: "moonshine/int8", available: true, reasons: [] }] },
   { id: "kokoro-82m-v1.0", family: "kokoro", capabilities: ["tts"], languages: ["es"], voices: [{ id: "ef_dora", languages: ["es"] }], speed: { min: 0.5, max: 2 }, parametersM: 1, license: "MIT", installed: true, builds: [{ id: "kokoro/int8", available: true, reasons: [] }] },
 ] }] as unknown as CatalogView[];
-const NUC = { fp: "fp-nuc", device_id: "d-1", urls: ["https://nuc.example"], rv: null, host: "NUC", paired_at: 1_700_000_000, revoked: false };
+const NUC = { fp: "fp-nuc", device_id: "d-1", urls: ["https://nuc.example"], host: "NUC", paired_at: 1_700_000_000, revoked: false };
 
 let actions: Record<string, ReturnType<typeof vi.fn>>;
 beforeEach(() => {
@@ -317,7 +317,7 @@ test("preparing this computer never offers Prepare again: the install, then wait
   expect(screen.getByText("Checking that the service answers…")).toBeInTheDocument();
   expect(document.getElementById("wizard-prepare")).toBeNull();
   // Answering: its agents, in the same step.
-  act(() => store.patch({ pairings: [{ fp: "fp-local", host: "This computer", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d", paired_at: 1, revoked: false }],
+  act(() => store.patch({ pairings: [{ fp: "fp-local", host: "This computer", local: true, urls: ["http://127.0.0.1:45781"], device_id: "d", paired_at: 1, revoked: false }],
     machineLinks: { "fp-local": { reach: "ok", via: "node" } } }));
   expect(screen.getByText("This computer is ready. Connect Sidevoice to the agents you use here.")).toBeInTheDocument();
   act(() => localHostInstallController.clear());
@@ -348,7 +348,7 @@ test("where the app does not install Sidevoice itself, preparing this computer i
   expect(document.querySelector("#wizard .wizard-prepare-wait")).toHaveTextContent("Starting the service…");
   // Answering: on to its agents by itself, in the same step.
   act(() => store.patch({ localHostStatus: { state: "running", installed: true, reachable: true },
-    pairings: [{ fp: "fp-local", host: "This computer", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d", paired_at: 1, revoked: false }],
+    pairings: [{ fp: "fp-local", host: "This computer", local: true, urls: ["http://127.0.0.1:45781"], device_id: "d", paired_at: 1, revoked: false }],
     machineLinks: { "fp-local": { reach: "ok", via: "node" } } }));
   expect(wizard().getByText("This computer is ready. Connect Sidevoice to the agents you use here.")).toBeInTheDocument();
 });
@@ -391,7 +391,7 @@ test("where the app installs Sidevoice itself, the command is the other way, und
   expect(manualToggle(true)).toBeNull();
   expect(document.querySelector("#wizard .wizard-prepare-wait")).toHaveTextContent("Starting the service…");
   act(() => store.patch({ localHostStatus: { state: "running", installed: true, reachable: true },
-    pairings: [{ fp: "fp-local", host: "This computer", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d", paired_at: 1, revoked: false }],
+    pairings: [{ fp: "fp-local", host: "This computer", local: true, urls: ["http://127.0.0.1:45781"], device_id: "d", paired_at: 1, revoked: false }],
     machineLinks: { "fp-local": { reach: "ok", via: "node" } } }));
   expect(wizard().getByText("This computer is ready. Connect Sidevoice to the agents you use here.")).toBeInTheDocument();
   expect(install).not.toHaveBeenCalled();
@@ -502,7 +502,7 @@ test("Back from the last step lands on each step before it and stays there, on t
   const store = createRoomStore();
   act(() => store.patch({ machinesReady: true, speechLanguage: "es", localHostAvailable: true, localHostStatus: { state: "running", installed: true, reachable: true },
     voiceSettings: defaultVoiceSettings(), voiceCatalogue: { state: "ready", catalogs: CATALOGS, error: "" },
-    pairings: [{ fp: "fp-local", host: "This computer", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d", paired_at: 1, revoked: false }],
+    pairings: [{ fp: "fp-local", host: "This computer", local: true, urls: ["http://127.0.0.1:45781"], device_id: "d", paired_at: 1, revoked: false }],
     machineLinks: { "fp-local": { reach: "ok", via: "node" } } }));
   render(<App store={store} />);
   expect(title()).toHaveTextContent("When your turn ends");

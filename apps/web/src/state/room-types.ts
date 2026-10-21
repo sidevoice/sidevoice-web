@@ -95,7 +95,7 @@ export interface MachineView {
   host: string;
   revoked: boolean;
   /** Where this device reaches it: directly, through the room, or not at all. Every paired machine is live at once. */
-  reach: "direct" | "room" | "away" | "offline" | "checking" | "revoked";
+  reach: "direct" | "away" | "offline" | "checking" | "revoked";
   state: "connected" | "checking" | "offline" | "revoked" | "failed";
   /** Whether this row is the app-owned local host, which is projected from the desktop bridge. */
   local?: boolean;

@@ -27,7 +27,7 @@ function dialog(pairDevice: (...args: unknown[]) => Promise<unknown> = vi.fn()) 
 }
 /** A code as `npx sidevoice pair-device` prints it, for "nuc", valid for ten minutes from now. */
 function pairingCode(extra: Record<string, unknown> = {}) {
-  const payload = { v: 1, fp: "A".repeat(43), host: "nuc", urls: ["http://127.0.0.1:8768", "https://nuc.example:8768"], rv: null, secret: "s3cret",
+  const payload = { v: 1, fp: "A".repeat(43), host: "nuc", urls: ["http://127.0.0.1:8768", "https://nuc.example:8768"], secret: "s3cret",
     exp: Math.floor(Date.now() / 1000) + 600, ...extra };
   return "SV1." + Buffer.from(JSON.stringify(payload)).toString("base64url");
 }
