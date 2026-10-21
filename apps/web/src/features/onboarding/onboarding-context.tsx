@@ -81,8 +81,14 @@ export function useOnboarding() {
   return value;
 }
 
+/** What the setup reads of the room, and nothing else. */
+interface RoomForSetup {
+  machines: RoomViewState["machines"];
+  facts: Pick<RoomViewState["facts"], "machineLinks" | "localHostStatus" | "voiceSettings" | "voiceDraft" | "machinesReady">;
+}
+
 /** A paired machine this device reaches now (its link answers), local or not. */
-function answering(room: RoomViewState, local: boolean) {
+function answering(room: RoomForSetup, local: boolean) {
   return room.machines.find((machine) => machine.local === local && !!machine.pairingId && !machine.revoked
     && room.facts.machineLinks[machine.pairingId]?.reach === "ok") ?? null;
 }
@@ -100,7 +106,7 @@ function microphoneFacts(microphone: MicrophoneSnapshot, record: OnboardingRecor
 }
 
 /** What resume reads of the room: which machines answer, and the device's kept voice settings; and the microphone. */
-function liveFacts(room: RoomViewState, microphone: { passed: boolean }) {
+function liveFacts(room: RoomForSetup, microphone: { passed: boolean }) {
   const kept = room.facts.voiceSettings;
   return {
     microphonePassed: microphone.passed,
@@ -112,7 +118,16 @@ function liveFacts(room: RoomViewState, microphone: { passed: boolean }) {
 }
 
 export function OnboardingProvider({ children, repository: given, startAt }: { children: ReactNode; repository?: OnboardingRepository; startAt?: OnboardingStep }) {
-  const room = useRoomStore((state) => state);
+  // Only what it reads: this wraps the whole room, and the whole snapshot is new on every publish of the store (the room's
+  // beats, the voice's cues), which would draw everything under it again each time (desktop#149).
+  const machines = useRoomStore((state) => state.machines);
+  const machineLinks = useRoomStore((state) => state.facts.machineLinks);
+  const localHostStatus = useRoomStore((state) => state.facts.localHostStatus);
+  const voiceSettings = useRoomStore((state) => state.facts.voiceSettings);
+  const voiceDraft = useRoomStore((state) => state.facts.voiceDraft);
+  const machinesReady = useRoomStore((state) => state.facts.machinesReady);
+  const room = useMemo<RoomForSetup>(() => ({ machines, facts: { machineLinks, localHostStatus, voiceSettings, voiceDraft, machinesReady } }),
+    [machines, machineLinks, localHostStatus, voiceSettings, voiceDraft, machinesReady]);
   const roomStore = useContext(RoomStoreContext);
   if (!roomStore) throw new Error("OnboardingProvider must be inside RoomProvider");
   const repository = useMemo(() => given ?? createOnboardingRepository(), [given]);
