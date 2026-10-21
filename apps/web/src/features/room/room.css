@@ -138,6 +138,9 @@
     padding: var(--sv-space-2) var(--sv-space-3) var(--sv-space-4); border: 0; border-radius: 0 0 var(--sv-radius-2xl) var(--sv-radius-2xl); background: var(--sv-surface); box-shadow: var(--sv-shadow-md);
     transform: translateY(-100%); visibility: hidden; transition: transform var(--sv-dur-base) var(--sv-ease), visibility 0s linear var(--sv-dur-base); }
   .conversation-sidebar[data-open] { transform: none; visibility: visible; transition: transform var(--sv-dur-slow) var(--sv-ease); }
+  /* Closed, the list waits off screen: what blinks in it (a working conversation's dot) does not run until it is opened (no
+     animation at all: a dot that starts working while the list is closed starts nothing, where a paused one would run). */
+  .conversation-sidebar:not([data-open]) * { animation: none !important; }
   .conversation-sidebar .sidebar-collapse { display: none; }
   /* The header's chevron (always there, turned up while the list is down) closes it, as do a tap outside and Escape: the
      sheet's own arrow stays for assistive tech only, inside the dialog. */

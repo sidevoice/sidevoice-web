@@ -217,11 +217,14 @@
 .ui-switch:disabled .ui-switch-thumb { background: var(--sv-disabled-text); }
 
 /* ----- Progress. */
-.ui-progress { position: relative; height: 6px; overflow: hidden; border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken); }
+.ui-progress { position: relative; height: 6px; overflow: hidden; isolation: isolate; border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken); }
 [data-theme="dark"] .ui-progress { background: var(--sv-border); }
 .ui-progress-fill { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--sv-accent); transition: width var(--sv-dur-slow) linear; }
+/* Unknown length: a block 35% of the track wide slides across it by transform, so it moves on the compositor and lays nothing
+   out (a percentage in translateX is of the block's own width: from one block before the track, -100%, to the track's far
+   edge, 100% / 35% = 285.7143%; the same path as its left, -35% to 100%, was). */
 .ui-progress[data-indeterminate] .ui-progress-fill { width: 35%; animation: ui-indeterminate 1.2s var(--sv-ease) infinite; }
-@keyframes ui-indeterminate { from { left: -35%; } to { left: 100%; } }
+@keyframes ui-indeterminate { from { transform: translateX(-100%); } to { transform: translateX(285.7143%); } }
 @media (prefers-reduced-motion: reduce) { .ui-progress[data-indeterminate] .ui-progress-fill { animation: none; left: 0; width: 100%; opacity: .35; } .ui-spinner { animation-duration: 2s; } }
 
 /* ----- Dialog and the full-screen page: a head, a body that alone scrolls, a footer in sight. */

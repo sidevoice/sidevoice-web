@@ -180,6 +180,26 @@ test("in silence, once drained, the wave holds its samples: no render ten times 
   expect(renders - drained).toBeLessThanOrEqual(1);
 });
 
+test("in silence, once drained, the wave runs no timer at all; a level wakes it and shows at once", () => {
+  let heights: number[] = [];
+  function Wave({ level }: { level: number }) {
+    heights = useWave(level, false);
+    return null;
+  }
+  // The intervals it holds: those it started and has not cleared.
+  const started = vi.spyOn(globalThis, "setInterval"), cleared = vi.spyOn(globalThis, "clearInterval");
+  const held = () => started.mock.calls.length - cleared.mock.calls.length;
+  const { rerender } = render(<Wave level={40} />);
+  expect(held()).toBe(1);
+  rerender(<Wave level={0} />);
+  for (let i = 0; i < 10; i += 1) act(() => { vi.advanceTimersByTime(WAVE_SAMPLE_MS); });
+  expect(heights.every((value) => value === 0)).toBe(true);
+  expect(held()).toBe(0);
+  rerender(<Wave level={60} />);
+  expect(heights.at(-1)).toBe(60);
+  expect(held()).toBe(1);
+});
+
 test("near the pointer the call controls appear; they carry the room's commands to the app", () => {
   const host = fakeHost({ call: snapshot({ canSkip: true }) });
   render(<Card host={host} />);

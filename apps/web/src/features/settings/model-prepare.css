@@ -24,12 +24,15 @@
 .model-try-state { display: flex; align-items: center; gap: var(--sv-space-2); }
 .model-try-state .ui-spinner { color: var(--sv-accent-text); }
 .model-try-listening { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-3); min-width: 0; }
-/* How long the take has run, filling to its longest (MAX_TAKE_MS, set as its animation's length) from when it listens. */
-.model-try-take { flex: 1 0 100%; height: 3px; border-radius: 2px; background: var(--sv-accent) no-repeat 0 0 / 0% 100%; background-color: var(--sv-bg-sunken);
-  background-image: linear-gradient(var(--sv-accent), var(--sv-accent)); animation: model-try-take linear forwards; }
-@keyframes model-try-take { to { background-size: 100% 100%; } }
+/* How long the take has run, filling to its longest (MAX_TAKE_MS, set as the element's animation-duration, which the fill takes) from
+   when it listens. The fill is a layer scaled from its left edge, by transform: composited, nothing painted again on each frame;
+   the track's round ends clip it. */
+.model-try-take { position: relative; overflow: hidden; flex: 1 0 100%; height: 3px; border-radius: 2px; background-color: var(--sv-bg-sunken); }
+.model-try-take::before { content: ""; position: absolute; inset: 0; background: var(--sv-accent); transform: scaleX(0); transform-origin: 0 50%;
+  animation: model-try-take linear forwards; animation-duration: inherit; }
+@keyframes model-try-take { to { transform: scaleX(1); } }
 /* The take ended (Stop, its longest, a silence): its length stays where it stopped while it is transcribed. */
-.model-try-take[data-ended] { animation-play-state: paused; }
+.model-try-take[data-ended]::before { animation-play-state: paused; }
 .model-try-wave { display: inline-flex; flex: none; color: var(--sv-accent-text); }
 .model-try .voice-wave { width: min(9rem, 36vw); height: 28px; }
 /* The voice's sentence: what was heard in the text's colour, the rest quieter until it is. */
