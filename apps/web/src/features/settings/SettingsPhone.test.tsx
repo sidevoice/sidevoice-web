@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, onTestFinished, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { withMicrophone } from "./with-microphone.test-util";
@@ -12,6 +12,7 @@ import type { LocalHostStatus } from "../../services/desktop-host";
 import type { HostAgentsState } from "../../state/room-types";
 import { SETTINGS_PHONE_QUERY, useSectionShown } from "./settings-levels";
 import { openSettings } from "./open-settings";
+import { DEVELOPER_MODE_KEY } from "./developer-mode";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -368,3 +369,29 @@ test("a section is on show only at its page on a phone (a try there stops at the
   expect(result.current).toBe(true);
 });
 
+
+test("Developer options is a row of the list below Advanced, with no line under it, once developer mode is on in a nightly", async () => {
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { build: { channel: "nightly", version: "0.2.1-nightly.608" } } } });
+  localStorage.setItem(DEVELOPER_MODE_KEY, "1");
+  onTestFinished(() => { localStorage.clear(); delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; });
+  room();
+  await open();
+  const labels = [...nav().querySelectorAll(".settings-menu-label")].map((label) => label.textContent);
+  expect(labels.slice(-2)).toEqual(["Advanced", "Developer options"]);
+  expect(summary("developer")).toBeNull();
+  await tap(row("developer"));
+  expect(title()).toHaveTextContent(/^Developer options$/);
+  expect(stack()).toEqual(["list", "developer"]);
+  expect(document.getElementById("pane-developer")).not.toHaveAttribute("hidden");
+  // Turned off from its page: the page is gone, so the list is what shows.
+  await tap(within(document.getElementById("pane-developer")!).getByRole("switch", { name: "Developer mode" }));
+  expect(document.getElementById("pane-developer")).toBeNull();
+  expect(title()).toHaveTextContent(/^General$/);
+});
+
+test("without developer mode the list ends with Advanced", async () => {
+  room();
+  await open();
+  expect([...nav().querySelectorAll(".settings-menu-label")].map((label) => label.textContent).at(-1)).toBe("Advanced");
+  expect(document.getElementById("settings-developer")).toBeNull();
+});

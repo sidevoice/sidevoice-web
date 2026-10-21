@@ -1,5 +1,5 @@
 import { describe, expect, onTestFinished, test } from "vitest";
-import { desktopBuild, desktopDataBridge, desktopResetBridge, localHostLocator, normalizeLocalHostPairing } from "./desktop-host";
+import { desktopBuild, desktopDataBridge, desktopDebugBridge, desktopResetBridge, localHostLocator, normalizeLocalHostPairing } from "./desktop-host";
 
 const pairing = normalizeLocalHostPairing({
   fp: "fp-local", public_key: "key", device_id: "local-device", token: "session-secret",
@@ -66,5 +66,45 @@ describe("desktopBuild", () => {
   test("a build that is not an object is no build", () => {
     withHost({ build: "nightly" });
     expect(desktopBuild()).toBeNull();
+  });
+});
+
+describe("desktopDebugBridge", () => {
+  const withHost = (host: Record<string, unknown> | undefined) => {
+    Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: host && { host } });
+    onTestFinished(() => { Reflect.deleteProperty(window, "__sidevoiceDesktop"); });
+  };
+
+  test("is the app's own object, so its getters stay live", () => {
+    let inspectable = false;
+    const debug = { available: ["inspectable"], get inspectable() { return inspectable; }, compositingBorders: false, repaintCounters: false, set: async () => {} };
+    withHost({ debug });
+    const bridge = desktopDebugBridge();
+    expect(bridge).toBe(debug);
+    inspectable = true;
+    expect(desktopDebugBridge()?.inspectable).toBe(true);
+  });
+
+  test("a platform with no switches still has the seam: an empty list", () => {
+    withHost({ debug: { available: [], inspectable: false, compositingBorders: false, repaintCounters: false, set: async () => {} } });
+    expect(desktopDebugBridge()?.available).toEqual([]);
+  });
+
+  test.each([
+    ["none (a release, a browser)", undefined],
+    ["not an object", "inspectable"],
+    ["no list of switches", { inspectable: false, set: async () => {} }],
+    ["a list that is not a list", { available: "inspectable", set: async () => {} }],
+    ["no set", { available: ["inspectable"], inspectable: false }],
+    ["set that is not a function", { available: ["inspectable"], set: true }],
+    ["the seam before this one, with setInspectable", { inspectable: false, setInspectable: async () => {} }],
+  ])("is none for %s", (_, debug) => {
+    withHost({ debug });
+    expect(desktopDebugBridge()).toBeNull();
+  });
+
+  test("is none outside the app", () => {
+    withHost(undefined);
+    expect(desktopDebugBridge()).toBeNull();
   });
 });

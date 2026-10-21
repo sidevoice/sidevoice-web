@@ -215,6 +215,25 @@ export function desktopBuild(): DesktopBuild | null {
   return { channel, version: text(build.version) ?? "", commit: text(build.commit), date: text(build.date) };
 }
 
+/** What the desktop app's debugging seam can switch: Safari's Web Inspector on its web views, WebKit's compositing
+ *  borders (each layer the GPU draws) and its repaint counters (how often the CPU repainted each layer). */
+export type DebugSwitch = "inspectable" | "compositingBorders" | "repaintCounters";
+/** The desktop app's debugging seam (`host.debug`, sidevoice-desktop #168), present only in a nightly or a development
+ *  build. `available` is the switches this platform has (all three on macOS, none elsewhere): the page shows only
+ *  those. Each switch is a live getter, so it is read when it is needed, and again once `set` resolves, for what took.
+ *  A rejection means the app did not change it. */
+export interface DesktopDebugBridge {
+  readonly available: readonly DebugSwitch[];
+  readonly inspectable: boolean;
+  readonly compositingBorders: boolean;
+  readonly repaintCounters: boolean;
+  set(name: DebugSwitch, on: boolean): Promise<void>;
+}
+export function desktopDebugBridge(): DesktopDebugBridge | null {
+  const debug = desktopHost()?.debug as Partial<DesktopDebugBridge> | undefined;
+  return debug && Array.isArray(debug.available) && typeof debug.set === "function" ? debug as DesktopDebugBridge : null;
+}
+
 export function desktopComputerName() {
   const name = desktopHost()?.computerName;
   return typeof name === "string" && name.trim() ? name.trim() : null;

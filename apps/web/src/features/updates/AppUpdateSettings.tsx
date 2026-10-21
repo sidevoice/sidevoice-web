@@ -6,6 +6,7 @@ import { Segmented } from "../../components/ui/Tabs";
 import { desktopBuild } from "../../services/desktop-host";
 import { RoomStoreContext } from "../../state/room-store";
 import { updaterFailure } from "../settings/error-message";
+import { useDeveloperModeGesture } from "../settings/developer-mode";
 import { translator, type Translate } from "../../i18n/translator";
 import { UPDATE_PLACE, useAppUpdate, type UpdateMode, type UpdaterStatus } from "./useUpdates";
 import "./updates.css";
@@ -44,6 +45,8 @@ export function AppUpdateSettings({ service, onRestart, current }: { service?: R
   // A call of this page's that failed; and whether the person's own check found nothing.
   const [failure, setFailure] = useState<unknown>(null);
   const [upToDate, setUpToDate] = useState(false);
+  // Ten clicks on the installed version turn a nightly's developer mode on or off (developer-mode.ts).
+  const developer = useDeveloperModeGesture();
   const { status, mode, can, checkedAt, inView } = update;
   // What the app says next replaces what a call of this page's said.
   useEffect(() => { setFailure(null); }, [status?.state]);
@@ -93,7 +96,8 @@ export function AppUpdateSettings({ service, onRestart, current }: { service?: R
     <div className="app-update-settings">
       {/* The Sidevoice installed: where a landing goes while no newer one waits. */}
       <div id={found ? undefined : UPDATE_PLACE.app} className="app-update-setting app-update-installed" data-settings-row="">
-        <span className="update-action-copy">{checking ? `${name} · ${t("updates.checking")}` : upToDateNow ? `${name} · ${t("settings.updates.upToDate")}` : name}
+        <span className="update-action-copy" {...developer.props}>{checking ? `${name} · ${t("updates.checking")}` : upToDateNow ? `${name} · ${t("settings.updates.upToDate")}` : name}
+          {developer.note && <><span aria-hidden>{" · "}{developer.note}</span><span role="status" className="sr-only">{developer.note}</span></>}
           {/* Only while nothing was found since: one the app found by itself later is not up to date. */}
           {upToDate && status?.state === "idle" && <span role="status" className="sr-only">{t("updates.upToDate")}</span>}</span>
         {can.check && <Button size="sm" variant="secondary" loading={checking} onClick={() => void act("check")}>{t("updates.check")}</Button>}

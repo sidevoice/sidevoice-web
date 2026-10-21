@@ -8,6 +8,7 @@ import { LocalHostUpdateControl } from "../updates/LocalHostUpdate";
 import { useThisComputerUpdate } from "../updates/useThisComputerUpdate";
 import { appUpdater, continueAfterRestart, continued, continuing, UPDATE_PLACE, useOutdatedMachines } from "../updates/useUpdates";
 import { translator, type Translate } from "../../i18n/translator";
+import { useDeveloperModeGesture } from "./developer-mode";
 import "./updates-settings.css";
 
 /* Updates, a Settings section of their own (decided 2026-10-13), holding everything that updates, each in its row with
@@ -55,12 +56,15 @@ export function ThisDeviceVersion({ t }: { t: Translate }) {
 }
 
 /** A part of this computer that updates, at its card's top, under its group's title: what it is, then its version, with
- *  Up to date once its part says so, and a build's note. */
+ *  Up to date once its part says so, and a build's note. Its version is where a nightly's developer mode is turned on
+ *  and off (developer-mode.ts), for an app with no updater. */
 function PartVersion({ hint, version, upToDate, note, t }: { hint?: string; version: string | null | undefined; upToDate: boolean; note?: ReactNode; t: Translate }) {
+  const developer = useDeveloperModeGesture();
   return <div className="updates-settings-version">
     {hint && <span className="updates-part-hint">{hint}</span>}
-    {version && <span className="host-status-product">{t("settings.updates.version", { version })}
-      {upToDate && <span className="updates-up-to-date">{" · "}{t("settings.updates.upToDate")}</span>}</span>}
+    {version && <span className="host-status-product" {...developer.props}>{t("settings.updates.version", { version })}
+      {upToDate && <span className="updates-up-to-date">{" · "}{t("settings.updates.upToDate")}</span>}
+      {developer.note && <><span aria-hidden>{" · "}{developer.note}</span><span role="status" className="sr-only">{developer.note}</span></>}</span>}
     {note}
   </div>;
 }
