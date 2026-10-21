@@ -281,7 +281,6 @@ function matches(entry, subject) {
  */
 export const ALLOWED = [
   // TEMPORARY, one each removed by the commit that moves it to a transform or an opacity (audit 2026-10-21).
-  { rule: "property", name: "ui-indeterminate", why: "The indeterminate progress bar slides by its left: to be moved to a transform (next commits)." },
   { rule: "property", name: "model-try-take", why: "The try's take bar fills by its background-size: to be moved to a transform (next commits)." },
   { rule: "property", name: "turn-try-late", why: "The delayed 'Getting ready' appears by visibility: to be moved to an opacity (next commits)." },
   {
