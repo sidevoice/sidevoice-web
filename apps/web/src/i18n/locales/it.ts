@@ -214,7 +214,6 @@ export const messages: Messages = {
   "messages.cancel": "Annulla invio",
   "messages.thinking": "La conversazione sta lavorando al tuo messaggio",
   "messages.new": "Nuovi messaggi",
-  "messages.latest": "Vai in fondo",
   "messages.toLatest": "Vai in fondo alla conversazione",
 
   "wave.listening": "In ascolto",

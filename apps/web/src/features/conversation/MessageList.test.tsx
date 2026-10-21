@@ -204,10 +204,10 @@ test("scrolling away keeps a neutral way back without announcing new messages", 
   Object.defineProperty(list, "scrollTo", { configurable: true, value: scrollTo });
   list.scrollTop = 100;
   fireEvent.scroll(list);
-  expect(screen.getByRole("button", { name: "Go to the end of the conversation" })).toHaveTextContent("Go to the end");
+  expect(screen.getByRole("button", { name: "Go to the end of the conversation" }).textContent).toBe("");
   rerender(<MessageList conversation={view([message({ segment: "a" }), message({ segment: "b", text: "Another reply" })])} />);
   expect(scrollTo).not.toHaveBeenCalled();
-  expect(screen.getByRole("button", { name: "Go to the end of the conversation" })).toHaveTextContent("Go to the end");
+  expect(screen.getByRole("button", { name: "Go to the end of the conversation" }).textContent).toBe("");
   fireEvent.click(screen.getByRole("button", { name: "Go to the end of the conversation" }));
   expect(scrollTo).toHaveBeenCalledWith({ top: 900, behavior: "smooth" });
   expect(screen.queryByRole("button", { name: "Go to the end of the conversation" })).toBeNull();

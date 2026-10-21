@@ -206,7 +206,6 @@ export const messages: Messages = {
   "messages.cancel": "送信をキャンセル",
   "messages.thinking": "会話があなたのメッセージに取り組んでいます",
   "messages.new": "新着メッセージ",
-  "messages.latest": "最新へ移動",
   "messages.toLatest": "会話の最後へ移動",
   "wave.listening": "聞き取り中",
   "wave.listeningTitle": "聞き取り中…",

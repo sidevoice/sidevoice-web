@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { Button } from "../../components/ui/Button";
-import { ChevronIcon, TranscriptIcon } from "../../components/ui/Icons";
+import { ToLatestIcon, TranscriptIcon } from "../../components/ui/Icons";
 import type { ConversationView } from "../../state/room-types";
 import { translator, type Translate } from "../../i18n/translator";
 import { groupMessages } from "./group-messages";
@@ -105,8 +105,8 @@ export function MessageList({ conversation, visible = true }: { conversation: Co
           <article className="chat-bubble thinking" data-role="assistant" data-position="only" aria-label={t("messages.thinking")}><span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span></article>
         </div></div>}
       </div>
-      {away && <Button variant="secondary" size="sm" className="latest-jump" aria-label={t("messages.toLatest")} onClick={() => scrollToBottom()}>
-        {t("messages.latest")}<ChevronIcon />
+      {away && <Button variant="secondary" size="icon-sm" className="latest-jump" aria-label={t("messages.toLatest")} title={t("messages.toLatest")} onClick={() => scrollToBottom()}>
+        <ToLatestIcon />
       </Button>}
     </div>
   );
