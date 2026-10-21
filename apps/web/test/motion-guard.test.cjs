@@ -109,3 +109,22 @@ test("a colour fading on a change of state is excused as a class; a width or a l
   assert.deepEqual(violations({ animations: [transition(["color", "width"])] }).map((v) => v.rule), ["property"], "one that also moves a width is not just a colour");
   assert.deepEqual(violations({ animations: [{ ...transition(["backgroundColor"]), kind: "CSSAnimation", infinite: true }] }).map((v) => v.rule), ["property"], "a keyframe loop of colours is not a state's fade");
 });
+
+/* What waits while nobody sees it (the audit of 2026-10-21): the CSS that stops a loop where it is off screen, hidden, or
+ * under an opaque page. The browsers' half (e2e/motion-guard.spec.mjs) watches that nothing infinite runs unseen. */
+const css = (file) => fs.readFileSync(path.join(SRC, file), "utf8").replace(/\s+/g, " ");
+
+test("on a phone the closed conversation list and the closed transcript run no animation", () => {
+  assert.match(css("features/room/room.css"), /\.conversation-sidebar:not\(\[data-open\]\) \* \{ animation: none !important; \}/);
+  // Both of its drawers: the phone's sheet and the compact window's.
+  assert.equal(css("features/conversation/transcript.css").match(/\.call-layout > \.transcript:not\(\[data-open\]\) \* \{ animation: none !important; \}/g)?.length, 2);
+});
+
+test("an offline agent, drawn at opacity 0 under the wanted poster, runs no animation", () => {
+  assert.match(css("styles/call.css"), /\.stage-tile\[data-mood=offline\] \.stage-agent \* \{ animation:none !important \}/);
+});
+
+test("a full page (Settings) over the room pauses what moves behind it, and not the page itself", () => {
+  const app = css("styles/app.css");
+  assert.match(app, /#root > \.room-shell:has\(> \.ui-dialog\[data-layout="page"\]\[open\]\) > :not\(\.ui-dialog\) \* \{ animation-play-state: paused !important; \}/);
+});
