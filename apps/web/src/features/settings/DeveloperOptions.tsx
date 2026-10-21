@@ -2,6 +2,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { Group, Row, Section } from "../../components/ui/Card";
 import { Switch } from "../../components/ui/Switch";
 import { desktopDebugBridge, type DebugSwitch, type DesktopDebugBridge } from "../../services/desktop-host";
+import { setAnimatedThumbnails, useAnimatedThumbnails } from "../../lib/animated-thumbnails";
 import { setDeveloperMode, useDeveloperMode } from "./developer-mode";
 import { TurnTuningDev } from "./TurnTuningDev";
 
@@ -49,6 +50,7 @@ function DebugSwitchRow({ debug, name, label, description }: { debug: DesktopDeb
 
 export function DeveloperOptions() {
   const mode = useDeveloperMode();
+  const animated = useAnimatedThumbnails();
   const debug = desktopDebugBridge();
   const switches = debug ? DEBUG_SWITCHES.filter(({ name }) => debug.available.includes(name)) : [];
   return <Section id="developer" title={DEVELOPER_OPTIONS_TITLE} description="Tools for testing Sidevoice. English only, and not part of the normal app.">
@@ -59,6 +61,11 @@ export function DeveloperOptions() {
     </Group>}
     {debug && switches.length > 0 && <Group title="Rendering">
       {switches.map((entry) => <DebugSwitchRow key={entry.name} debug={debug} {...entry} />)}
+    </Group>}
+    {mode && <Group title="Conversations">
+      <Row label="Animate conversation thumbnails" description="The thumbnails in the conversations list move as the creature on the stage does: drawn as GPU layers, with the mouth following the voice. Off: still, with the light. Kept on this device.">
+        <Switch checked={animated} onChange={setAnimatedThumbnails} aria-label="Animate conversation thumbnails" />
+      </Row>
     </Group>}
     <TurnTuningDev />
   </Section>;

@@ -388,7 +388,7 @@ test("with developer mode on in a nightly, Developer options is below Advanced a
   expect(document.getElementById("settings-developer")).toHaveAttribute("aria-current", "page");
   expect(within(developer).getByRole("heading", { name: "Developer options" })).toBeInTheDocument();
   expect(within(developer).getByRole("switch", { name: "Developer mode" })).toHaveAttribute("aria-checked", "true");
-  expect([...developer.querySelectorAll(".ui-group-title")].map((title) => title.textContent)).toEqual(["Rendering", "Turn tuning (dev)"]);
+  expect([...developer.querySelectorAll(".ui-group-title")].map((title) => title.textContent)).toEqual(["Rendering", "Conversations", "Turn tuning (dev)"]);
   expect(within(developer).getByRole("switch", { name: "Web Inspector" })).toBeInTheDocument();
   expect(within(developer).getByRole("switch", { name: "Compositing borders" })).toBeInTheDocument();
   expect(within(developer).getByRole("switch", { name: "Repaint counters" })).toBeInTheDocument();
@@ -399,13 +399,12 @@ test("with developer mode on in a nightly, Developer options is below Advanced a
   expect(within(advanced).queryByRole("button", { name: "Reset to defaults" })).toBeNull();
 });
 
-test("without the app's debugging seam, Developer options has just the turn tuning and developer mode", () => {
+test("without the app's debugging seam, Developer options has just the thumbnails, the turn tuning and developer mode", () => {
   withDeveloperMode({ debug: false });
   open("whisper-base");
   fireEvent.click(document.getElementById("settings-developer")!);
   const developer = document.getElementById("pane-developer")!;
-  expect([...developer.querySelectorAll(".ui-group-title")]).toHaveLength(1);
-  expect(developer).toHaveTextContent("Turn tuning (dev)");
+  expect([...developer.querySelectorAll(".ui-group-title")].map((title) => title.textContent)).toEqual(["Conversations", "Turn tuning (dev)"]);
   expect(within(developer).queryByRole("switch", { name: "Web Inspector" })).toBeNull();
 });
 
