@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.10.1](https://github.com/sidevoice/sidevoice-web/compare/v0.10.0...v0.10.1) (2026-10-21)
+
+
+### Performance Improvements
+
+* **avatar:** an avatar with no box does not follow the voice ([#324](https://github.com/sidevoice/sidevoice-web/issues/324)) ([4bbe8d8](https://github.com/sidevoice/sidevoice-web/commit/4bbe8d8c4c93e28a1cae0bffe0c7b71b3dee9a62))
+* **avatar:** held still, the stage's mouth does not follow the voice either ([#322](https://github.com/sidevoice/sidevoice-web/issues/322)) ([f626abe](https://github.com/sidevoice/sidevoice-web/commit/f626abeae683f8c11fc95c52966846aef0e296e1))
+* **call:** the balloon's words are lit by moving windows, not by repainting text ([#323](https://github.com/sidevoice/sidevoice-web/issues/323)) ([fb165cb](https://github.com/sidevoice/sidevoice-web/commit/fb165cb79be9ba4aa2531948ff3c267a5d3bdc31))
+
 ## [0.10.0](https://github.com/sidevoice/sidevoice-web/compare/v0.9.0...v0.10.0) (2026-10-21)
 
 
