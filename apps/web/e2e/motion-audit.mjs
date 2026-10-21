@@ -280,8 +280,6 @@ function matches(entry, subject) {
  * transform or an opacity on an HTML layer, or why it has to run unseen, and what removes the entry.
  */
 export const ALLOWED = [
-  // TEMPORARY, one each removed by the commit that moves it to a transform or an opacity (audit 2026-10-21).
-  { rule: "property", name: "turn-try-late", why: "The delayed 'Getting ready' appears by visibility: to be moved to an opacity (next commits)." },
   {
     rule: "property", name: "bx-bulb",
     why: "The creatures' lamps, gems and bulbs flicker (brightness 1.5 / .7, steps(1)): twice a cycle, not on every frame. An opacity version is a different glow; the look is the operator's call (audit 2026-10-21, to decide).",
