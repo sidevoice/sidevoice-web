@@ -148,9 +148,9 @@ test("a phone's row: the room's order with the one on the stage marked where it 
   expect(avatars().map((avatar) => avatar.getAttribute("aria-pressed"))).toEqual(["true", "false", "false", "false"]);
   expect(plus()).toHaveAccessibleName("New conversation");
   expect(plus()).toHaveAttribute("title", "New conversation");
-  // Every conversation in the row: the chevron still there (the operator's decision; CHEVRON_ALWAYS), with no "+N".
+  // Every conversation in the row: the chevron still there (the operator's decision; CHEVRON_ALWAYS), showing how many there are.
   expect(chevron()).toHaveAccessibleName("All conversations (4)");
-  expect(chevron()!.querySelector(".conversations-rest")).toBeNull();
+  expect(chevron()!.querySelector(".conversations-count")).toHaveTextContent(/^4$/);
 });
 
 test("the chevron when more exist than fit, with how many are behind it; one with something new there marks it, said in words", () => {
@@ -158,7 +158,7 @@ test("the chevron when more exist than fit, with how many are behind it; one wit
   const store = room();
   expect(titles()).toEqual(["Fix the slow login", "Review the nightly backups"]);
   expect(chevron()).toHaveAccessibleName("All conversations (4)");
-  expect(chevron()!.querySelector(".conversations-rest")).toHaveTextContent(/^\+2$/);
+  expect(chevron()!.querySelector(".conversations-count")).toHaveTextContent(/^4$/);
   expect(chevron()!.querySelector(".conversations-cue")).toBeNull();
   // A reply unread in one behind the chevron: its dot on it, and said.
   const reply = { segment: "r-1", thread: "fp-1|t-week", role: "assistant" as const, text: "Done", name: "x", time: 1, session: "s1", seq: 1 };
@@ -174,7 +174,7 @@ test("nothing reorders the row: one that joins goes last, and one chosen from th
   // A new conversation, listed by the room before the others: last in the row's order, behind the chevron.
   act(() => store.patch({ people: [person("t-new", "Answer the support ticket"), ...PEOPLE] }));
   expect(titles()).toEqual(["Fix the slow login", "Review the nightly backups"]);
-  expect(chevron()!.querySelector(".conversations-rest")).toHaveTextContent(/^\+3$/);
+  expect(chevron()!.querySelector(".conversations-count")).toHaveTextContent(/^5$/);
   // Chosen from the sheet: in the row's last slot, marked, and focus on it there.
   await act(async () => { fireEvent.click(chevron()!); });
   const sheet = document.getElementById("conversations")!;

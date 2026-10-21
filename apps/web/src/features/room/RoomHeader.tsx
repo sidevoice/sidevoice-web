@@ -1,6 +1,6 @@
 import { Tooltip } from "../../components/ui/Tooltip";
 import { Button } from "../../components/ui/Button";
-import { ChevronIcon, SettingsIcon, SidevoiceMark } from "../../components/ui/Icons";
+import { ChevronIcon, ConversationsIcon, SettingsIcon, SidevoiceMark } from "../../components/ui/Icons";
 import { useCallLayout } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
 import { useLayoutEffect, useReducer, useRef, useState, type RefObject } from "react";
@@ -51,7 +51,7 @@ function ConversationsToggle({ t, hidden }: { t: Translate; hidden: ParticipantV
     <Tooltip action content={label}>
       <Button variant="ghost" tone="neutral" size="sm" className="conversations-toggle" aria-label={label}
         aria-haspopup="dialog" aria-expanded={open} aria-controls="conversations" onClick={open ? closeConversations : openConversations}>
-        {hidden.length > 0 && <span className="conversations-rest" aria-hidden="true">+{Math.min(hidden.length, 99)}</span>}<ChevronIcon size={18} />
+        <ConversationsIcon size={16} /><span className="conversations-count" aria-hidden="true">{count}</span><ChevronIcon size={16} className="conversations-chevron" />
         {news > 0 && <span className="conversations-cue" data-cue="unread" aria-hidden="true" />}
       </Button>
     </Tooltip>

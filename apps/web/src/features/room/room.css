@@ -38,6 +38,8 @@
 .sidebar-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-2); flex: none; min-height: 32px; padding-inline-start: var(--sv-space-2); }
 .sidebar-head h2 { display: flex; align-items: center; gap: var(--sv-space-2); flex: 1; min-width: 0; overflow: hidden; font-size: var(--sv-font-sm); line-height: 1.25rem; font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); white-space: nowrap; text-overflow: ellipsis; }
 .sidebar-head h2 svg { flex: none; width: 16px; height: 16px; }
+/* The number of conversations, as the call card's switcher says it (call-card.css .card-conversations-button): tabular, in the muted weight. */
+.conversations-count { flex: none; font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); font-variant-numeric: tabular-nums; }
 .conversation-sidebar .sidebar-close { display: none; }
 .sidebar-body { display: grid; align-content: start; gap: var(--sv-space-4); min-width: 0; }
 .sidebar-group { display: grid; gap: var(--sv-space-0-5); min-width: 0; }
@@ -107,8 +109,7 @@
   /* The conversations from the left, as many as fit (header-row.ts measures the row), then "+", then the chevron with
      the count of the rest. */
   .header-conversations { display: flex; align-items: center; gap: var(--sv-space-1); flex: 1; min-width: 0; }
-  .conversations-toggle { gap: 2px; padding-inline: var(--sv-space-2); }
-  .conversations-rest { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); font-variant-numeric: tabular-nums; }
+  .conversations-toggle { gap: 3px; padding-inline: var(--sv-space-2); }
   .header-avatar { position: relative; display: grid; place-items: center; flex: none; margin: 0; padding: 2px; border: 0; border-radius: 50%; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .header-avatar .conversation-avatar { width: 34px; height: 34px; }
   .header-avatar:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 0; }
@@ -130,8 +131,8 @@
   .conversations-cue[data-cue="unread"] { width: 8px; height: 8px; background: var(--sv-accent); }
 
   /* The chevron after the avatars, wherever the variant puts them: it drops the list, and turns up while it is down. */
-  .conversations-toggle svg { transition: transform var(--sv-dur-base) var(--sv-ease); }
-  .conversations-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+  .conversations-toggle .conversations-chevron { transition: transform var(--sv-dur-base) var(--sv-ease); }
+  .conversations-toggle[aria-expanded="true"] .conversations-chevron { transform: rotate(180deg); }
 
   /* The list drops from under the header as a panel over the dimmed call. */
   .conversation-sidebar { --dot-ring: var(--sv-surface); position: fixed; z-index: 31; top: var(--conversations-top, var(--sv-header-height)); left: 0; right: 0; width: auto; max-height: min(72dvh, 36rem); gap: var(--sv-space-2);

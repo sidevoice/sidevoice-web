@@ -125,7 +125,7 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
         {/* The brand at the column's head, where the room has no header (VARIANTS layout "meet"); hidden otherwise. */}
         <div className="sidebar-brand"><SidevoiceMark size={22} /><span translate="no">Sidevoice</span></div>
         <div className="sidebar-head">
-          <h2><ConversationsIcon />{t("sidebar.title")}</h2>
+          <h2><ConversationsIcon />{t("sidebar.title")}{!blocked && <span className="conversations-count" aria-hidden="true">{participants.length}</span>}</h2>
           <Tooltip action content={rail ? t("sidebar.expand") : t("sidebar.collapse")}>
             <Button variant="ghost" tone="neutral" size="icon-sm" className="sidebar-collapse" aria-controls="conversations" aria-expanded={!rail}
               aria-label={rail ? t("sidebar.expand") : t("sidebar.collapse")}

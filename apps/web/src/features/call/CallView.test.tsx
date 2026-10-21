@@ -486,7 +486,7 @@ test("a phone's header avatars switch the call at a tap, and the chevron brings 
   expect(avatars.map((button) => button.getAttribute("aria-label")?.split(" · ")[0])).toEqual(["Fix the slow login", "Migrate the payments API"]);
   expect(avatars.map((button) => button.getAttribute("aria-pressed"))).toEqual(["true", "false"]);
   expect(avatars[1].getAttribute("aria-label")).toBe("Migrate the payments API · Working");
-  expect(document.querySelector(".conversations-rest")).toHaveTextContent("+2");
+  expect(document.querySelector(".conversations-toggle .conversations-count")).toHaveTextContent(/^4$/);
   const sidebar = document.getElementById("conversations")!;
   // Asked of the header alone: a role query over the whole page costs a third of a second each under jsdom.
   const chevron = () => within(document.querySelector<HTMLElement>(".room-header")!).getByRole("button", { name: "All conversations (4)" });
