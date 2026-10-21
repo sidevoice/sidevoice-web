@@ -191,6 +191,9 @@ export interface CallControlsBridge {
   preview?(): void;
   /** Leaving Settings: a preview showing goes at once. */
   endPreview?(): void;
+  /** Whether the room shows the call's stage, and where in the viewport (sidevoice-desktop#165): the card shows while it
+   *  is out of view, Settings included. An app before it has none, and decides from its window alone. */
+  setStageVisible?(visible: boolean, rect?: { x: number; y: number; width: number; height: number }): void;
 }
 /** The app's mute shortcut and call controls settings, where it offers them (an app before them has neither). */
 export function muteShortcutBridge(): MuteShortcutBridge | null {

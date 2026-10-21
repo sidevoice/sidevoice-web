@@ -24,6 +24,8 @@ import { VoiceSetupCard } from "../features/call/VoiceSetupCard";
 import { useRoomStore } from "../state/room-store";
 import type { OnboardingRepository, OnboardingStep } from "../services/onboarding-state";
 import { useUiLanguage } from "../i18n/use-ui-language";
+import { callControlsBridge } from "../services/desktop-host";
+import { reportStage } from "../features/call/stage-visibility";
 
 function RoomContent() {
   const ready = useRoomStore((state) => state.facts.machinesReady);
@@ -40,6 +42,13 @@ function RoomContent() {
   // call's own space says is missing — one thing at a time.
   const { roomHidden, waiting, blocked } = callArea({ ready: onboarding.ready, done: onboarding.done, noMachine: !!noMachine, voice: onboarding.voice.state });
   const callBlocked = waiting !== null;
+
+  // The desktop app's floating card shows while the stage is out of view: the page says when it shows it (Settings does not).
+  useEffect(() => {
+    const bridge = callControlsBridge();
+    if (!bridge?.setStageVisible) return;
+    return reportStage((visible, rect) => bridge.setStageVisible?.(visible, rect));
+  }, []);
 
   useEffect(() => {
     if (install.phase === "installing") {
