@@ -1,5 +1,85 @@
 # Changelog
 
+## [0.9.0](https://github.com/sidevoice/sidevoice-web/compare/v0.8.3...v0.9.0) (2026-10-21)
+
+
+### Features
+
+* **call-card:** "!" for unread replies in the header ([#261](https://github.com/sidevoice/sidevoice-web/issues/261)) ([5125109](https://github.com/sidevoice/sidevoice-web/commit/5125109104defd061e10a8df721540df7c2c21ab))
+* **call-card:** free resize for the picture-in-picture ([#258](https://github.com/sidevoice/sidevoice-web/issues/258)) ([e312aab](https://github.com/sidevoice/sidevoice-web/commit/e312aab2bb2f2239894a45ab1dc7fb88132f656b))
+* **call-card:** picture-in-picture by default ([#259](https://github.com/sidevoice/sidevoice-web/issues/259)) ([189c1a8](https://github.com/sidevoice/sidevoice-web/commit/189c1a80589b4ca11e43656fd8a218629319a503))
+* **call-card:** the avatar's compact card ([#283](https://github.com/sidevoice/sidevoice-web/issues/283)) ([8349198](https://github.com/sidevoice/sidevoice-web/commit/83491984ab0194e80c2fdd04020eeca09f8b7778))
+* **call-card:** the avatar's controls open from a handle ([#263](https://github.com/sidevoice/sidevoice-web/issues/263)) ([6a2230f](https://github.com/sidevoice/sidevoice-web/commit/6a2230f3869eb3f43178b6d389b704f8d341c077))
+* **call:** captions toggle in the call bar and an upward balloon tail ([#254](https://github.com/sidevoice/sidevoice-web/issues/254)) ([2a79062](https://github.com/sidevoice/sidevoice-web/commit/2a790621ea22206aeeb954ccb5a926b9c17bc03a)), closes [#239](https://github.com/sidevoice/sidevoice-web/issues/239) [#240](https://github.com/sidevoice/sidevoice-web/issues/240)
+* **callcard:** preview the card and drop the custom size from Settings ([#256](https://github.com/sidevoice/sidevoice-web/issues/256)) ([543133d](https://github.com/sidevoice/sidevoice-web/commit/543133d38f7e170b775aa9f39d411dc65639ba87))
+* **callcard:** the floating card's three formats on the room's own components, and its Settings section ([#255](https://github.com/sidevoice/sidevoice-web/issues/255)) ([1413891](https://github.com/sidevoice/sidevoice-web/commit/141389158a61ac7ab8ceae1041c437a8fb33cca0))
+* **conversation:** jump-to-latest is a centered down arrow, no text ([#299](https://github.com/sidevoice/sidevoice-web/issues/299)) ([0509c5f](https://github.com/sidevoice/sidevoice-web/commit/0509c5fce91730347af9bdb06fc1ccc6b212ef88)), closes [#52](https://github.com/sidevoice/sidevoice-web/issues/52)
+* **onboarding:** the try's own button is Stop while its try runs ([#228](https://github.com/sidevoice/sidevoice-web/issues/228)) ([a1095d5](https://github.com/sidevoice/sidevoice-web/commit/a1095d58a608d764b3bdd38f846082acbbef0a25)), closes [#225](https://github.com/sidevoice/sidevoice-web/issues/225)
+* **room:** each machine's group in the conversations wears its connected mark ([#233](https://github.com/sidevoice/sidevoice-web/issues/233)) ([8ca2473](https://github.com/sidevoice/sidevoice-web/commit/8ca247363aeb1ef367e3b04b05af5194d6d81b99))
+* **room:** show the conversation count in the list, as the call card does ([#298](https://github.com/sidevoice/sidevoice-web/issues/298)) ([a88fde1](https://github.com/sidevoice/sidevoice-web/commit/a88fde10dd6a7820c2e977b3ebca96da73faba31)), closes [#252](https://github.com/sidevoice/sidevoice-web/issues/252)
+* **settings:** disable model choice until a remote provider has its key ([#217](https://github.com/sidevoice/sidevoice-web/issues/217)) ([7df9ed0](https://github.com/sidevoice/sidevoice-web/commit/7df9ed0dde2ab88291597660c28f2a47ed6f70e5)), closes [#206](https://github.com/sidevoice/sidevoice-web/issues/206)
+* **settings:** hidden developer panel to tune turn and barge-in numbers ([#288](https://github.com/sidevoice/sidevoice-web/issues/288)) ([e0f85b0](https://github.com/sidevoice/sidevoice-web/commit/e0f85b05a9a0c1176858c1def03eaa5081223e93))
+* **settings:** Preferred position and Size ([#271](https://github.com/sidevoice/sidevoice-web/issues/271)) ([059cc47](https://github.com/sidevoice/sidevoice-web/commit/059cc4700001252498ea42a5fd60f72e98b9674f))
+* **settings:** turn the floating card off ([#262](https://github.com/sidevoice/sidevoice-web/issues/262)) ([3dc8e7b](https://github.com/sidevoice/sidevoice-web/commit/3dc8e7b4843894371d9bb97b75ff8fa4d7235aea))
+* **voice:** start calls with input and output halves, update them live, preload chosen models ([#246](https://github.com/sidevoice/sidevoice-web/issues/246)) ([4ec4d96](https://github.com/sidevoice/sidevoice-web/commit/4ec4d9662dd88045eb0675f6b7f9c9a9a7648627)), closes [#160](https://github.com/sidevoice/sidevoice-web/issues/160) [#204](https://github.com/sidevoice/sidevoice-web/issues/204) [#225](https://github.com/sidevoice/sidevoice-web/issues/225) [#150](https://github.com/sidevoice/sidevoice-web/issues/150)
+* **voice:** the app owns the turn and barge-in numbers and hands them to the voice ([#269](https://github.com/sidevoice/sidevoice-web/issues/269)) ([32c2627](https://github.com/sidevoice/sidevoice-web/commit/32c262772fc6520c27c794d6afc38d564f44beed))
+
+
+### Bug Fixes
+
+* **audio:** a reply already here plays to its end whatever happens to the link ([#226](https://github.com/sidevoice/sidevoice-web/issues/226)) ([ead820a](https://github.com/sidevoice/sidevoice-web/commit/ead820ae0ec185e0eb0ef98f66c3151417d84af5)), closes [#220](https://github.com/sidevoice/sidevoice-web/issues/220)
+* **audio:** play only the conversation in focus ([#208](https://github.com/sidevoice/sidevoice-web/issues/208)) ([ca2ba6f](https://github.com/sidevoice/sidevoice-web/commit/ca2ba6fda808e2cdae226480a7280d64890b16af)), closes [#200](https://github.com/sidevoice/sidevoice-web/issues/200)
+* **audio:** replies held across a new session of the same call still play ([#238](https://github.com/sidevoice/sidevoice-web/issues/238)) ([3f48cc8](https://github.com/sidevoice/sidevoice-web/commit/3f48cc80031b41b4dd512289f3a8e2adec2078cc))
+* **avatar:** a robot's arm covers the body's gloss, so no stripe crosses it ([#245](https://github.com/sidevoice/sidevoice-web/issues/245)) ([0b7ad61](https://github.com/sidevoice/sidevoice-web/commit/0b7ad615cd8db04e64cfff28f27c00fcbf1cc208)), closes [#194](https://github.com/sidevoice/sidevoice-web/issues/194)
+* **avatar:** keep the card thumbnail in step with the stage ([#211](https://github.com/sidevoice/sidevoice-web/issues/211)) ([4e31fc3](https://github.com/sidevoice/sidevoice-web/commit/4e31fc340157d5055352b2809b4dbd6240f6b3a9))
+* **call-card:** close the devices panel once the room confirms the device ([#295](https://github.com/sidevoice/sidevoice-web/issues/295)) ([77ed67e](https://github.com/sidevoice/sidevoice-web/commit/77ed67e55928486efcfe295c2ec3677681ef7ff3))
+* **call-card:** no working badge over the creature ([#257](https://github.com/sidevoice/sidevoice-web/issues/257)) ([1d04670](https://github.com/sidevoice/sidevoice-web/commit/1d04670404a58c321d7999b521291b7d2e216273))
+* **call-card:** the avatar's controls stay open while the pointer is near ([#267](https://github.com/sidevoice/sidevoice-web/issues/267)) ([c56bb76](https://github.com/sidevoice/sidevoice-web/commit/c56bb764a0b033fdbe7f4be80bb495c14c179e18))
+* **call-card:** the list drops from its control; the compact card never moves the creature sideways ([#285](https://github.com/sidevoice/sidevoice-web/issues/285)) ([ba5c84f](https://github.com/sidevoice/sidevoice-web/commit/ba5c84fb9ed0f158680be728d1c8e9e57241bd7c))
+* **call-card:** the title gives way to the fixed controls ([#260](https://github.com/sidevoice/sidevoice-web/issues/260)) ([08c8e60](https://github.com/sidevoice/sidevoice-web/commit/08c8e6052b9d0caacefe4455cc2f20cc50a2dc53))
+* **call-card:** the wave holds still in silence instead of rendering 10 times a second ([#276](https://github.com/sidevoice/sidevoice-web/issues/276)) ([4e87da3](https://github.com/sidevoice/sidevoice-web/commit/4e87da35b71c0aa884cb25f07f49ec85618e8b86))
+* **call:** a call's machine that stops answering reads as away ([#232](https://github.com/sidevoice/sidevoice-web/issues/232)) ([1d129d1](https://github.com/sidevoice/sidevoice-web/commit/1d129d1c9523498c4cdfaf160140e9600fa4cfeb))
+* **callcard:** the card's shadow ends inside the window's margin ([#303](https://github.com/sidevoice/sidevoice-web/issues/303)) ([55de6c2](https://github.com/sidevoice/sidevoice-web/commit/55de6c209067b610ef8a420bed1341fbfbb2f48c))
+* **call:** don't block call and text on agent reachability ([#212](https://github.com/sidevoice/sidevoice-web/issues/212)) ([e416788](https://github.com/sidevoice/sidevoice-web/commit/e416788aa30d8d8d9487d13f768b4dfc47072bcb)), closes [#198](https://github.com/sidevoice/sidevoice-web/issues/198)
+* **call:** drop the hover shading on the stage heading ([#297](https://github.com/sidevoice/sidevoice-web/issues/297)) ([a802cb9](https://github.com/sidevoice/sidevoice-web/commit/a802cb967c04d53dc050d9959a8a71ed987fafec)), closes [#253](https://github.com/sidevoice/sidevoice-web/issues/253)
+* **call:** speaking again while a turn is transcribed shows listening ([#236](https://github.com/sidevoice/sidevoice-web/issues/236)) ([d6b770b](https://github.com/sidevoice/sidevoice-web/commit/d6b770bcf2957ed4bd064653f8645298a4db384b))
+* **call:** start a call again after its microphone or speaker fails ([#224](https://github.com/sidevoice/sidevoice-web/issues/224)) ([d766011](https://github.com/sidevoice/sidevoice-web/commit/d76601171ba722bf174bc73fc0c34d01e55e41cf)), closes [#190](https://github.com/sidevoice/sidevoice-web/issues/190) [#192](https://github.com/sidevoice/sidevoice-web/issues/192)
+* **conversation:** the waveform runs no frame loop out of sight ([#275](https://github.com/sidevoice/sidevoice-web/issues/275)) ([b0d7ba5](https://github.com/sidevoice/sidevoice-web/commit/b0d7ba50e1269e90cf7423022955c47269835795))
+* **mic:** trust a granted microphone on iOS Safari ([#234](https://github.com/sidevoice/sidevoice-web/issues/234)) ([06be0f5](https://github.com/sidevoice/sidevoice-web/commit/06be0f5f16ee5e81d5a080dd665bfb0d80e25fb1)), closes [#231](https://github.com/sidevoice/sidevoice-web/issues/231)
+* **models:** a model download's bar follows its bytes and no longer runs back at its start ([#222](https://github.com/sidevoice/sidevoice-web/issues/222)) ([232c1a0](https://github.com/sidevoice/sidevoice-web/commit/232c1a0da1f8d0c9ab811f67e99e25f7819e6fa7))
+* **onboarding:** a voice try only listens, and a try's result stays with its model ([#215](https://github.com/sidevoice/sidevoice-web/issues/215)) ([0782a75](https://github.com/sidevoice/sidevoice-web/commit/0782a756689a8cb4aad52edd942d05cb5111c8ab)), closes [#207](https://github.com/sidevoice/sidevoice-web/issues/207)
+* **onboarding:** Back passes a paired machine's step, as going on does ([#242](https://github.com/sidevoice/sidevoice-web/issues/242)) ([812dee7](https://github.com/sidevoice/sidevoice-web/commit/812dee7dece36304a6b32a0cb2031ce6a1dfa2fb)), closes [#186](https://github.com/sidevoice/sidevoice-web/issues/186)
+* **onboarding:** word a voice try's device failures as a try, not a call ([#213](https://github.com/sidevoice/sidevoice-web/issues/213)) ([ba8d6a3](https://github.com/sidevoice/sidevoice-web/commit/ba8d6a31798db4ecd6d393e5d9ba41aebf21cbf4)), closes [#205](https://github.com/sidevoice/sidevoice-web/issues/205)
+* **room:** no banner for a stale playback or hearing report ([#218](https://github.com/sidevoice/sidevoice-web/issues/218)) ([6378932](https://github.com/sidevoice/sidevoice-web/commit/63789328d8f3d7ce528e0fe1f9e8da316b0f6b16)), closes [#199](https://github.com/sidevoice/sidevoice-web/issues/199)
+* **settings:** always-show controls under Style, reflected in the previews ([#270](https://github.com/sidevoice/sidevoice-web/issues/270)) ([a505e19](https://github.com/sidevoice/sidevoice-web/commit/a505e19c815220f1c7d85c51fc3e7ed4b907b218))
+* **settings:** end the card preview on leaving, keep Reset size and position enabled ([#268](https://github.com/sidevoice/sidevoice-web/issues/268)) ([2235e2f](https://github.com/sidevoice/sidevoice-web/commit/2235e2fd377bfb26990af1473dfa9e116f483ac6))
+* **settings:** still card previews and a real check on the chosen one ([#264](https://github.com/sidevoice/sidevoice-web/issues/264)) ([53ca318](https://github.com/sidevoice/sidevoice-web/commit/53ca318e6de31922de4d44bfe0af7580540176f2))
+* **stage:** the person's balloon stays with the conversation they spoke to ([#244](https://github.com/sidevoice/sidevoice-web/issues/244)) ([e17cf15](https://github.com/sidevoice/sidevoice-web/commit/e17cf15924531399c7a3bbdd5c6deb468bac68f1)), closes [#243](https://github.com/sidevoice/sidevoice-web/issues/243)
+* **stage:** the speech balloon follows what plays, and nothing else ([#227](https://github.com/sidevoice/sidevoice-web/issues/227)) ([bcd11dd](https://github.com/sidevoice/sidevoice-web/commit/bcd11ddd7079b59b28f36a63d34b6b400aeae8a7)), closes [#221](https://github.com/sidevoice/sidevoice-web/issues/221)
+* **state:** show the working state outside calls ([#209](https://github.com/sidevoice/sidevoice-web/issues/209)) ([124a163](https://github.com/sidevoice/sidevoice-web/commit/124a163fc0fcf8fc025d47f48c73e3e756378a99))
+* **ui:** show the language icon only on the voice language filter ([#216](https://github.com/sidevoice/sidevoice-web/issues/216)) ([1d441cc](https://github.com/sidevoice/sidevoice-web/commit/1d441ccb0a0d6cf6738d11c774afea40a94fbad3)), closes [#203](https://github.com/sidevoice/sidevoice-web/issues/203)
+* **update:** hang the update notice under the conversation's title ([#202](https://github.com/sidevoice/sidevoice-web/issues/202)) ([7bbc7ec](https://github.com/sidevoice/sidevoice-web/commit/7bbc7ecaff6362aa0dba12859e8d9550249ee440))
+* **voice:** say so when a model download stops receiving bytes ([#248](https://github.com/sidevoice/sidevoice-web/issues/248)) ([1300c59](https://github.com/sidevoice/sidevoice-web/commit/1300c594700bae52ca4787fe0ba278c036cbb908)), closes [#223](https://github.com/sidevoice/sidevoice-web/issues/223)
+* **voice:** word a missing permission and a plan that does not allow apart from a rejected key ([#219](https://github.com/sidevoice/sidevoice-web/issues/219)) ([959b46b](https://github.com/sidevoice/sidevoice-web/commit/959b46b13aabbb299ca0b399f6f184ac809f28f0)), closes [#195](https://github.com/sidevoice/sidevoice-web/issues/195)
+
+
+### Performance Improvements
+
+* **avatar:** creatures stay still; motion only where it carries state ([#274](https://github.com/sidevoice/sidevoice-web/issues/274)) ([e1c5322](https://github.com/sidevoice/sidevoice-web/commit/e1c5322deffb2fc5fc8826f50b130947ba9c74c8))
+* **avatar:** the stage's and the card's creatures move as GPU layers ([#292](https://github.com/sidevoice/sidevoice-web/issues/292)) ([47942c7](https://github.com/sidevoice/sidevoice-web/commit/47942c758a7c03613a7ab4ae62e0564809a96f9b))
+* **call-card:** your wave's bars move by transform, not by height ([#290](https://github.com/sidevoice/sidevoice-web/issues/290)) ([b595c16](https://github.com/sidevoice/sidevoice-web/commit/b595c16cf8cc29919571de8f8343d569a4e45894))
+* **call:** the agent speaking restyles only its mouth and re-renders only its balloon ([#302](https://github.com/sidevoice/sidevoice-web/issues/302)) ([a6ffc74](https://github.com/sidevoice/sidevoice-web/commit/a6ffc74a1e410d659c4203de4a4c13f155e1e521))
+* **call:** the microphone's bars follow each reading without a transition ([#300](https://github.com/sidevoice/sidevoice-web/issues/300)) ([0d6b625](https://github.com/sidevoice/sidevoice-web/commit/0d6b6257b10bc392d2a338a6dcb764a69f867390))
+* **call:** the microphone's bars move by transform, not by height ([#289](https://github.com/sidevoice/sidevoice-web/issues/289)) ([b6bf0d0](https://github.com/sidevoice/sidevoice-web/commit/b6bf0d067f19faa37b6b6697216ad024d1954f19))
+* **conversation:** the live waveform is bars that move by transform, not a canvas ([#296](https://github.com/sidevoice/sidevoice-web/issues/296)) ([823331d](https://github.com/sidevoice/sidevoice-web/commit/823331d94b8447dea7098293f121990e4d7a99d0))
+* nothing animates where nobody sees it, and a guard for what moves ([#301](https://github.com/sidevoice/sidevoice-web/issues/301)) ([a26816e](https://github.com/sidevoice/sidevoice-web/commit/a26816ee0fdce10221e0f2b8d1836eb4606f600b))
+* **stage:** no spinner inside the hidden Working status ([#287](https://github.com/sidevoice/sidevoice-web/issues/287)) ([fb37062](https://github.com/sidevoice/sidevoice-web/commit/fb37062cb219fdf92022f256ea0f30317fda49c1))
+
+
+### Reverts
+
+* creatures move again (back out [#274](https://github.com/sidevoice/sidevoice-web/issues/274)) ([#291](https://github.com/sidevoice/sidevoice-web/issues/291)) ([88ba4f4](https://github.com/sidevoice/sidevoice-web/commit/88ba4f4e4e11c55441e1c7c6c3e905f2bde5eaea))
+
 ## [0.8.3](https://github.com/sidevoice/sidevoice-web/compare/v0.8.2...v0.8.3) (2026-10-18)
 
 
