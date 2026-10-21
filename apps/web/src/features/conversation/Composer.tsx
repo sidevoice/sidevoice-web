@@ -14,13 +14,17 @@ export function Composer({ narrow }: { narrow: boolean }) {
 
   // The runtime clears the box by setting its value once the text is sent, and no input event follows: the box kept
   // the height of what was sent. Right after, it always sets the form's state again (enabled, placeholder), so that
-  // write is the moment to measure the box again — the way it measures itself as it is typed into.
+  // write is the moment to measure the box again — the way it measures itself as it is typed into. It sets them again with
+  // every change of the room's state (several a second while the agent speaks), most times to what they already are: only
+  // a write that changes one measures, the box is not laid out again for nothing.
   useEffect(() => {
     const node = form.current;
     const box = node?.querySelector("textarea");
     if (!node || !box) return;
-    const observer = new MutationObserver(() => box.dispatchEvent(new Event("input", { bubbles: true })));
-    observer.observe(node, { subtree: true, attributes: true, attributeFilter: ["disabled", "placeholder"] });
+    const observer = new MutationObserver((records) => {
+      if (records.some((record) => record.attributeName && (record.target as Element).getAttribute(record.attributeName) !== record.oldValue)) box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    observer.observe(node, { subtree: true, attributes: true, attributeOldValue: true, attributeFilter: ["disabled", "placeholder"] });
     return () => observer.disconnect();
   }, []);
 
