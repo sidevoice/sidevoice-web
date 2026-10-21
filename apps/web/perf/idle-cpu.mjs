@@ -18,66 +18,21 @@
  * in that call, the microphone's level arriving as the app hands it (about 30 readings a second). Each row lists the
  * animations still running, by name and element. */
 
-import { execFileSync, spawn } from "node:child_process";
-import { appendFileSync, readFileSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { appendFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { webkit } from "@playwright/test";
 import { installHarness } from "../e2e/harness.mjs";
+import { sample } from "./cpu.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SECONDS = Number(process.env.PERF_SECONDS || 15);
 const SETTLE_MS = 3000;
 const BASE = "http://127.0.0.1:4173";
-const TICK = 100; // Linux /proc clock ticks per second (sysconf CLK_TCK on every Linux runner)
 
 const conversation = (n) => ({ thread_id: `t${n}`, title: `project-${n}`, available: true, reach: { state: "listening" }, harness: "claude-code" });
 const several = Array.from({ length: 6 }, (_, i) => conversation(i + 1));
-
-/** The CPU seconds each of the browser's processes has spent so far, by pid. */
-function cpuTimes() {
-  const out = new Map();
-  if (process.platform === "linux") {
-    for (const pid of execFileSync("ls", ["/proc"], { encoding: "utf8" }).split("\n").filter((p) => /^\d+$/.test(p))) {
-      try {
-        const command = readFileSync(`/proc/${pid}/cmdline`, "utf8").replaceAll("\0", " ");
-        if (!command.includes("ms-playwright/webkit") && !command.includes("/wk/")) continue;
-        const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
-        const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
-        out.set(pid, { command, seconds: (Number(fields[11]) + Number(fields[12])) / TICK });
-      } catch { /* gone meanwhile */ }
-    }
-    return out;
-  }
-  // macOS: `time` is user + system, [[dd-]hh:]mm:ss.cc. The XPC services are launchd's children: matched by their path.
-  for (const line of execFileSync("ps", ["-A", "-o", "pid=,time=,command="], { encoding: "utf8" }).split("\n")) {
-    const match = line.trim().match(/^(\d+)\s+(\S+)\s+(.*)$/);
-    if (!match || !match[3].includes("ms-playwright/webkit")) continue;
-    const parts = match[2].replace(/^(\d+)-/, (_, d) => `${Number(d) * 24}:`).split(":").map(Number);
-    const seconds = parts.reduce((total, part) => total * 60 + part, 0);
-    out.set(match[1], { command: match[3], seconds });
-  }
-  return out;
-}
-
-function kind(command) {
-  if (/GPU/.test(command)) return "gpu";
-  if (/WebContent|WebProcess/.test(command)) return "web";
-  if (/Network/.test(command)) return "net";
-  return "ui";
-}
-
-/** The percentage of one core each kind of process spent over `seconds`. */
-async function sample(seconds) {
-  const before = cpuTimes();
-  const started = performance.now();
-  await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
-  const elapsed = (performance.now() - started) / 1000;
-  const after = cpuTimes();
-  const total = { ui: 0, web: 0, gpu: 0, net: 0 };
-  for (const [pid, { command, seconds: spent }] of after) total[kind(command)] += spent - (before.get(pid)?.seconds ?? 0);
-  return Object.fromEntries(Object.entries(total).map(([k, v]) => [k, (100 * v) / elapsed]));
-}
 
 /** What the page keeps moving: its running animations, how many of them are on SVG (repainted, never composited), and
  *  which they are: the animation's name on its element (tag and first class), counted. */

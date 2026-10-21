@@ -67,3 +67,16 @@ test("a bicho with no pastime that suits it stays quiet; work and rest are picke
   releaseIdle();
   releaseWork();
 });
+
+test("the page wakes when a pick can end, not on a clock of its own: no timer while nothing is held", () => {
+  vi.useFakeTimers();
+  expect(vi.getTimerCount()).toBe(0);
+  const release = holdRotation("work", "t-4", ["read"]);
+  expect(vi.getTimerCount()).toBe(1);
+  // Nothing runs before the pick's shortest spell is over (a tick reads the clock; there is none).
+  const reads = vi.spyOn(Date, "now");
+  vi.advanceTimersByTime(WORK_DURATION.read[0] - 1);
+  expect(reads).not.toHaveBeenCalled();
+  release();
+  expect(vi.getTimerCount()).toBe(0);
+});

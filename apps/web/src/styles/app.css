@@ -25,6 +25,10 @@ main[tabindex="-1"]:focus { outline: none; }
 .call-column { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .call-column > .call-bar { flex: none; }
 @media (max-width: 559px), (max-width: 899px) and (pointer: coarse) { #root > .room-shell > main.call-layout { flex-direction: column; } }
+/* A full page (Settings) is opaque and covers the whole room: while it is open, what moves behind it waits (the creatures, the
+ * dots, the poster), and goes on from where it was when the page closes. */
+#root > .room-shell:has(> .ui-dialog[data-layout="page"][open]) > :not(.ui-dialog),
+#root > .room-shell:has(> .ui-dialog[data-layout="page"][open]) > :not(.ui-dialog) * { animation-play-state: paused !important; }
 
 .startup-error { width: min(34rem, calc(100% - 2rem)); min-height: 100dvh; margin: auto; padding: var(--sv-space-8); display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--sv-space-3); }
 .setup-main { flex: 1; display: grid; place-items: center; min-height: 0; padding: var(--sv-space-4); overflow: auto; background: var(--sv-bg-subtle); }

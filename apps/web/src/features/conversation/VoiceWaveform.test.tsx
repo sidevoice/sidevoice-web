@@ -170,6 +170,8 @@ function bars(size = { width: 30, height: 22 }) {
     /** Advance the clock and run the frame that was waiting. */
     frame: (ms = 16) => act(() => { now += ms; const run = queue; queue = []; run.forEach((callback) => callback(now)); }),
     resize: () => act(() => resize()),
+    /** The frames asked for and not yet run. */
+    pending: () => queue.length,
     /** What is drawn, slot by slot, newest first: each slot's three transforms. */
     drawn: (container: HTMLElement) => {
       const parts = [...container.querySelectorAll<HTMLElement>(".voice-wave-bars > *")].map((part) => part.style.transform);
@@ -245,6 +247,24 @@ test("silence adds no column: what was said holds its shape through the pause", 
   await view.frame(200);
   expect(view.drawn(container)).toEqual(said);
   expect(view.writes.transform).toBe(0);
+});
+
+test("in silence it asks for no frames: the level is read on a timer, and a voice brings the frames back", async () => {
+  const view = bars();
+  let voice = 0.5;
+  render(<VoiceWaveform phase="listening" level={() => voice} />);
+  await view.frame();
+  expect(view.pending()).toBe(1);
+  voice = 0;
+  await view.frame(100);
+  // Silent: nothing waits for a frame; the next look is on a timer.
+  expect(view.pending()).toBe(0);
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  expect(view.pending()).toBe(0);
+  // A voice is heard at the next look, and the frames run again.
+  voice = 0.8;
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  expect(view.pending()).toBe(1);
 });
 
 test("a resize grows or trims the slots and keeps the newest columns", async () => {

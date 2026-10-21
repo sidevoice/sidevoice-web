@@ -13,6 +13,9 @@ import "./transcript.css";
  * CPU, in its GPU process: about 38 % of a core with the person speaking (desktop#149). */
 
 const COLUMN_MS = 55; // one column of history per ~55 ms, so the scroll follows time and not the frame rate
+/** In silence nothing is drawn, so the level is read on a timer this often (a column lasts `COLUMN_MS`) instead of on every frame:
+ *  a frame asked for sixty times a second to draw nothing keeps the whole page rendering (desktop#149). */
+const SILENT_POLL_MS = 50;
 /** Below this level the microphone hears silence: the waveform waits instead of scrolling it in. */
 const SILENCE = 0.04;
 const CELL = 5; // column pitch in CSS pixels
@@ -151,9 +154,12 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
     // Transcribing keeps the last frame: nothing is read, nothing is scheduled, the pulse is CSS.
     if (!node || reduced || phase !== "listening") return;
     let frame = 0;
+    let timer = 0;
     let lastColumn = 0;
 
     const tick = () => {
+      frame = 0;
+      timer = 0;
       // The level now, as the meter measures it (0 to 1): the call's, or the try's own. Only a host without it falls back to
       // the analyser's history, which, averaged, barely moves.
       const own = ownLevel.current ?? window.sidevoiceAudio?.level?.bind(window.sidevoiceAudio);
@@ -163,7 +169,7 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
       const now = performance.now();
       // Silence adds no column: what was said holds its shape through the pauses and the wait for the end of turn, so
       // the turn closes on the voice's own shape, frozen there while it is transcribed (operator, 2026-10-15).
-      if (value < SILENCE && values.length) { lastColumn = now; frame = requestAnimationFrame(tick); return; }
+      if (value < SILENCE && values.length) { lastColumn = now; timer = window.setTimeout(tick, SILENT_POLL_MS); return; }
       if (!values.length || now - lastColumn >= COLUMN_MS) { values.push(value); lastColumn = now; }
       // Between columns the newest one keeps the loudest instant it covers, so a peak is never skipped.
       else values[values.length - 1] = Math.max(values[values.length - 1], value);
@@ -173,8 +179,8 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
     // Only while it can be seen: a waveform mounted out of sight (a Settings or setup page not shown, a hidden tab) reads
     // and schedules nothing. A loop of frames that never stops keeps the page rendering every frame (desktop#149).
     let shown = typeof IntersectionObserver === "undefined";
-    const start = () => { if (!frame && shown && !document.hidden) { lastColumn = performance.now(); frame = requestAnimationFrame(tick); } };
-    const stop = () => { if (frame) { cancelAnimationFrame(frame); frame = 0; } };
+    const start = () => { if (!frame && !timer && shown && !document.hidden) { lastColumn = performance.now(); frame = requestAnimationFrame(tick); } };
+    const stop = () => { if (frame) { cancelAnimationFrame(frame); frame = 0; } if (timer) { clearTimeout(timer); timer = 0; } };
     const visibility = () => { if (document.hidden) stop(); else start(); };
     document.addEventListener("visibilitychange", visibility);
     const sight = typeof IntersectionObserver === "undefined" ? null : new IntersectionObserver((entries) => {

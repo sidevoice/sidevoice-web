@@ -19,7 +19,7 @@
 /* Starting again with a new setting is quick once its models are loaded: "Getting ready…" shows only if it takes a
    moment, rather than flashing at each change. */
 .turn-try[data-phase="restarting"] .turn-try-busy { animation: turn-try-late 0s 300ms both; }
-@keyframes turn-try-late { from { visibility: hidden; } to { visibility: visible; } }
+@keyframes turn-try-late { from { opacity: 0; } to { opacity: 1; } }
 
 /* A phone (a narrow group): the button full width, under where the try stands. */
 @container (max-width: 560px) {
