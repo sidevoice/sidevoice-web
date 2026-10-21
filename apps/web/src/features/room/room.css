@@ -39,6 +39,10 @@
 .sidebar-head h2 { display: flex; align-items: center; gap: var(--sv-space-2); flex: 1; min-width: 0; overflow: hidden; font-size: var(--sv-font-sm); line-height: 1.25rem; font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); white-space: nowrap; text-overflow: ellipsis; }
 .sidebar-head h2 svg { flex: none; width: 16px; height: 16px; }
 /* The number of conversations, as the call card's switcher says it (call-card.css .card-conversations-button): tabular, in the muted weight. */
+.sidebar-head h2 .conversations-chip { display: inline-flex; align-items: center; gap: 3px; flex: none; height: 20px; padding: 0 6px; border-radius: 8px;
+  background: color-mix(in srgb, var(--sv-text) 8%, transparent); color: var(--sv-text-muted); font: 600 12.5px/1 var(--sv-font-sans, inherit); font-variant-numeric: tabular-nums; }
+.sidebar-head h2 .conversations-chip svg { width: 14px; height: 14px; }
+.conversations-chip .conversations-count { font: inherit; color: inherit; }
 .conversations-count { flex: none; font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); font-variant-numeric: tabular-nums; }
 .conversation-sidebar .sidebar-close { display: none; }
 .sidebar-body { display: grid; align-content: start; gap: var(--sv-space-4); min-width: 0; }
