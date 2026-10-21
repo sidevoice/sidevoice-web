@@ -2,7 +2,7 @@ import type { ChatMessage, ConversationView, HostAgentsState, JoinStatusView, Ma
 import type { PairingSummary } from '../services/device-pairing.js';
 /** How a paired machine is reached now: proved at an address ('ok'), being looked for, or why not. */
 export type NodeReach = 'ok' | 'checking' | 'revoked' | 'offline' | 'away';
-export interface MachineLink { reach: NodeReach; via: '' | 'room' | 'node' }
+export interface MachineLink { reach: NodeReach; via: '' | 'node' }
 /** Where the call's voice is, as it reports it. */
 export interface VoiceState {
  listening: 'idle' | 'muted' | 'listening' | 'speaking'; recognising: number; playback: 'idle' | 'synthesizing' | 'playing';

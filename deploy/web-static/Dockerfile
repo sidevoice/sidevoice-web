@@ -4,7 +4,7 @@
 #   docker build -f deploy/web-static/Dockerfile -t sidevoice-web .
 #   docker run -p 8080:8080 -e SIDEVOICE_TARGET=https://rendezvous.example sidevoice-web
 #
-# SIDEVOICE_TARGET (optional) is where the interface looks first: a rendezvous room or a node. Without it, the
+# SIDEVOICE_TARGET (optional) is where the interface looks first: a node. Without it, the
 # pairing code says where the machine is. Serve it over https (the microphone needs a secure context).
 #
 # The site is the same on every architecture, so it is built once, on the builder's own platform; the image of each

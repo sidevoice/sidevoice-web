@@ -20,7 +20,7 @@ const LOGIN = "fp-1|t-login";
 const ROOM: Partial<SessionFacts> = {
   ws: {}, sessionId: "s1", callNode: "fp-1", roomBinding: { thread_id: "t-login", title: "Fix the slow login", binding_id: "b1" },
   people: [{ thread_id: "t-login", title: "Fix the slow login", available: true, node: "fp-1", reach: { state: "listening" } }],
-  machineLinks: { "fp-1": { reach: "ok", via: "node" } }, pairings: [{ fp: "fp-1", host: "Laptop", urls: [], rv: null, device_id: "d", paired_at: 1, revoked: false }] as never,
+  machineLinks: { "fp-1": { reach: "ok", via: "node" } }, pairings: [{ fp: "fp-1", host: "Laptop", urls: [], device_id: "d", paired_at: 1, revoked: false }] as never,
   botLive: true, karaokeState: { segment: "h-2", from: 20, to: 20 },
   history: [{ segment: "h-2", thread: LOGIN, role: "assistant", text: REPLY, name: "Fix the slow login", time: 1, session: "s1", audio: "playing" }] as never,
 };

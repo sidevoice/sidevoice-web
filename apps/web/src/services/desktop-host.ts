@@ -28,7 +28,6 @@ export interface LocalHostPairing {
   device_id: string;
   token: string;
   urls: string[];
-  rv?: Pairing["rv"];
   host?: string | null;
   node?: { fingerprint?: string; public_key?: string; host?: string | null };
   local?: true;
@@ -37,7 +36,7 @@ export interface LocalHostPairing {
 export interface LocalPairingCode {
   code: string;
   expires_in: number;
-  reach: "room" | "direct" | "local-only";
+  reach: "direct" | "local-only";
 }
 
 export interface LocalHostInstallProgress {
@@ -90,7 +89,6 @@ export interface LocalHostBridge {
   reconnect?(): Promise<unknown>;
   revealLog?(): Promise<unknown> | unknown;
   pairingCode?(): Promise<LocalPairingCode>;
-  pairRoom?(url: string, code: string): Promise<unknown>;
   install?(onProgress?: (event: LocalHostInstallProgress) => void): LocalHostInstallOperation;
   cancel?(job: string): Promise<boolean>;
   update?(): Promise<LocalHostStatus>;
@@ -233,7 +231,7 @@ export function normalizeLocalHostPairing(value: unknown): Pairing | null {
       !Array.isArray(candidate.urls) || typeof candidate.urls[0] !== "string" || !candidate.urls[0]) return null;
   return {
     fp, public_key: publicKey, device_id: candidate.device_id, token: candidate.token,
-    urls: candidate.urls.filter((url): url is string => typeof url === "string"), rv: candidate.rv ?? null,
+    urls: candidate.urls.filter((url): url is string => typeof url === "string"),
     host: candidate.host || candidate.node?.host || null, paired_at: 0, local: true,
   };
 }

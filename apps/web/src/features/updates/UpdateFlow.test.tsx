@@ -33,7 +33,7 @@ afterEach(() => {
  * available · Download, nothing while it downloads; either mode, Sidevoice 0.4.0 is ready · Restart to update; nothing
  * while the person's check runs. Restart is only ever the person's press. */
 
-const local: PairingSummary = { fp: "fp-local", host: "MacBook", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d-local", paired_at: 1_700_000_000, revoked: false };
+const local: PairingSummary = { fp: "fp-local", host: "MacBook", local: true, urls: ["http://127.0.0.1:45781"], device_id: "d-local", paired_at: 1_700_000_000, revoked: false };
 const running: LocalHostStatus = { state: "running", reachable: true, installed: true, service: "launchd", core: { version: "0.8.1", api: 1 }, calls: 0, product_version: "0.8.1" };
 const CURRENT: LocalHostVersion = { bridge: 3, bundled: { version: "0.8.1" }, installed: { version: "0.8.1" }, core_api: 1, update: "current" };
 const FOUND: UpdaterStatus = { state: "available", version: "0.4.0" };

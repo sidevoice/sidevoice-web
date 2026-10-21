@@ -16,10 +16,10 @@ vi.mock("../../services/room-session-controller.js", () => ({}));
 
 
 const paired = (extra: Partial<PairingSummary> = {}): PairingSummary => ({
-  fp: "fp-nuc", host: "NUC", urls: ["https://nuc.example"], rv: { url: "https://room.example", node: "nuc-1" },
+  fp: "fp-nuc", host: "NUC", urls: ["https://nuc.example"],
   device_id: "d-nuc", paired_at: 1_700_000_000, revoked: false, ...extra,
 });
-const local = paired({ fp: "fp-local", host: "MacBook", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d-local" });
+const local = paired({ fp: "fp-local", host: "MacBook", local: true, urls: ["http://127.0.0.1:45781"], device_id: "d-local" });
 const running: LocalHostStatus = { state: "running", reachable: true, installed: true, service: "launchd", core: { version: "0.1.0", api: 1 }, calls: 0 };
 
 function setBridge(bridge: Partial<LocalHostBridge>) {
@@ -53,7 +53,7 @@ function room(pairings: PairingSummary[], facts: Record<string, unknown> = {}) {
 test("the local host is This device's; every remote row says Online however it is reached, never a route, and no machine is to be chosen", async () => {
   actions();
   const other = paired({ fp: "fp-other", host: "Other PC" });
-  room([local, paired(), other], { machineLinks: { "fp-nuc": { reach: "ok", via: "room" }, "fp-other": { reach: "ok", via: "node" } } });
+  room([local, paired(), other], { machineLinks: { "fp-nuc": { reach: "ok", via: "node" }, "fp-other": { reach: "ok", via: "node" } } });
   expect(thisDevice().querySelector('.host-detail[aria-label="MacBook"]')).not.toBeNull();
   const rows = [...document.querySelectorAll(".machines-inline .machine-entry")];
   expect(rows).toHaveLength(2);
@@ -297,7 +297,7 @@ test.each(["not-installed", "service-failed", "stopped-by-person"] as const)(
 test("Devices waits for the verified local pairing if reachability arrives first", async () => {
   const status: LocalHostStatus = { state: "stopped-by-person", reachable: true, installed: true, service: "launchd" };
   const pairingCode = vi.fn().mockResolvedValue({ code: "SV1.local", expires_in: 600, reach: "local-only" as const });
-  setBridge({ state: vi.fn(async () => status), pairingCode, pairRoom: vi.fn().mockResolvedValue({ ok: true }) });
+  setBridge({ state: vi.fn(async () => status), pairingCode });
   const done = actions();
   const store = createRoomStore();
   act(() => { store.patch({ pairings: [], localHostAvailable: true, inApp: true,
@@ -325,7 +325,7 @@ test("Devices discards the old host's rows when the local pairing identity chang
   await act(async () => {});
   await waitFor(() => expect(screen.getByText("Old phone")).toBeInTheDocument());
 
-  const replacement = paired({ fp: "fp-local-new", host: "Mac mini", local: true, urls: ["http://127.0.0.1:47212"], rv: null, device_id: "d-local-new" });
+  const replacement = paired({ fp: "fp-local-new", host: "Mac mini", local: true, urls: ["http://127.0.0.1:47212"], device_id: "d-local-new" });
   act(() => { store.patch({ pairings: [replacement] }); });
   await waitFor(() => expect(screen.getByText("New phone")).toBeInTheDocument());
   expect(screen.queryByText("Old phone")).toBeNull();
@@ -335,7 +335,7 @@ test("Devices discards the old host's rows when the local pairing identity chang
 test("Devices clears cached contents on loss and refreshes them when native reachability returns", async () => {
   const status: LocalHostStatus = { state: "running", reachable: true, installed: true, service: "launchd" };
   const pairingCode = vi.fn().mockResolvedValue({ code: "SV1.initial", expires_in: 600, reach: "local-only" as const });
-  setBridge({ state: vi.fn(async () => status), pairingCode, pairRoom: vi.fn().mockResolvedValue({ ok: true }) });
+  setBridge({ state: vi.fn(async () => status), pairingCode });
   const done = actions();
   let loads = 0;
   done.localHostDevices.mockImplementation(async () => ++loads === 1
@@ -368,7 +368,7 @@ test("an in-flight device list cannot repopulate Devices after reachability is l
   const pairingCode = vi.fn()
     .mockImplementationOnce(() => new Promise<LocalPairingCode>((resolve) => { resolveCode = resolve; }))
     .mockResolvedValue({ code: "SV1.fresh", expires_in: 600, reach: "direct" as const });
-  setBridge({ state: vi.fn(async () => status), pairingCode, pairRoom: vi.fn().mockResolvedValue({ ok: true }) });
+  setBridge({ state: vi.fn(async () => status), pairingCode });
   const done = actions();
   done.localHostDevices.mockImplementationOnce(() => new Promise<HostDeviceView[]>((resolve) => { resolveDevices = resolve; }));
   const store = createRoomStore();
@@ -641,7 +641,7 @@ test("this computer is not among the remote machines; stopped, its card says Not
 
 test("a machine paired without encryption shows exactly what the same machine paired with it shows: its entry, its page", async () => {
   // The same machine, paired over https or — as the person agreed when pairing — over plain http on a private network.
-  const lab = { fp: "fp-lab", host: "Lab box", rv: null };
+  const lab = { fp: "fp-lab", host: "Lab box" };
   const encrypted = paired({ ...lab, urls: ["https://lab.example"] });
   const unencrypted = paired({ ...lab, insecure: true, urls: ["http://192.168.1.20:8768"] });
   // What the person meets under Machines, with Lab box's page open; React's own ids are counted afresh each render.

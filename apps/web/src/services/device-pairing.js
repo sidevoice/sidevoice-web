@@ -5,10 +5,7 @@
  * anywhere the address has to prove it is the node that was paired — a signature with the key pinned at
  * pairing — so that an address which is not the node, and cannot reach it, never gets the token.
  *
- * That proof does not make a relay safe. A room relaying to the node forwards the node's signature, terminates
- * TLS on both sides, and sees the pairing secret, the token and everything the page and the node say: a room is
- * trusted with all of it until there is an end-to-end encrypted channel to the pinned identity. And a secret or
- * a token goes only over https, loopback http, or private-network http after the person's explicit consent.
+ * A secret or a token goes only over https, loopback http, or private-network http after the person's explicit consent.
  *
  * No DOM and no clock of its own: storage, fetch, WebCrypto and the time are handed in, so each step can be
  * tested alone. Only `export function|async function|const`: the controller's node tests inline this file. */
@@ -155,8 +152,7 @@ const PLAINTEXT = 'Este código solo lleva a la máquina por http sin cifrar, y 
  *  sentence it was sent in: the `SV1.` token is found either way.
  *
  *  Read as every reader of the protocol is (sidevoice-core#112): a field this version does not know is ignored, and
- *  an address it cannot use — one that is not http(s), a room without the node's id, a room or an entry of a shape it
- *  does not know — is left out rather than making the whole code unusable; what is left is for `decodePairingCode` to
+ *  an address it cannot use — one that is not http(s), or an entry of a shape it does not know — is left out rather than making the whole code unusable; what is left is for `decodePairingCode` to
  *  judge, through its own "no address" sentence when nothing is. `v` stays the one deliberate gate: a code of another
  *  version is a breaking change, said as such. What the code cannot be redeemed without (`fp`, `secret`, `exp`) still
  *  has to be there, in its shape: the fingerprint is what the machine is checked against. */
@@ -170,40 +166,38 @@ function readPairingCode(code) {
     catch { throw pairingError(DAMAGED, 'code-damaged'); }
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw pairingError(DAMAGED, 'code-damaged');
     if (payload.v !== 1) throw pairingError('Este código es de otra versión de Sidevoice. Actualiza la aplicación o pide un código nuevo.', 'code-version');
-    const { fp, host, urls, rv, secret, exp } = payload;
+    const { fp, host, urls, secret, exp } = payload;
     if (typeof fp !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(fp) ||
         typeof secret !== 'string' || !/^[A-Za-z0-9_-]+$/.test(secret) || typeof exp !== 'number' || !Number.isFinite(exp))
         throw pairingError(DAMAGED, 'code-damaged');
     const urlList = (Array.isArray(urls) ? urls : []).map(httpUrl).filter(url => url !== null);
-    const roomUrl = rv && typeof rv === 'object' && typeof rv.node === 'string' && rv.node ? httpUrl(rv.url) : null;
-    const room = roomUrl ? { url: roomUrl, node: rv.node } : null;
-    return { fp, host: typeof host === 'string' ? host : null, urls: urlList, room, secret, exp };
+    return { fp, host: typeof host === 'string' ? host : null, urls: urlList, secret, exp };
 }
 const EXPIRED = 'Este código ya caducó: duran 10 minutos. Pide uno nuevo.';
 /** What a pasted code says, or why it cannot be used, in one sentence the person can act on. */
 export function decodePairingCode(code, now = Date.now(), { address = null } = {}) {
-    const { fp, host, urls: urlList, room, secret, exp } = readPairingCode(code);
-    if (!urlList.length && !room && !address) throw pairingError('El código no dice dónde encontrar la máquina. Pide uno nuevo.', 'code-no-address');
+    const { fp, host, urls: urlList, secret, exp } = readPairingCode(code);
+    if (!urlList.length && !address) throw pairingError('El código no dice dónde encontrar la máquina. Pide uno nuevo.', 'code-no-address');
     // An address the secret may not travel to is left out (a node may list a cluster address for others); a code
     // left with none cannot be used from here.
     // A node lists its own address and a few public ones, and each one is probed: past MAX_CODE_URLS the rest are not.
-    const secureUrls = urlList.filter(url => secureBase(url)).slice(0, MAX_CODE_URLS), secureRoom = room && secureBase(room.url) ? room : null;
-    if (!secureUrls.length && !secureRoom && !address) throw pairingError(PLAINTEXT, 'code-plaintext');
+    const secureUrls = urlList.filter(url => secureBase(url)).slice(0, MAX_CODE_URLS);
+    if (!secureUrls.length && !address) throw pairingError(PLAINTEXT, 'code-plaintext');
     if (exp * 1000 <= now) throw pairingError(EXPIRED, 'code-expired');
-    return { v: 1, fp, host: host || null, urls: secureUrls, rv: secureRoom, secret, exp };
+    return { v: 1, fp, host: host || null, urls: secureUrls, secret, exp };
 }
 /** What a code says as it is pasted, before anything is sent anywhere: whose it is (`host`), until when (`exp`, in
- *  seconds), whether it tells another device where its machine is (`reachable`: an https address other than loopback,
- *  or a room), and the private-network addresses it lists over plain http, as host:port (`plain`) — which pairing
+ *  seconds), whether it tells another device where its machine is (`reachable`: an https address other than loopback),
+ *  and the private-network addresses it lists over plain http, as host:port (`plain`) — which pairing
  *  reaches only typed, and only once the person agrees (`insecure`). Throws as `decodePairingCode` does for a code that
  *  cannot be used wherever its machine is. */
 export function previewPairingCode(code, now = Date.now()) {
-    const { host, urls, room, exp } = readPairingCode(code);
+    const { host, urls, exp } = readPairingCode(code);
     if (exp * 1000 <= now) throw pairingError(EXPIRED, 'code-expired');
     const away = urls.map(url => new URL(url)).filter(url => !LOOPBACK.has(url.hostname));
     return {
         host: host || null, exp,
-        reachable: away.some(url => url.protocol === 'https:') || !!(room && secureBase(room.url)),
+        reachable: away.some(url => url.protocol === 'https:'),
         plain: away.filter(url => url.protocol === 'http:' && privateHost(url.hostname)).map(url => url.host),
     };
 }
@@ -248,8 +242,7 @@ export async function proveIdentity(base, expected, { get = globalThis.fetch, su
         ? { ok: true, publicKey } : { ok: false, reason: 'impostor' };
 }
 /** Where a pairing (or a code) can be reached, in the contract's order: the target this page was pointed at when
- *  it is that node, or a room (then its relay to the node); each direct URL; then the node's own room. Each
- *  says how: `direct` or `room`. `about` is the target's own `/api/rendezvous` answer, `null` if it gave none.
+ *  it is that node, then each direct URL. Each says how: `direct`. `about` is the target's own `/api/rendezvous` answer, `null` if it gave none.
  *  An address a secret or a token may not go to (`secureBase`) is no candidate, wherever it came from. */
 export function candidateBases(pairing, { target = '', about = null, origin = '' } = {}) {
     const list = [], seen = new Set();
@@ -260,12 +253,9 @@ export function candidateBases(pairing, { target = '', about = null, origin = ''
         if (seen.has(key) || !secureBase(base, origin, { insecure })) return;
         seen.add(key); list.push({ base, via });
     };
-    const relay = room => room + '/nodes/' + encodeURIComponent(pairing.rv.node);
     // A server of a kind this version does not know is that node when it says its fingerprint: it proves it all the same.
     if ((about?.kind === 'node' || about?.kind === 'unknown') && about.fingerprint && about.fingerprint === pairing.fp) add(target, 'direct');
-    if (about?.kind === 'room' && pairing.rv) add(relay(target), 'room');
     for (const url of pairing.urls || []) add(url, 'direct');
-    if (pairing.rv) add(relay(pairing.rv.url), 'room');
     return list;
 }
 /** The first candidate, in order, that proves it is the node. All are asked at once — the order decides which
@@ -326,7 +316,7 @@ export async function redeemPairingCode(code, { name = '', address = '', target 
     try { fp = await fingerprintOf(base64ToBytes(node.public_key), crypto); } catch { /* not a key */ }
     if (fp !== payload.fp) throw pairingError('La máquina que respondió no es la del código. No se ha guardado nada.', 'identity-mismatch');
     return {
-        pairing: { fp, public_key: node.public_key, host: node.host || payload.host, urls: payload.urls, rv: payload.rv,
+        pairing: { fp, public_key: node.public_key, host: node.host || payload.host, urls: payload.urls,
             device_id: answer.device_id, token: answer.token, paired_at: Math.floor(now / 1000), ...(payload.insecure ? { insecure: true } : {}) },
         base: place,
     };
@@ -354,7 +344,7 @@ export function deviceName(nav = globalThis.navigator) {
 // ----- the pairings this device keeps -----
 function validPairing(p) {
     return !!p && typeof p === 'object' && typeof p.fp === 'string' && typeof p.token === 'string' && typeof p.public_key === 'string' &&
-        typeof p.device_id === 'string' && Array.isArray(p.urls) && (p.rv === null || (p.rv && typeof p.rv.url === 'string' && typeof p.rv.node === 'string'));
+        typeof p.device_id === 'string' && Array.isArray(p.urls);
 }
 /** Several pairings, every one of them live: `{list}`, newest first. What storage cannot give back is no pairing. */
 export function readPairings(storage) {
@@ -390,6 +380,6 @@ export function revokedPairing(pairings, fp) {
 }
 /** A pairing as the interface may see it: everything but the token. */
 export function pairingSummary(p) {
-    return { fp: p.fp, host: p.host || null, urls: [...(p.urls || [])], rv: p.rv ? { ...p.rv } : null, device_id: p.device_id,
+    return { fp: p.fp, host: p.host || null, urls: [...(p.urls || [])], device_id: p.device_id,
         paired_at: typeof p.paired_at === 'number' ? p.paired_at : null, revoked: !!p.revoked, local: !!p.local, insecure: p.insecure === true };
 }

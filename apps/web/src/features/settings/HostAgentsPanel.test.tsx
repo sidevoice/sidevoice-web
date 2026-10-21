@@ -32,7 +32,7 @@ const ready = (agents = [known()]): HostAgentsState => ({
   error: null, busy: {}, actionErrors: {},
 });
 
-const pairing = (fp: string, host: string): PairingSummary => ({ fp, host, urls: [`https://${host.toLowerCase()}.example`], rv: null,
+const pairing = (fp: string, host: string): PairingSummary => ({ fp, host, urls: [`https://${host.toLowerCase()}.example`],
   device_id: `device-${fp}`, paired_at: 1_700_000_000, revoked: false });
 
 /** The steps shown in a row, each a block to copy, in order. */

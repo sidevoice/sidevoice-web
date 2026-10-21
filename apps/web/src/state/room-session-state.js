@@ -40,7 +40,7 @@ export function initialSessionFacts() {
         settingsSection: 'general', settingsLevel: 'list', settingsError: null, machinesView: { machine: null }, settingsSavedAt: 0, uiLanguage: '', webUpdate: null, settingsFocus: null, audioDevices: null, audioLost: null,
         localHostAvailable: false, localHostStatus: { state: 'absent' },
         // How each paired machine is reached, by fingerprint: `{reach, via}` — reach 'ok', 'checking', 'away', 'offline'
-        // or 'revoked'; via 'room' (through a relay) or 'node' (directly). And the machine the call is with, if any.
+        // or 'revoked'; via 'node' (directly). And the machine the call is with, if any.
         machineLinks: {}, callNode: null,
         // The pairing dialog, and the sentence it opens with when the page opened it (a revoked pairing).
         pairingOpen: false, pairingNote: '',
@@ -409,7 +409,7 @@ export function machinesView(s) {
         const reachableLocal = p.local && status?.reachable === true && !!local?.fp;
         const reach = p.revoked ? 'revoked' : p.local ? reachableLocal ? 'direct'
             : ['failed', 'service-failed', 'refused', 'incompatible'].includes(localStatus) ? 'offline' : 'checking'
-            : remoteReach === 'connected' ? link.via === 'room' ? 'room' : 'direct'
+            : remoteReach === 'connected' ? 'direct'
             : remoteReach === 'offline' ? 'offline' : 'checking';
         const state = p.local ? reachableLocal ? 'connected' : ['failed', 'service-failed', 'refused', 'incompatible'].includes(localStatus) ? 'failed' : 'offline'
             : p.revoked ? 'revoked' : remoteReach;

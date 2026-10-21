@@ -16,7 +16,7 @@ const WHOLE_APP_MS = 15_000;
  * desktop app's; every state it can be in — not asked, waiting, allowed (and on by itself), blocked (how to allow it,
  * Check again), the request closed, no microphone — and where there is nothing to ask. */
 
-const NUC = { fp: "fp-nuc", device_id: "d-1", urls: ["https://nuc.example"], rv: null, host: "NUC", paired_at: 1_700_000_000, revoked: false };
+const NUC = { fp: "fp-nuc", device_id: "d-1", urls: ["https://nuc.example"], host: "NUC", paired_at: 1_700_000_000, revoked: false };
 
 /** The browser's microphone permission, as `permissions.query` gives it: its state, changed by the test. */
 function permission(state: PermissionState) {

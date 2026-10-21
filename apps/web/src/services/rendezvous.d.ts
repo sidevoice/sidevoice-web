@@ -1,10 +1,10 @@
 /** What a server's `GET /api/rendezvous` said it is. */
 export interface TargetDescription {
   /** `unknown`: a kind this version does not know yet, read only for its fingerprint and build. */
-  kind: "room" | "node" | "unknown";
+  kind: "node" | "unknown";
   /** A node's fingerprint (sidevoice-core `control/devices.py`): whether the target is the node a pairing names. */
   fingerprint: string | null;
-  /** The web build a room serves, when it said. */
+  /** The web build the server serves, when it said. */
   build: string | null;
 }
 
@@ -25,4 +25,3 @@ export function callSocketUrl(nodeBase: string, location: { protocol: string; ho
 export function describeTarget(answer: unknown): TargetDescription | null;
 export function patiently<T>(promise: Promise<T>, ms?: number): Promise<T>;
 export function askTarget(target: string, get?: typeof fetch, timeoutMs?: number): Promise<TargetDescription | null>;
-export function askRoomNode(room: string, id: string, get?: typeof fetch, timeoutMs?: number): Promise<boolean | null>;

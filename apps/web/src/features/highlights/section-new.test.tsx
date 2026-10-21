@@ -23,7 +23,7 @@ const listing = (ids: string[]): HostAgentsState => ({ status: "ready", error: n
   can: { connect: true, update: true, disconnect: true }, manual: { connect: [], disconnect: [], replace: [] } }) as DetectedAgent),
   scanned_at: "2026-10-02T10:00:00Z", custom: { command: "c", snippet: "{}", version: "1" } } });
 let shown = "";
-const nuc: PairingSummary = { fp: "fp-nuc", host: "NUC", urls: ["https://nuc.example"], rv: null, device_id: "d-nuc", paired_at: 1_700_000_000, revoked: false };
+const nuc: PairingSummary = { fp: "fp-nuc", host: "NUC", urls: ["https://nuc.example"], device_id: "d-nuc", paired_at: 1_700_000_000, revoked: false };
 
 /** A browser paired with the NUC, where `n` agents were just found: `n` candidates, under Machines and the NUC. */
 function open(stored: Record<string, string> | null, n = 1) {

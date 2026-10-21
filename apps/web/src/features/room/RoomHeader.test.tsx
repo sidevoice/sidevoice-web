@@ -18,7 +18,7 @@ const PEOPLE = [person("t-login", "Fix the slow login"), person("t-backup", "Rev
 function room(people = PEOPLE) {
   const store = createRoomStore();
   act(() => store.patch({
-    machinesReady: true, pairings: [{ fp: "fp-1", host: "Laptop", urls: [], rv: null, device_id: "d", paired_at: 1, revoked: false }],
+    machinesReady: true, pairings: [{ fp: "fp-1", host: "Laptop", urls: [], device_id: "d", paired_at: 1, revoked: false }],
     machineLinks: { "fp-1": { reach: "ok", via: "node" } }, callNode: "fp-1", ws: {}, sessionId: "s1", roomBinding: { thread_id: "t-login", title: "Fix the slow login", binding_id: "b1" },
     people, harness: { "fp-1|t-pay": true },
   }));

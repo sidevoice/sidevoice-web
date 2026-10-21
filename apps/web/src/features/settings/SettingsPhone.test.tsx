@@ -27,7 +27,7 @@ const catalogs = [
   { id: "elevenlabs", name: "ElevenLabs", status: { stale: false }, models: [] },
 ] as unknown as CatalogView[];
 const paired = (fp: string, host: string, extra: Partial<PairingSummary> = {}): PairingSummary => ({
-  fp, host, urls: [`https://${host.toLowerCase().replace(/ /g, "-")}.example`], rv: null, device_id: "d-" + fp, paired_at: 1_700_000_000, revoked: false, ...extra,
+  fp, host, urls: [`https://${host.toLowerCase().replace(/ /g, "-")}.example`], device_id: "d-" + fp, paired_at: 1_700_000_000, revoked: false, ...extra,
 });
 const NUC = paired("fp-nuc", "NUC");
 const LAB = paired("fp-lab", "Lab box", { insecure: true, urls: ["http://192.168.1.20:8768"] });

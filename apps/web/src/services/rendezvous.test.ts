@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "vitest";
-import { askRoomNode, askTarget, callSocketUrl, describeTarget, isNodePath, pageTarget, resolveTarget, routeUrl, targetAnswers } from "./rendezvous.js";
+import { askTarget, callSocketUrl, describeTarget, isNodePath, pageTarget, resolveTarget, routeUrl, targetAnswers } from "./rendezvous.js";
 
 const ORIGIN = "https://room.example";
 
@@ -33,31 +33,28 @@ test("the page reads its target from the window a shell writes to, before its ow
   expect(pageTarget()).toBe("http://127.0.0.1:8767");
 });
 
-test("what a target is: a node by its fingerprint, a room by the build it serves, or neither", () => {
+test("what a target is: a node by its fingerprint, or neither", () => {
   expect(describeTarget({ kind: "node", fingerprint: "fp-1" })).toEqual({ kind: "node", fingerprint: "fp-1", build: null });
-  expect(describeTarget({ kind: "room", nodes: [], web_build: "b1" })).toEqual({ kind: "room", fingerprint: null, build: "b1" });
-  // A 404's body, a static server's page, a room from before rendezvous: not a node, not a room.
+  // A 404's body, a static server's page, not a node.
   for (const answer of [null, {}, { binding: null }, { kind: "" }, { kind: 3 }]) expect(describeTarget(answer)).toBeNull();
 });
 
 test("a newer server's rendezvous answer is read for what this version knows of it (core#112)", () => {
   // Extra fields ignored.
   expect(describeTarget({ kind: "node", fingerprint: "fp-1", api: 4, features: ["relay"] })).toEqual({ kind: "node", fingerprint: "fp-1", build: null });
-  expect(describeTarget({ kind: "room", web_build: "b1", region: "eu" })).toEqual({ kind: "room", fingerprint: null, build: "b1" });
   // Optional fields missing, or of a shape it does not know: none.
   expect(describeTarget({ kind: "node" })).toEqual({ kind: "node", fingerprint: null, build: null });
-  expect(describeTarget({ kind: "room", web_build: { id: "b1" } })).toEqual({ kind: "room", fingerprint: null, build: null });
   // A kind it does not know yet: what it says of its fingerprint and build, all the same.
   expect(describeTarget({ kind: "node+room", fingerprint: "fp-1", web_build: "b2" })).toEqual({ kind: "unknown", fingerprint: "fp-1", build: "b2" });
   expect(describeTarget({ kind: "other" })).toEqual({ kind: "unknown", fingerprint: null, build: null });
 });
 
-test("asking the target: a failure, or anything that is not a node or a room, is no answer at all", async () => {
+test("asking the target: a failure, or anything that is not a node, is no answer at all", async () => {
   const asked: string[] = [];
   const answer = (status: number, body: unknown = {}) => (async (url: string) => { asked.push(url); return new Response(JSON.stringify(body), { status }); }) as unknown as typeof fetch;
 
-  expect(await askTarget("https://room.example", answer(200, { kind: "room", nodes: [], web_build: "b2" }))).toMatchObject({ kind: "room", build: "b2" });
-  expect(asked.at(-1)).toBe("https://room.example/api/rendezvous");
+  expect(await askTarget("https://node.example", answer(200, { kind: "unknown-kind", web_build: "b2" }))).toMatchObject({ kind: "unknown", build: "b2" });
+  expect(asked.at(-1)).toBe("https://node.example/api/rendezvous");
   expect(await askTarget("", answer(200, { kind: "node", fingerprint: "fp" }))).toMatchObject({ kind: "node", fingerprint: "fp" });
   expect(asked.at(-1)).toBe("/api/rendezvous");
   expect(await askTarget("", answer(404))).toBeNull();
@@ -67,19 +64,6 @@ test("asking the target: a failure, or anything that is not a node or a room, is
   // A target that never answers is no answer, after a while, rather than a page that waits for ever.
   const hangs = (() => new Promise(() => {})) as unknown as typeof fetch;
   expect(await askTarget("https://blackhole.example", hangs, 5)).toBeNull();
-  expect(await askRoomNode("https://blackhole.example", "m-1", hangs, 5)).toBeNull();
-});
-
-test("a room answers only for the node a page names, and says whether it is connected", async () => {
-  const asked: string[] = [];
-  const room = (body: unknown, status = 200) => (async (url: string) => { asked.push(url); return new Response(JSON.stringify(body), { status }); }) as unknown as typeof fetch;
-  expect(await askRoomNode("https://room.example", "m/1", room({ kind: "room", nodes: [{ id: "m/1", connected: true }] }))).toBe(true);
-  expect(asked.at(-1)).toBe("https://room.example/api/rendezvous?nodes=m%2F1");
-  expect(await askRoomNode("https://room.example", "m-1", room([{ id: "m-1", connected: false }]))).toBe(false);
-  // Not named in the answer, a failure, or no answer: nothing is known.
-  expect(await askRoomNode("https://room.example", "m-1", room({ kind: "room", nodes: [] }))).toBeNull();
-  expect(await askRoomNode("https://room.example", "m-1", room({}, 500))).toBeNull();
-  expect(await askRoomNode("https://room.example", "m-1", (async () => { throw new TypeError("offline"); }) as unknown as typeof fetch)).toBeNull();
 });
 
 test("a conversation's request, and this device's pairing, go to the node; telemetry to the target", () => {

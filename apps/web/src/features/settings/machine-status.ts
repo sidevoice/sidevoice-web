@@ -5,8 +5,7 @@ import type { Translate } from "../../i18n/translator";
 /* A machine's state, in one set of words wherever it shows: its entry in Settings' nav, a phone's machine list, its
  * page's header, this computer's service card, the design system. Nothing else words a machine's state.
  *
- * A remote machine says whether this device reaches it: connected (how — directly or through the room — is not said
- * while the relay is not shipping), still being checked,
+ * A remote machine says whether this device reaches it: connected, still being checked,
  * not connected, or no longer paired. Not connected is grey, not red: a laptop asleep is not something to fix, and the
  * conversations say the same fact in grey; red is for what is (This device not working), amber for what needs the
  * person (pairing it again). This device, where the app reads its service (its own section), says where the service
@@ -41,7 +40,7 @@ function reachStatus(machine: MachineView | null, t: Translate): MachineStatus {
   if (machine?.revoked || machine?.state === "revoked") return { key: "unpaired", tone: "warning", short: t("hosts.machineState.unpaired"),
     long: t("hosts.machineState.unpaired.long"), hint: t("hosts.machineState.unpaired.hint") };
   if (!machine || machine.state === "checking") return { key: "checking", tone: "neutral", short: t("hosts.machineState.checking"), long: t("hosts.machineState.checking") };
-  // Connected, however it is reached: directly or through the room is not said while the relay is not shipping.
+  // Connected, however it is reached.
   if (machine.state === "connected") return { key: "direct", tone: "positive", short: t("hosts.machineState.direct"), long: t("hosts.machineState.direct") };
   return { key: "unreachable", tone: UNREACHABLE_TONE, short: t("hosts.machineState.unreachable"), long: t("hosts.machineState.unreachable"), hint: t("hosts.reach.none") };
 }

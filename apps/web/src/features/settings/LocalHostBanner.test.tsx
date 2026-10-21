@@ -11,7 +11,7 @@ import { localHostInstallController } from "../../services/local-host-install";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
-const local: PairingSummary = { fp: "fp-local", host: "MacBook", urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d-local",
+const local: PairingSummary = { fp: "fp-local", host: "MacBook", urls: ["http://127.0.0.1:45781"], device_id: "d-local",
   paired_at: 1_700_000_000, revoked: false, local: true };
 
 function bridge() {

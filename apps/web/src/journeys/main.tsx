@@ -104,7 +104,7 @@ function type(field: HTMLInputElement | HTMLTextAreaElement, value: string) {
 const drawn = () => new Promise((resolve) => setTimeout(resolve, 50));
 /** A pairing code as `npx sidevoice pair-device` prints it, for the NUC at `urls`, valid for ten minutes. */
 function sampleCode(urls: string[]) {
-  const payload = { v: 1, fp: "A".repeat(43), host: "NUC", urls, rv: null, secret: "c2VjcmV0", exp: Math.floor(Date.now() / 1000) + 600 };
+  const payload = { v: 1, fp: "A".repeat(43), host: "NUC", urls, secret: "c2VjcmV0", exp: Math.floor(Date.now() / 1000) + 600 };
   return "SV1." + btoa(JSON.stringify(payload)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
