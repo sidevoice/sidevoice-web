@@ -18,14 +18,14 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
   --line: rgb(255 255 255 / 9%); --accent: var(--sv-primary); --accent-bg: var(--sv-primary-muted);
   --avatar: #4a2f6b; --muted-bg: #f9dedc; --muted-fg: #601410; --end: #dc362e; --end-hover: #ef443b; --cross: #ff8a80;
   box-sizing: border-box; width: 320px; padding: 10px 12px; border-radius: 16px; color: var(--fg);
-  background: rgb(22 25 31 / 92%); border: 1px solid var(--line); box-shadow: 0 8px 22px rgb(0 0 0 / 40%);
+  background: rgb(22 25 31 / 92%); border: 1px solid var(--line); box-shadow: 0 2px 8px rgb(0 0 0 / 45%);
   -webkit-backdrop-filter: blur(22px) saturate(1.4); backdrop-filter: blur(22px) saturate(1.4);
 }
 :root[data-theme=light] {
   .call-card {
     --fg: #1b1d24; --mu: #5d6470; --btn: rgb(27 29 36 / 7%); --btn-hover: rgb(27 29 36 / 13%); --line: rgb(42 26 64 / 12%);
     --accent: #4a2f6b; --accent-bg: #f3eefa; --cross: #d93025;
-    background: rgb(255 255 255 / 92%); box-shadow: 0 8px 22px rgb(42 26 64 / 22%);
+    background: rgb(255 255 255 / 92%); box-shadow: 0 2px 8px rgb(42 26 64 / 28%);
   }
 }
 
@@ -232,8 +232,8 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 /* One box, as the room's screen: the room's title block, its stage tile at 16:9, its call bar. */
 .picture-card { position: relative; display: grid; grid-template-rows: auto auto auto; gap: 8px; width: var(--card-w); padding: 10px 10px 0;
   border: 1px solid var(--sv-border); border-radius: var(--sv-radius-2xl, 20px); background: var(--sv-bg); color: var(--sv-text); --card-bg: var(--sv-bg);
-  font-family: var(--sv-font-sans); box-shadow: 0 12px 34px rgb(0 0 0 / 45%); container: picture / inline-size; }
-:root[data-theme=light] .picture-card { box-shadow: 0 12px 34px rgb(42 26 64 / 22%); }
+  font-family: var(--sv-font-sans); box-shadow: 0 2px 8px rgb(0 0 0 / 50%); container: picture / inline-size; }
+:root[data-theme=light] .picture-card { box-shadow: 0 2px 8px rgb(42 26 64 / 28%); }
 .picture-card[data-sized] { height: var(--card-h); grid-template-rows: auto minmax(0, 1fr) auto; }
 .picture-stage { position: relative; aspect-ratio: 16 / 9; min-height: 0; }
 .picture-card[data-sized] .picture-stage { aspect-ratio: auto; }
