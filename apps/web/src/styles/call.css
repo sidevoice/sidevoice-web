@@ -155,3 +155,5 @@
   .stage-scene *,.stage-desk,.wanted { animation:none !important;transition:none !important }
   .stage-spinner { border-right-color:currentColor;opacity:.7 }
 }
+/* MEASUREMENT ONLY (desktop#149): a thumbnail's mouth held still while it speaks, as under reduced motion. */
+.sv-avatar[data-style=bichos][data-size=sidebar][data-mood=speaking][data-mouth=playback][data-mouth-active] .m-open { transform:scaleY(.55) !important }
