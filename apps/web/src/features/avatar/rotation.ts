@@ -33,11 +33,25 @@ export type RotationKind = keyof typeof KINDS;
 interface Entry { kind: RotationKind; step: Step<unknown>; pool: readonly string[]; until: number; holders: number }
 const entries = new Map<string, Entry>();
 const listeners = new Set<() => void>();
-let timer: ReturnType<typeof setInterval> | null = null;
+/** One timer, for the soonest end of a pick, and when that is: the page wakes when a pick ends, not on a clock of its own. */
+let timer: ReturnType<typeof setTimeout> | null = null;
+let due = Infinity;
 
 const notify = () => listeners.forEach((listener) => listener());
 
+/** Sets the timer for the soonest pick to end, or none when nothing is held. */
+function schedule() {
+  let soonest = Infinity;
+  for (const entry of entries.values()) soonest = Math.min(soonest, entry.until);
+  if (soonest === due) return;
+  if (timer) clearTimeout(timer);
+  due = soonest;
+  timer = soonest === Infinity ? null : setTimeout(tick, Math.max(0, soonest - Date.now()));
+}
+
 function tick() {
+  timer = null;
+  due = Infinity;
   const now = Date.now();
   let changed = false;
   for (const entry of entries.values()) {
@@ -47,6 +61,7 @@ function tick() {
     changed = true;
   }
   if (changed) notify();
+  schedule();
 }
 
 /** `key`'s avatar is in this state: start a pick if none is running. Returns its release (held more than once, it lets go
@@ -61,11 +76,11 @@ export function holdRotation(kind: RotationKind, key: string, pool: readonly str
     notify();
   }
   entry.holders += 1;
-  timer ??= setInterval(tick, 500);
+  schedule();
   return () => {
     const held = entries.get(id);
     if (held && (held.holders -= 1) <= 0) entries.delete(id);
-    if (!entries.size && timer) { clearInterval(timer); timer = null; }
+    schedule();
   };
 }
 
