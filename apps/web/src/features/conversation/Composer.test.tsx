@@ -54,3 +54,19 @@ test("when the runtime clears the sent text itself, the box shrinks back to one 
   textarea.placeholder = "Write a message…";
   await waitFor(() => expect(textarea.style.height).toBe(`${20 + 22}px`));
 });
+
+test("the runtime setting the form's state again to what it already is does not measure the box again", async () => {
+  const { container } = render(inRoom(<Composer narrow={false} />));
+  const textarea = box(container);
+  textarea.disabled = false;
+  // Its own change is read and measured first.
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  type(textarea, lines(4));
+  expect(textarea.style.height).toBe(`${4 * 20 + 22}px`);
+  // The value goes without an input event, as when the room took the text; the placeholder is written as it already is.
+  textarea.value = "";
+  textarea.placeholder = textarea.placeholder;
+  textarea.disabled = false;
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(textarea.style.height).toBe(`${4 * 20 + 22}px`);
+});
