@@ -230,12 +230,12 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 
 /* ---------- B1: the picture-in-picture ---------- */
 /* One box, as the room's screen: the room's title block, its stage tile at 16:9, its call bar. */
-.picture-card { position: relative; display: grid; grid-template-rows: auto auto auto; gap: 8px; width: var(--card-w); padding: 10px 10px 0;
+.picture-card { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; gap: 8px; width: var(--card-w); padding: 10px 10px 0;
   border: 1px solid var(--sv-border); border-radius: var(--sv-radius-2xl, 20px); background: var(--sv-bg); color: var(--sv-text); --card-bg: var(--sv-bg);
   font-family: var(--sv-font-sans); box-shadow: 0 2px 8px rgb(0 0 0 / 50%); container: picture / inline-size; }
 :root[data-theme=light] .picture-card { box-shadow: 0 2px 8px rgb(42 26 64 / 28%); }
 .picture-card[data-sized] { height: var(--card-h); grid-template-rows: auto minmax(0, 1fr) auto; }
-.picture-stage { position: relative; aspect-ratio: 16 / 9; min-height: 0; }
+.picture-stage { position: relative; aspect-ratio: 16 / 9; min-width: 0; min-height: 0; }
 .picture-card[data-sized] .picture-stage { aspect-ratio: auto; }
 .picture-stage .stage-slot { position: absolute; inset: 0; }
 /* The room's tile, at the desktop's 16:9 whatever the window's width (the room's phone rules key on the viewport), its
