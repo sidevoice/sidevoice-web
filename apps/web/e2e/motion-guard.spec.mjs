@@ -38,6 +38,8 @@ const STATES = [
   { id: "in a call, the person speaking, transcript open", state: "person-speaking", after: "transcript" },
   { id: "in a call, the turn being transcribed", state: "transcribing" },
   { id: "in a call, the agent speaking", state: "agent-speaking" },
+  { id: "in a call, the agent speaking, thumbnails animated", state: "agent-speaking", thumbnails: true },
+  { id: "in a call, the agent and two others working, thumbnails animated", state: "working", thumbnails: true },
   { id: "in a call, reconnecting", state: "reconnecting" },
   { id: "in a call, its conversation offline", state: "own-offline" },
   { id: "in a call, Settings open over it", state: "listening", after: "settings" },
@@ -68,7 +70,7 @@ for (const mode of ["gpu", "still"]) {
     test.describe("desktop", () => {
       for (const spec of STATES) {
         test(spec.id, async ({ page, browser, browserName }) => {
-          await openRoom(page, { people: MIXED, state: spec.state, mode, after: spec.after });
+          await openRoom(page, { people: MIXED, state: spec.state, mode, after: spec.after, thumbnails: spec.thumbnails });
           const seen = await watch(page);
           expect(broken(seen)).toEqual([]);
           // Held still, with nothing happening: nothing runs, nothing asks for a frame, and the browser paints nothing

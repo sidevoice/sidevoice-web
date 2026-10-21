@@ -100,10 +100,12 @@ export async function choose(page) {
 }
 
 /** The room on `page` (a fresh page of a fresh context), motion `mode` (gpu | still), the probe installed, the conversation
- *  chosen, then the state. `after`: "transcript" opens the transcript, "settings" (or "settings:<section>") opens Settings over the room. */
-export async function openRoom(page, { people = MIXED, state = "not-in-call", mode = "still", after = null } = {}) {
+ *  chosen, then the state. `thumbnails`: the developer option that animates the conversations' thumbnails is on. `after`: "transcript" opens the transcript, "settings" (or "settings:<section>") opens Settings over the room. */
+export async function openRoom(page, { people = MIXED, state = "not-in-call", mode = "still", after = null, thumbnails = false } = {}) {
   await page.addInitScript(probe);
   await page.addInitScript((how) => localStorage.setItem("sidevoice.motion", how), mode);
+  // The developer option "Animate conversation thumbnails" (lib/animated-thumbnails.ts), on.
+  if (thumbnails) await page.addInitScript(() => localStorage.setItem("sidevoiceAnimatedThumbnails", "1"));
   await installHarness(page, { participants: { first: people } });
   await page.goto("/voice/");
   await choose(page);
