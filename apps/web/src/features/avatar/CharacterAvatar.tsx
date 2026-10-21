@@ -65,9 +65,21 @@ export function CharacterAvatar({ spec, state, size, mouth = "voice", mouthKey, 
   useEffect(() => {
     const element = avatar.current;
     if (mouth !== "playback" || !mouthLevel || !element) return;
+    // The level is written on the mouth itself, never on the root: a custom property is inherited, so one written up
+    // there makes every element of the drawing (a layered stage holds about a thousand) work out its style again, on each
+    // reading, about thirty a second, to change a single transform (desktop#149).
+    let open: HTMLElement | SVGElement | null = null;
+    let shown: number | null = null;
+    let active = false;
     return mouthLevel((level) => {
-      element.style.setProperty("--mouth", String(level));
-      if (level > 0) element.setAttribute("data-mouth-active", "");
+      // The mouth that moves: a layered drawing keeps a clone of it holding still in a slice (styles/call.css [data-clone]).
+      // Found again when the drawing was cut into layers, or put back, since it was.
+      if (!open?.isConnected) { open = element.querySelector<HTMLElement | SVGElement>(".m-open:not([data-clone])"); shown = null; }
+      const value = Math.round(level * 1000) / 1000;
+      if (open && value !== shown) { open.style.setProperty("--mouth", String(value)); shown = value; }
+      if ((level > 0) === active) return;
+      active = level > 0;
+      if (active) element.setAttribute("data-mouth-active", "");
       else element.removeAttribute("data-mouth-active");
     });
   }, [mouth, mouthLevel]);

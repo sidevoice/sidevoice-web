@@ -101,6 +101,8 @@ export interface SessionFacts {
 /** Why a call ended without the person ending it: nobody used it, its conversation's machine went away (`detail`:
  *  the conversation's title), or the room or the machine refused it (`detail`: the room's words). */
 export interface CallEnded { reason: 'idle' | 'offline' | 'failed'; detail: string }
+/** `next`, with `previous` itself wherever the two hold the same data (the store's projections keep what did not change). */
+export function keepEqual<T>(previous: unknown, next: T): T;
 export function participantsView(s: SessionFacts): ParticipantView[];
 export function conversationView(s: SessionFacts): ConversationView;
 export function initialSessionFacts(): SessionFacts;

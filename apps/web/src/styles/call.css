@@ -34,10 +34,13 @@
 /* The person's mouth follows the microphone's level, written as --mouth (0–1) on the root. */
 .sv-avatar[data-style=bichos][data-mood=speaking][data-mouth=level] .m-open { animation:none;opacity:1;transform:scaleY(calc(.2 + var(--mouth, .3) * .8));transition:transform 80ms linear }
 .sv-avatar[data-style=bichos][data-mood=speaking][data-mouth=level] .m-rest { animation:none;opacity:0 }
-/* The stage agent rests in every output gap, including gaps inside an otherwise playing reply. */
+/* The stage agent rests in every output gap, including gaps inside an otherwise playing reply. The output's level is
+   --mouth, written on the mouth itself (CharacterAvatar): on the root it would be inherited, and each reading restyle every
+   element of the drawing. No transition: readings come about thirty a second, and a transition retargeted on each one runs
+   all the while it speaks (for a thumbnail, repainted every frame) to smooth steps of a few pixels (desktop#149). */
 .sv-avatar[data-style=bichos][data-mouth=playback] .m-open { animation:none;opacity:0;transform:scaleY(1);transition:none }
 .sv-avatar[data-style=bichos][data-mouth=playback] .m-rest { animation:none;opacity:1 }
-.sv-avatar[data-style=bichos][data-mood=speaking][data-mouth=playback][data-mouth-active] .m-open { opacity:1;transform:scaleY(calc(.2 + var(--mouth, 0) * .8));transition:transform 80ms linear }
+.sv-avatar[data-style=bichos][data-mood=speaking][data-mouth=playback][data-mouth-active] .m-open { opacity:1;transform:scaleY(calc(.2 + var(--mouth, 0) * .8)) }
 .sv-avatar[data-style=bichos][data-mood=speaking][data-mouth=playback][data-mouth-active] .m-rest { opacity:0 }
 @keyframes av-talk { from { opacity:0;transform:scaleY(.3) } to { opacity:1;transform:scaleY(1) } }
 @keyframes av-talk-rest { from { opacity:1 } to { opacity:0 } }

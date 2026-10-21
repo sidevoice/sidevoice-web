@@ -13,6 +13,8 @@ afterEach(() => { states.clear(); playbackLevel.clear(); vi.useRealTimers(); vi.
 const spec = avatarFor("fp|one");
 const speaker = (mood: AvatarMood, voice = "fp|one") => act(() => states.set("one", { spec, mood, voice }));
 /** One copy of the figure "one", drawn from its state. */
+/** The mouth a copy moves: the one `.m-open` that is not a layered drawing's still clone. */
+const mouthOf = (avatar: Element) => avatar.querySelector<SVGElement>(".m-open:not([data-clone])")!;
 const copy = () => <CharacterAvatar spec={spec} state={states.get("one")!} size="stage" mouth="playback" mouthLevel={states.mouth("one")} />;
 
 test("the stage mouth follows only its conversation's output, rests at zero and when it leaves", () => {
@@ -27,7 +29,7 @@ test("the stage mouth follows only its conversation's output, rests at zero and 
   expect(avatar).not.toHaveAttribute("data-mouth-active");
   act(() => playbackLevel.publish(0.8, "fp|one"));
   expect(avatar).toHaveAttribute("data-mouth-active");
-  expect(Number(avatar.style.getPropertyValue("--mouth"))).toBeGreaterThan(0.5);
+  expect(Number(mouthOf(avatar).style.getPropertyValue("--mouth"))).toBeGreaterThan(0.5);
   act(() => playbackLevel.publish(0, "fp|one"));
   expect(avatar).not.toHaveAttribute("data-mouth-active");
   act(() => playbackLevel.publish(0.8, "fp|one"));
@@ -85,10 +87,49 @@ test("two copies of one figure open their mouths together, one drawn mid-word in
   act(() => playbackLevel.publish(0.5, "fp|one"));
   const thumbnail = render(<CharacterAvatar spec={spec} state={states.get("one")!} size="small" mouth="playback" mouthLevel={states.mouth("one")} />)
     .container.firstElementChild as HTMLElement;
-  expect(thumbnail.style.getPropertyValue("--mouth")).toBe(stage.style.getPropertyValue("--mouth"));
+  expect(mouthOf(thumbnail).style.getPropertyValue("--mouth")).toBe(mouthOf(stage).style.getPropertyValue("--mouth"));
   expect(thumbnail).toHaveAttribute("data-mouth-active");
   act(() => playbackLevel.publish(0.9, "fp|one"));
-  expect(thumbnail.style.getPropertyValue("--mouth")).toBe(stage.style.getPropertyValue("--mouth"));
+  expect(mouthOf(thumbnail).style.getPropertyValue("--mouth")).toBe(mouthOf(stage).style.getPropertyValue("--mouth"));
+});
+
+test("the level is written on the mouth alone: a custom property on the root would restyle the whole drawing on each reading", () => {
+  speaker("speaking");
+  const avatar = render(copy()).container.firstElementChild as HTMLElement;
+  act(() => playbackLevel.publish(0.8, "fp|one"));
+  expect(mouthOf(avatar).style.getPropertyValue("--mouth")).not.toBe("");
+  expect(avatar.style.getPropertyValue("--mouth")).toBe("");
+  // Every other element of the drawing is left as it was.
+  expect([...avatar.querySelectorAll("*")].filter((element) => (element as HTMLElement).style?.getPropertyValue("--mouth"))).toEqual([mouthOf(avatar)]);
+  act(() => playbackLevel.publish(0, "fp|one"));
+  expect(mouthOf(avatar).style.getPropertyValue("--mouth")).toBe("0");
+});
+
+test("a reading that changes nothing writes nothing, and the mouth it lands on is found again when the drawing is replaced", () => {
+  speaker("speaking");
+  const avatar = render(copy()).container.firstElementChild as HTMLElement;
+  act(() => playbackLevel.publish(0.8, "fp|one"));
+  const first = mouthOf(avatar);
+  const write = vi.spyOn(first.style, "setProperty");
+  // The mouth settles on a steady level (smoothing: playback-mouth.ts), and then has nothing to write.
+  for (let reading = 0; reading < 20; reading += 1) act(() => playbackLevel.publish(0.8, "fp|one"));
+  const settled = write.mock.calls.length;
+  expect(settled).toBeGreaterThan(0);
+  expect(settled).toBeLessThan(20);
+  act(() => playbackLevel.publish(0.8, "fp|one"));
+  expect(write.mock.calls.length).toBe(settled);
+  // The drawing cut into layers (or put back) leaves another mouth in its place: the next reading, and the level the
+  // old one showed, are on it at once. A clone of the mouth that a layer holds still is never written.
+  const replacement = first.cloneNode(true) as SVGElement;
+  replacement.style.removeProperty("--mouth");
+  const clone = first.cloneNode(true) as SVGElement;
+  clone.setAttribute("data-clone", "");
+  clone.style.removeProperty("--mouth");
+  first.replaceWith(replacement);
+  replacement.after(clone);
+  act(() => playbackLevel.publish(0.6, "fp|one"));
+  expect(replacement.style.getPropertyValue("--mouth")).not.toBe("");
+  expect(clone.style.getPropertyValue("--mouth")).toBe("");
 });
 
 test("every copy runs its animations from the moment its state last changed, whenever it was drawn", () => {

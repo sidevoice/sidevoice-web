@@ -300,8 +300,4 @@ export const ALLOWED = [
     rule: "restarted", key: /your-wave/,
     why: "The title card's wave: 5 bars ease their transform over 70 ms to each of 10 readings a second (call-card.css). Without the ease it steps at 10 fps; the look is the operator's call (audit 2026-10-21, to decide).",
   },
-  {
-    rule: "restarted", key: /m-open/,
-    why: "The agent's mouth follows the reply's level through a 80 ms transform transition on the SVG mouth (styles/call.css data-mouth=playback). The agent-speaking path is being reworked on perf/agent-speaking; remove this entry and the SVG one above when it lands.",
-  },
 ];

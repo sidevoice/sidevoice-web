@@ -1,17 +1,27 @@
-import { useEffect, useReducer, useRef, useState, useCallback } from "react";
+import { useEffect, useReducer, useRef, useState, useCallback, type RefObject } from "react";
 import type { ChatMessage, ConversationView } from "../../state/room-types";
 import { readingMoves, readingPosition, readOn, type Reading } from "./speech-chunks";
 
 /* Where the voice is in a reply, and what the person's spoken turn sent, on the clocks the stage's bubbles (CallStage)
  * read them by. */
 
-/** How far into `reply` the voice is (speech-chunks.ts `readOn`): the part sounding now, its words moving on at a
- *  speaking pace within it, or that pace from the start while the voice gives no cue yet. A reply that has finished,
- *  or left the list, is read from the start if it sounds again (listening again). */
-export function useSpokenTo(reply: ChatMessage | null, sounding: boolean, messages: ChatMessage[]): number | null {
-  const reading = useRef<Reading | null>(null);
+/** Moves `reading` on to now (speech-chunks.ts `readOn`): the part sounding now, its words moving on at a speaking pace
+ *  within it, or that pace from the start while the voice gives no cue yet. A reply that has finished, or left the list,
+ *  is read from the start if it sounds again (listening again). */
+function readOnward(reading: RefObject<Reading | null>, reply: ChatMessage | null, sounding: boolean, messages: ChatMessage[]) {
   const kept = reading.current && messages.some((message) => message.segment === reading.current!.segment && message.playback !== "complete") ? reading.current : null;
   reading.current = readOn(kept, reply?.segment ?? null, sounding, reply?.karaoke ?? null, Date.now());
+}
+
+/** How far into `reply` the voice is, drawn again five times a second while the words go on. */
+export function useSpokenTo(reply: ChatMessage | null, sounding: boolean, messages: ChatMessage[]): number | null {
+  return useSpokenFrom(useRef<Reading | null>(null), reply, sounding, messages);
+}
+
+/** The same, with the reading kept by the caller: a caller that is not drawn again as the words go on keeps the reading
+ *  (`useReadingClock`) and hands it to whatever shows them, which is the one that ticks. */
+export function useSpokenFrom(reading: RefObject<Reading | null>, reply: ChatMessage | null, sounding: boolean, messages: ChatMessage[]): number | null {
+  readOnward(reading, reply, sounding, messages);
   const ticking = !!reply && !!reading.current && readingMoves(reading.current);
   const [, tick] = useReducer((count: number) => count + 1, 0);
   useEffect(() => {
@@ -20,6 +30,12 @@ export function useSpokenTo(reply: ChatMessage | null, sounding: boolean, messag
     return () => clearInterval(timer);
   }, [ticking]);
   return reply && reading.current?.segment === reply.segment ? readingPosition(reading.current) : null;
+}
+
+/** Keeps `reading` on time as of this render, without ticking: the clock of a reply runs whether or not its words are
+ *  shown (captions off), so turning them on mid-reply finds them where the voice is. */
+export function useReadingClock(reading: RefObject<Reading | null>, reply: ChatMessage | null, sounding: boolean, messages: ChatMessage[]) {
+  readOnward(reading, reply, sounding, messages);
 }
 
 /** How long what was sent takes to leave (call-view.css). */

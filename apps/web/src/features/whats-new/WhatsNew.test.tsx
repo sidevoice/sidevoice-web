@@ -7,7 +7,7 @@ import { createRoomStore } from "../../state/room-store";
 import { defaultVoiceSettings } from "../../services/voice-settings.js";
 import { ONBOARDING_STORAGE_KEY } from "../../services/onboarding-state";
 import type { SidevoiceActions } from "../../state/room-types";
-import { OnboardingProvider } from "../onboarding/onboarding-context";
+import { OnboardingProvider, useOnboarding } from "../onboarding/onboarding-context";
 import { HIGHLIGHTS_ON } from "../highlights/highlights";
 import { useWhatsNew } from "./WhatsNew";
 
@@ -77,4 +77,24 @@ test("a feature already seen stays not new", () => {
 
 test("never while the setup is not settled", () => {
   expect(whatsNew({ baseline_release: 0, completed_at: null })).toEqual([]);
+});
+
+test("a publish that changes nothing the setup reads draws neither it nor what asks what is new (the room's beats, the voice's cues)", () => {
+  const store = setUp({ baseline_release: 0 });
+  let setup = 0, news = 0;
+  function Setup() { useOnboarding(); setup += 1; return null; }
+  function News() { useWhatsNew(); news += 1; return null; }
+  render(<RoomProvider store={store} runtime={false}><OnboardingProvider><Setup /><News /></OnboardingProvider></RoomProvider>);
+  const [setupBefore, newsBefore] = [setup, news];
+  // What a call writes while nothing changes: the same binding and the same conversations, as new objects.
+  act(() => store.patch({ roomBinding: { thread_id: "t", binding_id: "b" } }));
+  const settled = [setup, news];
+  act(() => store.patch({ roomBinding: { thread_id: "t", binding_id: "b" }, machinesAt: 2, people: [], harness: {} }));
+  act(() => store.patch({ karaokeState: { segment: "h", from: 0, to: 3 } }));
+  expect([setup, news]).toEqual(settled);
+  expect(setupBefore).toBeGreaterThan(0);
+  expect(newsBefore).toBeGreaterThan(0);
+  // What they do read still draws them.
+  act(() => store.patch({ voiceSettings: { ...defaultVoiceSettings(), end_of_turn: "smart-turn" } as never }));
+  expect(news).toBeGreaterThan(settled[1]);
 });

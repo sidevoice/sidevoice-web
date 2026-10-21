@@ -443,6 +443,45 @@ export function recordReply(s, d) {
     const previous = s.turns[id] || {};
     return { ...s.turns, [id]: { ...previous, session: d.session_id || s.sessionId, thread: conversationKey(s.callNode, d.thread_id), settled: true } };
 }
+/** `next`, with `previous` itself wherever the two hold the same data, at any depth: whoever holds a piece of a projection
+ *  that did not change is not told it did (a component that reads it is not drawn again). Plain data only, as the
+ *  projections are; anything else is the same only when it is the same object. Nothing of either is changed. */
+export function keepEqual(previous, next) {
+    if (Object.is(previous, next))
+        return previous;
+    const plain = value => value !== null && typeof value === 'object' && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
+    if (Array.isArray(next) && Array.isArray(previous)) {
+        let kept = null;
+        for (let i = 0; i < next.length; i++) {
+            const item = i < previous.length ? keepEqual(previous[i], next[i]) : next[i];
+            if (kept)
+                kept.push(item);
+            else if (item !== previous[i])
+                kept = previous.slice(0, i).concat([item]);
+        }
+        return kept || (next.length === previous.length ? previous : previous.slice(0, next.length));
+    }
+    if (plain(next) && plain(previous)) {
+        const keys = Object.keys(next);
+        let kept = null;
+        for (const key of keys) {
+            const has = Object.prototype.hasOwnProperty.call(previous, key), item = has ? keepEqual(previous[key], next[key]) : next[key];
+            if (kept)
+                kept[key] = item;
+            else if (!has || item !== previous[key]) {
+                kept = {};
+                for (const earlier of keys) {
+                    if (earlier === key)
+                        break;
+                    kept[earlier] = previous[earlier];
+                }
+                kept[key] = item;
+            }
+        }
+        return kept || (Object.keys(previous).length === keys.length ? previous : Object.fromEntries(keys.map(key => [key, previous[key]])));
+    }
+    return next;
+}
 // A single store is shared by React and the runtime adapter. The writable facade records top-level
 // facts; batch() makes a synchronous protocol transition observable only once. Nested records are
 // replaced, not mutated. Browser handles are opaque and never persisted or sent to the room.
@@ -454,12 +493,20 @@ export function createRoomSessionStore(seed = {}) {
         const participants = participantsView(facts);
         // The desktop card's whole snapshot, from the same rows.
         const callCard = callCardView(facts, participants);
-        return { facts, session: sessionStatus(facts), conversation: conversationView(facts), participants,
+        const next = { facts, session: sessionStatus(facts), conversation: conversationView(facts), participants,
             join: joinView(facts),
             mic: micView(facts), call: callView(facts), callCard, title: viewedTitle(facts), screenLock: facts.screenLock,
             enginePanel: enginePanel(facts),
             machines: machinesView(facts), pairing: { open: facts.pairingOpen, note: facts.pairingNote },
             bootError: facts.bootError };
+        // Each projection is made anew from the facts, and most of them are what they were: the room's beats write the
+        // same binding and the same conversations as new objects every second or two, and the voice's cues change only the
+        // words. What did not change keeps its identity, so what shows it is not drawn again.
+        if (snapshot)
+            for (const key of Object.keys(next))
+                if (key !== 'facts')
+                    next[key] = keepEqual(snapshot[key], next[key]);
+        return next;
     }
     function publish() { if (depth || !dirty)
         return; dirty = false; const previous = snapshot; snapshot = project(); for (const listener of listeners)
