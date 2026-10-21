@@ -9,6 +9,7 @@
  *   PERF_NO_ANIMATIONS=1                         the floor: every CSS animation and transition stopped
  *   PERF_MOTION=gpu|still                        the drawings moving as GPU layers, or held still, whatever the page
  *                                                would decide itself (web#278, lib/motion.ts)
+ *   PERF_ANIMATED_THUMBNAILS=1                   the developer option "Animate conversation thumbnails" on (lib/animated-thumbnails.ts)
  *   PERF_WEBKIT=<path>                           another WebKit executable (a rootless wrapper, an older build)
  *   PERF_STYLE='<css>'                           extra CSS on the page, to isolate one animation's cost
  *   PERF_ONLY=<text>                             only the scenarios whose name contains it
@@ -182,6 +183,7 @@ try {
     try {
       const page = await browser.newPage({ baseURL: BASE, viewport: { width: 1280, height: 800 } });
       if (process.env.PERF_MOTION) await page.addInitScript((how) => localStorage.setItem("sidevoice.motion", how), process.env.PERF_MOTION);
+      if (process.env.PERF_ANIMATED_THUMBNAILS) await page.addInitScript(() => localStorage.setItem("sidevoiceAnimatedThumbnails", "1"));
       await scenario.run(page);
       // The floor, for comparison: the same page with every CSS animation and transition stopped.
       if (process.env.PERF_NO_ANIMATIONS) await page.addStyleTag({ content: "*, *::before, *::after { animation: none !important; transition: none !important }" });
