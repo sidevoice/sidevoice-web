@@ -34,8 +34,9 @@ export interface CharacterAvatarProps {
   /** What it shows: its figure's one state (avatar-state.ts), the same object for every copy of it. */
   state: AvatarState;
   size: AvatarSize;
-  /** How the mouth follows the voice: legacy word beats, an externally written level, or the output channel. */
-  mouth?: "voice" | "level" | "playback";
+  /** How the mouth follows the voice: legacy word beats, an externally written level, the output channel, or not at all
+   *  (`still`: a conversation's thumbnail, at rest whatever its agent does). */
+  mouth?: "voice" | "level" | "playback" | "still";
   mouthKey?: string | number;
   /** With the output channel: the level its mouth is open, the same for every copy (AvatarStates.mouth). */
   mouthLevel?: MouthLevel;

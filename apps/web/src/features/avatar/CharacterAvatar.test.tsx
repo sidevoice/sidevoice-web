@@ -155,3 +155,13 @@ test("every copy runs its animations from the moment its state last changed, whe
     delete (HTMLElement.prototype as { getAnimations?: unknown }).getAnimations;
   }
 });
+
+test("a still mouth follows nothing: a thumbnail rests while its agent speaks", () => {
+  speaker("speaking");
+  const thumbnail = render(<CharacterAvatar spec={spec} state={states.get("one")!} size="small" mouth="still" />).container
+    .firstElementChild as HTMLElement;
+  act(() => playbackLevel.publish(0.8, "fp|one"));
+  expect(thumbnail).toHaveAttribute("data-mouth", "still");
+  expect(thumbnail).not.toHaveAttribute("data-mouth-active");
+  expect(mouthOf(thumbnail).style.getPropertyValue("--mouth")).toBe("");
+});

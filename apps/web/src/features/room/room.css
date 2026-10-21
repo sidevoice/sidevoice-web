@@ -7,9 +7,7 @@
 
 /* ----- a conversation's agent, small, and the dot of its state. The dot is ringed in what is behind it (--dot-ring),
  * so it reads as cut out of the avatar on a row, a selected row, the header or the panel alike. */
-/* Each is a composited layer of its own: its mouth follows the agent's voice about 30 times a second, and WebKit paints
- * an SVG on the CPU, so without one each of those frames repaints the whole sidebar it sits in. */
-.conversation-avatar { position: relative; display: block; flex: none; width: 40px; height: 40px; will-change: transform; }
+.conversation-avatar { position: relative; display: block; flex: none; width: 40px; height: 40px; }
 .conversation-avatar .sv-avatar { width: 100%; height: 100%; border-radius: 50%; background: color-mix(in srgb, var(--av-color) 22%, var(--sv-surface)); }
 [data-theme="dark"] .conversation-avatar .sv-avatar { background: var(--av-bg); }
 .state-dot { position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border: 2px solid var(--dot-ring, var(--sv-surface)); border-radius: 50%; background: var(--sv-text-subtle); }
