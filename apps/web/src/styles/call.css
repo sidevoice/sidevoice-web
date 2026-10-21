@@ -42,6 +42,9 @@
 .sv-avatar[data-style=bichos][data-mouth=playback] .m-rest { animation:none;opacity:1 }
 .sv-avatar[data-style=bichos][data-mood=speaking][data-mouth=playback][data-mouth-active] .m-open { opacity:1;transform:scaleY(calc(.2 + var(--mouth, 0) * .8)) }
 .sv-avatar[data-style=bichos][data-mood=speaking][data-mouth=playback][data-mouth-active] .m-rest { opacity:0 }
+/* A conversation's thumbnail keeps its mouth at rest while its agent speaks: only the stage and the card lip-sync. */
+.sv-avatar[data-style=bichos][data-mouth=still] .m-open { animation:none;opacity:0 }
+.sv-avatar[data-style=bichos][data-mouth=still] .m-rest { animation:none;opacity:1 }
 @keyframes av-talk { from { opacity:0;transform:scaleY(.3) } to { opacity:1;transform:scaleY(1) } }
 @keyframes av-talk-rest { from { opacity:1 } to { opacity:0 } }
 @keyframes av-word-a { 0% { opacity:1;transform:scaleY(1) } 55% { opacity:1;transform:scaleY(.75) } 100% { opacity:0;transform:scaleY(.3) } }
