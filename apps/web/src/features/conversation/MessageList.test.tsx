@@ -101,6 +101,15 @@ test("F9 a manually heard text-only reply no longer claims it was not played", (
   expect(screen.getByRole("article", { name: "Agente: Answer" })).toBeInTheDocument();
 });
 
+test("a transcript that is closed does not light the words the voice says, and lights them as it opens", () => {
+  const conversation = view([message({ segment: "voice", text: "Respuesta activa ahora", playback: "playing", karaoke: { from: 10, to: 16 } })]);
+  const { container, rerender } = render(<MessageList conversation={conversation} visible={false} />);
+  expect(container.querySelector(".karaoke-played")?.textContent).toBe("");
+  expect(container.querySelector(".karaoke-upcoming")?.textContent).toBe("Respuesta activa ahora");
+  rerender(<MessageList conversation={conversation} visible />);
+  expect(container.querySelector(".karaoke-played")?.textContent).toBe("Respuesta activa");
+});
+
 test("keeps a live user draft visible beside a newly queued reply and renders karaoke declaratively", () => {
   const { container } = render(<MessageList conversation={view([message({ segment: "voice", text: "Respuesta activa ahora", playback: "playing", karaoke: { from: 10, to: 16 } })], "Sigo hablando…")} />);
   expect(screen.getByText("Sigo hablando…")).toBeInTheDocument();
