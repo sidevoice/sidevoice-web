@@ -1,6 +1,6 @@
 {
   "name": "@sidevoice/web",
-  "version": "0.8.3",
+  "version": "0.9.0",
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
@@ -23,7 +23,7 @@
     "@radix-ui/react-select": "^2.3.7",
     "@radix-ui/react-tooltip": "^1.2.16",
     "@sidevoice/engine": "0.5.0",
-    "@sidevoice/protocol": "0.8.3",
+    "@sidevoice/protocol": "0.9.0",
     "@sidevoice/voice": "0.7.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
