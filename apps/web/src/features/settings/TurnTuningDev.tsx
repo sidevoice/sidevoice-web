@@ -3,14 +3,15 @@ import { Group, Row } from "../../components/ui/Card";
 import { useRoomStore } from "../../state/room-store";
 import { TURN_BOUNDS, TURN_TUNING, type TurnTuning } from "../../services/voice-settings.js";
 
-/* "Turn tuning (dev)": a developer tool to tune the turn and barge-in numbers in real calls. Hidden from normal users
- * (see turnTuningDevEnabled) and deliberately English-only and outside the i18n catalogues. Every change goes through
+/* "Turn tuning (dev)": a developer tool to tune the turn and barge-in numbers in real calls. It lives in Settings ›
+ * Developer options (DeveloperOptions.tsx), hidden from normal users, and is deliberately English-only and outside the
+ * i18n catalogues. Every change goes through
  * the same `editVoice` action as the rest of Settings, so it is stored in the device settings and reaches a call in
  * progress (audio_grace_ms at once, the input numbers from the next turn; on desktop fade_ms is fixed at 30 ms natively). */
 
-/** The flag that shows the panel. The web has no debug signal from the desktop app (SIDEVOICE_DEBUG is not passed
- *  through the bridge), so it is set by hand: `localStorage.sidevoiceDevTurnTuning = "1"` and reload, or open the app
- *  with `?devTurnTuning=1` once (it is then kept in localStorage); `?devTurnTuning=0` turns it off. */
+/** The flag that shows Developer options without developer mode, which only a nightly desktop build has: a browser, a
+ *  playground. It is set by hand: `localStorage.sidevoiceDevTurnTuning = "1"` and reload, or open the app with
+ *  `?devTurnTuning=1` once (it is then kept in localStorage); `?devTurnTuning=0` turns it off. */
 export const DEV_TURN_TUNING_KEY = "sidevoiceDevTurnTuning";
 
 export function turnTuningDevEnabled(storage: Storage | null | undefined = typeof localStorage === "undefined" ? null : localStorage, search: string = typeof location === "undefined" ? "" : location.search): boolean {
@@ -53,7 +54,7 @@ export function TurnTuningDev() {
   if (!draft) return null;
   const turn = draft.turn;
   return <Group title="Turn tuning (dev)">
-    <Row label="Developer tool" description="Applies to the call in progress and is kept on this device. English only; hide it with localStorage.removeItem('sidevoiceDevTurnTuning').">
+    <Row label="Developer tool" description="Applies to the call in progress and is kept on this device. English only.">
       <div className="turn-tuning-dev-actions" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {(Object.keys(TURN_PRESETS) as (keyof typeof TURN_PRESETS)[]).map((key) =>
           <Button key={key} type="button" size="sm" variant="ghost" onClick={() => edit({ turn: TURN_PRESETS[key].turn })}>{"Preset " + TURN_PRESETS[key].name}</Button>)}

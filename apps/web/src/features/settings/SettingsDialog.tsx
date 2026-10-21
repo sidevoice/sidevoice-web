@@ -1,7 +1,7 @@
 import { Fragment, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { OverlayPortalProvider, Tooltip } from "../../components/ui/Tooltip";
-import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, FloatingCardIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ShortcutsIcon, PermissionsIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon, UpdateIcon, WarningIcon } from "../../components/ui/Icons";
+import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, DeveloperIcon, FloatingCardIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ShortcutsIcon, PermissionsIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon, UpdateIcon, WarningIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { Select } from "../../components/ui/Select";
 import { LanguagePicker } from "../../components/ui/LanguagePicker";
@@ -37,7 +37,9 @@ import { remoteProviders } from "../../services/voice-settings.js";
 import { useDialogFocusReturn } from "../../lib/focus-return";
 import { motionOf, SettingsLevelsProvider, useSectionShown, useSettingsLevelsOf } from "./settings-levels";
 import { MenuRow } from "./SettingsMenu";
-import { TurnTuningDev, turnTuningDevEnabled } from "./TurnTuningDev";
+import { turnTuningDevEnabled } from "./TurnTuningDev";
+import { DEVELOPER_OPTIONS_TITLE, DeveloperOptions } from "./DeveloperOptions";
+import { useDeveloperMode } from "./developer-mode";
 import { UpdatesSettings, useUpdatesSection } from "./UpdatesSettings";
 import "./settings.css";
 
@@ -48,7 +50,7 @@ import "./settings.css";
  * (no machine yet, an agent waiting). There is no Save: every setting applies as it changes. */
 
 /** Each section in the nav's order, its icon drawn at the size asked (the nav's, by default; a phone's row, 20px). */
-const SECTIONS: { id: string; label: MessageKey; icon: (size?: number) => ReactNode }[] = [
+const SECTIONS: ({ id: string; icon: (size?: number) => ReactNode } & ({ label: MessageKey } | { text: string }))[] = [
   { id: "general", label: "settings.section.general", icon: (size) => <GeneralIcon size={size} /> },
   { id: "transcription", label: "settings.section.transcription", icon: (size) => <TranscriptionIcon size={size} /> },
   { id: "voice", label: "settings.section.voice", icon: (size) => <VoicesIcon size={size} /> },
@@ -65,6 +67,8 @@ const SECTIONS: { id: string; label: MessageKey; icon: (size?: number) => ReactN
   // Everything that updates: in the desktop app, or wherever a machine is behind (UpdatesSettings).
   { id: "updates", label: "settings.section.updates", icon: (size) => <UpdateIcon size={size} /> },
   { id: "advanced", label: "settings.section.advanced", icon: (size) => <AdvancedIcon size={size} /> },
+  // Below Advanced, English-only and outside the catalogues: for a nightly with developer mode on (DeveloperOptions).
+  { id: "developer", text: DEVELOPER_OPTIONS_TITLE, icon: (size) => <DeveloperIcon size={size} /> },
 ];
 
 /** What a place asked for (`settingsFocus`) can focus: a control that takes it now. */
@@ -150,10 +154,8 @@ function RestartNote({ t }: { t: Translate }) {
 function AdvancedSettings({ t }: { t: Translate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const build = (window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev";
-  const turnTuningDev = turnTuningDevEnabled();
   return <Section id="advanced" title={t("settings.section.advanced")} description={t("settings.advanced.description")}>
     {draft && <Group title={t("settings.advanced.models")}><IdleUnloadChoice draft={draft} /><DeleteUnusedChoice /><DownloadedModels /></Group>}
-    {turnTuningDev && <TurnTuningDev />}
     <Group title={t("settings.general.device")}>
       <Row label={t("settings.general.reset")} description={<>{t("settings.general.deviceHint")} <span id="reset-settings-note" role="status" /></>}>
         <Button id="reset-settings" variant="ghost" tone="danger" size="sm" aria-label={t("settings.general.reset")}>{t("settings.general.resetShort")}</Button>
@@ -270,15 +272,27 @@ export function SettingsDialog() {
   const mic = useMicrophoneAccess();
   const permissionsShown = mic.microphone?.state !== "none";
   const floatingCardShown = useFloatingCardSection();
+  // Developer options: developer mode on (a nightly), or the turn-tuning flag a browser or a playground sets by hand.
+  const developerMode = useDeveloperMode();
+  const developerShown = developerMode || turnTuningDevEnabled();
   const sections = SECTIONS.filter((section) => (section.id !== "this-computer" || ownComputer) && (section.id !== "updates" || updatesShown)
     && (section.id !== "shortcuts" || shortcutsShown) && (section.id !== "permissions" || permissionsShown)
-    && (section.id !== "floating-card" || floatingCardShown));
+    && (section.id !== "floating-card" || floatingCardShown) && (section.id !== "developer" || developerShown));
   // Updates shown as the last machine behind is updated (a browser, a phone), or Shortcuts as the mouse or trackpad
   // goes (a tablet's keyboard taken off): General.
   useEffect(() => {
     if ((current === "updates" && !updatesShown) || (current === "shortcuts" && !shortcutsShown) || (current === "permissions" && !permissionsShown)) show("general");
   }, [current, updatesShown, shortcutsShown, permissionsShown]); // eslint-disable-line react-hooks/exhaustive-deps
-  const label = (id: string) => t(ownComputer && id === "machines" ? "settings.section.remoteMachines" : SECTIONS.find((section) => section.id === id)?.label ?? "settings.title");
+  // Developer mode turned off from its own page: General, with the focus on its entry rather than lost with the page.
+  useEffect(() => {
+    if (current !== "developer" || developerShown) return;
+    show("general");
+    document.getElementById("settings-general")?.focus?.();
+  }, [current, developerShown]); // eslint-disable-line react-hooks/exhaustive-deps
+  const label = (id: string) => {
+    const section = SECTIONS.find((entry) => entry.id === id);
+    return ownComputer && id === "machines" ? t("settings.section.remoteMachines") : section && "text" in section ? section.text : t(section && "label" in section ? section.label : "settings.title");
+  };
   // This device's icon wears its connected dot, as a machine's does.
   const icon = (id: string, size?: number) => ownComputer && id === "machines" ? <OtherMachineIcon size={size ?? 18} />
     : id === "this-computer" ? <StateOnIcon icon={SECTIONS.find((section) => section.id === id)!.icon(size)} status={thisDevice} />
@@ -359,6 +373,7 @@ export function SettingsDialog() {
                 <Pane id="machines" current={current}><MachineList /></Pane>
                 {updatesShown && <Pane id="updates" current={current}><UpdatesSettings /></Pane>}
                 <Pane id="advanced" current={current}><AdvancedSettings t={t} /></Pane>
+                {developerShown && <Pane id="developer" current={current}><DeveloperOptions /></Pane>}
               </div>
             </div>
             {/* Settings' own polite region (a machine forgotten), never the call's. */}

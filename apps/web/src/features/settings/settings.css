@@ -361,3 +361,6 @@
 .fcp-compact > .fcp-lines i { width: 62%; }
 .fcp-compact > .fcp-bar { flex-basis: 100%; justify-content: space-between; }
 .fcp-lines .fcp-actions i { width: 8px; height: 8px; border-radius: 50%; opacity: 1; background: color-mix(in srgb, var(--sv-text) 25%, transparent); }
+/* Developer options (DeveloperOptions): a row's how-to, a line each. */
+.developer-howto { display: block; }
+.developer-howto + .developer-howto { margin-top: var(--sv-space-1); }

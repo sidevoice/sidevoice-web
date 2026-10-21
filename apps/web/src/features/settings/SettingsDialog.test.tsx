@@ -3,6 +3,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { withMicrophone } from "./with-microphone.test-util";
 import { SettingsDialog } from "./SettingsDialog";
 import { KEYBOARD_QUERY } from "./ShortcutsSettings";
+import { DEVELOPER_MODE_KEY, setDeveloperMode } from "./developer-mode";
+import { DEV_TURN_TUNING_KEY } from "./TurnTuningDev";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import { defaultVoiceSettings, editVoiceSettings } from "../../services/voice-settings.js";
@@ -358,4 +360,113 @@ test("Permissions wears the warning dot while the microphone is not allowed, sai
   await act(async () => { fireEvent.click(await within(document.getElementById("pane-permissions")!).findByRole("button", { name: "Allow microphone" })); });
   await waitFor(() => expect(document.querySelector("#pane-permissions .perm-badge")).toHaveTextContent("Allowed"));
   expect(document.querySelector("#settings-permissions .settings-attention")).toBeNull();
+});
+
+/* Developer options (operator, 2026-10-21): a section below Advanced, English only, for a nightly desktop build with
+ * developer mode on (turned on from Updates: developer-mode.test.tsx, UpdatesSettings.test.tsx) — or, for a browser or
+ * a playground, with the turn-tuning flag set by hand. It holds the turn tuning panel, no longer Advanced's, and the
+ * debugging switches the app offers (DeveloperOptions.test.tsx). */
+
+/** The desktop app as its bridge shows it: its build and, where it has one, its debugging seam; developer mode kept
+ *  on this device, or not. */
+function withDeveloperMode({ channel = "nightly", on = true, debug = true }: { channel?: string | null; on?: boolean; debug?: boolean } = {}) {
+  if (channel) {
+    Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { build: { channel, version: "0.2.1-nightly.608" },
+      ...(debug ? { debug: { available: ["inspectable", "compositingBorders", "repaintCounters"], inspectable: false, compositingBorders: false, repaintCounters: false, set: vi.fn(async () => {}) } } : {}) } } });
+  }
+  if (on) localStorage.setItem(DEVELOPER_MODE_KEY, "1");
+  onTestFinished(() => { localStorage.clear(); delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; });
+}
+
+test("with developer mode on in a nightly, Developer options is below Advanced and holds the turn tuning, which Advanced no longer has", () => {
+  withDeveloperMode();
+  open("whisper-base");
+  expect(navLabels().slice(-2)).toEqual(["Advanced", "Developer options"]);
+  fireEvent.click(document.getElementById("settings-developer")!);
+  const developer = document.getElementById("pane-developer")!;
+  expect(developer).not.toHaveAttribute("hidden");
+  expect(document.getElementById("settings-developer")).toHaveAttribute("aria-current", "page");
+  expect(within(developer).getByRole("heading", { name: "Developer options" })).toBeInTheDocument();
+  expect(within(developer).getByRole("switch", { name: "Developer mode" })).toHaveAttribute("aria-checked", "true");
+  expect([...developer.querySelectorAll(".ui-group-title")].map((title) => title.textContent)).toEqual(["Rendering", "Turn tuning (dev)"]);
+  expect(within(developer).getByRole("switch", { name: "Web Inspector" })).toBeInTheDocument();
+  expect(within(developer).getByRole("switch", { name: "Compositing borders" })).toBeInTheDocument();
+  expect(within(developer).getByRole("switch", { name: "Repaint counters" })).toBeInTheDocument();
+  expect(within(developer).getByRole("button", { name: "Reset to defaults" })).toBeInTheDocument();
+  // Moved, not copied.
+  const advanced = document.getElementById("pane-advanced")!;
+  expect(advanced).not.toHaveTextContent("Turn tuning (dev)");
+  expect(within(advanced).queryByRole("button", { name: "Reset to defaults" })).toBeNull();
+});
+
+test("without the app's debugging seam, Developer options has just the turn tuning and developer mode", () => {
+  withDeveloperMode({ debug: false });
+  open("whisper-base");
+  fireEvent.click(document.getElementById("settings-developer")!);
+  const developer = document.getElementById("pane-developer")!;
+  expect([...developer.querySelectorAll(".ui-group-title")]).toHaveLength(1);
+  expect(developer).toHaveTextContent("Turn tuning (dev)");
+  expect(within(developer).queryByRole("switch", { name: "Web Inspector" })).toBeNull();
+});
+
+test.each([
+  ["a nightly with developer mode off", { channel: "nightly", on: false }],
+  ["a release with a stored on from elsewhere", { channel: "release", on: true }],
+  ["a development build with a stored on", { channel: "dev", on: true }],
+  ["a browser with a stored on", { channel: null, on: true }],
+])("Developer options is not shown in %s", (_, options) => {
+  withDeveloperMode(options);
+  open("whisper-base");
+  expect(navLabels()).not.toContain("Developer options");
+  expect(document.getElementById("pane-developer")).toBeNull();
+  expect(document.getElementById("pane-advanced")).not.toHaveTextContent("Turn tuning (dev)");
+});
+
+test("the turn-tuning flag, set by hand in a browser or a playground, still shows Developer options with the turn tuning alone", () => {
+  withDeveloperMode({ channel: null, on: false });
+  localStorage.setItem(DEV_TURN_TUNING_KEY, "1");
+  open("whisper-base");
+  expect(navLabels().slice(-2)).toEqual(["Advanced", "Developer options"]);
+  fireEvent.click(document.getElementById("settings-developer")!);
+  const developer = document.getElementById("pane-developer")!;
+  expect(developer).toHaveTextContent("Turn tuning (dev)");
+  expect(within(developer).queryByRole("switch")).toBeNull();
+  expect(document.getElementById("pane-advanced")).not.toHaveTextContent("Turn tuning (dev)");
+});
+
+test("turning developer mode off from its own page takes the section away and lands on General, its entry focused", () => {
+  withDeveloperMode();
+  const store = open("whisper-base");
+  fireEvent.click(document.getElementById("settings-developer")!);
+  expect(store.getState().facts.settingsSection).toBe("developer");
+  fireEvent.click(within(document.getElementById("pane-developer")!).getByRole("switch", { name: "Developer mode" }));
+  expect(navLabels()).not.toContain("Developer options");
+  expect(document.getElementById("pane-developer")).toBeNull();
+  expect(localStorage.getItem(DEVELOPER_MODE_KEY)).toBeNull();
+  expect(store.getState().facts.settingsSection).toBe("general");
+  expect(document.getElementById("pane-general")).not.toHaveAttribute("hidden");
+  expect(document.activeElement).toBe(document.getElementById("settings-general"));
+});
+
+test("developer mode turned off while another section shows leaves that section alone", () => {
+  withDeveloperMode();
+  const store = open("whisper-base");
+  fireEvent.click(document.getElementById("settings-advanced")!);
+  act(() => { setDeveloperMode(false); });
+  expect(navLabels()).not.toContain("Developer options");
+  expect(store.getState().facts.settingsSection).toBe("advanced");
+});
+
+test("a section shown again reads the app's switches as it holds them now, not as they were", () => {
+  withDeveloperMode();
+  const { debug } = (window as unknown as { __sidevoiceDesktop: { host: { debug: { compositingBorders: boolean } } } }).__sidevoiceDesktop.host;
+  open("whisper-base");
+  fireEvent.click(document.getElementById("settings-developer")!);
+  expect(screen.getByRole("switch", { name: "Compositing borders" })).toHaveAttribute("aria-checked", "false");
+  // Off and on again, with the app now holding it on.
+  fireEvent.click(screen.getByRole("switch", { name: "Developer mode" }));
+  debug.compositingBorders = true;
+  act(() => { setDeveloperMode(true); });
+  fireEvent.click(document.getElementById("settings-developer")!);
+  expect(screen.getByRole("switch", { name: "Compositing borders" })).toHaveAttribute("aria-checked", "true");
 });
