@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, type CSSProperties } from "react";
+import { useCallback, useContext, useEffect, useRef, type CSSProperties, type RefObject } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { UpdateNotice } from "../updates/UpdateNotice";
 import { Button } from "../../components/ui/Button";
@@ -13,7 +13,8 @@ import { StageBackdrop, StageDesk, useSceneScale, WantedPoster, type PosterWords
 import { KaraokeText } from "../conversation/KaraokeText";
 import { uiLanguage, translator, type Translate } from "../../i18n/translator";
 import { moodText } from "./conversation-state";
-import { useAgentTurns, useSpokenTo, type AgentTurn } from "./speech-reading";
+import { useAgentTurns, useReadingClock, useSpokenFrom, type AgentTurn } from "./speech-reading";
+import type { Reading } from "./speech-chunks";
 import { PagedText } from "./PagedText";
 import { useStageConversation, type StageConversation } from "./stage-view";
 import { BalloonTail } from "./BalloonTail";
@@ -86,8 +87,13 @@ function StageName({ stage, className, tone, voice }: { stage: StageConversation
 }
 
 /** The agent's replies on the stage: the one sounding, followed as it is heard; once its last words are said it stays
- *  PAGE_MS, then leaves. A new reply over it: the one before lifts away at once (as the person's sent turn does). */
-function AgentBubbles({ reply, spokenTo, onUp }: { reply: ChatMessage | null; spokenTo: number | null; onUp: (up: boolean) => void }) {
+ *  PAGE_MS, then leaves. A new reply over it: the one before lifts away at once (as the person's sent turn does).
+ *
+ *  The words go on five times a second while the voice says them: that draws the balloons and nothing around them, so the
+ *  clock is here and not in the tile (its caller keeps `reading`, so captions turned on mid-reply pick it up where it is). */
+function AgentBubbles({ reading, reply, sounding, messages, onUp }: { reading: RefObject<Reading | null>; reply: ChatMessage | null;
+  sounding: boolean; messages: ChatMessage[]; onUp: (up: boolean) => void }) {
+  const spokenTo = useSpokenFrom(reading, reply, sounding, messages);
   const turns = useAgentTurns(reply, spokenTo);
   // Whether a balloon is on the stage, for the agent to hold still under it (no idle pastime until it has gone).
   const up = turns.length > 0;
@@ -166,7 +172,8 @@ export function StageTile({ card = false }: { card?: boolean }) {
   useMovingCopy(stage.threadId);
   const conversation = useRoomStore((state) => state.conversation);
   const reply = stage.isTarget ? conversation.saying ?? null : null;
-  const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
+  const reading = useRef<Reading | null>(null);
+  useReadingClock(reading, reply, stage.speaking, conversation.messages);
   const narrow = useMedia(NARROW_QUERY);
   const voice = useVoiceModels();
   // Captions off (the call bar's toggle): no balloons on the stage; the transcript keeps everything said.
@@ -192,7 +199,7 @@ export function StageTile({ card = false }: { card?: boolean }) {
         {!card && <StageName stage={stage} className="stage-name" tone={tone} voice={voice} />}
         <div className="stage-top">
           {/* Its own conversation's: another one on the stage starts with none of the replies before it. */}
-          {captions && <AgentBubbles key={stage.threadId} reply={reply} spokenTo={spokenTo} onUp={holdStill} />}
+          {captions && <AgentBubbles key={stage.threadId} reading={reading} reply={reply} sounding={stage.speaking} messages={conversation.messages} onUp={holdStill} />}
           {/* Working is said only to assistive tech here: the sidebar shows it. Not in the floating card (FLOATING-CARD-SPEC, "What
               the card leaves out"): its page has no .sr-only rule, so it would show over the creature; its figure label and state
               line carry it. */}
@@ -217,10 +224,11 @@ export function StageBalloons() {
   const holdStill = useCallback((up: boolean) => { if (stage.threadId) avatars.hold(stage.threadId, up); }, [avatars, stage.threadId]);
   const conversation = useRoomStore((state) => state.conversation);
   const reply = stage.isTarget ? conversation.saying ?? null : null;
-  const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
+  const reading = useRef<Reading | null>(null);
+  useReadingClock(reading, reply, stage.speaking, conversation.messages);
   if (!stage.threadId) return null;
   return <>
-    <div className="stage-top"><AgentBubbles key={stage.threadId} reply={reply} spokenTo={spokenTo} onUp={holdStill} /></div>
+    <div className="stage-top"><AgentBubbles key={stage.threadId} reading={reading} reply={reply} sounding={stage.speaking} messages={conversation.messages} onUp={holdStill} /></div>
     <PersonTurn conversation={conversation} t={t} />
   </>;
 }
