@@ -81,6 +81,7 @@ function viewport({ narrow = false, compact = false, crowded = false }) {
 const escape = () => act(() => { fireEvent.keyDown(document, { key: "Escape" }); });
 
 test("the stage plays what the agent says as a karaoke bubble, the whole reply in pages that follow the voice", () => {
+  motion("gpu");
   const store = room({ botLive: true, karaokeState: { segment: "h-2", from: 57, to: 57 } });
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "speaking");
   expect(stageAgent()).toHaveAttribute("data-mood", "speaking");
@@ -969,4 +970,10 @@ test("captions off in the call bar takes the balloons off the stage, for this de
   act(() => { toggle().click(); });
   expect(document.querySelector(".stage-bubble")).not.toBeNull();
   expect(localStorage.getItem(CAPTIONS_KEY)).toBeNull();
+});
+
+test("held still, the stage's mouth does not follow the voice either", () => {
+  motion("still");
+  room({ botLive: true, karaokeState: { segment: "h-2", from: 57, to: 57 } });
+  expect(stageAgent()).toHaveAttribute("data-mouth", "still");
 });
