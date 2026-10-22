@@ -31,7 +31,9 @@ export function addStage(element: Element, placeholder = false): () => void {
   return () => {
     stages.delete(element);
     placeholders.delete(element);
-    changed();
+    // Said a moment later: a stage handed over (the choose screen to the chosen conversation's tile) is added in the
+    // same commit, and the page is not "no stage" in between.
+    queueMicrotask(changed);
   };
 }
 
