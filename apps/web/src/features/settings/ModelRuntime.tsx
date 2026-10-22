@@ -4,33 +4,14 @@ import { ChevronIcon } from "../../components/ui/Icons";
 import { useRoomStore } from "../../state/room-store";
 import type { ModelBuild } from "@sidevoice/engine";
 import { translator, type Translate, type MessageKey } from "../../i18n/translator";
-import { sizeText, type ModelState } from "./ModelSetup";
+import type { ModelState } from "./ModelSetup";
+import { buildSizes, buildSummary, describeBuild, engineOf, useModelSummary } from "./model-facts";
 
 /* How a model of this device runs, under its block, folded until asked for: what this device offers (a graphics card
  * the browser can use, its memory and cores — read at once, no benchmark) and each build of the model the engine has —
  * its engine, precision and what it runs on, its download and memory, whether it is the recommended one, on disk, or
  * why it does not run here. Automatic is the engine's recommended build; another can be chosen, and is downloaded and
  * loaded as such. */
-
-const ENGINES: Record<string, string> = {
-  "transformers-js": "Transformers.js", "sherpa-onnx": "Sherpa-ONNX", "whisper-cpp": "whisper.cpp", onnxruntime: "ONNX Runtime", mlx: "MLX",
-};
-
-/** What a build runs on, from the class the engine resolved for this device. The accelerator is only the API name
- *  shown beside a graphics card; absent or unrecognized classes have no hardware label. */
-function runsOn(build: ModelBuild, t: Translate) {
-  switch (build.acceleratorClass) {
-    case "gpu": {
-      if (!build.accelerator) return "";
-      const names: Record<string, string> = { metal: "Metal", cuda: "CUDA", webgpu: "WebGPU" };
-      const api = names[build.accelerator] ?? build.accelerator;
-      return t("runtime.on.gpu", { api });
-    }
-    case "neural-engine": return t("runtime.on.neuralEngine");
-    case "cpu": return t("runtime.on.cpu");
-    default: return "";
-  }
-}
 
 /** This device as the engine sees it in a browser: a graphics card it can use, memory and cores. */
 function DeviceLine({ t }: { t: Translate }) {
@@ -47,6 +28,7 @@ export function ModelRuntime({ task, state, locked }: { task: "stt" | "tts"; sta
   const t = translator();
   const [open, setOpen] = useState(false);
   const panel = useId();
+  const summary = useModelSummary();
   const builds = state.model?.builds ?? [];
   if (!state.local || !builds.length) return null;
   const recommended = state.model?.recommendedBuild;
@@ -64,8 +46,8 @@ export function ModelRuntime({ task, state, locked }: { task: "stt" | "tts"; sta
       </label>
     );
   };
-  const describe = (build: ModelBuild) => [ENGINES[build.backend] ?? build.backend, build.precision, runsOn(build, t)].filter(Boolean).join(" · ");
-  const sizes = (build: ModelBuild) => t("runtime.sizes", { download: sizeText(build.downloadBytes), memory: sizeText(build.memoryMb * 1e6) });
+  const describe = (build: ModelBuild) => describeBuild(build, t);
+  const sizes = (build: ModelBuild) => buildSizes(build, t);
   const reasons = (build: ModelBuild) => build.available ? "" : t("runtime.notHere", {
     reasons: build.reasons.map((reason) => t(("voice.unfit." + reason.code) as MessageKey)).join("; ") || t("voice.model.unfitUnknown"),
   });
@@ -76,8 +58,11 @@ export function ModelRuntime({ task, state, locked }: { task: "stt" | "tts"; sta
         <button type="button" className="model-runtime-toggle" aria-expanded={open} aria-controls={panel} onClick={() => setOpen(!open)}>
           <ChevronIcon size={16} className={open ? "model-runtime-chevron-open" : undefined} />{t("runtime.advanced")}
         </button>
-        <span className="model-runtime-summary">{state.build ? describe(state.build) : ""}</span>
+        {/* Its line, closed or open: engine and precision, the block saying its size and hardware elsewhere ("status",
+            "facts"); or all the panel says of the build, wrapped on a line of its own under the toggle ("advanced"). */}
+        {summary !== "advanced" && <span className="model-runtime-summary">{state.build ? engineOf(state.build) : ""}</span>}
       </div>
+      {summary === "advanced" && state.build && <p className="model-runtime-summary-line">{buildSummary(state.build, t)}</p>}
       {open && <div className="model-runtime-panel" id={panel}>
         {/* What this is, and that most people can leave it. */}
         <p className="model-runtime-info">{t("runtime.info")}</p>

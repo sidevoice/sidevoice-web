@@ -2,10 +2,40 @@
 .model-prepare { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sv-space-3); min-width: 0; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); color: var(--sv-text); }
 .model-prepare-pickers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: var(--sv-space-3); }
 .model-prepare-meta { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
-.model-prepare-pickers + .model-prepare-status, .model-prepare-meta + .model-prepare-status { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.model-prepare-pickers + .model-prepare-status, .model-prepare-meta + .model-prepare-status, .model-prepare-notice + .model-prepare-status,
+.model-facts + .model-prepare-status { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+/* Which languages the model supports (ModelLanguages): the ones that matter here in bold; "+N more" a link in the text
+   that reveals the rest — in a popover, inline, or in a tooltip, as compared. */
+.model-prepare-meta strong { font-weight: 600; color: var(--sv-text); }
+.model-languages-more { display: inline; padding: 0; border: 0; background: none; color: var(--sv-accent-text); font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.model-languages-more:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: 2px; }
+.model-languages-more svg { display: inline-block; margin-inline-start: 2px; vertical-align: -1px; transform: rotate(-90deg); transition: transform var(--sv-dur-fast) var(--sv-ease); }
+.model-languages-more svg.model-languages-chevron-open { transform: none; }
+.model-languages-list { margin: 0; padding: 0; list-style: none; column-gap: var(--sv-space-4); }
+.model-languages-list li { break-inside: avoid; }
+.model-languages-list strong { font-weight: 600; }
+/* All of them (Whisper has about a hundred): the popover itself scrolls, so the focus in it scrolls it with the keys;
+   two columns where it is wide enough, one on a phone. */
+.ui-popover.model-languages-popover { width: min(22rem, calc(100vw - 24px)); max-height: min(24rem, 60vh); overflow-y: auto; }
+.model-languages-popover .ui-popover-title { color: var(--sv-text); }
+.model-languages-popover .model-languages-list { column-width: 9rem; color: var(--sv-text); }
+/* In the tooltip (300px at most): two columns, wide enough for both. */
+.model-languages-tip { width: 16rem; column-width: 6.5rem; }
+/* The language in use is not one of the model's: in the warning's colour and with its mark, so not by colour alone. Its
+   region stays in the block, empty while there is nothing to say. */
+.model-prepare-notice { display: flex; align-items: flex-start; gap: var(--sv-space-1-5); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-warning); }
+.model-prepare-notice:empty { display: none; }
+.model-prepare-notice svg { flex: none; margin-top: 2px; }
+/* What the model takes and where it runs, as a labelled row ("facts"): pairs that wrap as the block narrows. */
+.model-facts { display: flex; flex-wrap: wrap; gap: var(--sv-space-1) var(--sv-space-4); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; font-variant-numeric: tabular-nums; }
+.model-facts > div { display: flex; gap: var(--sv-space-1-5); min-width: 0; }
+.model-facts dt { color: var(--sv-text-muted); }
+.model-facts dd { margin: 0; color: var(--sv-text); }
 .model-prepare-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sv-space-3); min-height: 48px; min-width: 0; }
 .model-prepare-state { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; }
 .model-prepare-note { white-space: nowrap; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); font-variant-numeric: tabular-nums; }
+/* All of the model's facts on the status line ("status"): longer than a size, so they wrap. */
+.model-prepare-note.model-prepare-facts { white-space: normal; }
 .model-prepare-working { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text); }
 .model-prepare-state .ui-spinner { color: var(--sv-accent-text); }
 .model-prepare-progress { display: grid; gap: var(--sv-space-2); flex: 1; min-width: 0; }
@@ -60,6 +90,9 @@
 .model-runtime-toggle svg.model-runtime-chevron-open { transform: none; }
 .model-runtime-summary { min-width: 0; max-width: 100%; overflow: hidden; font-weight: 400; color: var(--sv-text-subtle); white-space: nowrap; text-overflow: ellipsis; }
 .model-runtime-summary:not(:empty)::before { content: "· "; }
+/* All the panel says of the build, with its sizes ("advanced"): on a line of its own under the toggle, aligned with its
+   words, and wrapped rather than cut — the numbers are the point. */
+.model-runtime-summary-line { margin: 0; padding-inline-start: calc(var(--sv-space-1) + 16px + var(--sv-space-1-5)); font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); font-variant-numeric: tabular-nums; }
 .model-runtime-panel { display: grid; gap: var(--sv-space-3); margin-top: var(--sv-space-2); padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface); }
 .model-runtime-device { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .model-runtime-options { display: grid; gap: var(--sv-space-2); margin: 0; padding: 0; border: 0; min-width: 0; }

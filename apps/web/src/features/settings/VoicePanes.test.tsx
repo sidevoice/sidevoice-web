@@ -534,8 +534,10 @@ test("the engine's accelerator class chooses the hardware label; the API only na
     on("webgpu", "future-class" as ModelBuild["acceleratorClass"], "onnxruntime"),
     on(undefined, "gpu", "whisper-cpp"),
   ]);
-  // Metal is the Mac's graphics card, never the processor: in the summary, Automatic and its own option.
-  expect(summary).toBe("whisper.cpp · int8 · graphics card (Metal)");
+  // Metal is the Mac's graphics card, never the processor: on the status line, Automatic and its own option. The closed
+  // line keeps engine and precision (modelSummary's default, "status": the hardware is on the status line).
+  expect(summary).toBe("whisper.cpp · int8");
+  expect(document.querySelector("#stt-model-card .model-prepare-status")).toHaveTextContent("graphics card (Metal)");
   expect(auto).toMatch(/^whisper\.cpp · int8 · graphics card \(Metal\) · /);
   expect(titles.slice(1)).toEqual([
     "whisper.cpp · int8 · graphics card (Metal)",
@@ -683,4 +685,81 @@ test("a provider with its key, and this device, keep the Model dropdown usable; 
   cleanup();
   renderPane();
   expect(modelBox()).not.toBeDisabled();
+});
+
+/* With "Advanced: how it runs" closed, what a model of this device takes and where it runs (sidevoice-web#340), in each
+ * place compared; and the Model list's sizes. Each variant is set as the preview's panel sets it. */
+const variants = (chosen: Record<string, string>) => localStorage.setItem("sidevoice.variants", JSON.stringify(chosen));
+const withTurnModel = () => catalogs.map((catalog) => catalog.id === "local" ? { ...catalog, models: [...catalog.models,
+  local("smart-turn-v3.2", "smart-turn", ["end-of-turn"], { installed: false, recommendedBuild: "smart-turn-v3.2/int8", builds: [build("smart-turn-v3.2/int8", { downloadBytes: 9e6, installed: false })] })] } : catalog) as CatalogView[];
+const card = (id: string) => document.getElementById(id)!;
+const closedLine = (task: string) => card(task + "-model-card").querySelector(".model-runtime-summary")?.textContent;
+
+test("by default, the status line says it all: download, memory and hardware, or what it takes here; Advanced keeps engine and precision", () => {
+  renderPane({ voiceSettings: withVoiceModel("piper-es"), voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
+  expect(card("tts-model-card").querySelector(".model-prepare-status .model-prepare-note")).toHaveTextContent(/^63 MB download · 1 MB in memory · processor$/);
+  expect(card("stt-model-card").querySelector(".model-prepare-status .model-prepare-note")).toHaveTextContent(/^1 MB on this device · 1 MB in memory · processor$/);
+  expect(card("turn-model-card").querySelector(".model-prepare-status .model-prepare-note")).toHaveTextContent(/^9 MB download · 1 MB in memory · processor$/);
+  expect(closedLine("stt")).toBe("Sherpa-ONNX · int8");
+  expect(document.querySelector(".model-facts, .model-runtime-summary-line, .model-prepare-summary")).toBeNull();
+});
+
+test("facts: a labelled row of its own, the status line keeping only where the model stands", () => {
+  variants({ modelSummary: "facts" });
+  renderPane({ voiceSettings: withVoiceModel("piper-es"), voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
+  const pairs = (id: string) => [...card(id).querySelectorAll(".model-facts > div")].map((pair) => [pair.querySelector("dt")!.textContent, pair.querySelector("dd")!.textContent]);
+  expect(pairs("tts-model-card")).toEqual([["Size", "63 MB"], ["Memory", "1 MB"], ["Runs on", "processor"]]);
+  expect(pairs("turn-model-card")).toEqual([["Size", "9 MB"], ["Memory", "1 MB"], ["Runs on", "processor"]]);
+  expect(card("tts-model-card").querySelector(".model-prepare-status .model-prepare-note")).toBeNull();
+  expect(card("stt-model-card").querySelector(".model-prepare-status .model-prepare-note")).toHaveTextContent(/^On this device$/);
+  expect(closedLine("stt")).toBe("Sherpa-ONNX · int8");
+});
+
+test("advanced: Advanced's line says all its panel says of the build, on a line of its own; the end of turn's block says it with no toggle", () => {
+  variants({ modelSummary: "advanced" });
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
+  const runtime = card("stt-model-card").querySelector(".model-runtime")!;
+  expect(runtime.querySelector(".model-runtime-summary")).toBeNull();
+  expect(runtime.querySelector(".model-runtime-head + .model-runtime-summary-line")).toHaveTextContent(/^Sherpa-ONNX · int8 · processor · 1 MB download · 1 MB in memory$/);
+  expect(card("stt-model-card").querySelector(".model-prepare-status .model-prepare-note")).toHaveTextContent(/^1 MB on this device$/);
+  const turn = card("turn-model-card");
+  expect(turn.querySelector(".model-runtime-toggle")).toBeNull();
+  expect(turn.querySelector(".model-prepare-summary")).toHaveTextContent(/^Sherpa-ONNX · int8 · processor · 9 MB download · 1 MB in memory$/);
+});
+
+test("a provider's model says none of it, in any of them", () => {
+  for (const modelSummary of ["status", "facts", "advanced"]) {
+    variants({ modelSummary });
+    renderPane({ voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "elevenlabs", model: "scribe_v2", language: null } } });
+    const stt = card("stt-model-card");
+    expect(stt.querySelector(".model-facts, .model-prepare-summary, .model-runtime")).toBeNull();
+    expect(stt.querySelector(".model-prepare-status .model-prepare-note")).toHaveTextContent(/^No download needed$/);
+    cleanup();
+  }
+});
+
+test("the Model list says under each model of this device that can be chosen what it takes and where it runs; names alone in the other", () => {
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
+  expect(listOptions("stt-model").map((option) => option.detail)).toEqual([
+    "1 MB on this device · 1 MB in memory · processor",
+    "does not run here: it does not fit in this device's memory",
+  ]);
+  expect(listOptions("turn-model").map((option) => option.detail)).toEqual(["9 MB download · 1 MB in memory · processor"]);
+  cleanup();
+  variants({ modelList: "names" });
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
+  expect(listOptions("stt-model").map((option) => option.detail)).toEqual(["", "does not run here: it does not fit in this device's memory"]);
+  expect(listOptions("turn-model").map((option) => option.detail)).toEqual([""]);
+});
+
+test("the languages line and its notice are the transcription and voice blocks', the chosen language counting for both", () => {
+  renderPane();
+  // The interface speaks English, which neither model lists: both say so, the end of turn's block nothing.
+  for (const task of ["stt", "tts"]) {
+    expect(card(task + "-model-card").querySelector(".model-prepare-meta")).toHaveTextContent(/^Spanish$/);
+    expect(card(task + "-model-card").querySelector(".model-prepare-notice")).toHaveTextContent(/^English isn't one of this model's languages\.$/);
+  }
+  cleanup();
+  renderPane({ voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-base", language: "es" } } });
+  for (const task of ["stt", "tts"]) expect(card(task + "-model-card").querySelector(".model-prepare-notice")).toBeEmptyDOMElement();
 });

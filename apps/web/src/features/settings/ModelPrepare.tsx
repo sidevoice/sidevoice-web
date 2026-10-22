@@ -5,7 +5,9 @@ import { Button } from "../../components/ui/Button";
 import { ProgressBar } from "../../components/ui/ProgressBar";
 import { DownloadsIcon } from "../../components/ui/Icons";
 import { translator } from "../../i18n/translator";
+import type { ModelBuild } from "@sidevoice/engine";
 import { sizeText } from "./ModelSetup";
+import { buildSummary, ModelFacts, modelFacts, useModelSummary } from "./model-facts";
 import "./model-prepare.css";
 
 /* A chosen model made ready on this device, the same block wherever a model is chosen (the first-run setup, Settings):
@@ -49,8 +51,14 @@ export interface ModelPrepareProps {
   pickers?: (locked: boolean) => ReactNode;
   /** A line about the choice: its languages, a quality note. */
   meta?: ReactNode;
+  /** Under that line, what to know about the choice (that it does not speak the language in use), in a region of its
+   *  own that stays as models are chosen, so choosing one says it. Hidden, as the line, while a download runs. */
+  notice?: ReactNode;
   /** Bytes to download, when known; none for a provider's model. */
   size?: number | null;
+  /** The build of this device's model it runs as (ModelSetup's `build`): what it takes and where it runs, said with
+   *  "Advanced: how it runs" closed (model-facts.tsx). None for a provider's model: nothing is said of it. */
+  build?: ModelBuild | null;
   /** How far the download is, 0–1; none while not known. */
   fraction?: number | null;
   /** Why it failed, in one sentence; and what was raw about it, behind Details (error-message.ts). */
@@ -68,23 +76,38 @@ export interface ModelPrepareProps {
   actionIds?: string;
 }
 
-export function ModelPrepare({ pending, runtime, status, model, pickers, meta, size = null, fraction = null, error, errorDetails, readyAction, readyPanel, onDownload, onCancel, onRetry, id, actionIds }: ModelPrepareProps) {
+export function ModelPrepare({ pending, runtime, status, model, pickers, meta, notice, size = null, build = null, fraction = null, error, errorDetails, readyAction, readyPanel, onDownload, onCancel, onRetry, id, actionIds }: ModelPrepareProps) {
   const actionId = (name: string) => actionIds ? actionIds + "-" + name : undefined;
   const t = translator();
   const hintId = useId();
+  const summary = useModelSummary();
   const sized = size ? sizeText(size) : "";
   const locked = status === "downloading";
   const stalled = useStalled(locked, fraction);
   const percent = fraction == null ? null : Math.round(fraction * 100);
+  // Beside Not downloaded or Ready: its size (once ready, on this device). A model of this device says all its facts
+  // there ("status"), or only that it is here, its facts having a row of their own ("facts").
+  const note = (ready: boolean): ReactNode => {
+    if (build && summary === "status") {
+      const facts = modelFacts(build, ready, t);
+      if (facts) return <span className="model-prepare-note model-prepare-facts">{facts}</span>;
+    }
+    if (build && summary === "facts") return ready && <span className="model-prepare-note">{t("runtime.onDisk")}</span>;
+    return ready ? <span className="model-prepare-note">{sized ? t("voice.prepare.onDevice", { size: sized }) : t("voice.prepare.noDownload")}</span>
+      : sized && <span className="model-prepare-note">{sized}</span>;
+  };
   return (
     <div className="model-prepare" id={id} data-status={status}>
       {pickers && <div className="model-prepare-pickers" aria-describedby={locked ? hintId : undefined}>{pickers(locked)}</div>}
       {locked && pickers && <p className="model-prepare-meta" id={hintId}>{t("voice.prepare.lockedHint")}</p>}
       {!locked && meta && <p className="model-prepare-meta">{meta}</p>}
-      {runtime}
+      {!locked && notice}
+      {build && status && summary === "facts" && <ModelFacts build={build} t={t} />}
+      {/* A block with no "Advanced: how it runs" (the end of turn's) says its line where that would be ("advanced"). */}
+      {runtime ?? (build && summary === "advanced" && <p className="model-prepare-meta model-prepare-summary">{buildSummary(build, t)}</p>)}
       {status && <div className="model-prepare-status" role={status === "failed" ? undefined : "status"} aria-live="polite">
         {status === "absent" && <>
-          <div className="model-prepare-state"><Badge>{t("voice.prepare.badge.absent")}</Badge>{sized && <span className="model-prepare-note">{sized}</span>}</div>
+          <div className="model-prepare-state"><Badge>{t("voice.prepare.badge.absent")}</Badge>{note(false)}</div>
           <Button size="sm" id={actionId("download")} onClick={onDownload}><DownloadsIcon />{t("voice.prepare.download")}</Button>
         </>}
         {status === "downloading" && <>
@@ -105,7 +128,7 @@ export function ModelPrepare({ pending, runtime, status, model, pickers, meta, s
         {status === "ready" && <>
           <div className="model-prepare-state">
             <Badge tone="positive" dot>{t("voice.prepare.badge.ready")}</Badge>
-            <span className="model-prepare-note">{sized ? t("voice.prepare.onDevice", { size: sized }) : t("voice.prepare.noDownload")}</span>
+            {note(true)}
           </div>
           {readyAction}
         </>}
