@@ -1181,7 +1181,7 @@ export const messages: Messages = {
   "voice.endOfTurn.infoLabel": "Informacje o końcu wypowiedzi",
   "voice.endOfTurn.info": "Inteligentny: model decyduje, czy twoja wypowiedź się zakończyła. Cisza: wypowiedź kończy się po pauzie bez mowy.",
   "voice.patience.infoLabel": "Informacje o cierpliwości",
-  "voice.patience.info": "Jak długo może trwać pauza, zanim twoja wypowiedź się zakończy. Z trybem Cisza: 2,0 s (Mała), 2,5 s (Normalna), 3,5 s (Duża). Z trybem Inteligentny wydłuża też czas oczekiwania, a wystarczająco długa pauza i tak kończy wypowiedź.",
+  "voice.patience.info": "Jak długo może trwać pauza, zanim twoja wypowiedź się zakończy. Z trybem Cisza: 2,0 s (Mała), 2,5 s (Normalna), 3,5 s (Duża). W trybie „Inteligentny” ustawienie „Cierpliwość” wydłuża też czas oczekiwania, a wystarczająco długa pauza i tak kończy wypowiedź.",
   "hosts.devices.close": "Zamknij",
   "hosts.devices.done": "Gotowe",
   "hosts.devices.pairIntro": "Utwórz tutaj jednorazowy kod, a potem wpisz go na urządzeniu, które parujesz.",

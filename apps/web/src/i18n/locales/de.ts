@@ -1166,7 +1166,7 @@ export const messages: Messages = {
   "voice.endOfTurn.infoLabel": "Über das Redeende",
   "voice.endOfTurn.info": "Intelligent: Ein Modell entscheidet, ob du fertig bist. Stille: Der Redebeitrag endet nach einer Pause ohne Sprache.",
   "voice.patience.infoLabel": "Über die Geduld",
-  "voice.patience.info": "Wie lang eine Pause dauern darf, bevor dein Redebeitrag endet. Mit Stille: 2,0 s (Schnell), 2,5 s (Normal), 3,5 s (Ruhig). Mit Intelligent verlängert sie auch die Wartezeit, und eine ausreichend lange Pause beendet den Redebeitrag in jedem Fall.",
+  "voice.patience.info": "Wie lang eine Pause dauern darf, bevor dein Redebeitrag endet. Mit Stille: 2,0 s (Schnell), 2,5 s (Normal), 3,5 s (Ruhig). Im Modus „Intelligent“ verlängert die Einstellung „Geduld“ auch die Wartezeit, und eine ausreichend lange Pause beendet den Redebeitrag in jedem Fall.",
   "hosts.devices.close": "Schließen",
   "hosts.devices.done": "Fertig",
   "hosts.devices.pairIntro": "Erstelle hier einen Einmalcode und gib ihn dann auf dem Gerät ein, das du koppelst.",

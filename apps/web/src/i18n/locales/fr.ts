@@ -1163,7 +1163,7 @@ export const messages: Messages = {
   "voice.endOfTurn.infoLabel": "À propos de la fin de tour",
   "voice.endOfTurn.info": "Intelligente : un modèle décide si vous avez fini. Silence : le tour se termine après une pause sans parole.",
   "voice.patience.infoLabel": "À propos de la patience",
-  "voice.patience.info": "La durée qu’une pause peut atteindre avant la fin de votre tour. Avec Silence : 2,0 s (Rapide), 2,5 s (Normale), 3,5 s (Calme). Avec Intelligente, elle allonge aussi l’attente, et une pause assez longue termine le tour dans tous les cas.",
+  "voice.patience.info": "La durée qu’une pause peut atteindre avant la fin de votre tour. Avec Silence : 2,0 s (Rapide), 2,5 s (Normale), 3,5 s (Calme). Avec « Intelligente », le réglage « Patience » allonge aussi l’attente, et une pause assez longue met fin au tour dans tous les cas.",
   "hosts.devices.close": "Fermer",
   "hosts.devices.done": "Terminé",
   "hosts.devices.pairIntro": "Créez ici un code à usage unique, puis saisissez-le sur l’appareil que vous associez.",

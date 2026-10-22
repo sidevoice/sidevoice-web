@@ -1193,7 +1193,7 @@ export const messages = {
   "voice.endOfTurn.infoLabel": "About the end of turn",
   "voice.endOfTurn.info": "Smart: a model decides whether you have finished. Silence: the turn ends after a pause without speech.",
   "voice.patience.infoLabel": "About patience",
-  "voice.patience.info": "How long a pause can last before your turn ends. With Silence: 2.0 s (Fast), 2.5 s (Normal), 3.5 s (Calm). With Smart, it also lengthens the wait, and a long enough pause ends the turn anyway.",
+  "voice.patience.info": "How long a pause can last before your turn ends. With Silence: 2.0 s (Fast), 2.5 s (Normal), 3.5 s (Calm). With Smart, patience also lengthens the wait, and a long enough pause ends the turn anyway.",
   "hosts.devices.close": "Close",
   "hosts.devices.done": "Done",
   "hosts.devices.pairIntro": "Create a one-time code here, then enter it on the device you are pairing.",

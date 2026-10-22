@@ -1163,7 +1163,7 @@ export const messages: Messages = {
   "voice.endOfTurn.infoLabel": "关于发言结束判定",
   "voice.endOfTurn.info": "智能：由模型判断你是否已说完。停顿：没有语音的停顿后结束发言。",
   "voice.patience.infoLabel": "关于耐心",
-  "voice.patience.info": "停顿多久后结束你的发言。使用“停顿”时：2.0 秒（快）、2.5 秒（正常）、3.5 秒（从容）。使用“智能”时，它也会延长等待时间，足够长的停顿无论如何都会结束发言。",
+  "voice.patience.info": "停顿多久后结束你的发言。使用“停顿”时：2.0 秒（快）、2.5 秒（正常）、3.5 秒（从容）。使用“智能”模式时，“耐心”设置也会延长等待时间；只要停顿足够长，无论模型如何判断，都会结束发言。",
   "hosts.devices.close": "关闭",
   "hosts.devices.done": "完成",
   "hosts.devices.pairIntro": "在这里创建一次性代码，然后在要配对的设备上输入。",
