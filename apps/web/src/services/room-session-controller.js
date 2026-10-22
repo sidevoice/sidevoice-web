@@ -2307,6 +2307,7 @@ function routedTrial(host){
    return Object.create(call,{ready:{value:ready}});
   },
   unroute:()=>current?unroute(host,current):Promise.resolve(),
+  reroute:async()=>{const call=current;if(!call)return;routeOwner=call;await host.routeInput(call)},
  };
 }
 /* Whose the microphone is among the tries: a try that is replaced while it closes its take (its fence, its last release)
@@ -2338,7 +2339,7 @@ async function tryTurnSettings({onLevel,onTurnStep,onTake}={}){
   const host=await voiceHost();
   const trial=routedTrial(host);
   const settings=turnTrySettings();if(!modelReady(settings,'end-of-turn',state.voiceCatalogue.catalogs))abort.abort();
-  const run=tryEndOfTurn(trial,settings,{signal:abort.signal,onLevel,onTurnStep,onTake});
+  const run=tryEndOfTurn(trial,settings,{signal:abort.signal,closeMic:()=>trial.unroute(),openMic:()=>trial.reroute(),onLevel,onTurnStep,onTake});
   turnTry={abort,run};
   try{await run.done}finally{await trial.unroute().catch(()=>{})}
  }catch(error){throw voiceRefused(error,'try')}

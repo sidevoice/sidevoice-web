@@ -638,6 +638,123 @@ test("the end of turn tried: the take since the voice last started to listen, on
   expect(listeners(voice)).toBe(0);
 });
 
+test("the end of turn take stops where the voice decided the turn ended, not where it stopped recording while it transcribed", async () => {
+  vi.useFakeTimers({ now: 1_000_000 });
+  try {
+    const voice = takingVoice();
+    Object.assign(voice, { stop: async () => { voice.calls.push(["stop"]); voice.emit("take", { sampleRate: 16000, samples: new Float32Array(48000), started_at: 1_000_000, ended_at: 1_003_000, turns: [] }); } });
+    const takes: Array<{ samples: Float32Array; ended_at: number }> = [];
+    const abort = new AbortController();
+    const run = tryEndOfTurn(voice as unknown as Host, SETTINGS as never, { signal: abort.signal, onTake: (take) => takes.push(take) });
+    run.done.catch(() => {});
+    await vi.advanceTimersByTimeAsync(0);
+    voice.emit("turn", { phase: "started", turn_id: "t1" });
+    voice.emit("state", callState("speaking"));
+    await vi.advanceTimersByTimeAsync(1500);
+    voice.emit("state", callState("listening", 1));
+    // One more second goes by in transcription, recorded all the same.
+    await vi.advanceTimersByTimeAsync(1000);
+    voice.emit("turn", { phase: "finished", turn_id: "t1", text: "hola" });
+    abort.abort();
+    await expect(run.done).rejects.toMatchObject({ code: "trial-cancelled" });
+    expect(takes).toHaveLength(1);
+    expect(takes[0].samples.length).toBe(24000);
+    expect(takes[0].ended_at).toBe(1_001_500);
+  } finally { vi.useRealTimers(); }
+});
+
+test("the end of turn closes the microphone when the voice decides the turn ended, and opens it again only if the turn comes to no words", async () => {
+  const voice = fakeVoice();
+  const mic: string[] = [];
+  const abort = new AbortController();
+  const run = tryEndOfTurn(voice as unknown as Host, SETTINGS as never, { signal: abort.signal, closeMic: async () => { mic.push("close"); }, openMic: async () => { mic.push("open"); } });
+  run.done.catch(() => {});
+  await vi.waitFor(() => expect(voice.calls.length).toBeGreaterThan(0));
+  await Promise.resolve();
+  voice.emit("turn", { phase: "started", turn_id: "t1" });
+  voice.emit("state", callState("speaking"));
+  expect(mic).toEqual([]);
+  voice.emit("state", callState("listening", 1));
+  await vi.waitFor(() => expect(mic).toEqual(["close"]));
+  // A cough: no words, so it listens again.
+  voice.emit("turn", { phase: "finished", turn_id: "t1", text: "" });
+  await vi.waitFor(() => expect(mic).toEqual(["close", "open"]));
+  voice.emit("turn", { phase: "started", turn_id: "t2" });
+  voice.emit("state", callState("speaking"));
+  voice.emit("state", callState("listening", 1));
+  voice.emit("turn", { phase: "finished", turn_id: "t2", text: "hola" });
+  await vi.waitFor(() => expect(mic).toEqual(["close", "open", "close"]));
+  abort.abort();
+  await expect(run.done).rejects.toMatchObject({ code: "trial-cancelled" });
+});
+
+test("speech that starts after the turn ended opens the microphone, and the earlier turn's late empty result leaves it open", async () => {
+  const voice = fakeVoice();
+  const mic: string[] = [];
+  const abort = new AbortController();
+  const run = tryEndOfTurn(voice as unknown as Host, SETTINGS as never, { signal: abort.signal, closeMic: async () => { mic.push("close"); }, openMic: async () => { mic.push("open"); } });
+  run.done.catch(() => {});
+  await vi.waitFor(() => expect(voice.calls.length).toBeGreaterThan(0));
+  await Promise.resolve();
+  voice.emit("turn", { phase: "started", turn_id: "t1" });
+  voice.emit("state", callState("speaking"));
+  voice.emit("state", callState("listening", 1));
+  voice.emit("turn", { phase: "started", turn_id: "t2" });
+  voice.emit("turn", { phase: "finished", turn_id: "t1", text: "" });
+  await vi.waitFor(() => expect(mic).toEqual(["close", "open"]));
+  abort.abort();
+  await expect(run.done).rejects.toMatchObject({ code: "trial-cancelled" });
+});
+
+test("a retune forgets where the earlier call's turn ended: cancelling then does not cut the new call's take", async () => {
+  vi.useFakeTimers({ now: 1_000_000 });
+  try {
+    const voice = fakeVoice();
+    const takes: Array<{ samples: Float32Array }> = [];
+    let stretch = 0;
+    const start = voice.start;
+    Object.assign(voice, {
+      start: (settings: unknown, options?: unknown) => { stretch++; return start(settings, options); },
+      stop: async () => { voice.calls.push(["stop"]); voice.emit("take", { sampleRate: 16000, samples: new Float32Array(16000), started_at: 1_000_000 + stretch * 1000, ended_at: 1_001_000 + stretch * 1000, turns: [] }); },
+    });
+    const abort = new AbortController();
+    const run = tryEndOfTurn(voice as unknown as Host, SETTINGS as never, { signal: abort.signal, onTake: (take) => takes.push(take) });
+    run.done.catch(() => {});
+    await vi.advanceTimersByTimeAsync(0);
+    voice.emit("turn", { phase: "started", turn_id: "t1" });
+    voice.emit("state", callState("speaking"));
+    voice.emit("state", callState("listening", 1));
+    await run.retune({ ...SETTINGS, patience: "calm" } as never);
+    await vi.advanceTimersByTimeAsync(500);
+    abort.abort();
+    await expect(run.done).rejects.toMatchObject({ code: "trial-cancelled" });
+    expect(takes).toHaveLength(1);
+    expect(takes[0].samples.length).toBe(16000);
+  } finally { vi.useRealTimers(); }
+});
+
+test("a retune while the microphone change awaits its route does not end the try when that lane stops", async () => {
+  const voice = fakeVoice();
+  let reject: (error: Error) => void = () => {};
+  const abort = new AbortController();
+  const run = tryEndOfTurn(voice as unknown as Host, SETTINGS as never, { signal: abort.signal, closeMic: () => new Promise<void>((_, no) => { reject = no; }) });
+  let over: unknown = null;
+  run.done.catch((error) => { over = error; });
+  await vi.waitFor(() => expect(voice.calls.length).toBeGreaterThan(0));
+  await Promise.resolve();
+  voice.emit("turn", { phase: "started", turn_id: "t1" });
+  voice.emit("state", callState("speaking"));
+  voice.emit("state", callState("listening", 1));
+  await new Promise((done) => setTimeout(done, 0));
+  const retuned = run.retune({ ...SETTINGS, patience: "calm" } as never);
+  reject(Object.assign(new Error("stopped"), { code: "stopped" }));
+  await retuned;
+  await new Promise((done) => setTimeout(done, 0));
+  expect(over).toBeNull();
+  abort.abort();
+  await expect(run.done).rejects.toMatchObject({ code: "trial-cancelled" });
+});
+
 /* Closing a take: the microphone is fenced off first, the open turn is closed once, and whatever goes wrong with either
  * is the try's failure — never silence — with the voice stopped all the same. */
 
