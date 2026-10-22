@@ -36,7 +36,7 @@ export const messages: Messages = {
   "sidebar.closeConversation": "关闭对话",
   "sidebar.new": "新对话",
   "sidebar.newTitle": "连接你的智能体，才能和它对话",
-  "sidebar.newBody": "智能体连接后，你就能和它对话。暂时还不能从这里发起对话。请在它的会话中说：",
+  "sidebar.newBody": "智能体连接后，你就能和它对话。暂时还不能从这里发起对话。请在你的智能体会话中说：",
   "sidebar.newPhrase": "连接到 Sidevoice（使用它的 voice_connect 工具）",
   "sidebar.newCopy": "复制要发给智能体的消息",
   "connect.body": "请在你的智能体会话中说：",

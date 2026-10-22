@@ -36,7 +36,7 @@ export const messages: Messages = {
   "sidebar.closeConversation": "Fermer la conversation",
   "sidebar.new": "Nouvelle conversation",
   "sidebar.newTitle": "Connectez votre agent pour lui parler",
-  "sidebar.newBody": "Votre agent se connecte, puis vous pouvez lui parler. Impossible pour l’instant de démarrer une conversation d’ici. Dans sa session, dites :",
+  "sidebar.newBody": "Votre agent se connecte, puis vous pouvez lui parler. Impossible pour l’instant de démarrer une conversation d’ici. Dans la session de votre agent, dites :",
   "sidebar.newPhrase": "Connecte-toi à Sidevoice (utilise son outil voice_connect)",
   "sidebar.newCopy": "Copier le message pour votre agent",
   "connect.body": "Dans la session de votre agent, dites :",
