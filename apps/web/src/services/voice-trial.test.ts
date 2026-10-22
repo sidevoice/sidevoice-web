@@ -638,6 +638,31 @@ test("the end of turn tried: the take since the voice last started to listen, on
   expect(listeners(voice)).toBe(0);
 });
 
+test("the end of turn take stops where the voice decided the turn ended, not where it stopped recording while it transcribed", async () => {
+  vi.useFakeTimers({ now: 1_000_000 });
+  try {
+    const voice = takingVoice();
+    Object.assign(voice, { stop: async () => { voice.calls.push(["stop"]); voice.emit("take", { sampleRate: 16000, samples: new Float32Array(48000), started_at: 1_000_000, ended_at: 1_003_000, turns: [] }); } });
+    const takes: Array<{ samples: Float32Array; ended_at: number }> = [];
+    const abort = new AbortController();
+    const run = tryEndOfTurn(voice as unknown as Host, SETTINGS as never, { signal: abort.signal, onTake: (take) => takes.push(take) });
+    run.done.catch(() => {});
+    await vi.advanceTimersByTimeAsync(0);
+    voice.emit("turn", { phase: "started", turn_id: "t1" });
+    voice.emit("state", callState("speaking"));
+    await vi.advanceTimersByTimeAsync(1500);
+    voice.emit("state", callState("listening", 1));
+    // One more second goes by in transcription, recorded all the same.
+    await vi.advanceTimersByTimeAsync(1000);
+    voice.emit("turn", { phase: "finished", turn_id: "t1", text: "hola" });
+    abort.abort();
+    await expect(run.done).rejects.toMatchObject({ code: "trial-cancelled" });
+    expect(takes).toHaveLength(1);
+    expect(takes[0].samples.length).toBe(24000);
+    expect(takes[0].ended_at).toBe(1_001_500);
+  } finally { vi.useRealTimers(); }
+});
+
 /* Closing a take: the microphone is fenced off first, the open turn is closed once, and whatever goes wrong with either
  * is the try's failure — never silence — with the voice stopped all the same. */
 

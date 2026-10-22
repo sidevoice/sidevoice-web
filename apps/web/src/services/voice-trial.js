@@ -293,7 +293,10 @@ export function tryEndOfTurn(host, settings, { signal, quietMs = 30000, onLevel,
   const tell = (step) => onTurnStep?.(step);
   // While the voice stops for other settings: the take it hands then is theirs.
   let retuning = false;
-  const take = takeOf(onTake, () => retuning);
+  // Unix ms when the voice decided the latest turn ended, while nothing has been said since: the take stops there, so
+  // what the voice recorded while it transcribed (the turn is over; the microphone is not the person's) is not in it.
+  let decidedAt = null;
+  const take = takeOf(onTake && ((taken) => onTake(decidedAt == null ? taken : takeUpTo(taken, decidedAt))), () => retuning);
   /** @type {(reason: unknown) => void} */
   let end = () => {};
   const over = new Promise((_, reject) => { end = reject; });
@@ -325,7 +328,7 @@ export function tryEndOfTurn(host, settings, { signal, quietMs = 30000, onLevel,
         if (listening === 'speaking') hush();
         else if (was === 'speaking') wait();
         if (!turn || turn.decided) return;
-        if (rose) { turn.decided = true; told('ended'); }
+        if (rose) { turn.decided = true; decidedAt = Date.now(); told('ended'); }
         else if (listening === 'speaking') told('speaking');
         else if (was === 'speaking') told('pause');
       }),
@@ -333,6 +336,7 @@ export function tryEndOfTurn(host, settings, { signal, quietMs = 30000, onLevel,
         if (!live) return;
         if (event.phase === 'started') {
           turn = { id: event.turn_id, decided: false, step: null };
+          decidedAt = null;
           hush();
           told('speaking');
           return;
