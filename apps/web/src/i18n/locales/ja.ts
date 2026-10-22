@@ -1164,7 +1164,7 @@ export const messages: Messages = {
   "voice.endOfTurn.infoLabel": "ターン終了の検出について",
   "voice.endOfTurn.info": "スマート：モデルが話し終えたかを判断します。無音：発話のない間が続くとターンを終了します。",
   "voice.patience.infoLabel": "待ち時間について",
-  "voice.patience.info": "ターンが終わるまでに許容する間の長さです。「無音」の場合：2.0 秒（短め）、2.5 秒（標準）、3.5 秒（長め）。",
+  "voice.patience.info": "ターンが終わるまでに許容する間の長さです。「無音」の場合：2.0 秒（短め）、2.5 秒（標準）、3.5 秒（長め）。「スマート」では待ち時間も長くなり、十分に長い間があればモデルに関係なくターンを終了します。",
   "hosts.devices.close": "閉じる",
   "hosts.devices.done": "完了",
   "hosts.devices.pairIntro": "ここで 1 回限りのコードを作成し、ペアリングするデバイスで入力してください。",

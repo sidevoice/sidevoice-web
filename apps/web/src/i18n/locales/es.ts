@@ -1181,7 +1181,7 @@ export const messages: Messages = {
   "voice.endOfTurn.infoLabel": "Sobre el fin de turno",
   "voice.endOfTurn.info": "Inteligente: un modelo decide si has terminado. Silencio: el turno acaba tras una pausa sin voz.",
   "voice.patience.infoLabel": "Sobre la paciencia",
-  "voice.patience.info": "Cuánto puede durar una pausa antes de que termine tu turno. Con Silencio: 2,0 s (Rápida), 2,5 s (Normal), 3,5 s (Tranquila).",
+  "voice.patience.info": "Cuánto puede durar una pausa antes de que termine tu turno. Con Silencio: 2,0 s (Rápida), 2,5 s (Normal), 3,5 s (Tranquila). Con Inteligente, también alarga la espera, y una pausa suficientemente larga termina el turno igualmente.",
   "hosts.devices.close": "Cerrar",
   "hosts.devices.done": "Hecho",
   "hosts.devices.pairIntro": "Crea aquí un código de un solo uso y escríbelo en el dispositivo que emparejas.",
