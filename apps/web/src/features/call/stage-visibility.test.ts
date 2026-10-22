@@ -104,6 +104,18 @@ describe("the stage the room shows, told to the desktop app (sidevoice-desktop#1
     expect(heard.map(([visible]) => visible)).toEqual([true]);
   });
 
+  it("never says hidden while the choose-a-conversation screen is up, and hidden again once it goes", () => {
+    const tile = stageTile();
+    const remove = addStage(tile, true);
+    const { heard, look } = watch();
+    look(tile, true);
+    expect(heard).toEqual([[true, undefined]]);
+    look(tile, false);
+    expect(heard.every(([visible]) => visible)).toBe(true);
+    remove();
+    expect(heard.at(-1)).toEqual([false, undefined]);
+  });
+
   it("cuts the stage to the viewport", () => {
     const tile = stageTile({ left: -20, top: 100, right: 400, bottom: window.innerHeight + 50 });
     stops.push(addStage(tile));
