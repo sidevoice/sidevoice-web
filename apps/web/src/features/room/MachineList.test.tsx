@@ -778,3 +778,13 @@ test("where the product does not say its version, the card shows the app's, as i
   room([local], { localHostStatus: running });
   expect(versionLine()).toHaveTextContent("Sidevoice 0.5.0-nightly");
 });
+
+test("This device's title follows a rename made while the page is mounted", async () => {
+  actions();
+  onTestFinished(() => localStorage.removeItem("sidevoice.deviceName"));
+  const store = room([local]);
+  expect(thisDevice().querySelector(".this-device-title")).not.toHaveTextContent("Ana’s laptop");
+  localStorage.setItem("sidevoice.deviceName", "Ana’s laptop");
+  act(() => { store.patch({ deviceName: "Ana’s laptop" }); });
+  expect(thisDevice().querySelector(".this-device-title")).toHaveTextContent("Ana’s laptop");
+});

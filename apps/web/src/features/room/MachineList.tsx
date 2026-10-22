@@ -222,7 +222,9 @@ export function ThisComputerSettings() {
   const preparing = install.phase !== "idle" && install.source === "no-machine"
     && (install.phase === "installing" || !local?.pairingId);
   const store = useContext(RoomStoreContext);
-  // Titled with this device's name; renaming it is General's (its one place), where the pencil takes you.
+  // Titled with this device's name; renaming it is General's (its one place), where the pencil takes you. Follows the
+  // name as it is set, so a rename made while this page is mounted (the setup's) shows at once.
+  useRoomStore((state) => state.facts.deviceName);
   const name = currentDeviceName((_, params) => t("pair.deviceNameBrowser", params));
   const rename = () => store?.patch({ settingsSection: "general", settingsFocus: "device-name" });
   return (
