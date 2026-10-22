@@ -663,6 +663,31 @@ test("the end of turn take stops where the voice decided the turn ended, not whe
   } finally { vi.useRealTimers(); }
 });
 
+test("the end of turn closes the microphone when the voice decides the turn ended, and opens it again only if the turn comes to no words", async () => {
+  const voice = fakeVoice();
+  const mic: string[] = [];
+  const abort = new AbortController();
+  const run = tryEndOfTurn(voice as unknown as Host, SETTINGS as never, { signal: abort.signal, closeMic: async () => { mic.push("close"); }, openMic: async () => { mic.push("open"); } });
+  run.done.catch(() => {});
+  await vi.waitFor(() => expect(voice.calls.length).toBeGreaterThan(0));
+  await Promise.resolve();
+  voice.emit("turn", { phase: "started", turn_id: "t1" });
+  voice.emit("state", callState("speaking"));
+  expect(mic).toEqual([]);
+  voice.emit("state", callState("listening", 1));
+  expect(mic).toEqual(["close"]);
+  // A cough: no words, so it listens again.
+  voice.emit("turn", { phase: "finished", turn_id: "t1", text: "" });
+  expect(mic).toEqual(["close", "open"]);
+  voice.emit("turn", { phase: "started", turn_id: "t2" });
+  voice.emit("state", callState("speaking"));
+  voice.emit("state", callState("listening", 1));
+  voice.emit("turn", { phase: "finished", turn_id: "t2", text: "hola" });
+  expect(mic).toEqual(["close", "open", "close"]);
+  abort.abort();
+  await expect(run.done).rejects.toMatchObject({ code: "trial-cancelled" });
+});
+
 /* Closing a take: the microphone is fenced off first, the open turn is closed once, and whatever goes wrong with either
  * is the try's failure — never silence — with the voice stopped all the same. */
 

@@ -277,7 +277,8 @@ export async function tryVoice(host, settings, text, { language = null, signal, 
  * one tells late. A pause is the voice's state going from speaking back to listening within a turn; the end, its count
  * of turns in transcription rising (or the turn finishing, where that never shows). It listens until `signal` aborts
  * (`trial-cancelled`), `quietMs` pass with no speech (`trial-silence`) or the voice fails (its error); then the voice
- * stops, whatever happens. `onLevel`: the microphone's level from 0 to 1, as the voice measures it. `onTake`, once the
+ * stops, whatever happens. `closeMic` is called when the voice decides a turn ended, so the microphone is closed from
+ * then on; `openMic`, when that turn came to no words, so the try goes on listening. `onLevel`: the microphone's level from 0 to 1, as the voice measures it. `onTake`, once the
  * voice has stopped: what the microphone gave it since it last started to listen; what it heard before other settings is theirs, and goes with them.
  *
  * `retune` puts other settings in place while it runs: the turn in progress is dropped, its call stops, and another
@@ -285,11 +286,11 @@ export async function tryVoice(host, settings, text, { language = null, signal, 
  * with the latest; the same input half changes nothing.
  * @param {TrialHost} host
  * @param {import('./voice-settings.js').DeviceVoiceSettings} settings
- * @param {{signal?: AbortSignal, quietMs?: number, onLevel?: (level: number) => void, onTurnStep?: (step: TurnStep) => void, onTake?: (take: import('@sidevoice/voice').VoiceTake) => void}} [options]
+ * @param {{signal?: AbortSignal, quietMs?: number, closeMic?: () => Promise<void>, openMic?: () => Promise<void>, onLevel?: (level: number) => void, onTurnStep?: (step: TurnStep) => void, onTake?: (take: import('@sidevoice/voice').VoiceTake) => void}} [options]
  * @returns {{done: Promise<void>, retune: (settings: import('./voice-settings.js').DeviceVoiceSettings) => Promise<void>}} `done`
  *   settles once the try is over and the voice stopped, rejecting with why it ended.
  */
-export function tryEndOfTurn(host, settings, { signal, quietMs = 30000, onLevel, onTurnStep, onTake } = {}) {
+export function tryEndOfTurn(host, settings, { signal, quietMs = 30000, closeMic, openMic, onLevel, onTurnStep, onTake } = {}) {
   const tell = (step) => onTurnStep?.(step);
   // While the voice stops for other settings: the take it hands then is theirs.
   let retuning = false;
@@ -312,6 +313,9 @@ export function tryEndOfTurn(host, settings, { signal, quietMs = 30000, onLevel,
   const hush = () => { clearTimeout(quiet); quiet = null; };
   // The quiet starts over each time speech stops.
   const wait = () => { hush(); quiet = setTimeout(() => end(trialError('trial-silence')), quietMs); };
+  // The turn ended: the microphone closes, so nothing after it is recorded. If its words come to nothing, it opens again.
+  const shut = () => { Promise.resolve(closeMic?.()).catch((error) => end(error)); };
+  const reopen = () => { if (live) Promise.resolve(openMic?.()).catch((error) => end(error)); };
   const told = (step) => { if (turn && turn.step !== step) { turn.step = step; tell({ step }); } };
 
   // The call now open, and what listens to it (its events, and its take apart: the voice hands the take as it stops).
@@ -328,7 +332,7 @@ export function tryEndOfTurn(host, settings, { signal, quietMs = 30000, onLevel,
         if (listening === 'speaking') hush();
         else if (was === 'speaking') wait();
         if (!turn || turn.decided) return;
-        if (rose) { turn.decided = true; decidedAt = Date.now(); told('ended'); }
+        if (rose) { turn.decided = true; decidedAt = Date.now(); told('ended'); shut(); }
         else if (listening === 'speaking') told('speaking');
         else if (was === 'speaking') told('pause');
       }),
@@ -345,6 +349,7 @@ export function tryEndOfTurn(host, settings, { signal, quietMs = 30000, onLevel,
         turn = null;
         wait();
         const text = event.phase === 'finished' ? String(event.text ?? '').trim() : '';
+        if (!text) { decidedAt = null; reopen(); }
         if (text) tell({ step: 'heard', text, endpoint_silence_ms: event.timings?.endpoint_silence_ms ?? null });
         // Joined into the next turn, which tells it.
         else if (!(event.phase === 'cancelled' && event.merged)) tell({ step: 'not-a-turn' });
