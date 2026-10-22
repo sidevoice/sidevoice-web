@@ -315,8 +315,10 @@ export function tryEndOfTurn(host, settings, { signal, quietMs = 30000, closeMic
   const wait = () => { hush(); quiet = setTimeout(() => end(trialError('trial-silence')), quietMs); };
   // The turn ended: the microphone closes, so nothing after it is recorded. If its words come to nothing, it opens again.
   // Closing and opening run in order, and a turn that starts while it is closed opens it: new speech is never muted.
+  // Which call's lane the microphone changes belong to: one that stopped for a retune fails with its lane, not the try.
+  let laneOf = 0;
   let micShut = false, micQueue = Promise.resolve();
-  const mic = (shutting, change) => { micShut = shutting; micQueue = micQueue.then(() => change?.()).catch((error) => end(error)); };
+  const mic = (shutting, change) => { micShut = shutting; const lane = laneOf; micQueue = micQueue.then(() => change?.()).catch((error) => { if (lane === laneOf) end(error); }); };
   const shut = () => mic(true, closeMic);
   const reopen = () => { if (live && micShut) mic(false, openMic); };
   const told = (step) => { if (turn && turn.step !== step) { turn.step = step; tell({ step }); } };
@@ -325,6 +327,7 @@ export function tryEndOfTurn(host, settings, { signal, quietMs = 30000, closeMic
   let call = null, listeners = [], stopTake = () => {};
   const attach = (opened) => {
     call = opened;
+    laneOf++;
     stopTake = take.listen(opened);
     listeners = [
       opened.onState((state) => {
@@ -367,6 +370,7 @@ export function tryEndOfTurn(host, settings, { signal, quietMs = 30000, closeMic
   async function closeCall(quietly = false) {
     const closing = call, heard = listeners, handedTo = stopTake;
     call = null;
+    laneOf++;
     listeners = [];
     stopTake = () => {};
     if (!closing) return;

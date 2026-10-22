@@ -733,6 +733,28 @@ test("a retune forgets where the earlier call's turn ended: cancelling then does
   } finally { vi.useRealTimers(); }
 });
 
+test("a retune while the microphone change awaits its route does not end the try when that lane stops", async () => {
+  const voice = fakeVoice();
+  let reject: (error: Error) => void = () => {};
+  const abort = new AbortController();
+  const run = tryEndOfTurn(voice as unknown as Host, SETTINGS as never, { signal: abort.signal, closeMic: () => new Promise<void>((_, no) => { reject = no; }) });
+  let over: unknown = null;
+  run.done.catch((error) => { over = error; });
+  await vi.waitFor(() => expect(voice.calls.length).toBeGreaterThan(0));
+  await Promise.resolve();
+  voice.emit("turn", { phase: "started", turn_id: "t1" });
+  voice.emit("state", callState("speaking"));
+  voice.emit("state", callState("listening", 1));
+  await new Promise((done) => setTimeout(done, 0));
+  const retuned = run.retune({ ...SETTINGS, patience: "calm" } as never);
+  reject(Object.assign(new Error("stopped"), { code: "stopped" }));
+  await retuned;
+  await new Promise((done) => setTimeout(done, 0));
+  expect(over).toBeNull();
+  abort.abort();
+  await expect(run.done).rejects.toMatchObject({ code: "trial-cancelled" });
+});
+
 /* Closing a take: the microphone is fenced off first, the open turn is closed once, and whatever goes wrong with either
  * is the try's failure — never silence — with the voice stopped all the same. */
 
