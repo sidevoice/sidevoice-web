@@ -2,7 +2,7 @@ import { Fragment, useId, useState, type ReactNode } from "react";
 import { Popover } from "../../components/ui/Popover";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { ChevronIcon, WarningIcon } from "../../components/ui/Icons";
-import { translator } from "../../i18n/translator";
+import { pluralKey, translator } from "../../i18n/translator";
 import { useUiLanguage } from "../../i18n/use-ui-language";
 import { useVariant } from "../../lib/variants";
 import { cn } from "../../lib/cn";
@@ -42,7 +42,7 @@ function Line({ ordered, bold, note, more }: Languages & { more: ReactNode }) {
  *  they are. An element, so a popover or a tooltip can take it as its trigger. */
 function moreButton(n: number) {
   const t = translator();
-  return <button type="button" className="model-languages-more" aria-label={t("voice.languages.moreLabel", { n })}>{t("voice.languages.more", { n })}</button>;
+  return <button type="button" className="model-languages-more" aria-label={t(pluralKey("voice.languages.moreLabel", n), { n })}>{t(pluralKey("voice.languages.more", n), { n })}</button>;
 }
 
 function PopoverLanguages(props: Languages) {
@@ -65,8 +65,8 @@ function InlineLanguages(props: Languages) {
     <span id={rest} hidden={!open}>, <Names tags={props.ordered.slice(SHOWN)} bold={props.bold} /></span>{" "}
     {/* Open, what it shows is its name. */}
     <button type="button" className="model-languages-more" aria-expanded={open} aria-controls={rest} onClick={() => setOpen(!open)}
-      aria-label={open ? undefined : t("voice.languages.moreLabel", { n })}>
-      {open ? t("voice.languages.fewer") : t("voice.languages.more", { n })}<ChevronIcon size={12} className={open ? "model-languages-chevron-open" : undefined} />
+      aria-label={open ? undefined : t(pluralKey("voice.languages.moreLabel", n), { n })}>
+      {open ? t("voice.languages.fewer") : t(pluralKey("voice.languages.more", n), { n })}<ChevronIcon size={12} className={open ? "model-languages-chevron-open" : undefined} />
     </button>
   </>} />;
 }

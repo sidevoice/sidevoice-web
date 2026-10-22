@@ -62,6 +62,14 @@ export function translator(language = uiLanguage()): Translate {
     params?.[name] === undefined ? "" : String(params[name]));
 }
 
+/** The key of the form of a text that depends on a count: `<base>.one`, `<base>.few` or `<base>.other`, by the language's
+ *  plural rules for whole numbers (CLDR, as Intl gives them: Polish's 2–4 are few, its 5–21 and the like other). A text
+ *  with forms has all three in every catalogue, the same where a language does not tell them apart. */
+export function pluralKey<Base extends string>(base: Base, count: number, language = uiLanguage()) {
+  const category = new Intl.PluralRules(language).select(count);
+  return `${base}.${category === "one" || category === "few" ? category : "other"}` as `${Base}.one` | `${Base}.few` | `${Base}.other`;
+}
+
 /** Whether this language's own catalogue contains the key, without using the English UI fallback. */
 export function hasTranslation(language: string, key: string): key is MessageKey {
   return Object.hasOwn(locales[language]?.messages ?? en, key);

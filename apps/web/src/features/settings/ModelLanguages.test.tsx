@@ -71,8 +71,8 @@ test("a language in use the model does not list is said under the line, in a reg
     cleanup();
     return text;
   };
-  expect(notice(["es"], null)).toBe("English isn't one of this model's languages.");
-  expect(notice(["es"], "fr")).toBe("French isn't one of this model's languages.");
+  expect(notice(["es"], null)).toBe("This model doesn't support English.");
+  expect(notice(["es"], "fr")).toBe("This model doesn't support French.");
   expect(notice(["es", "en-US"], null)).toBe("");
   // A model that lists no languages says nothing about them.
   expect(notice([], "fr")).toBe("");

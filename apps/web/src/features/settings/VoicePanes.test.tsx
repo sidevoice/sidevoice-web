@@ -757,7 +757,7 @@ test("the languages line and its notice are the transcription and voice blocks',
   // The interface speaks English, which neither model lists: both say so, the end of turn's block nothing.
   for (const task of ["stt", "tts"]) {
     expect(card(task + "-model-card").querySelector(".model-prepare-meta")).toHaveTextContent(/^Spanish$/);
-    expect(card(task + "-model-card").querySelector(".model-prepare-notice")).toHaveTextContent(/^English isn't one of this model's languages\.$/);
+    expect(card(task + "-model-card").querySelector(".model-prepare-notice")).toHaveTextContent(/^This model doesn't support English\.$/);
   }
   cleanup();
   renderPane({ voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-base", language: "es" } } });
