@@ -19,6 +19,7 @@ import { Group, Row } from "../../components/ui/Card";
 import { Select } from "../../components/ui/Select";
 import { LanguagePicker } from "../../components/ui/LanguagePicker";
 import { useModelState, useVoiceTry, type ModelState, type SetupTry, catalogueShown } from "../settings/ModelSetup";
+import { useUiLanguage } from "../../i18n/use-ui-language";
 import { languageName, translator, UI_LANGUAGES, type MessageKey, type Translate } from "../../i18n/translator";
 import { hostStatusText, localHostRecovery, runLocalHostAction, type LocalHostAction } from "../settings/local-host-status";
 import { useOnboarding } from "./onboarding-context";
@@ -248,7 +249,7 @@ export function Wizard() {
   const model = useModelState(stageTask ?? "stt", draft);
   const speechLanguage = useRoomStore((state) => state.facts.speechLanguage);
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
-  const preview = voicePreview(draft ?? defaultVoiceSettings(), catalogs, speechLanguage);
+  const preview = voicePreview(draft ?? defaultVoiceSettings(), catalogs, speechLanguage, useUiLanguage());
   const [sample, setSample] = useState(() => preview.sample);
   const editedSample = useRef(false);
   useEffect(() => { if (!editedSample.current) setSample(preview.sample); }, [preview.sample]);

@@ -6,16 +6,17 @@ import { messages as hi } from "../i18n/speech-samples/hi";
 
 const extraSamples: Record<string, string> = { pt: pt["wizard.sampleText"], hi: hi["wizard.sampleText"] };
 
-/** The preview describes the selected speaker, not the interface's language. For an automatic voice, the engine uses
+/** The preview describes the selected speaker; the interface language is the first choice when the voice speaks it,
+ * then the transcription and device languages, then the voice's own. For an automatic voice, the engine uses
  * the model's first voice; use that voice's languages when the catalogue names it. */
-export function voicePreview(settings: DeviceVoiceSettings, catalogs: CatalogView[], deviceSpeechLanguage: string) {
+export function voicePreview(settings: DeviceVoiceSettings, catalogs: CatalogView[], deviceSpeechLanguage: string, interfaceLanguage?: string) {
   const model = catalogs.find((catalog) => catalog.id === settings.tts.catalog)?.models
     .find((candidate) => candidate.id === settings.tts.model);
   const voice = settings.tts.voice
     ? model?.voices.find((candidate) => candidate.id === settings.tts.voice)
     : model?.voices[0];
   const languages = voice?.languages?.length ? voice.languages : model?.languages ?? [];
-  const preferred = [settings.stt.language, deviceSpeechLanguage].filter((tag): tag is string => !!tag);
+  const preferred = [interfaceLanguage, settings.stt.language, deviceSpeechLanguage].filter((tag): tag is string => !!tag);
   const primary = (tag: string) => tag.toLowerCase().split(/[-_]/)[0];
   const matching = (tag: string) => languages.find((supported) => supported.toLowerCase() === tag.toLowerCase())
     ?? languages.find((supported) => primary(supported) === primary(tag));

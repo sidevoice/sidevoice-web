@@ -10,6 +10,7 @@ import { Segmented } from "../../components/ui/Tabs";
 import { voiceChoices, voiceSettingsToLoad, endOfTurnModel, endOfTurnModels, IDLE_UNLOAD_MINUTES, SPEED, type DeviceVoiceSettings as Settings, type Note } from "../../services/voice-settings.js";
 import { SPEECH_LANGUAGES } from "../../services/system-language.js";
 import { voicePreview } from "../../services/voice-preview";
+import { useUiLanguage } from "../../i18n/use-ui-language";
 import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 import { PROVIDER_SAYS, ProviderKeyNeeded, reasonState } from "./ProviderConnect";
 import { NewMark } from "../highlights/highlights";
@@ -150,7 +151,7 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
   const languages = model.model?.languages ?? [];
   const meta = [optionNote ? noteText(t, optionNote) : "", languages.length ? languages.slice(0, 4).map(languageName).join(", ") + (languages.length > 4 ? " " + t("voice.languages.more", { n: languages.length - 4 }) : "") : ""].filter(Boolean).join(" · ");
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
-  const preview = voicePreview(draft, catalogs, speechLanguage);
+  const preview = voicePreview(draft, catalogs, speechLanguage, useUiLanguage());
   // Settings' try says its sentence (the sample, editable once it is shown); the first-run setup's is the setup's,
   // started from its footer too.
   const [sentence, setSentence] = useState(() => preview.sample);

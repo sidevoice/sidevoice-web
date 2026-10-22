@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import type { CatalogView } from "./model-catalogs.js";
 import { defaultVoiceSettings } from "./voice-settings.js";
+import { translator } from "../i18n/translator";
 import { voicePreview } from "./voice-preview";
 
 const settings = defaultVoiceSettings();
@@ -50,4 +51,15 @@ test("speech languages without a full interface bundle still use matching exampl
 
 test("a Korean-only voice never receives an English fallback sample or an unsupported English locale", () => {
   expect(voicePreview(settings, catalogs(["ko"], []), "en")).toEqual({ language: "ko", sample: "" });
+});
+
+test("the interface language's sample is the default when the voice speaks it, else the voice's own language", () => {
+  const multi = catalogs(["en", "es", "fr"], [{ id: "multi", languages: ["en", "es", "fr"] }]);
+  const chosen = { ...settings, stt: { ...settings.stt, language: "en" }, tts: { ...settings.tts, voice: "multi" } };
+  expect(voicePreview(chosen, multi, "en", "fr")).toEqual({
+    language: "fr", sample: translator("fr")("wizard.sampleText"),
+  });
+  expect(voicePreview(chosen, multi, "en", "de").language).toBe("en");
+  const dora = { ...chosen, tts: { ...chosen.tts, voice: "ef_dora" } };
+  expect(voicePreview(dora, catalogs(["es"], [{ id: "ef_dora", languages: ["es"] }]), "en", "fr").language).toBe("es");
 });
