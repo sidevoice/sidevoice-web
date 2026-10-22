@@ -314,8 +314,11 @@ export function tryEndOfTurn(host, settings, { signal, quietMs = 30000, closeMic
   // The quiet starts over each time speech stops.
   const wait = () => { hush(); quiet = setTimeout(() => end(trialError('trial-silence')), quietMs); };
   // The turn ended: the microphone closes, so nothing after it is recorded. If its words come to nothing, it opens again.
-  const shut = () => { Promise.resolve(closeMic?.()).catch((error) => end(error)); };
-  const reopen = () => { if (live) Promise.resolve(openMic?.()).catch((error) => end(error)); };
+  // Closing and opening run in order, and a turn that starts while it is closed opens it: new speech is never muted.
+  let micShut = false, micQueue = Promise.resolve();
+  const mic = (shutting, change) => { micShut = shutting; micQueue = micQueue.then(() => change?.()).catch((error) => end(error)); };
+  const shut = () => mic(true, closeMic);
+  const reopen = () => { if (live && micShut) mic(false, openMic); };
   const told = (step) => { if (turn && turn.step !== step) { turn.step = step; tell({ step }); } };
 
   // The call now open, and what listens to it (its events, and its take apart: the voice hands the take as it stops).
@@ -341,6 +344,7 @@ export function tryEndOfTurn(host, settings, { signal, quietMs = 30000, closeMic
         if (event.phase === 'started') {
           turn = { id: event.turn_id, decided: false, step: null };
           decidedAt = null;
+          reopen();
           hush();
           told('speaking');
           return;
@@ -383,6 +387,8 @@ export function tryEndOfTurn(host, settings, { signal, quietMs = 30000, closeMic
   async function open(again) {
     live = false;
     turn = null;
+    decidedAt = null;
+    micShut = false;
     hush();
     starting = true;
     for (;;) {
