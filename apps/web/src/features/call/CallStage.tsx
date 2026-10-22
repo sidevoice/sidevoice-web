@@ -131,13 +131,15 @@ export function CallStage() {
   const voice = useVoiceModels();
   // Captions off (the call bar's toggle): no balloons on the stage; the transcript keeps everything said.
   const captions = useCaptions();
+  // The choose screen is the room's stage with nothing on it: it keeps the desktop card from opening over it.
+  const emptyRef = useStageRef<HTMLDivElement>(true, true);
 
   if (!stage.threadId) {
     return (
       <section className="call-stage" aria-label={t("stage.label")}>
         <BootError />
         <UpdateNotice />
-        <div className="stage-tile stage-empty">
+        <div ref={emptyRef} className="stage-tile stage-empty">
           <p>{t("stage.empty")}</p>
           <Button className="stage-choose" onClick={showConversations}>{t("stage.chooseConversation")}</Button>
           {narrow && <TranscriptEntry />}

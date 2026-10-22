@@ -62,7 +62,7 @@ describe("the stage the room shows, told to the desktop app (sidevoice-desktop#1
     expect(heard).toHaveLength(1);
   });
 
-  it("says hidden with no stage in the page, and while it is off screen", () => {
+  it("says hidden with no stage in the page, and while it is off screen", async () => {
     const { heard, look } = watch();
     expect(heard).toEqual([[false, undefined]]);
     const tile = stageTile();
@@ -72,6 +72,7 @@ describe("the stage the room shows, told to the desktop app (sidevoice-desktop#1
     look(tile, true);
     expect(heard.at(-1)?.[0]).toBe(true);
     remove();
+    await flush();
     expect(heard.at(-1)).toEqual([false, undefined]);
   });
 
@@ -102,6 +103,32 @@ describe("the stage the room shows, told to the desktop app (sidevoice-desktop#1
     small.setAttribute("open", "");
     await flush();
     expect(heard.map(([visible]) => visible)).toEqual([true]);
+  });
+
+  it("never says hidden while the choose-a-conversation screen is up, and hidden again once it goes", async () => {
+    const tile = stageTile();
+    const remove = addStage(tile, true);
+    const { heard, look } = watch();
+    look(tile, true);
+    expect(heard).toEqual([[true, undefined]]);
+    look(tile, false);
+    expect(heard.every(([visible]) => visible)).toBe(true);
+    remove();
+    await flush();
+    expect(heard.at(-1)).toEqual([false, undefined]);
+  });
+
+  it("hands the stage from the choose screen to the chosen conversation's tile without saying hidden", async () => {
+    const choose = stageTile();
+    const removeChoose = addStage(choose, true);
+    const { heard, look } = watch();
+    look(choose, true);
+    const tile = stageTile();
+    removeChoose();
+    stops.push(addStage(tile));
+    await flush();
+    look(tile, true);
+    expect(heard.map(([visible]) => visible)).toEqual([true, true]);
   });
 
   it("cuts the stage to the viewport", () => {

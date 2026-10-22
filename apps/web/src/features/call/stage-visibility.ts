@@ -15,6 +15,8 @@ const FULL_PAGE = '.ui-dialog[data-layout="page"][open]';
 
 /** The room's stage tiles in the page now (the floating card's own picture is not one). */
 const stages = new Set<Element>();
+/** The stages that show no conversation (the "choose a conversation" tile): there is nothing in them for the card to take over. */
+const placeholders = new Set<Element>();
 const changes = new Set<() => void>();
 
 function changed() {
@@ -22,23 +24,27 @@ function changed() {
 }
 
 /** The stage's tile is in the page until the returned function is called. */
-export function addStage(element: Element): () => void {
+export function addStage(element: Element, placeholder = false): () => void {
   stages.add(element);
+  if (placeholder) placeholders.add(element);
   changed();
   return () => {
     stages.delete(element);
-    changed();
+    placeholders.delete(element);
+    // Said a moment later: a stage handed over (the choose screen to the chosen conversation's tile) is added in the
+    // same commit, and the page is not "no stage" in between.
+    queueMicrotask(changed);
   };
 }
 
 /** A ref for the room's stage tile: it counts as the stage while it is in the page. `on` false (the floating card's
  *  own picture of it) leaves it out. */
-export function useStageRef<T extends Element>(on: boolean) {
+export function useStageRef<T extends Element>(on: boolean, placeholder = false) {
   const remove = useRef<(() => void) | null>(null);
   return useCallback((element: T | null) => {
     remove.current?.();
-    remove.current = on && element ? addStage(element) : null;
-  }, [on]);
+    remove.current = on && element ? addStage(element, placeholder) : null;
+  }, [on, placeholder]);
 }
 
 export interface StageEnvironment {
@@ -57,7 +63,14 @@ export function reportStage(report: StageReport, env: StageEnvironment = { docum
   const send = () => {
     // A stage not looked at yet: wait for its first look.
     for (const element of stages) if (!seen.has(element)) return;
-    const shown = [...stages].find((element) => seen.get(element));
+    const shown = [...stages].find((element) => seen.get(element) && !placeholders.has(element));
+    // No conversation to show (the choose screen is up): the card has nothing to take over, so the stage is never hidden.
+    if (!shown && placeholders.size > 0) {
+      if (last === "empty") return;
+      last = "empty";
+      report(true);
+      return;
+    }
     const visible = !!shown && !doc.querySelector(FULL_PAGE);
     const rect = visible && shown ? viewportRect(shown, win) : undefined;
     const key = JSON.stringify([visible, rect]);
