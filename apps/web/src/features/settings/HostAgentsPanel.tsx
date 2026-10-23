@@ -8,7 +8,7 @@ import { ErrorDetails } from "../../components/ui/ErrorText";
 import { Tooltip } from "../../components/ui/Tooltip";
 import type { AgentManualStep, DetectedAgent, HostAgentsListing, HostAgentsState } from "../../state/room-types";
 import { useRoomStore } from "../../state/room-store";
-import { actionableAgent } from "../../services/host-agents";
+import { actionableAgent, scanFailed } from "../../services/host-agents";
 import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 import { errorMessage, keyFor, type ErrorMessage } from "./error-message";
 import { NewMark } from "../highlights/highlights";
@@ -21,7 +21,8 @@ import { AgentReadiness, AgentReadinessDetails } from "./AgentReadiness";
  *  line, the key behind Details. */
 function translatedError(t: Translate, key: string, params?: Record<string, string | number>): ErrorMessage {
   return errorMessage({ key }, { t, generic: t("agents.error.unknown"), known: (code) => {
-    const known = keyFor("agents.error.", code);
+    // The connector's own keys come as "agents.scan-failed": said under this panel's "agents.error." prefix.
+    const known = keyFor("agents.error.", code.replace(/^agents\./, ""));
     return known ? t(known, params) : null;
   } });
 }
@@ -300,6 +301,7 @@ export function HostAgentsPanel({ fp }: { fp: string | null }) {
           </Button>
         </Tooltip>
       </div>
+      {scanFailed(value) && <p className="muted host-agents-stale" role="status">{t("agents.staleScan")}</p>}
       {rows.length === 0 ? <p className="muted">{t("agents.none")}</p> : <ul className="host-agent-rows">
         {rows.map((agent) => <HostAgentRow key={agent.id} fp={fp} agent={agent} />)}
       </ul>}

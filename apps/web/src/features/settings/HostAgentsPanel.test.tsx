@@ -531,3 +531,28 @@ test("readiness works for any agent, while an absent field leaves the Codex card
   expect(within(codex).getByRole("group", { name: "Needs attention" })).toHaveTextContent("Sidevoice cannot show the reason for this status.");
   expect(within(codex).getByRole("group", { name: "Needs attention" })).not.toHaveTextContent("other.future");
 });
+
+test("the agents panel says, quietly, when the list is the last scan kept after a failed one", () => {
+  for (const [scan_failed, shown] of [[true, true], [false, false], [undefined, false]] as const) {
+    const store = createRoomStore();
+    setActions({ loadHostAgents: vi.fn(async () => {}) });
+    const state = ready();
+    act(() => store.patch({ hostAgents: { fp: { ...state, value: { ...state.value!, ...(scan_failed === undefined ? {} : { scan_failed }) } } } }));
+    const view = render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
+    if (shown) expect(screen.getByText("Could not refresh the agents; showing the last scan.")).toBeInTheDocument();
+    else expect(screen.queryByText(/Could not refresh the agents/)).toBeNull();
+    view.unmount();
+  }
+});
+
+test("the connector's scan-failed keys are worded on the row, with the agent's name", async () => {
+  for (const [key, copy] of [["agents.scan-failed", "Could not look for Codex on this computer just now; nothing was changed. Try again."],
+    ["agents.scan-failed-after", "Codex was changed, but Sidevoice could not check the result just now. Refresh to see its state."]] as const) {
+    const store = createRoomStore();
+    setActions({ loadHostAgents: vi.fn(async () => {}) });
+    act(() => store.patch({ hostAgents: { fp: { ...ready(), actionErrors: { codex: { key, params: { id: "codex", agent: "Codex" } } } } } }));
+    const view = render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
+    expect(screen.getByText(copy)).toBeInTheDocument();
+    view.unmount();
+  }
+});

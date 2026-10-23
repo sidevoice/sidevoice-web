@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { actionableAgent, createHostAgentsController } from "./host-agents";
+import { actionableAgent, createHostAgentsController, isHostAgentsListing, scanFailed } from "./host-agents";
 import type { HostAgentsListing, HostAgentsState } from "../state/room-types";
 
 const agent = (id: string, changes: Partial<HostAgentsListing["agents"][number]> = {}) => ({
@@ -95,4 +95,14 @@ test("the connector actionable flag drives notices, with a conservative legacy f
   expect(actionableAgent(agent("codex", { actionable: undefined, connect: "manual" }))).toBe(true);
   expect(actionableAgent(agent("codex", { actionable: undefined, registration: "foreign" }))).toBe(false);
   expect(actionableAgent(agent("codex", { actionable: undefined, present: false }))).toBe(false);
+});
+
+test("scan_failed is read from the listing: true, false, and absent (older connectors) is false", () => {
+  const listing = (extra: Record<string, unknown>) => ({ agents: [], scanned_at: "2026-10-02T10:00:00Z", ...extra });
+  for (const [extra, expected] of [[{ scan_failed: true }, true], [{ scan_failed: false }, false], [{}, false], [{ scan_failed: "yes" }, false]] as const) {
+    const value = listing({ ...extra, some_future_field: 1 });
+    expect(isHostAgentsListing(value)).toBe(true);
+    expect(scanFailed(value as never)).toBe(expected);
+  }
+  expect(scanFailed(null)).toBe(false);
 });

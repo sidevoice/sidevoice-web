@@ -27,6 +27,9 @@ export function isHostAgentsListing(value: unknown): value is HostAgentsListing 
   return Array.isArray(candidate.agents) && (typeof candidate.scanned_at === "string" || typeof candidate.scanned_at === "number");
 }
 
+/** Whether the listing is the last good scan kept after a newer one failed; an absent field (older connectors) is false. */
+export const scanFailed = (listing: HostAgentsListing | null | undefined): boolean => listing?.scan_failed === true;
+
 function safeParams(value: unknown): Record<string, string | number> | undefined {
   if (!value || typeof value !== "object") return undefined;
   const entries = Object.entries(value as Record<string, unknown>).filter(([, item]) =>
