@@ -1,4 +1,4 @@
-import { nextIdle, type Idle, type IdleStep } from "./engine/bichos/idle";
+import { idleTurn, nextIdle, type Idle, type IdleStep } from "./engine/bichos/idle";
 import { nextWork, workTurn, type Work } from "./engine/bichos/work";
 
 /* What a bicho does with its hands is the client's, not the bicho's: a working style while it works (work.ts), an idle
@@ -50,6 +50,9 @@ export function seededRandom(seed: string): () => number {
   };
 }
 
+/* The sequence repeats, so its end meets its start: a cycle ends on a pastime (never mid-quiet), and its first pastime or
+ * tool is changed, if it is the same as its last, to one that is neither that nor the one after it (the same rule as
+ * between any two steps: never the same twice in a row). */
 interface Cycle { values: string[]; ends: number[]; length: number }
 const cycles = new Map<string, Cycle>();
 
@@ -58,19 +61,33 @@ function cycleOf(kind: RotationKind, seed: string, pool: readonly string[]): Cyc
   let cycle = cycles.get(id);
   if (cycle) return cycle;
   const random = seededRandom(id);
-  const values: string[] = [], ends: number[] = [];
+  const values: string[] = [], spells: number[] = [];
   let step = KINDS[kind].first(pool, random), length = 0;
   for (;;) {
     values.push(step.value);
-    length += Math.max(1, step.ms);
-    ends.push(length);
-    if (length >= CYCLE_MS) break;
+    spells.push(Math.max(1, step.ms));
+    length += spells[spells.length - 1];
+    if (length >= CYCLE_MS && (step.value !== "quiet" || !pool.some((v) => v !== "quiet"))) break;
     step = KINDS[kind].next(step.state, pool, random);
   }
+  const first = kind === "idle" ? 1 : 0, last = values.length - 1;
+  if (last > first + 1 && values[first] === values[last]) {
+    const options = pool.filter((v) => v !== "quiet" && v !== values[last] && v !== values[first + (kind === "idle" ? 2 : 1)]);
+    if (options.length) {
+      const pick = options[Math.floor(random() * options.length)];
+      values[first] = pick;
+      spells[first] = Math.max(1, kind === "idle" ? idleTurn(pick as Idle, random) : Math.round(workTurn(pick as Work, random)));
+    }
+  }
+  const ends = spells.map((_, i) => spells.slice(0, i + 1).reduce((a, b) => a + b, 0));
+  length = ends[ends.length - 1];
   if (cycles.size >= 64) cycles.clear();
   cycles.set(id, (cycle = { values, ends, length }));
   return cycle;
 }
+
+/** How long one cycle of the sequence `seed` names is, in ms. */
+export const cycleLength = (kind: RotationKind, seed: string, pool: readonly string[]) => cycleOf(kind, seed, pool).length;
 
 /** The pick showing `t` ms into the sequence `seed` names (t >= 0), and when it began and ends, in ms from the same start. */
 export function rotationAt(kind: RotationKind, seed: string, pool: readonly string[], t: number): { value: string; start: number; end: number } {

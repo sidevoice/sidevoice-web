@@ -139,7 +139,7 @@ export function createAvatarStates(): AvatarStates {
   /** Works out what it shows at the current time (wall-clock) and when that can next change; whether it changed. Run
    *  again from the current time whenever its timer fires, however late (a hidden window's timers are throttled): it
    *  heals itself. */
-  function settle(id: string, entry: Entry, ended = false): boolean {
+  function settle(id: string, entry: Entry): boolean {
     const { mood, still, unread } = entry.inputs;
     const now = Date.now();
     const origin = entry.inputs.restStart ?? entry.born;
@@ -150,7 +150,8 @@ export function createAvatarStates(): AvatarStates {
     const pick = (kind: Kind, pool: readonly string[], from: number) => {
       const step = rotationAt(kind, `${id}\u0000${origin}`, pool, t - from);
       nextAt = Math.min(nextAt, origin + from + step.end);
-      begun = Math.max(begun, origin + from + step.start);
+      // The first step of a sequence began with the rest itself: the quiet before it and that step are one stretch.
+      begun = Math.max(begun, step.start === 0 ? origin : origin + from + step.start);
       return step.value;
     };
     const working = entry.acts === "working" && !still && entry.pools.work.length > 0 ? pick("work", entry.pools.work, 0) : undefined;
@@ -172,22 +173,23 @@ export function createAvatarStates(): AvatarStates {
       unread: unread || undefined,
     };
     // A fresh entry has no moment yet: its first state is stamped whatever it is. The moment is the one every window
-    // computes alike: when the step it shows began, or else when its rest did (the entrance ending is local).
+    // computes alike, whenever it began to draw: when the step it shows began, or else when its rest did.
     const changed = entry.state.since === undefined || !sameState(next, entry.state);
-    if (changed) entry.state = { ...next, since: begun > -Infinity ? begun : ended ? now : origin };
+    if (changed) entry.state = { ...next, since: begun > -Infinity ? begun : origin };
     followMouth(id, entry);
     return changed;
   }
 
-  function restartEnter(id: string, entry: Entry) {
+  /** The entrance ends ENTER_MS after the rest began (the shared stamp), not after this window heard of it. */
+  function restartEnter(id: string, entry: Entry, left: number) {
     clearTimeout(entry.enterTimer);
     entry.enterTimer = undefined;
     if (!entry.enter) return;
     entry.enterTimer = setTimeout(() => {
       entry.enterTimer = undefined;
       entry.enter = null;
-      if (settle(id, entry, true)) notify();
-    }, ENTER_MS);
+      if (settle(id, entry)) notify();
+    }, left);
   }
 
   /** Its mouth follows its voice while it speaks and a copy shows it; shut otherwise. */
@@ -237,9 +239,11 @@ export function createAvatarStates(): AvatarStates {
     entry.inputs = inputs;
     const acts = ENGINE_MOOD[inputs.mood];
     if (acts !== entry.acts) {
-      entry.enter = enterFrom(entry.acts, acts);
+      // An entrance already over by the time this window hears of it is not made.
+      const left = (inputs.restStart ?? Date.now()) + ENTER_MS - Date.now();
+      entry.enter = left > 0 ? enterFrom(entry.acts, acts) : null;
       entry.acts = acts;
-      restartEnter(id, entry);
+      restartEnter(id, entry, left);
     }
     // Idle steps while idle and drawn moving: offline sleeps instead, and held still it stays quiet until its balloon goes.
     const resting = inputs.mood === "idle" && !inputs.still && !!inputs.pastimes;

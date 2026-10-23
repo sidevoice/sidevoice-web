@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { IDLE_DEFS } from "./engine/bichos/idle";
 import { WORK_DURATION, type Work } from "./engine/bichos/work";
-import { CYCLE_MS, rotationAt, seededRandom } from "./rotation";
+import { CYCLE_MS, cycleLength, rotationAt, seededRandom } from "./rotation";
 
 const WORKS = ["crank", "hammer", "read", "type"] as const;
 const IDLES = ["quiet", "music", "bubbles", "stretch"] as const;
@@ -67,7 +67,7 @@ test("a pool with only quiet stays quiet; the pool decides the picks", () => {
 test("a very long rest repeats the sequence by whole cycles, arithmetically: the hours cost what the minutes do", () => {
   const inside = rotationAt("idle", "long", IDLES, 123_456);
   // Whole cycles later the same step shows; its bounds move by the cycles.
-  const cycle = walk("idle", "long", IDLES, CYCLE_MS).at(-1)!.end;
+  const cycle = cycleLength("idle", "long", IDLES);
   expect(cycle).toBeGreaterThanOrEqual(CYCLE_MS);
   const later = rotationAt("idle", "long", IDLES, 123_456 + 1000 * cycle);
   expect(later.value).toBe(inside.value);
@@ -76,4 +76,16 @@ test("a very long rest repeats the sequence by whole cycles, arithmetically: the
   const started = performance.now();
   rotationAt("idle", "long", IDLES, 40 * 24 * 3_600_000);
   expect(performance.now() - started).toBeLessThan(200);
+});
+
+test("the wrap of a cycle keeps the rule too: the pastime or tool that ends it is not the one that starts the next", () => {
+  for (let seed = 0; seed < 150; seed += 1) {
+    for (const [kind, pool] of [["idle", IDLES], ["work", WORKS]] as const) {
+      const id = `wrap${seed}`;
+      const into = cycleLength(kind, id, pool);
+      const steps = walk(kind, id, pool, into + 40_000).filter((step) => step.end > into - 1);
+      const shown = steps.map((step) => step.value).filter((value) => value !== "quiet");
+      shown.forEach((value, index) => { if (index) expect(value, `${kind} ${id}`).not.toBe(shown[index - 1]); });
+    }
+  }
 });

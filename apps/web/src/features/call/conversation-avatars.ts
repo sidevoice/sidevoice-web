@@ -22,7 +22,7 @@ import { agentMood, moodFacts } from "./stage-view";
 /** What every conversation's agent is given, from the room's store: its mood (agentMood, the same projection for all of
  *  them), held still while the stage's balloon is up over it (`held`), its unread mark, what last happened with it,
  *  and whether a copy of it is drawn moving (`moving`, counted). */
-function agentInputs(state: RoomViewState, held: string | null, moving: ReadonlyMap<string, number>, stamps: Map<string, Stamp>): Map<string, AvatarInputs> {
+function agentInputs(state: RoomViewState, held: string | null, moving: ReadonlyMap<string, number>, stamps: Map<string, Stamp>, previous: ReadonlyMap<string, AvatarInputs>): Map<string, AvatarInputs> {
   const gpu = motion() === "gpu";
   const facts = moodFacts(state);
   const viewed = facts.viewed;
@@ -42,7 +42,11 @@ function agentInputs(state: RoomViewState, held: string | null, moving: Readonly
     const unread = onStage && facts.preview ? !!facts.preview.unread : !!row && hasUnread(row, viewed);
     // The room stamps the moment it noticed a change (while it rests, anything that happens with it; at work, only the
     // mood: the tool in hand goes with the figure on and off the stage); the card takes the room's.
-    const restStart = state.facts.restRelayed ? state.facts.restStart?.[thread] : stamp(stamps, thread, mood === "idle" ? interaction + "\u0000" + mood : mood);
+    const relayed = state.facts.restRelayed ? state.facts.restStart?.[thread] : undefined;
+    // The stamp names the mood it was made for: the card never shows a new mood with the old figure's stamp. Until the
+    // stamp that goes with it arrives (the room publishes it a moment after the facts), it keeps what it showed.
+    if (relayed && relayed.mood !== base && previous.has(thread)) { all.set(thread, previous.get(thread)!); continue; }
+    const restStart = state.facts.restRelayed ? relayed?.at : stamp(stamps, thread, mood === "idle" ? interaction + "\u0000" + mood : mood, base);
     all.set(thread, { spec: avatarFor(thread), mood, still, interaction, restStart, pastimes: gpu && !!moving.get(thread), unread, voice: thread });
   }
   for (const thread of stamps.keys()) if (!all.has(thread)) stamps.delete(thread);
@@ -50,11 +54,11 @@ function agentInputs(state: RoomViewState, held: string | null, moving: Readonly
 }
 
 /** When `key` last changed for a figure, as the room noticed it. */
-interface Stamp { key: string; at: number }
-function stamp(stamps: Map<string, Stamp>, thread: string, key: string): number {
+interface Stamp { key: string; at: number; mood: string }
+function stamp(stamps: Map<string, Stamp>, thread: string, key: string, mood: string): number {
   const known = stamps.get(thread);
   if (known?.key === key) return known.at;
-  const fresh = { key, at: Date.now() };
+  const fresh = { key, at: Date.now(), mood };
   stamps.set(thread, fresh);
   return fresh.at;
 }
@@ -83,15 +87,17 @@ function conversationAvatars(store: RoomStore): ConversationAvatars {
   let copies = 0;
   let unfollow: (() => void) | null = null;
   const stamps = new Map<string, Stamp>();
+  let previous = new Map<string, AvatarInputs>();
   const sync = () => {
-    const all = agentInputs(store.getState(), held, moving, stamps);
+    const all = agentInputs(store.getState(), held, moving, stamps, previous);
+    previous = all;
     states.sync(all);
     // Shipped to the card with the rest of its facts (cardFacts), once per change.
     if (store.getState().facts.restRelayed) return;
     const shown = store.getState().facts.restStart ?? {};
     const keys = Object.keys(shown);
-    if (keys.length !== stamps.size || [...stamps].some(([thread, { at }]) => shown[thread] !== at))
-      store.patch({ restStart: Object.fromEntries([...stamps].map(([thread, { at }]) => [thread, at])) });
+    if (keys.length !== stamps.size || [...stamps].some(([thread, { at, mood }]) => shown[thread]?.at !== at || shown[thread]?.mood !== mood))
+      store.patch({ restStart: Object.fromEntries([...stamps].map(([thread, { at, mood }]) => [thread, { at, mood }])) });
   };
   // Followed as soon as a copy asks, so the first frame already shows the state (and the pick in hand).
   const follow = () => {

@@ -23,7 +23,7 @@ test("the room stamps when its figure's rest began, the card receives it with it
   const room = createRoomStore();
   act(() => room.patch(facts));
   const inRoom = renderHook(() => { useMovingCopy(KEY); return useConversationAvatar(KEY); }, { wrapper: wrap(room) });
-  const stamp = room.getState().facts.restStart[KEY];
+  const stamp = room.getState().facts.restStart[KEY].at;
   expect(stamp).toBe(Date.now());
   expect(room.getState().facts.restRelayed).toBe(false);
 
@@ -33,10 +33,10 @@ test("the room stamps when its figure's rest began, the card receives it with it
   act(() => card.patch({ restRelayed: true }));
   act(() => card.patch(cardFacts(room.getState().facts) as unknown as Partial<SessionFacts>));
   const inCard = renderHook(() => { useMovingCopy(KEY); return useConversationAvatar(KEY); }, { wrapper: wrap(card) });
-  expect(card.getState().facts.restStart[KEY]).toBe(stamp);
+  expect(card.getState().facts.restStart[KEY].at).toBe(stamp);
   // Nothing it noticed on its own changes the stamp: not even a later look.
   act(() => card.patch({ micEnabled: false }));
-  expect(card.getState().facts.restStart[KEY]).toBe(stamp);
+  expect(card.getState().facts.restStart[KEY].at).toBe(stamp);
 
   // Both count the rest from the room's stamp: the same moment for the animations and the same step at any time.
   expect(inCard.result.current.since).toBe(inRoom.result.current.since);
@@ -49,4 +49,19 @@ test("the room stamps when its figure's rest began, the card receives it with it
   }
   // They were not just quiet: a pastime came up in both.
   expect([...seen].some((idle) => idle !== "quiet")).toBe(true);
+});
+
+test("a relay that hears the room before the room has stamped never shows the card a new mood with the old stamp", () => {
+  const room = createRoomStore(), card = createRoomStore();
+  act(() => room.patch(facts));
+  act(() => card.patch({ restRelayed: true }));
+  // The relay subscribes first, as the desktop's host does: it hears every publication, the mood's before the stamp's.
+  room.subscribe((state) => card.patch(cardFacts(state.facts) as unknown as Partial<SessionFacts>));
+  act(() => card.patch(cardFacts(room.getState().facts) as unknown as Partial<SessionFacts>));
+  const inRoom = renderHook(() => { useMovingCopy(KEY); return useConversationAvatar(KEY); }, { wrapper: wrap(room) });
+  const inCard = renderHook(() => { useMovingCopy(KEY); return useConversationAvatar(KEY); }, { wrapper: wrap(card) });
+  act(() => { vi.advanceTimersByTime(5_000); });
+  act(() => room.patch({ userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: KEY }, pendingPhase: "listening" } as Partial<SessionFacts>));
+  expect(inRoom.result.current).toMatchObject({ mood: "listening", enter: "idle" });
+  expect(inCard.result.current).toEqual(inRoom.result.current);
 });

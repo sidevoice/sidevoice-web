@@ -201,3 +201,35 @@ test("`since` is wall-clock, and each window turns it into the same animation ph
   expect(phase(windowA, 70_000)).toBe(phase(windowB, 5_000));
   expect(phase(windowA, 70_000)).toBe(Date.now() - wall);
 });
+
+test("a window that starts drawing later shows the same moment: in the first quiet step after the rest, `since` is the rest's start", () => {
+  const restStart = Date.now();
+  const room = createAvatarStates(), card = createAvatarStates();
+  room.set("a", inputs({ restStart }));
+  vi.advanceTimersByTime(BORED_AFTER_MS + 500);
+  card.set("a", inputs({ restStart }));
+  expect(card.get("a")).toEqual(room.get("a"));
+  expect(card.get("a")!.since).toBe(restStart);
+  room.clear();
+  card.clear();
+});
+
+test("the entrance ends with the shared stamp, not when a window hears of it: a late relay ends it at the same moment, same moment stamped", () => {
+  const restStart = Date.now();
+  const room = createAvatarStates(), card = createAvatarStates();
+  room.set("a", inputs({ mood: "working", restStart: restStart - 5_000 }));
+  vi.advanceTimersByTime(5_000);
+  const changed = Date.now();
+  room.set("a", inputs({ mood: "listening", restStart: changed }));
+  vi.advanceTimersByTime(100);
+  card.set("a", inputs({ mood: "working", restStart: restStart - 5_000 }));
+  card.set("a", inputs({ mood: "listening", restStart: changed }));
+  expect(room.get("a")).toMatchObject({ enter: "working" });
+  expect(card.get("a")).toMatchObject({ enter: "working" });
+  vi.advanceTimersByTime(ENTER_MS - 100);
+  // The room's entrance is over, and so is the card's, with no tool left in hand.
+  expect(card.get("a")).toEqual(room.get("a"));
+  expect(card.get("a")).toMatchObject({ enter: undefined, work: undefined, since: changed });
+  room.clear();
+  card.clear();
+});
