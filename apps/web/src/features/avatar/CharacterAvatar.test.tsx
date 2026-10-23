@@ -144,12 +144,15 @@ test("every copy runs its animations from the moment its state last changed, whe
     return [...animations.get(this)!, transition];
   } });
   try {
+    // `since` is wall-clock; each document turns it into its own timeline (web#334).
     vi.spyOn(performance, "now").mockReturnValue(1000);
+    vi.spyOn(Date, "now").mockReturnValue(50_000);
     act(() => states.set("one", { spec, mood: "working" }));
     const stage = render(copy()).container.firstElementChild!;
     expect(animations.get(stage)![0].startTime).toBe(1000);
     // Later, a thumbnail appears: its animations run from the same moment, not from its own drawing.
     vi.mocked(performance.now).mockReturnValue(4000);
+    vi.mocked(Date.now).mockReturnValue(53_000);
     const thumbnail = render(<CharacterAvatar spec={spec} state={states.get("one")!} size="small" />).container.firstElementChild!;
     expect(animations.get(thumbnail)![0].startTime).toBe(1000);
     // A transition is left to itself.

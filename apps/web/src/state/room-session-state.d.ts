@@ -29,6 +29,9 @@ export interface SessionFacts {
  now: number; karaokeState: (KaraokeRange & {segment: string}) | null;
  /** Since when each conversation (by its key) has been busy without a break; Working shows WORKING_SHOWN_AFTER_MS later. */
  workingSince: Record<string, number>;
+ /** What the room says of each conversation's figure, as one value: its mood, whether it is held still, and when something last
+  *  happened with it (wall-clock). Relayed to the card, which acts out exactly that (conversation-avatars.ts). `restRelayed`: this store only receives it. */
+ figures: Record<string, { mood: import('../features/avatar/avatar-spec').AvatarMood; still: boolean; restStart: number }>; restRelayed: boolean;
  /** The room's error above the stage, as people read it (error-message.ts). */
  bootError: import('../components/ui/ErrorText').ErrorMessage | null;
  /** The machines this device is paired with (never their tokens), and the clock they were read at. */
