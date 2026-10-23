@@ -239,7 +239,7 @@ test("the caller's constraints are not read before the original call", async () 
   const { win, original } = setup();
   let reads = 0;
   const constraints = { get audio() { if (++reads > 1) throw new Error("second read"); return true; } };
-  original.mockImplementationOnce(async (c: any) => { void c.audio; return { getAudioTracks: () => [] }; });
+  original.mockImplementationOnce((async (c: any) => { void c.audio; return { getAudioTracks: () => [] }; }) as any);
   await expect(win.navigator.mediaDevices.getUserMedia(constraints)).resolves.toBeDefined();
 });
 
