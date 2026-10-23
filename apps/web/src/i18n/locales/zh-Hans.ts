@@ -897,7 +897,6 @@ export const messages: Messages = {
   "voice.languages.moreLabel.few": "另外 {n} 种语言",
   "voice.languages.moreLabel.other": "另外 {n} 种语言",
   "voice.languages.title": "此模型支持的语言（{n}）",
-  "voice.languages.fewer": "收起",
   "voice.languages.unsupported": "{language}不在此模型支持的语言中。",
   "voice.language.hint": "你说的语言；不确定时会自动检测。",
   "voice.patience.hint": "停顿多久后结束你的发言。",

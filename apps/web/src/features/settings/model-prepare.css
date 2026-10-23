@@ -4,23 +4,27 @@
 .model-prepare-meta { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .model-prepare-pickers + .model-prepare-status, .model-prepare-meta + .model-prepare-status, .model-prepare-notice + .model-prepare-status,
 .model-facts + .model-prepare-status { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
-/* Which languages the model supports (ModelLanguages): the ones that matter here in bold; "+N more" a link in the text
-   that reveals the rest — in a popover, inline, or in a tooltip, as compared. */
+/* Which languages the model supports (ModelLanguages): the one in use in bold; "+N more" a link in the text that opens
+   all of them in a popover. */
 .model-prepare-meta strong { font-weight: 600; color: var(--sv-text); }
 .model-languages-more { display: inline; padding: 0; border: 0; background: none; color: var(--sv-accent-text); font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .model-languages-more:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: 2px; }
-.model-languages-more svg { display: inline-block; margin-inline-start: 2px; vertical-align: -1px; transform: rotate(-90deg); transition: transform var(--sv-dur-fast) var(--sv-ease); }
-.model-languages-more svg.model-languages-chevron-open { transform: none; }
-.model-languages-list { margin: 0; padding: 0; list-style: none; column-gap: var(--sv-space-4); }
+/* All of them (Whisper has about a hundred): the popover itself scrolls, so the focus in it scrolls it with the keys;
+   two columns where it is wide enough, one on a phone. A shadow at an edge says there is more beyond it: covers in the
+   popover's own colour scroll with the list (local) over shadows that stay at its edges (scroll), so at either end, or
+   with all of it in sight, a cover hides the shadow. Its background colour stays the popover's own. */
+.ui-popover.model-languages-popover { width: min(22rem, calc(100vw - 24px)); max-height: min(24rem, 60vh); overflow-y: auto;
+  background-image: linear-gradient(var(--sv-surface-raised) 30%, transparent), linear-gradient(transparent, var(--sv-surface-raised) 70%),
+    radial-gradient(farthest-side at 50% 0, color-mix(in srgb, var(--sv-text) 22%, transparent), transparent),
+    radial-gradient(farthest-side at 50% 100%, color-mix(in srgb, var(--sv-text) 22%, transparent), transparent);
+  background-size: 100% 2.5rem, 100% 2.5rem, 100% 0.75rem, 100% 0.75rem;
+  background-repeat: no-repeat;
+  background-attachment: local, local, scroll, scroll;
+  background-position: center top, center bottom, center top, center bottom; }
+.model-languages-popover .ui-popover-title { color: var(--sv-text); }
+.model-languages-list { margin: 0; padding: 0; list-style: none; column-width: 9rem; column-gap: var(--sv-space-4); color: var(--sv-text); }
 .model-languages-list li { break-inside: avoid; }
 .model-languages-list strong { font-weight: 600; }
-/* All of them (Whisper has about a hundred): the popover itself scrolls, so the focus in it scrolls it with the keys;
-   two columns where it is wide enough, one on a phone. */
-.ui-popover.model-languages-popover { width: min(22rem, calc(100vw - 24px)); max-height: min(24rem, 60vh); overflow-y: auto; }
-.model-languages-popover .ui-popover-title { color: var(--sv-text); }
-.model-languages-popover .model-languages-list { column-width: 9rem; color: var(--sv-text); }
-/* In the tooltip (300px at most): two columns, wide enough for both. */
-.model-languages-tip { width: 16rem; column-width: 6.5rem; }
 /* The language in use is not one of the model's: in the warning's colour and with its mark, so not by colour alone. Its
    region stays in the block, empty while there is nothing to say. */
 .model-prepare-notice { display: flex; align-items: flex-start; gap: var(--sv-space-1-5); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-warning); }

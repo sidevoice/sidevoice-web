@@ -908,7 +908,6 @@ export const messages: Messages = {
   "voice.languages.moreLabel.few": "+{n} idiomas más",
   "voice.languages.moreLabel.other": "+{n} idiomas más",
   "voice.languages.title": "Idiomas que admite este modelo ({n})",
-  "voice.languages.fewer": "Mostrar menos",
   "voice.languages.unsupported": "Este modelo no admite {language}.",
   "voice.language.hint": "Lo que hablas; se detecta si no lo sabes.",
   "voice.patience.hint": "Cuánto puede durar una pausa antes de que acabe tu turno.",

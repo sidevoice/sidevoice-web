@@ -897,7 +897,6 @@ export const messages: Messages = {
   "voice.languages.moreLabel.few": "+{n} autres langues",
   "voice.languages.moreLabel.other": "+{n} autres langues",
   "voice.languages.title": "Langues prises en charge par ce modèle ({n})",
-  "voice.languages.fewer": "Afficher moins",
   "voice.languages.unsupported": "Langue non prise en charge par ce modèle : {language}.",
   "voice.language.hint": "La langue que vous parlez ; détectée en cas de doute.",
   "voice.patience.hint": "La durée qu’une pause peut atteindre avant la fin de votre tour.",

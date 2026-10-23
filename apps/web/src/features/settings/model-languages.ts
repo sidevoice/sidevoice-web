@@ -21,11 +21,6 @@ export function languageSupported(tags: readonly string[], wanted: string) {
   return !tags.length || tags.some((tag) => languagePrimary(tag) === languagePrimary(wanted));
 }
 
-/** Whether `tag` is one of `languages` (empty entries are none). */
-export function languageAmong(tag: string, languages: readonly (string | null | undefined)[]) {
-  return languages.some((language) => !!language && languagePrimary(language) === languagePrimary(tag));
-}
-
 /** A language's name in the interface's language (the page's `lang`), as the panes list it. */
 export function languageName(tag: string) {
   try {

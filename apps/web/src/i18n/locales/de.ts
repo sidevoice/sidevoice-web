@@ -900,7 +900,6 @@ export const messages: Messages = {
   "voice.languages.moreLabel.few": "+{n} weitere Sprachen",
   "voice.languages.moreLabel.other": "+{n} weitere Sprachen",
   "voice.languages.title": "Sprachen, die dieses Modell unterstützt ({n})",
-  "voice.languages.fewer": "Weniger anzeigen",
   "voice.languages.unsupported": "{language} gehört nicht zu den Sprachen dieses Modells.",
   "voice.language.hint": "Was du sprichst; im Zweifel wird es erkannt.",
   "voice.patience.hint": "Wie lang eine Pause sein darf, bevor dein Redebeitrag endet.",

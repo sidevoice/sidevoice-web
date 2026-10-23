@@ -917,7 +917,6 @@ export const messages = {
   "voice.languages.moreLabel.few": "+{n} more languages",
   "voice.languages.moreLabel.other": "+{n} more languages",
   "voice.languages.title": "Languages this model supports ({n})",
-  "voice.languages.fewer": "Show fewer",
   "voice.languages.unsupported": "This model doesn't support {language}.",
   "voice.language.hint": "What you speak; detected when unsure.",
   "voice.patience.hint": "How long a pause can be before your turn ends.",

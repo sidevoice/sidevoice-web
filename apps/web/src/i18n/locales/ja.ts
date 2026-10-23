@@ -898,7 +898,6 @@ export const messages: Messages = {
   "voice.languages.moreLabel.few": "他 {n} 言語",
   "voice.languages.moreLabel.other": "他 {n} 言語",
   "voice.languages.title": "このモデルが対応する言語（{n}）",
-  "voice.languages.fewer": "表示を減らす",
   "voice.languages.unsupported": "{language}はこのモデルの対応言語に含まれていません。",
   "voice.language.hint": "あなたが話す言語です。不明な場合は自動で検出します。",
   "voice.patience.hint": "ターンが終了するまでに許容する間の長さです。",
