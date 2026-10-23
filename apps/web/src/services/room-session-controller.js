@@ -2038,7 +2038,7 @@ async function joinRoom(epoch,context){
   state.sessionId=session.session_id;relay.reset();awaitingTurnAck.clear();startMessageTurns.clear();threadEpochs.clear();
  }
  callSessions.add(session.session_id);
- if(!resumedSession(session,context.resume))audioLog.callStarted();
+ audioLog.callStarted();
  keepTicket(true);
  // From here this socket speaks for the session: the outbox may use it.
  socket.session=state.sessionId;
