@@ -106,3 +106,19 @@ test("scan_failed is read from the listing: true, false, and absent (older conne
   }
   expect(scanFailed(null)).toBe(false);
 });
+
+test("a good scan clears 'changed, but could not check' from the agents it re-inspected; other errors stay", async () => {
+  const states = new Map<string, HostAgentsState>();
+  const listing = (scan_failed: boolean) => ({ agents: [agent("codex")], scanned_at: "2026-10-02T10:00:00Z", scan_failed });
+  let answer: unknown = listing(true);
+  const controller = createHostAgentsController({
+    request: async () => answer, hasHost: () => true, getState: (fp) => states.get(fp), setState: (fp, next) => void states.set(fp, next),
+  });
+  states.set("h", { status: "ready", value: null, error: null, busy: {}, actionErrors: {
+    codex: { key: "agents.scan-failed-after" }, cursor: { key: "connect-failed" } } });
+  await controller.load("h");
+  expect(Object.keys(states.get("h")!.actionErrors).sort()).toEqual(["codex", "cursor"]);
+  answer = listing(false);
+  await controller.load("h", { rescan: true });
+  expect(states.get("h")!.actionErrors).toEqual({ cursor: { key: "connect-failed" } });
+});

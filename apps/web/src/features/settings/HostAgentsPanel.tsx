@@ -287,6 +287,7 @@ export function HostAgentsPanel({ fp }: { fp: string | null }) {
   const rows = (value?.agents ?? []).filter((agent) => agent.present);
   const scanning = listing?.status === "loading";
   const failed = listing?.status === "failed";
+  const firstScanFailed = scanFailed(value) && (value?.agents.length ?? 0) === 0;
   return (
     <section className="host-agents" aria-labelledby="host-agents-title">
       {/* The heading, when the list was searched (in words, as time passes), and searching again as an icon. */}
@@ -301,8 +302,9 @@ export function HostAgentsPanel({ fp }: { fp: string | null }) {
           </Button>
         </Tooltip>
       </div>
-      {scanFailed(value) && <p className="muted host-agents-stale" role="status">{t("agents.staleScan")}</p>}
-      {rows.length === 0 ? <p className="muted">{t("agents.none")}</p> : <ul className="host-agent-rows">
+      {/* The first search failed (the connector sends no agents): nothing was ever found, so no "last scan" to show. */}
+      {scanFailed(value) && <p className="muted host-agents-stale" role="status">{t(firstScanFailed ? "agents.scanFailedFirst" : "agents.staleScan")}</p>}
+      {rows.length === 0 ? (firstScanFailed ? null : <p className="muted">{t("agents.none")}</p>) : <ul className="host-agent-rows">
         {rows.map((agent) => <HostAgentRow key={agent.id} fp={fp} agent={agent} />)}
       </ul>}
       <OtherAgentSection custom={value?.custom} />

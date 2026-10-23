@@ -30,6 +30,11 @@ export function isHostAgentsListing(value: unknown): value is HostAgentsListing 
 /** Whether the listing is the last good scan kept after a newer one failed; an absent field (older connectors) is false. */
 export const scanFailed = (listing: HostAgentsListing | null | undefined): boolean => listing?.scan_failed === true;
 
+/** A good scan has re-inspected the agents: "changed, but could not check" no longer holds for any of them. */
+function withoutStaleChecks(errors: HostAgentsState["actionErrors"]): HostAgentsState["actionErrors"] {
+  return Object.fromEntries(Object.entries(errors).filter(([, error]) => error.key !== "agents.scan-failed-after"));
+}
+
 function safeParams(value: unknown): Record<string, string | number> | undefined {
   if (!value || typeof value !== "object") return undefined;
   const entries = Object.entries(value as Record<string, unknown>).filter(([, item]) =>
@@ -83,7 +88,8 @@ export function createHostAgentsController(deps: {
       const value = await deps.request(fp, path, { headers: { accept: "application/json" }, cache: "no-store" });
       if (!current(fp, generation)) return;
       if (!isHostAgentsListing(value)) throw Object.assign(new Error("invalid-agents-response"), { key: "invalid-response" });
-      deps.setState(fp, { ...stateFor(fp), status: "ready", value, error: null });
+      const state = stateFor(fp);
+      deps.setState(fp, { ...state, status: "ready", value, error: null, actionErrors: scanFailed(value) ? state.actionErrors : withoutStaleChecks(state.actionErrors) });
     } catch (reason) {
       if (!current(fp, generation)) return;
       const error = errorData(reason, "unreachable");
