@@ -37,6 +37,7 @@ function setup(extra: Partial<Parameters<typeof createAudioDiagnostics>[0]> = {}
 test("every microphone acquisition is logged with settings, context facts, elapsed time and a rebuild counter", async () => {
   const { diag, win, advance } = setup();
   const context = new win.AudioContext();
+  diag.callStarted();
   await win.navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, deviceId: { exact: SECRET_DEVICE } } });
   advance(60_000);
   await win.navigator.mediaDevices.getUserMedia({ audio: true });
@@ -50,6 +51,7 @@ test("every microphone acquisition is logged with settings, context facts, elaps
 
 test("a video-only request passes through untouched and a refusal is logged then rethrown", async () => {
   const { diag, win, original } = setup();
+  original.mockResolvedValueOnce({ getAudioTracks: () => [] });
   await win.navigator.mediaDevices.getUserMedia({ video: true });
   expect(diag.entries()).toHaveLength(0);
   original.mockRejectedValueOnce(Object.assign(new Error("secret text"), { name: "NotAllowedError" }));
@@ -106,6 +108,7 @@ test("a kind is rate limited, the dropped count rides on the next entry, and the
 
 test("barge-in facts recorded by the page carry the call clock, and the call's end resets the counters", async () => {
   const { diag, win, advance } = setup();
+  diag.callStarted();
   await win.navigator.mediaDevices.getUserMedia({ audio: true });
   advance(5000);
   diag.record("barge-in", { reason: "user_interrupted", mic_level: 40, playback_level: 70 });
@@ -207,5 +210,85 @@ test("teardown events after callEnded do not start a clock: the next call counts
   expect(diag.entries().at(-1)).toMatchObject({ kind: "ctx-closed", call_ms: null });
   diag.callStarted();
   diag.record("barge-in");
+  expect(diag.entries().at(-1)).toMatchObject({ call_ms: 0 });
+});
+
+test("the wrappers are pass-throughs: same promise, synchronous throws, this, all arguments, name and length", async () => {
+  const sync = Object.assign(new EventTarget(), { getUserMedia: function getUserMedia(this: unknown, _a: unknown, _b?: unknown) { throw new TypeError("sync"); } });
+  const win: any = { navigator: { mediaDevices: sync }, AudioContext: FakeContext };
+  const diag = createAudioDiagnostics({ win, storage: null, log: () => {} });
+  diag.install(); made.push(diag);
+  expect(sync.getUserMedia.name).toBe("getUserMedia");
+  expect(sync.getUserMedia.length).toBe(2);
+  expect(() => sync.getUserMedia({ audio: true }, 1)).toThrow(TypeError);
+
+  const { win: w2, original, diag: d2 } = setup();
+  const promise = Promise.resolve({ getAudioTracks: () => [] });
+  original.mockReturnValueOnce(promise);
+  expect(w2.navigator.mediaDevices.getUserMedia({ audio: true }, "extra")).toBe(promise);
+  expect(original).toHaveBeenLastCalledWith({ audio: true }, "extra");
+  expect(original.mock.contexts.at(-1)).toBe(w2.navigator.mediaDevices);
+  const ctx = new w2.AudioContext();
+  const sinkPromise = ctx.setSinkId("a");
+  expect(sinkPromise).toBeInstanceOf(Promise);
+  await sinkPromise;
+  expect(d2.entries().some((e) => e.kind === "sink-set")).toBe(true);
+});
+
+test("the caller's constraints are not read before the original call", async () => {
+  const { win, original } = setup();
+  let reads = 0;
+  const constraints = { get audio() { if (++reads > 1) throw new Error("second read"); return true; } };
+  original.mockImplementationOnce(async (c: any) => { void c.audio; return { getAudioTracks: () => [] }; });
+  await expect(win.navigator.mediaDevices.getUserMedia(constraints)).resolves.toBeDefined();
+});
+
+test("a second copy of the module on the same window installs nothing", () => {
+  const { win, original, diag } = setup();
+  const wrapped = win.navigator.mediaDevices.getUserMedia;
+  const copy = createAudioDiagnostics({ win, storage: null, log: () => {} });
+  copy.install(); copy.uninstall();
+  expect(win.navigator.mediaDevices.getUserMedia).toBe(wrapped);
+  diag.uninstall();
+  expect(win.navigator.mediaDevices.getUserMedia).toBe(original);
+});
+
+test("a stopped track and a closed context are let go: listeners are bounded and detached on close", async () => {
+  const { win } = setup();
+  const context = new win.AudioContext();
+  const removedContext = vi.spyOn(context, "removeEventListener");
+  context.state = "closed"; context.dispatchEvent(new Event("statechange"));
+  expect(removedContext).toHaveBeenCalledWith("statechange", expect.any(Function));
+  const removed = vi.spyOn(FakeTrack.prototype, "removeEventListener");
+  for (let i = 0; i < 40; i++) await win.navigator.mediaDevices.getUserMedia({ audio: true });
+  // 120 listeners were attached on tracks never ended; the registry holds at most 32 of everything.
+  expect(removed.mock.calls.length).toBeGreaterThanOrEqual(80);
+  removed.mockRestore();
+});
+
+test("an acquisition resolving after uninstall attaches nothing and logs nothing", async () => {
+  const { diag, win, original, track } = setup();
+  let release: (s: any) => void = () => {};
+  original.mockReturnValueOnce(new Promise((resolve) => { release = resolve; }));
+  const pending = win.navigator.mediaDevices.getUserMedia({ audio: true });
+  diag.uninstall();
+  const t = new FakeTrack("late", settings);
+  const add = vi.spyOn(t, "addEventListener");
+  release({ getAudioTracks: () => [t] });
+  await pending;
+  await Promise.resolve();
+  expect(add).not.toHaveBeenCalled();
+  expect(diag.entries().some((e) => e.kind === "mic-acquired")).toBe(false);
+  void track;
+});
+
+test("events before callStarted read call_ms null, and callStarted overwrites an earlier clock", () => {
+  const { diag, advance } = setup();
+  diag.record("mic-state");
+  expect(diag.entries().at(-1)).toMatchObject({ call_ms: null });
+  diag.callStarted();
+  advance(1000);
+  diag.callStarted();
+  diag.record("mic-state");
   expect(diag.entries().at(-1)).toMatchObject({ call_ms: 0 });
 });
