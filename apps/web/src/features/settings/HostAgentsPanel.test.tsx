@@ -563,7 +563,7 @@ test("when the first search failed (no agents, scan_failed) the panel does not c
   const state = ready([]);
   act(() => store.patch({ hostAgents: { fp: { ...state, value: { ...state.value!, scan_failed: true } } } }));
   render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
-  expect(screen.getByText("Could not scan this machine for agents yet.")).toBeInTheDocument();
+  expect(screen.getByText("Sidevoice hasn’t been able to search this machine for agents yet.")).toBeInTheDocument();
   expect(screen.queryByText(/showing the last search results/)).toBeNull();
   expect(screen.queryByText("No agents found on this machine.")).toBeNull();
 });

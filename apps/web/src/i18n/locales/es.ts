@@ -621,7 +621,7 @@ export const messages: Messages = {
   "agents.error.scan-failed": "No se pudo buscar {agent} en esta máquina; no se cambió nada. Inténtalo de nuevo.",
   "agents.error.scan-failed-after": "Se aplicó el cambio a {agent}, pero Sidevoice no pudo comprobar el resultado. Busca de nuevo para ver su estado.",
   "agents.staleScan": "No se pudo actualizar la lista de agentes; se muestran los resultados de la última búsqueda.",
-  "agents.scanFailedFirst": "Todavía no se ha podido buscar agentes en esta máquina.",
+  "agents.scanFailedFirst": "Todavía no se han podido buscar agentes en esta máquina.",
   "agents.foreign": "Otra entrada ‘sidevoice’",
   "agents.foreign.info": "Los ajustes MCP de {agent} ya tienen una entrada llamada ‘sidevoice’ que Sidevoice no añadió, así que no la tocamos. Quítala o renómbrala en los ajustes MCP de {agent} y vuelve a buscar.",
   "agents.outdated": "Configurado por un Sidevoice anterior",

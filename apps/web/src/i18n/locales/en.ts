@@ -628,7 +628,7 @@ export const messages = {
   "agents.error.scan-failed": "Could not search this machine for {agent}; nothing was changed. Try again.",
   "agents.error.scan-failed-after": "The change to {agent} was applied, but Sidevoice could not check the result. Search again to see its state.",
   "agents.staleScan": "Could not refresh the agent list; showing the last search results.",
-  "agents.scanFailedFirst": "Could not scan this machine for agents yet.",
+  "agents.scanFailedFirst": "Sidevoice hasn’t been able to search this machine for agents yet.",
   "agents.foreign": "Another ‘sidevoice’ entry",
   "agents.foreign.info": "{agent}’s MCP settings already have an entry named ‘sidevoice’ that Sidevoice didn’t add, so we leave it alone. Remove or rename it in {agent}’s MCP settings, then search again.",
   "agents.outdated": "Set up by an older Sidevoice",
