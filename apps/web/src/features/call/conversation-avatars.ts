@@ -14,15 +14,16 @@ import { agentMood, moodFacts } from "./stage-view";
  * pastimes while a copy of it is drawn moving (the stage's, the card's: useMovingCopy) and the GPU moves it (web#278);
  * meanwhile the still copies show it at rest (CharacterAvatar).
  *
- * The room is the one that notices what happened with a figure, and stamps when (`restStart`, wall-clock, once per change,
- * kept in the store's facts); the floating card, another window with a store of its own, receives it in the facts the room
- * relays (cardFacts) and stamps nothing. Both windows' figures then count their rest, pastimes and tools from the same
- * moment (avatar-state.ts, web#334). */
+ * The room is the one that notices what happened with a figure, and says it in ONE fact per figure (`figures`: its mood, whether
+ * it is held still, and `restStart`, the wall-clock moment of the last change), written in one store update. The floating
+ * card, another window with a store of its own, receives that fact in the facts the room relays (cardFacts) and acts out
+ * exactly it: it can never combine a mood with another change's stamp, and it stamps nothing. Both windows' figures then
+ * count their rest, pastimes and tools from the same moment (avatar-state.ts, web#334). */
 
 /** What every conversation's agent is given, from the room's store: its mood (agentMood, the same projection for all of
  *  them), held still while the stage's balloon is up over it (`held`), its unread mark, what last happened with it,
  *  and whether a copy of it is drawn moving (`moving`, counted). */
-function agentInputs(state: RoomViewState, held: string | null, moving: ReadonlyMap<string, number>, stamps: Map<string, Stamp>, previous: ReadonlyMap<string, AvatarInputs>): Map<string, AvatarInputs> {
+function agentInputs(state: RoomViewState, held: string | null, moving: ReadonlyMap<string, number>, stamps: Map<string, Stamp>): Map<string, AvatarInputs> {
   const gpu = motion() === "gpu";
   const facts = moodFacts(state);
   const viewed = facts.viewed;
@@ -31,10 +32,12 @@ function agentInputs(state: RoomViewState, held: string | null, moving: Readonly
   if (viewed && !threads.includes(viewed)) threads.push(viewed);
   for (const thread of threads) {
     const row = state.participants.find((participant) => participant.threadId === thread);
-    const still = thread === held;
-    const base = agentMood(facts, thread);
+    // The card acts out what the room said of the figure; the room works it out.
+    const said = state.facts.restRelayed ? state.facts.figures?.[thread] : undefined;
+    const still = said ? said.still : thread === held;
+    const base = said ? said.mood : agentMood(facts, thread);
     // Under its balloon it holds still (operator, 2026-10-15): work that starts meanwhile waits for it to go.
-    const mood = still && base === "working" ? "speaking" : base;
+    const mood = said ? said.mood : still && base === "working" ? "speaking" : base;
     const onStage = thread === viewed;
     // Anything that happens with the agent on the stage restarts its rest before a pastime: the call starting, its
     // coming on the stage, the person speaking, a balloon, its mood (operator, 2026-10-15).
@@ -42,11 +45,7 @@ function agentInputs(state: RoomViewState, held: string | null, moving: Readonly
     const unread = onStage && facts.preview ? !!facts.preview.unread : !!row && hasUnread(row, viewed);
     // The room stamps the moment it noticed a change (while it rests, anything that happens with it; at work, only the
     // mood: the tool in hand goes with the figure on and off the stage); the card takes the room's.
-    const relayed = state.facts.restRelayed ? state.facts.restStart?.[thread] : undefined;
-    // The stamp names the mood it was made for: the card never shows a new mood with the old figure's stamp. Until the
-    // stamp that goes with it arrives (the room publishes it a moment after the facts), it keeps what it showed.
-    if (relayed && relayed.mood !== base && previous.has(thread)) { all.set(thread, previous.get(thread)!); continue; }
-    const restStart = state.facts.restRelayed ? relayed?.at : stamp(stamps, thread, mood === "idle" ? interaction + "\u0000" + mood : mood, base);
+    const restStart = said ? said.restStart : state.facts.restRelayed ? undefined : stamp(stamps, thread, mood === "idle" ? interaction + "\u0000" + mood : mood);
     all.set(thread, { spec: avatarFor(thread), mood, still, interaction, restStart, pastimes: gpu && !!moving.get(thread), unread, voice: thread });
   }
   for (const thread of stamps.keys()) if (!all.has(thread)) stamps.delete(thread);
@@ -54,11 +53,11 @@ function agentInputs(state: RoomViewState, held: string | null, moving: Readonly
 }
 
 /** When `key` last changed for a figure, as the room noticed it. */
-interface Stamp { key: string; at: number; mood: string }
-function stamp(stamps: Map<string, Stamp>, thread: string, key: string, mood: string): number {
+interface Stamp { key: string; at: number }
+function stamp(stamps: Map<string, Stamp>, thread: string, key: string): number {
   const known = stamps.get(thread);
   if (known?.key === key) return known.at;
-  const fresh = { key, at: Date.now(), mood };
+  const fresh = { key, at: Date.now() };
   stamps.set(thread, fresh);
   return fresh.at;
 }
@@ -87,17 +86,18 @@ function conversationAvatars(store: RoomStore): ConversationAvatars {
   let copies = 0;
   let unfollow: (() => void) | null = null;
   const stamps = new Map<string, Stamp>();
-  let previous = new Map<string, AvatarInputs>();
   const sync = () => {
-    const all = agentInputs(store.getState(), held, moving, stamps, previous);
-    previous = all;
+    const all = agentInputs(store.getState(), held, moving, stamps);
     states.sync(all);
     // Shipped to the card with the rest of its facts (cardFacts), once per change.
     if (store.getState().facts.restRelayed) return;
-    const shown = store.getState().facts.restStart ?? {};
-    const keys = Object.keys(shown);
-    if (keys.length !== stamps.size || [...stamps].some(([thread, { at, mood }]) => shown[thread]?.at !== at || shown[thread]?.mood !== mood))
-      store.patch({ restStart: Object.fromEntries([...stamps].map(([thread, { at, mood }]) => [thread, { at, mood }])) });
+    const shown = store.getState().facts.figures ?? {};
+    const same = Object.keys(shown).length === all.size && [...all].every(([thread, one]) => {
+      const was = shown[thread];
+      return was && was.mood === one.mood && was.still === !!one.still && was.restStart === one.restStart;
+    });
+    if (!same)
+      store.patch({ figures: Object.fromEntries([...all].map(([thread, one]) => [thread, { mood: one.mood, still: !!one.still, restStart: one.restStart! }])) });
   };
   // Followed as soon as a copy asks, so the first frame already shows the state (and the pick in hand).
   const follow = () => {

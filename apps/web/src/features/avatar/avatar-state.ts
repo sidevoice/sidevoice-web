@@ -172,10 +172,12 @@ export function createAvatarStates(): AvatarStates {
       enter: entry.enter ?? undefined,
       unread: unread || undefined,
     };
-    // A fresh entry has no moment yet: its first state is stamped whatever it is. The moment is the one every window
-    // computes alike, whenever it began to draw: when the step it shows began, or else when its rest did.
-    const changed = entry.state.since === undefined || !sameState(next, entry.state);
-    if (changed) entry.state = { ...next, since: begun > -Infinity ? begun : origin };
+    // The moment is the one every window computes alike, whenever it began to draw: when the step it shows began, or
+    // else when its rest did.
+    const since = begun > -Infinity ? begun : origin;
+    // `since` is the same function of (restStart, now) in every window, so a rest reset while quiet moves it too.
+    const changed = entry.state.since !== since || !sameState(next, entry.state);
+    if (changed) entry.state = { ...next, since };
     followMouth(id, entry);
     return changed;
   }

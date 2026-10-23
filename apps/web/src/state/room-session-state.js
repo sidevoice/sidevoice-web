@@ -31,7 +31,7 @@ export function initialSessionFacts() {
         // Since when each conversation has been busy without a break (busySince): the runtime keeps it, and the clock
         // fact `now` above, so Working shows WORKING_SHOWN_AFTER_MS later (working).
         workingSince: {},
-        restStart: {}, restRelayed: false,
+        figures: {}, restRelayed: false,
         // The machines this device is paired with (never their tokens), and when they were read. Every one of them is live
         // at once (`machineLinks`).
         pairings: [], machinesAt: 0, machinesReady: false, remoteHostStatus: {},
@@ -170,7 +170,7 @@ function cardDevices(devices) {
  *  records, and of the others only the replies not seen yet (their unread marks). */
 const CARD_FACTS = ['sessionId', 'roomRevision', 'roomInfo', 'connecting', 'reconnecting', 'reconnectShown', 'switching', 'roomBinding', 'people',
     'roomSeen', 'inputReceipts', 'userLive', 'botLive', 'userTurn', 'pendingPhase', 'pendingUserText', 'cancelledInput', 'textSending', 'micEnabled',
-    'speechOutput', 'voiceState', 'holding', 'harness', 'turns', 'now', 'karaokeState', 'workingSince', 'restStart', 'pairings', 'machineLinks', 'callNode',
+    'speechOutput', 'voiceState', 'holding', 'harness', 'turns', 'now', 'karaokeState', 'workingSince', 'figures', 'pairings', 'machineLinks', 'callNode',
     'audioDevices', 'movingTo', 'setupDone', 'callIdleWarning', 'callEnded', 'screenLock'];
 export const CARD_HISTORY = 40;
 export function cardFacts(s) {

@@ -96,14 +96,14 @@ test("offline it sleeps: no step, and none starts however long it lasts", () => 
   expect(states.get("a")).toMatchObject({ mood: "offline", idle: undefined, work: undefined });
 });
 
-test("its moment (wall-clock) moves with what it shows, and only then; the same object until then", () => {
+test("its moment (wall-clock) is the step's or the rest's start; the same object until either changes", () => {
   const start = Date.now();
   states.set("a", inputs({ restStart: start }));
   const first = states.get("a")!;
   expect(first.since).toBe(start);
   vi.advanceTimersByTime(200);
-  // An interaction restarts its rest but changes nothing it shows.
-  states.set("a", inputs({ interaction: "x", restStart: start + 200 }));
+  // The same rest again: nothing changes.
+  states.set("a", inputs({ interaction: "x", restStart: start }));
   expect(states.get("a")).toBe(first);
   states.set("a", inputs({ mood: "working", restStart: start + 200 }));
   // At work, its moment is the one its tool was picked up: when its work began.
@@ -230,6 +230,20 @@ test("the entrance ends with the shared stamp, not when a window hears of it: a 
   // The room's entrance is over, and so is the card's, with no tool left in hand.
   expect(card.get("a")).toEqual(room.get("a"));
   expect(card.get("a")).toMatchObject({ enter: undefined, work: undefined, since: changed });
+  room.clear();
+  card.clear();
+});
+
+test("a rest reset while quiet moves `since` to the new rest, as a window opened after it computes it", () => {
+  const restStart = Date.now();
+  const room = createAvatarStates(), card = createAvatarStates();
+  room.set("a", inputs({ restStart }));
+  vi.advanceTimersByTime(3_000);
+  const reset = Date.now();
+  room.set("a", inputs({ restStart: reset, interaction: "again" }));
+  card.set("a", inputs({ restStart: reset, interaction: "again" }));
+  expect(room.get("a")).toEqual(card.get("a"));
+  expect(room.get("a")!.since).toBe(reset);
   room.clear();
   card.clear();
 });

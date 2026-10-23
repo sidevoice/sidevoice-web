@@ -89,3 +89,12 @@ test("the wrap of a cycle keeps the rule too: the pastime or tool that ends it i
     }
   }
 });
+
+test("the wrap holds for a pool of two pastimes too (seed two0: music, quiet, music across the 603845 ms boundary)", () => {
+  const pool = ["quiet", "music", "bubbles"] as const;
+  for (const id of ["two0", ...Array.from({ length: 150 }, (_, i) => `two${i}`)]) {
+    const into = cycleLength("idle", id, pool);
+    const shown = walk("idle", id, pool, into + 40_000).filter((step) => step.end > into - 1).map((step) => step.value).filter((value) => value !== "quiet");
+    shown.forEach((value, index) => { if (index) expect(value, id).not.toBe(shown[index - 1]); });
+  }
+});
