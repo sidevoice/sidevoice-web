@@ -24,8 +24,7 @@ import { SETTINGS_PHONE_QUERY, useSectionShown } from "./settings-levels";
 import { VoicePicker } from "./VoicePicker";
 import { ModelLanguageNotice, ModelLanguages } from "./ModelLanguages";
 import { languageName } from "./model-languages";
-import { listedFacts, listedLines, useHardwareLabel } from "./model-facts";
-import { useVariant } from "../../lib/variants";
+import { listedFacts, useHardwareLabel } from "./model-facts";
 import type { ModelBuild } from "@sidevoice/engine";
 
 /* The call's voice as the person chooses it, for what transcribes and for what speaks: where it runs — this device, or
@@ -73,23 +72,15 @@ function noted(t: Translate, option: { disabled: boolean; note: Note | null }): 
   return option.disabled ? { reason: text } : { description: text };
 }
 
-/* What the Model list says of each model of this device that can be chosen, still being compared (sidevoice-web#340):
- * - "sized": what it takes and where it runs (model-facts.tsx), under its name;
- * - "names": its name alone;
- * - "twolines": its memory on its name's line, at the end, then its download and hardware under it. */
-const MODEL_LISTS = ["sized", "names", "twolines"] as const;
-
 type Listed = { id: string; builds?: ModelBuild[]; recommendedBuild?: string; installed?: boolean };
 
-/** What a model of this device says in the Model list beside and under its name, while it can be chosen. Put before
- *  what the pane says of the model (`noted`), which takes the line under it. */
+/** What a model of this device says under its name in the Model list, while it can be chosen: what it takes and where
+ *  it runs (model-facts.tsx, sidevoice-web#340). Put before what the pane says of the model (`noted`), which takes its
+ *  place. */
 function useListedFacts(t: Translate) {
-  const list = useVariant("modelList", MODEL_LISTS);
   const hardware = useHardwareLabel();
-  return (model: Listed | undefined, disabled: boolean): Pick<SelectOption, "badge" | "description"> => {
-    if (!model || disabled) return {};
-    if (list === "twolines") return listedLines(model, t, hardware);
-    const facts = list === "sized" ? listedFacts(model, t) : "";
+  return (model: Listed | undefined, disabled: boolean): Pick<SelectOption, "description"> => {
+    const facts = model && !disabled ? listedFacts(model, t, hardware) : null;
     return facts ? { description: facts } : {};
   };
 }
@@ -175,7 +166,6 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
   const languages = model.model?.languages ?? [];
   const chosenLanguage = draft.stt.language ?? null;
   const note = optionNote ? noteText(t, optionNote) : "";
-  const meta = note || languages.length ? <ModelLanguages languages={languages} chosen={chosenLanguage} note={note} /> : null;
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
   const preview = voicePreview(draft, catalogs, speechLanguage, useUiLanguage());
   // Settings' try says its sentence (the sample, editable once it is shown); the first-run setup's is the setup's,
@@ -230,7 +220,8 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
       {remote && <ProviderKeyNeeded key={remote.id} provider={remote.id} name={remote.name ?? remote.id} needed={!!provider} onDone={() => keyKept(remote.name ?? remote.id)} />}
       <Row label={t("voice.model")} block>
         <ModelPrepare id={task + "-model-card"} actionIds={task + "-model"} pending={pending} status={model.status} model={draft[task].model} size={model.local ? model.size : null} fraction={model.fraction} error={model.failure} errorDetails={model.failureDetails}
-          meta={!model.needsKey && meta || undefined} pickers={(locked) => <ModelPickers task={task} draft={draft} options={slot.options} locked={locked} needsKey={model.needsKey} t={t} />}
+          meta={!model.needsKey && note || undefined} pickers={(locked) => <ModelPickers task={task} draft={draft} options={slot.options} locked={locked} needsKey={model.needsKey} t={t} />}
+          languages={!model.needsKey && languages.length ? <ModelLanguages languages={languages} chosen={chosenLanguage} /> : undefined}
           notice={model.needsKey ? undefined : <ModelLanguageNotice languages={languages} chosen={chosenLanguage} />} build={model.local ? model.build : null}
           runtime={<ModelRuntime task={task} state={model} locked={model.installing} />}
           onDownload={() => downloadModel(task)} onCancel={cancelDownload} onRetry={() => downloadModel(task)} />

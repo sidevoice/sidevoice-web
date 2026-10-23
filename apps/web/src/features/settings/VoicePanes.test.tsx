@@ -128,7 +128,9 @@ test("the voice is always a list, its automatic voice first, even when the model
 
 test("a model not on this device offers its download with its size; its voices wait until it is here", () => {
   const { actions } = renderPane({ voiceSettings: withVoiceModel("piper-es") });
-  expect(document.getElementById("tts-model-card")).toHaveTextContent(/Not downloaded\s*63 MB/);
+  // Its size in its spec sheet, its state under it.
+  expect(document.querySelector("#tts-model-card .model-prepare-sheet")).toHaveTextContent("63 MB download");
+  expect(document.querySelector("#tts-model-card .model-prepare-status")).toHaveTextContent("Not downloaded");
   expect(document.getElementById("tts-voice")).toBeNull();
   expect(document.getElementById("tts-try")).toBeNull();
   fireEvent.click(document.getElementById("tts-model-download")!);
@@ -534,10 +536,10 @@ test("the engine's accelerator class chooses the hardware label; the API only na
     on("webgpu", "future-class" as ModelBuild["acceleratorClass"], "onnxruntime"),
     on(undefined, "gpu", "whisper-cpp"),
   ]);
-  // Metal is the Mac's graphics card, never the processor: on the status line, Automatic and its own option. The closed
-  // line keeps engine and precision (modelSummary's default, "status": the hardware is on the status line).
+  // Metal is the Mac's graphics card, never the processor: in the spec sheet, Automatic and its own option. The closed
+  // line keeps engine and precision (the spec sheet says the hardware).
   expect(summary).toBe("whisper.cpp · int8");
-  expect(document.querySelector("#stt-model-card .model-prepare-status")).toHaveTextContent("graphics card (Metal)");
+  expect(document.querySelector("#stt-model-card .model-prepare-sheet .model-hardware")).toHaveTextContent(/^GPU · Metal$/);
   expect(auto).toMatch(/^whisper\.cpp · int8 · graphics card \(Metal\) · /);
   expect(titles.slice(1)).toEqual([
     "whisper.cpp · int8 · graphics card (Metal)",
@@ -615,7 +617,8 @@ test("the smart end of turn has its model chosen like the others — just the mo
   const { actions } = renderPane({ voiceCatalogue: { state: "ready", catalogs: withTurn, error: "" } });
   expect(listOptions("voice-end-of-turn")[0].label).toMatch(/^Smart/);
   expect(listOptions("turn-model").map((option) => option.value)).toEqual(["smart-turn-v3.2"]);
-  expect(document.getElementById("turn-model-card")).toHaveTextContent(/Not downloaded\s*9 MB/);
+  expect(document.querySelector("#turn-model-card .model-prepare-sheet")).toHaveTextContent("9 MB download");
+  expect(document.querySelector("#turn-model-card .model-prepare-status")).toHaveTextContent("Not downloaded");
   // Kept as Smart, without its model: calls end turns with silence until it is downloaded, never downloading it.
   expect(document.getElementById("turn-model-card")).toHaveTextContent("Will switch when ready: the turn ends with silence until then.");
   fireEvent.click(document.getElementById("turn-model-download")!);
@@ -687,133 +690,104 @@ test("a provider with its key, and this device, keep the Model dropdown usable; 
   expect(modelBox()).not.toBeDisabled();
 });
 
-/* With "Advanced: how it runs" closed, what a model of this device takes and where it runs (sidevoice-web#340), in each
- * place compared; and the Model list's sizes. Each variant is set as the preview's panel sets it. */
+/* A model of this device that runs here has a spec sheet (sidevoice-web#340): Advanced right under the pickers, then one
+ * block with its languages (and the notice on their row), the hardware it runs on, or will, and its sizes; the status row
+ * says the state alone. The hardware is named as the hardware label says (still compared: set as the preview's panel
+ * sets it), "both" by default. */
 const variants = (chosen: Record<string, string>) => localStorage.setItem("sidevoice.variants", JSON.stringify(chosen));
 const withTurnModel = () => catalogs.map((catalog) => catalog.id === "local" ? { ...catalog, models: [...catalog.models,
   local("smart-turn-v3.2", "smart-turn", ["end-of-turn"], { installed: false, recommendedBuild: "smart-turn-v3.2/int8", builds: [build("smart-turn-v3.2/int8", { downloadBytes: 9e6, installed: false })] })] } : catalog) as CatalogView[];
 const card = (id: string) => document.getElementById(id)!;
 const closedLine = (task: string) => card(task + "-model-card").querySelector(".model-runtime-summary")?.textContent;
+const state = (id: string) => card(id).querySelector(".model-prepare-status .model-prepare-state")!;
+/** The sheet's rows, label and value; the Languages row's value without its notice. */
+const sheetRows = (id: string) => [...card(id).querySelectorAll(".model-prepare-sheet dt")].map((label) => {
+  const value = label.nextElementSibling!;
+  return [label.textContent, (value.matches(".model-sheet-languages") ? value.firstElementChild! : value).textContent];
+});
+const withLanguages = (languages: string[], base = catalogs) => base.map((catalog) => catalog.id !== "local" ? catalog : { ...catalog,
+  models: catalog.models.map((model) => model.id === "whisper-base" ? { ...model, languages } : model) }) as CatalogView[];
+const onMetal = (installed: boolean, extra: Partial<ModelBuild> = {}) => catalogs.map((catalog) => catalog.id !== "local" ? catalog : { ...catalog,
+  models: catalog.models.map((model) => model.id !== "whisper-base" ? model : { ...model, installed, recommendedBuild: "whisper-base/metal",
+    builds: [build("whisper-base/metal", { backend: "whisper-cpp", accelerator: "metal", acceleratorClass: "gpu", installed, ...extra })] }) }) as CatalogView[];
+/** The transcription sheet's hardware: its label, what shows, what is said to screen readers only, the lighter technical
+ *  name, its title, and whether it is expected. */
+function sttHardware() {
+  const chip = card("stt-model-card").querySelector(".model-prepare-sheet .model-hardware");
+  if (!chip) return null;
+  const hidden = chip.querySelector(".sr-only")?.textContent ?? "";
+  const name = chip.querySelector(".model-hardware-name")?.textContent ?? "";
+  return { label: chip.closest("dd")!.previousElementSibling!.textContent, shown: chip.textContent!.replace(hidden, "").replace(name, ""), hidden, name,
+    title: chip.getAttribute("title"), expected: chip.hasAttribute("data-expected") };
+}
 
-test("by default, the status line says it all: download, memory and hardware, or what it takes here; Advanced keeps engine and precision", () => {
-  renderPane({ voiceSettings: withVoiceModel("piper-es"), voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
-  expect(card("tts-model-card").querySelector(".model-prepare-status .model-prepare-note")).toHaveTextContent(/^63 MB download · 1 MB in memory · processor$/);
-  expect(card("stt-model-card").querySelector(".model-prepare-status .model-prepare-note")).toHaveTextContent(/^1 MB on this device · 1 MB in memory · processor$/);
-  expect(card("turn-model-card").querySelector(".model-prepare-status .model-prepare-note")).toHaveTextContent(/^9 MB download · 1 MB in memory · processor$/);
-  expect(closedLine("stt")).toBe("Sherpa-ONNX · int8");
-  expect(document.querySelector(".model-facts, .model-runtime-summary-line, .model-prepare-summary")).toBeNull();
+test("the sheet: Advanced right under the pickers, then languages with +N more, runs on and size; the state alone under it", () => {
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: withLanguages(["ko", "ja", "en", "de", "es", "fr"], onMetal(true)), error: "" } });
+  expect([...card("stt-model-card").children].map((child) => child.className))
+    .toEqual(["model-prepare-pickers", "model-runtime", "model-prepare-sheet", "model-prepare-status"]);
+  expect(closedLine("stt")).toBe("whisper.cpp · int8");
+  expect(sheetRows("stt-model-card")).toEqual([["Languages", "English, Korean, Japanese, German +2 more"], ["Runs on", "GPU · Metal"], ["Size", "1 MB on this device · 1 MB in memory"]]);
+  expect(card("stt-model-card").querySelector(".model-prepare-sheet button.model-languages-more")).toHaveAccessibleName("+2 more languages");
+  expect(state("stt-model-card")).toHaveTextContent(/^Ready$/);
 });
 
-test("facts: a labelled row of its own, the status line keeping only where the model stands", () => {
-  variants({ modelSummary: "facts" });
-  renderPane({ voiceSettings: withVoiceModel("piper-es"), voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
-  const pairs = (id: string) => [...card(id).querySelectorAll(".model-facts > div")].map((pair) => [pair.querySelector("dt")!.textContent, pair.querySelector("dd")!.textContent]);
-  expect(pairs("tts-model-card")).toEqual([["Size", "63 MB"], ["Memory", "1 MB"], ["Runs on", "processor"]]);
-  expect(pairs("turn-model-card")).toEqual([["Size", "9 MB"], ["Memory", "1 MB"], ["Runs on", "processor"]]);
-  expect(card("tts-model-card").querySelector(".model-prepare-status .model-prepare-note")).toBeNull();
-  expect(card("stt-model-card").querySelector(".model-prepare-status .model-prepare-note")).toHaveTextContent(/^On this device$/);
-  expect(closedLine("stt")).toBe("Sherpa-ONNX · int8");
-});
-
-test("advanced: Advanced's line says all its panel says of the build, on a line of its own; the end of turn's block says it with no toggle", () => {
-  variants({ modelSummary: "advanced" });
-  renderPane({ voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
-  const runtime = card("stt-model-card").querySelector(".model-runtime")!;
-  expect(runtime.querySelector(".model-runtime-summary")).toBeNull();
-  expect(runtime.querySelector(".model-runtime-head + .model-runtime-summary-line")).toHaveTextContent(/^Sherpa-ONNX · int8 · processor · 1 MB download · 1 MB in memory$/);
-  expect(card("stt-model-card").querySelector(".model-prepare-status .model-prepare-note")).toHaveTextContent(/^1 MB on this device$/);
-  const turn = card("turn-model-card");
-  expect(turn.querySelector(".model-runtime-toggle")).toBeNull();
-  expect(turn.querySelector(".model-prepare-summary")).toHaveTextContent(/^Sherpa-ONNX · int8 · processor · 9 MB download · 1 MB in memory$/);
-});
-
-test("a provider's model says none of it, in any of them", () => {
-  for (const modelSummary of ["status", "facts", "advanced"]) {
-    variants({ modelSummary });
-    renderPane({ voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "elevenlabs", model: "scribe_v2", language: null } } });
-    const stt = card("stt-model-card");
-    expect(stt.querySelector(".model-facts, .model-prepare-summary, .model-runtime")).toBeNull();
-    expect(stt.querySelector(".model-prepare-status .model-prepare-note")).toHaveTextContent(/^No download needed$/);
-    cleanup();
-  }
-});
-
-test("the Model list says under each model of this device that can be chosen what it takes and where it runs; names alone in the other", () => {
-  renderPane({ voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
-  expect(listOptions("stt-model").map((option) => option.detail)).toEqual([
-    "1 MB on this device · 1 MB in memory · processor",
-    "does not run here: it does not fit in this device's memory",
-  ]);
-  expect(listOptions("turn-model").map((option) => option.detail)).toEqual(["9 MB download · 1 MB in memory · processor"]);
-  cleanup();
-  variants({ modelList: "names" });
-  renderPane({ voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
-  expect(listOptions("stt-model").map((option) => option.detail)).toEqual(["", "does not run here: it does not fit in this device's memory"]);
-  expect(listOptions("turn-model").map((option) => option.detail)).toEqual([""]);
-});
-
-test("the languages line and its notice are the transcription and voice blocks', the chosen language counting for both", () => {
+test("the notice is on the Languages row, at its end, in its region; for the voice too, as the language chosen counts for both", () => {
   renderPane();
-  // The interface speaks English, which neither model lists: both say so, the end of turn's block nothing.
   for (const task of ["stt", "tts"]) {
-    expect(card(task + "-model-card").querySelector(".model-prepare-meta")).toHaveTextContent(/^Spanish$/);
-    expect(card(task + "-model-card").querySelector(".model-prepare-notice")).toHaveTextContent(/^This model doesn't support English\.$/);
+    const row = card(task + "-model-card").querySelector(".model-sheet-languages")!;
+    expect(row.querySelector(".model-prepare-notice")).toHaveTextContent(/^Doesn't support English$/);
+    expect(row.querySelector(".model-prepare-notice")).toHaveAttribute("aria-live", "polite");
+    expect(card(task + "-model-card").querySelector(":scope > .model-prepare-notice, :scope > .model-prepare-meta")).toBeNull();
   }
+  expect(sttHardware()).toMatchObject({ label: "Runs on", shown: "CPU", name: "", title: null });
   cleanup();
   renderPane({ voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-base", language: "es" } } });
   for (const task of ["stt", "tts"]) expect(card(task + "-model-card").querySelector(".model-prepare-notice")).toBeEmptyDOMElement();
 });
 
-/* The hardware as a chip (modelSummary "chip", "chipfacts", "chipadvanced"): the engine's pick for the build that runs,
- * or will once downloaded — then said as expected, in words and in a lighter look. */
-const chips = (root: Element) => [...root.querySelectorAll(".model-hardware")].map((chip) => [chip.textContent, chip.hasAttribute("data-expected")]);
-const state = (id: string) => card(id).querySelector(".model-prepare-status .model-prepare-state")!;
-
-test("chip: the hardware beside Not downloaded or Ready, expected until the model is here; the sizes as text after it", () => {
-  variants({ modelSummary: "chip" });
+test("not downloaded: it will run on, dashed, and the download's sizes; the end of turn's has no languages and no Advanced", () => {
   renderPane({ voiceSettings: withVoiceModel("piper-es"), voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
-  expect(chips(state("tts-model-card"))).toEqual([["Will run on CPU", true]]);
-  expect(state("tts-model-card").querySelector(".model-prepare-note")).toHaveTextContent(/^63 MB download · 1 MB in memory$/);
-  expect(chips(state("stt-model-card"))).toEqual([["CPU", false]]);
-  expect(state("stt-model-card").querySelector(".model-prepare-note")).toHaveTextContent(/^1 MB on this device · 1 MB in memory$/);
-  expect(chips(state("turn-model-card"))).toEqual([["Will run on CPU", true]]);
-  expect(closedLine("stt")).toBe("Sherpa-ONNX · int8");
-  expect(chips(card("stt-model-card").querySelector(".model-runtime")!)).toEqual([]);
+  expect(sheetRows("tts-model-card")).toEqual([["Languages", "Spanish"], ["Will run on", "CPU"], ["Size", "63 MB download · 1 MB in memory"]]);
+  expect(card("tts-model-card").querySelector(".model-prepare-sheet .model-hardware")).toHaveAttribute("data-expected");
+  expect(state("tts-model-card")).toHaveTextContent(/^Not downloaded$/);
+  expect(sheetRows("turn-model-card")).toEqual([["Will run on", "CPU"], ["Size", "9 MB download · 1 MB in memory"]]);
+  expect(card("turn-model-card").querySelector(".model-runtime-toggle")).toBeNull();
 });
 
-test("chipfacts: the labelled row with the hardware first, as a chip its label says is expected", () => {
-  variants({ modelSummary: "chipfacts" });
-  renderPane({ voiceSettings: withVoiceModel("piper-es"), voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
-  const pairs = (id: string) => [...card(id).querySelectorAll(".model-facts > div")].map((pair) => [pair.querySelector("dt")!.textContent, pair.querySelector("dd")!.textContent]);
-  expect(pairs("tts-model-card")).toEqual([["Will run on", "CPU"], ["Size", "63 MB"], ["Memory", "1 MB"]]);
-  expect(chips(card("tts-model-card").querySelector(".model-facts")!)).toEqual([["CPU", true]]);
-  expect(pairs("stt-model-card")).toEqual([["Runs on", "CPU"], ["Size", "1 MB"], ["Memory", "1 MB"]]);
-  expect(chips(card("stt-model-card").querySelector(".model-facts")!)).toEqual([["CPU", false]]);
-  expect(state("tts-model-card").querySelector(".model-prepare-note")).toBeNull();
-  expect(state("stt-model-card").querySelector(".model-prepare-note")).toHaveTextContent(/^On this device$/);
-  expect(closedLine("stt")).toBe("Sherpa-ONNX · int8");
+test("a provider's model has no sheet: the line about it and its state, as before", () => {
+  renderPane({ voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "elevenlabs", model: "scribe_v2", language: null } } });
+  expect(card("stt-model-card").querySelector(".model-prepare-sheet")).toBeNull();
+  expect(state("stt-model-card").querySelector(".model-prepare-note")).toHaveTextContent(/^No download needed$/);
 });
 
-test("chipadvanced: the chip on Advanced's line, before engine and precision; the sizes on the status line; the end of turn's beside its state", () => {
-  variants({ modelSummary: "chipadvanced" });
-  renderPane({ voiceSettings: withVoiceModel("piper-es"), voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
-  const head = (task: string) => card(task + "-model-card").querySelector(".model-runtime-head")!;
-  expect(chips(head("stt"))).toEqual([["CPU", false]]);
-  expect(head("stt").querySelector(".model-runtime-engine")).toHaveTextContent(/^Sherpa-ONNX · int8$/);
-  expect(head("stt").querySelector(".model-runtime-summary")).toBeNull();
-  expect(chips(head("tts"))).toEqual([["Will run on CPU", true]]);
-  expect(chips(state("stt-model-card"))).toEqual([]);
-  expect(state("stt-model-card").querySelector(".model-prepare-note")).toHaveTextContent(/^1 MB on this device · 1 MB in memory$/);
-  expect(chips(state("turn-model-card"))).toEqual([["Will run on CPU", true]]);
-  expect(state("turn-model-card").querySelector(".model-prepare-note")).toHaveTextContent(/^9 MB download · 1 MB in memory$/);
+test("the sheet's hardware follows the hardware label, installed and expected", () => {
+  const seen = (hardwareLabel: string, installed: boolean) => {
+    variants({ hardwareLabel });
+    renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(installed), error: "" } });
+    const hardware = sttHardware();
+    cleanup();
+    return hardware;
+  };
+  expect(seen("both", true)).toEqual({ label: "Runs on", shown: "GPU", hidden: "", name: " · Metal", title: null, expected: false });
+  expect(seen("class", true)).toEqual({ label: "Runs on", shown: "GPU", hidden: " (Metal)", name: "", title: "Metal", expected: false });
+  expect(seen("technical", true)).toEqual({ label: "Runs on", shown: "Metal", hidden: "", name: "", title: null, expected: false });
+  expect(seen("both", false)).toEqual({ label: "Will run on", shown: "GPU", hidden: "", name: " · Metal", title: null, expected: true });
+  expect(seen("class", false)).toEqual({ label: "Will run on", shown: "GPU", hidden: " (Metal)", name: "", title: "Metal", expected: true });
+  expect(seen("technical", false)).toEqual({ label: "Will run on", shown: "Metal", hidden: "", name: "", title: null, expected: true });
 });
 
-test("no chip where the engine does not say the hardware, whatever its label; the sizes are still said", () => {
-  for (const hardwareLabel of ["class", "technical", "both"]) for (const modelSummary of ["chip", "chipfacts", "chipadvanced"]) {
-    variants({ modelSummary, hardwareLabel });
+test("only what the engine says: a graphics card with no API is a GPU but has no technical name; no class, no hardware row", () => {
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true, { accelerator: undefined }), error: "" } });
+  expect(sttHardware()).toMatchObject({ shown: "GPU", name: "", hidden: "" });
+  cleanup();
+  variants({ hardwareLabel: "technical" });
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true, { accelerator: undefined }), error: "" } });
+  expect(sttHardware()).toBeNull();
+  cleanup();
+  for (const hardwareLabel of ["both", "class", "technical"]) {
+    variants({ hardwareLabel });
     renderPane({ voiceCatalogue: { state: "ready", catalogs: withBuilds([withoutClass(build("whisper-base/int8"))]), error: "" } });
-    expect(card("stt-model-card").querySelector(".model-hardware")).toBeNull();
-    expect(card("stt-model-card")).toHaveTextContent("1 MB");
+    expect(sheetRows("stt-model-card")).toEqual([["Languages", "Spanish"], ["Size", "1 MB on this device · 1 MB in memory"]]);
     cleanup();
   }
 });
@@ -822,145 +796,22 @@ test("the build a model runs as, with Automatic, is the engine's: one installed 
   renderPane({ voiceCatalogue: { state: "ready", catalogs: withBuilds([
     build("whisper-base/fp16", { installed: false, downloadBytes: 2e6, accelerator: "metal", acceleratorClass: "gpu" }), build("whisper-base/int8"),
   ]), error: "" } });
-  expect(state("stt-model-card").querySelector(".model-prepare-note")).toHaveTextContent(/^1 MB on this device · 1 MB in memory · processor$/);
+  expect(sheetRows("stt-model-card").slice(1)).toEqual([["Runs on", "CPU"], ["Size", "1 MB on this device · 1 MB in memory"]]);
 });
 
-test("twolines: a model's memory at the end of its name's line, its download or what it takes here and its hardware under it", () => {
-  variants({ modelList: "twolines" });
-  renderPane({ voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
-  // The memory, which the option's end does not say to whatever reads it, is said in its description too.
-  expect(listOptions("stt-model").map((option) => option.detail)).toEqual([
-    "1 MB on this device · CPU · 1 MB in memory",
-    "does not run here: it does not fit in this device's memory",
-  ]);
-  expect(listOptions("turn-model").map((option) => option.detail)).toEqual(["9 MB download · CPU · 1 MB in memory"]);
-  fireEvent.click(document.getElementById("stt-model")!);
-  const memory = (value: string) => document.querySelector(`[role=option][data-value="${value}"] .ui-select-item-badge`)?.textContent ?? "";
-  expect([memory("whisper-base"), memory("whisper-large")]).toEqual(["1 MB in memory", ""]);
-  fireEvent.keyDown(document.querySelector("[role=listbox]")!, { key: "Escape" });
-  expect(document.getElementById("stt-model")).toHaveTextContent(/^whisper-base$/);
-});
-
-/* How the chips and the Model list's two lines name the hardware (hardwareLabel): the plain class by default, its
- * technical name as the chip's title and said to screen readers; the technical name; or both. */
-const onMetal = (installed: boolean, extra: Partial<ModelBuild> = {}) => catalogs.map((catalog) => catalog.id !== "local" ? catalog : { ...catalog,
-  models: catalog.models.map((model) => model.id !== "whisper-base" ? model : { ...model, installed, recommendedBuild: "whisper-base/metal",
-    builds: [build("whisper-base/metal", { backend: "whisper-cpp", accelerator: "metal", acceleratorClass: "gpu", installed, ...extra })] }) }) as CatalogView[];
-/** The stt block's chip: what shows, what is said to screen readers only, the lighter technical name, and its title. */
-function sttChip() {
-  const chip = state("stt-model-card").querySelector(".model-hardware");
-  if (!chip) return null;
-  const hidden = chip.querySelector(".sr-only")?.textContent ?? "";
-  const name = chip.querySelector(".model-hardware-name")?.textContent ?? "";
-  return { shown: chip.textContent!.replace(hidden, "").replace(name, ""), hidden, name, title: chip.getAttribute("title") };
-}
-
-test("by default the chip says the class, its technical name a title and said to screen readers; as expected too", () => {
-  variants({ modelSummary: "chip" });
-  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true), error: "" } });
-  expect(sttChip()).toEqual({ shown: "GPU", hidden: " (Metal)", name: "", title: "Metal" });
-  cleanup();
-  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(false), error: "" } });
-  expect(sttChip()).toEqual({ shown: "Will run on GPU", hidden: " (Metal)", name: "", title: "Metal" });
-});
-
-test("technical: the chip says the technical name alone; as expected too", () => {
-  variants({ modelSummary: "chip", hardwareLabel: "technical" });
-  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true), error: "" } });
-  expect(sttChip()).toEqual({ shown: "Metal", hidden: "", name: "", title: null });
-  cleanup();
-  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(false), error: "" } });
-  expect(sttChip()).toEqual({ shown: "Will run on Metal", hidden: "", name: "", title: null });
-});
-
-test("both: the class, then the technical name lighter; expected, one plain string", () => {
-  variants({ modelSummary: "chip", hardwareLabel: "both" });
-  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true), error: "" } });
-  expect(sttChip()).toEqual({ shown: "GPU", hidden: "", name: " · Metal", title: null });
-  cleanup();
-  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(false), error: "" } });
-  expect(sttChip()).toEqual({ shown: "Will run on GPU · Metal", hidden: "", name: "", title: null });
-});
-
-test("the label reaches every chip: the labelled row's and the Advanced line's", () => {
-  variants({ modelSummary: "chipfacts", hardwareLabel: "both" });
-  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true), error: "" } });
-  expect(card("stt-model-card").querySelector(".model-facts .model-hardware")).toHaveTextContent(/^GPU · Metal$/);
-  cleanup();
-  variants({ modelSummary: "chipadvanced", hardwareLabel: "technical" });
-  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(false), error: "" } });
-  expect(card("stt-model-card").querySelector(".model-runtime-head .model-hardware")).toHaveTextContent(/^Will run on Metal$/);
-});
-
-test("a graphics card with no API: GPU for the class labels, no chip for the technical one", () => {
-  variants({ modelSummary: "chip" });
-  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true, { accelerator: undefined }), error: "" } });
-  expect(sttChip()).toEqual({ shown: "GPU", hidden: "", name: "", title: null });
-  cleanup();
-  variants({ modelSummary: "chip", hardwareLabel: "technical" });
-  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true, { accelerator: undefined }), error: "" } });
-  expect(sttChip()).toBeNull();
-});
-
-test("the Model list's two lines name the hardware as the label does; the text variants keep their words", () => {
-  const line = (hardwareLabel: string, modelList = "twolines") => {
-    variants({ modelList, hardwareLabel });
+test("the Model list says under each model that can be chosen what it takes, and its hardware as the hardware label names it", () => {
+  const listed = (hardwareLabel: string) => {
+    variants({ hardwareLabel });
     renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true), error: "" } });
-    const detail = listOptions("stt-model")[0].detail;
+    const details = listOptions("stt-model").map((option) => option.detail);
     cleanup();
-    return detail;
+    return details;
   };
-  // The class's technical name, and the memory at the line's end, are said to screen readers only.
-  expect(line("class")).toBe("1 MB on this device · GPU (Metal) · 1 MB in memory");
-  expect(line("technical")).toBe("1 MB on this device · Metal · 1 MB in memory");
-  expect(line("both")).toBe("1 MB on this device · GPU · Metal · 1 MB in memory");
-  expect(line("class", "sized")).toBe("1 MB on this device · 1 MB in memory · graphics card (Metal)");
-});
-
-/* The spec sheet (modelSummary "sheet"): Advanced under the pickers, then one block with the languages, the hardware
- * (always class and technical name) and the sizes; the status row has the state alone. */
-const sheetRows = (id: string) => [...card(id).querySelectorAll(".model-prepare-sheet dt")].map((label) => [label.textContent, label.nextElementSibling!.textContent]);
-const withLanguages = (languages: string[], base = catalogs) => base.map((catalog) => catalog.id !== "local" ? catalog : { ...catalog,
-  models: catalog.models.map((model) => model.id === "whisper-base" ? { ...model, languages } : model) }) as CatalogView[];
-
-test("sheet: Advanced right under the pickers, then the sheet — languages with +N more, runs on, size — and the state alone", () => {
-  variants({ modelSummary: "sheet", hardwareLabel: "technical" });
-  renderPane({ voiceCatalogue: { state: "ready", catalogs: withLanguages(["ko", "ja", "en", "de", "es", "fr"], onMetal(true)), error: "" } });
-  const parts = [...card("stt-model-card").children].map((child) => child.className);
-  expect(parts).toEqual(["model-prepare-pickers", "model-runtime", "model-prepare-sheet", "model-prepare-status"]);
-  expect(closedLine("stt")).toBe("whisper.cpp · int8");
-  expect(sheetRows("stt-model-card")).toEqual([["Languages", "English, Korean, Japanese, German +2 more"], ["Runs on", "GPU · Metal"], ["Size", "1 MB on this device · 1 MB in memory"]]);
-  expect(card("stt-model-card").querySelector(".model-prepare-sheet button.model-languages-more")).toHaveAccessibleName("+2 more languages");
-  // Class and technical name whatever the hardware label; installed, a plain chip.
-  const chip = card("stt-model-card").querySelector(".model-prepare-sheet .model-hardware")!;
-  expect(chip.querySelector(".model-hardware-name")).toHaveTextContent(/^· Metal$/);
-  expect(chip).not.toHaveAttribute("data-expected");
-  expect(state("stt-model-card").querySelector(".model-prepare-note, .model-hardware")).toBeNull();
-});
-
-test("sheet: the notice under the languages, inside the sheet; a CPU build is just CPU", () => {
-  variants({ modelSummary: "sheet" });
-  renderPane();
-  const sheet = card("stt-model-card").querySelector(".model-prepare-sheet")!;
-  expect(sheet.querySelector(".model-prepare-notice")).toHaveTextContent(/^This model doesn't support English\.$/);
-  expect(sheet.querySelector(".model-prepare-notice")).toHaveAttribute("aria-live", "polite");
-  expect(card("stt-model-card").querySelector(":scope > .model-prepare-notice, :scope > .model-prepare-meta")).toBeNull();
-  expect(sheet.querySelector(".model-hardware")).toHaveTextContent(/^CPU$/);
-});
-
-test("sheet: not downloaded, it will run on, dashed, and the download's sizes; the end of turn's has no languages", () => {
-  variants({ modelSummary: "sheet" });
-  renderPane({ voiceSettings: withVoiceModel("piper-es"), voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
-  expect(sheetRows("tts-model-card")).toEqual([["Languages", "Spanish"], ["Will run on", "CPU"], ["Size", "63 MB download · 1 MB in memory"]]);
-  expect(card("tts-model-card").querySelector(".model-prepare-sheet .model-hardware")).toHaveAttribute("data-expected");
-  expect(state("tts-model-card").querySelector(".model-prepare-note")).toBeNull();
-  expect(sheetRows("turn-model-card")).toEqual([["Will run on", "CPU"], ["Size", "9 MB download · 1 MB in memory"]]);
-  expect(card("turn-model-card").querySelector(".model-runtime-toggle")).toBeNull();
-});
-
-test("sheet: a provider's model has none of it, and shows the block as by default", () => {
-  variants({ modelSummary: "sheet" });
-  renderPane({ voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "elevenlabs", model: "scribe_v2", language: null } } });
-  expect(card("stt-model-card").querySelector(".model-prepare-sheet")).toBeNull();
-  expect(state("stt-model-card").querySelector(".model-prepare-note")).toHaveTextContent(/^No download needed$/);
+  // A model that cannot be chosen keeps why; the class's technical name is said to screen readers only.
+  const reason = "does not run here: it does not fit in this device's memory";
+  expect(listed("both")).toEqual(["1 MB on this device · 1 MB in memory · GPU · Metal", reason]);
+  expect(listed("class")).toEqual(["1 MB on this device · 1 MB in memory · GPU (Metal)", reason]);
+  expect(listed("technical")).toEqual(["1 MB on this device · 1 MB in memory · Metal", reason]);
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
+  expect(listOptions("turn-model").map((option) => option.detail)).toEqual(["9 MB download · 1 MB in memory · CPU"]);
 });

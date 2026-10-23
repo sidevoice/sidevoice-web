@@ -7,7 +7,7 @@ import { DownloadsIcon } from "../../components/ui/Icons";
 import { translator } from "../../i18n/translator";
 import type { ModelBuild } from "@sidevoice/engine";
 import { sizeText } from "./ModelSetup";
-import { buildSummary, HardwareChip, ModelFacts, modelFacts, ModelSheet, sizeFacts, useModelSummary } from "./model-facts";
+import { ModelSheet } from "./model-facts";
 import "./model-prepare.css";
 
 /* A chosen model made ready on this device, the same block wherever a model is chosen (the first-run setup, Settings):
@@ -49,15 +49,18 @@ export interface ModelPrepareProps {
   model: string;
   /** The family and model pickers; disabled by the block while a download runs. */
   pickers?: (locked: boolean) => ReactNode;
-  /** A line about the choice: its languages, a quality note. */
+  /** A line about the choice: a note on it (why it does not run here, its quality). */
   meta?: ReactNode;
-  /** Under that line, what to know about the choice (that it does not speak the language in use), in a region of its
-   *  own that stays as models are chosen, so choosing one says it. Hidden, as the line, while a download runs. */
+  /** The languages it supports (ModelLanguages), when it lists some: on the line about the choice, or the spec sheet's
+   *  Languages row. */
+  languages?: ReactNode;
+  /** That it does not speak the language in use, in a region of its own that stays as models are chosen, so choosing
+   *  one says it: under the line, hidden with it while a download runs; or at the end of the spec sheet's Languages row. */
   notice?: ReactNode;
   /** Bytes to download, when known; none for a provider's model. */
   size?: number | null;
-  /** The build of this device's model it runs as (ModelSetup's `build`): what it takes and where it runs, said with
-   *  "Advanced: how it runs" closed (model-facts.tsx). None for a provider's model: nothing is said of it. */
+  /** The build of this device's model it runs as (ModelSetup's `build`): what it takes and where it runs, in its spec
+   *  sheet (model-facts.tsx). None for a provider's model, or one with nothing that runs here: it has no sheet. */
   build?: ModelBuild | null;
   /** How far the download is, 0–1; none while not known. */
   fraction?: number | null;
@@ -76,35 +79,20 @@ export interface ModelPrepareProps {
   actionIds?: string;
 }
 
-export function ModelPrepare({ pending, runtime, status, model, pickers, meta, notice, size = null, build = null, fraction = null, error, errorDetails, readyAction, readyPanel, onDownload, onCancel, onRetry, id, actionIds }: ModelPrepareProps) {
+export function ModelPrepare({ pending, runtime, status, model, pickers, meta, languages, notice, size = null, build = null, fraction = null, error, errorDetails, readyAction, readyPanel, onDownload, onCancel, onRetry, id, actionIds }: ModelPrepareProps) {
   const actionId = (name: string) => actionIds ? actionIds + "-" + name : undefined;
   const t = translator();
   const hintId = useId();
-  const summary = useModelSummary();
   const sized = size ? sizeText(size) : "";
   const locked = status === "downloading";
   const stalled = useStalled(locked, fraction);
   const percent = fraction == null ? null : Math.round(fraction * 100);
-  // Its hardware as a chip beside Not downloaded or Ready: "chip", and "chipadvanced" in a block with no Advanced line
-  // to carry it (the end of turn's).
-  const stateChip = !!build && (summary === "chip" || (summary === "chipadvanced" && runtime === undefined));
-  // Beside Not downloaded or Ready: its size (once ready, on this device). A model of this device says all its facts
-  // there ("status"), or only that it is here, its facts having a row of their own ("facts", "chipfacts"), or its
-  // sizes, its hardware being a chip ("chip", "chipadvanced").
-  // The spec sheet ("sheet"), for a model of this device: Advanced under the pickers, then one block with its languages,
-  // hardware and sizes; its status row has the state alone.
-  const sheet = summary === "sheet" && !!build;
+  // A model of this device that runs here has a spec sheet (sidevoice-web#340): Advanced under the pickers, then one
+  // block with its languages, hardware and sizes, its status row saying the state alone. Any other keeps the line about
+  // the choice, and its size beside the state.
+  const sheet = !!build;
   const note = (ready: boolean): ReactNode => {
     if (sheet) return null;
-    if (build && summary === "status") {
-      const facts = modelFacts(build, ready, t);
-      if (facts) return <span className="model-prepare-note model-prepare-facts">{facts}</span>;
-    }
-    if (build && (summary === "facts" || summary === "chipfacts")) return ready && <span className="model-prepare-note">{t("runtime.onDisk")}</span>;
-    if (build && (summary === "chip" || summary === "chipadvanced")) {
-      const sizes = sizeFacts(build, ready, t);
-      return <>{stateChip && <HardwareChip build={build} expected={!ready} t={t} />}{sizes && <span className="model-prepare-note model-prepare-facts">{sizes}</span>}</>;
-    }
     return ready ? <span className="model-prepare-note">{sized ? t("voice.prepare.onDevice", { size: sized }) : t("voice.prepare.noDownload")}</span>
       : sized && <span className="model-prepare-note">{sized}</span>;
   };
@@ -114,19 +102,18 @@ export function ModelPrepare({ pending, runtime, status, model, pickers, meta, n
       {locked && pickers && <p className="model-prepare-meta" id={hintId}>{t("voice.prepare.lockedHint")}</p>}
       {sheet ? <>
         {runtime}
-        {/* Its languages and notice stay in the sheet while a download runs: the pickers' hint is a line of its own. */}
-        {status && <ModelSheet build={build!} meta={meta} notice={notice} expected={status !== "ready"} t={t} />}
+        {/* The note and the sheet stay while a download runs: the pickers' hint is a line of its own. A note is not a
+            language: it is a line of its own, above the sheet. */}
+        {meta && <p className="model-prepare-meta">{meta}</p>}
+        {status && <ModelSheet build={build!} languages={languages} notice={notice} expected={status !== "ready"} t={t} />}
       </> : <>
-        {!locked && meta && <p className="model-prepare-meta">{meta}</p>}
+        {!locked && (meta || languages) && <p className="model-prepare-meta">{meta}{meta && languages && " · "}{languages}</p>}
         {!locked && notice}
-        {build && status && summary === "facts" && <ModelFacts build={build} t={t} />}
-        {build && status && summary === "chipfacts" && <ModelFacts build={build} chip expected={status !== "ready"} t={t} />}
-        {/* A block with no "Advanced: how it runs" (the end of turn's) says its line where that would be ("advanced"). */}
-        {runtime ?? (build && summary === "advanced" && <p className="model-prepare-meta model-prepare-summary">{buildSummary(build, t)}</p>)}
+        {runtime}
       </>}
       {status && <div className="model-prepare-status" role={status === "failed" ? undefined : "status"} aria-live="polite">
         {status === "absent" && <>
-          <div className="model-prepare-state" data-chip={stateChip || undefined}><Badge>{t("voice.prepare.badge.absent")}</Badge>{note(false)}</div>
+          <div className="model-prepare-state"><Badge>{t("voice.prepare.badge.absent")}</Badge>{note(false)}</div>
           <Button size="sm" id={actionId("download")} onClick={onDownload}><DownloadsIcon />{t("voice.prepare.download")}</Button>
         </>}
         {status === "downloading" && <>
@@ -145,7 +132,7 @@ export function ModelPrepare({ pending, runtime, status, model, pickers, meta, n
           <span className="model-prepare-working">{t(status === "verifying" ? "voice.prepare.verifying" : "voice.prepare.loading")}</span>
         </div>}
         {status === "ready" && <>
-          <div className="model-prepare-state" data-chip={stateChip || undefined}>
+          <div className="model-prepare-state">
             <Badge tone="positive" dot>{t("voice.prepare.badge.ready")}</Badge>
             {note(true)}
           </div>

@@ -40,3 +40,12 @@ test("a failed download offers Retry", () => {
   screen.getByRole("button", { name: translator()("voice.prepare.retry") }).click();
   expect(onRetry).toHaveBeenCalled();
 });
+
+test("a note about a model of this device is a line of its own above its spec sheet, never a Languages row", () => {
+  const build = { id: "b", backend: "sherpa-onnx", precision: "int8", accelerator: "cpu", acceleratorClass: "cpu" as const, downloadBytes: 1e6, memoryMb: 1, available: true, reasons: [], installed: true };
+  const { container } = render(<ModelPrepare status="ready" model="whisper-base" build={build} meta="Best for short phrases" />);
+  const parts = [...container.querySelector(".model-prepare")!.children].map((child) => child.className);
+  expect(parts).toEqual(["model-prepare-meta", "model-prepare-sheet", "model-prepare-status"]);
+  expect(container.querySelector(".model-prepare-meta")).toHaveTextContent(/^Best for short phrases$/);
+  expect([...container.querySelectorAll(".model-sheet dt")].map((label) => label.textContent)).toEqual(["Runs on", "Size"]);
+});

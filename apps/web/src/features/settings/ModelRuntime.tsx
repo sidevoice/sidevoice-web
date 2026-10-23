@@ -5,7 +5,7 @@ import { useRoomStore } from "../../state/room-store";
 import type { ModelBuild } from "@sidevoice/engine";
 import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 import type { ModelState } from "./ModelSetup";
-import { buildSizes, buildSummary, describeBuild, engineOf, HardwareChip, useModelSummary } from "./model-facts";
+import { buildSizes, describeBuild, engineOf } from "./model-facts";
 
 /* How a model of this device runs, under its block, folded until asked for: what this device offers (a graphics card
  * the browser can use, its memory and cores — read at once, no benchmark) and each build of the model the engine has —
@@ -28,7 +28,6 @@ export function ModelRuntime({ task, state, locked }: { task: "stt" | "tts"; sta
   const t = translator();
   const [open, setOpen] = useState(false);
   const panel = useId();
-  const summary = useModelSummary();
   const builds = state.model?.builds ?? [];
   if (!state.local || !builds.length) return null;
   const recommended = state.model?.recommendedBuild;
@@ -58,17 +57,9 @@ export function ModelRuntime({ task, state, locked }: { task: "stt" | "tts"; sta
         <button type="button" className="model-runtime-toggle" aria-expanded={open} aria-controls={panel} onClick={() => setOpen(!open)}>
           <ChevronIcon size={16} className={open ? "model-runtime-chevron-open" : undefined} />{t("runtime.advanced")}
         </button>
-        {/* Its line, closed or open: engine and precision, the block saying its size and hardware elsewhere ("status",
-            "facts", "chip", "chipfacts"); or all the panel says of the build, wrapped on a line of its own under the toggle
-            ("advanced"); or the hardware as a chip — expected while the model is not here — then engine and precision,
-            wrapping ("chipadvanced"). */}
-        {summary === "chipadvanced" && state.build && <>
-          <HardwareChip build={state.build} expected={state.status !== "ready"} t={t} />
-          <span className="model-runtime-engine">{engineOf(state.build)}</span>
-        </>}
-        {summary !== "advanced" && summary !== "chipadvanced" && <span className="model-runtime-summary">{state.build ? engineOf(state.build) : ""}</span>}
+        {/* Its line, closed or open: engine and precision; the spec sheet says its hardware and sizes. */}
+        <span className="model-runtime-summary">{state.build ? engineOf(state.build) : ""}</span>
       </div>
-      {summary === "advanced" && state.build && <p className="model-runtime-summary-line">{buildSummary(state.build, t)}</p>}
       {open && <div className="model-runtime-panel" id={panel}>
         {/* What this is, and that most people can leave it. */}
         <p className="model-runtime-info">{t("runtime.info")}</p>

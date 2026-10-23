@@ -1,7 +1,9 @@
 import { expect, test } from "vitest";
+import { createElement, Fragment, type ReactNode } from "react";
+import { cleanup, render } from "@testing-library/react";
 import type { ModelBuild } from "@sidevoice/engine";
 import { translator } from "../../i18n/translator";
-import { buildSizes, buildSummary, hardwareLabel, hardwareName, listedFacts, modelFacts, sizeFacts } from "./model-facts";
+import { buildSizes, describeBuild, hardwareLabel, hardwareName, listedFacts, sizeFacts } from "./model-facts";
 
 /* What a model of this device takes and where it runs, from its build: each fact left out while it is not known. */
 
@@ -9,30 +11,31 @@ const t = translator("en");
 const build = (extra: Partial<ModelBuild> = {}): ModelBuild => ({ id: "b", backend: "sherpa-onnx", precision: "int8", accelerator: "cpu", acceleratorClass: "cpu",
   downloadBytes: 145e6, memoryMb: 190, available: true, reasons: [], installed: false, ...extra });
 
-test("before it is here: its download, its memory, what it runs on; once here, what it takes on this device", () => {
-  expect(modelFacts(build(), false, t)).toBe("145 MB download · 190 MB in memory · processor");
-  expect(modelFacts(build(), true, t)).toBe("145 MB on this device · 190 MB in memory · processor");
-});
+/** What a node says, read as text (what is hidden for screen readers included). */
+function said(node: ReactNode) {
+  const { container } = render(createElement(Fragment, null, node));
+  const text = container.textContent;
+  cleanup();
+  return text;
+}
 
-test("what the engine does not say is left out", () => {
-  const unknown = build({ memoryMb: 0, acceleratorClass: undefined });
-  expect(modelFacts(unknown, false, t)).toBe("145 MB");
-  expect(modelFacts(unknown, true, t)).toBe("145 MB on this device");
+test("what the engine does not say is left out of the sizes", () => {
+  expect(sizeFacts(build({ memoryMb: 0 }), false, t)).toBe("145 MB");
+  expect(sizeFacts(build({ memoryMb: 0 }), true, t)).toBe("145 MB on this device");
   expect(buildSizes(build({ downloadBytes: 0 }), t)).toBe("190 MB in memory");
 });
 
-test("the Advanced line, as its panel says the build: how it runs, then its sizes", () => {
-  expect(buildSummary(build(), t)).toBe("Sherpa-ONNX · int8 · processor · 145 MB download · 190 MB in memory");
-  expect(buildSummary(build({ acceleratorClass: "gpu", accelerator: "webgpu", backend: "transformers-js" }), t))
-    .toBe("Transformers.js · int8 · graphics card (WebGPU) · 145 MB download · 190 MB in memory");
+test("the builds list says a build by its engine, precision and what it runs on, in words", () => {
+  expect(describeBuild(build(), t)).toBe("Sherpa-ONNX · int8 · processor");
+  expect(describeBuild(build({ acceleratorClass: "gpu", accelerator: "webgpu", backend: "transformers-js" }), t)).toBe("Transformers.js · int8 · graphics card (WebGPU)");
 });
 
 test("a model of the list is said by its recommended build, else its first that runs here; on this device when installed", () => {
   const builds = [build({ id: "slow", available: false }), build({ id: "first", downloadBytes: 40e6 }), build({ id: "best", downloadBytes: 75e6 })];
-  expect(listedFacts({ builds, recommendedBuild: "best" }, t)).toMatch(/^75 MB download/);
-  expect(listedFacts({ builds }, t)).toMatch(/^40 MB download/);
-  expect(listedFacts({ builds, recommendedBuild: "best", installed: true }, t)).toMatch(/^75 MB on this device/);
-  expect(listedFacts({ builds: [] }, t)).toBe("");
+  expect(said(listedFacts({ builds, recommendedBuild: "best" }, t, "both"))).toBe("75 MB download · 190 MB in memory · CPU");
+  expect(said(listedFacts({ builds }, t, "both"))).toMatch(/^40 MB download/);
+  expect(said(listedFacts({ builds, recommendedBuild: "best", installed: true }, t, "both"))).toMatch(/^75 MB on this device/);
+  expect(listedFacts({ builds: [] }, t, "both")).toBeNull();
 });
 
 test("the hardware as a chip names it only when the engine says it, for a build that runs here", () => {
@@ -46,7 +49,7 @@ test("the hardware as a chip names it only when the engine says it, for a build 
   expect(hardwareName(build({ available: false }), t)).toBe("");
 });
 
-test("its sizes without its hardware, for the chip's variants", () => {
+test("its sizes, as the spec sheet says them", () => {
   expect(sizeFacts(build(), false, t)).toBe("145 MB download · 190 MB in memory");
   expect(sizeFacts(build(), true, t)).toBe("145 MB on this device · 190 MB in memory");
   expect(sizeFacts(build({ memoryMb: 0 }), true, t)).toBe("145 MB on this device");

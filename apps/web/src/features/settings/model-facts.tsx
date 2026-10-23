@@ -3,26 +3,13 @@ import type { ModelBuild } from "@sidevoice/engine";
 import type { Translate } from "../../i18n/translator";
 import { useVariant } from "../../lib/variants";
 import { Badge } from "../../components/ui/Badge";
-import type { SelectOption } from "../../components/ui/Select";
 import { sizeText } from "./ModelSetup";
 
 /* What a model of this device takes and where it runs, from the build it runs as: its download, its memory, and the
  * hardware it runs on (each left out while the engine does not say it). The hardware is the engine's pick for this
  * device, for the build that runs or will once downloaded — known before any download, never measured. The builds list
- * of "Advanced: how it runs" (ModelRuntime) says them per build; with Advanced closed, where the model's block says them
- * is still being compared (sidevoice-web#340), for the transcription, voice and end-of-turn blocks alike (ModelPrepare):
- * - "status": on the status line, beside Not downloaded or Ready; Advanced's line keeps engine and precision.
- * - "facts": a labelled row of their own (Size, Memory, Runs on); Advanced's line keeps engine and precision.
- * - "advanced": on Advanced's line, as its open panel says them for the build.
- * - "chip": the hardware as a chip beside Not downloaded or Ready, the sizes as text after it.
- * - "chipfacts": the labelled row, the hardware first as a chip.
- * - "chipadvanced": the hardware as a chip on Advanced's line, the sizes on the status line (a block with no Advanced,
- *   the end of turn's, has the chip beside its state, as "chip").
- * - "sheet": Advanced under the pickers, then one bordered block with the languages, the hardware and the sizes (a spec
- *   sheet), the status row with the state alone. */
-export const MODEL_SUMMARIES = ["status", "facts", "advanced", "chip", "chipfacts", "chipadvanced", "sheet"] as const;
-
-export const useModelSummary = () => useVariant("modelSummary", MODEL_SUMMARIES);
+ * of "Advanced: how it runs" (ModelRuntime) says them per build; with Advanced closed, the model's block says them in its
+ * spec sheet (ModelSheet, sidevoice-web#340), and the Model list under each model. */
 
 const ENGINES: Record<string, string> = {
   "transformers-js": "Transformers.js", "sherpa-onnx": "Sherpa-ONNX", "whisper-cpp": "whisper.cpp", onnxruntime: "ONNX Runtime", mlx: "MLX",
@@ -71,19 +58,18 @@ function hardwareClass(build: ModelBuild, t: Translate) {
   }
 }
 
-/* How every chip, and the Model list's "twolines", names the hardware, still being compared (sidevoice-web#340); the
- * text variants ("status", "facts", "advanced", "sized") keep runsOn's words:
+/* How the spec sheet's hardware and the Model list name it, still being compared (sidevoice-web#340); the builds list of
+ * "Advanced: how it runs" keeps runsOn's words:
+ * - "both": the class, then the technical name in lighter text ("GPU · Metal");
  * - "class": the plain class ("GPU"), its technical name ("Metal") as the chip's title and said to screen readers;
- * - "technical": the technical name ("Metal", "Neural Engine", "CPU");
- * - "both": the class, then the technical name in lighter text ("GPU · Metal"). */
-const HARDWARE_LABELS = ["class", "technical", "both"] as const;
+ * - "technical": the technical name ("Metal", "Neural Engine", "CPU"). */
+const HARDWARE_LABELS = ["both", "class", "technical"] as const;
 
 export type HardwareLabelMode = (typeof HARDWARE_LABELS)[number];
 
 export const useHardwareLabel = () => useVariant("hardwareLabel", HARDWARE_LABELS);
 
-/** The hardware as `mode` names it: `main`, what is shown (and what "Will run on {hardware}" says, with `name`); `name`,
- *  the technical name after it, in lighter text ("both"); `hint`, the technical name as a title and for screen readers
+/** The hardware as `mode` names it: `main`, what is shown; `name`, the technical name after it, in lighter text ("both"); `hint`, the technical name as a title and for screen readers
  *  only ("class"). The technical part only where it says more than the class: none for the CPU, whatever its
  *  accelerator. The class alone is known enough for "class" and "both" (a graphics card with no API is "GPU"); not for
  *  "technical". Null when nothing is known. */
@@ -96,18 +82,14 @@ export function hardwareLabel(build: ModelBuild, t: Translate, mode: HardwareLab
   return mode === "both" ? { main: plain, name: more, hint: "" } : { main: plain, name: "", hint: more };
 }
 
-/** The hardware as a chip ("chip", "chipfacts", "chipadvanced"). `expected`: the model is not here yet, so it is what
- *  the engine expects — a lighter look, and said in words ("Will run on GPU"), unless `bare`, where a label beside it
- *  says so. `mode`: a label of its own, whatever the hardware label chosen. None when the engine does not say. */
-export function HardwareChip({ build, expected, bare = false, mode, t }: { build: ModelBuild; expected: boolean; bare?: boolean; mode?: HardwareLabelMode; t: Translate }) {
-  const chosen = useHardwareLabel();
-  const label = hardwareLabel(build, t, mode ?? chosen);
+/** The hardware as a chip, as the hardware label names it: beside its label in the spec sheet, which says whether it runs
+ *  on it or will (`expected`: the model is not here yet, a lighter look). None when the engine does not say. */
+export function HardwareChip({ build, expected, t }: { build: ModelBuild; expected: boolean; t: Translate }) {
+  const label = hardwareLabel(build, t, useHardwareLabel());
   if (!label) return null;
-  // Said as expected, the hardware is one plain string: the verb may come after it in some languages.
-  const said = expected && !bare;
   return <Badge tone="accent" className="model-hardware" data-expected={expected || undefined} title={label.hint || undefined}>
-    {said ? t("runtime.hardware.expected", { hardware: [label.main, label.name].filter(Boolean).join(" · ") }) : label.main}
-    {!said && label.name && <span className="model-hardware-name"> · {label.name}</span>}
+    {label.main}
+    {label.name && <span className="model-hardware-name"> · {label.name}</span>}
     {label.hint && <span className="sr-only"> ({label.hint})</span>}
   </Badge>;
 }
@@ -129,21 +111,12 @@ export function buildSizes(build: ModelBuild, t: Translate) {
   return bytes || (memoryText ? t("runtime.memory", { memory: memoryText }) : "");
 }
 
-/** The whole of it on one line, as the open panel says it for the build ("advanced"). */
-export const buildSummary = (build: ModelBuild, t: Translate) => [describeBuild(build, t), buildSizes(build, t)].filter(Boolean).join(" · ");
-
-/** Its sizes as a model's status says them: before it is here, its download and memory ("145 MB download · 190 MB in
+/** Its sizes as the spec sheet says them: before it is here, its download and memory ("145 MB download · 190 MB in
  *  memory"); once here, what it takes on this device and its memory ("145 MB on this device · 190 MB in memory"). */
 export function sizeFacts(build: ModelBuild, installed: boolean, t: Translate) {
   if (!installed) return buildSizes(build, t);
   const [bytes, memoryText] = [download(build), memory(build)];
   return [bytes && t("voice.prepare.onDevice", { size: bytes }), memoryText && t("runtime.memory", { memory: memoryText })].filter(Boolean).join(" · ");
-}
-
-/** Its facts as a model's status says them, joined by " · ": its sizes, then what it runs on ("145 MB download · 190 MB
- *  in memory · processor"). The status line ("status") and the Model list ("sized") say them so. */
-export function modelFacts(build: ModelBuild, installed: boolean, t: Translate) {
-  return [sizeFacts(build, installed, t), runsOn(build, t)].filter(Boolean).join(" · ");
 }
 
 type Listed = { builds?: ModelBuild[]; recommendedBuild?: string; installed?: boolean };
@@ -155,55 +128,27 @@ function listedBuild(model: Listed) {
   return build ? { build, installed: model.installed === true || build.installed } : null;
 }
 
-/** A model of the list as the Model list describes it under its name ("sized"). "" when it has no build. */
-export function listedFacts(model: Listed, t: Translate) {
+/** A model of the list as the Model list describes it under its name: its sizes, then its hardware as the hardware label
+ *  names it (its technical name said to screen readers only, with "class"). Null when it has no build. */
+export function listedFacts(model: Listed, t: Translate, mode: HardwareLabelMode): ReactNode {
   const listed = listedBuild(model);
-  return listed ? modelFacts(listed.build, listed.installed, t) : "";
-}
-
-/** A model of the list on two lines ("twolines"): its memory on its name's line, at the end (the option's `badge`), then
- *  its download — or what it takes here — and its hardware, as `mode` names it (its `description`; its technical name
- *  said to screen readers only with "class"). What is not known is left out. The memory is said in the description too,
- *  for whatever reads it rather than sees it: the option's badge is not read. */
-export function listedLines(model: Listed, t: Translate, mode: HardwareLabelMode): Pick<SelectOption, "badge" | "description"> {
-  const listed = listedBuild(model);
-  if (!listed) return {};
-  const bytes = download(listed.build);
-  const memoryText = memory(listed.build) && t("runtime.memory", { memory: memory(listed.build) });
+  if (!listed) return null;
   const hardware = hardwareLabel(listed.build, t, mode);
-  const line = [bytes && t(listed.installed ? "voice.prepare.onDevice" : "runtime.download", { size: bytes }), hardware?.main, hardware?.name].filter(Boolean).join(" · ");
-  return {
-    ...(memoryText ? { badge: <span className="model-list-memory" aria-hidden>{memoryText}</span> } : {}),
-    ...(line || memoryText ? { description: <>
-      {line}{hardware?.hint && <span className="sr-only"> ({hardware.hint})</span>}
-      {memoryText && <span className="sr-only">{(line ? " · " : "") + memoryText}</span>}
-    </> } : {}),
-  };
+  const text = [sizeFacts(listed.build, listed.installed, t), hardware?.main, hardware?.name].filter(Boolean).join(" · ");
+  return text ? <>{text}{hardware?.hint && <span className="sr-only"> ({hardware.hint})</span>}</> : null;
 }
 
-/** Its facts as a labelled row ("facts"): Size, Memory, Runs on, each while it is known. With `chip` ("chipfacts"), the
- *  hardware first, as a chip, labelled as what it will run on while the model is not here (`expected`). */
-export function ModelFacts({ build, chip = false, expected = false, t }: { build: ModelBuild; chip?: boolean; expected?: boolean; t: Translate }) {
-  const hardware = hardwareLabel(build, t, useHardwareLabel());
-  const sizes: [string, ReactNode][] = [[t("runtime.fact.size"), download(build)], [t("runtime.fact.memory"), memory(build)]];
-  const facts = (chip
-    ? [[t(expected ? "runtime.fact.willRunOn" : "runtime.fact.runsOn"), hardware && <HardwareChip build={build} expected={expected} bare t={t} />], ...sizes]
-    : [...sizes, [t("runtime.fact.runsOn"), runsOn(build, t)]]) as [string, ReactNode][];
-  const known = facts.filter(([, value]) => value);
-  if (!known.length) return null;
-  return <dl className="model-facts">{known.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>;
-}
-
-/** The spec sheet ("sheet"): one block with what the model is, as rows that are left out when they have nothing — its
- *  languages (`meta`, the languages line) with the notice under them (its region kept), the hardware it runs on, or
- *  will once here (`expected`), always as class and technical name, and its sizes. */
-export function ModelSheet({ build, meta, notice, expected, t }: { build: ModelBuild; meta?: ReactNode; notice?: ReactNode; expected: boolean; t: Translate }) {
+/** The spec sheet: what the model is, as rows left out when they have nothing — its languages (`languages`, only when
+ *  it lists some) with the notice that the language in use is not one of them on the same row (its region kept), the
+ *  hardware it runs on, or will once here (`expected`), and its sizes. */
+export function ModelSheet({ build, languages, notice, expected, t }: { build: ModelBuild; languages?: ReactNode; notice?: ReactNode; expected: boolean; t: Translate }) {
+  const mode = useHardwareLabel();
   const sizes = sizeFacts(build, !expected, t);
   return <div className="model-prepare-sheet">
     <dl className="model-sheet">
-      {meta && <><dt>{t("runtime.fact.languages")}</dt><dd>{meta}</dd>{notice && <dd className="model-sheet-notice">{notice}</dd>}</>}
-      {hardwareLabel(build, t, "both") && <><dt>{t(expected ? "runtime.fact.willRunOn" : "runtime.fact.runsOn")}</dt>
-        <dd><HardwareChip build={build} expected={expected} bare mode="both" t={t} /></dd></>}
+      {languages && <><dt>{t("runtime.fact.languages")}</dt><dd className="model-sheet-languages"><span>{languages}</span>{notice}</dd></>}
+      {hardwareLabel(build, t, mode) && <><dt>{t(expected ? "runtime.fact.willRunOn" : "runtime.fact.runsOn")}</dt>
+        <dd><HardwareChip build={build} expected={expected} t={t} /></dd></>}
       {sizes && <><dt>{t("runtime.fact.size")}</dt><dd className="model-sheet-size">{sizes}</dd></>}
     </dl>
   </div>;
