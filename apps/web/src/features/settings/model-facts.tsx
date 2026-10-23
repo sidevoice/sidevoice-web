@@ -74,12 +74,12 @@ function HardwareText({ label }: { label: { main: string; name: string } }) {
   return <>{label.main}{label.name && <span className="model-hardware-name"> · {label.name}</span>}</>;
 }
 
-/** The hardware as a chip, beside its label in the spec sheet, which says whether it runs on it or will (`expected`:
- *  the model is not here yet, a lighter look). None when the engine does not say. */
-export function HardwareChip({ build, expected, t }: { build: ModelBuild; expected: boolean; t: Translate }) {
+/** The hardware as a chip, in the spec sheet: known before any download, so the same whether the model is here or not.
+ *  None when the engine does not say. */
+export function HardwareChip({ build, t }: { build: ModelBuild; t: Translate }) {
   const label = hardwareLabel(build, t);
   if (!label) return null;
-  return <Badge tone="accent" className="model-hardware" data-expected={expected || undefined}><HardwareText label={label} /></Badge>;
+  return <Badge tone="accent" className="model-hardware"><HardwareText label={label} /></Badge>;
 }
 
 /** Its engine and precision. */
@@ -132,16 +132,21 @@ export function listedOption(model: Listed, t: Translate): Pick<SelectOption, "b
 }
 
 /** The spec sheet: what the model is, as rows left out when they have nothing — its languages (`languages`, only when
- *  it lists some) with the notice that the language in use is not one of them on the same row (its region kept), the
- *  hardware it runs on, or will once here (`expected`), and its sizes. */
-export function ModelSheet({ build, languages, notice, expected, t }: { build: ModelBuild; languages?: ReactNode; notice?: ReactNode; expected: boolean; t: Translate }) {
-  const sizes = sizeFacts(build, !expected, t);
+ *  it lists some) with the notice that the language in use is not one of them right after them (its region kept), the
+ *  hardware it runs on, its sizes (`installed`: what it takes here, else its download) — then where it stands
+ *  (`state`, said as it changes), and at its foot what to do about it (`footer`: download, cancel, retry). */
+export function ModelSheet({ build, languages, notice, installed, state, footer, t }: {
+  build: ModelBuild; languages?: ReactNode; notice?: ReactNode; installed: boolean; state: ReactNode; footer?: ReactNode; t: Translate;
+}) {
+  const sizes = sizeFacts(build, installed, t);
   return <div className="model-prepare-sheet">
     <dl className="model-sheet">
       {languages && <><dt>{t("runtime.fact.languages")}</dt><dd className="model-sheet-languages"><span>{languages}</span>{notice}</dd></>}
-      {hardwareLabel(build, t) && <><dt>{t(expected ? "runtime.fact.willRunOn" : "runtime.fact.runsOn")}</dt>
-        <dd><HardwareChip build={build} expected={expected} t={t} /></dd></>}
+      {hardwareLabel(build, t) && <><dt>{t("runtime.fact.runsOn")}</dt><dd><HardwareChip build={build} t={t} /></dd></>}
       {sizes && <><dt>{t("runtime.fact.size")}</dt><dd className="model-sheet-size">{sizes}</dd></>}
+      <dt>{t("runtime.fact.status")}</dt>
+      <dd><div className="model-sheet-state" role="status" aria-live="polite">{state}</div></dd>
     </dl>
+    {footer && <div className="model-sheet-footer">{footer}</div>}
   </div>;
 }

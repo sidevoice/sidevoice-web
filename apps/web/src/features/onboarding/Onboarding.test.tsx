@@ -274,7 +274,7 @@ test("a model not on this device is downloaded first, in its block as in Setting
   paired(store);
   expect(title()).toHaveTextContent("Set up transcription");
   expect(document.querySelector("#stt-model-card .model-prepare-sheet")).toHaveTextContent("148 MB");
-  expect(document.querySelector("#stt-model-card .model-prepare-status")).toHaveTextContent("Not downloaded");
+  expect(document.querySelector("#stt-model-card .model-sheet-state")).toHaveTextContent("Not downloaded");
   expect(tryButton()).toHaveAttribute("aria-disabled", "true");
   // Waiting for its model: only Try it, blocked, with why in the footer's row; no Continue without trying yet.
   expect(document.getElementById("wizard-stage-action")).toBeNull();

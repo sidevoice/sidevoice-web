@@ -130,7 +130,7 @@ test("a model not on this device offers its download with its size; its voices w
   const { actions } = renderPane({ voiceSettings: withVoiceModel("piper-es") });
   // Its size in its spec sheet, its state under it.
   expect(document.querySelector("#tts-model-card .model-prepare-sheet")).toHaveTextContent("63 MB download");
-  expect(document.querySelector("#tts-model-card .model-prepare-status")).toHaveTextContent("Not downloaded");
+  expect(document.querySelector("#tts-model-card .model-sheet-state")).toHaveTextContent("Not downloaded");
   expect(document.getElementById("tts-voice")).toBeNull();
   expect(document.getElementById("tts-try")).toBeNull();
   fireEvent.click(document.getElementById("tts-model-download")!);
@@ -570,7 +570,7 @@ test("in the model's card, how it runs comes after the model is chosen and befor
   for (const task of ["stt", "tts"]) {
     const card = document.getElementById(task + "-model-card")!;
     const parts = [...card.children].map((child) => child.className);
-    const pickers = parts.indexOf("model-prepare-pickers"), runtime = parts.indexOf("model-runtime"), status = parts.indexOf("model-prepare-status");
+    const pickers = parts.indexOf("model-prepare-pickers"), runtime = parts.indexOf("model-runtime"), status = parts.indexOf("model-prepare-sheet");
     expect(pickers).toBeGreaterThanOrEqual(0);
     expect(runtime).toBeGreaterThan(pickers);
     expect(status).toBeGreaterThan(runtime);
@@ -618,7 +618,7 @@ test("the smart end of turn has its model chosen like the others — just the mo
   expect(listOptions("voice-end-of-turn")[0].label).toMatch(/^Smart/);
   expect(listOptions("turn-model").map((option) => option.value)).toEqual(["smart-turn-v3.2"]);
   expect(document.querySelector("#turn-model-card .model-prepare-sheet")).toHaveTextContent("9 MB download");
-  expect(document.querySelector("#turn-model-card .model-prepare-status")).toHaveTextContent("Not downloaded");
+  expect(document.querySelector("#turn-model-card .model-sheet-state")).toHaveTextContent("Not downloaded");
   // Kept as Smart, without its model: calls end turns with silence until it is downloaded, never downloading it.
   expect(document.getElementById("turn-model-card")).toHaveTextContent("Will switch when ready: the turn ends with silence until then.");
   fireEvent.click(document.getElementById("turn-model-download")!);
@@ -697,7 +697,8 @@ const withTurnModel = () => catalogs.map((catalog) => catalog.id === "local" ? {
   local("smart-turn-v3.2", "smart-turn", ["end-of-turn"], { installed: false, recommendedBuild: "smart-turn-v3.2/int8", builds: [build("smart-turn-v3.2/int8", { downloadBytes: 9e6, installed: false })] })] } : catalog) as CatalogView[];
 const card = (id: string) => document.getElementById(id)!;
 const closedLine = (task: string) => card(task + "-model-card").querySelector(".model-runtime-summary")?.textContent;
-const state = (id: string) => card(id).querySelector(".model-prepare-status .model-prepare-state")!;
+/** Where the block's model stands: the sheet's state, or the status row's of a block with no sheet. */
+const state = (id: string) => card(id).querySelector(".model-sheet-state, .model-prepare-status .model-prepare-state")!;
 /** The sheet's rows, label and value; the Languages row's value without its notice. */
 const sheetRows = (id: string) => [...card(id).querySelectorAll(".model-prepare-sheet dt")].map((label) => {
   const value = label.nextElementSibling!;
@@ -708,20 +709,20 @@ const withLanguages = (languages: string[], base = catalogs) => base.map((catalo
 const onMetal = (installed: boolean, extra: Partial<ModelBuild> = {}) => catalogs.map((catalog) => catalog.id !== "local" ? catalog : { ...catalog,
   models: catalog.models.map((model) => model.id !== "whisper-base" ? model : { ...model, installed, recommendedBuild: "whisper-base/metal",
     builds: [build("whisper-base/metal", { backend: "whisper-cpp", accelerator: "metal", acceleratorClass: "gpu", installed, ...extra })] }) }) as CatalogView[];
-/** The transcription sheet's hardware: its label, its class, its lighter technical name, and whether it is expected. */
+/** The transcription sheet's hardware: its label, its class and its lighter technical name. */
 function sttHardware() {
   const chip = card("stt-model-card").querySelector(".model-prepare-sheet .model-hardware");
   if (!chip) return null;
   const name = chip.querySelector(".model-hardware-name")?.textContent ?? "";
-  return { label: chip.closest("dd")!.previousElementSibling!.textContent, shown: chip.textContent!.replace(name, ""), name, expected: chip.hasAttribute("data-expected") };
+  return { label: chip.closest("dd")!.previousElementSibling!.textContent, shown: chip.textContent!.replace(name, ""), name };
 }
 
 test("the sheet: Advanced right under the pickers, then languages with +N more, runs on and size; the state alone under it", () => {
   renderPane({ voiceCatalogue: { state: "ready", catalogs: withLanguages(["ko", "ja", "en", "de", "es", "fr"], onMetal(true)), error: "" } });
   expect([...card("stt-model-card").children].map((child) => child.className))
-    .toEqual(["model-prepare-pickers", "model-runtime", "model-prepare-sheet", "model-prepare-status"]);
+    .toEqual(["model-prepare-pickers", "model-runtime", "model-prepare-sheet"]);
   expect(closedLine("stt")).toBe("whisper.cpp · int8");
-  expect(sheetRows("stt-model-card")).toEqual([["Languages", "English, Korean, Japanese, German +2 more"], ["Runs on", "GPU · Metal"], ["Size", "1 MB on this device · 1 MB in memory"]]);
+  expect(sheetRows("stt-model-card")).toEqual([["Languages", "English, Korean, Japanese, German +2 more"], ["Runs on", "GPU · Metal"], ["Size", "1 MB on this device · 1 MB in memory"], ["Status", "Ready"]]);
   expect(card("stt-model-card").querySelector(".model-prepare-sheet button.model-languages-more")).toHaveAccessibleName("+2 more languages");
   expect(state("stt-model-card")).toHaveTextContent(/^Ready$/);
 });
@@ -734,18 +735,18 @@ test("the notice is on the Languages row, at its end, in its region; for the voi
     expect(row.querySelector(".model-prepare-notice")).toHaveAttribute("aria-live", "polite");
     expect(card(task + "-model-card").querySelector(":scope > .model-prepare-notice, :scope > .model-prepare-meta")).toBeNull();
   }
-  expect(sttHardware()).toEqual({ label: "Runs on", shown: "CPU", name: "", expected: false });
+  expect(sttHardware()).toEqual({ label: "Runs on", shown: "CPU", name: "" });
   cleanup();
   renderPane({ voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-base", language: "es" } } });
   for (const task of ["stt", "tts"]) expect(card(task + "-model-card").querySelector(".model-prepare-notice")).toBeEmptyDOMElement();
 });
 
-test("not downloaded: it will run on, dashed, and the download's sizes; the end of turn's has no languages and no Advanced", () => {
+test("not downloaded: it runs on, the download's sizes, its state and the Download at its foot; the end of turn's has no languages and no Advanced", () => {
   renderPane({ voiceSettings: withVoiceModel("piper-es"), voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
-  expect(sheetRows("tts-model-card")).toEqual([["Languages", "Spanish"], ["Will run on", "CPU"], ["Size", "63 MB download · 1 MB in memory"]]);
-  expect(card("tts-model-card").querySelector(".model-prepare-sheet .model-hardware")).toHaveAttribute("data-expected");
+  expect(sheetRows("tts-model-card")).toEqual([["Languages", "Spanish"], ["Runs on", "CPU"], ["Size", "63 MB download · 1 MB in memory"], ["Status", "Not downloaded"]]);
+  expect(card("tts-model-card").querySelector(".model-sheet-footer #tts-model-download")).toBeInTheDocument();
   expect(state("tts-model-card")).toHaveTextContent(/^Not downloaded$/);
-  expect(sheetRows("turn-model-card")).toEqual([["Will run on", "CPU"], ["Size", "9 MB download · 1 MB in memory"]]);
+  expect(sheetRows("turn-model-card")).toEqual([["Runs on", "CPU"], ["Size", "9 MB download · 1 MB in memory"], ["Status", "Not downloaded"]]);
   expect(card("turn-model-card").querySelector(".model-runtime-toggle")).toBeNull();
 });
 
@@ -757,24 +758,24 @@ test("a provider's model has no sheet: the line about it and its state, as befor
 
 test("the sheet's hardware: the class, then the technical name lighter; a GPU with no API is a GPU; no class, no hardware row", () => {
   renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true), error: "" } });
-  expect(sttHardware()).toEqual({ label: "Runs on", shown: "GPU", name: " · Metal", expected: false });
+  expect(sttHardware()).toEqual({ label: "Runs on", shown: "GPU", name: " · Metal" });
   cleanup();
-  // Not downloaded: what it will run on, dashed.
+  // Not downloaded: the same, known before any download.
   renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(false), error: "" } });
-  expect(sttHardware()).toEqual({ label: "Will run on", shown: "GPU", name: " · Metal", expected: true });
+  expect(sttHardware()).toEqual({ label: "Runs on", shown: "GPU", name: " · Metal" });
   cleanup();
   renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true, { accelerator: undefined }), error: "" } });
-  expect(sttHardware()).toEqual({ label: "Runs on", shown: "GPU", name: "", expected: false });
+  expect(sttHardware()).toEqual({ label: "Runs on", shown: "GPU", name: "" });
   cleanup();
   renderPane({ voiceCatalogue: { state: "ready", catalogs: withBuilds([withoutClass(build("whisper-base/int8"))]), error: "" } });
-  expect(sheetRows("stt-model-card")).toEqual([["Languages", "Spanish"], ["Size", "1 MB on this device · 1 MB in memory"]]);
+  expect(sheetRows("stt-model-card")).toEqual([["Languages", "Spanish"], ["Size", "1 MB on this device · 1 MB in memory"], ["Status", "Ready"]]);
 });
 
 test("the build a model runs as, with Automatic, is the engine's: one installed that runs here before the recommended one", () => {
   renderPane({ voiceCatalogue: { state: "ready", catalogs: withBuilds([
     build("whisper-base/fp16", { installed: false, downloadBytes: 2e6, accelerator: "metal", acceleratorClass: "gpu" }), build("whisper-base/int8"),
   ]), error: "" } });
-  expect(sheetRows("stt-model-card").slice(1)).toEqual([["Runs on", "CPU"], ["Size", "1 MB on this device · 1 MB in memory"]]);
+  expect(sheetRows("stt-model-card").slice(1, 3)).toEqual([["Runs on", "CPU"], ["Size", "1 MB on this device · 1 MB in memory"]]);
 });
 
 test("the Model list: each model that can be chosen with its download size at the end of its name's line, its hardware under it", () => {

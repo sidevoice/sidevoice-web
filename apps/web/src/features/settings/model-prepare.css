@@ -2,8 +2,7 @@
 .model-prepare { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sv-space-3); min-width: 0; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); color: var(--sv-text); }
 .model-prepare-pickers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: var(--sv-space-3); }
 .model-prepare-meta { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
-.model-prepare-pickers + .model-prepare-status, .model-prepare-meta + .model-prepare-status, .model-prepare-notice + .model-prepare-status,
-.model-prepare-sheet + .model-prepare-status { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.model-prepare-pickers + .model-prepare-status, .model-prepare-meta + .model-prepare-status, .model-prepare-notice + .model-prepare-status { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
 /* Which languages the model supports (ModelLanguages): the one in use in bold; "+N more" a link in the text that opens
    all of them in a popover. */
 .model-prepare-meta strong { font-weight: 600; color: var(--sv-text); }
@@ -33,10 +32,9 @@
 .model-prepare-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sv-space-3); min-height: 48px; min-width: 0; }
 .model-prepare-state { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; }
 .model-prepare-note { white-space: nowrap; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); font-variant-numeric: tabular-nums; }
-/* The hardware as a chip, in the spec sheet: the engine's pick for this device, in the accent's weight. Expected (the
-   model not here yet): clear and dashed, and its label says so too. It wraps rather than overflow a narrow block. */
+/* The hardware as a chip, in the spec sheet: the engine's pick for this device, in the accent's weight. It wraps rather
+   than overflow a narrow block. */
 .ui-badge.model-hardware { flex: 0 1 auto; max-width: 100%; height: auto; min-height: 22px; padding-block: 2px; border: 1px solid transparent; line-height: 1.2; white-space: normal; text-align: start; }
-.ui-badge.model-hardware[data-expected] { border-style: dashed; border-color: currentColor; background: transparent; }
 /* "both": the technical name after the class, lighter. */
 .model-hardware-name { font-weight: var(--sv-weight-regular); color: var(--sv-text-muted); }
 .model-prepare-working { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text); }
@@ -158,9 +156,15 @@
 .model-sheet dd { margin: 0; min-width: 0; color: var(--sv-text); }
 .model-sheet strong { font-weight: 600; }
 .model-sheet .model-sheet-size { color: var(--sv-text-muted); }
-/* The notice on the Languages row, at its end; under the languages when both do not fit. */
-.model-sheet .model-sheet-languages { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0 var(--sv-space-3); }
-.model-sheet-languages .model-prepare-notice { margin-inline-start: auto; }
+/* The notice right after the languages, a small chip in the warning's soft tone (with its mark: not by colour alone);
+   under them when both do not fit. */
+.model-sheet .model-sheet-languages { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sv-space-1) var(--sv-space-2); }
+.model-sheet-languages .model-prepare-notice { align-items: center; padding: 0 var(--sv-space-1-5); border-radius: var(--sv-radius-sm); background: var(--sv-warning-soft); }
+.model-sheet-languages .model-prepare-notice svg { margin-top: 0; }
+/* Its state, the last row; what to do about it (download, cancel, retry) at the card's foot, full width on a phone. */
+.model-sheet-state { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); min-height: 22px; }
+.model-sheet-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sv-space-3); margin-top: var(--sv-space-2); padding-top: var(--sv-space-2); border-top: 1px solid var(--sv-border); }
+@media (max-width: 360px) { .model-sheet-footer > .ui-button { flex: 1 1 100%; } }
 @media (max-width: 360px) {
   .model-sheet { grid-template-columns: minmax(0, 1fr); row-gap: 0; }
   .model-sheet dd + dt { margin-top: var(--sv-space-1-5); }
