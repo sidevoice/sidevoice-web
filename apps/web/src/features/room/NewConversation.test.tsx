@@ -18,7 +18,7 @@ test("the button opens a small panel that says why and quotes the message, with 
   const panel = document.querySelector(".ui-popover") as HTMLElement;
   expect(panel).toHaveAttribute("role", "dialog");
   expect(panel).toHaveTextContent("isn't possible yet");
-  expect(panel).toHaveTextContent("Tell your agent to connect");
+  expect(panel).toHaveTextContent("Connect your agent to talk to it");
   // A phrase to say, so a Quote (not a Snippet, which is for a terminal), with its copy button and nothing under it.
   expect(panel.querySelector(".ui-quote blockquote")).toHaveTextContent("Connect to Sidevoice (use its voice_connect tool)");
   expect(panel.querySelector(".ui-snippet")).toBeNull();

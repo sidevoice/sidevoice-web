@@ -225,7 +225,7 @@ test("\"+\" opens what a new conversation needs, below it; with the list down, t
   expect(document.getElementById("conversations")).not.toHaveAttribute("data-open");
   expect(plus()).toHaveAttribute("aria-expanded", "true");
   const panel = document.querySelector<HTMLElement>(".ui-popover")!;
-  expect(within(panel).getByText("Tell your agent to connect")).toBeInTheDocument();
+  expect(within(panel).getByText("Connect your agent to talk to it")).toBeInTheDocument();
   expect(panel).toHaveAttribute("data-side", "bottom");
 });
 
