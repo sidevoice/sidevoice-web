@@ -763,3 +763,80 @@ test("the languages line and its notice are the transcription and voice blocks',
   renderPane({ voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-base", language: "es" } } });
   for (const task of ["stt", "tts"]) expect(card(task + "-model-card").querySelector(".model-prepare-notice")).toBeEmptyDOMElement();
 });
+
+/* The hardware as a chip (modelSummary "chip", "chipfacts", "chipadvanced"): the engine's pick for the build that runs,
+ * or will once downloaded — then said as expected, in words and in a lighter look. */
+const chips = (root: Element) => [...root.querySelectorAll(".model-hardware")].map((chip) => [chip.textContent, chip.hasAttribute("data-expected")]);
+const state = (id: string) => card(id).querySelector(".model-prepare-status .model-prepare-state")!;
+
+test("chip: the hardware beside Not downloaded or Ready, expected until the model is here; the sizes as text after it", () => {
+  variants({ modelSummary: "chip" });
+  renderPane({ voiceSettings: withVoiceModel("piper-es"), voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
+  expect(chips(state("tts-model-card"))).toEqual([["Will run on CPU", true]]);
+  expect(state("tts-model-card").querySelector(".model-prepare-note")).toHaveTextContent(/^63 MB download · 1 MB in memory$/);
+  expect(chips(state("stt-model-card"))).toEqual([["CPU", false]]);
+  expect(state("stt-model-card").querySelector(".model-prepare-note")).toHaveTextContent(/^1 MB on this device · 1 MB in memory$/);
+  expect(chips(state("turn-model-card"))).toEqual([["Will run on CPU", true]]);
+  expect(closedLine("stt")).toBe("Sherpa-ONNX · int8");
+  expect(chips(card("stt-model-card").querySelector(".model-runtime")!)).toEqual([]);
+});
+
+test("chipfacts: the labelled row with the hardware first, as a chip its label says is expected", () => {
+  variants({ modelSummary: "chipfacts" });
+  renderPane({ voiceSettings: withVoiceModel("piper-es"), voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
+  const pairs = (id: string) => [...card(id).querySelectorAll(".model-facts > div")].map((pair) => [pair.querySelector("dt")!.textContent, pair.querySelector("dd")!.textContent]);
+  expect(pairs("tts-model-card")).toEqual([["Will run on", "CPU"], ["Size", "63 MB"], ["Memory", "1 MB"]]);
+  expect(chips(card("tts-model-card").querySelector(".model-facts")!)).toEqual([["CPU", true]]);
+  expect(pairs("stt-model-card")).toEqual([["Runs on", "CPU"], ["Size", "1 MB"], ["Memory", "1 MB"]]);
+  expect(chips(card("stt-model-card").querySelector(".model-facts")!)).toEqual([["CPU", false]]);
+  expect(state("tts-model-card").querySelector(".model-prepare-note")).toBeNull();
+  expect(state("stt-model-card").querySelector(".model-prepare-note")).toHaveTextContent(/^On this device$/);
+  expect(closedLine("stt")).toBe("Sherpa-ONNX · int8");
+});
+
+test("chipadvanced: the chip on Advanced's line, before engine and precision; the sizes on the status line; the end of turn's beside its state", () => {
+  variants({ modelSummary: "chipadvanced" });
+  renderPane({ voiceSettings: withVoiceModel("piper-es"), voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
+  const head = (task: string) => card(task + "-model-card").querySelector(".model-runtime-head")!;
+  expect(chips(head("stt"))).toEqual([["CPU", false]]);
+  expect(head("stt").querySelector(".model-runtime-engine")).toHaveTextContent(/^Sherpa-ONNX · int8$/);
+  expect(head("stt").querySelector(".model-runtime-summary")).toBeNull();
+  expect(chips(head("tts"))).toEqual([["Will run on CPU", true]]);
+  expect(chips(state("stt-model-card"))).toEqual([]);
+  expect(state("stt-model-card").querySelector(".model-prepare-note")).toHaveTextContent(/^1 MB on this device · 1 MB in memory$/);
+  expect(chips(state("turn-model-card"))).toEqual([["Will run on CPU", true]]);
+  expect(state("turn-model-card").querySelector(".model-prepare-note")).toHaveTextContent(/^9 MB download · 1 MB in memory$/);
+});
+
+test("no chip where the engine does not say the hardware; the sizes are still said", () => {
+  for (const modelSummary of ["chip", "chipfacts", "chipadvanced"]) {
+    variants({ modelSummary });
+    renderPane({ voiceCatalogue: { state: "ready", catalogs: withBuilds([withoutClass(build("whisper-base/int8"))]), error: "" } });
+    expect(card("stt-model-card").querySelector(".model-hardware")).toBeNull();
+    expect(card("stt-model-card")).toHaveTextContent("1 MB");
+    cleanup();
+  }
+});
+
+test("the build a model runs as, with Automatic, is the engine's: one installed that runs here before the recommended one", () => {
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: withBuilds([
+    build("whisper-base/fp16", { installed: false, downloadBytes: 2e6, accelerator: "metal", acceleratorClass: "gpu" }), build("whisper-base/int8"),
+  ]), error: "" } });
+  expect(state("stt-model-card").querySelector(".model-prepare-note")).toHaveTextContent(/^1 MB on this device · 1 MB in memory · processor$/);
+});
+
+test("twolines: a model's memory at the end of its name's line, its download or what it takes here and its hardware under it", () => {
+  variants({ modelList: "twolines" });
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
+  // The memory, which the option's end does not say to whatever reads it, is said in its description too.
+  expect(listOptions("stt-model").map((option) => option.detail)).toEqual([
+    "1 MB on this device · CPU · 1 MB in memory",
+    "does not run here: it does not fit in this device's memory",
+  ]);
+  expect(listOptions("turn-model").map((option) => option.detail)).toEqual(["9 MB download · CPU · 1 MB in memory"]);
+  fireEvent.click(document.getElementById("stt-model")!);
+  const memory = (value: string) => document.querySelector(`[role=option][data-value="${value}"] .ui-select-item-badge`)?.textContent ?? "";
+  expect([memory("whisper-base"), memory("whisper-large")]).toEqual(["1 MB in memory", ""]);
+  fireEvent.keyDown(document.querySelector("[role=listbox]")!, { key: "Escape" });
+  expect(document.getElementById("stt-model")).toHaveTextContent(/^whisper-base$/);
+});

@@ -5,7 +5,7 @@ import { useRoomStore } from "../../state/room-store";
 import type { ModelBuild } from "@sidevoice/engine";
 import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 import type { ModelState } from "./ModelSetup";
-import { buildSizes, buildSummary, describeBuild, engineOf, useModelSummary } from "./model-facts";
+import { buildSizes, buildSummary, describeBuild, engineOf, HardwareChip, useModelSummary } from "./model-facts";
 
 /* How a model of this device runs, under its block, folded until asked for: what this device offers (a graphics card
  * the browser can use, its memory and cores — read at once, no benchmark) and each build of the model the engine has —
@@ -59,8 +59,14 @@ export function ModelRuntime({ task, state, locked }: { task: "stt" | "tts"; sta
           <ChevronIcon size={16} className={open ? "model-runtime-chevron-open" : undefined} />{t("runtime.advanced")}
         </button>
         {/* Its line, closed or open: engine and precision, the block saying its size and hardware elsewhere ("status",
-            "facts"); or all the panel says of the build, wrapped on a line of its own under the toggle ("advanced"). */}
-        {summary !== "advanced" && <span className="model-runtime-summary">{state.build ? engineOf(state.build) : ""}</span>}
+            "facts", "chip", "chipfacts"); or all the panel says of the build, wrapped on a line of its own under the toggle
+            ("advanced"); or the hardware as a chip — expected while the model is not here — then engine and precision,
+            wrapping ("chipadvanced"). */}
+        {summary === "chipadvanced" && state.build && <>
+          <HardwareChip build={state.build} expected={state.status !== "ready"} t={t} />
+          <span className="model-runtime-engine">{engineOf(state.build)}</span>
+        </>}
+        {summary !== "advanced" && summary !== "chipadvanced" && <span className="model-runtime-summary">{state.build ? engineOf(state.build) : ""}</span>}
       </div>
       {summary === "advanced" && state.build && <p className="model-runtime-summary-line">{buildSummary(state.build, t)}</p>}
       {open && <div className="model-runtime-panel" id={panel}>

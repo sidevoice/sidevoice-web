@@ -38,9 +38,12 @@ export function useModelState(task: Task | "end-of-turn", draft: Settings | null
   const model = slot ? catalog?.models.find((candidate) => candidate.id === slot.model) ?? null : null;
   const local = slot?.catalog === "local";
   const needsKey = !!slot && !local && catalog?.status?.reason?.code === "credential-missing";
-  // The build it runs as: the one chosen (Settings, "How it runs"), else the engine's recommended one.
+  // The build it runs as, as the engine loads it: the one chosen (Settings, "How it runs"); with Automatic, one installed
+  // that runs here (the first, in the catalogue's order), else the engine's recommended one — what a download fetches
+  // (WebEngine.load). The catalogue says no more: which hardware it ran on once loaded is not reported.
   const chosen = slot?.build ? model?.builds?.find((candidate) => candidate.id === slot.build) : undefined;
-  const build = chosen ?? model?.builds?.find((candidate) => candidate.id === model.recommendedBuild) ?? model?.builds?.find((candidate) => candidate.available);
+  const build = chosen ?? model?.builds?.find((candidate) => candidate.installed && candidate.available)
+    ?? model?.builds?.find((candidate) => candidate.id === model.recommendedBuild) ?? model?.builds?.find((candidate) => candidate.available);
   const installed = !!model && (!local || (chosen ? chosen.installed : model.installed === true || !!model.builds?.some((candidate) => candidate.installed)));
   const mine = install && install.task === task && install.model === slot?.model ? install : null;
   const installing = mine?.state === "running";
@@ -63,7 +66,7 @@ export function useModelState(task: Task | "end-of-turn", draft: Settings | null
     /** The slot's provider has no key: its models can be neither chosen nor tried until one is connected. */
     needsKey,
     size: build?.downloadBytes ?? null,
-    /** The build it runs as, and whether it was chosen rather than the engine's. */
+    /** The build it runs as (or will, once downloaded), and whether it was chosen rather than the engine's. */
     build: build ?? null,
     buildChosen: !!chosen,
     installing,

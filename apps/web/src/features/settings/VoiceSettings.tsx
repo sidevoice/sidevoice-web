@@ -24,7 +24,7 @@ import { SETTINGS_PHONE_QUERY, useSectionShown } from "./settings-levels";
 import { VoicePicker } from "./VoicePicker";
 import { ModelLanguageNotice, ModelLanguages } from "./ModelLanguages";
 import { languageName } from "./model-languages";
-import { listedFacts } from "./model-facts";
+import { listedFacts, listedLines } from "./model-facts";
 import { useVariant } from "../../lib/variants";
 import type { ModelBuild } from "@sidevoice/engine";
 
@@ -73,19 +73,22 @@ function noted(t: Translate, option: { disabled: boolean; note: Note | null }): 
   return option.disabled ? { reason: text } : { description: text };
 }
 
-/* What the Model list says under each model of this device, still being compared (sidevoice-web#340):
- * - "sized": what it takes and where it runs (model-facts.tsx), under each one that can be chosen;
- * - "names": its name alone. */
-const MODEL_LISTS = ["sized", "names"] as const;
+/* What the Model list says of each model of this device that can be chosen, still being compared (sidevoice-web#340):
+ * - "sized": what it takes and where it runs (model-facts.tsx), under its name;
+ * - "names": its name alone;
+ * - "twolines": its memory on its name's line, at the end, then its download and hardware under it. */
+const MODEL_LISTS = ["sized", "names", "twolines"] as const;
 
 type Listed = { id: string; builds?: ModelBuild[]; recommendedBuild?: string; installed?: boolean };
 
-/** The line under a model of this device in the Model list, while it can be chosen ("sized"). Put before what the pane
- *  says of the model (`noted`), which takes its place. */
+/** What a model of this device says in the Model list beside and under its name, while it can be chosen. Put before
+ *  what the pane says of the model (`noted`), which takes the line under it. */
 function useListedFacts(t: Translate) {
-  const sized = useVariant("modelList", MODEL_LISTS) === "sized";
-  return (model: Listed | undefined, disabled: boolean): Pick<SelectOption, "description"> => {
-    const facts = sized && model && !disabled ? listedFacts(model, t) : "";
+  const list = useVariant("modelList", MODEL_LISTS);
+  return (model: Listed | undefined, disabled: boolean): Pick<SelectOption, "badge" | "description"> => {
+    if (!model || disabled) return {};
+    if (list === "twolines") return listedLines(model, t);
+    const facts = list === "sized" ? listedFacts(model, t) : "";
     return facts ? { description: facts } : {};
   };
 }

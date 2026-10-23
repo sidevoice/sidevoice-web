@@ -32,14 +32,23 @@
 .model-prepare-notice svg { flex: none; margin-top: 2px; }
 /* What the model takes and where it runs, as a labelled row ("facts"): pairs that wrap as the block narrows. */
 .model-facts { display: flex; flex-wrap: wrap; gap: var(--sv-space-1) var(--sv-space-4); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; font-variant-numeric: tabular-nums; }
-.model-facts > div { display: flex; gap: var(--sv-space-1-5); min-width: 0; }
+.model-facts > div { display: flex; align-items: center; gap: var(--sv-space-1-5); min-width: 0; }
 .model-facts dt { color: var(--sv-text-muted); }
 .model-facts dd { margin: 0; color: var(--sv-text); }
 .model-prepare-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sv-space-3); min-height: 48px; min-width: 0; }
 .model-prepare-state { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; }
 .model-prepare-note { white-space: nowrap; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); font-variant-numeric: tabular-nums; }
-/* All of the model's facts on the status line ("status"): longer than a size, so they wrap. */
+/* All of the model's facts on the status line ("status"), or its sizes ("chip", "chipadvanced"): longer than a size,
+   so they wrap. */
 .model-prepare-note.model-prepare-facts { white-space: normal; }
+/* The hardware as a chip ("chip", "chipfacts", "chipadvanced"): the engine's pick for this device, in the accent's
+   weight. Expected (the model not here yet): clear and dashed, and its words say so too. It wraps rather than overflow
+   a narrow block. */
+.ui-badge.model-hardware { flex: 0 1 auto; max-width: 100%; height: auto; min-height: 22px; padding-block: 2px; border: 1px solid transparent; line-height: 1.2; white-space: normal; text-align: start; }
+.ui-badge.model-hardware[data-expected] { border-style: dashed; border-color: currentColor; background: transparent; }
+.model-prepare-state[data-chip] { flex-wrap: wrap; row-gap: var(--sv-space-1); }
+/* "twolines": a model's memory at the end of its name's line in the Model list, quieter than its name. */
+.model-list-memory { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-regular); line-height: 1.25rem; color: var(--sv-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .model-prepare-working { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text); }
 .model-prepare-state .ui-spinner { color: var(--sv-accent-text); }
 .model-prepare-progress { display: grid; gap: var(--sv-space-2); flex: 1; min-width: 0; }
@@ -94,6 +103,9 @@
 .model-runtime-toggle svg.model-runtime-chevron-open { transform: none; }
 .model-runtime-summary { min-width: 0; max-width: 100%; overflow: hidden; font-weight: 400; color: var(--sv-text-subtle); white-space: nowrap; text-overflow: ellipsis; }
 .model-runtime-summary:not(:empty)::before { content: "· "; }
+/* "chipadvanced": after the toggle, the hardware's chip, then engine and precision, wrapping rather than cut. */
+.model-runtime-head .model-hardware { margin-inline-end: var(--sv-space-1); }
+.model-runtime-engine { min-width: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 /* All the panel says of the build, with its sizes ("advanced"): on a line of its own under the toggle, aligned with its
    words, and wrapped rather than cut — the numbers are the point. */
 .model-runtime-summary-line { margin: 0; padding-inline-start: calc(var(--sv-space-1) + 16px + var(--sv-space-1-5)); font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); font-variant-numeric: tabular-nums; }

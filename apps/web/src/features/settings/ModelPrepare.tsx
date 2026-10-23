@@ -7,7 +7,7 @@ import { DownloadsIcon } from "../../components/ui/Icons";
 import { translator } from "../../i18n/translator";
 import type { ModelBuild } from "@sidevoice/engine";
 import { sizeText } from "./ModelSetup";
-import { buildSummary, ModelFacts, modelFacts, useModelSummary } from "./model-facts";
+import { buildSummary, HardwareChip, ModelFacts, modelFacts, sizeFacts, useModelSummary } from "./model-facts";
 import "./model-prepare.css";
 
 /* A chosen model made ready on this device, the same block wherever a model is chosen (the first-run setup, Settings):
@@ -85,14 +85,22 @@ export function ModelPrepare({ pending, runtime, status, model, pickers, meta, n
   const locked = status === "downloading";
   const stalled = useStalled(locked, fraction);
   const percent = fraction == null ? null : Math.round(fraction * 100);
+  // Its hardware as a chip beside Not downloaded or Ready: "chip", and "chipadvanced" in a block with no Advanced line
+  // to carry it (the end of turn's).
+  const stateChip = !!build && (summary === "chip" || (summary === "chipadvanced" && runtime === undefined));
   // Beside Not downloaded or Ready: its size (once ready, on this device). A model of this device says all its facts
-  // there ("status"), or only that it is here, its facts having a row of their own ("facts").
+  // there ("status"), or only that it is here, its facts having a row of their own ("facts", "chipfacts"), or its
+  // sizes, its hardware being a chip ("chip", "chipadvanced").
   const note = (ready: boolean): ReactNode => {
     if (build && summary === "status") {
       const facts = modelFacts(build, ready, t);
       if (facts) return <span className="model-prepare-note model-prepare-facts">{facts}</span>;
     }
-    if (build && summary === "facts") return ready && <span className="model-prepare-note">{t("runtime.onDisk")}</span>;
+    if (build && (summary === "facts" || summary === "chipfacts")) return ready && <span className="model-prepare-note">{t("runtime.onDisk")}</span>;
+    if (build && (summary === "chip" || summary === "chipadvanced")) {
+      const sizes = sizeFacts(build, ready, t);
+      return <>{stateChip && <HardwareChip build={build} expected={!ready} t={t} />}{sizes && <span className="model-prepare-note model-prepare-facts">{sizes}</span>}</>;
+    }
     return ready ? <span className="model-prepare-note">{sized ? t("voice.prepare.onDevice", { size: sized }) : t("voice.prepare.noDownload")}</span>
       : sized && <span className="model-prepare-note">{sized}</span>;
   };
@@ -103,11 +111,12 @@ export function ModelPrepare({ pending, runtime, status, model, pickers, meta, n
       {!locked && meta && <p className="model-prepare-meta">{meta}</p>}
       {!locked && notice}
       {build && status && summary === "facts" && <ModelFacts build={build} t={t} />}
+      {build && status && summary === "chipfacts" && <ModelFacts build={build} chip expected={status !== "ready"} t={t} />}
       {/* A block with no "Advanced: how it runs" (the end of turn's) says its line where that would be ("advanced"). */}
       {runtime ?? (build && summary === "advanced" && <p className="model-prepare-meta model-prepare-summary">{buildSummary(build, t)}</p>)}
       {status && <div className="model-prepare-status" role={status === "failed" ? undefined : "status"} aria-live="polite">
         {status === "absent" && <>
-          <div className="model-prepare-state"><Badge>{t("voice.prepare.badge.absent")}</Badge>{note(false)}</div>
+          <div className="model-prepare-state" data-chip={stateChip || undefined}><Badge>{t("voice.prepare.badge.absent")}</Badge>{note(false)}</div>
           <Button size="sm" id={actionId("download")} onClick={onDownload}><DownloadsIcon />{t("voice.prepare.download")}</Button>
         </>}
         {status === "downloading" && <>
@@ -126,7 +135,7 @@ export function ModelPrepare({ pending, runtime, status, model, pickers, meta, n
           <span className="model-prepare-working">{t(status === "verifying" ? "voice.prepare.verifying" : "voice.prepare.loading")}</span>
         </div>}
         {status === "ready" && <>
-          <div className="model-prepare-state">
+          <div className="model-prepare-state" data-chip={stateChip || undefined}>
             <Badge tone="positive" dot>{t("voice.prepare.badge.ready")}</Badge>
             {note(true)}
           </div>
