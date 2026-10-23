@@ -1088,6 +1088,7 @@ export const messages: Messages = {
   "runtime.onDisk": "在此设备上",
   "runtime.sizes": "下载 {download} · 内存 {memory}",
   "runtime.memory": "内存 {memory}",
+  "runtime.fact.languages": "语言",
   "runtime.fact.size": "大小",
   "runtime.fact.memory": "内存",
   "runtime.fact.runsOn": "运行于",

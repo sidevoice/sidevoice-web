@@ -17,8 +17,10 @@ import { sizeText } from "./ModelSetup";
  * - "chip": the hardware as a chip beside Not downloaded or Ready, the sizes as text after it.
  * - "chipfacts": the labelled row, the hardware first as a chip.
  * - "chipadvanced": the hardware as a chip on Advanced's line, the sizes on the status line (a block with no Advanced,
- *   the end of turn's, has the chip beside its state, as "chip"). */
-export const MODEL_SUMMARIES = ["status", "facts", "advanced", "chip", "chipfacts", "chipadvanced"] as const;
+ *   the end of turn's, has the chip beside its state, as "chip").
+ * - "sheet": Advanced under the pickers, then one bordered block with the languages, the hardware and the sizes (a spec
+ *   sheet), the status row with the state alone. */
+export const MODEL_SUMMARIES = ["status", "facts", "advanced", "chip", "chipfacts", "chipadvanced", "sheet"] as const;
 
 export const useModelSummary = () => useVariant("modelSummary", MODEL_SUMMARIES);
 
@@ -96,9 +98,10 @@ export function hardwareLabel(build: ModelBuild, t: Translate, mode: HardwareLab
 
 /** The hardware as a chip ("chip", "chipfacts", "chipadvanced"). `expected`: the model is not here yet, so it is what
  *  the engine expects — a lighter look, and said in words ("Will run on GPU"), unless `bare`, where a label beside it
- *  says so. None when the engine does not say. */
-export function HardwareChip({ build, expected, bare = false, t }: { build: ModelBuild; expected: boolean; bare?: boolean; t: Translate }) {
-  const label = hardwareLabel(build, t, useHardwareLabel());
+ *  says so. `mode`: a label of its own, whatever the hardware label chosen. None when the engine does not say. */
+export function HardwareChip({ build, expected, bare = false, mode, t }: { build: ModelBuild; expected: boolean; bare?: boolean; mode?: HardwareLabelMode; t: Translate }) {
+  const chosen = useHardwareLabel();
+  const label = hardwareLabel(build, t, mode ?? chosen);
   if (!label) return null;
   // Said as expected, the hardware is one plain string: the verb may come after it in some languages.
   const said = expected && !bare;
@@ -189,4 +192,19 @@ export function ModelFacts({ build, chip = false, expected = false, t }: { build
   const known = facts.filter(([, value]) => value);
   if (!known.length) return null;
   return <dl className="model-facts">{known.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>;
+}
+
+/** The spec sheet ("sheet"): one block with what the model is, as rows that are left out when they have nothing — its
+ *  languages (`meta`, the languages line) with the notice under them (its region kept), the hardware it runs on, or
+ *  will once here (`expected`), always as class and technical name, and its sizes. */
+export function ModelSheet({ build, meta, notice, expected, t }: { build: ModelBuild; meta?: ReactNode; notice?: ReactNode; expected: boolean; t: Translate }) {
+  const sizes = sizeFacts(build, !expected, t);
+  return <div className="model-prepare-sheet">
+    <dl className="model-sheet">
+      {meta && <><dt>{t("runtime.fact.languages")}</dt><dd>{meta}</dd>{notice && <dd className="model-sheet-notice">{notice}</dd>}</>}
+      {hardwareLabel(build, t, "both") && <><dt>{t(expected ? "runtime.fact.willRunOn" : "runtime.fact.runsOn")}</dt>
+        <dd><HardwareChip build={build} expected={expected} bare mode="both" t={t} /></dd></>}
+      {sizes && <><dt>{t("runtime.fact.size")}</dt><dd className="model-sheet-size">{sizes}</dd></>}
+    </dl>
+  </div>;
 }

@@ -916,3 +916,51 @@ test("the Model list's two lines name the hardware as the label does; the text v
   expect(line("both")).toBe("1 MB on this device · GPU · Metal · 1 MB in memory");
   expect(line("class", "sized")).toBe("1 MB on this device · 1 MB in memory · graphics card (Metal)");
 });
+
+/* The spec sheet (modelSummary "sheet"): Advanced under the pickers, then one block with the languages, the hardware
+ * (always class and technical name) and the sizes; the status row has the state alone. */
+const sheetRows = (id: string) => [...card(id).querySelectorAll(".model-prepare-sheet dt")].map((label) => [label.textContent, label.nextElementSibling!.textContent]);
+const withLanguages = (languages: string[], base = catalogs) => base.map((catalog) => catalog.id !== "local" ? catalog : { ...catalog,
+  models: catalog.models.map((model) => model.id === "whisper-base" ? { ...model, languages } : model) }) as CatalogView[];
+
+test("sheet: Advanced right under the pickers, then the sheet — languages with +N more, runs on, size — and the state alone", () => {
+  variants({ modelSummary: "sheet", hardwareLabel: "technical" });
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: withLanguages(["ko", "ja", "en", "de", "es", "fr"], onMetal(true)), error: "" } });
+  const parts = [...card("stt-model-card").children].map((child) => child.className);
+  expect(parts).toEqual(["model-prepare-pickers", "model-runtime", "model-prepare-sheet", "model-prepare-status"]);
+  expect(closedLine("stt")).toBe("whisper.cpp · int8");
+  expect(sheetRows("stt-model-card")).toEqual([["Languages", "English, Korean, Japanese, German +2 more"], ["Runs on", "GPU · Metal"], ["Size", "1 MB on this device · 1 MB in memory"]]);
+  expect(card("stt-model-card").querySelector(".model-prepare-sheet button.model-languages-more")).toHaveAccessibleName("+2 more languages");
+  // Class and technical name whatever the hardware label; installed, a plain chip.
+  const chip = card("stt-model-card").querySelector(".model-prepare-sheet .model-hardware")!;
+  expect(chip.querySelector(".model-hardware-name")).toHaveTextContent(/^· Metal$/);
+  expect(chip).not.toHaveAttribute("data-expected");
+  expect(state("stt-model-card").querySelector(".model-prepare-note, .model-hardware")).toBeNull();
+});
+
+test("sheet: the notice under the languages, inside the sheet; a CPU build is just CPU", () => {
+  variants({ modelSummary: "sheet" });
+  renderPane();
+  const sheet = card("stt-model-card").querySelector(".model-prepare-sheet")!;
+  expect(sheet.querySelector(".model-prepare-notice")).toHaveTextContent(/^This model doesn't support English\.$/);
+  expect(sheet.querySelector(".model-prepare-notice")).toHaveAttribute("aria-live", "polite");
+  expect(card("stt-model-card").querySelector(":scope > .model-prepare-notice, :scope > .model-prepare-meta")).toBeNull();
+  expect(sheet.querySelector(".model-hardware")).toHaveTextContent(/^CPU$/);
+});
+
+test("sheet: not downloaded, it will run on, dashed, and the download's sizes; the end of turn's has no languages", () => {
+  variants({ modelSummary: "sheet" });
+  renderPane({ voiceSettings: withVoiceModel("piper-es"), voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
+  expect(sheetRows("tts-model-card")).toEqual([["Languages", "Spanish"], ["Will run on", "CPU"], ["Size", "63 MB download · 1 MB in memory"]]);
+  expect(card("tts-model-card").querySelector(".model-prepare-sheet .model-hardware")).toHaveAttribute("data-expected");
+  expect(state("tts-model-card").querySelector(".model-prepare-note")).toBeNull();
+  expect(sheetRows("turn-model-card")).toEqual([["Will run on", "CPU"], ["Size", "9 MB download · 1 MB in memory"]]);
+  expect(card("turn-model-card").querySelector(".model-runtime-toggle")).toBeNull();
+});
+
+test("sheet: a provider's model has none of it, and shows the block as by default", () => {
+  variants({ modelSummary: "sheet" });
+  renderPane({ voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "elevenlabs", model: "scribe_v2", language: null } } });
+  expect(card("stt-model-card").querySelector(".model-prepare-sheet")).toBeNull();
+  expect(state("stt-model-card").querySelector(".model-prepare-note")).toHaveTextContent(/^No download needed$/);
+});

@@ -1089,6 +1089,7 @@ export const messages: Messages = {
   "runtime.onDisk": "このデバイス上",
   "runtime.sizes": "ダウンロード {download} · メモリ {memory}",
   "runtime.memory": "メモリ {memory}",
+  "runtime.fact.languages": "言語",
   "runtime.fact.size": "サイズ",
   "runtime.fact.memory": "メモリ",
   "runtime.fact.runsOn": "実行先",

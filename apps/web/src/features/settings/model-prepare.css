@@ -3,7 +3,7 @@
 .model-prepare-pickers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: var(--sv-space-3); }
 .model-prepare-meta { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .model-prepare-pickers + .model-prepare-status, .model-prepare-meta + .model-prepare-status, .model-prepare-notice + .model-prepare-status,
-.model-facts + .model-prepare-status { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.model-facts + .model-prepare-status, .model-prepare-sheet + .model-prepare-status { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
 /* Which languages the model supports (ModelLanguages): the one in use in bold; "+N more" a link in the text that opens
    all of them in a popover. */
 .model-prepare-meta strong { font-weight: 600; color: var(--sv-text); }
@@ -166,3 +166,18 @@
   .stt-try-head .voice-wave { max-width: none; }
 }
 .model-prepare-stalled { color: var(--sv-warning); }
+/* The spec sheet ("sheet", ModelSheet): what the model is in one bordered block, a label column and a value column, tight;
+   on a narrow phone each label above its value. */
+.model-prepare-sheet { padding: var(--sv-space-2) var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-surface); }
+.model-sheet { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: baseline; gap: var(--sv-space-1) var(--sv-space-3); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; font-variant-numeric: tabular-nums; }
+.model-sheet dt { color: var(--sv-text-muted); }
+.model-sheet dd { margin: 0; min-width: 0; color: var(--sv-text); }
+.model-sheet strong { font-weight: 600; }
+.model-sheet .model-sheet-size { color: var(--sv-text-muted); }
+/* The notice under the languages, across both columns; no row while it is empty. */
+.model-sheet .model-sheet-notice { display: contents; }
+.model-sheet .model-prepare-notice { grid-column: 1 / -1; }
+@media (max-width: 360px) {
+  .model-sheet { grid-template-columns: minmax(0, 1fr); row-gap: 0; }
+  .model-sheet dd + dt { margin-top: var(--sv-space-1-5); }
+}

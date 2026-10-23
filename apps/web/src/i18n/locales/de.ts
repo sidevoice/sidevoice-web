@@ -1091,6 +1091,7 @@ export const messages: Messages = {
   "runtime.onDisk": "Auf diesem Gerät",
   "runtime.sizes": "{download} Download · {memory} im Speicher",
   "runtime.memory": "{memory} im Speicher",
+  "runtime.fact.languages": "Sprachen",
   "runtime.fact.size": "Größe",
   "runtime.fact.memory": "Arbeitsspeicher",
   "runtime.fact.runsOn": "Läuft auf",

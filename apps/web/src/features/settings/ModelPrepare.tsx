@@ -7,7 +7,7 @@ import { DownloadsIcon } from "../../components/ui/Icons";
 import { translator } from "../../i18n/translator";
 import type { ModelBuild } from "@sidevoice/engine";
 import { sizeText } from "./ModelSetup";
-import { buildSummary, HardwareChip, ModelFacts, modelFacts, sizeFacts, useModelSummary } from "./model-facts";
+import { buildSummary, HardwareChip, ModelFacts, modelFacts, ModelSheet, sizeFacts, useModelSummary } from "./model-facts";
 import "./model-prepare.css";
 
 /* A chosen model made ready on this device, the same block wherever a model is chosen (the first-run setup, Settings):
@@ -91,7 +91,11 @@ export function ModelPrepare({ pending, runtime, status, model, pickers, meta, n
   // Beside Not downloaded or Ready: its size (once ready, on this device). A model of this device says all its facts
   // there ("status"), or only that it is here, its facts having a row of their own ("facts", "chipfacts"), or its
   // sizes, its hardware being a chip ("chip", "chipadvanced").
+  // The spec sheet ("sheet"), for a model of this device: Advanced under the pickers, then one block with its languages,
+  // hardware and sizes; its status row has the state alone.
+  const sheet = summary === "sheet" && !!build;
   const note = (ready: boolean): ReactNode => {
+    if (sheet) return null;
     if (build && summary === "status") {
       const facts = modelFacts(build, ready, t);
       if (facts) return <span className="model-prepare-note model-prepare-facts">{facts}</span>;
@@ -108,12 +112,18 @@ export function ModelPrepare({ pending, runtime, status, model, pickers, meta, n
     <div className="model-prepare" id={id} data-status={status}>
       {pickers && <div className="model-prepare-pickers" aria-describedby={locked ? hintId : undefined}>{pickers(locked)}</div>}
       {locked && pickers && <p className="model-prepare-meta" id={hintId}>{t("voice.prepare.lockedHint")}</p>}
-      {!locked && meta && <p className="model-prepare-meta">{meta}</p>}
-      {!locked && notice}
-      {build && status && summary === "facts" && <ModelFacts build={build} t={t} />}
-      {build && status && summary === "chipfacts" && <ModelFacts build={build} chip expected={status !== "ready"} t={t} />}
-      {/* A block with no "Advanced: how it runs" (the end of turn's) says its line where that would be ("advanced"). */}
-      {runtime ?? (build && summary === "advanced" && <p className="model-prepare-meta model-prepare-summary">{buildSummary(build, t)}</p>)}
+      {sheet ? <>
+        {runtime}
+        {/* Its languages and notice stay in the sheet while a download runs: the pickers' hint is a line of its own. */}
+        {status && <ModelSheet build={build!} meta={meta} notice={notice} expected={status !== "ready"} t={t} />}
+      </> : <>
+        {!locked && meta && <p className="model-prepare-meta">{meta}</p>}
+        {!locked && notice}
+        {build && status && summary === "facts" && <ModelFacts build={build} t={t} />}
+        {build && status && summary === "chipfacts" && <ModelFacts build={build} chip expected={status !== "ready"} t={t} />}
+        {/* A block with no "Advanced: how it runs" (the end of turn's) says its line where that would be ("advanced"). */}
+        {runtime ?? (build && summary === "advanced" && <p className="model-prepare-meta model-prepare-summary">{buildSummary(build, t)}</p>)}
+      </>}
       {status && <div className="model-prepare-status" role={status === "failed" ? undefined : "status"} aria-live="polite">
         {status === "absent" && <>
           <div className="model-prepare-state" data-chip={stateChip || undefined}><Badge>{t("voice.prepare.badge.absent")}</Badge>{note(false)}</div>
