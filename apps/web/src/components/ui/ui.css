@@ -358,3 +358,7 @@
 .ui-tooltip-arrow { fill: var(--sv-tooltip-bg); }
 .ui-infotip { width: 24px; height: 24px; color: var(--sv-text-subtle); vertical-align: middle; }
 .ui-infotip svg { width: 16px; height: 16px; }
+/* A row with a trailing badge (the Model list's size): the check sits next to the label and the badge stays alone at the far end. */
+.ui-select-item:has(.ui-select-item-badge) .ui-select-item-text { flex: 0 1 auto; }
+.ui-select-item:has(.ui-select-item-badge) .ui-select-item-check { order: 1; margin-left: calc(-1 * var(--sv-space-1)); }
+.ui-select-item:has(.ui-select-item-badge) .ui-select-item-badge { order: 2; margin-left: auto; }
