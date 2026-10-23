@@ -42,13 +42,15 @@ export function beginBrowserAudioActivation(input = null) {
   void stream.catch(() => {});
   // The page's own stream and context are watched, not changed (sidevoice-web#341).
   const unwatch = [];
+  let released = false;
   try {
     const diagnostics = audioDiagnostics();
     const stopContext = diagnostics.watchContext(context);
-    void stream.then((opened) => { unwatch.push(diagnostics.watchStream(opened, context)); }, () => {});
+    void stream.then((opened) => { if (!released) unwatch.push(diagnostics.watchStream(opened, context)); }, () => {});
     unwatch.push(stopContext);
   } catch { /* never in the way of the call */ }
   return { context, resumed, stream, release() {
+    released = true;
     try { unwatch.forEach((stop) => stop()); } catch { /* nothing to undo */ }
     void stream.then((opened) => opened.getTracks().forEach((track) => track.stop()), () => {});
     void context.close().catch(() => {});

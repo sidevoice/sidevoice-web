@@ -63,6 +63,8 @@ export function createAudioDiagnostics(options: AudioDiagnosticsOptions = {}) {
   let callStart: number | null = null;
   let acquisitions = 0;
   const detachers = new Set<() => void>();
+  // The listeners on the page's streams and contexts: none is held across calls.
+  const watched = new Set<() => void>();
   const gates = new Map<string, { since: number; count: number; dropped: number }>();
   let saving = false;
   let installed = false;
@@ -126,6 +128,12 @@ export function createAudioDiagnostics(options: AudioDiagnosticsOptions = {}) {
     };
   }
 
+  /** Keeps a watch's way off, so the end of a call can let go of it. */
+  function watch(off: () => void): () => void {
+    watched.add(off);
+    return () => { watched.delete(off); off(); };
+  }
+
   function install() {
     if (installed || !win) return;
     installed = true;
@@ -154,7 +162,7 @@ export function createAudioDiagnostics(options: AudioDiagnosticsOptions = {}) {
     /** The call ended: its totals are the last entry, the next call counts from zero, and the clock stops. */
     callEnded() {
       try { record("call-ended", { mic_acquisitions: acquisitions }); }
-      finally { callStart = null; acquisitions = 0; }
+      finally { callStart = null; acquisitions = 0; [...watched].forEach((off) => quietly(off)); watched.clear(); }
     },
     /** A microphone stream the page opened itself: its tracks' settings now, and their events until `stop`. Returns
      *  how to stop watching (call it when the page lets the stream go: a stopped track emits no `ended`). */
@@ -166,10 +174,10 @@ export function createAudioDiagnostics(options: AudioDiagnosticsOptions = {}) {
         for (const track of tracks) {
           record("mic-acquired", { n, ...trackFacts(track), ...contextFacts(context) });
           for (const type of ["ended", "mute", "unmute"]) {
-            quietly(() => offs.push(listen(track, type, () => {
+            quietly(() => offs.push(watch(listen(track, type, () => {
               record("track-" + type, { n, ...trackFacts(track), ...contextFacts(context) });
               if (type === "ended") offs.forEach((off) => off());
-            })));
+            }))));
           }
         }
       });
@@ -180,10 +188,10 @@ export function createAudioDiagnostics(options: AudioDiagnosticsOptions = {}) {
       let off = () => {};
       quietly(() => {
         record("ctx-created", contextFacts(context));
-        off = listen(context, "statechange", () => {
+        off = watch(listen(context, "statechange", () => {
           record("ctx-" + (peek(() => context.state) ?? "state"), contextFacts(context));
           if (peek(() => context.state) === "closed") off();
-        });
+        }));
       });
       return () => off();
     },

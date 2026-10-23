@@ -153,3 +153,16 @@ test("nothing personal reaches the log, in memory or in storage", () => {
   expect(createAudioDiagnostics({ win, storage, log: () => {} }).entries().length).toBe(diag.entries().length);
   vi.useRealTimers();
 });
+
+test("the end of a call lets go of every watched track and context", () => {
+  const { diag, stream } = setup();
+  const context = new FakeContext();
+  const { track, stream: s } = stream();
+  diag.watchStream(s, context);
+  diag.watchContext(context);
+  const removedTrack = vi.spyOn(track, "removeEventListener");
+  const removedContext = vi.spyOn(context, "removeEventListener");
+  diag.callEnded();
+  expect(removedTrack).toHaveBeenCalledTimes(3);
+  expect(removedContext).toHaveBeenCalledTimes(1);
+});
