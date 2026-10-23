@@ -12,7 +12,7 @@
  * id only as a short hash. The log is a ring of the last events, kept in memory and mirrored to localStorage so it
  * outlives a reload, and read with `window.sidevoiceAudioDiagnostics.dump()` or from the stats dialog's copied text. */
 
-export type AudioDiagnosticEntry = { at: string; call_ms: number; kind: string; mic_rebuilds: number; [field: string]: unknown };
+export type AudioDiagnosticEntry = { at: string; call_ms: number | null; kind: string; mic_rebuilds: number; [field: string]: unknown };
 
 type Any = any; // The browser objects here are observed through feature checks, never trusted to have a shape.
 
@@ -40,6 +40,15 @@ export function shortId(id: unknown): string | null {
 
 const num = (value: unknown, digits = 0) => typeof value === "number" && Number.isFinite(value) ? Number(value.toFixed(digits)) : null;
 
+/** The one installed instance on this page: a second install, from any instance, is a no-op while it stands, so the
+ *  wrappers never stack and an uninstall in any order restores the browser's own functions. */
+let installedBy: object | null = null;
+
+/** Reads a value the browser may refuse to give; the log goes on without it. */
+function peek<T>(read: () => T): T | null {
+  try { const value = read(); return value === undefined ? null : value; } catch { return null; }
+}
+
 export function createAudioDiagnostics(options: AudioDiagnosticsOptions = {}) {
   const win: Any = options.win ?? (typeof window === "undefined" ? undefined : window);
   const now = options.now ?? (() => Date.now());
@@ -48,14 +57,20 @@ export function createAudioDiagnostics(options: AudioDiagnosticsOptions = {}) {
   const windowMs = options.windowMs ?? 10_000;
   const storage = options.storage === undefined ? safeStorage(win) : options.storage;
   const log = options.log ?? ((line: string) => { try { console.debug(line); } catch { /* nothing to say it to */ } });
+  const owner = {};
 
   let entries: AudioDiagnosticEntry[] = load(storage, max);
+  // The clock of the call: set by its start (or by the first event before one), cleared only by its end; the events of
+  // a teardown never start it again, so an idle hour does not become the next call's first minute.
   let callStart: number | null = null;
+  let callOver = false;
   let acquisitions = 0;
+  let live = false;
   const contexts = new Set<Any>();
+  const detach = new Set<() => void>();
   const gates = new Map<string, { since: number; count: number; dropped: number }>();
   let saving = false;
-  let installed: (() => void) | null = null;
+  let uninstallAll: (() => void) | null = null;
 
   function load(from: typeof storage, keep: number): AudioDiagnosticEntry[] {
     try {
@@ -67,7 +82,7 @@ export function createAudioDiagnostics(options: AudioDiagnosticsOptions = {}) {
     if (!storage || saving) return;
     saving = true;
     const write = () => { saving = false; try { storage.setItem(AUDIO_DIAGNOSTICS_KEY, JSON.stringify(entries)); } catch { /* full or blocked: memory still has it */ } };
-    if (typeof setTimeout === "function") setTimeout(write, 1000); else write();
+    try { if (typeof setTimeout === "function") setTimeout(write, 1000); else write(); } catch { saving = false; }
   }
 
   function record(kind: string, fields: Record<string, unknown> = {}) {
@@ -78,8 +93,8 @@ export function createAudioDiagnostics(options: AudioDiagnosticsOptions = {}) {
       gates.set(kind, gate);
       if (gate.count >= burst) { gate.dropped++; return; }
       gate.count++;
-      callStart ??= t;
-      const entry: AudioDiagnosticEntry = { at: new Date(t).toISOString(), call_ms: t - callStart, kind, mic_rebuilds: Math.max(0, acquisitions - 1), ...fields };
+      if (callStart === null && !callOver) callStart = t;
+      const entry: AudioDiagnosticEntry = { at: new Date(t).toISOString(), call_ms: callStart === null ? null : t - callStart, kind, mic_rebuilds: Math.max(0, acquisitions - 1), ...fields } as AudioDiagnosticEntry;
       if (gate.dropped) { entry.suppressed = gate.dropped; gate.dropped = 0; }
       entries.push(entry);
       if (entries.length > max) entries = entries.slice(-max);
@@ -88,114 +103,169 @@ export function createAudioDiagnostics(options: AudioDiagnosticsOptions = {}) {
     } catch { /* diagnostics never break a call */ }
   }
 
+  const sinkName = (sink: unknown) => typeof sink === "string" ? (sink === "" ? "default" : shortId(sink)) : sink && typeof sink === "object" ? String(peek(() => (sink as Any).type) ?? "object") : null;
+
+  /** Never throws: each property is read on its own. */
   function contextFacts(context: Any = [...contexts].pop()): Record<string, unknown> {
     if (!context) return {};
-    const sink = context.sinkId;
     return {
-      ctx_state: context.state ?? null,
-      ctx_rate: num(context.sampleRate),
-      ctx_sink: typeof sink === "string" ? (sink === "" ? "default" : shortId(sink)) : sink && typeof sink === "object" ? String(sink.type ?? "object") : null,
-      ctx_out_latency_ms: num(context.outputLatency * 1000, 1),
-      ctx_base_latency_ms: num(context.baseLatency * 1000, 1),
+      ctx_state: peek(() => context.state),
+      ctx_rate: peek(() => num(context.sampleRate)),
+      ctx_sink: peek(() => sinkName(context.sinkId)),
+      ctx_out_latency_ms: peek(() => num(context.outputLatency * 1000, 1)),
+      ctx_base_latency_ms: peek(() => num(context.baseLatency * 1000, 1)),
     };
   }
   function trackFacts(track: Any): Record<string, unknown> {
-    let s: Any = {};
-    try { s = track.getSettings?.() ?? {}; } catch { /* none */ }
+    const s: Any = peek(() => track.getSettings?.()) ?? {};
     return {
-      track: typeof track.id === "string" ? track.id.slice(0, 8) : null,
-      ready: track.readyState ?? null, muted: track.muted ?? null, enabled: track.enabled ?? null,
-      aec: s.echoCancellation ?? null, ns: s.noiseSuppression ?? null, agc: s.autoGainControl ?? null,
-      rate: num(s.sampleRate), channels: num(s.channelCount),
-      device: shortId(s.deviceId), group: shortId(s.groupId),
+      track: peek(() => typeof track.id === "string" ? track.id.slice(0, 8) : null),
+      ready: peek(() => track.readyState), muted: peek(() => track.muted), enabled: peek(() => track.enabled),
+      aec: peek(() => s.echoCancellation), ns: peek(() => s.noiseSuppression), agc: peek(() => s.autoGainControl),
+      rate: peek(() => num(s.sampleRate)), channels: peek(() => num(s.channelCount)),
+      device: peek(() => shortId(s.deviceId)), group: peek(() => shortId(s.groupId)),
     };
+  }
+  /** Runs a hook of the log; whatever it does, the caller's own result stands. */
+  const quietly = (hook: () => void) => { try { hook(); } catch { /* unobserved */ } };
+
+  function listen(target: Any, type: string, handler: () => void) {
+    target.addEventListener(type, handler);
+    const off = () => { detach.delete(off); try { target.removeEventListener(type, handler); } catch { /* gone */ } };
+    detach.add(off);
+    return off;
   }
 
   function watchTrack(track: Any, n: number) {
+    const offs: Array<() => void> = [];
+    const drop = () => offs.forEach((off) => off());
     for (const type of ["ended", "mute", "unmute"]) {
-      track.addEventListener?.(type, () => record("track-" + type, { n, ...trackFacts(track), ...contextFacts() }));
+      offs.push(listen(track, type, () => {
+        if (!live) return;
+        record("track-" + type, { n, ...trackFacts(track), ...contextFacts() });
+        if (type === "ended") drop();
+      }));
     }
   }
 
-  function wrapGetUserMedia(devices: Any) {
+  function wrapGetUserMedia(devices: Any): (() => void) | null {
     const original = devices.getUserMedia;
-    if (typeof original !== "function") return () => {};
+    if (typeof original !== "function") return null;
     const wrapped = async function (this: Any, constraints?: Any) {
-      const audio = constraints?.audio;
+      if (!live) return original.call(this, constraints);
+      const audio = peek(() => constraints?.audio);
       if (!audio) return original.call(this, constraints);
-      const asked = typeof audio === "object" ? { aec: audio.echoCancellation ?? null, ns: audio.noiseSuppression ?? null, agc: audio.autoGainControl ?? null, device: shortId(audio.deviceId?.exact ?? audio.deviceId) } : {};
-      try {
-        const stream = await original.call(this, constraints);
-        const n = ++acquisitions;
-        const tracks: Any[] = stream?.getAudioTracks?.() ?? [];
-        for (const track of tracks) { record("mic-acquired", { n, asked, ...trackFacts(track), ...contextFacts() }); watchTrack(track, n); }
-        if (!tracks.length) record("mic-acquired", { n, asked, tracks: 0, ...contextFacts() });
-        return stream;
-      } catch (error: Any) {
-        record("mic-failed", { asked, error: String(error?.name ?? "Error").slice(0, 40), ...contextFacts() });
+      let asked: Record<string, unknown> = {};
+      quietly(() => { asked = typeof audio === "object" ? { aec: audio.echoCancellation ?? null, ns: audio.noiseSuppression ?? null, agc: audio.autoGainControl ?? null, device: shortId(audio.deviceId?.exact ?? audio.deviceId) } : {}; });
+      let stream: Any;
+      try { stream = await original.call(this, constraints); }
+      catch (error: Any) {
+        quietly(() => record("mic-failed", { asked, error: String(error?.name ?? "Error").slice(0, 40), ...contextFacts() }));
         throw error;
       }
+      quietly(() => {
+        const n = ++acquisitions;
+        const tracks: Any[] = Array.from(stream?.getAudioTracks?.() ?? []);
+        for (const track of tracks) {
+          quietly(() => record("mic-acquired", { n, asked, ...trackFacts(track), ...contextFacts() }));
+          quietly(() => watchTrack(track, n));
+        }
+        if (!tracks.length) record("mic-acquired", { n, asked, tracks: 0, ...contextFacts() });
+      });
+      return stream;
     };
-    devices.getUserMedia = wrapped;
-    return () => { if (devices.getUserMedia === wrapped) devices.getUserMedia = original; };
+    // A property the browser or another script made read-only cannot be wrapped: skipped, not thrown.
+    try { devices.getUserMedia = wrapped; } catch { return null; }
+    if (devices.getUserMedia !== wrapped) return null;
+    return () => { if (devices.getUserMedia === wrapped) { try { devices.getUserMedia = original; } catch { /* stays wrapped, passes through */ } } };
   }
 
   function observeContext(context: Any) {
     contexts.add(context);
     record("ctx-created", contextFacts(context));
-    context.addEventListener?.("statechange", () => {
-      record("ctx-" + (context.state ?? "state"), contextFacts(context));
-      if (context.state === "closed") contexts.delete(context);
+    listen(context, "statechange", () => {
+      if (!live) return;
+      record("ctx-" + (peek(() => context.state) ?? "state"), contextFacts(context));
+      if (peek(() => context.state) === "closed") contexts.delete(context);
     });
   }
 
-  function wrapAudioContext(target: Any) {
+  function wrapAudioContext(target: Any): (() => void) | null {
     const Base = target.AudioContext;
-    if (typeof Base !== "function") return () => {};
+    if (typeof Base !== "function") return null;
     class Observed extends Base {
-      constructor(...args: Any[]) { super(...args); try { observeContext(this); } catch { /* unobserved */ } }
+      constructor(...args: Any[]) { super(...args); if (live) quietly(() => observeContext(this)); }
     }
     // Only where the browser has it: a subclass that grew setSinkId would change what the page's feature checks see.
     if (typeof Base.prototype.setSinkId === "function") {
       Object.defineProperty(Observed.prototype, "setSinkId", {
         configurable: true, writable: true,
         value: async function (this: Any, sink: Any) {
-          const wanted = typeof sink === "string" ? (sink === "" ? "default" : shortId(sink)) : sink && typeof sink === "object" ? String(sink.type ?? "object") : null;
-          try { const result = await Base.prototype.setSinkId.call(this, sink); record("sink-set", { wanted, ...contextFacts(this) }); return result; }
-          catch (error: Any) { record("sink-failed", { wanted, error: String(error?.name ?? "Error").slice(0, 40), ...contextFacts(this) }); throw error; }
+          if (!live) return Base.prototype.setSinkId.call(this, sink);
+          let wanted: unknown = null;
+          quietly(() => { wanted = sinkName(sink); });
+          let result: Any;
+          try { result = await Base.prototype.setSinkId.call(this, sink); }
+          catch (error: Any) {
+            quietly(() => record("sink-failed", { wanted, error: String(error?.name ?? "Error").slice(0, 40), ...contextFacts(this) }));
+            throw error;
+          }
+          quietly(() => record("sink-set", { wanted, ...contextFacts(this) }));
+          return result;
         },
       });
     }
-    target.AudioContext = Observed;
-    return () => { if (target.AudioContext === Observed) target.AudioContext = Base; };
+    try { target.AudioContext = Observed; } catch { return null; }
+    if (target.AudioContext !== Observed) return null;
+    return () => { if (target.AudioContext === Observed) { try { target.AudioContext = Base; } catch { /* stays, passes through */ } } };
   }
 
+  /** Never throws. Where something cannot be wrapped it is left alone and the fact is logged. */
   function install() {
-    if (installed || !win) return;
-    const undo: Array<() => void> = [];
-    const devices = win.navigator?.mediaDevices;
-    if (devices) {
-      undo.push(wrapGetUserMedia(devices));
-      const onChange = async () => {
-        let inputs: number | null = null, outputs: number | null = null;
-        try { const list: Any[] = await devices.enumerateDevices(); inputs = list.filter((d) => d.kind === "audioinput").length; outputs = list.filter((d) => d.kind === "audiooutput").length; } catch { /* counts unknown */ }
-        record("devicechange", { inputs, outputs, ...contextFacts() });
+    try {
+      if (installedBy || !win) return;
+      installedBy = owner;
+      live = true;
+      const undo: Array<() => void> = [];
+      const skipped: string[] = [];
+      const devices = peek(() => win.navigator?.mediaDevices);
+      if (devices) {
+        const off = peek(() => wrapGetUserMedia(devices));
+        if (off) undo.push(off); else skipped.push("getUserMedia");
+        const onChange = async () => {
+          if (!live) return;
+          let inputs: number | null = null, outputs: number | null = null;
+          try { const list: Any[] = await devices.enumerateDevices(); inputs = list.filter((d) => d.kind === "audioinput").length; outputs = list.filter((d) => d.kind === "audiooutput").length; } catch { /* counts unknown */ }
+          record("devicechange", { inputs, outputs, ...contextFacts() });
+        };
+        try { listen(devices, "devicechange", onChange); } catch { skipped.push("devicechange"); }
+      } else skipped.push("mediaDevices");
+      const restoreContext = peek(() => wrapAudioContext(win));
+      if (restoreContext) undo.push(restoreContext); else skipped.push("AudioContext");
+      uninstallAll = () => {
+        live = false;
+        [...detach].forEach((off) => off());
+        contexts.clear();
+        undo.reverse().forEach((fn) => quietly(fn));
+        uninstallAll = null;
+        if (installedBy === owner) installedBy = null;
       };
-      devices.addEventListener?.("devicechange", onChange);
-      undo.push(() => devices.removeEventListener?.("devicechange", onChange));
-    }
-    undo.push(wrapAudioContext(win));
-    installed = () => { undo.reverse().forEach((fn) => fn()); installed = null; };
+      if (skipped.length) record("install-skipped", { skipped });
+    } catch { if (installedBy === owner) installedBy = null; live = false; }
   }
 
   return {
     install,
-    uninstall: () => installed?.(),
+    uninstall() { try { uninstallAll?.(); } catch { /* nothing more to undo */ } },
     record,
     /** The call began (the first event of a call starts the clock too, if this is not said). */
-    callStarted() { callStart ??= now(); },
-    /** The call ended: its totals are the last entry, and the next call counts from zero. */
-    callEnded() { record("call-ended", { mic_acquisitions: acquisitions, ...contextFacts() }); callStart = null; acquisitions = 0; },
+    callStarted() { try { callOver = false; callStart ??= now(); } catch { /* clock unchanged */ } },
+    /** The call ended: its totals are the last entry, the next call counts from zero, and no event of the teardown
+     *  starts a clock. */
+    callEnded() {
+      try { record("call-ended", { mic_acquisitions: acquisitions, ...contextFacts() }); }
+      finally { callStart = null; callOver = true; acquisitions = 0; }
+    },
     entries: () => entries.slice(),
     dump: () => entries.map((e) => JSON.stringify(e)).join("\n"),
   };
@@ -205,13 +275,18 @@ export type AudioDiagnostics = ReturnType<typeof createAudioDiagnostics>;
 
 function safeStorage(win: Any) { try { return win?.localStorage ?? null; } catch { return null; } }
 
-/** The page's one log, installed on first use. */
+/** The page's one log, installed on first use. Never throws: where it cannot start, the page gets a log that records
+ *  nothing, and the controller loads all the same. */
 let shared: AudioDiagnostics | null = null;
 export function audioDiagnostics(): AudioDiagnostics {
-  if (!shared) {
-    shared = createAudioDiagnostics();
-    shared.install();
-    try { (window as Any).sidevoiceAudioDiagnostics = { dump: shared.dump, entries: shared.entries }; } catch { /* no window */ }
+  if (shared) return shared;
+  try {
+    const made = createAudioDiagnostics();
+    made.install();
+    shared = made;
+    try { (window as Any).sidevoiceAudioDiagnostics = { dump: made.dump, entries: made.entries }; } catch { /* no window */ }
+  } catch {
+    shared = { install() {}, uninstall() {}, record() {}, callStarted() {}, callEnded() {}, entries: () => [], dump: () => "" };
   }
   return shared;
 }

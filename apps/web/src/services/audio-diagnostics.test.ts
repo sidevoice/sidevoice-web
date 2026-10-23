@@ -1,5 +1,8 @@
-import { expect, test, vi } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { AUDIO_DIAGNOSTICS_KEY, createAudioDiagnostics, shortId } from "./audio-diagnostics";
+
+const made: Array<{ uninstall(): void }> = [];
+afterEach(() => { made.splice(0).forEach((d) => d.uninstall()); });
 
 /* Fakes of the browser's audio objects: the diagnostics only observe them. */
 class FakeTrack extends EventTarget {
@@ -27,6 +30,7 @@ function setup(extra: Partial<Parameters<typeof createAudioDiagnostics>[0]> = {}
   const win: any = { navigator: { mediaDevices: devices }, AudioContext: FakeContext };
   const diag = createAudioDiagnostics({ win, now: () => t, storage: null, log: () => {}, ...extra });
   diag.install();
+  made.push(diag);
   return { diag, win, devices, original, advance: (ms: number) => { t += ms; }, track: () => track };
 }
 
@@ -83,7 +87,9 @@ test("setSinkId changes and devicechange are logged, and the subclass adds setSi
 
   class Bare extends EventTarget { state = "running"; sampleRate = 44100; }
   const plain: any = { navigator: { mediaDevices: undefined }, AudioContext: Bare };
-  createAudioDiagnostics({ win: plain, storage: null, log: () => {} }).install();
+  diag.uninstall();
+  const second = createAudioDiagnostics({ win: plain, storage: null, log: () => {} });
+  second.install(); made.push(second);
   expect(typeof plain.AudioContext.prototype.setSinkId).toBe("undefined");
 });
 
@@ -134,4 +140,72 @@ test("uninstall restores the browser's own functions", () => {
   diag.uninstall();
   expect(win.AudioContext).toBe(FakeContext);
   expect(win.navigator.mediaDevices.getUserMedia).toBe(original);
+});
+
+test("a throwing diagnostic getter never changes what the audio call returns, and callEnded still resets", async () => {
+  const { diag, win, devices } = setup();
+  const context = new win.AudioContext();
+  Object.defineProperty(context, "outputLatency", { get() { throw new Error("boom"); } });
+  const stream = { getAudioTracks: () => [{ id: "t", getSettings() { throw new Error("boom"); }, get readyState() { throw new Error("boom"); }, addEventListener() {} }] };
+  devices.getUserMedia = win.navigator.mediaDevices.getUserMedia;
+  const original = vi.fn(async () => stream);
+  diag.uninstall();
+  win.navigator.mediaDevices.getUserMedia = original;
+  diag.install();
+  await expect(win.navigator.mediaDevices.getUserMedia({ audio: true })).resolves.toBe(stream);
+  await expect(context.setSinkId("x")).resolves.toBeUndefined();
+  expect(() => diag.callEnded()).not.toThrow();
+  expect(diag.entries().at(-1)).toMatchObject({ kind: "call-ended" });
+});
+
+test("an install that cannot wrap getUserMedia does not throw, and says so", () => {
+  const frozen = Object.freeze({ getUserMedia: async () => ({}) });
+  const win: any = { navigator: { mediaDevices: frozen }, AudioContext: FakeContext };
+  const diag = createAudioDiagnostics({ win, storage: null, log: () => {} });
+  expect(() => diag.install()).not.toThrow();
+  made.push(diag);
+  expect(diag.entries().find((e) => e.kind === "install-skipped")).toMatchObject({ skipped: expect.arrayContaining(["getUserMedia"]) });
+});
+
+test("installing twice and uninstalling in any order leaves nothing wrapped", () => {
+  const { diag: a, win, original } = setup();
+  const b = createAudioDiagnostics({ win, storage: null, log: () => {} });
+  b.install(); made.push(b);
+  a.uninstall(); b.uninstall();
+  expect(win.navigator.mediaDevices.getUserMedia).toBe(original);
+  expect(win.AudioContext).toBe(FakeContext);
+});
+
+test("uninstall detaches every listener and repeated installs do not accumulate", async () => {
+  const { diag, win, devices, track } = setup();
+  const context = new win.AudioContext();
+  await win.navigator.mediaDevices.getUserMedia({ audio: true });
+  const t = track();
+  diag.uninstall();
+  const before = diag.entries().length;
+  t.dispatchEvent(new Event("mute"));
+  context.dispatchEvent(new Event("statechange"));
+  devices.dispatchEvent(new Event("devicechange"));
+  await Promise.resolve();
+  expect(diag.entries().length).toBe(before);
+  diag.install();
+  diag.uninstall();
+  diag.install(); made.push(diag);
+  const created = diag.entries().length;
+  const c2 = new win.AudioContext();
+  c2.dispatchEvent(new Event("statechange"));
+  expect(diag.entries().length - created).toBe(2);
+});
+
+test("teardown events after callEnded do not start a clock: the next call counts from its own start", async () => {
+  const { diag, win, advance } = setup();
+  const context = new win.AudioContext();
+  diag.callStarted();
+  diag.callEnded();
+  advance(3_600_000);
+  context.state = "closed"; context.dispatchEvent(new Event("statechange"));
+  expect(diag.entries().at(-1)).toMatchObject({ kind: "ctx-closed", call_ms: null });
+  diag.callStarted();
+  diag.record("barge-in");
+  expect(diag.entries().at(-1)).toMatchObject({ call_ms: 0 });
 });
