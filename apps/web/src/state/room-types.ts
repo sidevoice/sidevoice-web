@@ -140,6 +140,8 @@ export interface AgentManualStep { command?: string; snippet?: string; file?: st
 export interface HostAgentsListing {
   agents: DetectedAgent[];
   scanned_at: string | number;
+  /** The connector kept the last good scan because the latest one failed; absent (older connectors) means false. */
+  scan_failed?: boolean;
   custom?: { command: string; snippet: string; version?: string | null } | null;
 }
 
