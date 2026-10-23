@@ -1095,6 +1095,8 @@ export const messages: Messages = {
   "runtime.download": "ダウンロード {size}",
   "runtime.fact.willRunOn": "実行予定先",
   "runtime.hardware.cpu": "CPU",
+  "runtime.hardware.gpu": "GPU",
+  "runtime.hardware.npu": "NPU",
   "runtime.hardware.expected": "{hardware} で実行予定",
   "runtime.notHere": "ここでは動作しません：{reasons}",
   "runtime.on.gpu": "グラフィックカード（{api}）",

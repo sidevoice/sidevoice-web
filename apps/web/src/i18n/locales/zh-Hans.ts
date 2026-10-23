@@ -1094,6 +1094,8 @@ export const messages: Messages = {
   "runtime.download": "下载 {size}",
   "runtime.fact.willRunOn": "将运行于",
   "runtime.hardware.cpu": "CPU",
+  "runtime.hardware.gpu": "GPU",
+  "runtime.hardware.npu": "NPU",
   "runtime.hardware.expected": "将在 {hardware} 上运行",
   "runtime.notHere": "无法在此运行：{reasons}",
   "runtime.on.gpu": "显卡（{api}）",

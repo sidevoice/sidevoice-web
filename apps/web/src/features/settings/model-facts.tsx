@@ -44,7 +44,7 @@ export function runsOn(build: ModelBuild, t: Translate) {
   }
 }
 
-/** The hardware as a chip names it: a graphics card by its API ("Metal"), the Neural Engine, the CPU. "" when the engine
+/** The hardware's technical name: a graphics card by its API ("Metal"), the Neural Engine, the CPU. "" when the engine
  *  does not say: a build that does not run here, a class it does not give or does not know, a graphics card with no
  *  API. */
 export function hardwareName(build: ModelBuild, t: Translate) {
@@ -57,14 +57,55 @@ export function hardwareName(build: ModelBuild, t: Translate) {
   }
 }
 
+/** The hardware's plain class: GPU, NPU, CPU. "" for a build that does not run here, or a class the engine does not
+ *  give or does not know. */
+function hardwareClass(build: ModelBuild, t: Translate) {
+  if (!build.available) return "";
+  switch (build.acceleratorClass) {
+    case "gpu": return t("runtime.hardware.gpu");
+    case "neural-engine": return t("runtime.hardware.npu");
+    case "cpu": return t("runtime.hardware.cpu");
+    default: return "";
+  }
+}
+
+/* How every chip, and the Model list's "twolines", names the hardware, still being compared (sidevoice-web#340); the
+ * text variants ("status", "facts", "advanced", "sized") keep runsOn's words:
+ * - "class": the plain class ("GPU"), its technical name ("Metal") as the chip's title and said to screen readers;
+ * - "technical": the technical name ("Metal", "Neural Engine", "CPU");
+ * - "both": the class, then the technical name in lighter text ("GPU · Metal"). */
+const HARDWARE_LABELS = ["class", "technical", "both"] as const;
+
+export type HardwareLabelMode = (typeof HARDWARE_LABELS)[number];
+
+export const useHardwareLabel = () => useVariant("hardwareLabel", HARDWARE_LABELS);
+
+/** The hardware as `mode` names it: `main`, what is shown (and what "Will run on {hardware}" says, with `name`); `name`,
+ *  the technical name after it, in lighter text ("both"); `hint`, the technical name as a title and for screen readers
+ *  only ("class"). The technical part only where it says more than the class: none for the CPU, whatever its
+ *  accelerator. The class alone is known enough for "class" and "both" (a graphics card with no API is "GPU"); not for
+ *  "technical". Null when nothing is known. */
+export function hardwareLabel(build: ModelBuild, t: Translate, mode: HardwareLabelMode): { main: string; name: string; hint: string } | null {
+  const technical = hardwareName(build, t);
+  if (mode === "technical") return technical ? { main: technical, name: "", hint: "" } : null;
+  const plain = hardwareClass(build, t);
+  if (!plain) return null;
+  const more = build.acceleratorClass !== "cpu" && technical !== plain ? technical : "";
+  return mode === "both" ? { main: plain, name: more, hint: "" } : { main: plain, name: "", hint: more };
+}
+
 /** The hardware as a chip ("chip", "chipfacts", "chipadvanced"). `expected`: the model is not here yet, so it is what
- *  the engine expects — a lighter look, and said in words ("Will run on Metal"), unless `bare`, where a label beside it
+ *  the engine expects — a lighter look, and said in words ("Will run on GPU"), unless `bare`, where a label beside it
  *  says so. None when the engine does not say. */
 export function HardwareChip({ build, expected, bare = false, t }: { build: ModelBuild; expected: boolean; bare?: boolean; t: Translate }) {
-  const hardware = hardwareName(build, t);
-  if (!hardware) return null;
-  return <Badge tone="accent" className="model-hardware" data-expected={expected || undefined}>
-    {expected && !bare ? t("runtime.hardware.expected", { hardware }) : hardware}
+  const label = hardwareLabel(build, t, useHardwareLabel());
+  if (!label) return null;
+  // Said as expected, the hardware is one plain string: the verb may come after it in some languages.
+  const said = expected && !bare;
+  return <Badge tone="accent" className="model-hardware" data-expected={expected || undefined} title={label.hint || undefined}>
+    {said ? t("runtime.hardware.expected", { hardware: [label.main, label.name].filter(Boolean).join(" · ") }) : label.main}
+    {!said && label.name && <span className="model-hardware-name"> · {label.name}</span>}
+    {label.hint && <span className="sr-only"> ({label.hint})</span>}
   </Badge>;
 }
 
@@ -118,26 +159,32 @@ export function listedFacts(model: Listed, t: Translate) {
 }
 
 /** A model of the list on two lines ("twolines"): its memory on its name's line, at the end (the option's `badge`), then
- *  its download — or what it takes here — and its hardware (its `description`). What is not known is left out. The
- *  memory is said in the description too, for whatever reads it rather than sees it: the option's badge is not read. */
-export function listedLines(model: Listed, t: Translate): Pick<SelectOption, "badge" | "description"> {
+ *  its download — or what it takes here — and its hardware, as `mode` names it (its `description`; its technical name
+ *  said to screen readers only with "class"). What is not known is left out. The memory is said in the description too,
+ *  for whatever reads it rather than sees it: the option's badge is not read. */
+export function listedLines(model: Listed, t: Translate, mode: HardwareLabelMode): Pick<SelectOption, "badge" | "description"> {
   const listed = listedBuild(model);
   if (!listed) return {};
   const bytes = download(listed.build);
   const memoryText = memory(listed.build) && t("runtime.memory", { memory: memory(listed.build) });
-  const line = [bytes && t(listed.installed ? "voice.prepare.onDevice" : "runtime.download", { size: bytes }), hardwareName(listed.build, t)].filter(Boolean).join(" · ");
+  const hardware = hardwareLabel(listed.build, t, mode);
+  const line = [bytes && t(listed.installed ? "voice.prepare.onDevice" : "runtime.download", { size: bytes }), hardware?.main, hardware?.name].filter(Boolean).join(" · ");
   return {
     ...(memoryText ? { badge: <span className="model-list-memory" aria-hidden>{memoryText}</span> } : {}),
-    ...(line || memoryText ? { description: <>{line}{memoryText && <span className="sr-only">{(line ? " · " : "") + memoryText}</span>}</> } : {}),
+    ...(line || memoryText ? { description: <>
+      {line}{hardware?.hint && <span className="sr-only"> ({hardware.hint})</span>}
+      {memoryText && <span className="sr-only">{(line ? " · " : "") + memoryText}</span>}
+    </> } : {}),
   };
 }
 
 /** Its facts as a labelled row ("facts"): Size, Memory, Runs on, each while it is known. With `chip` ("chipfacts"), the
  *  hardware first, as a chip, labelled as what it will run on while the model is not here (`expected`). */
 export function ModelFacts({ build, chip = false, expected = false, t }: { build: ModelBuild; chip?: boolean; expected?: boolean; t: Translate }) {
+  const hardware = hardwareLabel(build, t, useHardwareLabel());
   const sizes: [string, ReactNode][] = [[t("runtime.fact.size"), download(build)], [t("runtime.fact.memory"), memory(build)]];
   const facts = (chip
-    ? [[t(expected ? "runtime.fact.willRunOn" : "runtime.fact.runsOn"), hardwareName(build, t) && <HardwareChip build={build} expected={expected} bare t={t} />], ...sizes]
+    ? [[t(expected ? "runtime.fact.willRunOn" : "runtime.fact.runsOn"), hardware && <HardwareChip build={build} expected={expected} bare t={t} />], ...sizes]
     : [...sizes, [t("runtime.fact.runsOn"), runsOn(build, t)]]) as [string, ReactNode][];
   const known = facts.filter(([, value]) => value);
   if (!known.length) return null;

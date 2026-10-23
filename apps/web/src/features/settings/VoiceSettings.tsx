@@ -24,7 +24,7 @@ import { SETTINGS_PHONE_QUERY, useSectionShown } from "./settings-levels";
 import { VoicePicker } from "./VoicePicker";
 import { ModelLanguageNotice, ModelLanguages } from "./ModelLanguages";
 import { languageName } from "./model-languages";
-import { listedFacts, listedLines } from "./model-facts";
+import { listedFacts, listedLines, useHardwareLabel } from "./model-facts";
 import { useVariant } from "../../lib/variants";
 import type { ModelBuild } from "@sidevoice/engine";
 
@@ -85,9 +85,10 @@ type Listed = { id: string; builds?: ModelBuild[]; recommendedBuild?: string; in
  *  what the pane says of the model (`noted`), which takes the line under it. */
 function useListedFacts(t: Translate) {
   const list = useVariant("modelList", MODEL_LISTS);
+  const hardware = useHardwareLabel();
   return (model: Listed | undefined, disabled: boolean): Pick<SelectOption, "badge" | "description"> => {
     if (!model || disabled) return {};
-    if (list === "twolines") return listedLines(model, t);
+    if (list === "twolines") return listedLines(model, t, hardware);
     const facts = list === "sized" ? listedFacts(model, t) : "";
     return facts ? { description: facts } : {};
   };

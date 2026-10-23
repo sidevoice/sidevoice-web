@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import type { ModelBuild } from "@sidevoice/engine";
 import { translator } from "../../i18n/translator";
-import { buildSizes, buildSummary, hardwareName, listedFacts, modelFacts, sizeFacts } from "./model-facts";
+import { buildSizes, buildSummary, hardwareLabel, hardwareName, listedFacts, modelFacts, sizeFacts } from "./model-facts";
 
 /* What a model of this device takes and where it runs, from its build: each fact left out while it is not known. */
 
@@ -50,4 +50,27 @@ test("its sizes without its hardware, for the chip's variants", () => {
   expect(sizeFacts(build(), false, t)).toBe("145 MB download · 190 MB in memory");
   expect(sizeFacts(build(), true, t)).toBe("145 MB on this device · 190 MB in memory");
   expect(sizeFacts(build({ memoryMb: 0 }), true, t)).toBe("145 MB on this device");
+});
+
+test("the hardware as each label names it: the plain class, its technical name, or both; the technical part only where it says more", () => {
+  const metal = build({ acceleratorClass: "gpu", accelerator: "metal" });
+  const npu = build({ acceleratorClass: "neural-engine", accelerator: "coreml" });
+  const cpu = build({ accelerator: "wasm" });
+  expect([metal, npu, cpu].map((each) => hardwareLabel(each, t, "class"))).toEqual([
+    { main: "GPU", name: "", hint: "Metal" }, { main: "NPU", name: "", hint: "Neural Engine" }, { main: "CPU", name: "", hint: "" }]);
+  expect([metal, npu, cpu].map((each) => hardwareLabel(each, t, "technical"))).toEqual([
+    { main: "Metal", name: "", hint: "" }, { main: "Neural Engine", name: "", hint: "" }, { main: "CPU", name: "", hint: "" }]);
+  expect([metal, npu, cpu].map((each) => hardwareLabel(each, t, "both"))).toEqual([
+    { main: "GPU", name: "Metal", hint: "" }, { main: "NPU", name: "Neural Engine", hint: "" }, { main: "CPU", name: "", hint: "" }]);
+});
+
+test("a graphics card with no API is a GPU for the class labels, and nothing for the technical one; no class, or not here, is nothing", () => {
+  const noApi = build({ acceleratorClass: "gpu", accelerator: undefined });
+  expect(hardwareLabel(noApi, t, "class")).toEqual({ main: "GPU", name: "", hint: "" });
+  expect(hardwareLabel(noApi, t, "both")).toEqual({ main: "GPU", name: "", hint: "" });
+  expect(hardwareLabel(noApi, t, "technical")).toBeNull();
+  for (const mode of ["class", "technical", "both"] as const) {
+    expect(hardwareLabel(build({ acceleratorClass: undefined }), t, mode)).toBeNull();
+    expect(hardwareLabel(build({ acceleratorClass: "gpu", accelerator: "metal", available: false }), t, mode)).toBeNull();
+  }
 });

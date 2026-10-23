@@ -1094,6 +1094,8 @@ export const messages: Messages = {
   "runtime.download": "{size} à télécharger",
   "runtime.fact.willRunOn": "S’exécutera sur",
   "runtime.hardware.cpu": "CPU",
+  "runtime.hardware.gpu": "GPU",
+  "runtime.hardware.npu": "NPU",
   "runtime.hardware.expected": "S’exécutera sur {hardware}",
   "runtime.notHere": "Ne fonctionne pas ici : {reasons}",
   "runtime.on.gpu": "carte graphique ({api})",

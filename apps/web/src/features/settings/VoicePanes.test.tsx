@@ -808,9 +808,9 @@ test("chipadvanced: the chip on Advanced's line, before engine and precision; th
   expect(state("turn-model-card").querySelector(".model-prepare-note")).toHaveTextContent(/^9 MB download · 1 MB in memory$/);
 });
 
-test("no chip where the engine does not say the hardware; the sizes are still said", () => {
-  for (const modelSummary of ["chip", "chipfacts", "chipadvanced"]) {
-    variants({ modelSummary });
+test("no chip where the engine does not say the hardware, whatever its label; the sizes are still said", () => {
+  for (const hardwareLabel of ["class", "technical", "both"]) for (const modelSummary of ["chip", "chipfacts", "chipadvanced"]) {
+    variants({ modelSummary, hardwareLabel });
     renderPane({ voiceCatalogue: { state: "ready", catalogs: withBuilds([withoutClass(build("whisper-base/int8"))]), error: "" } });
     expect(card("stt-model-card").querySelector(".model-hardware")).toBeNull();
     expect(card("stt-model-card")).toHaveTextContent("1 MB");
@@ -839,4 +839,80 @@ test("twolines: a model's memory at the end of its name's line, its download or 
   expect([memory("whisper-base"), memory("whisper-large")]).toEqual(["1 MB in memory", ""]);
   fireEvent.keyDown(document.querySelector("[role=listbox]")!, { key: "Escape" });
   expect(document.getElementById("stt-model")).toHaveTextContent(/^whisper-base$/);
+});
+
+/* How the chips and the Model list's two lines name the hardware (hardwareLabel): the plain class by default, its
+ * technical name as the chip's title and said to screen readers; the technical name; or both. */
+const onMetal = (installed: boolean, extra: Partial<ModelBuild> = {}) => catalogs.map((catalog) => catalog.id !== "local" ? catalog : { ...catalog,
+  models: catalog.models.map((model) => model.id !== "whisper-base" ? model : { ...model, installed, recommendedBuild: "whisper-base/metal",
+    builds: [build("whisper-base/metal", { backend: "whisper-cpp", accelerator: "metal", acceleratorClass: "gpu", installed, ...extra })] }) }) as CatalogView[];
+/** The stt block's chip: what shows, what is said to screen readers only, the lighter technical name, and its title. */
+function sttChip() {
+  const chip = state("stt-model-card").querySelector(".model-hardware");
+  if (!chip) return null;
+  const hidden = chip.querySelector(".sr-only")?.textContent ?? "";
+  const name = chip.querySelector(".model-hardware-name")?.textContent ?? "";
+  return { shown: chip.textContent!.replace(hidden, "").replace(name, ""), hidden, name, title: chip.getAttribute("title") };
+}
+
+test("by default the chip says the class, its technical name a title and said to screen readers; as expected too", () => {
+  variants({ modelSummary: "chip" });
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true), error: "" } });
+  expect(sttChip()).toEqual({ shown: "GPU", hidden: " (Metal)", name: "", title: "Metal" });
+  cleanup();
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(false), error: "" } });
+  expect(sttChip()).toEqual({ shown: "Will run on GPU", hidden: " (Metal)", name: "", title: "Metal" });
+});
+
+test("technical: the chip says the technical name alone; as expected too", () => {
+  variants({ modelSummary: "chip", hardwareLabel: "technical" });
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true), error: "" } });
+  expect(sttChip()).toEqual({ shown: "Metal", hidden: "", name: "", title: null });
+  cleanup();
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(false), error: "" } });
+  expect(sttChip()).toEqual({ shown: "Will run on Metal", hidden: "", name: "", title: null });
+});
+
+test("both: the class, then the technical name lighter; expected, one plain string", () => {
+  variants({ modelSummary: "chip", hardwareLabel: "both" });
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true), error: "" } });
+  expect(sttChip()).toEqual({ shown: "GPU", hidden: "", name: " · Metal", title: null });
+  cleanup();
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(false), error: "" } });
+  expect(sttChip()).toEqual({ shown: "Will run on GPU · Metal", hidden: "", name: "", title: null });
+});
+
+test("the label reaches every chip: the labelled row's and the Advanced line's", () => {
+  variants({ modelSummary: "chipfacts", hardwareLabel: "both" });
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true), error: "" } });
+  expect(card("stt-model-card").querySelector(".model-facts .model-hardware")).toHaveTextContent(/^GPU · Metal$/);
+  cleanup();
+  variants({ modelSummary: "chipadvanced", hardwareLabel: "technical" });
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(false), error: "" } });
+  expect(card("stt-model-card").querySelector(".model-runtime-head .model-hardware")).toHaveTextContent(/^Will run on Metal$/);
+});
+
+test("a graphics card with no API: GPU for the class labels, no chip for the technical one", () => {
+  variants({ modelSummary: "chip" });
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true, { accelerator: undefined }), error: "" } });
+  expect(sttChip()).toEqual({ shown: "GPU", hidden: "", name: "", title: null });
+  cleanup();
+  variants({ modelSummary: "chip", hardwareLabel: "technical" });
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true, { accelerator: undefined }), error: "" } });
+  expect(sttChip()).toBeNull();
+});
+
+test("the Model list's two lines name the hardware as the label does; the text variants keep their words", () => {
+  const line = (hardwareLabel: string, modelList = "twolines") => {
+    variants({ modelList, hardwareLabel });
+    renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true), error: "" } });
+    const detail = listOptions("stt-model")[0].detail;
+    cleanup();
+    return detail;
+  };
+  // The class's technical name, and the memory at the line's end, are said to screen readers only.
+  expect(line("class")).toBe("1 MB on this device · GPU (Metal) · 1 MB in memory");
+  expect(line("technical")).toBe("1 MB on this device · Metal · 1 MB in memory");
+  expect(line("both")).toBe("1 MB on this device · GPU · Metal · 1 MB in memory");
+  expect(line("class", "sized")).toBe("1 MB on this device · 1 MB in memory · graphics card (Metal)");
 });

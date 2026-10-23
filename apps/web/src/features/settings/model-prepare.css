@@ -46,6 +46,8 @@
    a narrow block. */
 .ui-badge.model-hardware { flex: 0 1 auto; max-width: 100%; height: auto; min-height: 22px; padding-block: 2px; border: 1px solid transparent; line-height: 1.2; white-space: normal; text-align: start; }
 .ui-badge.model-hardware[data-expected] { border-style: dashed; border-color: currentColor; background: transparent; }
+/* "both": the technical name after the class, lighter. */
+.model-hardware-name { font-weight: var(--sv-weight-regular); color: var(--sv-text-muted); }
 .model-prepare-state[data-chip] { flex-wrap: wrap; row-gap: var(--sv-space-1); }
 /* "twolines": a model's memory at the end of its name's line in the Model list, quieter than its name. */
 .model-list-memory { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-regular); line-height: 1.25rem; color: var(--sv-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
