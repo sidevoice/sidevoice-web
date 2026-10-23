@@ -799,7 +799,7 @@ test("the build a model runs as, with Automatic, is the engine's: one installed 
   expect(sheetRows("stt-model-card").slice(1)).toEqual([["Runs on", "CPU"], ["Size", "1 MB on this device · 1 MB in memory"]]);
 });
 
-test("the Model list says under each model that can be chosen what it takes, and its hardware as the hardware label names it", () => {
+test("the Model list says under each model that can be chosen its size and its hardware, as the hardware label names it", () => {
   const listed = (hardwareLabel: string) => {
     variants({ hardwareLabel });
     renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true), error: "" } });
@@ -809,9 +809,9 @@ test("the Model list says under each model that can be chosen what it takes, and
   };
   // A model that cannot be chosen keeps why; the class's technical name is said to screen readers only.
   const reason = "does not run here: it does not fit in this device's memory";
-  expect(listed("both")).toEqual(["1 MB on this device · 1 MB in memory · GPU · Metal", reason]);
-  expect(listed("class")).toEqual(["1 MB on this device · 1 MB in memory · GPU (Metal)", reason]);
-  expect(listed("technical")).toEqual(["1 MB on this device · 1 MB in memory · Metal", reason]);
+  expect(listed("both")).toEqual(["1 MB · GPU · Metal", reason]);
+  expect(listed("class")).toEqual(["1 MB · GPU (Metal)", reason]);
+  expect(listed("technical")).toEqual(["1 MB · Metal", reason]);
   renderPane({ voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
-  expect(listOptions("turn-model").map((option) => option.detail)).toEqual(["9 MB download · 1 MB in memory · CPU"]);
+  expect(listOptions("turn-model").map((option) => option.detail)).toEqual(["9 MB · CPU"]);
 });

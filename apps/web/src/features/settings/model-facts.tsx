@@ -121,21 +121,21 @@ export function sizeFacts(build: ModelBuild, installed: boolean, t: Translate) {
 
 type Listed = { builds?: ModelBuild[]; recommendedBuild?: string; installed?: boolean };
 
-/** The build a model of the Model list is described by — its recommended one, else its first that runs here (none is
- *  chosen for a model not picked yet) — and whether it is on this device (the model, or that build). */
+/** The build a model of the Model list is described by: its recommended one, else its first that runs here (none is
+ *  chosen for a model not picked yet). */
 function listedBuild(model: Listed) {
-  const build = model.builds?.find((candidate) => candidate.id === model.recommendedBuild) ?? model.builds?.find((candidate) => candidate.available);
-  return build ? { build, installed: model.installed === true || build.installed } : null;
+  return model.builds?.find((candidate) => candidate.id === model.recommendedBuild) ?? model.builds?.find((candidate) => candidate.available);
 }
 
-/** A model of the list as the Model list describes it under its name: its sizes, then its hardware as the hardware label
- *  names it (its technical name said to screen readers only, with "class"). Null when it has no build. */
+/** A model of the list as the Model list describes it under its name, on one short line: its download size and its
+ *  hardware as the hardware label names it ("148 MB · GPU · Metal"; its technical name said to screen readers only, with
+ *  "class"). Its memory, and whether it is here, are the spec sheet's. Null when it says neither. */
 export function listedFacts(model: Listed, t: Translate, mode: HardwareLabelMode): ReactNode {
-  const listed = listedBuild(model);
-  if (!listed) return null;
-  const hardware = hardwareLabel(listed.build, t, mode);
-  const text = [sizeFacts(listed.build, listed.installed, t), hardware?.main, hardware?.name].filter(Boolean).join(" · ");
-  return text ? <>{text}{hardware?.hint && <span className="sr-only"> ({hardware.hint})</span>}</> : null;
+  const build = listedBuild(model);
+  if (!build) return null;
+  const hardware = hardwareLabel(build, t, mode);
+  const text = [download(build), hardware?.main, hardware?.name].filter(Boolean).join(" · ");
+  return text ? <span className="model-list-facts">{text}{hardware?.hint && <span className="sr-only"> ({hardware.hint})</span>}</span> : null;
 }
 
 /** The spec sheet: what the model is, as rows left out when they have nothing — its languages (`languages`, only when

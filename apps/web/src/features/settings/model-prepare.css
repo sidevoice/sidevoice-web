@@ -148,6 +148,8 @@
   .stt-try-head .voice-wave { max-width: none; }
 }
 .model-prepare-stalled { color: var(--sv-warning); }
+/* A model's line in the Model list: its size and hardware, one line, cut rather than wrapped where the list is narrow. */
+.model-list-facts { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 /* The spec sheet (ModelSheet): what the model is in one bordered block, a label column and a value column, tight;
    on a narrow phone each label above its value. */
 .model-prepare-sheet { padding: var(--sv-space-2) var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-surface); }

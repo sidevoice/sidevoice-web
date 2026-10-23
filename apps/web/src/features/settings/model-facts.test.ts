@@ -30,11 +30,16 @@ test("the builds list says a build by its engine, precision and what it runs on,
   expect(describeBuild(build({ acceleratorClass: "gpu", accelerator: "webgpu", backend: "transformers-js" }), t)).toBe("Transformers.js · int8 · graphics card (WebGPU)");
 });
 
-test("a model of the list is said by its recommended build, else its first that runs here; on this device when installed", () => {
+test("a model of the list is said by its recommended build, else its first that runs here: its size and hardware alone", () => {
   const builds = [build({ id: "slow", available: false }), build({ id: "first", downloadBytes: 40e6 }), build({ id: "best", downloadBytes: 75e6 })];
-  expect(said(listedFacts({ builds, recommendedBuild: "best" }, t, "both"))).toBe("75 MB download · 190 MB in memory · CPU");
-  expect(said(listedFacts({ builds }, t, "both"))).toMatch(/^40 MB download/);
-  expect(said(listedFacts({ builds, recommendedBuild: "best", installed: true }, t, "both"))).toMatch(/^75 MB on this device/);
+  expect(said(listedFacts({ builds, recommendedBuild: "best" }, t, "both"))).toBe("75 MB · CPU");
+  expect(said(listedFacts({ builds }, t, "both"))).toBe("40 MB · CPU");
+  // Installed or not, the same: whether it is here, and its memory, are the spec sheet's.
+  expect(said(listedFacts({ builds, recommendedBuild: "best", installed: true }, t, "both"))).toBe("75 MB · CPU");
+  // What is not known is left out; with neither, nothing.
+  expect(said(listedFacts({ builds: [build({ acceleratorClass: undefined })] }, t, "both"))).toBe("145 MB");
+  expect(said(listedFacts({ builds: [build({ downloadBytes: 0 })] }, t, "both"))).toBe("CPU");
+  expect(listedFacts({ builds: [build({ downloadBytes: 0, acceleratorClass: undefined })] }, t, "both")).toBeNull();
   expect(listedFacts({ builds: [] }, t, "both")).toBeNull();
 });
 
