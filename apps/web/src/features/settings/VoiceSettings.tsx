@@ -24,7 +24,7 @@ import { SETTINGS_PHONE_QUERY, useSectionShown } from "./settings-levels";
 import { VoicePicker } from "./VoicePicker";
 import { ModelLanguageNotice, ModelLanguages } from "./ModelLanguages";
 import { languageName } from "./model-languages";
-import { listedFacts, useHardwareLabel } from "./model-facts";
+import { listedOption } from "./model-facts";
 import type { ModelBuild } from "@sidevoice/engine";
 
 /* The call's voice as the person chooses it, for what transcribes and for what speaks: where it runs — this device, or
@@ -74,15 +74,11 @@ function noted(t: Translate, option: { disabled: boolean; note: Note | null }): 
 
 type Listed = { id: string; builds?: ModelBuild[]; recommendedBuild?: string; installed?: boolean };
 
-/** What a model of this device says under its name in the Model list, while it can be chosen: what it takes and where
- *  it runs (model-facts.tsx, sidevoice-web#340). Put before what the pane says of the model (`noted`), which takes its
- *  place. */
-function useListedFacts(t: Translate) {
-  const hardware = useHardwareLabel();
-  return (model: Listed | undefined, disabled: boolean): Pick<SelectOption, "description"> => {
-    const facts = model && !disabled ? listedFacts(model, t, hardware) : null;
-    return facts ? { description: facts } : {};
-  };
+/** What a model of this device says in the Model list, while it can be chosen: its download size at the end of its
+ *  name's line, its hardware under it (model-facts.tsx, sidevoice-web#340). Put before what the pane says of the model
+ *  (`noted`), which takes the line under it. */
+function optionFacts(t: Translate) {
+  return (model: Listed | undefined, disabled: boolean): Pick<SelectOption, "badge" | "description"> => model && !disabled ? listedOption(model, t) : {};
 }
 
 function SourceSelect({ id, value, sources, onChange, t }: { id: string; value: string; sources: Source[]; onChange: (catalog: string) => void; t: Translate }) {
@@ -97,7 +93,7 @@ function SourceSelect({ id, value, sources, onChange, t }: { id: string; value: 
  *  have no family, and are one list. */
 function ModelPickers({ task, draft, options, locked, needsKey, t }: { task: Task; draft: Settings; options: Option[]; locked: boolean; needsKey: boolean; t: Translate }) {
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
-  const facts = useListedFacts(t);
+  const facts = optionFacts(t);
   // This device's models as its catalogue lists them, for their facts; a provider's say none.
   const listed: Listed[] = draft[task].catalog === "local" ? catalogs.find((catalog) => catalog.id === "local")?.models ?? [] : [];
   const families = [...new Set(options.map((option) => option.group).filter((group): group is string => !!group))];
@@ -273,7 +269,7 @@ export function TurnChoices({ draft, setup = false, active = true, turnTry }: { 
   const turn = useModelState("end-of-turn", draft);
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
   const turnModels = useMemo(() => endOfTurnModels(catalogs), [catalogs]);
-  const listFacts = useListedFacts(t);
+  const listFacts = optionFacts(t);
   const saved = useRoomStore((state) => state.facts.voiceSettings);
   // What ends turns until the chosen model is ready: the smart model in use when it is on disk, else silence — Smart
   // kept without its model too (voiceSettingsToLoad). As the slots say it, outside the setup (nothing is in use there).
