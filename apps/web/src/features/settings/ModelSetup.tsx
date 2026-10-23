@@ -178,8 +178,11 @@ export type VoiceTry = ReturnType<typeof useVoiceTry> & { start(): void; sentenc
  *  sentence to hear, to edit (`sample`). */
 export type SetupTry = VoiceTry & { tried: boolean; hint?: string; sample?: ReactNode };
 
-/** Past these, a try is slow for this device: transcribing what was said, or the first sound of a sentence. */
-const SLOW_MS = { stt: 1500, tts: 1500 } as const;
+/** Past this, transcribing what was said is slow for this device; at or below it nothing is said (2 s is no problem). */
+export const SLOW_TRANSCRIPTION_MS = 5000;
+/** Past this, the first sound of a sentence is slow for this device. */
+const SLOW_FIRST_SOUND_MS = 2000;
+const SLOW_MS = { stt: SLOW_TRANSCRIPTION_MS, tts: SLOW_FIRST_SOUND_MS } as const;
 
 /** The time that matters after a try, in words: what was said transcribed, or the voice's first sound. */
 const timingMs = (task: Task, timings: TrialTimings) => task === "stt" ? timings.recognition_ms : timings.first_sound_ms;
