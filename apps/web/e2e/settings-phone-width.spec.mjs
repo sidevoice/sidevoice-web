@@ -82,7 +82,8 @@ for (const [language, width] of [["en", 360], ["es", 360], ["de", 360], ["pl", 3
       await seed();
       // Its "how it runs" open too, where it has one.
       for (const fold of await page.locator(".model-runtime-toggle[aria-expanded='false']:visible").all()) await fold.click();
-      if (id === "settings-transcription") await expect(page.locator(".model-runtime-summary:visible")).toContainText("WebGPU");
+      // Where it runs, in the spec sheet (the longest name it can have: the class and the API after it).
+      if (id === "settings-transcription") await expect(page.locator(".model-sheet:visible .model-hardware")).toContainText("WebGPU");
       await page.waitForTimeout(350);
       expect(await overflow(page), id).toEqual([]);
       await page.locator("#language-settings .settings-back:not(#settings-close)").click();
