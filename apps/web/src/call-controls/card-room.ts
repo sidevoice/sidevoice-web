@@ -17,6 +17,8 @@ export interface CardRoom {
 /** `run`: how a command goes to the room (the card's click guard in front of the host's). */
 export function createCardRoom(run: (command: CallCommand) => void): CardRoom {
   const store = createRoomStore();
+  // The figures' rest is stamped by the room and arrives in the facts (restStart): this store never stamps its own.
+  store.patch({ restRelayed: true });
   let level = 0;
   let lastFacts: unknown = null;
   let lastPlayback: unknown = null;

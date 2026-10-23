@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { cn } from "../../lib/cn";
 import { useMotion } from "../../lib/motion";
 import { avatarKey, avatarTone, type AvatarSpec } from "./avatar-spec";
-import { ENGINE_MOOD, type AvatarState, type MouthLevel } from "./avatar-state";
+import { ENGINE_MOOD, toTimeline, type AvatarState, type MouthLevel } from "./avatar-state";
 import { drawAvatar, engineSize, type AvatarSize } from "./bicho-draw";
 import { useLayers } from "./layers";
 
@@ -114,7 +114,7 @@ export function CharacterAvatar({ spec, state, size, mouth: asked = "voice", mou
     const element = avatar.current;
     if (state.since === undefined || !element || typeof element.getAnimations !== "function") return;
     for (const animation of element.getAnimations({ subtree: true }))
-      if ("animationName" in animation) animation.startTime = state.since;
+      if ("animationName" in animation) animation.startTime = toTimeline(state.since);
   }, [state, drawing, desk, layered]);
   return (
     <span ref={(element) => { avatar.current = element; if (typeof ref === "function") ref(element); else if (ref) ref.current = element; }} className={cn("sv-avatar", className)} data-style="bichos" data-avatar-state={state.mood} data-mood={acts}

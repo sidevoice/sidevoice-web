@@ -2,93 +2,82 @@ import { nextIdle, type Idle, type IdleStep } from "./engine/bichos/idle";
 import { nextWork, workTurn, type Work } from "./engine/bichos/work";
 
 /* What a bicho does with its hands is the client's, not the bicho's: a working style while it works (work.ts), an idle
- * step while it rests (idle.ts). One pick per figure, held by its state (avatar-state.ts) while it is in that state and
- * dropped when it leaves it: the next time it starts afresh. Every copy of the figure shows that one pick; the engine
- * reads it from the root (`data-work`, `data-idle`).
+ * step while it rests (idle.ts). Which one is showing is a PURE FUNCTION of (seed, time since the sequence began): the
+ * steps are drawn from a seeded generator, so every window that asks the same question gets the same answer, with no
+ * owner window and nothing relayed (web#334). The caller says where the sequence began (the figure's `restStart`) and the
+ * engine reads the current pick from the root (`data-work`, `data-idle`).
  *
- *   work  a random tool when work starts, swapped for another after that tool's own spell (hammering comes in short
- *         bursts, reading goes on: WORK_DURATION)
+ *   work  a tool when work starts, swapped for another after that tool's own spell (hammering comes in short bursts,
+ *         reading goes on: WORK_DURATION)
  *   idle  steps: quiet for a few seconds, then one pastime for its own spell, then quiet again, then another pastime
- *         (never the last one), and so on (nextIdle) */
+ *         (never the last one), and so on (nextIdle)
+ *
+ * A sequence is generated up to CYCLE_MS and then repeats: a figure that rests for hours costs the same as one that has
+ * rested for ten minutes (`t` is reduced by whole cycles, arithmetically). */
 
 /** A pick, how long it lasts, and what the next pick is made from. */
 interface Step<S> { value: string; ms: number; state: S }
 interface Kind<S> {
-  first(pool: readonly string[]): Step<S>;
-  next(state: S, pool: readonly string[]): Step<S>;
+  first(pool: readonly string[], random: () => number): Step<S>;
+  next(state: S, pool: readonly string[], random: () => number): Step<S>;
 }
 const work: Kind<Work> = {
-  first: (pool) => workStep(nextWork(null, pool as readonly Work[])),
-  next: (prev, pool) => workStep(nextWork(prev, pool as readonly Work[])),
+  first: (pool, random) => workStep(nextWork(null, pool as readonly Work[], random), random),
+  next: (prev, pool, random) => workStep(nextWork(prev, pool as readonly Work[], random), random),
 };
-const workStep = (value: Work): Step<Work> => ({ value, ms: workTurn(value), state: value });
+const workStep = (value: Work, random: () => number): Step<Work> => ({ value, ms: Math.round(workTurn(value, random)), state: value });
 const idle: Kind<IdleStep> = {
-  first: (pool) => idleStep(nextIdle(null, pool as readonly Idle[])),
-  next: (prev, pool) => idleStep(nextIdle(prev, pool as readonly Idle[])),
+  first: (pool, random) => idleStep(nextIdle(null, pool as readonly Idle[], random)),
+  next: (prev, pool, random) => idleStep(nextIdle(prev, pool as readonly Idle[], random)),
 };
 const idleStep = (step: IdleStep): Step<IdleStep> => ({ value: step.idle, ms: step.ms, state: step });
 const KINDS = { work, idle } as Record<"work" | "idle", Kind<unknown>>;
 export type RotationKind = keyof typeof KINDS;
 
-interface Entry { kind: RotationKind; step: Step<unknown>; pool: readonly string[]; until: number; holders: number }
-const entries = new Map<string, Entry>();
-const listeners = new Set<() => void>();
-/** One timer, for the soonest end of a pick, and when that is: the page wakes when a pick ends, not on a clock of its own. */
-let timer: ReturnType<typeof setTimeout> | null = null;
-let due = Infinity;
+/** How much of a sequence is generated before it repeats (a step that crosses this line is whole). */
+export const CYCLE_MS = 10 * 60_000;
 
-const notify = () => listeners.forEach((listener) => listener());
-
-/** Sets the timer for the soonest pick to end, or none when nothing is held. */
-function schedule() {
-  let soonest = Infinity;
-  for (const entry of entries.values()) soonest = Math.min(soonest, entry.until);
-  if (soonest === due) return;
-  if (timer) clearTimeout(timer);
-  due = soonest;
-  timer = soonest === Infinity ? null : setTimeout(tick, Math.max(0, soonest - Date.now()));
-}
-
-function tick() {
-  timer = null;
-  due = Infinity;
-  const now = Date.now();
-  let changed = false;
-  for (const entry of entries.values()) {
-    if (now < entry.until) continue;
-    entry.step = KINDS[entry.kind].next(entry.step.state, entry.pool);
-    entry.until = now + entry.step.ms;
-    changed = true;
-  }
-  if (changed) notify();
-  schedule();
-}
-
-/** `key`'s avatar is in this state: start a pick if none is running. Returns its release (held more than once, it lets go
- *  once every holder has). */
-export function holdRotation(kind: RotationKind, key: string, pool: readonly string[]): () => void {
-  const id = kind + "\u0000" + key;
-  let entry = entries.get(id);
-  if (!entry || entry.pool.join(" ") !== pool.join(" ")) {
-    const step = KINDS[kind].first(pool);
-    entry = { kind, step, pool, until: Date.now() + step.ms, holders: entry?.holders ?? 0 };
-    entries.set(id, entry);
-    notify();
-  }
-  entry.holders += 1;
-  schedule();
+/** A small, well-known seeded generator (mulberry32) over a string seed hashed with FNV-1a. */
+export function seededRandom(seed: string): () => number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 0x01000193);
+  let a = h >>> 0;
   return () => {
-    const held = entries.get(id);
-    if (held && (held.holders -= 1) <= 0) entries.delete(id);
-    schedule();
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), a | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
 
-/** The current pick for `key`, while it is held. */
-export const rotationValue = (kind: RotationKind, key: string) => entries.get(kind + "\u0000" + key)?.step.value;
+interface Cycle { values: string[]; ends: number[]; length: number }
+const cycles = new Map<string, Cycle>();
 
-/** Calls `listener` whenever a pick is made. */
-export function subscribeRotation(listener: () => void) {
-  listeners.add(listener);
-  return () => { listeners.delete(listener); };
+function cycleOf(kind: RotationKind, seed: string, pool: readonly string[]): Cycle {
+  const id = [kind, seed, ...pool].join("\u0000");
+  let cycle = cycles.get(id);
+  if (cycle) return cycle;
+  const random = seededRandom(id);
+  const values: string[] = [], ends: number[] = [];
+  let step = KINDS[kind].first(pool, random), length = 0;
+  for (;;) {
+    values.push(step.value);
+    length += Math.max(1, step.ms);
+    ends.push(length);
+    if (length >= CYCLE_MS) break;
+    step = KINDS[kind].next(step.state, pool, random);
+  }
+  if (cycles.size >= 64) cycles.clear();
+  cycles.set(id, (cycle = { values, ends, length }));
+  return cycle;
+}
+
+/** The pick showing `t` ms into the sequence `seed` names (t >= 0), and when it began and ends, in ms from the same start. */
+export function rotationAt(kind: RotationKind, seed: string, pool: readonly string[], t: number): { value: string; start: number; end: number } {
+  const cycle = cycleOf(kind, seed, pool);
+  const base = Math.floor(Math.max(0, t) / cycle.length) * cycle.length;
+  const into = Math.max(0, t) - base;
+  let lo = 0, hi = cycle.ends.length - 1;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (cycle.ends[mid] > into) hi = mid; else lo = mid + 1; }
+  return { value: cycle.values[lo], start: base + (lo ? cycle.ends[lo - 1] : 0), end: base + cycle.ends[lo] };
 }
