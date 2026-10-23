@@ -181,7 +181,7 @@ export type SetupTry = VoiceTry & { tried: boolean; hint?: string; sample?: Reac
 /** Past this, transcribing what was said is slow for this device; at or below it nothing is said (2 s is no problem). */
 export const SLOW_TRANSCRIPTION_MS = 5000;
 /** Past this, the first sound of a sentence is slow for this device. */
-const SLOW_FIRST_SOUND_MS = 1500;
+const SLOW_FIRST_SOUND_MS = 2000;
 const SLOW_MS = { stt: SLOW_TRANSCRIPTION_MS, tts: SLOW_FIRST_SOUND_MS } as const;
 
 /** The time that matters after a try, in words: what was said transcribed, or the voice's first sound. */
