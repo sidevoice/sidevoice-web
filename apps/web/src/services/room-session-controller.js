@@ -26,6 +26,10 @@ import {followWorking} from './working-clock.ts';
 import {shortcut} from '../state/shortcuts.ts';
 import {watchAudioDeviceRefresh} from './audio-device-refresh.ts';
 import {createMicrophoneAccess} from './microphone-access.ts';
+import {audioDiagnostics} from './audio-diagnostics.ts';
+// Always-on audio facts for sidevoice-web#341: it only watches getUserMedia, the audio contexts and devicechange.
+const audioLog=audioDiagnostics();
+let lastMicLevel=0,lastPlaybackLevel=0;
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
 // What this browser speaks in a call: the language of its system, among those the voice handles.
@@ -552,6 +556,7 @@ function reportHearing(said,data){
 }
 function finishReply(said,data){
  if(replies.get(said.reply.utterance_id)!==said)return;
+ if(data.reason==='user_interrupted'||data.reason==='newer_turn')audioLog.record('barge-in',{reason:data.reason,heard_chars:data.heard_chars??null,mic_level:lastMicLevel,playback_level:lastPlaybackLevel,mic_state:state.voiceState?.microphone??null});
  reportPlayback(said,data);
  reportHearing(said,data);
  replies.delete(said.reply.utterance_id);
@@ -1254,6 +1259,9 @@ function statsAggregatesText(replies){
   const own=measured.filter(reply=>reply.thread_id===thread);
   blocks.push(statsTextTable(statsConversationName(thread)+' · '+statsAggregateCaption(own.length),statsAggregate(own)));
  }
+ // The audio log goes with the latency tables it is read beside (sidevoice-web#341): technical lines, not translated.
+ const audio=audioLog.dump();
+ if(audio)blocks.push('Sidevoice · audio diagnostics (last events, oldest first)\n'+audio);
  return [t('stats.copyHeading'),...blocks].join('\n\n');
 }
 async function copyLatencyAggregates(){
@@ -1708,6 +1716,7 @@ function takeReceipt(segment){const status=state.inputReceipts[segment];if(statu
 // be acted on, and in the machine's log.
 function voiceFailed(error){window.sidevoiceUI?.playbackLevel?.clear?.();setRoomError(voiceError(error));reportClientError({kind:'voice',message:failureCode(error,'')})}
 function voiceStateChanged(next){
+ if(next?.microphone!==state.voiceState?.microphone)audioLog.record('mic-state',{microphone:next?.microphone??null});
  if(next?.playback!=='playing')window.sidevoiceUI?.playbackLevel?.clear?.();
  roomStore.batch(()=>{
   state.voiceState=next;
@@ -1724,6 +1733,7 @@ function voiceStateChanged(next){
 const waveLevels=new Float32Array(256);
 function voiceLevel(level){
  const value=Math.max(0,Math.min(100,Math.round(Number(level)*100)||0));
+ lastMicLevel=value;
  waveLevels.copyWithin(0,1);waveLevels[waveLevels.length-1]=value/100;
  $('mic-control')?.style.setProperty('--mic-level',String(value/100));
  $('mic-level-meter')?.setAttribute('aria-valuenow',String(value));
@@ -1731,6 +1741,7 @@ function voiceLevel(level){
 }
 // This is the speaker's level, never the microphone's. A host without the optional output channel leaves it at rest.
 function voicePlaybackLevel(level,entry){
+ lastPlaybackLevel=Math.max(0,Math.min(100,Math.round(Number(level)*100)||0));
  if(!entry||!conversationCalls.has(entry.key))return;
  // The host's level has no reply id. Use the replies whose handles say they are playing, not the binding at callback
  // time: a prior reply may still sound after a same-machine conversation switch. Mixed threads are ambiguous.
@@ -1803,7 +1814,7 @@ function openSession(socket,hello={},fp=state.callNode,token=null){return new Pr
   roomRefusal().then(admission=>fail(admissionFailure(admission,broken),admission?.admitted===false))};
  socket.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type!=='voice-session'){if(m.type==='error'){refusal=m.data?refusalError(m.data):refusal;refused=m.data?.reason||refused}message(e.data,socket);return}state.roomInfo=m.data?.room||state.roomInfo;clearTimeout(timer);resolve(m.data)}})}
 function disconnect() {
-    window.sidevoiceTelemetry?.endCall?.('left');
+    window.sidevoiceTelemetry?.endCall?.('left');audioLog.callEnded();
     // A deliberate hang-up is this app's not-heard choice for replies still pending. Offer the
     // semantic frames on the live socket before closing it; a lost frame remains unconfirmed.
     for(const said of replies.values())if(!said.terminal){if(said.action!=='user_skipped')said.action='call_ended';reportHearing(said,{status:'unplayed'})}
@@ -1877,6 +1888,7 @@ async function watchAudioDevices(host){
  if(devices)audioDevicesChanged(devices);
 }
 function audioDevicesChanged(devices){
+ if(devices.lost)audioLog.record('device-lost',{input:!!devices.lost.input,output:!!devices.lost.output});
  if(devices.lost)keepAudio(withoutLost(storedAudio(),devices.lost));
  roomStore.patch({audioDevices:{inputs:devices.inputs||[],outputs:devices.outputs||[],input:devices.input??null,output:devices.output??null,outputSelectable:!!devices.outputSelectable},
   ...(devices.lost?{audioLost:devices.lost}:{})});
@@ -2026,6 +2038,7 @@ async function joinRoom(epoch,context){
   state.sessionId=session.session_id;relay.reset();awaitingTurnAck.clear();startMessageTurns.clear();threadEpochs.clear();
  }
  callSessions.add(session.session_id);
+ audioLog.callStarted();
  keepTicket(true);
  // From here this socket speaks for the session: the outbox may use it.
  socket.session=state.sessionId;
@@ -2160,7 +2173,7 @@ function leaveSession(){
  writtenHearing.clear();
  const socket=state.ws;
  if(socket){socket.onclose=socket.onmessage=socket.onerror=null;try{socket.close(1000)}catch{}}
- window.sidevoiceTelemetry?.endCall?.('moved');
+ window.sidevoiceTelemetry?.endCall?.('moved');audioLog.callEnded();
  resumeToken=null;lastSeq=0;keepTicket(true);outboxHold=null;relay.reset();replies.clear();callSessions.clear();
  roomStore.batch(()=>{
   state.ws=null;state.sessionId=null;state.roomBinding=null;state.roomRevision=0;

@@ -8,6 +8,7 @@
 import { engineVoiceSource, voiceRefusal } from './voice-source.ts';
 import { engineCatalogs, localStorageCredentials } from './model-catalogs.js';
 import { engineFailureCode } from './failure-code.js';
+import { audioDiagnostics } from './audio-diagnostics.ts';
 
 /** The page as the engine's host: what this browser can run models on, and the provider keys `credentials` keeps. */
 export async function browserHost(navigator, credentials) {
@@ -39,7 +40,18 @@ export function beginBrowserAudioActivation(input = null) {
   // A model may load for a while before these promises are observed.
   void resumed.catch(() => {});
   void stream.catch(() => {});
+  // The page's own stream and context are watched, not changed (sidevoice-web#341).
+  const unwatch = [];
+  let released = false;
+  try {
+    const diagnostics = audioDiagnostics();
+    const stopContext = diagnostics.watchContext(context);
+    void stream.then((opened) => { if (!released) unwatch.push(diagnostics.watchStream(opened, context)); }, () => {});
+    unwatch.push(stopContext);
+  } catch { /* never in the way of the call */ }
   return { context, resumed, stream, release() {
+    released = true;
+    try { unwatch.forEach((stop) => stop()); } catch { /* nothing to undo */ }
     void stream.then((opened) => opened.getTracks().forEach((track) => track.stop()), () => {});
     void context.close().catch(() => {});
   } };

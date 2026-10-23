@@ -101,3 +101,18 @@ test("the browser supplies the shared owner and starts separate calls through it
   const source = create.mock.calls[0][0];
   expect(["vad", "transcriber", "speaker", "endOfTurn"].map((slot) => typeof (source as unknown as Record<string, unknown>)[slot])).toEqual(["function", "function", "function", "function"]);
 });
+
+test("an activation released while the microphone permission is pending attaches no listener when it resolves", async () => {
+  let grant: (stream: unknown) => void = () => {};
+  const getUserMedia = vi.fn(() => new Promise((resolve) => { grant = resolve; }));
+  Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: Object.assign(new EventTarget(), { getUserMedia }) });
+  vi.stubGlobal("AudioContext", class extends EventTarget { resume() { return Promise.resolve(); } close() { return Promise.resolve(); } });
+  const prepared = beginBrowserAudioActivation();
+  prepared?.release();
+  const track = Object.assign(new EventTarget(), { id: "late", stop: vi.fn(), getSettings: () => ({}) });
+  const add = vi.spyOn(track, "addEventListener");
+  grant({ getAudioTracks: () => [track], getTracks: () => [track] });
+  await vi.waitFor(() => expect(track.stop).toHaveBeenCalled());
+  expect(add).not.toHaveBeenCalled();
+  vi.unstubAllGlobals();
+});
