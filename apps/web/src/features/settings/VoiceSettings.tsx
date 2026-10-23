@@ -22,6 +22,10 @@ import { TurnTry, type TurnTryHandle } from "./TurnTry";
 import { useMedia } from "../../state/call-layout";
 import { SETTINGS_PHONE_QUERY, useSectionShown } from "./settings-levels";
 import { VoicePicker } from "./VoicePicker";
+import { ModelLanguageNotice, ModelLanguages } from "./ModelLanguages";
+import { languageName } from "./model-languages";
+import { listedOption } from "./model-facts";
+import type { ModelBuild } from "@sidevoice/engine";
 
 /* The call's voice as the person chooses it, for what transcribes and for what speaks: where it runs — this device, or
  * a remote provider — then, on this device, a family of models and one of them, made ready here (ModelPrepare); then
@@ -29,14 +33,6 @@ import { VoicePicker } from "./VoicePicker";
  * choices are the engine's catalogues; what cannot be chosen is listed greyed out, with why. Each choice applies as it is
  * made; a model not ready yet waits while the one in use stays (`useVoiceReadiness` says which wait). The first-run
  * setup shows the same, with `setup`, and its Continue waits for them. */
-
-function languageName(tag: string) {
-  try {
-    return new Intl.DisplayNames([document.documentElement.lang || "en"], { type: "language" }).of(tag) ?? tag;
-  } catch {
-    return tag;
-  }
-}
 
 /** A family as people read it: its id with a capital ("whisper" → "Whisper"); families are products' own names. */
 const familyName = (family: string) => family.charAt(0).toUpperCase() + family.slice(1);
@@ -76,6 +72,15 @@ function noted(t: Translate, option: { disabled: boolean; note: Note | null }): 
   return option.disabled ? { reason: text } : { description: text };
 }
 
+type Listed = { id: string; builds?: ModelBuild[]; recommendedBuild?: string; installed?: boolean };
+
+/** What a model of this device says in the Model list, while it can be chosen: its download size at the end of its
+ *  name's line, its hardware under it (model-facts.tsx, sidevoice-web#340). Put before what the pane says of the model
+ *  (`noted`), which takes the line under it. */
+function optionFacts(t: Translate) {
+  return (model: Listed | undefined, disabled: boolean): Pick<SelectOption, "badge" | "description"> => model && !disabled ? listedOption(model, t) : {};
+}
+
 function SourceSelect({ id, value, sources, onChange, t }: { id: string; value: string; sources: Source[]; onChange: (catalog: string) => void; t: Translate }) {
   return (
     <Select id={id} value={value} onValueChange={onChange} options={sources.map((source) => ({
@@ -87,6 +92,10 @@ function SourceSelect({ id, value, sources, onChange, t }: { id: string; value: 
 /** The family first, then a model of it: a family changed picks its first model that runs here. A provider's models
  *  have no family, and are one list. */
 function ModelPickers({ task, draft, options, locked, needsKey, t }: { task: Task; draft: Settings; options: Option[]; locked: boolean; needsKey: boolean; t: Translate }) {
+  const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
+  const facts = optionFacts(t);
+  // This device's models as its catalogue lists them, for their facts; a provider's say none.
+  const listed: Listed[] = draft[task].catalog === "local" ? catalogs.find((catalog) => catalog.id === "local")?.models ?? [] : [];
   const families = [...new Set(options.map((option) => option.group).filter((group): group is string => !!group))];
   const current = options.find((option) => option.id === draft[task].model);
   const family = current?.group ?? null;
@@ -102,7 +111,8 @@ function ModelPickers({ task, draft, options, locked, needsKey, t }: { task: Tas
     </Field>}
     <Field label={t("voice.model")}>
       <Select id={task + "-model"} value={needsKey ? "" : draft[task].model} disabled={locked || needsKey} placeholder={needsKey ? t("voice.prepare.badge.needsKey") : undefined}
-        onValueChange={(model) => edit({ [task]: { model } })} options={shown.map((option) => ({ value: option.id, label: option.id, disabled: option.disabled, ...noted(t, option) }))} />
+        onValueChange={(model) => edit({ [task]: { model } })} options={shown.map((option) => ({ value: option.id, label: option.id, disabled: option.disabled,
+          ...facts(listed.find((model) => model.id === option.id), option.disabled), ...noted(t, option) }))} />
     </Field>
   </>;
 }
@@ -148,8 +158,10 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
   const remote = current && !current.local ? current : null;
   const provider = model.needsKey ? current : null;
   const optionNote = slot.options.find((option: Option) => option.id === draft[task].model)?.note;
+  // Its languages, after its note: the one chosen to transcribe is the one the voice speaks too (none: automatic).
   const languages = model.model?.languages ?? [];
-  const meta = [optionNote ? noteText(t, optionNote) : "", languages.length ? languages.slice(0, 4).map(languageName).join(", ") + (languages.length > 4 ? " " + t("voice.languages.more", { n: languages.length - 4 }) : "") : ""].filter(Boolean).join(" · ");
+  const chosenLanguage = draft.stt.language ?? null;
+  const note = optionNote ? noteText(t, optionNote) : "";
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
   const preview = voicePreview(draft, catalogs, speechLanguage, useUiLanguage());
   // Settings' try says its sentence (the sample, editable once it is shown); the first-run setup's is the setup's,
@@ -204,7 +216,9 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
       {remote && <ProviderKeyNeeded key={remote.id} provider={remote.id} name={remote.name ?? remote.id} needed={!!provider} onDone={() => keyKept(remote.name ?? remote.id)} />}
       <Row label={t("voice.model")} block>
         <ModelPrepare id={task + "-model-card"} actionIds={task + "-model"} pending={pending} status={model.status} model={draft[task].model} size={model.local ? model.size : null} fraction={model.fraction} error={model.failure} errorDetails={model.failureDetails}
-          meta={!model.needsKey && meta || undefined} pickers={(locked) => <ModelPickers task={task} draft={draft} options={slot.options} locked={locked} needsKey={model.needsKey} t={t} />}
+          meta={!model.needsKey && note || undefined} pickers={(locked) => <ModelPickers task={task} draft={draft} options={slot.options} locked={locked} needsKey={model.needsKey} t={t} />}
+          languages={!model.needsKey && languages.length ? <ModelLanguages languages={languages} chosen={chosenLanguage} /> : undefined}
+          notice={model.needsKey ? undefined : <ModelLanguageNotice languages={languages} chosen={chosenLanguage} />} build={model.local ? model.build : null}
           runtime={<ModelRuntime task={task} state={model} locked={model.installing} />}
           onDownload={() => downloadModel(task)} onCancel={cancelDownload} onRetry={() => downloadModel(task)} />
       </Row>
@@ -255,6 +269,7 @@ export function TurnChoices({ draft, setup = false, active = true, turnTry }: { 
   const turn = useModelState("end-of-turn", draft);
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
   const turnModels = useMemo(() => endOfTurnModels(catalogs), [catalogs]);
+  const listFacts = optionFacts(t);
   const saved = useRoomStore((state) => state.facts.voiceSettings);
   // What ends turns until the chosen model is ready: the smart model in use when it is on disk, else silence — Smart
   // kept without its model too (voiceSettingsToLoad). As the slots say it, outside the setup (nothing is in use there).
@@ -276,11 +291,14 @@ export function TurnChoices({ draft, setup = false, active = true, turnTry }: { 
           options={[{ value: "smart-turn", label: t("voice.endOfTurn.smart"), disabled: !choices.endOfTurn.smartTurn }, { value: "silence", label: t("voice.endOfTurn.silence") }]} />
       </Row>
       {smart && turn.model && <Row label={t("voice.endOfTurn.model")} description={t("voice.endOfTurn.modelHint")} block>
-        <ModelPrepare id="turn-model-card" actionIds="turn-model" pending={turnPending} status={turn.status} model={turn.model.id} size={turn.size} fraction={turn.fraction} error={turn.failure} errorDetails={turn.failureDetails}
+        <ModelPrepare id="turn-model-card" actionIds="turn-model" pending={turnPending} status={turn.status} model={turn.model.id} size={turn.size} build={turn.build} fraction={turn.fraction} error={turn.failure} errorDetails={turn.failureDetails}
           pickers={(locked) => <Field label={t("voice.model")}>
-            {/* Just the models: one today, more later; no families, sizes or runtime here. */}
+            {/* Just the models: one today, more later; no families or runtime here. */}
             <Select id="turn-model" value={turn.model!.id} disabled={locked} onValueChange={(model) => edit({ turn_model: model })}
-              options={turnModels.map((model: { id: string; builds?: { available: boolean }[] }) => ({ value: model.id, label: model.id, disabled: !model.builds?.some((build) => build.available) }))} />
+              options={turnModels.map((model: Listed) => {
+                const disabled = !model.builds?.some((build) => build.available);
+                return { value: model.id, label: model.id, disabled, ...listFacts(model, disabled) };
+              })} />
           </Field>}
           onDownload={() => downloadModel("end-of-turn")} onCancel={cancelDownload} onRetry={() => downloadModel("end-of-turn")} />
       </Row>}

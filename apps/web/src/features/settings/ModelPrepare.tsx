@@ -5,7 +5,9 @@ import { Button } from "../../components/ui/Button";
 import { ProgressBar } from "../../components/ui/ProgressBar";
 import { DownloadsIcon } from "../../components/ui/Icons";
 import { translator } from "../../i18n/translator";
+import type { ModelBuild } from "@sidevoice/engine";
 import { sizeText } from "./ModelSetup";
+import { ModelSheet } from "./model-facts";
 import "./model-prepare.css";
 
 /* A chosen model made ready on this device, the same block wherever a model is chosen (the first-run setup, Settings):
@@ -47,10 +49,19 @@ export interface ModelPrepareProps {
   model: string;
   /** The family and model pickers; disabled by the block while a download runs. */
   pickers?: (locked: boolean) => ReactNode;
-  /** A line about the choice: its languages, a quality note. */
+  /** A line about the choice: a note on it (why it does not run here, its quality). */
   meta?: ReactNode;
+  /** The languages it supports (ModelLanguages), when it lists some: on the line about the choice, or the spec sheet's
+   *  Languages row. */
+  languages?: ReactNode;
+  /** That it does not speak the language in use, in a region of its own that stays as models are chosen, so choosing
+   *  one says it: under the line, hidden with it while a download runs; or at the end of the spec sheet's Languages row. */
+  notice?: ReactNode;
   /** Bytes to download, when known; none for a provider's model. */
   size?: number | null;
+  /** The build of this device's model it runs as (ModelSetup's `build`): what it takes and where it runs, in its spec
+   *  sheet (model-facts.tsx). None for a provider's model, or one with nothing that runs here: it has no sheet. */
+  build?: ModelBuild | null;
   /** How far the download is, 0–1; none while not known. */
   fraction?: number | null;
   /** Why it failed, in one sentence; and what was raw about it, behind Details (error-message.ts). */
@@ -68,7 +79,7 @@ export interface ModelPrepareProps {
   actionIds?: string;
 }
 
-export function ModelPrepare({ pending, runtime, status, model, pickers, meta, size = null, fraction = null, error, errorDetails, readyAction, readyPanel, onDownload, onCancel, onRetry, id, actionIds }: ModelPrepareProps) {
+export function ModelPrepare({ pending, runtime, status, model, pickers, meta, languages, notice, size = null, build = null, fraction = null, error, errorDetails, readyAction, readyPanel, onDownload, onCancel, onRetry, id, actionIds }: ModelPrepareProps) {
   const actionId = (name: string) => actionIds ? actionIds + "-" + name : undefined;
   const t = translator();
   const hintId = useId();
@@ -76,42 +87,69 @@ export function ModelPrepare({ pending, runtime, status, model, pickers, meta, s
   const locked = status === "downloading";
   const stalled = useStalled(locked, fraction);
   const percent = fraction == null ? null : Math.round(fraction * 100);
+  // A model of this device that runs here has a spec sheet (sidevoice-web#340): Advanced under the pickers, then one
+  // card with its languages, hardware, sizes and state, and at its foot what to do about it. Any other keeps the line
+  // about the choice, and a status row with its size beside the state.
+  const sheet = !!build;
+  const note = (ready: boolean): ReactNode => ready
+    ? <span className="model-prepare-note">{sized ? t("voice.prepare.onDevice", { size: sized }) : t("voice.prepare.noDownload")}</span>
+    : sized && <span className="model-prepare-note">{sized}</span>;
+  // The pieces both layouts show: what to do, how far a download is, the work after it, and a failure.
+  const download = <Button size="sm" id={actionId("download")} onClick={onDownload}><DownloadsIcon />{t("voice.prepare.download")}</Button>;
+  const cancel = <Button size="sm" variant="ghost" tone="neutral" id={actionId("cancel")} onClick={onCancel}>{t("voice.prepare.cancel")}</Button>;
+  const downloading = percent == null ? t("voice.prepare.downloading") : t("voice.prepare.downloadingAt", { percent });
+  const progress = stalled ? <span className="model-prepare-note model-prepare-stalled">{t("voice.prepare.stalled")}</span>
+    : size && fraction != null && <span className="model-prepare-note">{t("voice.prepare.progress", { done: sizeText(size * fraction), size: sized })}</span>;
+  const bar = <ProgressBar value={fraction} label={t("voice.prepare.downloading")} />;
+  const working = <><span className="ui-spinner ui-spinner--inline" aria-hidden />
+    <span className="model-prepare-working">{t(status === "verifying" ? "voice.prepare.verifying" : "voice.prepare.loading")}</span></>;
+  const failed = <Alert tone="danger" live className="model-prepare-alert" title={t("voice.prepare.failed", { model })} details={errorDetails}
+    action={<Button size="sm" id={actionId("retry")} onClick={onRetry}>{t("voice.prepare.retry")}</Button>}>{error}</Alert>;
+  // In the sheet: its state — a failed download is still not downloaded — and what to do about it, at its foot.
+  const sheetState = status === "ready" ? <Badge tone="positive" dot>{t("voice.prepare.badge.ready")}</Badge>
+    : status === "downloading" ? <strong>{downloading}</strong>
+    : status === "verifying" || status === "loading" ? working
+    : <Badge>{t("voice.prepare.badge.absent")}</Badge>;
+  const sheetFooter = status === "absent" ? download
+    : status === "downloading" ? <><div className="model-prepare-progress">{progress && <div className="model-prepare-progress-line">{progress}</div>}{bar}</div>{cancel}</>
+    : status === "failed" ? failed
+    : status === "ready" ? readyAction : null;
   return (
     <div className="model-prepare" id={id} data-status={status}>
       {pickers && <div className="model-prepare-pickers" aria-describedby={locked ? hintId : undefined}>{pickers(locked)}</div>}
       {locked && pickers && <p className="model-prepare-meta" id={hintId}>{t("voice.prepare.lockedHint")}</p>}
-      {!locked && meta && <p className="model-prepare-meta">{meta}</p>}
-      {runtime}
-      {status && <div className="model-prepare-status" role={status === "failed" ? undefined : "status"} aria-live="polite">
+      {sheet ? <>
+        {runtime}
+        {/* The note and the sheet stay while a download runs: the pickers' hint is a line of its own. A note is not a
+            language: it is a line of its own, above the sheet. */}
+        {meta && <p className="model-prepare-meta">{meta}</p>}
+        {status && <ModelSheet build={build!} languages={languages} notice={notice} installed={status === "ready"} state={sheetState} footer={sheetFooter} t={t} />}
+      </> : <>
+        {!locked && (meta || languages) && <p className="model-prepare-meta">{meta}{meta && languages && " · "}{languages}</p>}
+        {!locked && notice}
+        {runtime}
+      </>}
+      {!sheet && status && <div className="model-prepare-status" role={status === "failed" ? undefined : "status"} aria-live="polite">
         {status === "absent" && <>
-          <div className="model-prepare-state"><Badge>{t("voice.prepare.badge.absent")}</Badge>{sized && <span className="model-prepare-note">{sized}</span>}</div>
-          <Button size="sm" id={actionId("download")} onClick={onDownload}><DownloadsIcon />{t("voice.prepare.download")}</Button>
+          <div className="model-prepare-state"><Badge>{t("voice.prepare.badge.absent")}</Badge>{note(false)}</div>
+          {download}
         </>}
         {status === "downloading" && <>
           <div className="model-prepare-progress">
-            <div className="model-prepare-progress-line">
-              <strong>{percent == null ? t("voice.prepare.downloading") : t("voice.prepare.downloadingAt", { percent })}</strong>
-              {stalled ? <span className="model-prepare-note model-prepare-stalled">{t("voice.prepare.stalled")}</span>
-                : size && fraction != null && <span className="model-prepare-note">{t("voice.prepare.progress", { done: sizeText(size * fraction), size: sized })}</span>}
-            </div>
-            <ProgressBar value={fraction} label={t("voice.prepare.downloading")} />
+            <div className="model-prepare-progress-line"><strong>{downloading}</strong>{progress}</div>
+            {bar}
           </div>
-          <Button size="sm" variant="ghost" tone="neutral" id={actionId("cancel")} onClick={onCancel}>{t("voice.prepare.cancel")}</Button>
+          {cancel}
         </>}
-        {(status === "verifying" || status === "loading") && <div className="model-prepare-state">
-          <span className="ui-spinner ui-spinner--inline" aria-hidden />
-          <span className="model-prepare-working">{t(status === "verifying" ? "voice.prepare.verifying" : "voice.prepare.loading")}</span>
-        </div>}
+        {(status === "verifying" || status === "loading") && <div className="model-prepare-state">{working}</div>}
         {status === "ready" && <>
           <div className="model-prepare-state">
             <Badge tone="positive" dot>{t("voice.prepare.badge.ready")}</Badge>
-            <span className="model-prepare-note">{sized ? t("voice.prepare.onDevice", { size: sized }) : t("voice.prepare.noDownload")}</span>
+            {note(true)}
           </div>
           {readyAction}
         </>}
-        {status === "failed" && <Alert tone="danger" live className="model-prepare-alert" title={t("voice.prepare.failed", { model })}
-          details={errorDetails}
-          action={<Button size="sm" id={actionId("retry")} onClick={onRetry}>{t("voice.prepare.retry")}</Button>}>{error}</Alert>}
+        {status === "failed" && failed}
       </div>}
       {status === "ready" && readyPanel}
       {pending && status !== "ready" && <p className="model-prepare-pending" role="status">{pending}</p>}

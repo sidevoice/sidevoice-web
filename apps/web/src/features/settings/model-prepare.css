@@ -2,10 +2,41 @@
 .model-prepare { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sv-space-3); min-width: 0; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); color: var(--sv-text); }
 .model-prepare-pickers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: var(--sv-space-3); }
 .model-prepare-meta { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
-.model-prepare-pickers + .model-prepare-status, .model-prepare-meta + .model-prepare-status { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.model-prepare-pickers + .model-prepare-status, .model-prepare-meta + .model-prepare-status, .model-prepare-notice + .model-prepare-status { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+/* Which languages the model supports (ModelLanguages): the one in use in bold; "+N more" a link in the text that opens
+   all of them in a popover. */
+.model-prepare-meta strong { font-weight: 600; color: var(--sv-text); }
+.model-languages-more { display: inline; padding: 0; border: 0; background: none; color: var(--sv-accent-text); font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.model-languages-more:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: 2px; }
+/* All of them (Whisper has about a hundred): the popover itself scrolls, so the focus in it scrolls it with the keys;
+   two columns where it is wide enough, one on a phone. A shadow at an edge says there is more beyond it: covers in the
+   popover's own colour scroll with the list (local) over shadows that stay at its edges (scroll), so at either end, or
+   with all of it in sight, a cover hides the shadow. Its background colour stays the popover's own. */
+.ui-popover.model-languages-popover { width: min(22rem, calc(100vw - 24px)); max-height: min(24rem, 60vh); overflow-y: auto;
+  background-image: linear-gradient(var(--sv-surface-raised) 30%, transparent), linear-gradient(transparent, var(--sv-surface-raised) 70%),
+    radial-gradient(farthest-side at 50% 0, color-mix(in srgb, var(--sv-text) 22%, transparent), transparent),
+    radial-gradient(farthest-side at 50% 100%, color-mix(in srgb, var(--sv-text) 22%, transparent), transparent);
+  background-size: 100% 2.5rem, 100% 2.5rem, 100% 0.75rem, 100% 0.75rem;
+  background-repeat: no-repeat;
+  background-attachment: local, local, scroll, scroll;
+  background-position: center top, center bottom, center top, center bottom; }
+.model-languages-popover .ui-popover-title { color: var(--sv-text); }
+.model-languages-list { margin: 0; padding: 0; list-style: none; column-width: 9rem; column-gap: var(--sv-space-4); color: var(--sv-text); }
+.model-languages-list li { break-inside: avoid; }
+.model-languages-list strong { font-weight: 600; }
+/* The language in use is not one of the model's: in the warning's colour and with its mark, so not by colour alone. Its
+   region stays in the block, empty while there is nothing to say. */
+.model-prepare-notice { display: flex; align-items: flex-start; gap: var(--sv-space-1-5); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-warning); }
+.model-prepare-notice:empty { display: none; }
+.model-prepare-notice svg { flex: none; margin-top: 2px; }
 .model-prepare-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sv-space-3); min-height: 48px; min-width: 0; }
 .model-prepare-state { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; }
 .model-prepare-note { white-space: nowrap; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); font-variant-numeric: tabular-nums; }
+/* The hardware as a chip, in the spec sheet: the engine's pick for this device, in the accent's weight. It wraps rather
+   than overflow a narrow block. */
+.ui-badge.model-hardware { flex: 0 1 auto; max-width: 100%; height: auto; min-height: 22px; padding-block: 2px; border: 1px solid transparent; line-height: 1.2; white-space: normal; text-align: start; }
+/* "both": the technical name after the class, lighter. */
+.model-hardware-name { font-weight: var(--sv-weight-regular); color: var(--sv-text-muted); }
 .model-prepare-working { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text); }
 .model-prepare-state .ui-spinner { color: var(--sv-accent-text); }
 .model-prepare-progress { display: grid; gap: var(--sv-space-2); flex: 1; min-width: 0; }
@@ -115,3 +146,26 @@
   .stt-try-head .voice-wave { max-width: none; }
 }
 .model-prepare-stalled { color: var(--sv-warning); }
+/* A model's download size at the end of its name's line in the Model list, quieter than its name. */
+.model-list-size { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-regular); line-height: 1.25rem; color: var(--sv-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* The spec sheet (ModelSheet): what the model is in one bordered block, a label column and a value column, tight;
+   on a narrow phone each label above its value. */
+.model-prepare-sheet { padding: var(--sv-space-2) var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-surface); }
+.model-sheet { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: baseline; gap: var(--sv-space-1) var(--sv-space-3); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; font-variant-numeric: tabular-nums; }
+.model-sheet dt { color: var(--sv-text-muted); }
+.model-sheet dd { margin: 0; min-width: 0; color: var(--sv-text); }
+.model-sheet strong { font-weight: 600; }
+.model-sheet .model-sheet-size { color: var(--sv-text-muted); }
+/* The notice right after the languages, a small chip in the warning's soft tone (with its mark: not by colour alone);
+   under them when both do not fit. */
+.model-sheet .model-sheet-languages { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sv-space-1) var(--sv-space-2); }
+.model-sheet-languages .model-prepare-notice { align-items: center; padding: 0 var(--sv-space-1-5); border-radius: var(--sv-radius-sm); background: var(--sv-warning-soft); }
+.model-sheet-languages .model-prepare-notice svg { margin-top: 0; }
+/* Its state, the last row; what to do about it (download, cancel, retry) at the card's foot, full width on a phone. */
+.model-sheet-state { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); min-height: 22px; }
+.model-sheet-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sv-space-3); margin-top: var(--sv-space-2); padding-top: var(--sv-space-2); border-top: 1px solid var(--sv-border); }
+@media (max-width: 360px) { .model-sheet-footer > .ui-button { flex: 1 1 100%; } }
+@media (max-width: 360px) {
+  .model-sheet { grid-template-columns: minmax(0, 1fr); row-gap: 0; }
+  .model-sheet dd + dt { margin-top: var(--sv-space-1-5); }
+}
