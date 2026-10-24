@@ -3618,3 +3618,81 @@ test('A conversation the room says was closed is not gone back to: the call land
  assert.equal(c.s.run('targetId()'),'fp-mac|b');
  c.s.run('disconnect()');
 });
+// The person's words the call hears now, said as one turn: which conversation the room is told they are for.
+const sayNow=(c,id,text='Hola')=>{c.voice.routed.emit('turn',started(id));c.voice.routed.emit('turn',finished(id,text));return c.turns().filter(turn=>turn.turn_id===id).map(turn=>turn.thread_id)};
+test('A pick made while another is on its way is the one the call ends on, and the words go there',async()=>{
+ const room=coreRoom({active:['a','b']});
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|a'});
+ let release;const gate=new Promise(resolve=>{release=resolve});
+ c.s.context.fetch=async(path,options)=>{if(options?.method==='POST')await gate;return room.fetch(path,options)};
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|b')");await settleSoon();
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");
+ release();
+ for(let i=0;i<400&&!(room.selects.length===2&&c.s.run('targetId()')==='fp-mac|a'&&!c.s.run('state.switching'));i++)await settleSoon();
+ assert.deepEqual(plain(room.selects),['b','a'],'the second pick is not dropped');
+ assert.equal(c.s.run('targetId()'),'fp-mac|a');
+ assert.equal(c.store['sidevoice.selected'],'fp-mac|a');
+ assert.deepEqual(plain(sayNow(c,'t1')),['a','a']);
+ c.s.run('disconnect()');
+});
+test('A pick while the call\'s machine is being looked for again is taken once it answers, not left to the screen alone',async()=>{
+ const room=coreRoom({active:['a','b']});
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|b'});
+ c.s.run("linkOf(callNode).reach='checking';publishLinks()");
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");await settleSoon();
+ assert.equal(c.s.run('viewedThread'),'fp-mac|a');
+ assert.deepEqual(room.selects,[],'nothing asked of a machine not proved yet');
+ c.s.run("linkOf(callNode).reach='ok';publishLinks()");
+ await c.s.run('refresh()');
+ for(let i=0;i<200&&c.s.run('targetId()')!=='fp-mac|a';i++)await settleSoon();
+ assert.deepEqual(room.selects,['a']);
+ assert.deepEqual(plain(sayNow(c,'t1')),['a','a'],'the words go to the conversation on screen, not to the one the call was on');
+ c.s.run('disconnect()');
+});
+test('A pick the machine could not take, being away a moment, is asked again on the beat',async()=>{
+ const room=coreRoom({active:['a','b']});
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|b'});
+ let away=true;
+ c.s.context.fetch=async(path,options)=>{if(away&&options?.method==='POST')throw TypeError('Failed to fetch');return room.fetch(path,options)};
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");await settleSoon();
+ assert.equal(c.s.run('targetId()'),'fp-mac|b');
+ away=false;await c.s.run('refresh()');
+ for(let i=0;i<200&&c.s.run('targetId()')!=='fp-mac|a';i++)await settleSoon();
+ assert.equal(c.s.run('targetId()'),'fp-mac|a');
+ c.s.run('disconnect()');
+});
+test('A pick the room refuses leaves the call where it is, says why, and is not asked again and again',async()=>{
+ const room=coreRoom({active:['a','b']});
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|b'});
+ let refused=0;const errors=[];
+ c.s.context.window.sidevoiceUI=new Proxy({},{get:(_,name)=>name==='setBootError'?value=>errors.push(value):()=>{}});
+ c.s.context.fetch=async(path,options)=>{if(options?.method==='POST'){refused++;return {ok:false,status:429,json:async()=>({detail:{key:'room.input_backlog_full',message:'full'}})}}return room.fetch(path,options)};
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");await settleSoon();
+ await c.s.run('refresh()');await settleSoon();await c.s.run('refreshPeople()');await settleSoon();
+ assert.equal(refused,1);
+ assert.equal(c.s.run('targetId()'),'fp-mac|b');
+ assert.equal(c.store['sidevoice.selected'],'fp-mac|b','the call is remembered where it is');
+ assert.ok(errors.some(Boolean),'and the person is told');
+ c.s.run('disconnect()');
+});
+test('A pick made while the call is joining is where the call ends, not the conversation the join started for',async()=>{
+ const room=coreRoom({active:['a','b']});
+ const stored={pairings:[PAIRED]};
+ const s=setup({stored});const sockets=socketsOf(s);let ids=0;
+ s.context.crypto={randomUUID:()=>'id-'+(++ids)};s.context.window.sidevoiceUI=new Proxy({},{get:()=>()=>{}});
+ const store={'sidevoice.selected':'fp-mac|b'};s.context.sessionStorage=storageOf(store);
+ withVoice(s,fakeVoice());s.context.fetch=room.fetch;
+ s.run("keepScreenAwake=()=>{};roomBinding=null;sessionId=null");
+ await s.run('refreshPeople()');
+ const joined=s.run('toggleCall')();
+ for(let i=0;i<500&&!sockets.length;i++)await settleSoon();
+ const socket=sockets[0];socket.readyState=1;socket.onopen();room.hello(JSON.parse(socket.sent[0]).data);
+ // The hello went for B; A is picked before the room answers it.
+ s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");
+ socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'s1',resume:{token:'tok-a',seconds:60},resumed:false}})});
+ await joined;
+ for(let i=0;i<200&&s.run('targetId()')!=='fp-mac|a';i++)await settleSoon();
+ assert.equal(s.run('targetId()'),'fp-mac|a');
+ assert.equal(store['sidevoice.selected'],'fp-mac|a');
+ s.run('disconnect()');
+});

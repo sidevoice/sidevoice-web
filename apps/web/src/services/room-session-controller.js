@@ -719,7 +719,20 @@ async function select(key){
  if(to.node!==state.callNode)return moveCall(to.node,to.thread);
  state.switching=true;
  applyMicState();
- try{await post('/api/presentation/select',{thread_id:to.thread,session_id:state.sessionId});rememberThread(key);await refresh()}catch(e){if(!machineAway(e))setRoomError(roomError(e))}finally{state.switching=false;applyMicState()}
+ // The conversation this tab remembers is the person's latest pick (`selectParticipant`). One made while this select
+ // is on its way is the newer: it is kept, and asked for as soon as this one is done.
+ const before=rememberedThread();
+ let newer=false;
+ try{
+  await post('/api/presentation/select',{thread_id:to.thread,session_id:state.sessionId});
+  if(rememberedThread()===before)rememberThread(key);else newer=true;
+  await refresh();
+ }catch(e){
+  // A machine that is away, or did not answer, is asked again on the beat. A room that refuses the pick (its refusal
+  // names a key) leaves the call where it is.
+  if(!machineAway(e)){setRoomError(roomError(e));if(e?.key&&rememberedThread()===key)rememberThread(targetId())}
+ }finally{state.switching=false;applyMicState()}
+ if(newer)await reselectRemembered();
 }
 // Answers can arrive out of order, and one asked before this page had a session describes nobody: either
 // would read as the binding changing and cancel a reply just handed to this page.
@@ -749,7 +762,7 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
  const listening=nextThread?conversationCalls.get(conversationKey(fp,nextThread)):null;
  if(listening&&microphoneUsable())giveMicrophone(listening);
  refreshApplied=asked;
- const previousThread=targetId(),changed=state.roomBinding?.binding_id!==d.binding?.binding_id;roomStore.batch(()=>{state.roomBinding=d.binding;if(d.binding?.thread_id)rememberThread(targetId());
+ const previousThread=targetId(),changed=state.roomBinding?.binding_id!==d.binding?.binding_id;roomStore.batch(()=>{state.roomBinding=d.binding;if(d.binding?.thread_id&&!rememberedOn(fp))rememberThread(targetId());
   if(d.binding?.thread_id)acceptEpoch(d.binding.thread_id,d.binding.epoch);
  if(changed){state.viewedThread=null;state.turns={};if(previousThread!==targetId())state.harness=Object.fromEntries(Object.entries(state.harness).filter(([id])=>id!==previousThread));
   // A new binding on the same conversation is a rejoin, not a move: what is playing for it goes on, and whether it
@@ -767,6 +780,9 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
  // The conversations (and each one's model and effort) come on a slower beat: the first answer asks for them at once, so
  // the stage is whole from the start rather than six seconds later.
  if(!links.get(fp)?.peopleAnswered)void refreshPeople(fp);
+ // A pick the room has not taken yet (it was on its way to another, or the machine did not answer) is asked again,
+ // once the conversations have said which ones were closed.
+ if(links.get(fp)?.peopleAnswered)void reselectRemembered();
 }catch{}}
 const HISTORY_ROLES=new Set(['user','assistant']);
 function readableHistoryRow(r){return !!r&&typeof r==='object'&&typeof r.id==='string'&&!!r.id&&typeof r.text==='string'&&HISTORY_ROLES.has(r.role)}
@@ -1141,8 +1157,9 @@ async function reselectRemembered(){
  // Its agent may be away, and the room may not list it at all (a restart lost its binding, its agent has not come back
  // yet): the room takes the pick all the same, and what is said to it waits there for its agent. The hello named it
  // already, but the room honours a hello only for a conversation it holds a binding for (sidevoice-core focus.rs).
+ // So does a call that is on another conversation than the latest pick: the pick is the person's, the room never chooses.
  const wanted=rememberedThread(),to=conversationOf(wanted);
- if(!wanted||targetId()||state.switching||!state.ws||to?.node!==state.callNode)return false;
+ if(!wanted||targetId()===wanted||state.switching||!state.ws||!state.sessionId||to?.node!==state.callNode)return false;
  if(links.get(to.node)?.closed?.has(to.thread))return false;
  await select(wanted);return true;
 }
@@ -2515,7 +2532,9 @@ window.sidevoiceActions={
   window.sidevoiceUI?.playbackLevel?.clear?.();
   const to=conversationOf(key);
   state.viewedThread=key;markHistorySeen();acknowledgeDisplayedHistory();
-  if(!state.sessionId)rememberThread(key);
+  // The pick is what the call goes to: out of a call the next join, in one on the call's machine the room is asked now
+  // and, until it has it (another pick still on its way, the machine not answering for a moment), again on the beat.
+  if(!state.sessionId||to?.node===state.callNode)rememberThread(key);
   // Only a machine that has proved where it is: one being looked for again is not reachable until it answers. An agent that
   // is away does not keep the call from its conversation: what is sent to it waits there until it is back.
   const hears=state.machineLinks?.[to?.node]?.reach==='ok'&&linkBase(to?.node)!=null;
