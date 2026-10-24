@@ -913,6 +913,7 @@ async function refreshPeople(fp=state.callNode){
   // closure: the connector may still be registering after Core restart, or the response may be partial.
   const closed=new Set((Array.isArray(data.closed_threads)?data.closed_threads:[]).filter(thread=>typeof thread==='string'));
   for(const thread of closed)forgetCard(fp,thread);
+  link.closed=closed;
   const merged=new Map(link.people.filter(person=>!closed.has(person.thread_id))
    .map(person=>[person.thread_id,{...person,available:false,reach:{state:'offline'}}]));
   for(const person of data.participants)if(!closed.has(person.thread_id))merged.set(person.thread_id,{...person,node:fp});
@@ -1136,10 +1137,13 @@ async function renameLocalHostDevice(id,name){await localHostApi('/api/device/de
 // Browsers cannot set headers on a WebSocket: the token travels as the second subprotocol, the node answers with the first.
 function callProtocols(fp){const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing?.token||pairing.revoked)throw worded(noMachine());return ['sidevoice','sidevoice.token.'+pairing.token]}
 async function reselectRemembered(){
- // After a reload or a reconnect this tab goes back to the conversation it was on, if it is still in the room.
- const wanted=rememberedThread();
- if(!wanted||targetId()||state.switching||!state.ws||conversationOf(wanted)?.node!==state.callNode)return false;
- if(!state.people.some(person=>personKey(person)===wanted))return false;
+ // After a reload or a reconnect this tab goes back to the conversation it was on, unless the room says it was closed.
+ // Its agent may be away, and the room may not list it at all (a restart lost its binding, its agent has not come back
+ // yet): the room takes the pick all the same, and what is said to it waits there for its agent. The hello named it
+ // already, but the room honours a hello only for a conversation it holds a binding for (sidevoice-core focus.rs).
+ const wanted=rememberedThread(),to=conversationOf(wanted);
+ if(!wanted||targetId()||state.switching||!state.ws||to?.node!==state.callNode)return false;
+ if(links.get(to.node)?.closed?.has(to.thread))return false;
  await select(wanted);return true;
 }
 // Stats poll only while the modal is open; each opening owns its requests.
