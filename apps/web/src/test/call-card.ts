@@ -6,7 +6,7 @@ import type { ParticipantView } from "../state/room-types";
 
 export function row(threadId: string, extra: Partial<ParticipantView> = {}): ParticipantView {
   return {
-    threadId, title: threadId, selected: false, available: true, switching: false, unread: 0, reach: "listening",
+    threadId, title: threadId, selected: false, available: true, switching: false, unread: 0, reach: "listening", machineReachable: true,
     working: false, machine: "daimon", harness: "claude", ...extra,
   };
 }

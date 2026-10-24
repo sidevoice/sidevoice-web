@@ -26,11 +26,11 @@ function snapshot(overrides: Partial<CallSnapshot> = {}): CallSnapshot {
     version: 2, ready: true, joined: true, busy: false, micEnabled: true, micDisabled: false, title: "Sidevoice: mini call",
     agent: "idle", youTalking: false, canSkip: false, since: SINCE,
     participants: [
-      { threadId: "a", title: "Sidevoice: mini call", selected: true, available: true, switching: false, unread: 0, reach: "listening",
+      { threadId: "a", title: "Sidevoice: mini call", selected: true, available: true, switching: false, unread: 0, reach: "listening", machineReachable: true,
         working: false, machine: "daimon", harness: "claude" },
-      { threadId: "b", title: "brand/web", selected: false, available: true, switching: false, unread: 2, reach: "listening",
+      { threadId: "b", title: "brand/web", selected: false, available: true, switching: false, unread: 2, reach: "listening", machineReachable: true,
         working: true, machine: "daimon", harness: "claude" },
-      { threadId: "c", title: "landing", selected: false, available: false, switching: false, unread: 0, reach: "offline",
+      { threadId: "c", title: "landing", selected: false, available: false, switching: false, unread: 0, reach: "offline", machineReachable: true,
         working: false, machine: "portátil", harness: "cursor" },
     ],
     devices: { inputs: [{ id: "default", label: "Predeterminado del sistema", system: true }, { id: "mbp", label: "MacBook Pro Microphone" },
@@ -266,6 +266,11 @@ test("the conversations control opens them below the controls, in the card's wor
   fireEvent.click(screen.getByRole("button", { name: "Conversations (3), 1 with unread replies" }));
   fireEvent.click(screen.getByRole("button", { name: /landing/ }));
   expect(host.run).toHaveBeenCalledWith({ command: "select-participant", threadId: "c" });
+  // Its machine out of reach, the room would only show it: it cannot be picked here.
+  const call = snapshot();
+  host.push({ call: { ...call, participants: call.participants.map((row) => row.threadId === "c" ? { ...row, machineReachable: false } : row) } });
+  fireEvent.click(screen.getByRole("button", { name: "Conversations (3), 1 with unread replies" }));
+  expect(screen.getByRole("button", { name: /landing/ })).toBeDisabled();
 });
 
 test("a panel closes on a press elsewhere in the card, on a click outside it, and after the pointer leaves", () => {
