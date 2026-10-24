@@ -12,6 +12,7 @@ import { PermissionsSettings } from "../settings/PermissionsSettings";
 const t = translator("en");
 afterEach(() => {
   cleanup();
+  delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
   delete (navigator as { mediaDevices?: unknown }).mediaDevices;
   delete (navigator as { permissions?: unknown }).permissions;
   vi.restoreAllMocks();
@@ -189,4 +190,28 @@ test("Settings › Permissions trusts a successful stream when Safari's query re
     await waitFor(() => expect(document.querySelector(".perm-badge")).toHaveTextContent("Allowed"));
     cleanup();
   }
+});
+
+
+test.each(["setup", "settings"])("Windows %s: the privacy button uses the settings-only bridge; Check again still asks the webview", async (place) => {
+  const openSettings = vi.fn(async () => {});
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { microphone: { openSettings } } } });
+  vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
+  const { getUserMedia } = browser("prompt");
+  getUserMedia.mockRejectedValueOnce(Object.assign(new Error("blocked"), { name: "NotAllowedError" }));
+  function Setup() {
+    const { access, microphone } = useMicrophoneAccess();
+    return microphone && <PermissionsStep microphone={microphone} openSettings={access?.openSettings ?? null} onRequest={() => void access?.request()} t={t} />;
+  }
+  render(place === "settings" ? <Settings /> : <Setup />);
+  await act(async () => { fireEvent.click(await screen.findByRole("button", { name: "Allow microphone" })); });
+  expect(document.querySelector(".wizard-mic-help")).toHaveTextContent("Microphone access");
+  expect(document.querySelector(".wizard-mic-help")).toHaveTextContent("Let desktop apps access your microphone");
+  fireEvent.click(screen.getByRole("button", { name: "Open System Settings" }));
+  expect(openSettings).toHaveBeenCalledTimes(1);
+  expect(getUserMedia).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole("button", { name: "Check again" })).toBeInTheDocument();
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check again" })); });
+  expect(getUserMedia).toHaveBeenCalledTimes(2);
+  await waitFor(() => expect(document.querySelector(".perm-badge")).toHaveTextContent("Allowed"));
 });
