@@ -720,7 +720,7 @@ document.addEventListener('keydown',event=>{if(event.key==='Escape')for(const me
  * while its operation is still `pick.op`: a hang-up, a move, a new session or a close of its conversation let go of it
  * (`letGoOfSelect`), and then its answer changes nothing. `pick.answered` is the pick the room said yes to in this
  * session: it is not asked for again by itself (a room whose binding does not follow would be asked on every beat). */
-const pick={revision:0,op:null,ops:0,answered:null};
+const pick={revision:0,op:null,ops:0,answered:null,leftAt:0};
 const answeredKey=(session,revision,key)=>session+'\0'+revision+'\0'+key;
 function letGoOfSelect(){if(!pick.op)return;pick.op=null;state.switching=false;applyMicState()}
 /* A select this page let go of that the room took all the same, in the same session: the room's focus moved where the
@@ -734,19 +734,33 @@ async function settleLetGo(op){
 // Whether conversation `key` is one the room said was closed.
 function closedPick(key){const to=conversationOf(key);return !!to&&!!links.get(to.node)?.closed?.has(to.thread)}
 /* The one rule for where the call settles: never on a conversation the room said was closed (the room takes a select
- * of one, so a late or another device's answer can put the call there). Checked on every refresh: a call focused on a
- * closed conversation leaves that focus, as one operation of the pick's (`pick.op`), and is then brought to the latest
- * pick that is open, or to none. A leave that fails is tried again at the next refresh, on the call beat. Returns
- * whether a leave is on its way. */
+ * of one, so a late or another device's answer can put the call there). Checked on every refresh. When the latest pick
+ * is open and another conversation, selecting it is what moves the call off the closed one (`reselectRemembered`).
+ * Otherwise the call leaves that focus, as one operation of the pick's (`pick.op`), and is then brought to the latest
+ * open pick, or to none. A leave that fails is tried again at most once a call beat (`pick.leftAt`), never at once.
+ * Returns whether the call is to wait for a leave rather than ask for the pick. */
+const LEAVE_EVERY_MS=1500;
 function settleOnOpen(fp){
  const key=targetId(),binding=state.roomBinding?.binding_id;
- if(!key||!closedPick(key)||!binding||pick.op||!state.sessionId)return !!pick.op?.leave;
+ if(pick.op)return !!pick.op.leave;
+ if(!key||!closedPick(key)||!binding||!state.sessionId)return false;
+ const wanted=pickOn(fp);
+ if(wanted&&conversationKey(wanted.node,wanted.thread)!==key)return false;
+ if(Date.now()-pick.leftAt<LEAVE_EVERY_MS)return true;
+ pick.leftAt=Date.now();
  const op={id:++pick.ops,key,leave:true,session:state.sessionId,node:fp,epoch:connectEpoch,revision:pick.revision};
  pick.op=op;state.switching=true;applyMicState();
- void post('/api/presentation/leave',{session_id:op.session,binding_id:binding},fp)
-  .then(()=>{if(pick.op===op)pick.answered=null},()=>{})
-  .finally(async()=>{if(pick.op!==op)return;pick.op=null;state.switching=false;applyMicState();
-   if(op.session===state.sessionId&&op.node===state.callNode){await refresh();await reselectRemembered()}});
+ void post('/api/presentation/leave',{session_id:op.session,binding_id:binding},fp).then(async()=>{
+  if(pick.op!==op)return;
+  pick.op=null;pick.answered=null;state.switching=false;applyMicState();
+  if(op.session===state.sessionId&&op.node===state.callNode){await refresh();await reselectRemembered()}
+ },()=>{
+  if(pick.op!==op)return;
+  pick.op=null;state.switching=false;applyMicState();
+  // Not tried again now: the next call beat does. A newer open pick made meanwhile is asked for at once instead.
+  const wanted=pickOn(op.node);
+  if(wanted&&conversationKey(wanted.node,wanted.thread)!==op.key&&op.session===state.sessionId)void reselectRemembered();
+ });
  return true;
 }
 async function select(key){

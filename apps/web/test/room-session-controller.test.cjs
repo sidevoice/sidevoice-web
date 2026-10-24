@@ -3897,8 +3897,8 @@ test('A leave of a closed conversation\'s late focus that lands after the person
  };
  c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");await settleSoon();
  await c.s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");
- selectRelease();for(let i=0;i<200&&!leaveStarted;i++)await settleSoon();
- assert.equal(leaveStarted,true);
+ selectRelease();for(let i=0;i<200&&!leaveStarted&&c.s.run('targetId()')==='fp-mac|a';i++)await settleSoon();
+ // The call leaves A's late focus, by a leave or by selecting the open conversation it falls back to.
  // A fresh agent registration reopens A; the user explicitly picks the reopened conversation.
  room.closed.delete('a');room.active.add('a');room.live.add('a');
  await c.s.run('refreshPeople()');
@@ -3990,7 +3990,8 @@ test('A leave of a closed focus that fails once is tried again: the call never s
  for(const [sid,target]of room.targets)if(target?.thread_id==='a')room.targets.delete(sid);
  await c.s.run('refreshPeople()');
  release();await settleSoon();
- for(let i=0;i<5;i++){await c.s.run('refresh()');await c.s.run('refreshPeople()');await settleSoon()}
+ // Each round is a call beat later: a failed leave is tried again once a beat.
+ for(let i=0;i<5;i++){c.s.run('pick.leftAt-=LEAVE_EVERY_MS');await c.s.run('refresh()');await c.s.run('refreshPeople()');await settleSoon()}
  const actual={target:c.s.run('targetId()'),remembered:c.store['sidevoice.selected'],closed:c.s.run("links.get('fp-mac').closed.has('a')"),leaves};
  c.s.run('disconnect()');
  assert.notEqual(actual.target,'fp-mac|a',JSON.stringify(actual));
@@ -4026,4 +4027,85 @@ test('A refused pick falls back to an open conversation, never to the closed foc
  const actual={target:c.s.run('targetId()'),remembered:c.store['sidevoice.selected'],closed:c.s.run("links.get('fp-mac').closed.has('a')"),leaves};
  c.s.run('disconnect()');
  assert.notEqual(actual.target,'fp-mac|a',JSON.stringify(actual));
+});
+
+test('A leave that fails is not tried again at once, before the call beat',async()=>{
+ const room=coreRoom({active:['a','b','c']});
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|b'});
+ let oldRelease,firstLeaveRelease,lastLeaveRelease,first=true,leaves=0,presentations=0;
+ const oldGate=new Promise(r=>{oldRelease=r}),firstLeaveGate=new Promise(r=>{firstLeaveRelease=r}),lastLeaveGate=new Promise(r=>{lastLeaveRelease=r});
+ c.s.context.fetch=async(path,options)=>{
+  if(options?.method==='POST'&&path.includes('/presentation/select')&&first){first=false;await oldGate}
+  if(options?.method==='POST'&&path.includes('/presentation/leave')){
+   ++leaves;
+   if(leaves===1)await firstLeaveGate;
+   if(leaves>=25){await lastLeaveGate;return room.fetch(path,options)}
+   throw TypeError('Failed to fetch');
+  }
+  if(!options?.method&&path.includes('/api/presentation')&&!path.includes('/participants')&&!path.includes('/history'))presentations++;
+  return room.fetch(path,options);
+ };
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");await settleSoon();
+ room.active.delete('a');room.live.delete('a');room.closed.add('a');
+ await c.s.run('refreshPeople()');oldRelease();
+ for(let i=0;i<100&&!leaves;i++)await settleSoon();
+ assert.equal(leaves,1);
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|c')");
+ const started=Date.now();firstLeaveRelease();
+ for(let i=0;i<100&&leaves<25;i++)await settleSoon();
+ const actual={leaves,presentations,elapsedMs:Date.now()-started,selects:[...room.selects],target:c.s.run('targetId()'),remembered:c.store['sidevoice.selected'],switching:c.s.run('state.switching')};
+ c.s.run('disconnect()');lastLeaveRelease();await settleSoon();
+ assert.equal(actual.leaves,1,'No call beat has fired: '+JSON.stringify(actual));
+});
+test('Reopening and picking again a conversation whose leave is on its way ends on it, with one leave',async()=>{
+ const room=coreRoom({active:['a','b']});
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|b'});
+ let oldRelease,leaveRelease,first=true,leaves=0;
+ const oldGate=new Promise(r=>{oldRelease=r}),leaveGate=new Promise(r=>{leaveRelease=r});
+ c.s.context.fetch=async(path,options)=>{
+  if(options?.method==='POST'&&path.includes('/presentation/select')&&first){first=false;await oldGate}
+  if(options?.method==='POST'&&path.includes('/presentation/leave')){leaves++;await leaveGate}
+  return room.fetch(path,options);
+ };
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");await settleSoon();
+ room.active.delete('a');room.live.delete('a');room.closed.add('a');
+ await c.s.run('refreshPeople()');oldRelease();
+ for(let i=0;i<100&&!leaves;i++)await settleSoon();
+ assert.equal(leaves,1);
+ room.closed.delete('a');room.active.add('a');room.live.add('a');
+ await c.s.run('refreshPeople()');c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");
+ leaveRelease();await settleSoon();
+ for(let i=0;i<5;i++){await c.s.run('refreshPeople()');await c.s.run('refresh()');await settleSoon()}
+ const actual={target:c.s.run('targetId()'),remembered:c.store['sidevoice.selected'],switching:c.s.run('state.switching'),leaves,selects:[...room.selects]};
+ c.s.run('disconnect()');
+ assert.equal(actual.target,'fp-mac|a',JSON.stringify(actual));
+ assert.equal(actual.switching,false);
+ assert.equal(actual.leaves,1,JSON.stringify(actual));
+});
+
+test('A leave that keeps failing is tried at most once a call beat, and a newer open pick still goes through',async()=>{
+ const room=coreRoom({active:['a','b','c']});
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|a'});
+ let leaves=0;
+ c.s.context.fetch=async(path,options)=>{
+  if(options?.method==='POST'&&path.includes('/presentation/leave')){leaves++;throw TypeError('Failed to fetch')}
+  return room.fetch(path,options);
+ };
+ // A closed on another device while the room still holds the call's focus on it.
+ room.active.delete('a');room.live.delete('a');room.closed.add('a');
+ await c.s.run('refreshPeople()');await settleSoon();
+ for(let i=0;i<6;i++){await c.s.run('refresh()');await settleSoon()}
+ assert.equal(leaves,1,'one attempt within one beat, however many refreshes');
+ assert.equal(c.s.run('targetId()'),'fp-mac|a');
+ // A beat later it is tried again, once.
+ c.s.run('pick.leftAt-=LEAVE_EVERY_MS');
+ await c.s.run('refresh()');await settleSoon();await c.s.run('refresh()');await settleSoon();
+ assert.equal(leaves,2);
+ // The person picks C: selecting it is what moves the call off A, failing leave or not.
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|c')");
+ for(let i=0;i<200&&c.s.run('targetId()')!=='fp-mac|c';i++){await settleSoon();if(i%20===19)await c.s.run('refresh()')}
+ assert.equal(c.s.run('targetId()'),'fp-mac|c');
+ assert.equal(c.store['sidevoice.selected'],'fp-mac|c');
+ assert.ok(room.selects.includes('c'));
+ c.s.run('disconnect()');
 });
