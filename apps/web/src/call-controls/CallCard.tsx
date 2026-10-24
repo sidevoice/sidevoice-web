@@ -36,7 +36,7 @@ import { PagedText, PAGE_MS } from "../features/call/PagedText";
 import { SENT_LEAVING_MS, useAgentTurns, useSentTurns, useSpokenTo } from "../features/call/speech-reading";
 import { useStageConversation } from "../features/call/stage-view";
 import { useRoomStore } from "../state/room-store";
-import { receiptView } from "../state/room-session-state.js";
+import { cardCanPick, receiptView } from "../state/room-session-state.js";
 import { setCaptions, useCaptions } from "../state/captions";
 import { CARD_WIDTHS, PIP_MIN_HEIGHT, PIP_MIN_WIDTH, useFloatingCard, type CardFormat, type CardSize } from "../state/floating-card";
 import type { ParticipantView } from "../state/room-types";
@@ -122,8 +122,9 @@ function PanelCard({ state, shell, t }: { state: CallControlsState; shell: CardS
 function Conversations({ state, shell, t }: { state: CallControlsState; shell: CardShell; t: Translate }) {
   return (
     <ConversationPicker call={state.call} t={t}
-      // The call can only go to a conversation that is there; the room browses the others.
-      disabled={(row) => row.switching || !row.available || row.reach === "offline"}
+      // A conversation whose agent is away is one the call can go to: what is said to it waits there for its agent. One
+      // whose machine cannot be reached is not (the room would only show it). Both rows say they are offline.
+      disabled={(row) => !cardCanPick(row)}
       lead={(row: ParticipantView) => <ConversationAvatar row={row} />}
       onSelect={(threadId) => { shell.setPanel(null); shell.run({ command: "select-participant", threadId }); }} />
   );

@@ -26,11 +26,11 @@ function snapshot(overrides: Partial<CallSnapshot> = {}): CallSnapshot {
     version: 2, ready: true, joined: true, busy: false, micEnabled: true, micDisabled: false, title: "Sidevoice: mini call",
     agent: "idle", youTalking: false, canSkip: false, since: SINCE,
     participants: [
-      { threadId: "a", title: "Sidevoice: mini call", selected: true, available: true, switching: false, unread: 0, reach: "listening",
+      { threadId: "a", title: "Sidevoice: mini call", selected: true, available: true, switching: false, unread: 0, reach: "listening", machineReachable: true,
         working: false, machine: "daimon", harness: "claude" },
-      { threadId: "b", title: "brand/web", selected: false, available: true, switching: false, unread: 2, reach: "listening",
+      { threadId: "b", title: "brand/web", selected: false, available: true, switching: false, unread: 2, reach: "listening", machineReachable: true,
         working: true, machine: "daimon", harness: "claude" },
-      { threadId: "c", title: "landing", selected: false, available: false, switching: false, unread: 0, reach: "offline",
+      { threadId: "c", title: "landing", selected: false, available: false, switching: false, unread: 0, reach: "offline", machineReachable: true,
         working: false, machine: "portátil", harness: "cursor" },
     ],
     devices: { inputs: [{ id: "default", label: "Predeterminado del sistema", system: true }, { id: "mbp", label: "MacBook Pro Microphone" },
@@ -246,7 +246,7 @@ test("always expanded: the controls stay without hover", () => {
   expect(screen.getByRole("button", { name: "Hang up" })).toBeInTheDocument();
 });
 
-test("the conversations control opens them below the controls, in the card's words; only one that is there can be chosen", () => {
+test("the conversations control opens them below the controls, in the card's words; one whose agent is away can be chosen too", () => {
   const host = fakeHost();
   render(<Card host={host} />);
   hoverAndWait();
@@ -258,10 +258,19 @@ test("the conversations control opens them below the controls, in the card's wor
   expect(document.querySelectorAll(".card-conversations .card-unread")).toHaveLength(1);
   expect(document.querySelector(".card-conversations .card-unread")).toHaveAccessibleName("Unread message");
   expect(screen.getByText(/offline/)).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /landing/ })).toBeDisabled();
+  expect(screen.getByRole("button", { name: /landing/ })).toBeEnabled();
   fireEvent.click(screen.getByRole("button", { name: /brand\/web/ }));
   expect(host.run).toHaveBeenCalledWith({ command: "select-participant", threadId: "b" });
   expect(screen.queryByText("brand/web")).not.toBeInTheDocument();
+  // Its agent away, what is said to it waits there: the call goes to it all the same.
+  fireEvent.click(screen.getByRole("button", { name: "Conversations (3), 1 with unread replies" }));
+  fireEvent.click(screen.getByRole("button", { name: /landing/ }));
+  expect(host.run).toHaveBeenCalledWith({ command: "select-participant", threadId: "c" });
+  // Its machine out of reach, the room would only show it: it cannot be picked here.
+  const call = snapshot();
+  host.push({ call: { ...call, participants: call.participants.map((row) => row.threadId === "c" ? { ...row, machineReachable: false } : row) } });
+  fireEvent.click(screen.getByRole("button", { name: "Conversations (3), 1 with unread replies" }));
+  expect(screen.getByRole("button", { name: /landing/ })).toBeDisabled();
 });
 
 test("a panel closes on a press elsewhere in the card, on a click outside it, and after the pointer leaves", () => {
@@ -403,4 +412,18 @@ test("the conversations list is inside the avatar's compact card, against its co
   render(<Card host={sized} />);
   fireEvent.click(screen.getByRole("button", { name: "Conversations (3), 1 with unread replies" }));
   expect(document.querySelector(".card-heading > .card-panel-card")).not.toBeNull();
+});
+
+test("a row that does not say whether its machine is reachable is offered as before: only when its conversation is there", () => {
+  const host = fakeHost();
+  const call = snapshot();
+  // An older page's snapshot, or a host that relays only some fields: no machineReachable anywhere.
+  host.push({ call: { ...call, participants: call.participants.map(({ machineReachable: _, ...row }) => row) } });
+  render(<Card host={host} />);
+  hoverAndWait();
+  fireEvent.click(screen.getByRole("button", { name: "Conversations (3), 1 with unread replies" }));
+  expect(screen.getByRole("button", { name: /brand\/web/ })).toBeEnabled();
+  expect(screen.getByRole("button", { name: /landing/ })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: /brand\/web/ }));
+  expect(host.run).toHaveBeenCalledWith({ command: "select-participant", threadId: "b" });
 });

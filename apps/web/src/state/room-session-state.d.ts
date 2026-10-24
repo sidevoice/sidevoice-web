@@ -184,6 +184,7 @@ export function cardFacts(s: SessionFacts): CardFacts;
 export function callCardView(s: SessionFacts, participants?: ParticipantView[]): CallCardView;
 /** The conversation hears the person right now. */
 export function canHear(row: Pick<ParticipantView, 'available' | 'reach'>): boolean;
+export function cardCanPick(row: Pick<ParticipantView, 'switching' | 'machineReachable' | 'available' | 'reach'>): boolean;
 export interface StageFacts {
  /** The page is in the call. */
  inCall: boolean;

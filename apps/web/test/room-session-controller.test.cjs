@@ -3545,6 +3545,39 @@ test('Tries in a row each take the voice anew and let it go, whatever the one be
  assert.equal(s.run('voiceTry'),null);
  assert.equal(s.run('voiceTryFinish'),null);
 });
+test('The call card offers a conversation whose agent is away, and the words go to it; one whose machine cannot be reached it does not offer',async()=>{
+ const c=await callWithTwoMachines();const {s,voice}=c;
+ s.run("settleLink('fp-pc',null,'offline')");
+ s.run("people=[...people,{node:'fp-mac',thread_id:'b',title:'B',available:false,reach:{state:'offline'}}]");
+ let bound={thread_id:'a',title:'A',binding_id:'b-a'};const selects=[];
+ s.context.fetch=async(path,options)=>{
+  if(options?.method==='POST'&&path.includes('/select')){const {thread_id}=JSON.parse(options.body);selects.push(thread_id);bound={thread_id,title:thread_id,binding_id:'b-'+thread_id}}
+  return {ok:true,status:200,json:async()=>({binding:bound,room:{revision:0},clients:[],call:null,participants:[],messages:[]})};
+ };
+ s.run('publishSessionView()');
+ const rows=plain(s.run('roomStore.getState().callCard.participants'));
+ const offered=rows.filter(row=>s.run(`SessionState.cardCanPick(${JSON.stringify(row)})`)).map(row=>row.threadId);
+ assert.deepEqual(rows.filter(row=>row.reach==='offline').map(row=>row.threadId).sort(),['fp-mac|b','fp-pc|p'],'both read offline');
+ assert.ok(offered.includes('fp-mac|b'),'the one whose agent is away is offered');
+ assert.ok(!offered.includes('fp-pc|p'),'the one whose machine cannot be reached is not');
+ // What the card's pick does: the room is asked for B, and the next words are B's.
+ s.run("window.sidevoiceActions.selectParticipant('fp-mac|b')");
+ await c.until(()=>s.run('targetId()')==='fp-mac|b'&&voice.routed&&voice.routed!==voice.created[0],'the call on B');
+ assert.deepEqual(selects,['b']);
+ voice.routed.emit('turn',started('card-b'));voice.routed.emit('turn',finished('card-b','Para B'));
+ assert.deepEqual(plain(turnSent(c,c.first,'card-b','finished').map(turn=>turn.thread_id)),['b']);
+ s.run('disconnect()');
+});
+test('The card\'s pick, for a row that does not say whether its machine is reachable: as before, only a conversation that is there',()=>{
+ const s=setup();const can=row=>s.run(`SessionState.cardCanPick(${JSON.stringify(row)})`);
+ assert.equal(can({switching:false,available:true,reach:'listening'}),true);
+ assert.equal(can({switching:false,available:true,reach:'holding'}),true);
+ assert.equal(can({switching:false,available:false,reach:'offline'}),false);
+ assert.equal(can({switching:true,available:true,reach:'listening'}),false);
+ // Said, it decides: an agent away on a reachable machine, yes; an unreachable machine, no, whatever else the row says.
+ assert.equal(can({switching:false,available:false,reach:'offline',machineReachable:true}),true);
+ assert.equal(can({switching:false,available:true,reach:'listening',machineReachable:false}),false);
+});
 
 /* ----- the call and the conversation it is on, against a room kept as sidevoice-core keeps it -----
  * Each call's focus is its own; a select takes any conversation, its agent there or not (focus.rs `select`); a hello's

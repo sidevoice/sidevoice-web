@@ -65,6 +65,9 @@ export interface ParticipantView {
   /** Core's aggregate across devices, independent of whether text was opened. */
   unheard?: number;
   reach: "listening" | "holding" | "offline";
+  /** Whether the machine this conversation runs on can be reached now: `available` and `reach` alone also read
+   *  "offline" for a conversation whose agent is merely away (`cardCanPick`). */
+  machineReachable?: boolean;
   /** Honest activity support: unsupported and unknown are different messages. */
   activityNote?: string | null;
   detail?: string;

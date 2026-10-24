@@ -365,6 +365,21 @@ export function workingCapabilityNote(p) { const v = p.capabilities?.working; re
  *  minutes, which a call looking for it does not trust that long. */
 function machineDown(s, fp) { const reach = s.machineLinks?.[fp]?.reach; return !!reach && reach !== 'ok' || (!!s.reconnectShown && fp === s.callNode); }
 const REACH_STATES = new Set(['listening', 'holding', 'offline']);
+/** Whether the call can go to a conversation of machine `fp` now: the machine proved where it is and is not the call's own
+ *  in a drop past its grace. Whether the conversation's agent is there is another thing (`available`, `reach`), and
+ *  no reason to keep the call from it: what is said to it waits there for the agent (selectParticipant). */
+function machineReachable(s, fp) { return s.machineLinks?.[fp]?.reach === 'ok' && !machineDown(s, fp); }
+/** Whether the call card offers `row` to pick: a conversation whose agent is away, yes; one whose machine cannot be
+ *  reached, no — the room would only show it, and the call would stay where it is. */
+export function cardCanPick(row) {
+    if (row.switching)
+        return false;
+    // A row that does not say (an older page's snapshot, a host that relays only some fields) is offered only when its
+    // conversation is there, as before machines and agents were told apart.
+    if (row.machineReachable === undefined)
+        return !!row.available && row.reach !== 'offline';
+    return row.machineReachable === true;
+}
 /** What this device calls a paired machine: its alias here, else the machine's own name. */
 function machineName(s, fp) { return (s.pairings || []).find(p => p.fp === fp)?.host || null; }
 export function participantsView(s) {
@@ -381,6 +396,7 @@ export function participantsView(s) {
         const busy = working(s, key);
         // Grouped by the paired machine it runs on (one room each), named as this device names that machine.
         return { threadId: key, title: displayTitle(p.title, p), selected: key === selected, available: !!p.available, switching: s.switching,
+            machineReachable: machineReachable(s, person.node),
             unread, unheard: p.unheard?.count ?? 0, reach, working: busy,
             machine: machineName(s, p.node) || p.machine?.host || null, machineId: p.node || p.machine?.id || null, harness: p.harness || null, route: routeLabel(p),
             model: p.engine?.model || null, effort: p.engine?.effort || null,
