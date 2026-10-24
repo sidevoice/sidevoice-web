@@ -3578,3 +3578,76 @@ test('The card\'s pick, for a row that does not say whether its machine is reach
  assert.equal(can({switching:false,available:false,reach:'offline',machineReachable:true}),true);
  assert.equal(can({switching:false,available:true,reach:'listening',machineReachable:false}),false);
 });
+
+/* ----- the call and the conversation it is on, against a room kept as sidevoice-core keeps it -----
+ * Each call's focus is its own; a select takes any conversation, its agent there or not (focus.rs `select`); a hello's
+ * conversation is honoured only while the room holds a binding for it (focus.rs `restore_focus`); the conversations
+ * listed are those with a binding, and only a live one listens. */
+function coreRoom({active=[],live=active,closed=[]}={}){
+ const room={active:new Set(active),live:new Set(live),closed:new Set(closed),target:null,selects:[],focus:0,
+  rows(){return [...room.active].map(thread=>({thread_id:thread,title:thread.toUpperCase(),available:room.live.has(thread),
+   reach:{state:room.live.has(thread)?'listening':'offline'},epoch:0}))},
+  hello(data){const thread=data?.conversation;if(thread&&room.active.has(thread))room.target={thread_id:thread,binding_id:'focus-'+(++room.focus)}},
+  async fetch(path,options){
+   const answer=value=>({ok:true,status:200,json:async()=>value});
+   if(options?.method==='POST'&&path.includes('/presentation/select')){
+    const {thread_id}=JSON.parse(options.body);room.selects.push(thread_id);
+    if(room.target?.thread_id!==thread_id)room.target={thread_id,binding_id:'focus-'+(++room.focus)};
+    return answer({status:'activated',binding:room.target,epoch:0});
+   }
+   if(path.includes('/participants'))return answer({participants:room.rows(),closed_threads:[...room.closed]});
+   if(path.includes('/history'))return answer({messages:[]});
+   return answer({binding:room.target,room:{revision:0},clients:[],call:null});
+  }};
+ return room;
+}
+// A call joined on `room`, this tab having picked `selected` before; `cards`, the conversations this device remembers.
+async function callOnCoreRoom(room,{selected='fp-mac|a',cards=null}={}){
+ const stored={pairings:[PAIRED]};
+ const s=setup({stored,siteData:{'sidevoice.pairings':JSON.stringify(stored),...(cards?{'sidevoice.conversation-cards.v1':JSON.stringify(cards)}:{})}});
+ const sockets=socketsOf(s);let ids=0;
+ s.context.crypto={randomUUID:()=>'id-'+(++ids)};
+ s.context.window.sidevoiceUI=new Proxy({},{get:()=>()=>{}});
+ const store={'sidevoice.selected':selected};s.context.sessionStorage=storageOf(store);
+ const voice=withVoice(s,fakeVoice());
+ s.context.fetch=room.fetch;
+ s.run("keepScreenAwake=()=>{};roomBinding=null;sessionId=null");
+ const joined=s.run('toggleCall')();
+ for(let i=0;i<500&&!sockets.length;i++)await settleSoon();
+ const socket=sockets[0];socket.readyState=1;socket.onopen();room.hello(JSON.parse(socket.sent[0]).data);
+ socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'s1',resume:{token:'tok-a',seconds:60},resumed:false}})});
+ await joined;await settleSoon();await s.run('refreshPeople()');await settleSoon();
+ const turns=()=>socket.sent.filter(m=>typeof m==='string').map(m=>JSON.parse(m)).filter(m=>m.type==='voice-user-turn').map(m=>m.data);
+ return {s,voice,socket,store,turns};
+}
+const routedThread=c=>c.voice.routed?c.s.run(`[...conversationCalls.values()].find(entry=>entry.call.id===${JSON.stringify(c.voice.routed.id)})?.thread_id`):null;
+test('A call to a conversation whose agent is away, which the room does not even list, lands on it and hears the person',async()=>{
+ // The room restarted: the agent of A has not registered again, and this device never kept a card of A.
+ const room=coreRoom({active:[]});
+ const c=await callOnCoreRoom(room);
+ assert.deepEqual(room.selects,['a'],'the hello was not enough: the pick is said again');
+ assert.equal(c.s.run('targetId()'),'fp-mac|a');
+ assert.equal(c.s.run('SessionState.micView(state).disabled'),false,'the microphone can be turned on');
+ assert.equal(routedThread(c),'a','and the microphone is the call on A\'s');
+ c.voice.routed.emit('turn',started('t1'));c.voice.routed.emit('turn',finished('t1','Hola'));
+ assert.deepEqual(c.turns().map(turn=>[turn.phase,turn.thread_id]),[['started','a'],['finished','a']],'its words go to A, to wait there');
+ c.s.run('disconnect()');
+});
+test('A call to a conversation whose agent is away never falls back to another one that listens',async()=>{
+ const room=coreRoom({active:['b']});
+ const c=await callOnCoreRoom(room);
+ assert.deepEqual(room.selects,['a']);
+ assert.equal(c.s.run('targetId()'),'fp-mac|a');
+ assert.equal(routedThread(c),'a');
+ // B's agent is there all along, and the beats go on: the call stays where the person put it.
+ await c.s.run('refreshPeople()');await settleSoon();
+ assert.deepEqual(room.selects,['a']);
+ c.s.run('disconnect()');
+});
+test('A conversation the room says was closed is not gone back to: the call lands on one that listens',async()=>{
+ const room=coreRoom({active:['b'],closed:['a']});
+ const c=await callOnCoreRoom(room,{cards:[{node:'fp-mac',thread_id:'a',title:'A'}]});
+ assert.deepEqual(room.selects,['b']);
+ assert.equal(c.s.run('targetId()'),'fp-mac|b');
+ c.s.run('disconnect()');
+});
