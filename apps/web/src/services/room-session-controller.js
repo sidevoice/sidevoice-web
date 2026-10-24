@@ -729,6 +729,7 @@ async function select(key){
  try{
   await post('/api/presentation/select',{thread_id:to.thread,session_id:session});
   if(!current())return;
+  answeredPick=pickAsked(session,key);
   if(pickRevision===pick)rememberThread(key);else newer=true;
   await refresh();
  }catch(e){
@@ -745,6 +746,10 @@ async function select(key){
 }
 // Each pick of the person's in a call, counted: a select knows whether a newer one came while it was on its way.
 let pickRevision=0;
+// The pick the room last said yes to, in this session: it is not asked for again by itself (a room whose binding does
+// not follow would be asked on every beat); a new pick, or a new session, asks again.
+let answeredPick=null;
+const pickAsked=(session,key)=>session+'\0'+pickRevision+'\0'+key;
 // Answers can arrive out of order, and one asked before this page had a session describes nobody: either
 // would read as the binding changing and cancel a reply just handed to this page.
 let refreshAsked=0,refreshApplied=0;
@@ -794,7 +799,9 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
  // A pick the room has not taken yet (it was on its way to another, or the machine did not answer) is asked again,
  // once the conversations have said which ones were closed. A binding that has just gone (a close, the machine
  // restarting) is left to the conversations' next answer, which says whether it was closed.
- if(links.get(fp)?.peopleAnswered&&!(previousThread&&!now))void reselectRemembered();
+ const link=links.get(fp);
+ if(link&&previousThread&&!now)link.bindingGone=true;
+ if(link?.peopleAnswered&&!link.bindingGone)void reselectRemembered();
 }catch{}}
 const HISTORY_ROLES=new Set(['user','assistant']);
 function readableHistoryRow(r){return !!r&&typeof r==='object'&&typeof r.id==='string'&&!!r.id&&typeof r.text==='string'&&HISTORY_ROLES.has(r.role)}
@@ -941,7 +948,7 @@ async function refreshPeople(fp=state.callNode){
   // closure: the connector may still be registering after Core restart, or the response may be partial.
   const closed=new Set((Array.isArray(data.closed_threads)?data.closed_threads:[]).filter(thread=>typeof thread==='string'));
   for(const thread of closed)forgetCard(fp,thread);
-  link.closed=closed;
+  link.closed=closed;link.bindingGone=false;
   const merged=new Map(link.people.filter(person=>!closed.has(person.thread_id))
    .map(person=>[person.thread_id,{...person,available:false,reach:{state:'offline'}}]));
   for(const person of data.participants)if(!closed.has(person.thread_id))merged.set(person.thread_id,{...person,node:fp});
@@ -1172,6 +1179,7 @@ async function reselectRemembered(){
  // So does a call that is on another conversation than the latest pick: the pick is the person's, the room never chooses.
  const wanted=rememberedThread(),to=conversationOf(wanted);
  if(!wanted||targetId()===wanted||state.switching||!state.ws||!state.sessionId||to?.node!==state.callNode)return false;
+ if(answeredPick===pickAsked(state.sessionId,wanted))return false;
  if(links.get(to.node)?.closed?.has(to.thread))return false;
  await select(wanted);return true;
 }

@@ -3772,3 +3772,16 @@ test('A conversation closed is not gone back to by the refresh that follows the 
  c.s.run('disconnect()');
  assert.ok(!selects.includes('a'),JSON.stringify(selects));
 });
+test('A pick the room said yes to is not asked for again on every beat when its binding does not follow',async()=>{
+ const room=coreRoom({active:['a','b']});
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|b'});
+ // A room that answers the select but whose binding stays where it was (the e2e harness's, an older core's).
+ c.s.context.fetch=async(path,options)=>{if(options?.method==='POST'&&path.includes('/presentation/select')){room.selects.push(JSON.parse(options.body).thread_id);return {ok:true,status:200,json:async()=>({})}}return room.fetch(path,options)};
+ const before=room.selects.length;
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");await settleSoon();
+ for(let i=0;i<4;i++){await c.s.run('refresh()');await settleSoon();await c.s.run('refreshPeople()');await settleSoon()}
+ assert.deepEqual(plain(room.selects.slice(before)),['a'],'asked once');
+ // A new pick asks again.
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");await settleSoon();
+ c.s.run('disconnect()');
+});
