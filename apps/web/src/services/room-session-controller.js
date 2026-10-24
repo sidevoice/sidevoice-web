@@ -723,6 +723,22 @@ document.addEventListener('keydown',event=>{if(event.key==='Escape')for(const me
 const pick={revision:0,op:null,ops:0,answered:null};
 const answeredKey=(session,revision,key)=>session+'\0'+revision+'\0'+key;
 function letGoOfSelect(){if(!pick.op)return;pick.op=null;state.switching=false;applyMicState()}
+/* A select this page let go of that the room took all the same, in the same session: the room's focus moved where the
+ * person no longer wants it. Nothing of it is kept: what the room said yes to is forgotten (`pick.answered`), and the
+ * call is brought back to the latest pick. When there is none newer and the conversation was closed meanwhile, the
+ * focus the room gave is left first (the room takes a pick of a closed conversation). That leave may land after the
+ * person picked again, even that same conversation under the same binding: it is followed, like the rest, by asking
+ * the room again for the latest pick. */
+async function settleLetGo(op,answer){
+ pick.answered=null;
+ const to=conversationOf(op.key),binding=answer?.binding?.binding_id;
+ if(pick.revision===op.revision&&links.get(op.node)?.closed?.has(to?.thread)&&binding){
+  try{await post('/api/presentation/leave',{session_id:op.session,binding_id:binding},op.node)}catch{}
+  pick.answered=null;
+ }
+ if(op.session!==state.sessionId||op.node!==state.callNode)return;
+ await refresh();await reselectRemembered();
+}
 async function select(key){
  const to=conversationOf(key);
  if(!to||state.switching||key===targetId()||!state.sessionId)return;
@@ -733,13 +749,7 @@ async function select(key){
  let newer=false;
  try{
   const answer=await post('/api/presentation/select',{thread_id:to.thread,session_id:op.session},op.node);
-  if(!mine()){
-   // Let go of because its conversation was closed meanwhile: the room took it all the same (it takes a pick of any
-   // conversation), so the call is taken off it again, if it is still that session's focus.
-   if(op.session===state.sessionId&&links.get(op.node)?.closed?.has(to.thread)&&answer?.binding?.binding_id)
-    void post('/api/presentation/leave',{session_id:op.session,binding_id:answer.binding.binding_id},op.node).then(()=>refresh()).catch(()=>{});
-   return;
-  }
+  if(!mine()){if(op.session===state.sessionId&&op.node===state.callNode)void settleLetGo(op,answer);return}
   pick.answered=answeredKey(op.session,op.revision,key);
   // A pick made while this one was on its way is the newer: it is kept, and asked for as soon as this one is done.
   if(pick.revision===op.revision)rememberThread(key);else newer=true;
@@ -956,6 +966,8 @@ async function refreshPeople(fp=state.callNode){
   const closed=new Set((Array.isArray(data.closed_threads)?data.closed_threads:[]).filter(thread=>typeof thread==='string'));
   for(const thread of closed)forgetCard(fp,thread);
   link.closed=closed;
+  // A select of a conversation closed elsewhere is let go of, as one closed here (`closeParticipant`).
+  if(pick.op?.node===fp&&closed.has(conversationOf(pick.op.key)?.thread))letGoOfSelect();
   // Only an answer asked after a binding went says whether it was closed (`goneAt`).
   if(link.goneAt!=null&&asked>link.goneAt)link.goneAt=null;
   const reachable=new Set(link.people.filter(person=>person.available).map(person=>person.thread_id));

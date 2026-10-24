@@ -3879,3 +3879,98 @@ test('Only a conversations\' answer asked after the call\'s binding went may say
  c.s.run('disconnect()');
  assert.notEqual(actual.target,'fp-mac|a',JSON.stringify(actual));
 });
+
+test('A leave of a closed conversation\'s late focus that lands after the person picked it again is followed by asking for it again',async()=>{
+ const room=coreRoom({active:['a','b']});
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|b'});
+ let selectRelease,leaveRelease,first=true,leaveStarted=false;
+ const selectGate=new Promise(resolve=>{selectRelease=resolve}),leaveGate=new Promise(resolve=>{leaveRelease=resolve});
+ c.s.context.fetch=async(path,options)=>{
+  if(options?.method==='POST'&&path.includes('/presentation/select')&&first){first=false;await selectGate}
+  if(options?.method==='POST'&&path.includes('/presentation/leave')){leaveStarted=true;await leaveGate}
+  if(options?.method==='POST'&&path.includes('/presentation/close')){
+   room.active.delete('a');room.live.delete('a');room.closed.add('a');
+   for(const [sid,target]of room.targets)if(target?.thread_id==='a')room.targets.delete(sid);
+   return {ok:true,status:200,json:async()=>({status:'closed'})};
+  }
+  return room.fetch(path,options);
+ };
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");await settleSoon();
+ await c.s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");
+ selectRelease();for(let i=0;i<200&&!leaveStarted;i++)await settleSoon();
+ assert.equal(leaveStarted,true);
+ // A fresh agent registration reopens A; the user explicitly picks the reopened conversation.
+ room.closed.delete('a');room.active.add('a');room.live.add('a');
+ await c.s.run('refreshPeople()');
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");await settleSoon();
+ assert.equal(c.s.run('targetId()'),'fp-mac|a');
+ const repickedBinding=room.targets.get('s1').binding_id;
+ leaveRelease();await settleSoon();
+ for(let i=0;i<4;i++){await c.s.run('refresh()');await c.s.run('refreshPeople()');await settleSoon()}
+ const actual={target:c.s.run('targetId()'),remembered:c.store['sidevoice.selected'],repickedBinding,core:room.targets.get('s1')??null,selects:[...room.selects]};
+ c.s.run('disconnect()');
+ assert.equal(actual.target,'fp-mac|a',JSON.stringify(actual));
+});
+test('A late select of a closed conversation leaves the call on the newer pick',async()=>{
+ const room=coreRoom({active:['a','b','c']});
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|b'});
+ let release,first=true;const gate=new Promise(resolve=>{release=resolve});
+ c.s.context.fetch=async(path,options)=>{
+  if(options?.method==='POST'&&path.includes('/presentation/select')&&first){first=false;await gate}
+  if(options?.method==='POST'&&path.includes('/presentation/close')){
+   room.active.delete('a');room.live.delete('a');room.closed.add('a');
+   for(const [sid,target]of room.targets)if(target?.thread_id==='a')room.targets.delete(sid);
+   return {ok:true,status:200,json:async()=>({status:'closed'})};
+  }
+  return room.fetch(path,options);
+ };
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");await settleSoon();
+ await c.s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|c')");await settleSoon();
+ assert.equal(c.s.run('targetId()'),'fp-mac|c');
+ release();await settleSoon();
+ for(let i=0;i<4;i++){await c.s.run('refresh()');await c.s.run('refreshPeople()');await settleSoon()}
+ const actual={target:c.s.run('targetId()'),remembered:c.store['sidevoice.selected'],core:room.targets.get('s1')??null,selects:[...room.selects]};
+ c.s.run('disconnect()');
+ assert.equal(actual.target,'fp-mac|c',JSON.stringify(actual));
+});
+test('A conversation closed on another device lets go of a select of it on its way here',async()=>{
+ const room=coreRoom({active:['a','b']});
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|b'});
+ let release;const gate=new Promise(resolve=>{release=resolve});
+ c.s.context.fetch=async(path,options)=>{
+  if(options?.method==='POST'&&path.includes('/presentation/select'))await gate;
+  return room.fetch(path,options);
+ };
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");await settleSoon();
+ // Another device closes A; this device receives the authoritative closure list before its select completes.
+ room.active.delete('a');room.live.delete('a');room.closed.add('a');
+ for(const [sid,target]of room.targets)if(target?.thread_id==='a')room.targets.delete(sid);
+ await c.s.run('refreshPeople()');
+ release();await settleSoon();
+ for(let i=0;i<3;i++){await c.s.run('refresh()');await c.s.run('refreshPeople()');await settleSoon()}
+ const actual={target:c.s.run('targetId()'),remembered:c.store['sidevoice.selected'],closed:c.s.run("links.get('fp-mac').closed.has('a')")};
+ c.s.run('disconnect()');
+ assert.notEqual(actual.target,'fp-mac|a',JSON.stringify(actual));
+});
+test('An older conversations\' answer saying an agent came back keeps the newer pick',async()=>{
+ const room=coreRoom({active:['a','b','c'],live:['b','c']});
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|c'});
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");await settleSoon();
+ room.live.add('a');
+ let release,first=true;const gate=new Promise(resolve=>{release=resolve});
+ c.s.context.fetch=async(path,options)=>{
+  if(first&&path.includes('/participants')){
+   first=false;const snapshot=await(await room.fetch(path,options)).json();
+   await gate;return {ok:true,status:200,json:async()=>snapshot};
+  }
+  return room.fetch(path,options);
+ };
+ const pending=c.s.run('refreshPeople()');await settleSoon();
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|b')");await settleSoon();
+ release();await pending;await settleSoon();
+ for(let i=0;i<3;i++){await c.s.run('refresh()');await c.s.run('refreshPeople()');await settleSoon()}
+ const actual={target:c.s.run('targetId()'),remembered:c.store['sidevoice.selected'],selects:[...room.selects]};
+ c.s.run('disconnect()');
+ assert.deepEqual(actual,{target:'fp-mac|b',remembered:'fp-mac|b',selects:['a','b']});
+});
