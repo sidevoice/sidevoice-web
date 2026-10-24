@@ -413,3 +413,17 @@ test("the conversations list is inside the avatar's compact card, against its co
   fireEvent.click(screen.getByRole("button", { name: "Conversations (3), 1 with unread replies" }));
   expect(document.querySelector(".card-heading > .card-panel-card")).not.toBeNull();
 });
+
+test("a row that does not say whether its machine is reachable is offered as before: only when its conversation is there", () => {
+  const host = fakeHost();
+  const call = snapshot();
+  // An older page's snapshot, or a host that relays only some fields: no machineReachable anywhere.
+  host.push({ call: { ...call, participants: call.participants.map(({ machineReachable: _, ...row }) => row) } });
+  render(<Card host={host} />);
+  hoverAndWait();
+  fireEvent.click(screen.getByRole("button", { name: "Conversations (3), 1 with unread replies" }));
+  expect(screen.getByRole("button", { name: /brand\/web/ })).toBeEnabled();
+  expect(screen.getByRole("button", { name: /landing/ })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: /brand\/web/ }));
+  expect(host.run).toHaveBeenCalledWith({ command: "select-participant", threadId: "b" });
+});

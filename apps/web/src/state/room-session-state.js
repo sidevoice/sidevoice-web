@@ -371,7 +371,15 @@ const REACH_STATES = new Set(['listening', 'holding', 'offline']);
 function machineReachable(s, fp) { return s.machineLinks?.[fp]?.reach === 'ok' && !machineDown(s, fp); }
 /** Whether the call card offers `row` to pick: a conversation whose agent is away, yes; one whose machine cannot be
  *  reached, no — the room would only show it, and the call would stay where it is. */
-export function cardCanPick(row) { return !row.switching && row.machineReachable === true; }
+export function cardCanPick(row) {
+    if (row.switching)
+        return false;
+    // A row that does not say (an older page's snapshot, a host that relays only some fields) is offered only when its
+    // conversation is there, as before machines and agents were told apart.
+    if (row.machineReachable === undefined)
+        return !!row.available && row.reach !== 'offline';
+    return row.machineReachable === true;
+}
 /** What this device calls a paired machine: its alias here, else the machine's own name. */
 function machineName(s, fp) { return (s.pairings || []).find(p => p.fp === fp)?.host || null; }
 export function participantsView(s) {

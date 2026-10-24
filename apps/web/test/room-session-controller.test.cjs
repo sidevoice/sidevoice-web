@@ -3568,3 +3568,13 @@ test('The call card offers a conversation whose agent is away, and the words go 
  assert.deepEqual(plain(turnSent(c,c.first,'card-b','finished').map(turn=>turn.thread_id)),['b']);
  s.run('disconnect()');
 });
+test('The card\'s pick, for a row that does not say whether its machine is reachable: as before, only a conversation that is there',()=>{
+ const s=setup();const can=row=>s.run(`SessionState.cardCanPick(${JSON.stringify(row)})`);
+ assert.equal(can({switching:false,available:true,reach:'listening'}),true);
+ assert.equal(can({switching:false,available:true,reach:'holding'}),true);
+ assert.equal(can({switching:false,available:false,reach:'offline'}),false);
+ assert.equal(can({switching:true,available:true,reach:'listening'}),false);
+ // Said, it decides: an agent away on a reachable machine, yes; an unreachable machine, no, whatever else the row says.
+ assert.equal(can({switching:false,available:false,reach:'offline',machineReachable:true}),true);
+ assert.equal(can({switching:false,available:true,reach:'listening',machineReachable:false}),false);
+});
