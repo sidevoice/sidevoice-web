@@ -167,6 +167,12 @@
   line-height: 1.4667;
   -webkit-font-smoothing: antialiased;
   font-optical-sizing: auto;
+  /* The browser/OS chooses the thumb, track and overlay behaviour, in this surface's color-scheme. */
+  scrollbar-color: auto;
+}
+
+/* VARIANTS scrollbars: the previous theme colours, still drawn by the platform. */
+:root[data-scrollbars="themed"], :root[data-scrollbars="themed"] [data-theme] {
   scrollbar-color: var(--sv-border-strong) transparent;
 }
 

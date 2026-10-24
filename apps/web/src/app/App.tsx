@@ -26,6 +26,7 @@ import type { OnboardingRepository, OnboardingStep } from "../services/onboardin
 import { useUiLanguage } from "../i18n/use-ui-language";
 import { callControlsBridge } from "../services/desktop-host";
 import { reportStage } from "../features/call/stage-visibility";
+import { useVariant } from "../lib/variants";
 
 function RoomContent() {
   const ready = useRoomStore((state) => state.facts.machinesReady);
@@ -115,6 +116,12 @@ function RoomContent() {
 export function App({ store, onboarding, runtime }: { store?: RoomStore; onboarding?: { repository?: OnboardingRepository; startAt?: OnboardingStep }; runtime?: boolean } = {}) {
   // Every word on the page is drawn in the interface's language: a switch draws the page again.
   useUiLanguage();
+  // Compared from the playground's VARIANTS panel until the operator chooses the appearance.
+  const scrollbars = useVariant("scrollbars", ["native", "themed"] as const);
+  useEffect(() => {
+    document.documentElement.dataset.scrollbars = scrollbars;
+    return () => { delete document.documentElement.dataset.scrollbars; };
+  }, [scrollbars]);
   return (
     <RoomProvider store={store} runtime={runtime}>
       <OnboardingProvider repository={onboarding?.repository} startAt={onboarding?.startAt}>
