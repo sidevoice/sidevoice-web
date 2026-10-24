@@ -122,8 +122,9 @@ function PanelCard({ state, shell, t }: { state: CallControlsState; shell: CardS
 function Conversations({ state, shell, t }: { state: CallControlsState; shell: CardShell; t: Translate }) {
   return (
     <ConversationPicker call={state.call} t={t}
-      // The call can only go to a conversation that is there; the room browses the others.
-      disabled={(row) => row.switching || !row.available || row.reach === "offline"}
+      // A conversation whose agent is away is one the call can go to: what is said to it waits there for its agent, as
+      // the room's own list allows (selectParticipant). Its row says it is offline.
+      disabled={(row) => row.switching}
       lead={(row: ParticipantView) => <ConversationAvatar row={row} />}
       onSelect={(threadId) => { shell.setPanel(null); shell.run({ command: "select-participant", threadId }); }} />
   );

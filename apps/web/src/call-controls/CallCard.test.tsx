@@ -246,7 +246,7 @@ test("always expanded: the controls stay without hover", () => {
   expect(screen.getByRole("button", { name: "Hang up" })).toBeInTheDocument();
 });
 
-test("the conversations control opens them below the controls, in the card's words; only one that is there can be chosen", () => {
+test("the conversations control opens them below the controls, in the card's words; one whose agent is away can be chosen too", () => {
   const host = fakeHost();
   render(<Card host={host} />);
   hoverAndWait();
@@ -258,10 +258,14 @@ test("the conversations control opens them below the controls, in the card's wor
   expect(document.querySelectorAll(".card-conversations .card-unread")).toHaveLength(1);
   expect(document.querySelector(".card-conversations .card-unread")).toHaveAccessibleName("Unread message");
   expect(screen.getByText(/offline/)).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /landing/ })).toBeDisabled();
+  expect(screen.getByRole("button", { name: /landing/ })).toBeEnabled();
   fireEvent.click(screen.getByRole("button", { name: /brand\/web/ }));
   expect(host.run).toHaveBeenCalledWith({ command: "select-participant", threadId: "b" });
   expect(screen.queryByText("brand/web")).not.toBeInTheDocument();
+  // Its agent away, what is said to it waits there: the call goes to it all the same.
+  fireEvent.click(screen.getByRole("button", { name: "Conversations (3), 1 with unread replies" }));
+  fireEvent.click(screen.getByRole("button", { name: /landing/ }));
+  expect(host.run).toHaveBeenCalledWith({ command: "select-participant", threadId: "c" });
 });
 
 test("a panel closes on a press elsewhere in the card, on a click outside it, and after the pointer leaves", () => {
