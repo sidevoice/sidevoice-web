@@ -3566,6 +3566,12 @@ function coreRoom({active=[],live=active,closed=[]}={}){
     if(room.targets.get(session_id)?.thread_id!==thread_id)room.targets.set(session_id,{thread_id,binding_id:'focus-'+(++room.focus)});
     return answer({status:'activated',binding:room.targets.get(session_id),epoch:0});
    }
+   // focus.rs deselect: only the focus the call holds, by its binding id.
+   if(options?.method==='POST'&&path.includes('/presentation/leave')){
+    const {session_id,binding_id}=JSON.parse(options.body);
+    if(room.targets.get(session_id)?.binding_id!==binding_id)return answer({detail:{key:'room.focus_changed',message:'moved'}},409);
+    room.targets.delete(session_id);return answer({status:'activated',binding:null,epoch:0});
+   }
    if(path.includes('/participants'))return answer({participants:room.rows(),closed_threads:[...room.closed]});
    if(path.includes('/history'))return answer({messages:[]});
    const session=new URL(path,'http://room').searchParams.get('session_id');
@@ -3784,4 +3790,92 @@ test('A pick the room said yes to is not asked for again on every beat when its 
  // A new pick asks again.
  c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");await settleSoon();
  c.s.run('disconnect()');
+});
+
+test('A new session installed while a select is on its way frees the call to be moved: picks work again',async()=>{
+ const room=coreRoom({active:['a','b']});
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|b'});
+ let release;const gate=new Promise(resolve=>{release=resolve});let first=true;
+ c.s.context.fetch=async(path,options)=>{
+  if(first&&options?.method==='POST'&&path.includes('/presentation/select')){first=false;await gate}
+  return room.fetch(path,options);
+ };
+ c.s.run("RECONNECT_DELAYS_MS.splice(0,RECONNECT_DELAYS_MS.length,1);window.sidevoiceActions.selectParticipant('fp-mac|a')");await settleSoon();
+ // Core restarts: the old session and A's agent binding are lost. B re-registers first.
+ room.leave('s1');room.active.delete('a');room.live.delete('a');
+ const sockets=socketsOf(c.s);
+ const rejoining=c.s.run('lostConnection({code:1006},connectEpoch)');
+ for(let i=0;i<500&&!sockets.length;i++)await settleSoon();
+ const socket=sockets[0];socket.readyState=1;socket.onopen();room.hello(JSON.parse(socket.sent[0]).data,'s2');
+ socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'s2',resume:{token:'tok-b',seconds:60},resumed:false}})});
+ await rejoining;await settleSoon();release();await settleSoon();
+ for(let i=0;i<3;i++){await c.s.run('refresh()');await c.s.run('refreshPeople()');await settleSoon()}
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|b')");await settleSoon();
+ const actual={switching:c.s.run('state.switching'),target:c.s.run('targetId()'),selects:[...room.selects]};
+ c.s.run('disconnect()');
+ assert.equal(actual.switching,false,JSON.stringify(actual));
+ assert.equal(actual.target,'fp-mac|b',JSON.stringify(actual));
+});
+test('A conversation closed while a select of it is on its way is not where the call ends',async()=>{
+ const room=coreRoom({active:['a','b']});
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|b'});
+ let release;const gate=new Promise(resolve=>{release=resolve});
+ c.s.context.fetch=async(path,options)=>{
+  if(options?.method==='POST'&&path.includes('/presentation/select'))await gate;
+  if(options?.method==='POST'&&path.includes('/presentation/close')){
+   room.active.delete('a');room.live.delete('a');room.closed.add('a');
+   for(const [session,target]of room.targets)if(target?.thread_id==='a')room.targets.delete(session);
+   return {ok:true,status:200,json:async()=>({status:'closed'})};
+  }
+  return room.fetch(path,options);
+ };
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");await settleSoon();
+ await c.s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");
+ release();await settleSoon();
+ for(let i=0;i<3;i++){await c.s.run('refresh()');await c.s.run('refreshPeople()');await settleSoon()}
+ const actual={target:c.s.run('targetId()'),remembered:c.store['sidevoice.selected'],closed:c.s.run("links.get('fp-mac').closed.has('a')")};
+ c.s.run('disconnect()');
+ assert.notEqual(actual.target,'fp-mac|a',JSON.stringify(actual));
+});
+test('A pick the room took, whose confirmation was lost once, is not replaced by the first conversation that listens',async()=>{
+ const room=coreRoom({active:['b']});
+ const original=room.fetch;
+ let selected=false,failed=false;
+ room.fetch=async(path,options)=>{
+  if(options?.method==='POST'&&path.includes('/presentation/select')){
+   selected=true;return original(path,options);
+  }
+  // Only the immediate confirmation of the accepted select is lost; participants and all subsequent requests work.
+  if(selected&&!failed&&new URL(path,'http://room').pathname==='/api/presentation'){
+   failed=true;throw TypeError('Failed to fetch');
+  }
+  return original(path,options);
+ };
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|a'});
+ for(let i=0;i<3;i++){await c.s.run('refreshPeople()');await c.s.run('refresh()');await settleSoon()}
+ const actual={target:c.s.run('targetId()'),remembered:c.store['sidevoice.selected'],selects:[...room.selects],core:room.targets.get('s1')?.thread_id,failed};
+ c.s.run('disconnect()');
+ assert.equal(actual.target,'fp-mac|a',JSON.stringify(actual));
+});
+test('Only a conversations\' answer asked after the call\'s binding went may say it was not closed',async()=>{
+ const room=coreRoom({active:['a','b']});
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|a'});
+ let release;const gate=new Promise(resolve=>{release=resolve});let first=true;
+ c.s.context.fetch=async(path,options)=>{
+  if(first&&path.includes('/participants')){
+   first=false;const snapshot=await(await room.fetch(path,options)).json();
+   await gate;return {ok:true,status:200,json:async()=>snapshot};
+  }
+  return room.fetch(path,options);
+ };
+ const stale=c.s.run('refreshPeople()');await settleSoon();
+ // Another device closes A after this request took its snapshot.
+ room.active.delete('a');room.live.delete('a');room.closed.add('a');room.targets.clear();
+ await c.s.run('refresh()');
+ assert.notEqual(c.s.run("links.get('fp-mac').goneAt"),null);
+ release();await stale;await settleSoon();
+ await c.s.run('refreshPeople()');await settleSoon();
+ const actual={target:c.s.run('targetId()'),closed:c.s.run("links.get('fp-mac').closed.has('a')"),selects:[...room.selects]};
+ c.s.run('disconnect()');
+ assert.notEqual(actual.target,'fp-mac|a',JSON.stringify(actual));
 });
