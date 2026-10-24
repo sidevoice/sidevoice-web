@@ -3551,20 +3551,25 @@ test('Tries in a row each take the voice anew and let it go, whatever the one be
  * conversation is honoured only while the room holds a binding for it (focus.rs `restore_focus`); the conversations
  * listed are those with a binding, and only a live one listens. */
 function coreRoom({active=[],live=active,closed=[]}={}){
- const room={active:new Set(active),live:new Set(live),closed:new Set(closed),target:null,selects:[],focus:0,
+ // Each call (session) has its focus; a session the room does not hold (ended, never joined) is refused as core does.
+ const room={active:new Set(active),live:new Set(live),closed:new Set(closed),targets:new Map(),sessions:new Set(),selects:[],focus:0,
   rows(){return [...room.active].map(thread=>({thread_id:thread,title:thread.toUpperCase(),available:room.live.has(thread),
    reach:{state:room.live.has(thread)?'listening':'offline'},epoch:0}))},
-  hello(data){const thread=data?.conversation;if(thread&&room.active.has(thread))room.target={thread_id:thread,binding_id:'focus-'+(++room.focus)}},
+  hello(data,session='s1'){room.sessions.add(session);const thread=data?.conversation;
+   if(thread&&room.active.has(thread))room.targets.set(session,{thread_id:thread,binding_id:'focus-'+(++room.focus)})},
+  leave(session){room.sessions.delete(session);room.targets.delete(session)},
   async fetch(path,options){
-   const answer=value=>({ok:true,status:200,json:async()=>value});
+   const answer=(value,status=200)=>({ok:status<300,status,json:async()=>value});
    if(options?.method==='POST'&&path.includes('/presentation/select')){
-    const {thread_id}=JSON.parse(options.body);room.selects.push(thread_id);
-    if(room.target?.thread_id!==thread_id)room.target={thread_id,binding_id:'focus-'+(++room.focus)};
-    return answer({status:'activated',binding:room.target,epoch:0});
+    const {thread_id,session_id}=JSON.parse(options.body);room.selects.push(thread_id);
+    if(!room.sessions.has(session_id))return answer({detail:{key:'room.browser_absent',message:'gone'}},409);
+    if(room.targets.get(session_id)?.thread_id!==thread_id)room.targets.set(session_id,{thread_id,binding_id:'focus-'+(++room.focus)});
+    return answer({status:'activated',binding:room.targets.get(session_id),epoch:0});
    }
    if(path.includes('/participants'))return answer({participants:room.rows(),closed_threads:[...room.closed]});
    if(path.includes('/history'))return answer({messages:[]});
-   return answer({binding:room.target,room:{revision:0},clients:[],call:null});
+   const session=new URL(path,'http://room').searchParams.get('session_id');
+   return answer({binding:room.targets.get(session)??null,room:{revision:0},clients:[],call:null});
   }};
  return room;
 }
@@ -3695,4 +3700,75 @@ test('A pick made while the call is joining is where the call ends, not the conv
  assert.equal(s.run('targetId()'),'fp-mac|a');
  assert.equal(store['sidevoice.selected'],'fp-mac|a');
  s.run('disconnect()');
+});
+test('A pick the room refuses takes the screen back to the conversation the call is on, where the words go',async()=>{
+ const room=coreRoom({active:['a','b']});
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|b'});
+ c.s.context.fetch=async(path,options)=>options?.method==='POST'?{ok:false,status:429,json:async()=>({detail:{key:'room.input_backlog_full',message:'full'}})}:room.fetch(path,options);
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");await settleSoon();
+ await c.s.run('refresh()');await settleSoon();
+ const seen={viewed:c.s.run('SessionState.viewedThread(state)'),target:c.s.run('targetId()'),words:plain(sayNow(c,'refused-a'))};
+ c.s.run('disconnect()');
+ assert.deepEqual(seen,{viewed:'fp-mac|b',target:'fp-mac|b',words:['b','b']});
+});
+test('A refusal that comes after the hang-up leaves the pick the next join goes to',async()=>{
+ const room=coreRoom({active:['a','b']});
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|b'});
+ let release;const gate=new Promise(resolve=>{release=resolve});
+ c.s.context.fetch=async(path,options)=>{if(options?.method==='POST'){await gate;return {ok:false,status:409,json:async()=>({detail:{key:'room.browser_absent',message:'gone'}})}}return room.fetch(path,options)};
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");await settleSoon();
+ c.s.run('disconnect()');
+ release();await settleSoon();
+ assert.equal(c.store['sidevoice.selected'],'fp-mac|a');
+});
+test('An answer to an ended call\'s select changes nothing in the next call: its pick, its switching, where it goes',async()=>{
+ const room=coreRoom({active:['a','b']});
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|b'});
+ let oldRelease,newRelease,posts=0;
+ const oldGate=new Promise(resolve=>{oldRelease=resolve}),newGate=new Promise(resolve=>{newRelease=resolve});
+ c.s.context.fetch=async(path,options)=>{
+  if(options?.method==='POST'&&path.includes('/presentation/select')){
+   posts++;
+   if(posts===1){await oldGate;return {ok:false,status:409,json:async()=>({detail:{key:'room.browser_absent',message:'gone'}})}}
+   if(posts===2)await newGate;
+  }
+  return room.fetch(path,options);
+ };
+ // S1 asks for A and hangs up before the room answers; B is picked out of the call.
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");await settleSoon();
+ c.s.run("disconnect();window.sidevoiceActions.selectParticipant('fp-mac|b')");room.leave('s1');
+ // S2 joins on B and A is picked in it; S1's late refusal comes while S2's select is on its way.
+ const sockets=socketsOf(c.s),joining=c.s.run('toggleCall()');
+ for(let i=0;i<500&&!sockets.length;i++)await settleSoon();
+ const socket=sockets[0];socket.readyState=1;socket.onopen();room.hello(JSON.parse(socket.sent[0]).data,'s2');
+ socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'s2',resume:{token:'tok-b',seconds:60},resumed:false}})});
+ await joining;await settleSoon();
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");await settleSoon();
+ oldRelease();await settleSoon();
+ assert.equal(c.s.run('state.switching'),true,'S2\'s select is still on its way');
+ assert.equal(c.store['sidevoice.selected'],'fp-mac|a');
+ newRelease();
+ for(let i=0;i<200&&c.s.run('state.switching');i++)await settleSoon();
+ await c.s.run('refresh()');await settleSoon();
+ const seen={target:c.s.run('targetId()'),remembered:c.store['sidevoice.selected']};
+ c.s.run('disconnect()');
+ assert.deepEqual(seen,{target:'fp-mac|a',remembered:'fp-mac|a'});
+});
+test('A conversation closed is not gone back to by the refresh that follows the close',async()=>{
+ const room=coreRoom({active:['a','b']});
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|a'});
+ c.s.context.fetch=async(path,options)=>{
+  // Core's close: the binding goes, the call's focus with it, and A is among the closed conversations.
+  if(options?.method==='POST'&&path.includes('/presentation/close')){
+   room.active.delete('a');room.live.delete('a');room.closed.add('a');room.targets.clear();
+   return {ok:true,status:200,json:async()=>({status:'closed'})};
+  }
+  return room.fetch(path,options);
+ };
+ const before=room.selects.length;
+ await c.s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");await settleSoon();
+ await c.s.run('refresh()');await settleSoon();await c.s.run('refreshPeople()');await settleSoon();
+ const selects=plain(room.selects.slice(before));
+ c.s.run('disconnect()');
+ assert.ok(!selects.includes('a'),JSON.stringify(selects));
 });

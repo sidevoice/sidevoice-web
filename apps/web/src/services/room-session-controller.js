@@ -719,21 +719,32 @@ async function select(key){
  if(to.node!==state.callNode)return moveCall(to.node,to.thread);
  state.switching=true;
  applyMicState();
- // The conversation this tab remembers is the person's latest pick (`selectParticipant`). One made while this select
- // is on its way is the newer: it is kept, and asked for as soon as this one is done.
- const before=rememberedThread();
+ // The conversation this tab remembers is the person's latest pick (`selectParticipant`, which counts each one). One
+ // made while this select is on its way is the newer: it is kept, and asked for as soon as this one is done. An answer
+ // that comes after the call ended, moved or got another session is that call's, not this one's: it changes nothing
+ // here, not even `switching`, which the new call owns.
+ const epoch=connectEpoch,session=state.sessionId,node=state.callNode,pick=pickRevision;
+ const current=()=>epoch===connectEpoch&&session===state.sessionId&&node===state.callNode;
  let newer=false;
  try{
-  await post('/api/presentation/select',{thread_id:to.thread,session_id:state.sessionId});
-  if(rememberedThread()===before)rememberThread(key);else newer=true;
+  await post('/api/presentation/select',{thread_id:to.thread,session_id:session});
+  if(!current())return;
+  if(pickRevision===pick)rememberThread(key);else newer=true;
   await refresh();
  }catch(e){
+  if(!current())return;
   // A machine that is away, or did not answer, is asked again on the beat. A room that refuses the pick (its refusal
-  // names a key) leaves the call where it is.
-  if(!machineAway(e)){setRoomError(roomError(e));if(e?.key&&rememberedThread()===key)rememberThread(targetId())}
- }finally{state.switching=false;applyMicState()}
- if(newer)await reselectRemembered();
+  // names a key) leaves the call where it is, and the screen goes back to the conversation the call is on: what is on
+  // screen is never another than the one the microphone talks to because of a refusal.
+  if(!machineAway(e)){
+   setRoomError(roomError(e));
+   if(e?.key&&pickRevision===pick){rememberThread(targetId());if(state.viewedThread===key)state.viewedThread=null;markHistorySeen();updateComposer()}
+  }
+ }finally{if(current()){state.switching=false;applyMicState()}}
+ if(newer&&current())await reselectRemembered();
 }
+// Each pick of the person's in a call, counted: a select knows whether a newer one came while it was on its way.
+let pickRevision=0;
 // Answers can arrive out of order, and one asked before this page had a session describes nobody: either
 // would read as the binding changing and cancel a reply just handed to this page.
 let refreshAsked=0,refreshApplied=0;
@@ -781,8 +792,9 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
  // the stage is whole from the start rather than six seconds later.
  if(!links.get(fp)?.peopleAnswered)void refreshPeople(fp);
  // A pick the room has not taken yet (it was on its way to another, or the machine did not answer) is asked again,
- // once the conversations have said which ones were closed.
- if(links.get(fp)?.peopleAnswered)void reselectRemembered();
+ // once the conversations have said which ones were closed. A binding that has just gone (a close, the machine
+ // restarting) is left to the conversations' next answer, which says whether it was closed.
+ if(links.get(fp)?.peopleAnswered&&!(previousThread&&!now))void reselectRemembered();
 }catch{}}
 const HISTORY_ROLES=new Set(['user','assistant']);
 function readableHistoryRow(r){return !!r&&typeof r==='object'&&typeof r.id==='string'&&!!r.id&&typeof r.text==='string'&&HISTORY_ROLES.has(r.role)}
@@ -2534,7 +2546,7 @@ window.sidevoiceActions={
   state.viewedThread=key;markHistorySeen();acknowledgeDisplayedHistory();
   // The pick is what the call goes to: out of a call the next join, in one on the call's machine the room is asked now
   // and, until it has it (another pick still on its way, the machine not answering for a moment), again on the beat.
-  if(!state.sessionId||to?.node===state.callNode)rememberThread(key);
+  if(!state.sessionId||to?.node===state.callNode){rememberThread(key);++pickRevision}
   // Only a machine that has proved where it is: one being looked for again is not reachable until it answers. An agent that
   // is away does not keep the call from its conversation: what is sent to it waits there until it is back.
   const hears=state.machineLinks?.[to?.node]?.reach==='ok'&&linkBase(to?.node)!=null;
@@ -2550,7 +2562,10 @@ window.sidevoiceActions={
    setRoomError(roomError(e));throw e;
   }
   forgetCard(to.node,to.thread);
-  const link=links.get(to.node);if(link){link.peopleAsked++;link.people=link.people.filter(person=>person.thread_id!==to.thread);mergePeople()}
+  // Closed, it is no pick to go back to: neither the remembered one nor one a refresh may restore before the
+  // conversations' next answer says so.
+  if(rememberedThread()===key)rememberThread(null);
+  const link=links.get(to.node);if(link){link.closed=new Set([...(link.closed||[]),to.thread]);link.peopleAsked++;link.people=link.people.filter(person=>person.thread_id!==to.thread);mergePeople()}
   await disposeConversation(key);
   if(to.node===state.callNode)await refresh();await refreshPeople(to.node);await refreshHistory(to.node)
  },
