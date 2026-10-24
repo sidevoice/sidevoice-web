@@ -26,12 +26,16 @@ export interface MicrophoneSnapshot {
   from: MicrophoneState | null;
 }
 
-/** The desktop app's microphone permission (sidevoice-desktop `host.microphone`, macOS). */
-export interface MicrophoneBridge {
+/** Desktop microphone capabilities: macOS owns permission; Windows offers only the settings link. */
+interface MicrophoneSettingsBridge {
+  openSettings?(): Promise<void>;
+}
+
+/** The desktop app's native microphone permission (sidevoice-desktop `host.microphone`, macOS). */
+export interface MicrophoneBridge extends MicrophoneSettingsBridge {
   /** `missing`: not denied, and the system lists no audio input device. */
   state(): Promise<"prompt" | "granted" | "denied" | "missing">;
   request(): Promise<"granted" | "denied">;
-  openSettings?(): Promise<void>;
   /** Tells when the system's answer changes (the person changed it in the system's settings); returns how to stop. */
   onChange?(listener: () => void): () => void;
 }
@@ -84,6 +88,7 @@ function pageAnswer(media: MediaDevices): PageAnswer {
 export function createMicrophoneAccess(win: Window & typeof globalThis = window): MicrophoneAccess {
   const listeners = new Set<() => void>();
   const bridge = microphoneBridge();
+  const settings = desktopHost()?.microphone as MicrophoneSettingsBridge | undefined;
   const media = win.navigator?.mediaDevices;
   const inAppCall = !!desktopHost()?.voice;
   // The app asks where it runs the call; a page in such an app is never given the microphone, and an app too old to
@@ -215,7 +220,7 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
     subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     check,
     request,
-    openSettings: bridge?.openSettings ? () => bridge.openSettings!().catch(() => undefined) : null,
+    openSettings: typeof settings?.openSettings === "function" ? () => settings.openSettings!().catch(() => undefined) : null,
     dispose() {
       disposed = true;
       status?.removeEventListener?.("change", onChange);

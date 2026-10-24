@@ -172,3 +172,37 @@ test("the app's \"missing\" is the missing state, in both directions", async () 
   await waitFor(() => expect(stateOf(access)()).toBe("prompt"));
   access.dispose();
 });
+
+
+test("a settings-only desktop bridge leaves permission with the webview and offers the privacy button", async () => {
+  const b = browser("prompt");
+  const openSettings = vi.fn(async () => {});
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { microphone: { openSettings } } } });
+  const access = createMicrophoneAccess();
+  await waitFor(() => expect(access.getSnapshot()).toMatchObject({ state: "prompt", asker: "page" }));
+  expect(b.media.getUserMedia).not.toHaveBeenCalled();
+  b.media.getUserMedia.mockRejectedValueOnce(refused("NotAllowedError"));
+  await access.request();
+  expect(access.getSnapshot().state).toBe("denied");
+  await access.openSettings!();
+  expect(openSettings).toHaveBeenCalledTimes(1);
+  expect(access.getSnapshot().state).toBe("denied");
+  // Returning from Settings does not assert capture access. Check again must open a real stream.
+  window.dispatchEvent(new Event("focus"));
+  await access.check();
+  expect(access.getSnapshot().state).toBe("denied");
+  await access.request();
+  expect(access.getSnapshot().state).toBe("granted");
+  expect(b.tracks.stop).toHaveBeenCalled();
+  access.dispose();
+});
+
+test("no callable settings capability means no settings button", () => {
+  browser("prompt");
+  for (const microphone of [undefined, {}, { openSettings: true }]) {
+    Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { microphone } } });
+    const access = createMicrophoneAccess();
+    expect(access.openSettings).toBeNull();
+    access.dispose();
+  }
+});
