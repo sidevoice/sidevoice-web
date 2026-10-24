@@ -116,7 +116,7 @@ function RoomContent() {
 export function App({ store, onboarding, runtime }: { store?: RoomStore; onboarding?: { repository?: OnboardingRepository; startAt?: OnboardingStep }; runtime?: boolean } = {}) {
   // Every word on the page is drawn in the interface's language: a switch draws the page again.
   useUiLanguage();
-  // Compared from the playground's VARIANTS panel until the operator chooses the appearance.
+  // useVariant ignores persisted choices in release builds; the playground's dev/preview builds compare appearances.
   const scrollbars = useVariant("scrollbars", ["native", "themed"] as const);
   useEffect(() => {
     document.documentElement.dataset.scrollbars = scrollbars;

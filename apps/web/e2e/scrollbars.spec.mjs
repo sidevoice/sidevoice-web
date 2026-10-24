@@ -6,12 +6,13 @@ import { conversation } from "./motion-states.mjs";
 test.use({ launchOptions: { ignoreDefaultArgs: ["--hide-scrollbars"] } });
 const people = Array.from({ length: 20 }, (_, i) => conversation(i + 1));
 
-async function openList(page, theme = "light") {
+async function openList(page, theme = "light", variants = null) {
   await installHarness(page, { participants: { first: people } });
-  await page.addInitScript((theme) => {
+  await page.addInitScript(({ theme, variants }) => {
     localStorage.setItem("sidevoice.appearance", theme);
     localStorage.setItem("sidevoice.motion", "still");
-  }, theme);
+    if (variants) localStorage.setItem("sidevoice.variants", JSON.stringify(variants));
+  }, { theme, variants });
   await page.goto("/voice/");
   await page.locator("#participants .participant-row").first().waitFor();
   await page.evaluate(() => document.fonts.ready);
@@ -73,7 +74,50 @@ test("classic scrollbar appearance does not change card width", async ({ page })
   expect((await geometry(page)).cardWidth).toBeCloseTo(before.cardWidth, 1);
 });
 
-test("native and themed appearances switch live without changing the layout", async ({ page }, testInfo) => {
+test("cards keep their width without scrollbar-gutter support", async ({ page }) => {
+  // Model an older CSS parser: discard the unknown declaration and take the unsupported-feature branch.
+  // Patching window.CSS.supports alone would not affect the stylesheet's @supports evaluation.
+  await page.route("**/*.css", async (route) => {
+    const response = await route.fetch();
+    const css = (await response.text())
+      .replace(/@supports\s+not\s*\(scrollbar-gutter\s*:\s*stable\s*\)/g, "@supports (display: block)")
+      .replace(/scrollbar-gutter\s*:\s*stable\s*;?/g, "");
+    await route.fulfill({ response, body: css });
+  });
+  await page.setViewportSize({ width: 1100, height: 1800 });
+  await openList(page);
+  const list = page.locator("#participants");
+  const before = await geometry(page);
+  expect(before.overflow).toBe(false);
+  await expect(list).toHaveCSS("overflow-y", "scroll");
+  await expect(list).toHaveCSS("scrollbar-gutter", "auto");
+  await page.setViewportSize({ width: 1100, height: 400 });
+  expect((await geometry(page)).overflow).toBe(true);
+  expect((await geometry(page)).cardWidth).toBeCloseTo(before.cardWidth, 1);
+  expect((await geometry(page)).gap).toBeGreaterThanOrEqual(16);
+});
+
+test("production ignores persisted and live preview scrollbar choices", async ({ page }) => {
+  test.skip(process.env.SIDEVOICE_PREVIEW_VARIANTS === "1", "production build only");
+  await page.setViewportSize({ width: 1100, height: 700 });
+  await openList(page, "light", { scrollbars: "themed" });
+  const list = page.locator("#participants");
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("sidevoice.variants")).scrollbars)).toBe("themed");
+  await expect(list).toHaveCSS("scrollbar-color", "auto");
+  for (const scrollbars of ["native", "themed"]) {
+    await page.evaluate(async (scrollbars) => {
+      localStorage.setItem("sidevoice.variants", JSON.stringify({ scrollbars }));
+      window.dispatchEvent(new StorageEvent("storage", { key: "sidevoice.variants" }));
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    }, scrollbars);
+    await expect(list).toHaveCSS("scrollbar-color", "auto");
+  }
+  await page.reload();
+  await expect(list).toHaveCSS("scrollbar-color", "auto");
+});
+
+test("preview native and themed appearances switch live without changing the layout", async ({ page }, testInfo) => {
+  test.skip(process.env.SIDEVOICE_PREVIEW_VARIANTS !== "1", "explicit preview build only");
   await page.setViewportSize({ width: 1100, height: 700 });
   await openList(page);
   const list = page.locator("#participants");

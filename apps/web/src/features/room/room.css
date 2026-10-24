@@ -172,6 +172,10 @@
      Extend into the sidebar's outer padding so the scroll control sits beside the list, away from its cards. */
   scrollbar-gutter: stable; padding-inline: var(--sv-space-0-5) var(--sv-space-4);
   margin-inline: calc(-1 * var(--sv-space-0-5)) calc(-1 * var(--sv-space-3)); }
+@supports not (scrollbar-gutter: stable) {
+  /* Older WKWebView reserves a classic scrollbar's width only with scroll, even before the list overflows. */
+  .conversation-sidebar > .sidebar-body { overflow-y: scroll; }
+}
 @media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
   /* The rail has no card frames. Its scrollport uses the full rail width so a classic scrollbar cannot clip avatars. */
   .conversation-sidebar[data-collapsed] > .sidebar-body { margin-inline: -10px; padding-inline: 0; }

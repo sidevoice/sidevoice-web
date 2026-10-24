@@ -1,6 +1,6 @@
 # Scrollbar visual review — #361
 
-The conversation list uses a native scrollport. Cards previously ended at its client edge; classic scrollbar appearance also changed their width by 15px in Chromium. A stable gutter prevents the width jump. Inline padding separates cards and their shadows from overlay thumbs (which do not reserve a CSS gutter). The rail scrollport extends into its existing padding so classic scrollbars do not clip avatars.
+The conversation list uses a native scrollport. Cards previously ended at its client edge; classic scrollbar appearance also changed their width by 15px in Chromium. A stable gutter prevents the width jump. Browsers without gutter support (including older WKWebView) use `overflow-y: scroll` inside `@supports not (scrollbar-gutter: stable)` to reserve the width before overflow. Inline padding separates cards and their shadows from overlay thumbs (which do not reserve a CSS gutter). The rail scrollport extends into its existing padding so classic scrollbars do not clip avatars.
 
 The theme now leaves scrollbar colour to the browser and operating system. Code snippets also use the platform's default scrollbar thickness. There is no custom scrollbar renderer, OS detection, or z-index override.
 
@@ -8,7 +8,7 @@ The theme now leaves scrollbar colour to the browser and operating system. Code 
 
 Recommend **Native platform appearance**. It follows the OS/browser's thumb, track, overlay preference and the page's light/dark color scheme. **Platform scrollbar with theme colours** preserves the previous thumb colour and transparent track, using the same spacing fix.
 
-Compare both live in the playground's **VARIANTS → Scrollbars** panel (companion [playground PR #138](https://github.com/sidevoice/sidevoice-playground/pull/138)). Choose the web PR in the preview, use a long conversation list, expand the sidebar, and switch between light and dark. The options write `sidevoice.variants.scrollbars` (`native` or `themed`) and the page follows the storage event; no product preference is added. Once a choice is approved, the temporary variant can be removed.
+Compare both live in the playground's **VARIANTS → Scrollbars** panel (companion [playground PR #138](https://github.com/sidevoice/sidevoice-playground/pull/138)), using its **dev run** of this branch. Alternatively, build explicitly with `npm run build -w @sidevoice/web -- --mode preview`. Use a long conversation list, expand the sidebar, and switch between light and dark. The options write `sidevoice.variants.scrollbars` (`native` or `themed`) and the page follows the storage event; no product preference is added. Normal production builds, including the normal PR artifact, always use Native and ignore both persisted choices and storage events. Once a choice is approved, the temporary variant can be removed.
 
 ## Evidence
 
@@ -29,6 +29,6 @@ Theme-coloured alternative: [Chromium light](chromium-themed-light.jpg), [Chromi
 
 `npm run build`, `npm test`, and `npx playwright test -c apps/web/playwright.config.mjs scrollbars --workers 1`.
 
-The browser regression covers 390, 700, 899, 900, 1100 and 1440px, both themes, card separation at three scroll positions, stable card width across the overflow threshold, live appearance switching and keyboard selection in an overflowing rail. The separation and width checks fail on the previous CSS. Additional test screenshots at the other widths are generated in the Playwright output directory.
+The browser regression covers 390, 700, 899, 900, 1100 and 1440px, both themes, card separation at three scroll positions, stable card width across the overflow threshold, simulated missing gutter support, ignored production choices and keyboard selection in an overflowing rail. The missing-support test drops the gutter declaration and forces the stylesheet's unsupported-feature branch; overriding JavaScript's `CSS.supports` would not affect CSS parsing. Live appearance switching is checked against the explicit preview build with `SIDEVOICE_PREVIEW_VARIANTS=1 npx playwright test -c apps/web/playwright.config.mjs scrollbars --grep 'preview native' --workers 1`, with `SIDEVOICE_STATIC_SITE` pointing at that build's assembled site. The separation and width checks fail on the previous CSS. Additional test screenshots at the other widths are generated in the Playwright output directory. The modern-browser screenshots above are unchanged by these compatibility fixes.
 
 These Linux engine checks do not certify the packaged macOS or Windows scrollbar theme. Review both options in the actual desktop shell before approving the appearance. No public product-information claim changes.
