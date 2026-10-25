@@ -171,11 +171,6 @@
   scrollbar-color: auto;
 }
 
-/* VARIANTS scrollbars: the previous theme colours, still drawn by the platform. */
-:root[data-scrollbars="themed"], :root[data-scrollbars="themed"] [data-theme] {
-  scrollbar-color: var(--sv-border-strong) transparent;
-}
-
 /* The type scale, for text that is not inside a component. Sentence case throughout. */
 .sv-text-2xl { margin: 0; font-size: var(--sv-font-2xl); line-height: 2rem; font-weight: var(--sv-weight-heavy); letter-spacing: -.02em; }
 .sv-text-xl { margin: 0; font-size: var(--sv-font-xl); line-height: 1.625rem; font-weight: var(--sv-weight-bold); letter-spacing: -.015em; }

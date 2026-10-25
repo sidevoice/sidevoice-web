@@ -6,13 +6,12 @@ import { conversation } from "./motion-states.mjs";
 test.use({ launchOptions: { ignoreDefaultArgs: ["--hide-scrollbars"] } });
 const people = Array.from({ length: 20 }, (_, i) => conversation(i + 1));
 
-async function openList(page, theme = "light", variants = null) {
+async function openList(page, theme = "light") {
   await installHarness(page, { participants: { first: people } });
-  await page.addInitScript(({ theme, variants }) => {
+  await page.addInitScript((theme) => {
     localStorage.setItem("sidevoice.appearance", theme);
     localStorage.setItem("sidevoice.motion", "still");
-    if (variants) localStorage.setItem("sidevoice.variants", JSON.stringify(variants));
-  }, { theme, variants });
+  }, theme);
   await page.goto("/voice/");
   await page.locator("#participants .participant-row").first().waitFor();
   await page.evaluate(() => document.fonts.ready);
@@ -95,54 +94,6 @@ test("cards keep their width without scrollbar-gutter support", async ({ page })
   expect((await geometry(page)).overflow).toBe(true);
   expect((await geometry(page)).cardWidth).toBeCloseTo(before.cardWidth, 1);
   expect((await geometry(page)).gap).toBeGreaterThanOrEqual(16);
-});
-
-test("production ignores persisted and live preview scrollbar choices", async ({ page }) => {
-  test.skip(process.env.SIDEVOICE_PREVIEW_VARIANTS === "1", "production build only");
-  await page.setViewportSize({ width: 1100, height: 700 });
-  await openList(page, "light", { scrollbars: "themed" });
-  const list = page.locator("#participants");
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("sidevoice.variants")).scrollbars)).toBe("themed");
-  await expect(list).toHaveCSS("scrollbar-color", "auto");
-  for (const scrollbars of ["native", "themed"]) {
-    await page.evaluate(async (scrollbars) => {
-      localStorage.setItem("sidevoice.variants", JSON.stringify({ scrollbars }));
-      window.dispatchEvent(new StorageEvent("storage", { key: "sidevoice.variants" }));
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    }, scrollbars);
-    await expect(list).toHaveCSS("scrollbar-color", "auto");
-  }
-  await page.reload();
-  await expect(list).toHaveCSS("scrollbar-color", "auto");
-});
-
-test("preview native and themed appearances switch live without changing the layout", async ({ page }, testInfo) => {
-  test.skip(process.env.SIDEVOICE_PREVIEW_VARIANTS !== "1", "explicit preview build only");
-  await page.setViewportSize({ width: 1100, height: 700 });
-  await openList(page);
-  const list = page.locator("#participants");
-  await expect(list).toHaveCSS("scrollbar-color", "auto");
-  const before = await geometry(page);
-  await page.evaluate(() => {
-    localStorage.setItem("sidevoice.variants", JSON.stringify({ scrollbars: "themed" }));
-    window.dispatchEvent(new StorageEvent("storage", { key: "sidevoice.variants" }));
-  });
-  await expect.poll(() => list.evaluate((el) => getComputedStyle(el).scrollbarColor)).not.toBe("auto");
-  expect((await geometry(page)).cardWidth).toBeCloseTo(before.cardWidth, 1);
-  await page.locator('#participants .person').first().click();
-  for (const theme of ["light", "dark"]) {
-    await page.evaluate((theme) => { document.documentElement.dataset.theme = theme; }, theme);
-    const bounds = await list.boundingBox();
-    await page.mouse.move(bounds.x + bounds.width - 5, bounds.y + 80);
-    await page.mouse.wheel(0, 10);
-    await page.waitForTimeout(100);
-    await page.screenshot({ path: testInfo.outputPath(`themed-${theme}.jpg`), quality: 80 });
-  }
-  await page.evaluate(() => {
-    localStorage.setItem("sidevoice.variants", JSON.stringify({ scrollbars: "native" }));
-    window.dispatchEvent(new StorageEvent("storage", { key: "sidevoice.variants" }));
-  });
-  await expect(list).toHaveCSS("scrollbar-color", "auto");
 });
 
 test("the overflowing rail keeps its avatars visible and the list scrolls from the keyboard", async ({ page }) => {
