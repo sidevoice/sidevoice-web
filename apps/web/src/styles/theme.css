@@ -167,7 +167,8 @@
   line-height: 1.4667;
   -webkit-font-smoothing: antialiased;
   font-optical-sizing: auto;
-  scrollbar-color: var(--sv-border-strong) transparent;
+  /* The browser/OS chooses the thumb, track and overlay behaviour, in this surface's color-scheme. */
+  scrollbar-color: auto;
 }
 
 /* The type scale, for text that is not inside a component. Sentence case throughout. */
