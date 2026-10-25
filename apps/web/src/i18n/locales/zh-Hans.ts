@@ -933,6 +933,7 @@ export const messages: Messages = {
   "settings.desktop.recording": "正在录制，按 Esc 停止",
   "settings.desktop.clear": "清除",
   "settings.desktop.shortcutRefused": "另一个应用已在使用此快捷键。请从下列选项中选择一个，或重新录制。",
+  "settings.desktop.shortcutUnavailable": "此会话中无法使用全局快捷键。",
   "settings.desktop.alternatives": "可用的快捷键",
   "settings.desktop.voiceOverClash": "此快捷键也是 VoiceOver 命令；开启 VoiceOver 时，它可能无法传到 Sidevoice。",
   "settings.desktop.shortcutInvalid": "这个组合无法作为快捷键。请试试一个修饰键加一个字母。",

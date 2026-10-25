@@ -947,6 +947,7 @@ export const messages: Messages = {
   "settings.desktop.recording": "Nagrywanie — Esc, aby przerwać",
   "settings.desktop.clear": "Wyczyść",
   "settings.desktop.shortcutRefused": "Inna aplikacja używa już tego skrótu. Wybierz jeden z poniższych albo nagraj inny.",
+  "settings.desktop.shortcutUnavailable": "Skróty globalne są niedostępne w tej sesji.",
   "settings.desktop.alternatives": "Skróty, których możesz użyć",
   "settings.desktop.voiceOverClash": "Ten skrót jest też poleceniem VoiceOver; przy włączonym VoiceOver może nie dotrzeć do Sidevoice.",
   "settings.desktop.shortcutInvalid": "Ta kombinacja nie może być skrótem. Spróbuj z klawiszem modyfikującym i literą.",

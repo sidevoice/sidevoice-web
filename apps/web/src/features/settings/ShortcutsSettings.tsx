@@ -98,6 +98,7 @@ function MuteShortcutRow({ t }: { t: Translate }) {
           {now.alternatives.map((accelerator) => <Button key={accelerator} size="sm" variant="secondary" onClick={() => void set(accelerator)}>{accelerator}</Button>)}
         </div>}
       </div>}
+      {now?.state === "unavailable" && <p className="desktop-shortcut-note" role="alert">{t("settings.desktop.shortcutUnavailable")}</p>}
       {now?.voiceOver && <p className="desktop-shortcut-note">{t("settings.desktop.voiceOverClash")}</p>}
       {error && <p className="desktop-shortcut-error" role="alert">{error}</p>}
     </div>

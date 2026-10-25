@@ -947,6 +947,7 @@ export const messages: Messages = {
   "settings.desktop.recording": "Registrazione — Esc per fermare",
   "settings.desktop.clear": "Rimuovi",
   "settings.desktop.shortcutRefused": "Un’altra app usa già questa scorciatoia. Scegline una di queste o registrane un’altra.",
+  "settings.desktop.shortcutUnavailable": "Le scorciatoie globali non sono disponibili in questa sessione.",
   "settings.desktop.alternatives": "Scorciatoie che puoi usare",
   "settings.desktop.voiceOverClash": "Questa scorciatoia è anche un comando di VoiceOver; con VoiceOver attivo potrebbe non arrivare a Sidevoice.",
   "settings.desktop.shortcutInvalid": "Questa combinazione non può essere una scorciatoia. Prova con un tasto modificatore e una lettera.",

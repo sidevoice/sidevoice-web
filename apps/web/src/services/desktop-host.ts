@@ -166,7 +166,7 @@ export interface DesktopBuild {
 export interface MuteShortcut {
   accelerator: string | null;
   label: string | null;
-  state: "on" | "off" | "refused";
+  state: "on" | "off" | "refused" | "unavailable";
   alternatives: string[];
   voiceOver: boolean;
 }
