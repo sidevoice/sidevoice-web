@@ -956,6 +956,7 @@ export const messages = {
   "settings.desktop.recording": "Recording — Esc to stop",
   "settings.desktop.clear": "Clear",
   "settings.desktop.shortcutRefused": "Another app already uses this shortcut. Pick one of these, or record another.",
+  "settings.desktop.shortcutUnavailable": "Global shortcuts are unavailable in this session.",
   "settings.desktop.alternatives": "Shortcuts you can use",
   "settings.desktop.voiceOverClash": "This shortcut is also a VoiceOver command; with VoiceOver on, it may not reach Sidevoice.",
   "settings.desktop.shortcutInvalid": "That combination can't be a shortcut. Try one with a modifier and a letter.",

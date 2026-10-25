@@ -169,6 +169,24 @@ test("a refused shortcut says so and offers the alternatives, each of which sets
   expect(screen.queryByRole("alert")).toBeNull();
 });
 
+test("an unavailable backend warns on load and subscription while keeping the saved chord clearable", async () => {
+  const unavailable = shortcut({ state: "unavailable" });
+  const { bridge, emit } = muteBridge(unavailable);
+  inApp({ muteShortcut: bridge });
+  render(<ShortcutsSettings t={en} />);
+  expect(await screen.findByRole("alert")).toHaveTextContent(en("settings.desktop.shortcutUnavailable"));
+  expect(screen.getByLabelText("⇧⌘M")).toHaveAttribute("data-state", "unavailable");
+  expect(screen.queryByRole("group", { name: "Shortcuts you can use" })).toBeNull();
+  expect(screen.queryByText(/Another app already uses/)).toBeNull();
+  act(() => emit(shortcut()));
+  expect(screen.queryByRole("alert")).toBeNull();
+  act(() => emit(unavailable));
+  expect(screen.getByRole("alert")).toHaveTextContent(en("settings.desktop.shortcutUnavailable"));
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Clear" })); });
+  expect(bridge.set).toHaveBeenCalledExactlyOnceWith(null);
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
 test("a shortcut that clashes with VoiceOver carries a note", async () => {
   inApp({ muteShortcut: muteBridge(shortcut({ voiceOver: true })).bridge });
   render(<ShortcutsSettings t={en} />);

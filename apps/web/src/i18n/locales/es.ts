@@ -947,6 +947,7 @@ export const messages: Messages = {
   "settings.desktop.recording": "Grabando — Esc para parar",
   "settings.desktop.clear": "Quitar",
   "settings.desktop.shortcutRefused": "Otra aplicación ya usa este atajo. Elige uno de estos o graba otro.",
+  "settings.desktop.shortcutUnavailable": "Los atajos globales no están disponibles en esta sesión.",
   "settings.desktop.alternatives": "Atajos que puedes usar",
   "settings.desktop.voiceOverClash": "Este atajo también es una orden de VoiceOver; con VoiceOver activo puede no llegar a Sidevoice.",
   "settings.desktop.shortcutInvalid": "Esa combinación no puede ser un atajo. Prueba con una tecla modificadora y una letra.",

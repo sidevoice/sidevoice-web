@@ -934,6 +934,7 @@ export const messages: Messages = {
   "settings.desktop.recording": "記録中 — Esc で停止",
   "settings.desktop.clear": "クリア",
   "settings.desktop.shortcutRefused": "このショートカットはほかのアプリで使用されています。以下から選ぶか、別のショートカットを記録してください。",
+  "settings.desktop.shortcutUnavailable": "このセッションではグローバルショートカットを使用できません。",
   "settings.desktop.alternatives": "使用できるショートカット",
   "settings.desktop.voiceOverClash": "このショートカットは VoiceOver のコマンドでもあります。VoiceOver がオンのときは Sidevoice に届かない場合があります。",
   "settings.desktop.shortcutInvalid": "その組み合わせはショートカットにできません。修飾キーと文字キーの組み合わせを試してください。",

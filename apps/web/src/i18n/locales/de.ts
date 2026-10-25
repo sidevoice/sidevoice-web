@@ -936,6 +936,7 @@ export const messages: Messages = {
   "settings.desktop.recording": "Aufnahme – Esc zum Beenden",
   "settings.desktop.clear": "Entfernen",
   "settings.desktop.shortcutRefused": "Eine andere App nutzt dieses Kürzel bereits. Wähle eines davon oder nimm ein anderes auf.",
+  "settings.desktop.shortcutUnavailable": "Globale Tastenkürzel sind in dieser Sitzung nicht verfügbar.",
   "settings.desktop.alternatives": "Verfügbare Kürzel",
   "settings.desktop.voiceOverClash": "Dieses Kürzel ist auch ein VoiceOver-Befehl; bei aktivem VoiceOver erreicht es Sidevoice eventuell nicht.",
   "settings.desktop.shortcutInvalid": "Diese Kombination kann kein Kürzel sein. Versuch eine mit Sondertaste und Buchstabe.",

@@ -933,6 +933,7 @@ export const messages: Messages = {
   "settings.desktop.recording": "Enregistrement — Échap pour arrêter",
   "settings.desktop.clear": "Effacer",
   "settings.desktop.shortcutRefused": "Une autre app utilise déjà ce raccourci. Choisissez-en un parmi ceux-ci, ou enregistrez-en un autre.",
+  "settings.desktop.shortcutUnavailable": "Les raccourcis globaux ne sont pas disponibles dans cette session.",
   "settings.desktop.alternatives": "Raccourcis disponibles",
   "settings.desktop.voiceOverClash": "Ce raccourci est aussi une commande VoiceOver ; avec VoiceOver activé, il risque de ne pas atteindre Sidevoice.",
   "settings.desktop.shortcutInvalid": "Cette combinaison ne peut pas servir de raccourci. Essayez une touche de modification et une lettre.",
