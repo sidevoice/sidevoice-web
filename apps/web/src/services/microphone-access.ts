@@ -35,7 +35,7 @@ interface MicrophoneSettingsBridge {
 export interface MicrophoneBridge extends MicrophoneSettingsBridge {
   /** `missing`: not denied, and the system lists no audio input device. */
   state(): Promise<"prompt" | "granted" | "denied" | "missing">;
-  request(): Promise<"granted" | "denied">;
+  request(): Promise<"granted" | "denied" | "missing">;
   /** Tells when the system's answer changes (the person changed it in the system's settings); returns how to stop. */
   onChange?(listener: () => void): () => void;
 }
@@ -175,7 +175,15 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
     let answer: "granted" | "denied" | "missing";
     let closed = false;
     if (bridge) {
-      try { answer = await bridge.request() === "granted" ? "granted" : "denied"; } catch { answer = "denied"; }
+      try {
+        const said = await bridge.request();
+        answer = said === "granted" || said === "missing" ? said : "denied";
+      } catch {
+        // A failed native request says nothing: as a failed read does, the state stays what it was.
+        if (mine !== run) return;
+        set({ state: before === "granted" || before === "denied" || before === "missing" ? before : "prompt", from: null });
+        return;
+      }
     } else {
       try {
         // Called in the tap itself, before any await: iPhone Safari asks only from a gesture.
