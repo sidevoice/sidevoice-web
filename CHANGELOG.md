@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.11.0](https://github.com/sidevoice/sidevoice-web/compare/v0.10.1...v0.11.0) (2026-10-26)
+
+
+### Features
+
+* **agents:** say when the last agent scan failed ([#355](https://github.com/sidevoice/sidevoice-web/issues/355)) ([b3cf1b4](https://github.com/sidevoice/sidevoice-web/commit/b3cf1b4637c099b6581f6e2fd2d793966aeda04f))
+* **models:** language list and model size summary variants ([#350](https://github.com/sidevoice/sidevoice-web/issues/350)) ([4693b73](https://github.com/sidevoice/sidevoice-web/commit/4693b73b9a2f3cf3a828bb93188af9473155870f))
+* **voice:** always-on audio diagnostics ([#354](https://github.com/sidevoice/sidevoice-web/issues/354)) ([8e2889c](https://github.com/sidevoice/sidevoice-web/commit/8e2889cdbdd6ea5676f44753be1ce22d3758d63e))
+
+
+### Bug Fixes
+
+* **avatar:** the card and the main view show the same creature step ([#353](https://github.com/sidevoice/sidevoice-web/issues/353)) ([f93f770](https://github.com/sidevoice/sidevoice-web/commit/f93f770d10b6589469fc63d7ebeaeb3d852cc1fd))
+* **call:** a call goes back to the conversation picked even when the room does not list it ([#358](https://github.com/sidevoice/sidevoice-web/issues/358)) ([ddfbed4](https://github.com/sidevoice/sidevoice-web/commit/ddfbed46840f3ca7a69153a2da79d516d2c9e00c))
+* **call:** no PiP while no conversation is chosen ([#343](https://github.com/sidevoice/sidevoice-web/issues/343)) ([91a24ba](https://github.com/sidevoice/sidevoice-web/commit/91a24baf0a372bfab31b1117839310e6087d0902))
+* **call:** the call follows the latest pick, even one that could not go at once ([#359](https://github.com/sidevoice/sidevoice-web/issues/359)) ([b288144](https://github.com/sidevoice/sidevoice-web/commit/b28814439ec3eb55fb0105d001dd41dae86d47d5))
+* **microphone:** keep missing from the desktop request ([#368](https://github.com/sidevoice/sidevoice-web/issues/368)) ([1252698](https://github.com/sidevoice/sidevoice-web/commit/125269849050cffeae78289e331f6d7c72fe69c6))
+* **onboarding:** clarify what connecting an agent is for ([#349](https://github.com/sidevoice/sidevoice-web/issues/349)) ([7a55a41](https://github.com/sidevoice/sidevoice-web/commit/7a55a410e9b8fa7aac413068ad8348dab560cfe5))
+* **onboarding:** show the chosen device name in This device at once ([#344](https://github.com/sidevoice/sidevoice-web/issues/344)) ([18d0ae2](https://github.com/sidevoice/sidevoice-web/commit/18d0ae2d009330389f7138d0c41cb47dd0b9583a)), closes [#333](https://github.com/sidevoice/sidevoice-web/issues/333)
+* **settings:** default the voice sample text to the interface language ([#346](https://github.com/sidevoice/sidevoice-web/issues/346)) ([c64f913](https://github.com/sidevoice/sidevoice-web/commit/c64f9139e2e5b7f248d36434f24974ca42837332)), closes [#335](https://github.com/sidevoice/sidevoice-web/issues/335)
+* **settings:** shorten end-of-turn tooltips ([#348](https://github.com/sidevoice/sidevoice-web/issues/348)) ([d164ea7](https://github.com/sidevoice/sidevoice-web/commit/d164ea7a5df5b37ba07e04d57074cfed2df2ab8d))
+* show microphone settings for settings-only desktop hosts ([#363](https://github.com/sidevoice/sidevoice-web/issues/363)) ([ae6a2f1](https://github.com/sidevoice/sidevoice-web/commit/ae6a2f121c8c7945a1959890f4112e9ed6c00969))
+* **transcription:** show the slow-on-this-device warning only above 5 s ([#345](https://github.com/sidevoice/sidevoice-web/issues/345)) ([a944097](https://github.com/sidevoice/sidevoice-web/commit/a944097eedd9457ed24c11cc4f1d9e88cd04b196))
+* **ui:** keep native scrollbars clear of conversation cards ([#364](https://github.com/sidevoice/sidevoice-web/issues/364)) ([59edaf6](https://github.com/sidevoice/sidevoice-web/commit/59edaf6bad515b0df0b620c4c277f4b52d4df0d4))
+* **voice:** end the end-of-turn take where the turn ended ([#342](https://github.com/sidevoice/sidevoice-web/issues/342)) ([3389ba9](https://github.com/sidevoice/sidevoice-web/commit/3389ba9723ee8d877271107d9e8b5d98cec7f79c)), closes [#331](https://github.com/sidevoice/sidevoice-web/issues/331)
+
 ## [0.10.1](https://github.com/sidevoice/sidevoice-web/compare/v0.10.0...v0.10.1) (2026-10-21)
 
 
