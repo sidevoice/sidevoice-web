@@ -174,6 +174,23 @@ test("the app's \"missing\" is the missing state, in both directions", async () 
 });
 
 
+test("the app's request keeps \"missing\", and a failed request invents no denial", async () => {
+  let system: "granted" | "denied" | "missing" = "missing";
+  let fail = false;
+  (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop = { host: { voice: {}, microphone: {
+    state: async () => system,
+    request: async () => { if (fail) throw new Error("native"); return system; },
+  } } };
+  const access = createMicrophoneAccess();
+  await waitFor(() => expect(stateOf(access)()).toBe("missing"));
+  await access.request();
+  expect(stateOf(access)()).toBe("missing");
+  system = "granted"; await access.check();
+  fail = true; await access.request();
+  expect(stateOf(access)()).toBe("granted");
+  access.dispose();
+});
+
 test("a settings-only desktop bridge leaves permission with the webview and offers the privacy button", async () => {
   const b = browser("prompt");
   const openSettings = vi.fn(async () => {});
