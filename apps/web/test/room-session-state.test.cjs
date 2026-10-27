@@ -306,3 +306,18 @@ test('A disconnected conversation is never busy or working, whatever its harness
  const down=facts(api,{people:[person({available:true,reach:{state:'listening'}})],machineLinks:{m:{reach:'offline'}},harness:{'m|a':true},...lasted(api)});
  assert.equal(api.working(down),false);
 });
+
+test('A conversation with one live binding is not disconnected, whichever row comes first (web#371 review)',async()=>{
+ const api=await moduleReady;
+ const live={node:'m',thread_id:'a',available:true,reach:{state:'listening'}},off={node:'m',thread_id:'a',available:false,reach:{state:'offline'}};
+ for(const people of [[live,off],[off,live]]){
+  const s=facts(api,{people,harness:{'m|a':true},...lasted(api)});
+  assert.equal(api.working(s),true);
+ }
+ assert.equal(api.working(facts(api,{people:[off,off],harness:{'m|a':true},...lasted(api)})),false);
+});
+test('An empty view is not the call\'s conversation',async()=>{
+ const api=await moduleReady;
+ assert.equal(api.viewedThread(facts(api,{viewedThread:api.NO_VIEW})),null);
+ assert.equal(api.viewedThread(facts(api,{viewedThread:null})),'m|a');
+});

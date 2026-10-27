@@ -76,7 +76,9 @@ export function personKey(p) { return conversationKey(p?.node, p?.thread_id); }
 export function selectedThread(s) { return conversationKey(s.callNode, s.roomBinding?.thread_id); }
 // A call whose socket is being reopened is still a call: the person is not told otherwise until the grace is over.
 function inCall(s) { return !!(s.ws || s.reconnecting); }
-export function viewedThread(s) { return s.viewedThread || selectedThread(s); }
+/** `viewedThread` fact: the screen shows no conversation at all, though a call may still be on one. Null follows the call. */
+export const NO_VIEW = '';
+export function viewedThread(s) { return s.viewedThread === NO_VIEW ? null : s.viewedThread || selectedThread(s); }
 /** The conversation in focus, the only one that may sound: with the window shown, the one on screen (`viewedThread`);
  *  minimised (`hidden`), the one selected on the call card, which is the one the call is on. */
 export function focusedThread(s, hidden = false) { return hidden ? selectedThread(s) : viewedThread(s); }
@@ -371,15 +373,16 @@ function machineDown(s, fp) { const reach = s.machineLinks?.[fp]?.reach; return 
 const REACH_STATES = new Set(['listening', 'holding', 'offline']);
 /** How a listed conversation is reached: a machine that does not answer leaves its conversations unreachable; else the
  *  room's word, and a reach this version does not know read by whether the conversation is available (sidevoice-core#112). */
-function reachOf(s, person) {
+export function reachOf(s, person) {
     if (machineDown(s, person.node))
         return 'offline';
     return REACH_STATES.has(person.reach?.state) ? person.reach.state : (person.available ? 'listening' : 'offline');
 }
-/** Whether a listed conversation cannot be reached now. One the page does not list (just bound) is not said to be. */
+/** Whether a listed conversation cannot be reached now: every binding the room lists for it is offline, one live binding
+ *  keeps it reachable. One the page does not list (just bound) is not said to be. */
 function disconnected(s, thread) {
-    const person = s.people?.find(p => personKey(p) === thread);
-    return !!person && reachOf(s, person) === 'offline';
+    const rows = s.people?.filter(p => personKey(p) === thread) ?? [];
+    return rows.length > 0 && rows.every(p => reachOf(s, p) === 'offline');
 }
 /** What this device calls a paired machine: its alias here, else the machine's own name. */
 function machineName(s, fp) { return (s.pairings || []).find(p => p.fp === fp)?.host || null; }
