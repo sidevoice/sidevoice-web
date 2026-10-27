@@ -291,6 +291,16 @@ function publishLinks(){
 function mergePeople(){
  const order=[...new Set([...pairings.list.map(p=>p.fp),...links.keys()])];
  state.people=order.flatMap(fp=>links.get(fp)?.people||[]);
+ leaveGoneViewed();
+}
+// The conversation on screen is one the list no longer holds (closed here or elsewhere, its machine having answered):
+// nothing of it stays on screen. The view moves to the next conversation that listens, or to none (sidevoice-web#351).
+function leaveGoneViewed(){
+ const gone=state.viewedThread;if(!gone||gone===targetId())return;
+ const to=conversationOf(gone),link=to&&links.get(to.node);
+ if(!link||!(link.peopleAnswered||link.closed?.has(to.thread))||state.people.some(person=>personKey(person)===gone))return;
+ const next=state.people.find(person=>person.available&&person.reach?.state==='listening');
+ state.viewedThread=next?personKey(next):null;markHistorySeen();updateComposer();
 }
 /* Which address each machine answers at is asked when it matters: on load, on the beat while it has none or its
  * proof is old, before a join that has none, and before each reconnection attempt after the first. An address that

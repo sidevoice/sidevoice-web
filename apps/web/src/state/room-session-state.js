@@ -86,6 +86,10 @@ export function speechSegment(speech) { return speech.history_id || speech.sessi
 export function busy(s, thread = selectedThread(s)) {
     if (!thread)
         return false;
+    // A disconnected conversation is disconnected: no activity report or receipt makes it busy (sidevoice-core#159).
+    // Its busy start is dropped with it (busySince), so working shows only after it is back and busy again.
+    if (disconnected(s, thread))
+        return false;
     // false is an authoritative report too. Receipts and replies can never override it. The harness reports every
     // conversation of a paired machine, call or no call, so its word counts outside the call too.
     if (typeof s.harness[thread] === 'boolean')
@@ -365,6 +369,18 @@ export function workingCapabilityNote(p) { const v = p.capabilities?.working; re
  *  minutes, which a call looking for it does not trust that long. */
 function machineDown(s, fp) { const reach = s.machineLinks?.[fp]?.reach; return !!reach && reach !== 'ok' || (!!s.reconnectShown && fp === s.callNode); }
 const REACH_STATES = new Set(['listening', 'holding', 'offline']);
+/** How a listed conversation is reached: a machine that does not answer leaves its conversations unreachable; else the
+ *  room's word, and a reach this version does not know read by whether the conversation is available (sidevoice-core#112). */
+function reachOf(s, person) {
+    if (machineDown(s, person.node))
+        return 'offline';
+    return REACH_STATES.has(person.reach?.state) ? person.reach.state : (person.available ? 'listening' : 'offline');
+}
+/** Whether a listed conversation cannot be reached now. One the page does not list (just bound) is not said to be. */
+function disconnected(s, thread) {
+    const person = s.people?.find(p => personKey(p) === thread);
+    return !!person && reachOf(s, person) === 'offline';
+}
 /** What this device calls a paired machine: its alias here, else the machine's own name. */
 function machineName(s, fp) { return (s.pairings || []).find(p => p.fp === fp)?.host || null; }
 export function participantsView(s) {
@@ -375,9 +391,7 @@ export function participantsView(s) {
         // A machine that does not answer leaves its conversations listed as it last said them, none of them reachable.
         const p = machineDown(s, person.node) ? { ...person, available: false, reach: { state: 'offline' } } : person;
         const key = personKey(p), unread = unreadCount(s, key);
-        // A reach this version does not know reads as one the room did not say (sidevoice-core#112): by whether the
-        // conversation is available, which the room always says, rather than as offline.
-        const reach = REACH_STATES.has(p.reach?.state) ? p.reach.state : (p.available ? 'listening' : 'offline');
+        const reach = reachOf(s, p);
         const busy = working(s, key);
         // Grouped by the paired machine it runs on (one room each), named as this device names that machine.
         return { threadId: key, title: displayTitle(p.title, p), selected: key === selected, available: !!p.available, switching: s.switching,

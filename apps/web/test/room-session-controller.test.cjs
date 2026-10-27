@@ -4109,3 +4109,13 @@ test('A leave that keeps failing is tried at most once a call beat, and a newer 
  assert.ok(room.selects.includes('c'));
  c.s.run('disconnect()');
 });
+
+test('A conversation closed while on screen leaves the screen: the next one that listens, or none (sidevoice-web#351)',()=>{
+ const s=setup();
+ s.run("roomBinding=null;callNode='fp-mac';const link=linkOf('fp-mac');link.peopleAnswered=true;link.people=[{node:'fp-mac',thread_id:'a',title:'A',available:true,reach:{state:'listening'}},{node:'fp-mac',thread_id:'b',title:'B',available:true,reach:{state:'listening'}}];mergePeople();viewedThread='fp-mac|a'");
+ assert.equal(s.run('viewedThread'),'fp-mac|a','a listed conversation stays on screen');
+ s.run("link.people=link.people.filter(p=>p.thread_id!=='a');mergePeople()");
+ assert.equal(s.run('viewedThread'),'fp-mac|b','the next one that listens');
+ s.run("link.people=[];mergePeople()");
+ assert.equal(s.run('viewedThread'),null,'the empty state when none is left');
+});
