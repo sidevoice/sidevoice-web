@@ -433,6 +433,12 @@ export function reachNote(s) {
     const p = pairings.find(x => x.fp === fp), reach = p?.revoked ? 'revoked' : s.machineLinks?.[fp]?.reach;
     return ['revoked', 'offline', 'away'].includes(reach) ? say('session.reach.' + reach + (p?.host ? 'Named' : ''), { host: p?.host }) : '';
 }
+/** Why machine `fp` cannot be reached, said of that machine and never of the call's: a request to a machine that is away is
+ *  no "no machine available" while this device is paired with one. Only a device with no such pairing gets that. */
+export function unreached(s, fp) {
+    const facts = { ...s, callNode: fp };
+    return reachNote(facts) || reachNote({ ...facts, machineLinks: { ...s.machineLinks, [fp]: { reach: 'away', via: '' } } }) || noMachine();
+}
 // A receipt/reply records evidence about its own turn, never an instruction to extinguish a light.
 export function recordReceipt(s, id, status, at) {
     const previous = s.turns[id] || {};
