@@ -446,7 +446,9 @@ function historyThreadId(){return state.viewedThread||targetId()}
 
 // A refusal is a sentence, or a key with its sentence (sidevoice-core's refusals): rejected with both, for `roomError`
 // to say by its key — the sentence, in whatever language it came, only behind Details.
-async function api(path,options,fp=state.callNode){const r=await request(path,options,fp);if(r.status===401)throw worded(unreached(roomStore.getState().facts,fp));const d=await r.json();if(!r.ok)throw refusalError(d.detail);return d}
+async function api(path,options,fp=state.callNode){const token=pairings.list.find(p=>p.fp===fp)?.token,r=await request(path,options,fp);
+ // A 401 is the machine refusing this token, said at once, not once the pairing is saved as revoked; a pairing replaced meanwhile is not accused.
+ if(r.status===401)throw worded(unreached(roomStore.getState().facts,fp,pairings.list.find(p=>p.fp===fp)?.token===token));const d=await r.json();if(!r.ok)throw refusalError(d.detail);return d}
 const post=(path,body,fp=state.callNode)=>api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)},fp);
 /* ----- what the call owes its machine: the outbox (`outbox.js`) -----
  * A turn of the person's and what became of a reply are each one message with its own `client_msg_id`, which the machine

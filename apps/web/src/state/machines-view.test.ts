@@ -94,4 +94,6 @@ test("a request to a machine that is away says so of that machine, never that no
   expect(note({ callNode: null, machineLinks: { "fp-nuc": { reach: "away", via: "" }, "fp-ws": { reach: "away", via: "" } } })).not.toMatch(/^No machine available/);
   // A link not yet resolved is no reason to say there is no machine either.
   expect(note({ machineLinks: {} })).toMatch(/NUC/);
+  // A machine that answered by refusing this device's token is not "away", whatever its stored reach still says.
+  expect(unreached(createRoomSessionStore(facts).getState().facts, "fp-ws", true)).toMatch(/Workstation.*no longer recognises this device/);
 });

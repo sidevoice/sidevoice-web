@@ -239,5 +239,5 @@ export function selectedThread(s: SessionFacts): string | null;
 /** The conversation in focus, the only one that may sound: the one on screen, or, minimised, the call card's. */
 export function focusedThread(s: SessionFacts, hidden?: boolean): string | null;
 export function reachNote(s: SessionFacts): string;
-export function unreached(s: SessionFacts, fp: string): string;
+export function unreached(s: SessionFacts, fp: string, refused?: boolean): string;
 export function joinView(s: SessionFacts): JoinStatusView | null;

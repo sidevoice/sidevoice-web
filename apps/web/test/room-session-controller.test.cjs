@@ -4109,3 +4109,45 @@ test('A leave that keeps failing is tried at most once a call beat, and a newer 
  assert.ok(room.selects.includes('c'));
  c.s.run('disconnect()');
 });
+// web#362: a conversation of an away machine is asked about with that machine's name, never "No machine available".
+// What the room shows as its top line, as the page sets it.
+function bannerOf(s){const seen=[];s.context.window.sidevoiceUI={...s.context.window.sidevoiceUI,setBootError:value=>seen.push(value)};return {now:()=>JSON.stringify(seen.at(-1)??null),all:()=>JSON.stringify(seen)}}
+const awayPc="{const link=linkOf('fp-pc');link.base=null;link.reach='away';link.via='';publishLinks()}";
+test('Closing a conversation of an away machine, the call on another, refuses by that machine\'s name and closes nothing',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,fetched=[],bn=bannerOf(c.s);
+ const room=s.context.fetch;s.context.fetch=async(path,options)=>{fetched.push(String(path));return room(path,options)};
+ s.run(awayPc);s.run("viewedThread='fp-mac|a'");
+ const before=plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')),pick=s.run('rememberedThread()');
+ await s.run("window.sidevoiceActions.closeParticipant('fp-pc|p')");await settleSoon();
+ const banner=bn.all();
+ assert.match(banner,/“pc” cannot be reached by any route/);
+ assert.ok(!fetched.some(path=>path.includes('/presentation/close')),'nothing asked of any machine');
+ assert.doesNotMatch(banner,/No machine available/);
+ assert.deepEqual(plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')),before,'the row stays');
+ assert.equal(s.run('rememberedThread()'),pick);
+ assert.ok(s.run('state.ws'),'the call on the Mac goes on');
+ s.run('disconnect()');
+});
+test('Choosing a conversation of an away machine leaves the call where it is and shows no "No machine available"',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,bn=bannerOf(s);
+ s.run(awayPc);s.run("viewedThread='fp-mac|a'");
+ s.run("window.sidevoiceActions.selectParticipant('fp-pc|p')");await settleSoon();
+ assert.equal(s.run('callNode'),'fp-mac');assert.ok(s.run('state.ws'));
+ assert.doesNotMatch(bn.all(),/No machine available/);
+ assert.doesNotMatch(String(s.run('roomStore.getState().facts.joinFailure||""')),/No machine available/);
+ assert.doesNotMatch(JSON.stringify(plain(s.run('roomStore.getState().joinView||null'))),/No machine available/);
+ s.run('disconnect()');
+});
+test('A machine refusing the token on a close says it no longer recognises this device, even before the pairing is saved as revoked',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,bn=bannerOf(s);
+ s.context.fetch=async url=>String(url).startsWith('https://pc.example')?{ok:false,status:401,json:async()=>({detail:'no'})}:{ok:true,status:200,json:async()=>({participants:[],messages:[]})};
+ let release;const held=new Promise(resolve=>{release=resolve});
+ s.context.__held=held;s.run("writePairingProjection=async()=>{await __held}");
+ const closing=s.run("window.sidevoiceActions.closeParticipant('fp-pc|p')").catch(()=>{});
+ await settleSoon();
+ const banner=bn.now;
+ assert.match(banner(),/“pc” no longer recognises this device/);
+ release();await closing;await settleSoon();
+ assert.match(banner(),/“pc” no longer recognises this device/,'and still once it is saved');
+ s.run('disconnect()');
+});
