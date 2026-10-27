@@ -832,7 +832,9 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
  refreshApplied=asked;
  const previousThread=targetId(),changed=state.roomBinding?.binding_id!==d.binding?.binding_id;roomStore.batch(()=>{state.roomBinding=d.binding;if(d.binding?.thread_id&&!rememberedOn(fp))rememberThread(targetId());
   if(d.binding?.thread_id)acceptEpoch(d.binding.thread_id,d.binding.epoch);
- if(changed){state.viewedThread=null;state.turns={};if(previousThread!==targetId())state.harness=Object.fromEntries(Object.entries(state.harness).filter(([id])=>id!==previousThread));
+ // An explicitly empty view survives the call's binding being replaced or lost on the same conversation; only the call
+ // moving to another conversation puts the view back on the call.
+ if(changed){if(state.viewedThread!==NO_VIEW||previousThread&&targetId()&&previousThread!==targetId())state.viewedThread=null;state.turns={};if(previousThread!==targetId())state.harness=Object.fromEntries(Object.entries(state.harness).filter(([id])=>id!==previousThread));
   // A new binding on the same conversation is a rejoin, not a move: what is playing for it goes on, and whether it
   // plays is its voice's to say (`applyRoute`).
   state.pendingUserText='';state.userLive=false;markHistorySeen()}

@@ -4147,3 +4147,18 @@ test('The replacement view skips a machine known to be offline, and an empty vie
  s.run("machineLinks={};viewedThread='fp-mac|gone2';mergePeople()");
  assert.equal(s.run('viewedThread'),'fp-other|b');
 });
+
+test('An explicitly empty view survives the call being rebound or lost on its own conversation (web#371 review r2)',async()=>{
+ const s=setup();
+ s.run("roomBinding={thread_id:'a',title:'A',binding_id:'b1'};viewedThread=NO_VIEW;routeConversation=async()=>{}");
+ const refreshWith=async binding=>{s.context.fetch=async()=>({ok:true,json:async()=>({binding,room:{clients:1},call:{id:'s'}})});await s.run('refresh()')};
+ await refreshWith({thread_id:'a',title:'A',binding_id:'b2'});
+ assert.equal(s.run('SessionState.viewedThread(state)'),null,'rebinding keeps the screen empty');
+ assert.equal(s.run('focusedThread(state)'),null,'and no foreground focus');
+ await refreshWith(null);
+ assert.equal(s.run('SessionState.viewedThread(state)'),null);
+ await refreshWith({thread_id:'a',title:'A',binding_id:'b3'});
+ assert.equal(s.run('SessionState.viewedThread(state)'),null,'so does coming back');
+ await refreshWith({thread_id:'c',title:'C',binding_id:'b4'});
+ assert.equal(s.run('SessionState.viewedThread(state)'),'fp-mac|c','the call moving to another conversation shows it');
+});
