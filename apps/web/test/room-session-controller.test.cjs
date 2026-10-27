@@ -4162,3 +4162,13 @@ test('An explicitly empty view survives the call being rebound or lost on its ow
  await refreshWith({thread_id:'c',title:'C',binding_id:'b4'});
  assert.equal(s.run('SessionState.viewedThread(state)'),'fp-mac|c','the call moving to another conversation shows it');
 });
+test('The call moving to another conversation through a binding gap leaves the empty view (web#371 review r3)',async()=>{
+ const s=setup();
+ s.run("roomBinding={thread_id:'a',title:'A',binding_id:'b1'};routeConversation=async()=>{};callNode='fp-mac';linkOf('fp-mac').peopleAnswered=true;linkOf('fp-mac').people=[{node:'fp-mac',thread_id:'a',title:'A',available:true,reach:{state:'holding'}}];mergePeople();viewedThread='fp-mac|gone';mergePeople()");
+ assert.equal(s.run('viewedThread'),'');
+ const refreshWith=async binding=>{s.context.fetch=async()=>({ok:true,json:async()=>({binding,room:{clients:1},call:{id:'s'}})});await s.run('refresh()')};
+ await refreshWith(null);
+ await refreshWith({thread_id:'c',title:'C',binding_id:'b9'});
+ assert.equal(s.run('SessionState.viewedThread(state)'),'fp-mac|c');
+ assert.equal(s.run('focusedThread(state)'),'fp-mac|c','and foreground focus follows');
+});

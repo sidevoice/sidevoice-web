@@ -295,13 +295,16 @@ function mergePeople(){
 }
 // The conversation on screen is one the list no longer holds (closed here or elsewhere, its machine having answered):
 // nothing of it stays on screen. The view moves to the next conversation that listens, or to none (sidevoice-web#351).
+// The call's conversation when the screen was last made empty: a binding gap in between does not hide a move to another.
+let callBeforeEmptyView=null;
 function leaveGoneViewed(){
  const gone=state.viewedThread;if(!gone||gone===targetId())return;
  const to=conversationOf(gone),link=to&&links.get(to.node);
  if(!link||!(link.peopleAnswered||link.closed?.has(to.thread))||state.people.some(person=>personKey(person)===gone))return;
  const next=state.people.find(person=>person.available&&reachOf(state,person)==='listening');
  // With none, the screen is empty: not the call's conversation, which the call stays on.
- state.viewedThread=next?personKey(next):targetId()?NO_VIEW:null;markHistorySeen();updateComposer();
+ state.viewedThread=next?personKey(next):targetId()?NO_VIEW:null;
+ if(state.viewedThread===NO_VIEW)callBeforeEmptyView=targetId();markHistorySeen();updateComposer();
 }
 /* Which address each machine answers at is asked when it matters: on load, on the beat while it has none or its
  * proof is old, before a join that has none, and before each reconnection attempt after the first. An address that
@@ -834,7 +837,7 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
   if(d.binding?.thread_id)acceptEpoch(d.binding.thread_id,d.binding.epoch);
  // An explicitly empty view survives the call's binding being replaced or lost on the same conversation; only the call
  // moving to another conversation puts the view back on the call.
- if(changed){if(state.viewedThread!==NO_VIEW||previousThread&&targetId()&&previousThread!==targetId())state.viewedThread=null;state.turns={};if(previousThread!==targetId())state.harness=Object.fromEntries(Object.entries(state.harness).filter(([id])=>id!==previousThread));
+ if(changed){if(state.viewedThread!==NO_VIEW||targetId()&&(callBeforeEmptyView||previousThread)&&targetId()!==(callBeforeEmptyView||previousThread))state.viewedThread=null;state.turns={};if(previousThread!==targetId())state.harness=Object.fromEntries(Object.entries(state.harness).filter(([id])=>id!==previousThread));
   // A new binding on the same conversation is a rejoin, not a move: what is playing for it goes on, and whether it
   // plays is its voice's to say (`applyRoute`).
   state.pendingUserText='';state.userLive=false;markHistorySeen()}
