@@ -21,6 +21,15 @@ function MicrophoneRow({ microphone, view, onRequest, openSettings, t, actionId,
   const allowed = view.state === "granted" || view.state === "none";
   const badge = useRef<HTMLSpanElement>(null);
   const hadFocus = useRef(false);
+  // Focus on the check-again button or inside the how-to alert (its settings button) moves to the badge once allowed.
+  useEffect(() => {
+    const inHelp = (target: EventTarget | null) => target instanceof Node && !!document.getElementById(helpId)?.contains(target);
+    const enter = (event: FocusEvent) => { if (inHelp(event.target)) hadFocus.current = true; };
+    const leave = (event: FocusEvent) => { if (inHelp(event.target)) hadFocus.current = false; };
+    document.addEventListener("focusin", enter);
+    document.addEventListener("focusout", leave);
+    return () => { document.removeEventListener("focusin", enter); document.removeEventListener("focusout", leave); };
+  }, [helpId]);
   useEffect(() => {
     if (allowed && hadFocus.current) badge.current?.focus();
     hadFocus.current = false;
@@ -32,7 +41,7 @@ function MicrophoneRow({ microphone, view, onRequest, openSettings, t, actionId,
         {allowed
           ? <span ref={badge} tabIndex={-1} className="perm-badge-focus"><MicrophoneBadge view={view} t={t} /></span>
           : <Button id={actionId} size="sm" variant="primary" loading={busy}
-              aria-describedby={microphone.state === "denied" ? helpId : undefined}
+              aria-describedby={view.blocked ? helpId : undefined}
               onFocus={() => { hadFocus.current = true; }} onBlur={() => { hadFocus.current = false; }}
               onClick={() => { hadFocus.current = true; onRequest(); }}>{t(again ? "wizard.mic.checkAgain" : "wizard.mic.allow")}</Button>}
       </span>

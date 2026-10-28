@@ -40,7 +40,7 @@ test("one row says where the microphone stands: its name and why, Allow micropho
       expect(list().querySelector("#wizard-mic-action")).toBeNull();
       expect(list().querySelector(".perm-badge")).toHaveTextContent("Allowed");
     }
-    expect(document.querySelector(".wizard-mic-help") !== null).toBe(microphone.state === "denied");
+    expect(document.querySelector(".wizard-mic-help") !== null).toBe(microphone.state === "denied" || microphone.state === "missing");
     cleanup();
   }
 });
@@ -214,4 +214,33 @@ test.each(["setup", "settings"])("Windows %s: the privacy button uses the settin
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check again" })); });
   expect(getUserMedia).toHaveBeenCalledTimes(2);
   await waitFor(() => expect(document.querySelector(".perm-badge")).toHaveTextContent("Allowed"));
+});
+
+test("no microphone found in the desktop app on Windows: the alert says what to do, with Open System Settings", () => {
+  const openSettings = vi.fn(() => Promise.resolve());
+  render(<PermissionsStep microphone={snapshot("missing", { asker: "app" })} openSettings={openSettings} t={t} platform="windows" />);
+  expect(document.querySelector(".wizard-mic-help")).toHaveTextContent("Connect a microphone or turn one on, then check again.");
+  fireEvent.click(screen.getByRole("button", { name: "Open System Settings" }));
+  expect(openSettings).toHaveBeenCalled();
+});
+
+test("none found says itself once, by the alert: the polite status stays silent until a retry finds it still missing", () => {
+  const status = () => document.querySelector("[role=status][aria-live=polite]")!;
+  render(<PermissionsStep microphone={snapshot("missing")} openSettings={null} t={t} platform="windows" />);
+  expect(document.querySelector(".wizard-mic-help")).toHaveAttribute("role", "alert");
+  expect(status()).toHaveTextContent("");
+  cleanup();
+  render(<PermissionsStep microphone={snapshot("missing", { unchanged: true })} openSettings={null} t={t} platform="windows" />);
+  expect(status()).toHaveTextContent("Still no microphone found.");
+});
+
+test("focus on the settings button inside the alert moves to the badge once the microphone is allowed", () => {
+  const openSettings = () => Promise.resolve();
+  for (const blocked of ["missing", "denied"] as const) {
+    const { rerender } = render(<PermissionsStep microphone={snapshot(blocked, { asker: "app" })} openSettings={openSettings} t={t} platform="windows" />);
+    screen.getByRole("button", { name: "Open System Settings" }).focus();
+    rerender(<PermissionsStep microphone={snapshot("granted", { asker: "app" })} openSettings={openSettings} t={t} platform="windows" />);
+    expect(document.activeElement).toBe(document.querySelector(".perm-badge-focus"));
+    cleanup();
+  }
 });

@@ -234,7 +234,9 @@ test("none connected: No microphone found, and Check again finds one", async () 
   browser("prompt", () => found ? Promise.resolve(stream()) : Promise.reject(refused("NotFoundError")));
   await setup();
   await act(async () => { fireEvent.click(action()!); });
-  expect(said()).toBe("No microphone found");
+  // The alert says it; the polite status stays silent.
+  expect(document.querySelector("#wizard .wizard-mic-help")).toHaveTextContent("No microphone found");
+  expect(said()).toBe("");
   expect(action()).toHaveTextContent("Check again");
   found = true;
   await act(async () => { fireEvent.click(action()!); });

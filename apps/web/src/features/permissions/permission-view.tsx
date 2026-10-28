@@ -57,9 +57,9 @@ export function announcement(microphone: MicrophoneSnapshot, t: Translate) {
   const { state, asker, dismissed, unchanged } = microphone;
   if (state === "requesting") return t(asker === "app" ? "wizard.mic.requestingSystem" : "wizard.mic.requestingBrowser");
   if (state === "granted") return t("wizard.mic.allowedNow");
-  // The how-to alert is a live alert: it says a block when it appears, so only "still blocked" is said here.
+  // The how-to alert is a live alert: it says a block (or none found) when it appears, so only "still ..." is said here.
   if (state === "denied") return unchanged ? t("wizard.mic.stillDenied") : "";
-  if (state === "missing") return t(unchanged ? "wizard.mic.stillMissing" : "wizard.mic.state.missing");
+  if (state === "missing") return unchanged ? t("wizard.mic.stillMissing") : "";
   if (state === "prompt" && dismissed) return t("wizard.mic.dismissed");
   return "";
 }
@@ -73,15 +73,16 @@ export function MicrophoneBadge({ view, t }: { view: MicrophoneView; t: Translat
   </Badge>;
 }
 
-/** Blocked: how to allow it where this page runs — and, where the app can open them, the system's settings. */
+/** Blocked or none found: what to do, with the system settings where the app opens them. Blocked: how to allow it where this page runs — and, where the app can open them, the system's settings. */
 export function MicrophoneHowTo({ view, openSettings, t, id = MIC_HELP_ID }: { view: MicrophoneView; openSettings: (() => Promise<void>) | null; t: Translate; id?: string }) {
-  if (view.state !== "denied") return null;
+  if (!view.blocked) return null;
+  const missing = view.state === "missing";
   return <>
-    <Alert tone="warning" live id={id} className="wizard-mic-help perm-help" title={t("wizard.mic.denied.title")}
+    <Alert tone="warning" live id={id} className="wizard-mic-help perm-help" title={t(missing ? "wizard.mic.state.missing" : "wizard.mic.denied.title")}
       action={openSettings ? <Button type="button" variant="secondary" size="sm" id="wizard-mic-settings" onClick={() => void openSettings()}>{t("wizard.mic.openSettings")}</Button> : undefined}>
-      {t(view.howTo[0])}
+      {t(missing ? "wizard.mic.missing" : view.howTo[0])}
     </Alert>
-    {view.howTo[1] && <p className="wizard-mic-also perm-also">{t(view.howTo[1])}</p>}
+    {!missing && view.howTo[1] && <p className="wizard-mic-also perm-also">{t(view.howTo[1])}</p>}
   </>;
 }
 
