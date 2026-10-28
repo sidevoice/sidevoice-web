@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.13.0](https://github.com/sidevoice/sidevoice-web/compare/v0.12.0...v0.13.0) (2026-10-28)
+
+
+### Features
+
+* **call:** join and listen without a microphone ([#380](https://github.com/sidevoice/sidevoice-web/issues/380)) ([97662fe](https://github.com/sidevoice/sidevoice-web/commit/97662fe95b6d57d7c30982c072d7d987305b343c))
+
+
+### Bug Fixes
+
+* **call:** keep dismissed call audio error closed; follow motion changes live ([#379](https://github.com/sidevoice/sidevoice-web/issues/379)) ([d964783](https://github.com/sidevoice/sidevoice-web/commit/d9647836de4621999168517746e8a58a18766dc2))
+
 ## [0.12.0](https://github.com/sidevoice/sidevoice-web/compare/v0.11.1...v0.12.0) (2026-10-28)
 
 
