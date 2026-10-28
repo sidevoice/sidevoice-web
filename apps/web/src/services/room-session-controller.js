@@ -837,7 +837,7 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
  }
  // A call that lost its microphone and has none yet is given it again at the beat, where one can be had.
  const listening=nextThread?conversationCalls.get(conversationKey(fp,nextThread)):null;
- if(listening&&microphoneUsable())giveMicrophone(listening);
+ if(listening&&microphoneConfirmed())giveMicrophone(listening);
  refreshApplied=asked;
  const previousThread=targetId(),changed=state.roomBinding?.binding_id!==d.binding?.binding_id;roomStore.batch(()=>{state.roomBinding=d.binding;if(d.binding?.thread_id&&!rememberedOn(fp))rememberThread(targetId());
   if(d.binding?.thread_id)acceptEpoch(d.binding.thread_id,d.binding.epoch);
@@ -1673,6 +1673,8 @@ function stoppedByVoice(entry){return !!entry?.started&&entry.state?.listening==
  * can (`giveMicrophones`). A microphone that is wanted and cannot be opened is no failure of the call either: the voice
  * says why and goes on speaking. */
 function microphoneUsable(){const reading=microphone.getSnapshot().state;return reading!=='denied'&&reading!=='missing'}
+/* The beat retries a lost input only on the platform's word that it can be had (allowed, or an app that asks for itself): an open that failed while the permission was still to be asked is not tried again every beat. The page's explicit gestures and a grant (`microphoneChanged`, `askMicrophone`) give it on their own. */
+function microphoneConfirmed(){const reading=microphone.getSnapshot().state;return reading==='granted'||reading==='none'}
 function callSettings(){return voiceHalves(handed??voiceSettingsToLoad(state.voiceSettings,state.voiceCatalogue.catalogs),{input:microphoneUsable()})}
 async function prepareConversationCall(node,thread_id,binding_id){
  if(!thread_id)return null;
@@ -2065,6 +2067,21 @@ function microphoneChanged(){
  if(now==='granted'&&before!=='granted')giveMicrophones();
 }
 microphone.subscribe(microphoneChanged);
+/* A grant made outside the page (the browser's site settings, the system's) or a microphone plugged in tells the page
+ * through the permission's `change` and the devices' `devicechange`, though the reader above keeps the permission query
+ * as a hint only (WebKit's is not to be trusted): the calls without their input half try it once. A hint is taken at
+ * most every few seconds, so a device list that changes as a stream opens and is let go cannot make it a loop. */
+let hintedAt=0;
+function microphoneHint(granted){
+ const at=Date.now();if(at-hintedAt<3000)return;
+ if(!granted&&!microphoneUsable())return;
+ hintedAt=at;giveMicrophones();
+}
+try{
+ const navigatorOfPage=window.navigator;
+ navigatorOfPage?.mediaDevices?.addEventListener?.('devicechange',()=>microphoneHint(false));
+ navigatorOfPage?.permissions?.query?.({name:'microphone'}).then(status=>status?.addEventListener?.('change',()=>{if(status.state==='granted')microphoneHint(true)}),()=>{});
+}catch{}
 /* A call without its input half takes it back live (the voice's `update`), without rejoining: the microphone it was
  * missing can be had. The change comes at the next turn; the mute the person chose stays. */
 function giveMicrophone(entry){

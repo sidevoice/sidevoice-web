@@ -2822,6 +2822,36 @@ test('A call that lost its microphone is given it again at the next beat, where 
  assert.equal(voice.calls.filter(([name])=>name==='update').length,1,'a call that hears is left alone');
  s.run('disconnect()');
 });
+test('A microphone that failed to open while the permission is still to be asked is not opened again at every beat; a grant gives it once',async()=>{
+ const voice=fakeVoice();
+ // The join asks for the input once, and the open fails: the call goes on speaking without it.
+ voice.starts=async(settings,options,call)=>{call.emit('state',{listening:'off',recognising:0,playback:'idle',microphone:'live'})};
+ const c=await callOnRoom({microphone:'prompt',voice});const {s}=c;
+ assert.ok(plain(voice.calls[0][1]).input,'the join asked for the input once');
+ voice.calls.length=0;
+ for(let beat=0;beat<4;beat++){await s.run('refresh()');await settleSoon()}
+ assert.equal(voice.calls.filter(([name])=>name==='update').length,0,'no beat tries the open again while the permission is only prompt');
+ s.run("microphone.getSnapshot=()=>({state:'granted'});microphoneChanged()");await settleSoon();
+ assert.equal(voice.calls.filter(([name])=>name==='update').length,1,'the grant is the one new try');
+ s.run('disconnect()');
+});
+test('A grant made in the browser or system settings, or a microphone plugged in, gives the input half once to a call without it',async()=>{
+ const voice=fakeVoice();tellsHalves(voice);
+ const c=await callOnRoom({microphone:'prompt',voice});const {s}=c;
+ s.run("microphone.getSnapshot=()=>({state:'denied'})");
+ assert.equal(plain(voice.calls[0][1]).input.endOfTurn.kind,'silence');
+ voice.created[0].emit('state',{listening:'off',recognising:0,playback:'idle',microphone:'live'});
+ voice.calls.length=0;
+ // A devicechange while the page still reads the microphone as blocked gives nothing.
+ s.run('hintedAt=0;microphoneHint(false)');await settleSoon();
+ assert.equal(voice.calls.filter(([name])=>name==='update').length,0);
+ // The permission's own change to granted does, once: more hints in a row add nothing.
+ s.run('hintedAt=0;microphoneHint(true)');await settleSoon();
+ voice.created[0].emit('state',{listening:'off',recognising:0,playback:'idle',microphone:'live'});
+ s.run('microphoneHint(true);microphoneHint(false)');await settleSoon();
+ assert.equal(voice.calls.filter(([name])=>name==='update').length,1,'attached once, not in a loop');
+ s.run('disconnect()');
+});
 test('Turning the microphone on in a call that has none asks for it, and gives it once it can be had',async()=>{
  const voice=fakeVoice();tellsHalves(voice);
  const c=await callOnRoom({microphone:'denied',voice});const {s}=c;
