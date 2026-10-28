@@ -72,8 +72,14 @@ export function startMotion(root: HTMLElement = document.documentElement) {
   apply(root);
   if (following) return;
   following = true;
-  reduced()?.addEventListener("change", () => apply(root));
+  // The query is held (a list nobody refers to may be collected with its listener), and a change re-asks the GPU too:
+  // Windows changes both when the session moves (RDP to console), and what was probed before no longer holds.
+  watched = reduced() ?? null;
+  const again = () => { gpu = null; apply(root); };
+  watched?.addEventListener("change", again);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) again(); });
 }
+let watched: MediaQueryList | null = null;
 
 /** How the page's drawings move now: "still" until startMotion has decided (and in tests). */
 export const motion = (): Motion => current;
