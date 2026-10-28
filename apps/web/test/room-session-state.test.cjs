@@ -287,3 +287,37 @@ test('A call whose machine is away still reads its conversation, and a message t
  assert.equal(api.deliveryNote({...row,delivery:'not_sent'}),'session.delivery.notReached');
  assert.equal(api.deliveryNote({...row,delivery:'not_sent',audio_reason:'expired'}),'session.delivery.notReachedExpired');
 });
+
+test('A disconnected conversation is never busy or working, whatever its harness or receipts say (sidevoice-core#159, web#367)',async()=>{
+ const api=await moduleReady;
+ const person=(patch={})=>({node:'m',thread_id:'a',title:'A',available:false,reach:{state:'offline'},...patch});
+ const s=facts(api,{people:[person()],harness:{'m|a':true},turns:{one:turn()},...{workingSince:{'m|a':0},now:api.WORKING_SHOWN_AFTER_MS}});
+ assert.equal(api.busy(s),false);
+ assert.equal(api.working(s),false);
+ assert.equal(api.conversationView(s).working,false,'no typing bubble in the transcript');
+ assert.equal(api.participantsView(s)[0].working,false,'no Working in the sidebar');
+ assert.equal(api.sessionStatus(s).working,false);
+ assert.deepEqual(api.busySince(s,5),{},'its busy start is dropped, so it must be busy again, fresh, after it is back');
+ // Back and reporting busy again: working, once it has lasted.
+ const back=facts(api,{people:[person({available:true,reach:{state:'listening'}})],harness:{'m|a':true},...lasted(api)});
+ assert.equal(api.working(back),true);
+ assert.equal(api.participantsView(back)[0].working,true);
+ // A machine that does not answer leaves its conversations unreachable too.
+ const down=facts(api,{people:[person({available:true,reach:{state:'listening'}})],machineLinks:{m:{reach:'offline'}},harness:{'m|a':true},...lasted(api)});
+ assert.equal(api.working(down),false);
+});
+
+test('A conversation with one live binding is not disconnected, whichever row comes first (web#371 review)',async()=>{
+ const api=await moduleReady;
+ const live={node:'m',thread_id:'a',available:true,reach:{state:'listening'}},off={node:'m',thread_id:'a',available:false,reach:{state:'offline'}};
+ for(const people of [[live,off],[off,live]]){
+  const s=facts(api,{people,harness:{'m|a':true},...lasted(api)});
+  assert.equal(api.working(s),true);
+ }
+ assert.equal(api.working(facts(api,{people:[off,off],harness:{'m|a':true},...lasted(api)})),false);
+});
+test('An empty view is not the call\'s conversation',async()=>{
+ const api=await moduleReady;
+ assert.equal(api.viewedThread(facts(api,{viewedThread:api.NO_VIEW})),null);
+ assert.equal(api.viewedThread(facts(api,{viewedThread:null})),'m|a');
+});

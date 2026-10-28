@@ -4109,3 +4109,66 @@ test('A leave that keeps failing is tried at most once a call beat, and a newer 
  assert.ok(room.selects.includes('c'));
  c.s.run('disconnect()');
 });
+
+test('A conversation closed while on screen leaves the screen: the next one that listens, or none (sidevoice-web#351)',()=>{
+ const s=setup();
+ s.run("roomBinding=null;callNode='fp-mac';const link=linkOf('fp-mac');link.peopleAnswered=true;link.people=[{node:'fp-mac',thread_id:'a',title:'A',available:true,reach:{state:'listening'}},{node:'fp-mac',thread_id:'b',title:'B',available:true,reach:{state:'listening'}}];mergePeople();viewedThread='fp-mac|a'");
+ assert.equal(s.run('viewedThread'),'fp-mac|a','a listed conversation stays on screen');
+ s.run("link.people=link.people.filter(p=>p.thread_id!=='a');mergePeople()");
+ assert.equal(s.run('viewedThread'),'fp-mac|b','the next one that listens');
+ s.run("link.people=[];mergePeople()");
+ assert.equal(s.run('viewedThread'),null,'the empty state when none is left');
+});
+
+test('One live binding keeps a conversation listed live and working whichever order the room lists its bindings (web#371 review)',async()=>{
+ for(const order of [['live','off'],['off','live']]){
+  const node=await fakeNode();node.tokens.add('tok-1');
+  const rows={live:{thread_id:'t',title:'T',available:true,reach:{state:'listening'},working:true},off:{thread_id:'t',title:'T',available:false,reach:{state:'offline'},working:true}};
+  node.people=order.map(k=>rows[k]);
+  const s=setup({paired:false,stored:{pairings:[pairingOf(node,{})]}});s.context.__fp=node.fp;
+  s.run("const link=linkOf(__fp);link.base='http://127.0.0.1:8768';link.reach='ok';publishLinks();now=10000;workingSince={['__fp|t'.replace('__fp',__fp)]:0}");
+  s.context.fetch=network({at:{'http://127.0.0.1:8768':node}}).get;
+  await s.run('refreshPeople(__fp)');
+  assert.equal(s.run('roomStore.getState().participants.length'),1,order.join());
+  assert.equal(s.run('roomStore.getState().participants[0].reach'),'listening',order.join());
+  assert.equal(s.run('busy(state,__fp+"|t")'.replace('busy(state','SessionState.busy(state')),true,'not hidden by the offline binding: '+order.join());
+ }
+});
+
+test('The replacement view skips a machine known to be offline, and an empty view stays empty while the call remains on another conversation (web#371 review)',()=>{
+ const s=setup();
+ s.run("roomBinding={thread_id:'a',title:'A'};const link=linkOf('fp-mac');link.peopleAnswered=true;link.people=[{node:'fp-mac',thread_id:'a',title:'A',available:true,reach:{state:'holding'}},{node:'fp-mac',thread_id:'gone',title:'G',available:true,reach:{state:'listening'}}];mergePeople();viewedThread='fp-mac|gone'");
+ s.run("const other=linkOf('fp-other');other.peopleAnswered=true;other.people=[{node:'fp-other',thread_id:'b',title:'B',available:true,reach:{state:'listening'}}];machineLinks={'fp-other':{reach:'offline'}};link.people=link.people.filter(p=>p.thread_id!=='gone');mergePeople()");
+ assert.notEqual(s.run('viewedThread'),'fp-other|b','a stale listening row on a machine that does not answer is no replacement');
+ assert.equal(s.run('SessionState.viewedThread(state)'),null,'the screen is empty, though the call stays on A');
+ assert.equal(s.run('roomBinding.thread_id'),'a','the call is untouched');
+ assert.equal(s.run('roomStore.getState().session.viewed'),null);
+ // A listening one on a machine that answers is preferred over it.
+ s.run("machineLinks={};viewedThread='fp-mac|gone2';mergePeople()");
+ assert.equal(s.run('viewedThread'),'fp-other|b');
+});
+
+test('An explicitly empty view survives the call being rebound or lost on its own conversation (web#371 review r2)',async()=>{
+ const s=setup();
+ s.run("roomBinding={thread_id:'a',title:'A',binding_id:'b1'};viewedThread=NO_VIEW;routeConversation=async()=>{}");
+ const refreshWith=async binding=>{s.context.fetch=async()=>({ok:true,json:async()=>({binding,room:{clients:1},call:{id:'s'}})});await s.run('refresh()')};
+ await refreshWith({thread_id:'a',title:'A',binding_id:'b2'});
+ assert.equal(s.run('SessionState.viewedThread(state)'),null,'rebinding keeps the screen empty');
+ assert.equal(s.run('focusedThread(state)'),null,'and no foreground focus');
+ await refreshWith(null);
+ assert.equal(s.run('SessionState.viewedThread(state)'),null);
+ await refreshWith({thread_id:'a',title:'A',binding_id:'b3'});
+ assert.equal(s.run('SessionState.viewedThread(state)'),null,'so does coming back');
+ await refreshWith({thread_id:'c',title:'C',binding_id:'b4'});
+ assert.equal(s.run('SessionState.viewedThread(state)'),'fp-mac|c','the call moving to another conversation shows it');
+});
+test('The call moving to another conversation through a binding gap leaves the empty view (web#371 review r3)',async()=>{
+ const s=setup();
+ s.run("roomBinding={thread_id:'a',title:'A',binding_id:'b1'};routeConversation=async()=>{};callNode='fp-mac';linkOf('fp-mac').peopleAnswered=true;linkOf('fp-mac').people=[{node:'fp-mac',thread_id:'a',title:'A',available:true,reach:{state:'holding'}}];mergePeople();viewedThread='fp-mac|gone';mergePeople()");
+ assert.equal(s.run('viewedThread'),'');
+ const refreshWith=async binding=>{s.context.fetch=async()=>({ok:true,json:async()=>({binding,room:{clients:1},call:{id:'s'}})});await s.run('refresh()')};
+ await refreshWith(null);
+ await refreshWith({thread_id:'c',title:'C',binding_id:'b9'});
+ assert.equal(s.run('SessionState.viewedThread(state)'),'fp-mac|c');
+ assert.equal(s.run('focusedThread(state)'),'fp-mac|c','and foreground focus follows');
+});

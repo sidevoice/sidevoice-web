@@ -13,7 +13,7 @@ export interface VoiceState {
 export interface SessionFacts {
  ws: unknown; sessionId: string | null; roomRevision: number; roomInfo: Record<string, unknown> | null;
  connecting: boolean; reconnecting: boolean; reconnectShown: boolean; switching: boolean;
- roomBinding: {thread_id: string; title?: string; binding_id?: string} | null; viewedThread: string | null;
+ roomBinding: {thread_id: string; title?: string; binding_id?: string} | null; viewedThread: string | null; /* NO_VIEW: no conversation on screen */
  people: unknown[]; history: ChatMessage[]; roomSeen: Record<string, number>; inputReceipts: Record<string, string>;
  userLive: boolean; botLive: boolean;
  /** The person's turn being said: the voice's id for it, the bubble's segment, and the conversation it goes to. */
