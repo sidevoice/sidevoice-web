@@ -1,4 +1,4 @@
-import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,noMachine,reachNote,unreached,conversationKey,conversationOf,personKey,displayTitle,focusedThread} from '../state/room-session-state.js';
+import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,noMachine,reachNote,unreached,conversationKey,conversationOf,personKey,displayTitle,focusedThread,viewedThread as viewedOf,reachOf,NO_VIEW} from '../state/room-session-state.js';
 import {pageTarget,targetAnswers,routeUrl,callSocketUrl,isNodePath,askTarget} from './rendezvous.js';
 import {readPairingState,projectPairings,writePairings,withPairing,withoutPairing,revokedPairing,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {localHostBridge,desktopDataBridge,normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
@@ -291,6 +291,20 @@ function publishLinks(){
 function mergePeople(){
  const order=[...new Set([...pairings.list.map(p=>p.fp),...links.keys()])];
  state.people=order.flatMap(fp=>links.get(fp)?.people||[]);
+ leaveGoneViewed();
+}
+// The conversation on screen is one the list no longer holds (closed here or elsewhere, its machine having answered):
+// nothing of it stays on screen. The view moves to the next conversation that listens, or to none (sidevoice-web#351).
+// The call's conversation when the screen was last made empty: a binding gap in between does not hide a move to another.
+let callBeforeEmptyView=null;
+function leaveGoneViewed(){
+ const gone=state.viewedThread;if(!gone||gone===targetId())return;
+ const to=conversationOf(gone),link=to&&links.get(to.node);
+ if(!link||!(link.peopleAnswered||link.closed?.has(to.thread))||state.people.some(person=>personKey(person)===gone))return;
+ const next=state.people.find(person=>person.available&&reachOf(state,person)==='listening');
+ // With none, the screen is empty: not the call's conversation, which the call stays on.
+ state.viewedThread=next?personKey(next):targetId()?NO_VIEW:null;
+ if(state.viewedThread===NO_VIEW)callBeforeEmptyView=targetId();markHistorySeen();updateComposer();
 }
 /* Which address each machine answers at is asked when it matters: on load, on the beat while it has none or its
  * proof is old, before a join that has none, and before each reconnection attempt after the first. An address that
@@ -442,7 +456,7 @@ function newestPerMachine(rows,limit){
 // The conversation the call talks to, by its key (machine and thread); the room's own name for it is `targetThread`.
 function targetId(){return conversationKey(state.callNode,state.roomBinding?.thread_id)}
 function targetThread(){return state.roomBinding?.thread_id||null}
-function historyThreadId(){return state.viewedThread||targetId()}
+function historyThreadId(){return viewedOf(state)}
 
 // A refusal is a sentence, or a key with its sentence (sidevoice-core's refusals): rejected with both, for `roomError`
 // to say by its key — the sentence, in whatever language it came, only behind Details.
@@ -823,7 +837,9 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
  refreshApplied=asked;
  const previousThread=targetId(),changed=state.roomBinding?.binding_id!==d.binding?.binding_id;roomStore.batch(()=>{state.roomBinding=d.binding;if(d.binding?.thread_id&&!rememberedOn(fp))rememberThread(targetId());
   if(d.binding?.thread_id)acceptEpoch(d.binding.thread_id,d.binding.epoch);
- if(changed){state.viewedThread=null;state.turns={};if(previousThread!==targetId())state.harness=Object.fromEntries(Object.entries(state.harness).filter(([id])=>id!==previousThread));
+ // An explicitly empty view survives the call's binding being replaced or lost on the same conversation; only the call
+ // moving to another conversation puts the view back on the call.
+ if(changed){if(state.viewedThread!==NO_VIEW||targetId()&&(callBeforeEmptyView||previousThread)&&targetId()!==(callBeforeEmptyView||previousThread))state.viewedThread=null;state.turns={};if(previousThread!==targetId())state.harness=Object.fromEntries(Object.entries(state.harness).filter(([id])=>id!==previousThread));
   // A new binding on the same conversation is a rejoin, not a move: what is playing for it goes on, and whether it
   // plays is its voice's to say (`applyRoute`).
   state.pendingUserText='';state.userLive=false;markHistorySeen()}
@@ -1000,7 +1016,13 @@ async function refreshPeople(fp=state.callNode){
   const reachable=new Set(link.people.filter(person=>person.available).map(person=>person.thread_id));
   const merged=new Map(link.people.filter(person=>!closed.has(person.thread_id))
    .map(person=>[person.thread_id,{...person,available:false,reach:{state:'offline'}}]));
-  for(const person of data.participants)if(!closed.has(person.thread_id))merged.set(person.thread_id,{...person,node:fp});
+  // One row per binding: a thread with a live binding is not made offline by another binding's row, whatever the order.
+  const answered=new Map();
+  for(const person of data.participants){
+   if(closed.has(person.thread_id))continue;
+   if(answered.get(person.thread_id)?.available&&!person.available)continue;
+   answered.set(person.thread_id,person);merged.set(person.thread_id,{...person,node:fp});
+  }
   link.people=[...merged.values()];rememberCards(fp,link.people);
   // The pick's agent coming back is the room getting a binding for it: a pick the room said yes to without the call
   // landing on it is asked for again then (an older room that focuses only a conversation it holds).
@@ -1961,7 +1983,7 @@ function disconnect() {
     partial('');
     state.holding = false;
     // The call's machine is no longer the call's: the conversation it was on stays on screen, as one looked at.
-    if (!state.viewedThread)
+    if (state.viewedThread === null)
         state.viewedThread = targetId();
     state.roomBinding = null;
     state.callNode = null;
