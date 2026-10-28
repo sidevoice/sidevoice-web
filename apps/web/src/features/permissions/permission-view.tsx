@@ -57,9 +57,9 @@ export function announcement(microphone: MicrophoneSnapshot, t: Translate) {
   const { state, asker, dismissed, unchanged } = microphone;
   if (state === "requesting") return t(asker === "app" ? "wizard.mic.requestingSystem" : "wizard.mic.requestingBrowser");
   if (state === "granted") return t("wizard.mic.allowedNow");
-  // The how-to alert is a live alert: it says a block when it appears, so only "still blocked" is said here.
+  // The how-to alert is a live alert: it says a block (or none found) when it appears, so only "still ..." is said here.
   if (state === "denied") return unchanged ? t("wizard.mic.stillDenied") : "";
-  if (state === "missing") return t(unchanged ? "wizard.mic.stillMissing" : "wizard.mic.state.missing");
+  if (state === "missing") return unchanged ? t("wizard.mic.stillMissing") : "";
   if (state === "prompt" && dismissed) return t("wizard.mic.dismissed");
   return "";
 }

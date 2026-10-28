@@ -21,6 +21,15 @@ function MicrophoneRow({ microphone, view, onRequest, openSettings, t, actionId,
   const allowed = view.state === "granted" || view.state === "none";
   const badge = useRef<HTMLSpanElement>(null);
   const hadFocus = useRef(false);
+  // Focus on the check-again button or inside the how-to alert (its settings button) moves to the badge once allowed.
+  useEffect(() => {
+    const inHelp = (target: EventTarget | null) => target instanceof Node && !!document.getElementById(helpId)?.contains(target);
+    const enter = (event: FocusEvent) => { if (inHelp(event.target)) hadFocus.current = true; };
+    const leave = (event: FocusEvent) => { if (inHelp(event.target)) hadFocus.current = false; };
+    document.addEventListener("focusin", enter);
+    document.addEventListener("focusout", leave);
+    return () => { document.removeEventListener("focusin", enter); document.removeEventListener("focusout", leave); };
+  }, [helpId]);
   useEffect(() => {
     if (allowed && hadFocus.current) badge.current?.focus();
     hadFocus.current = false;
