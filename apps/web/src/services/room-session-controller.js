@@ -61,6 +61,10 @@ function conversationTitle(id){const p=state.people.find(p=>personKey(p)===id);r
  * words the bundles give it, any other one a generic line about what failed — never the engine's, the browser's or a
  * machine's own text, which goes behind Details with the code. A provider's own words, when it is the one refusing,
  * follow the sentence. `what` names what failed. */
+// The call's own error rides on every refresh: it is said once, so closing it keeps it closed. It is said again when the
+// error differs, a join starts (the retry) or the audio devices change.
+let sayCallError=null;
+function raiseCallError(call){if(!call?.error){sayCallError=null;return}const key=`${call.id}:${JSON.stringify(call.error)}`;if(key===sayCallError)return;sayCallError=key;setRoomError(roomError(call.error,'call'))}
 function voiceError(error,what='voice'){return voiceFailure(error,{what,inApp:!!state.inApp,t:translator()})}
 function roomError(error,what='room',generic){return roomFailure(error,{what,generic,t:translator()})}
 // A sentence of this page's bundle, as a failure.
@@ -844,7 +848,7 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
   // plays is its voice's to say (`applyRoute`).
   state.pendingUserText='';state.userLive=false;markHistorySeen()}
  updateComposer();
- const call=d.call?.id===state.sessionId?d.call:null;if(call?.error)setRoomError(roomError(call.error,'call'));});
+ const call=d.call?.id===state.sessionId?d.call:null;raiseCallError(call);});
  applyMicState();
  // Only the call moving to another conversation stops what it says. The room losing the conversation for a while (its
  // machine restarting) or giving it back is no move: what the voice already says for it plays to its end (#220).
@@ -2011,7 +2015,9 @@ async function watchAudioDevices(host){
  catch{devices=await host.audioDevices().catch(()=>null)}
  if(devices)audioDevicesChanged(devices);
 }
+let deviceSet=null;
 function audioDevicesChanged(devices){
+ const set=JSON.stringify([devices.inputs,devices.outputs,devices.input,devices.output]);if(set!==deviceSet){deviceSet=set;sayCallError=null}
  if(devices.lost)audioLog.record('device-lost',{input:!!devices.lost.input,output:!!devices.lost.output});
  if(devices.lost)keepAudio(withoutLost(storedAudio(),devices.lost));
  roomStore.patch({audioDevices:{inputs:devices.inputs||[],outputs:devices.outputs||[],input:devices.input??null,output:devices.output??null,outputSelectable:!!devices.outputSelectable},
@@ -2091,7 +2097,7 @@ async function callMachine(epoch){
 async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){disconnect();return}
  // Nothing to join without a machine this device is paired with: the tap asks for a code instead.
  if(!pairings.list.some(p=>!p.revoked)){openPairing(pairings.list.length?reachNote(state):'');return}
- personSignal();primeNowPlaying();state.callEnded=null;state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();setRoomError('');joinStatus('voice');
+ personSignal();primeNowPlaying();state.callEnded=null;state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();sayCallError=null;setRoomError('');joinStatus('voice');
  // Whether Smart's model is on disk is the catalogue's to say (voiceSettingsToLoad): read while the machine is looked for.
  const catalogue=state.voiceCatalogue.state==='ready'?null:loadVoiceCatalogue();
  try{
