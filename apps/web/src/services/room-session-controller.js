@@ -1,4 +1,4 @@
-import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,noMachine,reachNote,conversationKey,conversationOf,personKey,displayTitle,focusedThread,viewedThread as viewedOf,reachOf,NO_VIEW} from '../state/room-session-state.js';
+import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,noMachine,reachNote,unreached,conversationKey,conversationOf,personKey,displayTitle,focusedThread,viewedThread as viewedOf,reachOf,NO_VIEW} from '../state/room-session-state.js';
 import {pageTarget,targetAnswers,routeUrl,callSocketUrl,isNodePath,askTarget} from './rendezvous.js';
 import {readPairingState,projectPairings,writePairings,withPairing,withoutPairing,revokedPairing,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {localHostBridge,desktopDataBridge,normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
@@ -359,7 +359,7 @@ function settleLink(fp,found,reach){
  publishLinks();
  if(moved&&base!=null){if(fp===state.callNode)void refresh();void refreshPeople(fp);void refreshHistory(fp)}
 }
-function routed(path,fp){const url=routeUrl(path,target,linkBase(fp));if(url==null)throw worded(reachNote(state)||noMachine());return url}
+function routed(path,fp){const url=routeUrl(path,target,linkBase(fp));if(url==null)throw worded(unreached(roomStore.getState().facts,fp));return url}
 // A request with the token is never redirected: the node base proved itself, wherever a redirect points did not.
 function withToken(options,token){return {...options,redirect:'error',headers:{...(options?.headers||{}),Authorization:'Bearer '+token}}}
 // Every request to a machine carries the token of that machine's pairing — never another's; one the machine refuses
@@ -460,7 +460,9 @@ function historyThreadId(){return viewedOf(state)}
 
 // A refusal is a sentence, or a key with its sentence (sidevoice-core's refusals): rejected with both, for `roomError`
 // to say by its key — the sentence, in whatever language it came, only behind Details.
-async function api(path,options,fp=state.callNode){const r=await request(path,options,fp);if(r.status===401)throw worded(reachNote(state)||noMachine());const d=await r.json();if(!r.ok)throw refusalError(d.detail);return d}
+async function api(path,options,fp=state.callNode){const token=pairings.list.find(p=>p.fp===fp)?.token,r=await request(path,options,fp);
+ // A 401 is the machine refusing this token, said at once, not once the pairing is saved as revoked; a pairing replaced meanwhile is not accused.
+ if(r.status===401)throw worded(unreached(roomStore.getState().facts,fp,pairings.list.find(p=>p.fp===fp)?.token===token));const d=await r.json();if(!r.ok)throw refusalError(d.detail);return d}
 const post=(path,body,fp=state.callNode)=>api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)},fp);
 /* ----- what the call owes its machine: the outbox (`outbox.js`) -----
  * A turn of the person's and what became of a reply are each one message with its own `client_msg_id`, which the machine
@@ -1884,7 +1886,7 @@ function receiveReply(d){
  replies.set(d.utterance_id,said);replyQueue.push(said);
  drainReplies();
 }
-function roomSocketUrl(fp){const base=linkBase(fp);if(base==null)throw worded(reachNote(state)||noMachine());return callSocketUrl(base,location)}
+function roomSocketUrl(fp){const base=linkBase(fp);if(base==null)throw worded(unreached(roomStore.getState().facts,fp));return callSocketUrl(base,location)}
 /* Why the room refused, asked of the room itself over an ordinary request.
  * The room says it twice on the socket — an error frame, then the close code 1013 — and a tunnel
  * can lose both: a phone read only «La sala rechazó la conexión» while the room had written that it
@@ -2647,6 +2649,8 @@ window.sidevoiceActions={
  },
  async closeParticipant(key){
   const to=conversationOf(key);if(!to)return;
+  // A machine that is away cannot be asked to close it, and nothing is closed here without it: refused, saying why.
+  if(linkBase(to.node)==null){setRoomError(unreached(roomStore.getState().facts,to.node));return}
   try{await post('/api/presentation/close',{thread_id:to.thread},to.node)}
   catch(e){
    // A Core restart can make a remembered binding temporarily unknown. Only a confirmed close retires its card.

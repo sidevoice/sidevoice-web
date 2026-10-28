@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { createRoomSessionStore, reachNote, type SessionFacts } from "./room-session-state.js";
+import { createRoomSessionStore, reachNote, unreached, type SessionFacts } from "./room-session-state.js";
 
 const remote = {
   fp: "fp-nuc", host: "NUC", urls: ["https://nuc.example"],
@@ -81,4 +81,19 @@ test("a pairing kept without encryption by the person's choice is a machine like
     machineLinks: { "fp-nuc": { reach: "ok", via: "node" } } }).getState().machines;
   expect(machines(true)).toEqual(machines(false));
   expect(machines(true)[0]).not.toHaveProperty("insecure");
+});
+
+test("a request to a machine that is away says so of that machine, never that no machine is available (web#362)", () => {
+  // The call is on another machine that answers, nothing is being looked at: the call's reach is fine, the target's is not.
+  const facts: Partial<SessionFacts> = { pairings: [nuc, ws], machinesReady: true, callNode: "fp-ws", viewedThread: null,
+    machineLinks: { "fp-nuc": { reach: "away", via: "" }, "fp-ws": { reach: "ok", via: "node" } } };
+  const note = (over: Partial<SessionFacts> = {}) => unreached(createRoomSessionStore({ ...facts, ...over }).getState().facts, "fp-nuc");
+
+  expect(note()).toBe("“NUC” cannot be reached by any route. Check that it is on.");
+  // Every machine away, none chosen: still the named machine, not "No machine available".
+  expect(note({ callNode: null, machineLinks: { "fp-nuc": { reach: "away", via: "" }, "fp-ws": { reach: "away", via: "" } } })).not.toMatch(/^No machine available/);
+  // A link not yet resolved is no reason to say there is no machine either.
+  expect(note({ machineLinks: {} })).toMatch(/NUC/);
+  // A machine that answered by refusing this device's token is not "away", whatever its stored reach still says.
+  expect(unreached(createRoomSessionStore(facts).getState().facts, "fp-ws", true)).toMatch(/Workstation.*no longer recognises this device/);
 });
