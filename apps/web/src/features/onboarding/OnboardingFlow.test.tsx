@@ -142,10 +142,21 @@ test("each step passed without is kept, a reload goes on from there, and Ready s
   cleanup();
   room({ installed: false });
   expect(title()).toHaveTextContent("Set up transcription");
-  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Continue without transcription" })); });
+  // Transcription and voice skip like the machine: the footer says nothing, Skip for now asks first, Go back is focused.
+  expect(document.getElementById("wizard-stage-reason")).toHaveClass("sr-only");
+  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Skip for now" })); });
+  const askStt = within(document.getElementById("wizard-skip-stt")!);
+  expect(askStt.getByText("Continue without transcription?")).toBeInTheDocument();
+  expect(askStt.getByText("You’ll need transcription for your agents to hear you. You can get it from the call area.")).toBeInTheDocument();
+  expect(askStt.getByRole("button", { name: "Go back" })).toHaveFocus();
+  await act(async () => { fireEvent.click(askStt.getByRole("button", { name: "Go back" })); });
+  expect(record().stt_skipped ?? false).toBe(false);
+  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Skip for now" })); });
+  await act(async () => { fireEvent.click(within(document.getElementById("wizard-skip-stt")!).getByRole("button", { name: "Got it" })); });
   expect(record().stt_skipped).toBe(true);
   expect(title()).toHaveTextContent("Set up voice");
-  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Continue without a voice" })); });
+  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Skip for now" })); });
+  await act(async () => { fireEvent.click(within(document.getElementById("wizard-skip-tts")!).getByRole("button", { name: "Got it" })); });
   expect(record().tts_skipped).toBe(true);
   expect(title()).toHaveTextContent("When your turn ends");
   await act(async () => { fireEvent.click(document.getElementById("wizard-stage-action") ?? wizard().getByRole("button", { name: "Continue" })); });
