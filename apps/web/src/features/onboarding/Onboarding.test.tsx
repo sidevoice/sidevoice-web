@@ -462,7 +462,8 @@ for (const tried of [false, true]) {
     await act(async () => { fireEvent.click(tryButton()); });
     expect(actions.tryVoiceSettings).not.toHaveBeenCalled();
     expect(title()).toHaveTextContent("Set up transcription");
-    await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Continue without transcription" })); });
+    await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Skip for now" })); });
+    await act(async () => { fireEvent.click(within(document.getElementById("wizard-skip-stt")!).getByRole("button", { name: "Got it" })); });
     expect(title()).toHaveTextContent("Set up voice");
     expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).stt_skipped).toBe(true);
   }, WHOLE_APP_MS);
