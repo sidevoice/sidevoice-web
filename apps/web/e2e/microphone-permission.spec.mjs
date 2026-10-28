@@ -22,7 +22,7 @@ for (const hint of ["denied", "unsupported"]) {
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
     await expect(page.locator("#permissions .perm-badge")).toHaveText("Allowed");
     await page.reload();
-    await expect(page.locator(".call-held-note")).not.toContainText("can’t use the microphone");
+    await expect(page.locator(".call-listen-note")).not.toContainText("can’t use the microphone");
     await page.locator("#settings-open").click();
     if (!(await page.locator("#settings-permissions").isVisible())) await page.getByRole("button", { name: "Back to Settings" }).click();
     await page.locator("#settings-permissions").click();
@@ -69,10 +69,13 @@ test("iPhone Safari: the microphone allowed in Settings › Permissions lets the
   await installHarness(page, { microphone: "prompt" });
   await page.addInitScript(iphoneSafari);
   await page.goto("/voice/");
-  const held = page.locator(".call-held-note");
-  await expect(held).toHaveText("Allow the microphone to call. You can do it in Settings › Permissions.");
-  // The held call (aria-disabled, so forced) takes the person to Settings › Permissions, where the tap asks.
-  await page.locator("#connect").click({ force: true });
+  const held = page.locator(".call-listen-note");
+  await expect(held).toHaveText("The agents can’t hear you without the microphone. Allow it in Settings › Permissions.");
+  // The call is not held back: it can be joined to listen. The tap that asks is in Settings › Permissions.
+  await expect(page.locator("#connect")).not.toHaveAttribute("aria-disabled", "true");
+  await page.locator("#settings-open").click();
+  if (!(await page.locator("#settings-permissions").isVisible())) await page.getByRole("button", { name: "Back to Settings" }).click();
+  await page.locator("#settings-permissions").click();
   await page.locator("#permissions-mic-action").click();
   const badge = page.locator("#permissions .perm-badge");
   await expect(badge).toHaveText("Allowed");
@@ -96,7 +99,9 @@ test("iPhone Safari: Don't Allow says how to allow it, though Safari's permissio
   await page.addInitScript(iphoneSafari);
   await page.addInitScript(() => { window.__iphoneAnswer = "deny"; });
   await page.goto("/voice/");
-  await page.locator("#connect").click({ force: true });
+  await page.locator("#settings-open").click();
+  if (!(await page.locator("#settings-permissions").isVisible())) await page.getByRole("button", { name: "Back to Settings" }).click();
+  await page.locator("#settings-permissions").click();
   await page.locator("#permissions-mic-action").click();
   await expect(page.locator("#permissions-mic-action")).toHaveText("Check again");
   await expect(page.locator("#settings-mic-help")).toContainText("Allow it for this site");
@@ -105,5 +110,5 @@ test("iPhone Safari: Don't Allow says how to allow it, though Safari's permissio
   await page.locator("#permissions-mic-action").click();
   await expect(page.locator("#permissions .perm-badge")).toHaveText("Allowed");
   await leaveSettings(page);
-  await expect(page.locator(".call-held-note")).toHaveCount(0);
+  await expect(page.locator(".call-listen-note")).toHaveCount(0);
 });

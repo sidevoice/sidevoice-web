@@ -63,3 +63,20 @@ test("call menu only offers connection statistics, including when output is unav
   act(() => store.patch({ speechOutput: "voice_off" }));
   expect(menu.querySelectorAll("button")).toHaveLength(1);
 });
+
+test("without the microphone allowed the call can still be joined, and a calm note says the agents cannot hear the person", async () => {
+  vi.resetModules();
+  vi.doMock("../onboarding/onboarding-context", () => ({ useOnboardingIfAny: () => ({ microphone: { ready: false } }) }));
+  const { CallButton } = await import("./CallIndicators");
+  const { RoomProvider: Provider } = await import("../../app/RoomProvider");
+  const toggleCall = vi.fn().mockResolvedValue(undefined);
+  window.sidevoiceActions = { toggleCall } as unknown as typeof window.sidevoiceActions;
+  render(<Provider store={createRoomStore()}><CallButton /></Provider>);
+  expect(screen.getByRole("status")).toHaveTextContent("The agents can’t hear you without the microphone. Allow it in Settings › Permissions.");
+  const join = screen.getByRole("button", { name: "Join the call" });
+  expect(join).not.toBeDisabled();
+  expect(join).not.toHaveAttribute("aria-disabled", "true");
+  join.click();
+  expect(toggleCall).toHaveBeenCalledTimes(1);
+  vi.doUnmock("../onboarding/onboarding-context");
+});

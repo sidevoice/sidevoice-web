@@ -132,7 +132,7 @@ export interface ResumeFacts {
   /** Another machine is paired, in use and answering. */
   remoteReady: boolean;
   /** The permissions step was passed with the microphone allowed and still allowed, or there is nothing to ask here. The
-   *  microphone is required in this release (operator, 2026-10-16): there is no way past the step without it. */
+   *  microphone is not needed to call (operator, 2026-10-28): the step can be passed with Skip for now, and the call listens only. */
   microphonePassed: boolean;
   /** The keys of this device's transcription and voice settings now (`trialKey`). */
   sttKey: string | null;

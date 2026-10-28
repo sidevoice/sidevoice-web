@@ -1,6 +1,4 @@
-import { useContext } from "react";
-import { RoomStoreContext, useRoomStore } from "../../state/room-store";
-import { openSettings } from "../settings/open-settings";
+import { useRoomStore } from "../../state/room-store";
 import { Button } from "../../components/ui/Button";
 import { CallIcon, CaptionsIcon, CaptionsOffIcon, HangupIcon, MicrophoneIcon, MicrophoneOffIcon, SkipIcon, WarningIcon } from "../../components/ui/Icons";
 import { setCaptions, useCaptions } from "../../state/captions";
@@ -91,21 +89,19 @@ export function MuteButton() {
 export function CallButton() {
   const t = translator();
   const call = useRoomStore((state) => state.call);
-  const store = useContext(RoomStoreContext);
   const onboarding = useOnboardingIfAny();
-  // The microphone not allowed: the call waits, held back and saying why on hover and focus (operator, 2026-10-16);
-  // pressed, it opens Settings › Permissions. A call already joined can always be left.
-  const held = !call.joined && !(onboarding?.microphone?.ready ?? true);
+  // The microphone not allowed: the call is joined anyway, to listen (operator, 2026-10-28, replacing the hold of
+  // 2026-10-16). A calm note says the agents cannot hear the person and where to allow it; the runtime gives the call
+  // its microphone as soon as it can be had.
+  const listenOnly = !(onboarding?.microphone?.ready ?? true);
   return (<span className="call-held">
-    {/* Held: said above it, as the microphone that gives no sound is (operator, 2026-10-16). */}
-    {held && <span className="call-held-note" role="status"><WarningIcon size={14} />{t("call.needsMic")}</span>}
-    <Tooltip action content={held ? t("call.needsMic") : call.label}>
+    {listenOnly && <span id="connect-why" className="call-listen-note" role="status"><MicrophoneOffIcon size={14} />{t("call.listenOnly")}</span>}
+    <Tooltip action content={call.label}>
       <Button id="connect" variant="primary" className={cn("call-button", call.joined && "joined", call.busy && "reconnecting")}
-        aria-label={call.label} disabled={held} blockedBy={held ? "connect-why" : undefined} onBlocked={() => openSettings({ section: "permissions" }, store)} onClick={() => void window.sidevoiceActions?.toggleCall()}>
+        aria-label={call.label} aria-describedby={listenOnly ? "connect-why" : undefined} onClick={() => void window.sidevoiceActions?.toggleCall()}>
         {call.joined ? <HangupIcon /> : <CallIcon />}
       </Button>
     </Tooltip>
-    {held && <span id="connect-why" className="sr-only">{t("call.needsMic")}</span>}
   </span>);
 }
 
