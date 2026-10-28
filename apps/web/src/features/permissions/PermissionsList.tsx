@@ -32,7 +32,7 @@ function MicrophoneRow({ microphone, view, onRequest, openSettings, t, actionId,
         {allowed
           ? <span ref={badge} tabIndex={-1} className="perm-badge-focus"><MicrophoneBadge view={view} t={t} /></span>
           : <Button id={actionId} size="sm" variant="primary" loading={busy}
-              aria-describedby={microphone.state === "denied" ? helpId : undefined}
+              aria-describedby={view.blocked ? helpId : undefined}
               onFocus={() => { hadFocus.current = true; }} onBlur={() => { hadFocus.current = false; }}
               onClick={() => { hadFocus.current = true; onRequest(); }}>{t(again ? "wizard.mic.checkAgain" : "wizard.mic.allow")}</Button>}
       </span>

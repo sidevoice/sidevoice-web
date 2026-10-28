@@ -73,15 +73,16 @@ export function MicrophoneBadge({ view, t }: { view: MicrophoneView; t: Translat
   </Badge>;
 }
 
-/** Blocked: how to allow it where this page runs — and, where the app can open them, the system's settings. */
+/** Blocked or none found: what to do, with the system settings where the app opens them. Blocked: how to allow it where this page runs — and, where the app can open them, the system's settings. */
 export function MicrophoneHowTo({ view, openSettings, t, id = MIC_HELP_ID }: { view: MicrophoneView; openSettings: (() => Promise<void>) | null; t: Translate; id?: string }) {
-  if (view.state !== "denied") return null;
+  if (!view.blocked) return null;
+  const missing = view.state === "missing";
   return <>
-    <Alert tone="warning" live id={id} className="wizard-mic-help perm-help" title={t("wizard.mic.denied.title")}
+    <Alert tone="warning" live id={id} className="wizard-mic-help perm-help" title={t(missing ? "wizard.mic.state.missing" : "wizard.mic.denied.title")}
       action={openSettings ? <Button type="button" variant="secondary" size="sm" id="wizard-mic-settings" onClick={() => void openSettings()}>{t("wizard.mic.openSettings")}</Button> : undefined}>
-      {t(view.howTo[0])}
+      {t(missing ? "wizard.mic.missing" : view.howTo[0])}
     </Alert>
-    {view.howTo[1] && <p className="wizard-mic-also perm-also">{t(view.howTo[1])}</p>}
+    {!missing && view.howTo[1] && <p className="wizard-mic-also perm-also">{t(view.howTo[1])}</p>}
   </>;
 }
 

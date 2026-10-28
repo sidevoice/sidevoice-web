@@ -40,7 +40,7 @@ test("one row says where the microphone stands: its name and why, Allow micropho
       expect(list().querySelector("#wizard-mic-action")).toBeNull();
       expect(list().querySelector(".perm-badge")).toHaveTextContent("Allowed");
     }
-    expect(document.querySelector(".wizard-mic-help") !== null).toBe(microphone.state === "denied");
+    expect(document.querySelector(".wizard-mic-help") !== null).toBe(microphone.state === "denied" || microphone.state === "missing");
     cleanup();
   }
 });
@@ -214,4 +214,12 @@ test.each(["setup", "settings"])("Windows %s: the privacy button uses the settin
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check again" })); });
   expect(getUserMedia).toHaveBeenCalledTimes(2);
   await waitFor(() => expect(document.querySelector(".perm-badge")).toHaveTextContent("Allowed"));
+});
+
+test("no microphone found in the desktop app on Windows: the alert says what to do, with Open System Settings", () => {
+  const openSettings = vi.fn(() => Promise.resolve());
+  render(<PermissionsStep microphone={snapshot("missing", { asker: "app" })} openSettings={openSettings} t={t} platform="windows" />);
+  expect(document.querySelector(".wizard-mic-help")).toHaveTextContent("Connect a microphone or turn one on, then check again.");
+  fireEvent.click(screen.getByRole("button", { name: "Open System Settings" }));
+  expect(openSettings).toHaveBeenCalled();
 });
