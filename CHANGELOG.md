@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.0](https://github.com/sidevoice/sidevoice-web/compare/v0.11.1...v0.12.0) (2026-10-28)
+
+
+### Features
+
+* **onboarding:** confirm skipping transcription and voice like the machine ([#377](https://github.com/sidevoice/sidevoice-web/issues/377)) ([bf1f32e](https://github.com/sidevoice/sidevoice-web/commit/bf1f32ecbc7cb2bb584abd7a982a1c6b0f263b5b))
+
+
+### Bug Fixes
+
+* **permissions:** say what to do when no microphone is found ([#376](https://github.com/sidevoice/sidevoice-web/issues/376)) ([cef8f03](https://github.com/sidevoice/sidevoice-web/commit/cef8f038b68dbacbacf731ec05ebab016a1a9b08))
+
 ## [0.11.1](https://github.com/sidevoice/sidevoice-web/compare/v0.11.0...v0.11.1) (2026-10-28)
 
 
