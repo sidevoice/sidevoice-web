@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.1](https://github.com/sidevoice/sidevoice-web/compare/v0.11.0...v0.11.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* **room:** a closed conversation leaves the screen and a disconnected one is never shown as working ([#371](https://github.com/sidevoice/sidevoice-web/issues/371)) ([af12a7c](https://github.com/sidevoice/sidevoice-web/commit/af12a7c86dc67d65aed6ec331013352a1291d147))
+* **room:** name the away machine instead of "No machine available" ([#372](https://github.com/sidevoice/sidevoice-web/issues/372)) ([a8f125f](https://github.com/sidevoice/sidevoice-web/commit/a8f125f0634e6a1b65ab01864838fa51d1df648c))
+
 ## [0.11.0](https://github.com/sidevoice/sidevoice-web/compare/v0.10.1...v0.11.0) (2026-10-26)
 
 
