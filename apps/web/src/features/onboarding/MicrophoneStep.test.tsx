@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { App } from "../../app/App";
 import { createRoomStore } from "../../state/room-store";
 import { defaultVoiceSettings } from "../../services/voice-settings.js";
@@ -148,7 +148,7 @@ test("blocked: how to allow it for the site, Check again (still blocked, said so
   expect(title()).toHaveTextContent("Set up transcription");
 }, WHOLE_APP_MS);
 
-test("required in this release: no way past the step without the microphone allowed (only Continue without passes it), reloaded or not", async () => {
+test("no way past the step through Continue without the microphone allowed (only the confirmed skip passes it), reloaded or not", async () => {
   const { media } = browser("denied", () => Promise.reject(refused("NotAllowedError")));
   await setup();
   expect(title()).toHaveTextContent("Permissions");
@@ -173,7 +173,9 @@ test("Continue without microphone is kept, a reload goes on from there, and allo
   await setup();
   expect(title()).toHaveTextContent("Permissions");
   expect(proceed()).toHaveAttribute("aria-disabled", "true");
-  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Continue without microphone" })); });
+  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Skip for now" })); });
+  expect(title()).toHaveTextContent("Permissions");
+  await act(async () => { fireEvent.click(await screen.findByRole("button", { name: "Got it" })); });
   expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).microphone_skipped).toBe(true);
   expect(title()).not.toHaveTextContent("Permissions");
   cleanup();

@@ -292,7 +292,7 @@ export function Wizard() {
   }, [onboarding.open, step, onboarding.localReady, onboarding.remoteReady, onboarding.record.agents_done]); // eslint-disable-line react-hooks/exhaustive-deps
   // The permissions step comes after the basics whenever there is a microphone to ask for, allowed already or not: it
   // always shows, saying where each stands, and waits for Continue (operator, 2026-10-16). After it, where the agents are.
-  // The microphone is required in this release (operator, 2026-10-16): transcription always follows the machine.
+  // The microphone is needed to speak, not to call (operator, 2026-10-28): skipped, the call joins to listen. Transcription always follows the machine.
   const sttStep: OnboardingStep = "W4";
   const permissionsNext: OnboardingStep = onboarding.canHostAgents ? "W1" : onboarding.remoteReady ? sttStep : "W2r";
 
@@ -416,7 +416,7 @@ export function Wizard() {
       <span ref={setFooterSlot} className="wizard-slot" />
       {step === "W3" && <Button type="button" variant="primary" onClick={() => void finishAgents()}>{t("wizard.continue")}</Button>}
       {step === "W4m" && <MicrophoneContinue microphone={onboarding.microphone} onContinue={() => void onboarding.markMicrophoneDone().then((done) => { if (done) onboarding.goTo(permissionsNext); })}
-        onSkip={() => void skipMicrophone()} t={t} />}
+        skip={<SkipConfirm id="wizard-skip-microphone" title={t("wizard.skip.microphoneTitle")} body={t("wizard.skip.microphoneReason")} onSkip={() => void skipMicrophone()} t={t} />} t={t} />}
       {stageTask && <ModelStepFooter waiting={!(model.model && model.ready)} reason={t(stageTask === "stt" ? "wizard.skip.sttReason" : "wizard.skip.ttsReason")} reasonQuiet skip={stageSkip}
         tryReason={stageTask === "tts" && !sample.trim() ? t("wizard.wait.sentence") : undefined}
         running={trial.trial.phase === "running"} tried={onboarding.tried(stageTask) && !model.needsKey}

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Button } from "../../components/ui/Button";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { PermissionsList } from "../permissions/PermissionsList";
@@ -16,7 +17,7 @@ import type { Translate } from "../../i18n/translator";
  * One block per permission (PermissionBlock), each with its own action and, blocked, all its recovery inside it. The
  * action is in the block: one control that changes its label — Allow microphone, Check again once blocked or none
  * found, Allowed (a check, not pressable) — so focus stays on it; the footer's forward action is Continue, waiting until
- * the microphone is allowed (required in this release, operator 2026-10-16). The bicho moves a little by state
+ * the microphone is allowed (needed to speak, not to call: operator 2026-10-28). The bicho moves a little by state
  * (a hop once allowed, a droop while blocked, a lean while asked) on a wrapper: the engine has no expressions.
  *
  * Calm always: the permission check lets the microphone go at once, so nothing is heard here and the bicho never acts
@@ -28,14 +29,14 @@ export function PermissionsStep({ microphone, openSettings, onRequest = () => {}
   return <section className="wizard-mic"><PermissionsList microphone={microphone} openSettings={openSettings} onRequest={onRequest} t={t} platform={platform} /></section>;
 }
 
-/** The footer's forward action: Continue, waiting until the microphone is allowed. The microphone is required to call in
- *  this release (operator, 2026-10-16); one element, so focus stays on it. `onSkip` (operator
- *  2026-10-16): while it is not allowed, the quiet "Continue without microphone" left of it, alone — the row above already
- *  says what the microphone is for; the call area asks for it afterwards. */
-export function MicrophoneContinue({ microphone, onContinue, onSkip, t }: { microphone: MicrophoneSnapshot; onContinue(): void; onSkip?: () => void; t: Translate }) {
+/** The footer's forward action: Continue, waiting until the microphone is allowed. The microphone is needed
+ *  to speak, not to call (operator, 2026-10-28); one element, so focus stays on it. `skip` (operator
+ *  2026-10-28): while it is not allowed, the quiet "Skip for now" with its confirm left of it, which says what is lost —
+ *  the agents will not hear the person — and where to allow it; the call joins to listen meanwhile. */
+export function MicrophoneContinue({ microphone, onContinue, skip, t }: { microphone: MicrophoneSnapshot; onContinue(): void; skip?: ReactNode; t: Translate }) {
   const { done } = microphoneAction(microphone);
   return <>
-    {!done && onSkip && <Button type="button" variant="secondary" id="wizard-step-skip" onClick={onSkip}>{t("wizard.skip.microphone")}</Button>}
+    {!done && skip}
     {/* Waiting, it says why on hover and focus: aria-disabled (blockedBy), so it stays focusable and its tooltip shows. */}
     <Tooltip content={done ? null : t("wizard.mic.continueWaiting")}>
       <Button type="button" variant="primary" id="wizard-mic-continue" className={done ? undefined : "wizard-continue-waiting"}
