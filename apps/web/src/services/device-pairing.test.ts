@@ -3,7 +3,7 @@ import {
   base64ToBytes, bytesToBase64url, machineAddress, candidateBases, decodePairingCode, deviceName, fingerprintOf, firstProven,
   pairingSummary, proveIdentity, projectPairings, readPairingState, readPairings, redeemPairingCode, revokedPairing, secureBase, verifyIdentitySignature,
   withPairing, withoutPairing, writePairings, NO_WEBCRYPTO, PAIRINGS_KEY, type Pairing,
-  privateHost, previewPairingCode, PAIRING_HTTP_PRIVATE, PAIRING_HTTP_ONLY, PAIRING_HTTP_BLOCKED,
+  listeningPort, privateHost, previewPairingCode, PAIRING_HTTP_PRIVATE, PAIRING_HTTP_ONLY, PAIRING_HTTP_BLOCKED,
 } from "./device-pairing.js";
 
 // jsdom's window has no WebCrypto of its own; node's is what the tests run on, handed in where it is used.
@@ -514,4 +514,21 @@ test("an http:// address on a private network is never tried over https: asked a
   // Written to a public address, nothing is asked anywhere.
   await expect(redeemPairingCode(code, { address: "http://203.0.113.5:8768", get, subtle, now: NOW, origin: "http://localhost:5173", insecure: true }))
     .rejects.toThrow("address-insecure");
+});
+
+test("the Core port is the one Core's own addresses advertise, not a proxy's, and none when they disagree", () => {
+  // A proxy's https port is not Core's; the loopback and LAN addresses are.
+  expect(listeningPort(["https://proxy.example:8443", "http://127.0.0.1:10829"])).toBe(10829);
+  expect(listeningPort(["http://127.0.0.1:10829", "http://192.168.1.20:10829"])).toBe(10829);
+  expect(listeningPort(["http://127.0.0.1:10829", "http://192.168.1.20:9000"])).toBeNull();
+  expect(listeningPort(["https://proxy.example:8443"])).toBeNull();
+  expect(listeningPort([])).toBeNull();
+  expect(listeningPort(undefined)).toBeNull();
+});
+
+test("an explicit default port survives: URL drops :80 from an http address, and that is port 80", () => {
+  expect(new URL("http://127.0.0.1:80").port).toBe("");
+  expect(listeningPort(["http://127.0.0.1:80"])).toBe(80);
+  expect(listeningPort(["http://192.168.1.20"])).toBe(80);
+  expect(listeningPort(["https://192.168.1.20:443"])).toBeNull();
 });

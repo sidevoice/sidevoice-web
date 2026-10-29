@@ -58,6 +58,7 @@ export const NO_WEBCRYPTO: string;
 /** Whether a pairing secret or a device token may be sent to `base`: https anywhere, plain http only to loopback. */
 export function secureBase(base: string, origin?: string, options?: { insecure?: boolean }): boolean;
 export function privateHost(hostname: string): boolean;
+export function listeningPort(urls: string[] | undefined): number | null;
 export function bytesToBase64url(input: Uint8Array | ArrayBuffer): string;
 export function base64ToBytes(text: string): Uint8Array;
 export function utf8(text: string): Uint8Array;

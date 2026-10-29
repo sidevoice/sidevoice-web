@@ -118,6 +118,19 @@ function codeHttpPort(code) {
     // URL removes :80 from HTTP URLs; an empty port on an advertised HTTP URL means port 80.
     return direct ? direct.port || '80' : loopback ? loopback.port || '80' : DEFAULT_CORE_PORT;
 }
+/** The port the machine's Core listens on, as its pairing advertises it: from Core's own addresses (plain http on
+ *  loopback or a private network; an https one is a proxy's, not Core's). URL drops :80 from an http URL, so an empty
+ *  port there is 80, as in codeHttpPort. Null when none is advertised or the addresses disagree. */
+export function listeningPort(urls) {
+    const ports = new Set();
+    for (const text of urls || []) {
+        try {
+            const url = new URL(text);
+            if (url.protocol === 'http:' && privateHost(url.hostname)) ports.add(url.port || '80');
+        } catch { /* Not an address. */ }
+    }
+    return ports.size === 1 ? Number([...ports][0]) : null;
+}
 function plainAddress(written, address, code) {
     const url = new URL(written);
     url.protocol = 'http:';
