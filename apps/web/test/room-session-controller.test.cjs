@@ -416,11 +416,6 @@ test('A lock the system takes back is asked for again while the call is up, and 
  release();
  assert.equal(scheduled.length,0,'a call that ended does not keep the screen awake');
 });
-test('Latency turn storage is bounded',()=>{
- const s=setup();s.context.performance={now:()=>100};
- s.run("for(let r=0;r<150;r++)observeLatencyEvent('voice-user-turn',{phase:'finished',thread_id:'a',revision:r})");
- assert.equal(s.run('latencyTurns.size'),128);
-});
 test('Settings are reached from the header menu',()=>{
  // The ⋯ menu's Settings entry is the very button the runtime opens the dialog from: one entry, nothing relaying to it.
  const s=setup({strictDOM:true});

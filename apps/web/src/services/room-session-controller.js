@@ -1521,27 +1521,7 @@ $('connection-stats').addEventListener('close',stopConnectionStats);
 $('connection-stats').addEventListener('cancel',stopConnectionStats);
 // A backdrop click closes the modal without swallowing clicks inside its scroll area.
 $('connection-stats').addEventListener('click',event=>{if(event.target!==$('connection-stats'))return;const box=event.target.getBoundingClientRect();if(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)event.target.close()});
-// Diagnostic durations only. These events originate on the server; they are not raw mic timestamps.
-const latencyTurns=new Map();
-let latencyActiveTurn=null;
 function latencyNow(){return globalThis.performance?.now?.()}
-function latencyKey(thread,revision){return JSON.stringify([state.sessionId,thread,revision])}
-const latencyRevisions=new Map();
-function observeLatencyEvent(type,data){
- const now=latencyNow();if(!Number.isFinite(now))return;
- if(type==='voice-user-turn'){
-  // The room names the turn; only its answer to `started` carries the revision the turn is measured under.
-  if(data.phase==='started'&&data.turn_id!=null){latencyRevisions.set(data.turn_id,data.revision);if(latencyRevisions.size>128)latencyRevisions.delete(latencyRevisions.keys().next().value)}
-  const revision=data.revision??latencyRevisions.get(data.turn_id);
-  if(revision==null)return;
-  data={...data,revision};
-  const key=latencyKey(data.thread_id,data.revision);
-  if(data.phase==='started'){latencyActiveTurn=key;if(!latencyTurns.has(key))latencyTurns.set(key,{})}
-  if(data.phase==='cancelled'){latencyTurns.delete(key);if(latencyActiveTurn===key)latencyActiveTurn=null}
-  if(data.phase==='finished'){const turn=latencyTurns.get(key)||{};turn.finished=now;latencyTurns.set(key,turn)}
-  if(latencyTurns.size>128)latencyTurns.delete(latencyTurns.keys().next().value);
- }
-}
 // `socket` is the one the frame came in on: during a transcription swap this page holds two, and an
 // answer belongs to the socket that asked, not to whichever one the call is using.
 function message(raw,socket){return roomStore.batch(()=>recordMessage(raw,socket))}
@@ -1578,7 +1558,6 @@ function recordMessage(raw, socket) {
     }
     if (t === 'voice-user-turn' && d.session_id && d.session_id !== state.sessionId)
         return;
-    observeLatencyEvent(t, d);
     // A reply to say: written in the conversation at once, and handed to the voice, which decides when it sounds.
     if (t === 'voice-reply') {
         receiveReply(d);
