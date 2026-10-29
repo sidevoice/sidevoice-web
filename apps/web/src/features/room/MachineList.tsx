@@ -26,6 +26,7 @@ import { machineStatus } from "../settings/machine-status";
 import { ThisDeviceVersion } from "../settings/UpdatesSettings";
 import { MachineEntryCopy, MachineEntryState, MachineState, StateOnIcon, machineEntryName, machineEntryTitle } from "../settings/MachineState";
 import { canRunLocalHostAction, hostCause, hostStatusText, localHostRecovery, runLocalHostAction, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
+import { listeningPort } from "../../services/device-pairing.js";
 import { uiLocale } from "../../i18n/locale";
 
 function dateText(value: string | number | null | undefined) {
@@ -330,15 +331,16 @@ function ForgetMachine({ machine, name, onForget }: { machine: MachineView; name
 function RemoteHostCard({ machine, titleId }: { machine: MachineView; titleId: string }) {
   const t = translator();
   const info = useRoomStore((state) => machine.pairingId ? state.facts.remoteHostStatus?.[machine.pairingId] : undefined);
+  const port = listeningPort(machine.urls);
   useEffect(() => { if (machine.pairingId && machine.state === "connected") void window.sidevoiceActions?.loadMachineInfo?.(machine.pairingId); }, [machine.pairingId, machine.state]);
   return (
     <div className="host-status-card" data-remote>
       <div className="host-status-head">
         <h4 id={titleId}>{t("hosts.section.service")}</h4>
       </div>
-      {(info?.version || machine.port) && <dl className="host-status-facts">
+      {(info?.version || port) && <dl className="host-status-facts">
         {info?.version && <div className="host-status-product">{t("hosts.productVersion", { version: info.version })}</div>}
-        {machine.port && <div className="host-status-product">{t("hosts.port", { port: machine.port })}</div>}
+        {port && <div className="host-status-product">{t("hosts.port", { port })}</div>}
       </dl>}
     </div>
   );
@@ -358,6 +360,7 @@ function LocalHostStatusPanel({ machine, status, titleId }: { machine: MachineVi
   const statusMessage = hostStatusText(status, t);
   const hasMethod = (action: LocalHostAction) => canRunLocalHostAction(action);
   const state = machineStatus(machine, status, true, t);
+  const port = listeningPort(machine.urls);
   // Unknown is not none: Stop asks unless the service says no call is on.
   const calls = details.calls;
   const buttons: { action: LocalHostAction; label: string; variant: "primary" | "secondary" | "ghost" }[] = [];
@@ -412,7 +415,7 @@ function LocalHostStatusPanel({ machine, status, titleId }: { machine: MachineVi
             connector's) — and whether it is up to date: Update available is a link to its row in Updates, where
             everything that updates is. */}
         <ThisDeviceVersion t={t} />
-        {machine.port && <div className="host-status-product">{t("hosts.port", { port: machine.port })}</div>}
+        {port && <div className="host-status-product">{t("hosts.port", { port: port })}</div>}
       </dl>
       {/* Running or stopped, the state's word says it ("Running", "Not started") and Start follows: no sentence repeats it.
           Whether it starts at sign-in is its switch's alone, below. */}

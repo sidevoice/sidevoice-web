@@ -1,4 +1,3 @@
-import { listeningPort } from '../services/device-pairing.js';
 // The session's facts and pure projections. No DOM, storage, audio engine or clock reads here.
 export const PRESENCE_DELIVERED_DELAY_MS = 1500;
 /* How long a conversation works without a break before it shows as working (the operator, 2026-10-14): its words, its
@@ -434,8 +433,7 @@ export function machinesView(s) {
         const state = p.local ? reachableLocal ? 'connected' : ['failed', 'service-failed', 'refused', 'incompatible'].includes(localStatus) ? 'failed' : 'offline'
             : p.revoked ? 'revoked' : remoteReach;
         return { id: p.local ? 'local-host' : p.fp, pairingId: p.local ? local?.fp : p.fp, host: p.host || '', revoked: !!p.revoked, reach,
-            state, local: !!p.local, localStatus, alias: !!p.alias, machineHost: p.machine_host ?? null,
-            port: listeningPort(p.urls) };
+            state, local: !!p.local, localStatus, alias: !!p.alias, machineHost: p.machine_host ?? null, urls: p.urls };
     });
 }
 /** Why there is no machine to talk to, in one sentence, or '' when there is one (or it is still being found). The
