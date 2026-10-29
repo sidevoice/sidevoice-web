@@ -74,8 +74,6 @@
 }
 .chat-bubble[data-role="assistant"]:is([data-position="last"], [data-position="only"]) { border-bottom-left-radius: var(--sv-radius-sm); }
 .chat-bubble[data-role="user"]:is([data-position="last"], [data-position="only"]) { border-bottom-right-radius: var(--sv-radius-sm); }
-/* Cut off while it played: a bar in the voice's colour down its edge, over the card's own shadow. */
-.chat-bubble[data-interrupted] { box-shadow: inset 3px 0 0 var(--sv-voice), var(--sv-bubble-shadow); }
 /* Not sent yet: what is being said, still open, has a dashed edge and quieter text. */
 .chat-bubble[data-draft]:not([data-live]) { color: var(--sv-text-muted); outline: 1px dashed var(--sv-border-strong); outline-offset: -1px; }
 
@@ -223,3 +221,55 @@
 .messages-empty { display: grid; justify-items: center; align-content: center; gap: var(--sv-space-3); min-height: 60%; padding: var(--sv-space-8) var(--sv-space-6); text-align: center; color: var(--sv-text-muted); }
 .messages-empty svg { color: var(--sv-text-subtle); }
 .messages-empty p { max-width: 28ch; margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+
+/* ----- how a reply settles once played (UnheardReply.tsx): cut part-way, or never played. The choices are variants for now. */
+.cut-heard { white-space: pre-wrap; }
+.cut-marker { appearance: none; border: 0; background: none; padding: 0; font: inherit; color: var(--sv-voice-text); cursor: pointer; white-space: nowrap; }
+.cut-marker:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: var(--sv-radius-sm); }
+.cut-marker .cut-chevron { transition: transform 120ms; }
+.cut-marker[aria-expanded="true"] .cut-chevron { transform: rotate(180deg); }
+.cut-rest { color: var(--sv-text-subtle); }
+/* pill: the landing's own, a small pill with the pause bars, inline where the voice stopped. */
+.cut-marker[data-variant="pill"] {
+  display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px; border-radius: var(--sv-radius-pill); vertical-align: .08em;
+  background: var(--sv-voice-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sv-voice) 55%, transparent);
+  font-size: var(--sv-font-xs); font-weight: 650; line-height: 1.25rem;
+}
+/* bar: wordless, a bar in the voice's colour where it stopped and an ellipsis for the rest. */
+.cut-marker[data-variant="bar"] { display: inline-flex; align-items: center; gap: 4px; padding: 0 4px; vertical-align: -.2em; font-weight: 700; letter-spacing: .08em; }
+.cut-bar { width: 3px; height: 1.15em; border-radius: 2px; background: var(--sv-voice); }
+/* rule: a dashed line across the balloon with the way to the rest centred on it; the rest falls under it. */
+.cut-text[data-variant="rule"] { display: block; }
+.cut-text[data-variant="rule"] .cut-marker {
+  display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin: 6px 0 2px; font-size: var(--sv-font-xs); font-weight: 650; line-height: 1.25rem;
+}
+.cut-text[data-variant="rule"] .cut-marker::before, .cut-text[data-variant="rule"] .cut-marker::after {
+  content: ""; flex: 1; border-top: 1px dashed color-mix(in srgb, var(--sv-voice) 70%, transparent);
+}
+.cut-text[data-variant="rule"] .cut-rest { display: block; }
+
+/* A reply that never played takes the run's width, not a balloon: one small mark. */
+.unheard { min-width: 0; flex: 1; display: grid; justify-items: start; gap: var(--sv-space-1); color: var(--sv-text-muted); }
+.unheard-mark { appearance: none; border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; min-width: 0; max-width: 100%; position: relative; }
+.unheard-mark:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: var(--sv-radius-pill); }
+/* Small to the eye, not to a finger. */
+.unheard-mark::after { content: ""; position: absolute; inset: -8px 0; }
+.unheard-chip { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; }
+.unheard-chip svg { flex: none; }
+.unheard-snippet { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--sv-font-xs); line-height: 1rem; }
+.unheard-text {
+  margin: 0; padding-left: var(--sv-space-3); border-left: 2px dashed var(--sv-border-strong); max-width: min(86%, 34rem);
+  font-size: var(--sv-font-sm); line-height: 1.375rem; color: var(--sv-text-muted); white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.unheard-text time { margin-left: var(--sv-space-2); font-size: var(--sv-font-xs); font-variant-numeric: tabular-nums; color: var(--sv-text-subtle); }
+/* dot: the speaker-off mark alone, a 22px circle. */
+.unheard[data-variant="dot"] .unheard-chip { justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--sv-bg-sunken); box-shadow: inset 0 0 0 1px var(--sv-border); }
+[data-theme="dark"] .unheard[data-variant="dot"] .unheard-chip { background: var(--sv-surface-raised); }
+/* line: a hairline across the run with the mark and the first words on it, as a day's name sits on the log. */
+.unheard[data-variant="line"] { justify-items: stretch; }
+.unheard[data-variant="line"] .unheard-mark { display: flex; align-items: center; gap: var(--sv-space-2); width: 100%; min-height: 20px; }
+.unheard-rule { flex: 1; min-width: 12px; border-top: 1px solid var(--sv-border); }
+.unheard[data-variant="line"] .unheard-chip { flex: 0 1 auto; max-width: 70%; }
+/* ghost: one line of a balloon without the balloon: a dashed pill with the first words. */
+.unheard[data-variant="ghost"] .unheard-chip { padding: 2px var(--sv-space-3) 2px var(--sv-space-2); border-radius: var(--sv-radius-pill); outline: 1px dashed var(--sv-border-strong); outline-offset: -1px; }
+.unheard[data-variant="ghost"] .unheard-snippet { max-width: 22ch; }
