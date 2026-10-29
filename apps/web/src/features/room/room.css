@@ -194,6 +194,7 @@
 .sidebar-settings { position: relative; justify-content: flex-start; }
 .conversation-sidebar[data-collapsed] .sidebar-settings { justify-content: center; }
 .sidebar-settings .settings-notice[data-mark="count"] { right: auto; left: 22px; }
+.sidebar-settings .settings-notice[data-mark="update"] { right: auto; left: 26px; top: 8px; }
 .sidebar-settings .settings-notice[data-mark="attention"] { right: auto; left: 26px; top: 8px; }
 
 /* A desktop's room has no header, as a video call app's: the conversations' column from the top, the brand at its head

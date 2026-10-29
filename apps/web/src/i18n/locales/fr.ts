@@ -800,6 +800,8 @@ export const messages: Messages = {
   "voice.prepare.announceReady": "{model} est prêt",
   "settings.title": "Réglages",
   "settings.attention": "Réglages · un point demande votre attention",
+  "settings.updateAvailable": "Réglages · mise à jour disponible",
+  "updates.navAvailable": ", mise à jour disponible",
   "settings.close": "Fermer les réglages et revenir à vos conversations",
   "settings.sections": "Sections des réglages",
   "settings.section.general": "Général",

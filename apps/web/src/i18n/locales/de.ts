@@ -803,6 +803,8 @@ export const messages: Messages = {
   "voice.prepare.announceReady": "{model} ist bereit",
   "settings.title": "Einstellungen",
   "settings.attention": "Einstellungen · etwas braucht deine Aufmerksamkeit",
+  "settings.updateAvailable": "Einstellungen · Update verfügbar",
+  "updates.navAvailable": ", Update verfügbar",
   "settings.close": "Einstellungen schließen und zu deinen Unterhaltungen zurückkehren",
   "settings.sections": "Bereiche der Einstellungen",
   "settings.section.general": "Allgemein",

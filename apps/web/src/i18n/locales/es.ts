@@ -811,6 +811,8 @@ export const messages: Messages = {
   // Settings as a screen of sections (SettingsDialog), and its voice slots.
   "settings.title": "Configuración",
   "settings.attention": "Configuración · algo necesita tu atención",
+  "settings.updateAvailable": "Configuración · hay una actualización",
+  "updates.navAvailable": ", actualización disponible",
   "settings.close": "Cerrar la configuración y volver a tus conversaciones",
   "settings.sections": "Secciones de la configuración",
   "settings.section.general": "General",

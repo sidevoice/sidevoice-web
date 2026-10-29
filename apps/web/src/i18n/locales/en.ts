@@ -818,6 +818,8 @@ export const messages = {
   // Settings as a screen of sections (SettingsDialog), and its voice slots.
   "settings.title": "Settings",
   "settings.attention": "Settings · something needs your attention",
+  "settings.updateAvailable": "Settings · update available",
+  "updates.navAvailable": ", update available",
   "settings.close": "Close Settings and return to your conversations",
   "settings.sections": "Settings sections",
   "settings.section.general": "General",

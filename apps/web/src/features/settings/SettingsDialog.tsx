@@ -25,6 +25,7 @@ import { useMicrophoneAccess } from "../permissions/permission-view";
 import type { MicrophoneSnapshot } from "../../services/microphone-access";
 import { ShortcutsSettings, useShortcutsSection } from "./ShortcutsSettings";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
+import { useSeeUpdates, useUpdateMark } from "../updates/update-mark";
 import { machineStatus, type MachineStatus } from "./machine-status";
 import { MachineEntryCopy, MachineEntryState, StateOnIcon, machineEntryName } from "./MachineState";
 import { Alert } from "../../components/ui/Alert";
@@ -230,6 +231,18 @@ export function SettingsDialog() {
   useEffect(() => { if (!phone) content.current?.scrollTo?.({ top: 0 }); }, [current, machine]); // eslint-disable-line react-hooks/exhaustive-deps
   const waits = useVoiceReadiness();
   const news = useHighlights();
+  const updateMark = useUpdateMark();
+  // The Updates section in view marks the app's update seen: open (not closed behind), and its page shown on a phone.
+  const [opened, setOpened] = useState(false);
+  useEffect(() => {
+    if (!dialog) return;
+    const read = () => setOpened(dialog.open);
+    read();
+    const observer = new MutationObserver(read);
+    observer.observe(dialog, { attributes: true, attributeFilter: ["open"] });
+    return () => observer.disconnect();
+  }, [dialog]);
+  useSeeUpdates(opened && current === "updates" && (!phone || level > 1));
   // This device's state, as its section's entry says it (only shown where the app reads its service).
   const localMachine = useRoomStore((state) => state.machines.find((item) => item.local) ?? null);
   const localStatus = useRoomStore((state) => state.facts.localHostStatus);
@@ -299,6 +312,8 @@ export function SettingsDialog() {
       : SECTIONS.find((section) => section.id === id)!.icon(size);
   // How many new things are under a section (its mark, VARIANTS `section-new`).
   const isNew = (id: string) => news.filter((item) => item.section === id).length;
+  // The app's update, unseen: its mark is the Updates entry's, said in words to assistive tech.
+  const updated = (id: string) => id === "updates" && updateMark;
   // What needs attention wears the one warning dot the app uses (the stage's title has it too; operator, 2026-10-16):
   // a model chosen but not ready, or the microphone not allowed; said in words on hover and to assistive tech.
   const micBlocked = ["prompt", "requesting", "denied", "missing"].includes(mic.microphone?.state ?? "");
@@ -336,10 +351,10 @@ export function SettingsDialog() {
               inert={motionOf(across, 1)?.startsWith("out") || undefined} data-motion={motionOf(across, 1)}>
               {phone ? <ul className="settings-menu">
                   {sections.map((section) => <li key={section.id}>
-                    <MenuRow id={"settings-" + section.id} aria-controls={"pane-" + section.id} icon={<NewOnIcon icon={icon(section.id, 20)} isNew={isNew(section.id)} />}
+                    <MenuRow id={"settings-" + section.id} aria-controls={"pane-" + section.id} icon={<NewOnIcon icon={icon(section.id, 20)} isNew={isNew(section.id) || updated(section.id)} />}
                       // This device is a machine's entry too, named as one: its name, its service's state, new.
                       aria-label={section.id === "this-computer" ? machineEntryName(label(section.id), thisDevice, isNew(section.id), t) : undefined}
-                      label={label(section.id)} summary={summaries[section.id]} badge={badge(section.id)} end={<NewAtEnd isNew={isNew(section.id)} spoken={t("highlights.navNew")} />}
+                      label={label(section.id)} summary={summaries[section.id]} badge={badge(section.id)} end={<><NewAtEnd isNew={isNew(section.id)} spoken={t("highlights.navNew")} />{updated(section.id) && <span className="sr-only">{t("updates.navAvailable")}</span>}</>}
                       onClick={() => levels.open(section.id)} />
                   </li>)}
                 </ul>
@@ -349,8 +364,9 @@ export function SettingsDialog() {
                   return <Fragment key={section.id}><button type="button" id={"settings-" + section.id} className={device ? "ui-nav-item this-device-entry" : "ui-nav-item"} aria-controls={"pane-" + section.id}
                     aria-current={section.id === current ? section.id === "machines" ? "true" : "page" : undefined} aria-label={device ? machineEntryName(label(section.id), thisDevice, isNew(section.id), t) : undefined}
                     onClick={() => section.id === "machines" ? store?.patch({ settingsSection: "machines", machinesView: { machine: null } }) : show(section.id)}>
-                    <NewOnIcon icon={icon(section.id)} isNew={isNew(section.id)} />
+                    <NewOnIcon icon={icon(section.id)} isNew={isNew(section.id) || updated(section.id)} />
                     {device ? <MachineEntryCopy name={label(section.id)} status={thisDevice} isNew={isNew(section.id)} /> : <span>{label(section.id)}</span>}
+                    {updated(section.id) && <span className="sr-only">{t("updates.navAvailable")}</span>}
                     {badge(section.id)}
                     {!device && <NewAtEnd isNew={isNew(section.id)} spoken={t("highlights.navNew")} />}
                   </button>

@@ -801,6 +801,8 @@ export const messages: Messages = {
   "voice.prepare.announceReady": "{model} の準備ができました",
   "settings.title": "設定",
   "settings.attention": "設定 · 確認が必要な項目があります",
+  "settings.updateAvailable": "設定 · アップデートがあります",
+  "updates.navAvailable": "、アップデートあり",
   "settings.close": "設定を閉じて会話に戻る",
   "settings.sections": "設定のセクション",
   "settings.section.general": "一般",
