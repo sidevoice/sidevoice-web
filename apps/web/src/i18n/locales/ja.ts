@@ -1375,8 +1375,6 @@ export const messages: Messages = {
   "messages.audio.unconfirmed": "聴取状況は未確認",
   "messages.audio.unknown": "音声停止 · 再生範囲は不明",
   "messages.audio.skipped": "スキップしました",
-  "messages.cut.label": "中断",
-  "messages.cut.here": "ここで中断",
   "messages.cut.interrupted": "中断",
   "messages.cut.show": "続きを表示",
   "messages.cut.hide": "続きを隠す",

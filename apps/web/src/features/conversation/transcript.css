@@ -222,118 +222,41 @@
 .messages-empty svg { color: var(--sv-text-subtle); }
 .messages-empty p { max-width: 28ch; margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
 
-/* ----- how a reply settles once played (UnheardReply.tsx): cut part-way, or never played. The choices are variants for now. */
+/* ----- how a reply settles once played (UnheardReply.tsx, UnheardMark.tsx): cut part-way, or never played. */
 .cut-heard { white-space: pre-wrap; }
-.cut-marker { appearance: none; border: 0; background: none; padding: 0; font: inherit; color: var(--sv-voice-text); cursor: pointer; white-space: nowrap; }
-.cut-marker:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: var(--sv-radius-sm); }
-.cut-marker .cut-chevron { transition: transform 120ms; }
-.cut-marker[aria-expanded="true"] .cut-chevron { transform: rotate(180deg); }
-.cut-rest { color: var(--sv-text-subtle); }
-/* pill: the landing's own, a small pill with the pause bars, inline where the voice stopped. */
-.cut-marker[data-variant="pill"] {
-  display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px; border-radius: var(--sv-radius-pill); vertical-align: .08em;
-  background: var(--sv-voice-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sv-voice) 55%, transparent);
-  font-size: var(--sv-font-xs); font-weight: 650; line-height: 1.25rem;
-}
-/* bar: wordless, a bar in the voice's colour where it stopped and an ellipsis for the rest. */
-.cut-marker[data-variant="bar"] { display: inline-flex; align-items: center; gap: 4px; padding: 0 4px; vertical-align: -.2em; font-weight: 700; letter-spacing: .08em; }
-.cut-bar { width: 3px; height: 1.15em; border-radius: 2px; background: var(--sv-voice); }
-/* rule: a dashed line across the balloon with the way to the rest centred on it; the rest falls under it. */
-.cut-text[data-variant="rule"] { display: block; }
-.cut-text[data-variant="rule"] .cut-marker {
-  display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin: 6px 0 2px; font-size: var(--sv-font-xs); font-weight: 650; line-height: 1.25rem;
-}
-.cut-text[data-variant="rule"] .cut-marker::before, .cut-text[data-variant="rule"] .cut-marker::after {
-  content: ""; flex: 1; border-top: 1px dashed color-mix(in srgb, var(--sv-voice) 70%, transparent);
-}
-.cut-text[data-variant="rule"] .cut-rest { display: block; }
-
-/* A reply that never played takes the run's width, not a balloon: one small mark. */
-.unheard { min-width: 0; flex: 1; display: grid; justify-items: start; gap: var(--sv-space-1); color: var(--sv-text-muted); }
-.unheard-mark { appearance: none; border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; min-width: 0; max-width: 100%; position: relative; }
-.unheard-mark:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: var(--sv-radius-pill); }
-/* Small to the eye, not to a finger. */
-.unheard-mark::after { content: ""; position: absolute; inset: -8px 0; }
-.unheard-chip { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; }
-.unheard-chip svg { flex: none; }
-.unheard-snippet { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--sv-font-xs); line-height: 1rem; }
-.unheard-text {
-  margin: 0; padding-left: var(--sv-space-3); border-left: 2px dashed var(--sv-border-strong); max-width: min(86%, 34rem);
-  font-size: var(--sv-font-sm); line-height: 1.375rem; color: var(--sv-text-muted); white-space: pre-wrap; overflow-wrap: anywhere;
-}
-.unheard-body { display: grid; gap: var(--sv-space-1); max-width: min(86%, 34rem); }
-.unheard-body .unheard-text { max-width: none; }
-.unheard-text .ui-button.listen-again { display: inline-flex; vertical-align: middle; width: 22px; height: 22px; margin-left: var(--sv-space-1); border-radius: 50%; color: var(--sv-text-subtle); }
-.unheard-text time { margin-left: var(--sv-space-2); font-size: var(--sv-font-xs); font-variant-numeric: tabular-nums; color: var(--sv-text-subtle); }
-/* dot: the speaker-off mark alone, a 22px circle. */
-.unheard[data-variant="dot"] .unheard-chip { justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--sv-bg-sunken); box-shadow: inset 0 0 0 1px var(--sv-border); }
-[data-theme="dark"] .unheard[data-variant="dot"] .unheard-chip { background: var(--sv-surface-raised); }
-/* line: a hairline across the run with the mark and the first words on it, as a day's name sits on the log. */
-/* ghost: one line of a balloon without the balloon: a dashed pill with the first words. */
-.unheard[data-variant="ghost"] .unheard-chip { padding: 2px var(--sv-space-3) 2px var(--sv-space-2); border-radius: var(--sv-radius-pill); outline: 1px dashed var(--sv-border-strong); outline-offset: -1px; }
-.unheard[data-variant="ghost"] .unheard-snippet { max-width: 22ch; }
-
-/* line*: a hairline across the run with the mark and the first words on it, as a day's name sits on the log. The mark
- * starts at one fixed offset from the run's edge (a lead of fixed width), so every mark lines up whatever it says. */
-.unheard[data-line] { justify-items: stretch; }
-.unheard[data-line] .unheard-mark { display: flex; align-items: center; gap: var(--sv-space-2); width: 100%; max-width: 34rem; min-height: 20px; }
-.unheard-rule { flex: 1; min-width: 12px; border-top: 1px solid var(--sv-border); }
-.unheard-rule.unheard-lead { flex: none; width: 20px; min-width: 0; }
-.unheard[data-line] .unheard-chip { flex: 0 1 auto; max-width: 70%; }
-/* line-subtle: thinner and fainter than the day's label, smaller type, three words. */
-.unheard[data-variant="line-subtle"] .unheard-rule { border-top-color: color-mix(in srgb, var(--sv-border) 60%, transparent); }
-.unheard[data-variant="line-subtle"] .unheard-lead { width: 14px; }
-.unheard[data-variant="line-subtle"] { color: var(--sv-text-subtle); }
-.unheard[data-variant="line-subtle"] .unheard-snippet { font-size: 0.6875rem; line-height: 0.875rem; }
-.unheard[data-variant="line-subtle"] .unheard-chip svg { width: 10px; height: 10px; }
-/* line-quiet: the same line with the mark alone, no words. */
-.unheard[data-variant="line-quiet"] { color: var(--sv-text-subtle); }
-.unheard[data-variant="line-quiet"] .unheard-rule { border-top-color: color-mix(in srgb, var(--sv-border) 60%, transparent); }
-.unheard[data-variant="line-quiet"] .unheard-lead { width: 14px; }
-.unheard[data-variant="line-quiet"] .unheard-chip svg { width: 10px; height: 10px; }
-
-/* landing: the landing's interrupted pill (site.css .voice-cut): a small tinted pill with the pause bars and a short
- * word, the rest after it in a muted colour. */
-.cut-marker[data-variant^="landing"] {
-  display: inline-flex; align-items: center; gap: 4px; padding: 2px 5px; border-radius: 4px; vertical-align: .1em;
+.cut-rest { color: var(--sv-text-muted); }
+/* The landing's interrupted pill (site.css .voice-cut): the pause bars and an arrow at rest; its word grows in on hover or focus. */
+.cut-marker {
+  appearance: none; display: inline-flex; align-items: center; gap: 4px; padding: 2px 5px; border-radius: 4px; vertical-align: .1em; cursor: pointer; font: inherit;
   border: 1px solid color-mix(in srgb, var(--sv-accent) 25%, var(--sv-surface)); background: var(--sv-accent-soft); color: var(--sv-accent-text);
-  font-size: 0.64rem; font-weight: 650; line-height: 1.3;
+  font-size: 0.64rem; font-weight: 650; line-height: 1.3; white-space: nowrap;
 }
-.cut-marker[data-variant^="landing"] svg { width: 9px; height: 9px; }
-.cut-text[data-variant^="landing"] .cut-rest { color: var(--sv-text-muted); }
+.cut-marker:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.cut-marker svg { width: 9px; height: 9px; flex: none; }
+.cut-marker .cut-label { max-width: 0; overflow: hidden; opacity: 0; transition: max-width 160ms, opacity 160ms; }
+.cut-marker:is(:hover, :focus-visible) .cut-label { max-width: 10rem; opacity: 1; }
+.cut-marker .cut-chevron { transition: transform 120ms; }
+.cut-marker[aria-expanded="true"] .cut-chevron { transform: rotate(90deg); }
 
-/* bar-*: the bar variant with the choices to compare: an arrow right (bar-right, bar-purple, bar-label) or down
- * (bar-down), the bar amber (bar-right, bar-down) or the accent purple (bar-purple, bar-label), a short word (bar-label). */
-.cut-marker:is([data-variant="bar-right"], [data-variant="bar-down"], [data-variant="bar-purple"], [data-variant="bar-label"]) {
-  display: inline-flex; align-items: center; gap: 3px; margin-inline: 2px; padding: 0 2px; vertical-align: top; height: 1.5rem; font-size: var(--sv-font-xs); font-weight: 650;
+/* A reply that never played: one quiet row, at the message size in a light grey, from one fixed left edge. */
+.unheard { min-width: 0; flex: 1; display: grid; gap: var(--sv-space-1); }
+.unheard-mark {
+  appearance: none; display: flex; align-items: center; gap: var(--sv-space-2); width: 100%; max-width: 34rem; min-height: 24px; padding: var(--sv-space-2) 0; border: 0; background: none;
+  font: inherit; font-size: 1rem; line-height: 1.5rem; text-align: left; color: var(--sv-text-subtle); cursor: pointer; position: relative; min-width: 0;
 }
-.cut-marker:is([data-variant="bar-right"], [data-variant="bar-down"]) .cut-bar { background: var(--sv-voice); }
-.cut-marker:is([data-variant="bar-purple"], [data-variant="bar-label"]) { color: var(--sv-accent-text); }
-.cut-marker:is([data-variant="bar-purple"], [data-variant="bar-label"]) .cut-bar { background: var(--sv-accent); }
-.cut-marker[data-variant^="bar-"] .cut-bar { height: 1.125rem; }
-.cut-marker[data-variant^="bar-"][aria-expanded="true"] .cut-chevron { transform: rotate(90deg); }
-.cut-marker[data-variant="bar-down"][aria-expanded="true"] .cut-chevron { transform: rotate(180deg); }
-.cut-marker[data-variant="bar-label"] .cut-label { margin-left: 2px; }
-
-/* line-time, line-chevron*: the line with room around it (as much as between messages), the time as the other messages
- * show it, and, for the chevron ones, the arrow that turns on opening: one quiet row, as an agent's collapsed steps. */
-.unheard[data-roomy] .unheard-mark { padding-block: var(--sv-space-2); }
-.unheard-chevron { flex: none; width: 20px; color: var(--sv-text-subtle); transition: transform 120ms; }
+/* Small to the eye, not to a finger. */
+.unheard-mark::after { content: ""; position: absolute; inset: -4px 0; }
+.unheard-mark:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: var(--sv-radius-sm); }
+.unheard-rule { flex: none; width: 20px; border-top: 1px solid var(--sv-border); }
+.unheard-icon { position: relative; flex: none; width: 16px; height: 16px; }
+.unheard-icon svg { position: absolute; inset: 0; transition: opacity 140ms, transform 140ms; }
+.unheard-chevron { opacity: 0; transform: rotate(-45deg) scale(.7); }
+/* The icon morphs into the arrow: right while folded, down once the reply is open. */
+.unheard-mark:is(:hover, :focus-visible) .unheard-blocked, .unheard-mark[aria-expanded="true"] .unheard-blocked { opacity: 0; transform: rotate(45deg) scale(.7); }
+.unheard-mark:is(:hover, :focus-visible) .unheard-chevron, .unheard-mark[aria-expanded="true"] .unheard-chevron { opacity: 1; transform: none; }
 .unheard-mark[aria-expanded="true"] .unheard-chevron { transform: rotate(90deg); }
-.unheard-time { flex: none; font-size: var(--sv-font-xs); line-height: 1rem; font-variant-numeric: tabular-nums; color: var(--sv-text-subtle); }
-.unheard[data-variant="line-chevron-inline"] .unheard-chip { flex: 0 1 auto; max-width: 60%; }
-/* The chevron takes the lead's place: the mark's icon starts at the same offset in every variant of the family. */
-.unheard[data-variant^="line-chevron"] .unheard-mark { gap: var(--sv-space-1); }
-.cut-marker[data-variant="landing-chevron"] .cut-chevron { width: 10px; height: 10px; transition: transform 120ms; }
-.cut-marker[data-variant="landing-chevron"][aria-expanded="true"] .cut-chevron { transform: rotate(90deg); }
-
-/* line-chevron-after*: the line's short rule, the first words, then the arrow after them (a full rule follows it in
- * line-chevron-after-rule, none in line-chevron-after). */
-.unheard-chevron.unheard-chevron-after { width: 12px; }
-.unheard[data-variant^="line-chevron-after"] .unheard-chip { flex: 0 1 auto; max-width: 75%; }
-.unheard[data-variant="line-chevron-after"] .unheard-mark { width: max-content; }
-
-/* landing-icon-*: the landing's pill with the pause bars and the arrow alone; opened, the arrow points down or left. */
-.cut-marker:is([data-variant="landing-icon-down"], [data-variant="landing-icon-left"]) .cut-chevron { width: 10px; height: 10px; transition: transform 120ms; }
-.cut-marker[data-variant="landing-icon-down"][aria-expanded="true"] .cut-chevron { transform: rotate(90deg); }
-.cut-marker[data-variant="landing-icon-left"][aria-expanded="true"] .cut-chevron { transform: rotate(180deg); }
+.unheard-snippet { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unheard-label { flex: none; max-width: 0; overflow: hidden; opacity: 0; white-space: nowrap; font-size: var(--sv-font-xs); transition: max-width 160ms, opacity 160ms; }
+/* A little presence: darker, a touch heavier, and what it is. */
+.unheard-mark:is(:hover, :focus-visible) { color: var(--sv-text-muted); font-weight: 500; }
+.unheard-mark:is(:hover, :focus-visible) .unheard-label { max-width: 8rem; opacity: 1; }

@@ -249,9 +249,9 @@ test("a reply cut part-way shows what was heard and a cut marker, the rest folde
   expect(container.querySelector(".cut-heard")?.textContent).toBe("I fixed the clock fixture");
   expect(container.querySelector(".cut-rest")).toBeNull();
   expect(container.querySelector(".audio-fate-mark")).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Cut off · Show the rest" }));
+  fireEvent.click(screen.getByRole("button", { name: "Interrupted · Show the rest" }));
   expect(container.querySelector(".cut-rest")?.textContent).toBe("and the suite passes. Tell me if you want it in its own commit.");
-  fireEvent.click(screen.getByRole("button", { name: "Cut off · Hide the rest" }));
+  fireEvent.click(screen.getByRole("button", { name: "Interrupted · Hide the rest" }));
   expect(container.querySelector(".cut-rest")).toBeNull();
 });
 
@@ -272,9 +272,11 @@ test("a reply that never played is a small mark in the run that opens to its tex
   // The only balloon is the run's foot, so it wears the face; the mark does not.
   expect(container.querySelector(".chat-bubble")).toHaveAttribute("data-position", "only");
   expect(container.querySelectorAll(".ui-avatar")).toHaveLength(1);
-  expect(screen.queryByText(LONG)).toBeNull();
+  // Folded it is the row's first words; opened, the reply is a balloon like any other under the row.
   fireEvent.click(screen.getByRole("button", { name: "Not played · Show the reply" }));
-  expect(container.querySelector(".unheard-text")?.textContent).toContain(LONG);
+  expect(container.querySelectorAll(".chat-bubble")).toHaveLength(2);
+  expect(screen.getByRole("article", { name: `Agente: ${LONG}` })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Not played · Hide the reply" })).toHaveAttribute("aria-expanded", "true");
 });
 
 test("a reply that is playing keeps its whole balloon with the karaoke, whatever its earlier hearing says", () => {
@@ -294,7 +296,7 @@ test("a cut in Chinese falls on a word boundary the platform knows, not on white
 test("a cut in the middle of a Latin word is carried to the word's end", () => {
   const { container } = render(<MessageList conversation={view([message({ segment: "mid", text: "The migration is ready now", hearing: "partial", heard_chars: 8 })])} />);
   expect(container.querySelector(".cut-heard")?.textContent).toBe("The migration");
-  fireEvent.click(screen.getByRole("button", { name: "Cut off · Show the rest" }));
+  fireEvent.click(screen.getByRole("button", { name: "Interrupted · Show the rest" }));
   expect(container.querySelector(".cut-rest")?.textContent).toBe("is ready now");
 });
 

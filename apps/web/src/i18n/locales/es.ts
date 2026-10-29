@@ -1395,8 +1395,6 @@ export const messages: Messages = {
   "messages.audio.unconfirmed": "Escucha sin confirmar",
   "messages.audio.unknown": "Audio detenido · No se sabe cuánto se reprodujo",
   "messages.audio.skipped": "Omitido",
-  "messages.cut.label": "Cortada",
-  "messages.cut.here": "Interrumpida aquí",
   "messages.cut.interrupted": "Interrumpida",
   "messages.cut.show": "Mostrar el resto",
   "messages.cut.hide": "Ocultar el resto",

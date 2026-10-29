@@ -8,7 +8,7 @@ import "./transcript-lab.css";
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MessageList } from "../features/conversation/MessageList";
-import { CUT_MARKERS, CUT_MARKER_VARIANT, UNHEARD_MARKS, UNHEARD_MARK_VARIANT } from "../features/conversation/UnheardReply";
+import { UNHEARD_MARKS, UNHEARD_MARK_VARIANT } from "../features/conversation/UnheardMark";
 import { VARIANTS_KEY, useVariant } from "../lib/variants";
 import type { ChatMessage, ConversationView } from "../state/room-types";
 
@@ -72,6 +72,17 @@ function scenario(id: StateId, at: number, settled: "playing" | "heard" | "cut")
 const params = new URLSearchParams(location.search);
 const WIDTHS = [["phone", 380], ["panel", 420], ["wide", 560]] as const;
 
+/** A choice that was made is code, and a stored value that is no longer an option is dropped. */
+function pruneVariants() {
+  try {
+    const all = JSON.parse(localStorage.getItem(VARIANTS_KEY) || "{}");
+    delete all["transcript-cut-marker"];
+    if (!(UNHEARD_MARKS as readonly string[]).includes(all[UNHEARD_MARK_VARIANT])) delete all[UNHEARD_MARK_VARIANT];
+    localStorage.setItem(VARIANTS_KEY, JSON.stringify(all));
+  } catch { localStorage.removeItem(VARIANTS_KEY); }
+}
+pruneVariants();
+
 function setVariant(name: string, value: string) {
   let all: Record<string, string> = {};
   try { all = JSON.parse(localStorage.getItem(VARIANTS_KEY) || "{}"); } catch { /* start over */ }
@@ -130,7 +141,6 @@ function Lab() {
         </div>}
       </fieldset>
       <Choice name={UNHEARD_MARK_VARIANT} title="Never played: the mark" values={UNHEARD_MARKS} />
-      <Choice name={CUT_MARKER_VARIANT} title="Cut part-way: the marker" values={CUT_MARKERS} />
       <fieldset><legend>Theme</legend>
         {(["light", "dark"] as const).map((value) => <label key={value}><input type="radio" name="theme" checked={theme === value} onChange={() => setTheme(value)} /> {value}</label>)}
       </fieldset>

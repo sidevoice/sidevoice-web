@@ -6,8 +6,8 @@ test("a reply cut off draws its cut marker over its heard text, in both themes",
     const host = document.createElement("div");
     host.className = "call-layout";
     host.innerHTML = `<div class="chat-bubble" data-role="assistant" data-position="only">Complete</div>
-      <div class="chat-bubble" data-role="assistant" data-position="only" data-interrupted="true"><span class="cut-text" data-variant="pill"><span class="cut-heard">Interrupted</span>
-        <button class="cut-marker" data-variant="pill" aria-expanded="false">Cut off</button></span></div>`;
+      <div class="chat-bubble" data-role="assistant" data-position="only" data-interrupted="true"><span class="cut-text"><span class="cut-heard">Interrupted</span>
+        <button class="cut-marker" aria-expanded="false">Interrupted</button></span></div>`;
     document.body.append(host);
   });
   for (const theme of ["light", "dark"]) {
@@ -15,12 +15,12 @@ test("a reply cut off draws its cut marker over its heard text, in both themes",
       document.documentElement.dataset.theme = theme;
       const [complete, interrupted] = document.querySelectorAll(".call-layout .chat-bubble");
       const marker = getComputedStyle(interrupted.querySelector(".cut-marker"));
-      return { complete: getComputedStyle(complete).boxShadow, interrupted: getComputedStyle(interrupted).boxShadow, shape: marker.boxShadow, fill: marker.backgroundColor };
+      return { complete: getComputedStyle(complete).boxShadow, interrupted: getComputedStyle(interrupted).boxShadow, edge: marker.borderTopWidth, fill: marker.backgroundColor };
     }, theme);
     expect(paints.complete, theme).not.toBe("none");
-    // The balloon is the same as a complete one: the cut is the marker's, a pill with its own fill and edge.
+    // The balloon is the same as a complete one: the cut is the marker's, a pill with its own fill and a 1px edge.
     expect(paints.interrupted, theme).toBe(paints.complete);
-    expect(paints.shape, theme).toContain("inset");
+    expect(paints.edge, theme).toBe("1px");
     expect(paints.fill, theme).not.toBe("rgba(0, 0, 0, 0)");
   }
 });

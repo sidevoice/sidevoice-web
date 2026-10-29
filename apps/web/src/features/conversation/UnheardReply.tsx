@@ -1,19 +1,13 @@
 import { useState } from "react";
-import { ChevronIcon, CutIcon, CutMoreIcon, UnplayedIcon } from "../../components/ui/Icons";
-import { useVariant } from "../../lib/variants";
+import { CutIcon, CutMoreIcon } from "../../components/ui/Icons";
 import { translator } from "../../i18n/translator";
 import { uiLocale } from "../../i18n/locale";
 import type { ChatMessage } from "../../state/room-types";
 import { wordEnd } from "./KaraokeText";
-import { ListenAgain } from "./ListenAgain";
 
 /* How a reply settles once it has played (issue #182): heard whole, cut part-way, or never played. While it plays the
- * bubble is the karaoke's, whole, so nothing here applies until playback is over. Open visual choices, compared on the
- * transcript lab (transcript-lab.html) until one is picked: then its variant goes and the choice is the code. */
-export const UNHEARD_MARKS = ["dot", "line", "ghost", "line-subtle", "line-quiet", "line-time", "line-chevron", "line-chevron-time", "line-chevron-inline", "line-chevron-after", "line-chevron-after-rule"] as const;
-export const CUT_MARKERS = ["pill", "bar", "rule", "landing", "landing-chevron", "landing-icon-down", "landing-icon-left", "bar-right", "bar-down", "bar-purple", "bar-label"] as const;
-export const UNHEARD_MARK_VARIANT = "transcript-unheard-mark";
-export const CUT_MARKER_VARIANT = "transcript-cut-marker";
+ * bubble is the karaoke's, whole, so nothing here applies until playback is over. A cut reply is drawn here; a reply
+ * that never played is UnheardMark's row. */
 
 /** The cut, carried to the end of the word it falls in: the language's own word boundaries where the platform has them
  *  (CJK has no spaces), whitespace otherwise. */
@@ -45,70 +39,18 @@ export function hearingOf(message: ChatMessage): Hearing {
   return rest ? { kind: "cut", heard: message.text.slice(0, at).trimEnd(), rest } : { kind: "whole" };
 }
 
-/** The text of a cut reply: what was heard, the cut marker, and the rest folded until asked for. */
+/** The text of a cut reply: what was heard, the landing's marker (the pause bars and an arrow; its word shows on hover or
+ *  focus), and the rest folded until asked for. */
 export function CutText({ heard, rest }: { heard: string; rest: string }) {
   const t = translator();
-  const marker = useVariant(CUT_MARKER_VARIANT, CUT_MARKERS);
   const [open, setOpen] = useState(false);
+  const name = t("messages.cut.interrupted");
   const action = t(open ? "messages.cut.hide" : "messages.cut.show");
-  // landing-icon-*: no word on the marker, its name in the tooltip and for assistive tech.
-  const wordless = marker.startsWith("landing-icon");
-  const toggle = <button type="button" className="cut-marker" data-variant={marker} aria-expanded={open} title={wordless ? t("messages.cut.interrupted") : action} aria-label={`${wordless ? t("messages.cut.interrupted") : t("messages.cut.label")} · ${action}`} onClick={() => setOpen(!open)}>
-    {marker === "pill" && <><CutIcon /><span>{t("messages.cut.label")}</span><ChevronIcon className="cut-chevron" size={12} /></>}
-    {marker === "bar" && <><span className="cut-bar" aria-hidden="true" /><span className="cut-more" aria-hidden="true">…</span></>}
-    {marker === "rule" && <><CutIcon /><span>{action}</span><ChevronIcon className="cut-chevron" size={12} /></>}
-    {/* landing: the landing's own pill, pause bars and "Interrupted here"; the rest follows it as the landing's muted text. */}
-    {wordless && <><CutIcon /><CutMoreIcon className="cut-chevron" size={10} /></>}
-    {marker.startsWith("landing") && !wordless && <><CutIcon /><span>{t("messages.cut.here")}</span>{marker === "landing-chevron" && <CutMoreIcon className="cut-chevron" size={10} />}</>}
-    {/* bar-*: a bar, an arrow (right, or down for bar-down), and for bar-label a short word. */}
-    {marker.startsWith("bar-") && <><span className="cut-bar" aria-hidden="true" />
-      {marker === "bar-down" ? <ChevronIcon className="cut-chevron" size={12} /> : <CutMoreIcon className="cut-chevron" size={12} />}
-      {marker === "bar-label" && <span className="cut-label">{t("messages.cut.interrupted")}</span>}</>}
-  </button>;
-  // The rule is a block of its own: a space around it would be a blank line.
-  const gap = marker === "rule" ? null : " ";
-  return <span className="cut-text" data-variant={marker} data-open={open || undefined}>
-    <span className="cut-heard">{heard}</span>{gap}{toggle}{open && <>{gap}<span className="cut-rest">{rest}</span></>}
-  </span>;
-}
-
-/** The first words of a text, with an ellipsis when there are more. */
-const firstWords = (text: string, count: number) => {
-  const words = text.trim().split(/\s+/);
-  return words.length > count ? `${words.slice(0, count).join(" ")}…` : text.trim();
-};
-
-/** A reply that never played: a small mark in the run, in place of its balloon; opening it shows what it said. */
-export function UnheardMark({ message }: { message: ChatMessage }) {
-  const t = translator();
-  const variant = useVariant(UNHEARD_MARK_VARIANT, UNHEARD_MARKS);
-  const [open, setOpen] = useState(false);
-  const label = t("messages.audio.notPlayed");
-  const replay = message.replayable && message.role === "assistant";
-  const action = t(open ? "messages.unheard.hide" : "messages.unheard.show");
-  const line = variant.startsWith("line");
-  const after = variant.startsWith("line-chevron-after");
-  const chevron = variant.includes("chevron") && !after;
-  const when = new Date(message.time).toLocaleTimeString(uiLocale(), { hour: "2-digit", minute: "2-digit" });
-  const time = <time className="unheard-time" dateTime={new Date(message.time).toISOString()}>{when}</time>;
-  const showsTime = variant.endsWith("time") || variant.endsWith("inline");
-  return <div className="unheard" data-variant={variant} data-line={line || undefined} data-roomy={variant.length > 4 && !variant.endsWith("subtle") && !variant.endsWith("quiet") || undefined} data-open={open || undefined} data-segment={message.segment || undefined}>
-    <button type="button" className="unheard-mark" aria-expanded={open} title={`${label} · ${action}`} aria-label={`${label} · ${action}`} onClick={() => setOpen(!open)}>
-      {chevron ? <CutMoreIcon className="unheard-chevron" size={12} /> : line && <span className="unheard-rule unheard-lead" aria-hidden="true" />}
-      <span className="unheard-chip"><UnplayedIcon size={12} />{variant !== "dot" && variant !== "line-quiet" && <span className="unheard-snippet">{variant === "line-subtle" ? firstWords(message.text, 3) : message.text}</span>}</span>
-      {variant === "line-chevron-inline" && time}
-      {after && <CutMoreIcon className="unheard-chevron unheard-chevron-after" size={12} />}
-      {line && variant !== "line-chevron-after" && <span className="unheard-rule" aria-hidden="true" />}
-      {(variant === "line-time" || variant === "line-chevron-time") && time}
+  return <span className="cut-text" data-open={open || undefined}>
+    <span className="cut-heard">{heard}</span>{" "}
+    <button type="button" className="cut-marker" aria-expanded={open} aria-label={`${name} · ${action}`} onClick={() => setOpen(!open)}>
+      <CutIcon /><span className="cut-label" aria-hidden="true">{name}</span><CutMoreIcon className="cut-chevron" size={10} />
     </button>
-    {open && <div className="unheard-body">
-      <p className="unheard-text">
-        {message.text}
-        {!showsTime && <time dateTime={new Date(message.time).toISOString()}>{when}</time>}
-        {replay && <ListenAgain message={message} />}
-      </p>
-      {message.deliveryNote && <span className="chat-audio-note">{message.deliveryNote}</span>}
-      {message.audioNote && <span className="chat-audio-note">{message.audioNote}</span>}
-    </div>}
-  </div>;
+    {open && <>{" "}<span className="cut-rest">{rest}</span></>}
+  </span>;
 }

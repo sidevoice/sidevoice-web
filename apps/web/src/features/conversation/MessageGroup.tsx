@@ -5,7 +5,8 @@ import { CharacterAvatar } from "../avatar/CharacterAvatar";
 import { translator } from "../../i18n/translator";
 import { speakerName, type MessageGroupView } from "./group-messages";
 import { MessageBubble } from "./MessageBubble";
-import { UnheardMark, hearingOf } from "./UnheardReply";
+import { UnheardMark } from "./UnheardMark";
+import { hearingOf } from "./UnheardReply";
 
 /** The agent of a conversation wears the same face here as on the stage and in the list; a row from no known
  *  conversation keeps its initials. */
