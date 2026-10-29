@@ -394,6 +394,7 @@ export const messages: Messages = {
   "hosts.reconnect": "Neu verbinden",
   "hosts.version": "Version {version}",
   "hosts.calls": "Laufende Anrufe: {calls}",
+  "hosts.port": "Port {port}",
   "hosts.devices.empty": "Mit diesem Rechner sind keine Geräte gekoppelt.",
   "hosts.devices.emptyOthers": "Mit diesem Computer sind keine anderen Geräte gekoppelt.",
   "hosts.devices.thisDevice": "Dieses Gerät",

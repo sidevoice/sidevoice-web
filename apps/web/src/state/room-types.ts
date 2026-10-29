@@ -100,6 +100,8 @@ export interface MachineView {
   /** Whether this row is the app-owned local host, which is projected from the desktop bridge. */
   local?: boolean;
   localStatus?: import("../services/desktop-host").LocalHostStatusName | string;
+  /** The port its Core listens on, as its pairing advertises it; null when no address carries one. */
+  port?: number | null;
 }
 
 /** A host's view of one supported coding agent. Instructions always come from that host's connector. */

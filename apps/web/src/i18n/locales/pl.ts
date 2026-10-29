@@ -401,6 +401,7 @@ export const messages: Messages = {
   "hosts.reconnect": "Połącz ponownie",
   "hosts.version": "Wersja {version}",
   "hosts.calls": "Trwające połączenia: {calls}",
+  "hosts.port": "Port {port}",
   "hosts.devices.empty": "Z tą maszyną nie sparowano żadnych urządzeń.",
   "hosts.devices.emptyOthers": "Z tym komputerem nie sparowano innych urządzeń.",
   "hosts.devices.thisDevice": "To urządzenie",

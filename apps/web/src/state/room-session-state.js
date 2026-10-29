@@ -404,6 +404,17 @@ export function participantsView(s) {
             activityNote: [experimentalNote(p), workingCapabilityNote(p)].filter(Boolean).join(' ') || null, detail: p.reach?.detail ? (p.reach.detail + (p.reach.remedy ? '\n\n' + p.reach.remedy : '')) : undefined };
     });
 }
+/** The port the machine's Core listens on, as its pairing advertises it: the first address that carries one. */
+export function listeningPort(urls) {
+    for (const url of urls || []) {
+        try {
+            const { port } = new URL(url);
+            if (port) return Number(port);
+        }
+        catch { /* not an address */ }
+    }
+    return null;
+}
 /** The machines this device is paired with, each as one row: its name, how this device reaches it, and since when.
  *  Every one of them is live at once: none is "the one in use". A pairing the machine revoked stays listed, saying so,
  *  until the person pairs again or forgets it — a row that vanished would leave nothing to read about why. */
@@ -413,6 +424,7 @@ export function machinesView(s) {
     const showLocal = !!local || (s.localHostAvailable && localStatus !== 'absent');
     const localRow = showLocal ? {
         fp: local?.fp || 'local-host', host: local?.host || null, local: true, alias: !!local?.alias, machine_host: local?.machine_host ?? null,
+        urls: local?.urls,
         localStatus,
     } : null;
     const rows = [
@@ -432,7 +444,8 @@ export function machinesView(s) {
         const state = p.local ? reachableLocal ? 'connected' : ['failed', 'service-failed', 'refused', 'incompatible'].includes(localStatus) ? 'failed' : 'offline'
             : p.revoked ? 'revoked' : remoteReach;
         return { id: p.local ? 'local-host' : p.fp, pairingId: p.local ? local?.fp : p.fp, host: p.host || '', revoked: !!p.revoked, reach,
-            state, local: !!p.local, localStatus, alias: !!p.alias, machineHost: p.machine_host ?? null };
+            state, local: !!p.local, localStatus, alias: !!p.alias, machineHost: p.machine_host ?? null,
+            port: listeningPort(p.urls) };
     });
 }
 /** Why there is no machine to talk to, in one sentence, or '' when there is one (or it is still being found). The

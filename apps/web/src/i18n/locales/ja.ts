@@ -392,6 +392,7 @@ export const messages: Messages = {
   "hosts.reconnect": "再接続",
   "hosts.version": "バージョン {version}",
   "hosts.calls": "進行中の通話：{calls}",
+  "hosts.port": "ポート {port}",
   "hosts.devices.empty": "このマシンとペアリングされたデバイスはありません。",
   "hosts.devices.emptyOthers": "このコンピュータとペアリングされたほかのデバイスはありません。",
   "hosts.devices.thisDevice": "このデバイス",

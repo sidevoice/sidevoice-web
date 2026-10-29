@@ -336,8 +336,9 @@ function RemoteHostCard({ machine, titleId }: { machine: MachineView; titleId: s
       <div className="host-status-head">
         <h4 id={titleId}>{t("hosts.section.service")}</h4>
       </div>
-      {info?.version && <dl className="host-status-facts">
+      {(info?.version || machine.port) && <dl className="host-status-facts">
         {info?.version && <div className="host-status-product">{t("hosts.productVersion", { version: info.version })}</div>}
+        {machine.port && <div className="host-status-product">{t("hosts.port", { port: machine.port })}</div>}
       </dl>}
     </div>
   );
@@ -411,6 +412,7 @@ function LocalHostStatusPanel({ machine, status, titleId }: { machine: MachineVi
             connector's) — and whether it is up to date: Update available is a link to its row in Updates, where
             everything that updates is. */}
         <ThisDeviceVersion t={t} />
+        {machine.port && <div className="host-status-product">{t("hosts.port", { port: machine.port })}</div>}
       </dl>
       {/* Running or stopped, the state's word says it ("Running", "Not started") and Start follows: no sentence repeats it.
           Whether it starts at sign-in is its switch's alone, below. */}

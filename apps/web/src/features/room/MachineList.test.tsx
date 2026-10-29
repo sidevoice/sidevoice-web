@@ -642,7 +642,7 @@ test("this computer is not among the remote machines; stopped, its card says Not
 test("a machine paired without encryption shows exactly what the same machine paired with it shows: its entry, its page", async () => {
   // The same machine, paired over https or — as the person agreed when pairing — over plain http on a private network.
   const lab = { fp: "fp-lab", host: "Lab box" };
-  const encrypted = paired({ ...lab, urls: ["https://lab.example"] });
+  const encrypted = paired({ ...lab, urls: ["https://lab.example:8768"] });
   const unencrypted = paired({ ...lab, insecure: true, urls: ["http://192.168.1.20:8768"] });
   // What the person meets under Machines, with Lab box's page open; React's own ids are counted afresh each render.
   const shown = async (pairing: PairingSummary) => {
@@ -660,6 +660,17 @@ test("a machine paired without encryption shows exactly what the same machine pa
   // And nothing in it speaks of encryption: no words, no open lock, no (i) about the connection.
   expect(plain).not.toMatch(/encrypt|lucide-lock|insecure|About this connection/i);
   expect(plain).toContain("Lab box, Online");
+});
+
+test("a machine's page says the port its Core listens on, as its pairing advertises it, and nothing when no address carries one", async () => {
+  actions();
+  const lab = paired({ fp: "fp-lab", host: "Lab box", urls: ["https://lab.example", "http://192.168.1.20:9000"] });
+  room([lab, paired()], { remoteHostStatus: { "fp-lab": { state: "connected", checkedAt: 1_700_000_000_000 } },
+    machineLinks: { "fp-lab": { reach: "ok", via: "node" }, "fp-nuc": { reach: "ok", via: "node" } } });
+  await act(async () => { entry("Lab box").click(); });
+  expect(within(screen.getByRole("region", { name: "Lab box" })).getByText("Port 9000")).toBeInTheDocument();
+  await act(async () => { entry("NUC").click(); });
+  expect(within(screen.getByRole("region", { name: "NUC" })).queryByText(/^Port /)).toBeNull();
 });
 
 /** The devices list on a remote machine's page, and the action at that page's foot. */
