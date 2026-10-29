@@ -10,8 +10,8 @@ import { ListenAgain } from "./ListenAgain";
 /* How a reply settles once it has played (issue #182): heard whole, cut part-way, or never played. While it plays the
  * bubble is the karaoke's, whole, so nothing here applies until playback is over. Open visual choices, compared on the
  * transcript lab (transcript-lab.html) until one is picked: then its variant goes and the choice is the code. */
-export const UNHEARD_MARKS = ["dot", "line", "ghost", "line-subtle", "line-quiet", "line-time", "line-chevron", "line-chevron-time", "line-chevron-inline"] as const;
-export const CUT_MARKERS = ["pill", "bar", "rule", "landing", "landing-chevron", "bar-right", "bar-down", "bar-purple", "bar-label"] as const;
+export const UNHEARD_MARKS = ["dot", "line", "ghost", "line-subtle", "line-quiet", "line-time", "line-chevron", "line-chevron-time", "line-chevron-inline", "line-chevron-after", "line-chevron-after-rule"] as const;
+export const CUT_MARKERS = ["pill", "bar", "rule", "landing", "landing-chevron", "landing-icon-down", "landing-icon-left", "bar-right", "bar-down", "bar-purple", "bar-label"] as const;
 export const UNHEARD_MARK_VARIANT = "transcript-unheard-mark";
 export const CUT_MARKER_VARIANT = "transcript-cut-marker";
 
@@ -51,12 +51,15 @@ export function CutText({ heard, rest }: { heard: string; rest: string }) {
   const marker = useVariant(CUT_MARKER_VARIANT, CUT_MARKERS);
   const [open, setOpen] = useState(false);
   const action = t(open ? "messages.cut.hide" : "messages.cut.show");
-  const toggle = <button type="button" className="cut-marker" data-variant={marker} aria-expanded={open} title={action} aria-label={`${t("messages.cut.label")} · ${action}`} onClick={() => setOpen(!open)}>
+  // landing-icon-*: no word on the marker, its name in the tooltip and for assistive tech.
+  const wordless = marker.startsWith("landing-icon");
+  const toggle = <button type="button" className="cut-marker" data-variant={marker} aria-expanded={open} title={wordless ? t("messages.cut.interrupted") : action} aria-label={`${wordless ? t("messages.cut.interrupted") : t("messages.cut.label")} · ${action}`} onClick={() => setOpen(!open)}>
     {marker === "pill" && <><CutIcon /><span>{t("messages.cut.label")}</span><ChevronIcon className="cut-chevron" size={12} /></>}
     {marker === "bar" && <><span className="cut-bar" aria-hidden="true" /><span className="cut-more" aria-hidden="true">…</span></>}
     {marker === "rule" && <><CutIcon /><span>{action}</span><ChevronIcon className="cut-chevron" size={12} /></>}
     {/* landing: the landing's own pill, pause bars and "Interrupted here"; the rest follows it as the landing's muted text. */}
-    {marker.startsWith("landing") && <><CutIcon /><span>{t("messages.cut.here")}</span>{marker === "landing-chevron" && <CutMoreIcon className="cut-chevron" size={10} />}</>}
+    {wordless && <><CutIcon /><CutMoreIcon className="cut-chevron" size={10} /></>}
+    {marker.startsWith("landing") && !wordless && <><CutIcon /><span>{t("messages.cut.here")}</span>{marker === "landing-chevron" && <CutMoreIcon className="cut-chevron" size={10} />}</>}
     {/* bar-*: a bar, an arrow (right, or down for bar-down), and for bar-label a short word. */}
     {marker.startsWith("bar-") && <><span className="cut-bar" aria-hidden="true" />
       {marker === "bar-down" ? <ChevronIcon className="cut-chevron" size={12} /> : <CutMoreIcon className="cut-chevron" size={12} />}
@@ -84,7 +87,8 @@ export function UnheardMark({ message }: { message: ChatMessage }) {
   const replay = message.replayable && message.role === "assistant";
   const action = t(open ? "messages.unheard.hide" : "messages.unheard.show");
   const line = variant.startsWith("line");
-  const chevron = variant.includes("chevron");
+  const after = variant.startsWith("line-chevron-after");
+  const chevron = variant.includes("chevron") && !after;
   const when = new Date(message.time).toLocaleTimeString(uiLocale(), { hour: "2-digit", minute: "2-digit" });
   const time = <time className="unheard-time" dateTime={new Date(message.time).toISOString()}>{when}</time>;
   const showsTime = variant.endsWith("time") || variant.endsWith("inline");
@@ -93,7 +97,8 @@ export function UnheardMark({ message }: { message: ChatMessage }) {
       {chevron ? <CutMoreIcon className="unheard-chevron" size={12} /> : line && <span className="unheard-rule unheard-lead" aria-hidden="true" />}
       <span className="unheard-chip"><UnplayedIcon size={12} />{variant !== "dot" && variant !== "line-quiet" && <span className="unheard-snippet">{variant === "line-subtle" ? firstWords(message.text, 3) : message.text}</span>}</span>
       {variant === "line-chevron-inline" && time}
-      {line && <span className="unheard-rule" aria-hidden="true" />}
+      {after && <CutMoreIcon className="unheard-chevron unheard-chevron-after" size={12} />}
+      {line && variant !== "line-chevron-after" && <span className="unheard-rule" aria-hidden="true" />}
       {(variant === "line-time" || variant === "line-chevron-time") && time}
     </button>
     {open && <div className="unheard-body">

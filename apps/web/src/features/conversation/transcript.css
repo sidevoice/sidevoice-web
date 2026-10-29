@@ -326,3 +326,14 @@
 .unheard[data-variant^="line-chevron"] .unheard-mark { gap: var(--sv-space-1); }
 .cut-marker[data-variant="landing-chevron"] .cut-chevron { width: 10px; height: 10px; transition: transform 120ms; }
 .cut-marker[data-variant="landing-chevron"][aria-expanded="true"] .cut-chevron { transform: rotate(90deg); }
+
+/* line-chevron-after*: the line's short rule, the first words, then the arrow after them (a full rule follows it in
+ * line-chevron-after-rule, none in line-chevron-after). */
+.unheard-chevron.unheard-chevron-after { width: 12px; }
+.unheard[data-variant^="line-chevron-after"] .unheard-chip { flex: 0 1 auto; max-width: 75%; }
+.unheard[data-variant="line-chevron-after"] .unheard-mark { width: max-content; }
+
+/* landing-icon-*: the landing's pill with the pause bars and the arrow alone; opened, the arrow points down or left. */
+.cut-marker:is([data-variant="landing-icon-down"], [data-variant="landing-icon-left"]) .cut-chevron { width: 10px; height: 10px; transition: transform 120ms; }
+.cut-marker[data-variant="landing-icon-down"][aria-expanded="true"] .cut-chevron { transform: rotate(90deg); }
+.cut-marker[data-variant="landing-icon-left"][aria-expanded="true"] .cut-chevron { transform: rotate(180deg); }
