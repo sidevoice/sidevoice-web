@@ -28,11 +28,13 @@ export interface MicrophoneView {
   line: MessageKey | null;
   /** Blocked: how to allow it where this page runs, one or two lines. */
   howTo: MessageKey[];
+  /** The button that opens the system's settings, named as this system names them. */
+  openSettings: MessageKey;
 }
 
 /** How to allow a blocked microphone, where this page runs: the lines to show. */
 function howToAllow(asker: MicrophoneSnapshot["asker"], inDesktopApp: boolean, platform: Platform): MessageKey[] {
-  if (asker === "app") return ["wizard.mic.denied.app"];
+  if (asker === "app") return [platform === "windows" ? "wizard.mic.denied.windows" : "wizard.mic.denied.app"];
   if (inDesktopApp) return [platform === "windows" ? "wizard.mic.denied.windows" : platform === "mac" ? "wizard.mic.denied.app" : "wizard.mic.denied.linux"];
   const system: MessageKey | null = platform === "mac" ? "wizard.mic.denied.siteMac" : platform === "windows" ? "wizard.mic.denied.siteWindows" : null;
   return system ? ["wizard.mic.denied.site", system] : ["wizard.mic.denied.site"];
@@ -49,7 +51,8 @@ export function microphoneView(microphone: MicrophoneSnapshot, platform: Platfor
     : state === "requesting" ? (fromSystem ? "wizard.mic.requestingSystem" : "wizard.mic.requestingBrowser")
       : state === "granted" ? "wizard.mic.granted" : state === "missing" ? "wizard.mic.missing" : null;
   return { state, busy: microphone.state === "checking" || microphone.state === "requesting", blocked: state === "denied" || state === "missing",
-    label, line, howTo: howToAllow(asker, inDesktopApp, platform) };
+    label, line, howTo: howToAllow(asker, inDesktopApp, platform),
+    openSettings: platform === "windows" ? "wizard.mic.openSettingsWindows" : "wizard.mic.openSettings" };
 }
 
 /** What a live region says of a state: its change, not the whole screen again. */
@@ -79,7 +82,7 @@ export function MicrophoneHowTo({ view, openSettings, t, id = MIC_HELP_ID }: { v
   const missing = view.state === "missing";
   return <>
     <Alert tone="warning" live id={id} className="wizard-mic-help perm-help" title={t(missing ? "wizard.mic.state.missing" : "wizard.mic.denied.title")}
-      action={openSettings ? <Button type="button" variant="secondary" size="sm" id="wizard-mic-settings" onClick={() => void openSettings()}>{t("wizard.mic.openSettings")}</Button> : undefined}>
+      action={openSettings ? <Button type="button" variant="secondary" size="sm" id="wizard-mic-settings" onClick={() => void openSettings()}>{t(view.openSettings)}</Button> : undefined}>
       {t(missing ? "wizard.mic.missing" : view.howTo[0])}
     </Alert>
     {!missing && view.howTo[1] && <p className="wizard-mic-also perm-also">{t(view.howTo[1])}</p>}

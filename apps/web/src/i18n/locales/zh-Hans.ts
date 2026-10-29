@@ -1175,6 +1175,7 @@ export const messages: Messages = {
   "wizard.prepare.continueWaiting": "请先准备本机以继续。",
   "wizard.mic.checkAgain": "再检查一次",
   "wizard.mic.openSettings": "打开系统设置",
+  "wizard.mic.openSettingsWindows": "打开 Windows 设置",
   "perm.mic.why": "这是让你的智能体听到你的必要条件",
   "perm.state.none": "这里没有需要允许的内容",
   "wizard.turnIntro": "Sidevoice 如何判断你已说完。你可以在“设置 → 通话”中更改。",

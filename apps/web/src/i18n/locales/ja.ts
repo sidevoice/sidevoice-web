@@ -1176,6 +1176,7 @@ export const messages: Messages = {
   "wizard.prepare.continueWaiting": "続けるには、このコンピュータを準備してください。",
   "wizard.mic.checkAgain": "もう一度確認",
   "wizard.mic.openSettings": "システム設定を開く",
+  "wizard.mic.openSettingsWindows": "Windows の設定を開く",
   "perm.mic.why": "エージェントがあなたの声を聞くために必要です",
   "perm.state.none": "ここで許可するものはありません",
   "wizard.turnIntro": "Sidevoice があなたが話し終えたと判断する方法です。「設定 → 通話」で変更できます。",
