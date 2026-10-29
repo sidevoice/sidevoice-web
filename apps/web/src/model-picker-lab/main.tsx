@@ -13,34 +13,24 @@ import { createRoomStore, installRoomBridge, RoomStoreContext } from "../state/r
 import { defaultVoiceSettings, editVoiceSettings } from "../services/voice-settings.js";
 import type { SidevoiceActions } from "../state/room-types";
 import { SlotPane } from "../features/settings/VoiceSettings";
-import { UNRUNNABLE_POLICIES, UNRUNNABLE_VARIANT } from "../features/settings/unrunnable-policy";
-import { VARIANTS_KEY } from "../lib/variants";
 import { ENVIRONMENTS, catalogueFor, firstRunnable, type EnvironmentId } from "./environments";
 
 /* The model picker lab (model-picker.html, served by the dev server only): Settings' transcription and voice panes on a
- * mocked machine, with a panel to switch the variant for models that cannot run here, the machine, and the main or the
- * advanced view. The choice lives in the URL, so a link shows what was looking at. */
+ * mocked machine, with a panel to switch the machine and the main or the advanced view. The choice lives in the URL, so a link shows what was looking at. */
 
 const params = new URLSearchParams(location.search);
 const pick = <Value extends string>(name: string, values: readonly Value[], fallback: Value) => (values as readonly string[]).includes(params.get(name) ?? "") ? (params.get(name) as Value) : fallback;
 
-function setVariant(value: string) {
-  localStorage.setItem(VARIANTS_KEY, JSON.stringify({ [UNRUNNABLE_VARIANT]: value }));
-  window.dispatchEvent(new StorageEvent("storage", { key: VARIANTS_KEY }));
-}
-
 function Lab() {
-  const [variant, setVariantState] = useState(() => pick("variant", UNRUNNABLE_POLICIES, "disable"));
   const [env, setEnv] = useState<EnvironmentId>(() => pick("env", ENVIRONMENTS.map((entry) => entry.id), "desktop-gpu"));
   const [view, setView] = useState(() => pick("view", ["main", "advanced"] as const, "main"));
   const store = useMemo(() => createRoomStore(), []);
   const body = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setVariant(variant); }, [variant]);
   useEffect(() => {
-    const next = new URLSearchParams({ variant, env, view });
+    const next = new URLSearchParams({ env, view });
     history.replaceState(null, "", "?" + next);
-  }, [variant, env, view]);
+  }, [env, view]);
 
   // The machine: its catalogue and its kind; a fresh choice on it, as a first run there would make.
   useEffect(() => {
@@ -75,7 +65,6 @@ function Lab() {
 
   return <RoomStoreContext.Provider value={store}><TooltipProvider>
     <header className="lab-panel">
-      {choices("Variant", variant, [{ id: "hide", label: "A · hide" }, { id: "disable", label: "B · show disabled" }], setVariantState)}
       {choices("Machine", env, ENVIRONMENTS, setEnv)}
       {choices("View", view, [{ id: "main", label: "Main" }, { id: "advanced", label: "Advanced" }], setView)}
     </header>

@@ -894,7 +894,6 @@ export const messages: Messages = {
   "settings.save.waitVoice": "语音模型尚未就绪。",
   "voice.family": "系列",
   "voice.family.none": "选择系列",
-  "voice.family.unfit": "该系列没有可在此运行的模型",
   "voice.languages.more.one": "另外 {n} 种",
   "voice.languages.more.few": "另外 {n} 种",
   "voice.languages.more.other": "另外 {n} 种",

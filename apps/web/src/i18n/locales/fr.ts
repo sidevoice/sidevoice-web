@@ -894,7 +894,6 @@ export const messages: Messages = {
   "settings.save.waitVoice": "Le modèle de voix n’est pas encore prêt.",
   "voice.family": "Famille",
   "voice.family.none": "Choisissez une famille",
-  "voice.family.unfit": "Aucun de ses modèles ne s'exécute ici",
   "voice.languages.more.one": "+{n}",
   "voice.languages.more.few": "+{n}",
   "voice.languages.more.other": "+{n}",

@@ -65,15 +65,12 @@ test("a slot's source comes first: this device, then each provider; one without 
   expect(actions.editVoice).toHaveBeenCalledWith({ stt: { catalog: "elevenlabs" } });
 });
 
-test("then the source's models, this device's family first and then a model of it, one that does not run here disabled with why", () => {
+test("then the source's models, this device's family first and then a model of it, one that does not run here left out", () => {
   const { actions } = renderPane();
   expect(listOptions("stt-family").map((option) => [option.value, option.label])).toEqual([["whisper", "Whisper"], ["moonshine", "Moonshine"]]);
-  expect(listOptions("stt-model").map((option) => option.value)).toEqual(["whisper-base", "whisper-large"]);
+  expect(listOptions("stt-model").map((option) => option.value)).toEqual(["whisper-base"]);
   chooseOption("stt-family", "moonshine");
   expect(actions.editVoice).toHaveBeenCalledWith({ stt: { model: "moonshine-tiny" } });
-  const large = listOptions("stt-model").find((option) => option.value === "whisper-large")!;
-  expect(large.disabled).toBe(true);
-  expect([large.label, large.detail]).toEqual(["whisper-large", "does not run here: it does not fit in this device's memory"]);
 });
 
 test("the voice and the speed range are the model's; smart-turn says why it cannot be chosen; a change says it restarts the voice", () => {
@@ -780,15 +777,14 @@ test("the build a model runs as, with Automatic, is the engine's: one installed 
 
 test("the Model list: each model that can be chosen with its download size at the end of its name's line, its hardware under it", () => {
   renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true), error: "" } });
-  // The size is not read from the line's end: its description says it first, to screen readers. One that cannot be
-  // chosen keeps why.
-  expect(listOptions("stt-model").map((option) => option.detail)).toEqual(["1 MB · GPU · Metal", "does not run here: it does not fit in this device's memory"]);
+  // The size is not read from the line's end: its description says it first, to screen readers. One that cannot run
+  // here is not in the list.
+  expect(listOptions("stt-model").map((option) => option.detail)).toEqual(["1 MB · GPU · Metal"]);
   fireEvent.click(document.getElementById("stt-model")!);
   const row = (value: string) => document.querySelector(`[role=option][data-value="${value}"]`)!;
   expect(row("whisper-base").querySelector(".ui-select-item-badge .model-list-size")).toHaveTextContent(/^1 MB$/);
   expect(row("whisper-base").querySelector(".ui-select-item-badge .model-list-size")).toHaveAttribute("aria-hidden", "true");
   expect(row("whisper-base").querySelector(".ui-select-item-description .model-hardware-name")).toHaveTextContent(/^· Metal$/);
-  expect(row("whisper-large").querySelector(".ui-select-item-badge")).toBeNull();
   fireEvent.keyDown(document.querySelector("[role=listbox]")!, { key: "Escape" });
   expect(document.getElementById("stt-model")).toHaveTextContent(/^whisper-base$/);
   cleanup();
@@ -796,29 +792,17 @@ test("the Model list: each model that can be chosen with its download size at th
   expect(listOptions("turn-model").map((option) => option.detail)).toEqual(["9 MB · CPU"]);
 });
 
-/* Models no engine here can run (variant "unrunnable-models"): hidden in hide, disabled with why in disable. */
+/* Models no engine here can run: left out of the main view, listed in Advanced with why. */
 const gone = (id: string, family: string, code = "backend-not-in-this-build") => local(id, family, ["stt"], { installed: false, builds: [withoutClass(build(id + "/int8", { available: false, accelerator: undefined, installed: false, reasons: [{ code, params: {} }] }))] });
 const localWith = (...extra: unknown[]) => [{ ...catalogs[0], models: [...(catalogs[0] as unknown as { models: unknown[] }).models, ...extra] }, ...catalogs.slice(1)] as unknown as CatalogView[];
 // A family with none that runs, and a mixed one whose first model cannot run.
 const withParakeet = localWith(gone("parakeet-a", "parakeet"), gone("parakeet-b", "parakeet"), gone("mixed-a", "mixed"), local("mixed-b", "mixed", ["stt"]));
-const useVariantValue = (value: string) => localStorage.setItem("sidevoice.variants", JSON.stringify({ "unrunnable-models": value }));
 const ready = () => within(document.getElementById("stt-model-card")!).queryByText("Ready");
 
-test("variant hide: a family and a model that nothing here can run are not offered", () => {
-  useVariantValue("hide");
-  renderPane({ voiceCatalogue: { state: "ready", catalogs: withParakeet, error: "" } });
+test("a family and a model that nothing here can run are not offered; a family changed picks one that runs", () => {
+  const { actions } = renderPane({ voiceCatalogue: { state: "ready", catalogs: withParakeet, error: "" } });
   expect(listOptions("stt-family").map((option) => option.value)).toEqual(["whisper", "moonshine", "mixed"]);
   expect(listOptions("stt-model").map((option) => option.value)).toEqual(["whisper-base"]);
-});
-
-test("variant disable: they are listed greyed out with why, and a family changed picks a model that runs, never one that does not", () => {
-  useVariantValue("disable");
-  const { actions } = renderPane({ voiceCatalogue: { state: "ready", catalogs: withParakeet, error: "" } });
-  const parakeet = listOptions("stt-family").find((option) => option.value === "parakeet")!;
-  expect([parakeet.disabled, parakeet.detail]).toEqual([true, "None of its models run here"]);
-  expect(listOptions("stt-model").find((option) => option.value === "whisper-large")!.disabled).toBe(true);
-  chooseOption("stt-family", "parakeet");
-  expect(actions.editVoice).not.toHaveBeenCalled();
   chooseOption("stt-family", "mixed");
   expect(actions.editVoice).toHaveBeenCalledWith({ stt: { model: "mixed-b" } });
 });

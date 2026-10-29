@@ -46,7 +46,9 @@ export function useModelState(task: Task | "end-of-turn", draft: Settings | null
   const chosen = slot?.build ? model?.builds?.find((candidate) => candidate.id === slot.build && candidate.available) : undefined;
   const build = chosen ?? model?.builds?.find((candidate) => candidate.installed && candidate.available)
     ?? model?.builds?.find((candidate) => candidate.id === model.recommendedBuild && candidate.available) ?? model?.builds?.find((candidate) => candidate.available);
-  const installed = !!model && (!local || (chosen ? chosen.installed : model.builds ? model.builds.some((candidate) => candidate.installed && candidate.available) : model.installed === true));
+  const installed = !!model && (!local || (chosen ? chosen.installed
+    : model.builds?.some((candidate) => typeof candidate.installed === "boolean") ? model.builds.some((candidate) => candidate.installed && candidate.available)
+    : model.installed === true && !!model.builds?.some((candidate) => candidate.available)));
   const mine = install && install.task === task && install.model === slot?.model ? install : null;
   const installing = mine?.state === "running";
   const failure = mine?.state === "failed" ? mine.error : "";
