@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { CutMoreIcon, UnplayedIcon } from "../../components/ui/Icons";
 import { useVariant } from "../../lib/variants";
 import { translator } from "../../i18n/translator";
@@ -18,13 +18,15 @@ export function UnheardMark({ message }: { message: ChatMessage }) {
   const [open, setOpen] = useState(false);
   const label = t("messages.audio.notPlayed");
   const action = t(open ? "messages.unheard.hide" : "messages.unheard.show");
-  return <div className="unheard" data-variant={variant} data-open={open || undefined} data-segment={message.segment || undefined}>
-    <button type="button" className="unheard-mark" aria-expanded={open} aria-label={`${label} · ${action}`} onClick={() => setOpen(!open)}>
-      {variant === "line-rule" && <span className="unheard-rule" aria-hidden="true" />}
-      <span className="unheard-icon" aria-hidden="true"><UnplayedIcon className="unheard-blocked" size={16} /><CutMoreIcon className="unheard-chevron" size={16} /></span>
-      <span className="unheard-snippet">{message.text}</span>
-      <span className="unheard-label" aria-hidden="true">{label}</span>
-    </button>
-    {open && <MessageBubble message={{ ...message, hearing: "heard" }} position="only" />}
+  const icon = <span className="unheard-icon" aria-hidden="true"><UnplayedIcon className="unheard-blocked" size={16} /><CutMoreIcon className="unheard-chevron" size={16} /></span>;
+  const toggle = (children: ReactNode, rule: boolean) => <button type="button" className="unheard-mark" aria-expanded={open} aria-label={`${label} · ${action}`} onClick={() => setOpen(!open)}>
+    {rule && variant === "line-rule" && <span className="unheard-rule" aria-hidden="true" />}{icon}{children}
+  </button>;
+  // Opened, the reply is a balloon exactly like the others, with the row's title as its header line.
+  if (open) return <div className="unheard" data-variant={variant} data-open data-segment={message.segment || undefined}>
+    <MessageBubble message={{ ...message, hearing: "heard" }} position="first" header={<div className="unheard-header">{toggle(<span className="unheard-label" aria-hidden="true">{label}</span>, false)}</div>} />
+  </div>;
+  return <div className="unheard" data-variant={variant} data-segment={message.segment || undefined}>
+    {toggle(<><span className="unheard-snippet">{message.text}</span><span className="unheard-label" aria-hidden="true">{label}</span></>, true)}
   </div>;
 }

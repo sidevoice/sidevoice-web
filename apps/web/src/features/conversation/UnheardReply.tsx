@@ -49,7 +49,7 @@ export function CutText({ heard, rest }: { heard: string; rest: string }) {
   return <span className="cut-text" data-open={open || undefined}>
     <span className="cut-heard">{heard}</span>{" "}
     <button type="button" className="cut-marker" aria-expanded={open} aria-label={`${name} · ${action}`} onClick={() => setOpen(!open)}>
-      <CutIcon /><span className="cut-label" aria-hidden="true">{name}</span><CutMoreIcon className="cut-chevron" size={10} />
+      <span className="cut-icon" aria-hidden="true"><CutIcon className="cut-pause" /><CutMoreIcon className="cut-chevron" /></span><span className="cut-label" aria-hidden="true">{name}</span>
     </button>
     {open && <>{" "}<span className="cut-rest">{rest}</span></>}
   </span>;

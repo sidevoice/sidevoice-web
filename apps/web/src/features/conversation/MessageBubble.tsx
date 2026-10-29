@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { Button } from "../../components/ui/Button";
 import { PendingIcon, ReadIcon, SentIcon, UncertainIcon } from "../../components/ui/Icons";
@@ -22,7 +23,7 @@ export function DeliveryMark({ state }: { state: string }) {
 
 /* No sender's name on a bubble (2026-10-11): the side says who — the agent at the left, the person at the right —
  * and the agent's face sits at the foot of its run. The name stays in what a screen reader is told. */
-export function MessageBubble({ message, position }: { message: ChatMessage; position: "only" | "first" | "middle" | "last" }) {
+export function MessageBubble({ message, position, header }: { message: ChatMessage; position: "only" | "first" | "middle" | "last"; header?: ReactNode }) {
   const t = translator();
   // A delivery status this version does not know (sidevoice-core#112) shows no mark: it has no words to say.
   const delivery = message.role === "user" && message.delivery && receiptView(message.delivery).label ? message.delivery : null;
@@ -34,6 +35,7 @@ export function MessageBubble({ message, position }: { message: ChatMessage; pos
   return (
     <article className="chat-bubble" data-role={message.role} data-position={position} data-draft={message.draft || undefined}
       data-interrupted={message.interrupted && !message.globally_heard || undefined} aria-label={label}>
+      {header}
       {hearing.kind === "cut" ? <CutText heard={hearing.heard} rest={hearing.rest} />
         : <KaraokeText text={message.text} range={message.karaoke} playback={message.playback} />}
       {message.cancellable && <Tooltip action content={t("messages.cancel")}>

@@ -225,23 +225,31 @@
 /* ----- how a reply settles once played (UnheardReply.tsx, UnheardMark.tsx): cut part-way, or never played. */
 .cut-heard { white-space: pre-wrap; }
 .cut-rest { color: var(--sv-text-muted); }
-/* The landing's interrupted pill (site.css .voice-cut): the pause bars and an arrow at rest; its word grows in on hover or focus. */
+/* The landing's interrupted pill (site.css .voice-cut), built like the never-played row: the pause bars are the icon, which
+ * becomes the arrow in its place on hover or focus (down once the rest is open). The icon variant shows its word only then. */
 .cut-marker {
-  appearance: none; display: inline-flex; align-items: center; gap: 4px; padding: 2px 5px; border-radius: 4px; vertical-align: .1em; cursor: pointer; font: inherit;
+  appearance: none; display: inline-flex; align-items: center; gap: 4px; padding: 2px 5px; border-radius: 4px; vertical-align: middle; cursor: pointer; font: inherit;
   border: 1px solid color-mix(in srgb, var(--sv-accent) 25%, var(--sv-surface)); background: var(--sv-accent-soft); color: var(--sv-accent-text);
   font-size: 0.64rem; font-weight: 650; line-height: 1.3; white-space: nowrap;
 }
 .cut-marker:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
-.cut-marker svg { width: 9px; height: 9px; flex: none; }
-.cut-marker .cut-label { max-width: 0; overflow: hidden; opacity: 0; transition: max-width 160ms, opacity 160ms; }
-.cut-marker:is(:hover, :focus-visible) .cut-label { max-width: 10rem; opacity: 1; }
-.cut-marker .cut-chevron { transition: transform 120ms; }
-.cut-marker[aria-expanded="true"] .cut-chevron { transform: rotate(90deg); }
+.cut-icon { position: relative; flex: none; width: 10px; height: 10px; }
+.cut-icon svg { position: absolute; inset: 0; width: 10px; height: 10px; transition: opacity 140ms, transform 140ms; }
+.cut-chevron { opacity: 0; transform: rotate(-45deg) scale(.7); }
+.cut-marker:is(:hover, :focus-visible) .cut-pause, .cut-marker[aria-expanded="true"] .cut-pause { opacity: 0; transform: rotate(45deg) scale(.7); }
+.cut-marker:is(:hover, :focus-visible) .cut-chevron, .cut-marker[aria-expanded="true"] .cut-chevron { opacity: 1; transform: none; }
+/* The rest continues in the same balloon: the arrow points right (more after), and left once open (back). */
+.cut-marker[aria-expanded="true"] .cut-chevron { transform: rotate(180deg); }
+.cut-marker .cut-label { overflow: hidden; transition: max-width 160ms, opacity 160ms; }
+/* What was not heard continues the same balloon, quieter. */
+.cut-rest { color: var(--sv-text-subtle); }
+.cut-heard { white-space: pre-wrap; }
 
 /* A reply that never played: one quiet row, at the message size in a light grey, from one fixed left edge. */
-.unheard { min-width: 0; flex: 1; display: grid; gap: var(--sv-space-1); }
+/* Never wider than an agent's balloon, whose width it takes. */
+.unheard { min-width: 0; flex: 1; display: grid; gap: var(--sv-space-1); max-width: min(86%, 34rem); }
 .unheard-mark {
-  appearance: none; display: flex; align-items: center; gap: var(--sv-space-2); width: 100%; max-width: 34rem; min-height: 24px; padding: var(--sv-space-2) 0; border: 0; background: none;
+  appearance: none; display: flex; align-items: center; gap: var(--sv-space-2); width: 100%; min-height: 24px; padding: var(--sv-space-2) 0; border: 0; background: none;
   font: inherit; font-size: 1rem; line-height: 1.5rem; text-align: left; color: var(--sv-text-subtle); cursor: pointer; position: relative; min-width: 0;
 }
 /* Small to the eye, not to a finger. */
@@ -260,3 +268,12 @@
 /* A little presence: darker, a touch heavier, and what it is. */
 .unheard-mark:is(:hover, :focus-visible) { color: var(--sv-text-muted); font-weight: 500; }
 .unheard-mark:is(:hover, :focus-visible) .unheard-label { max-width: 8rem; opacity: 1; }
+
+/* Opened, the reply is a balloon like any other, its first line the row's title, the arrow pointing down. */
+.unheard-header { margin-bottom: var(--sv-space-1); }
+.unheard-header .unheard-mark { padding-block: 0; min-height: 24px; color: var(--sv-text-subtle); }
+.unheard-header .unheard-label { max-width: none; opacity: 1; font-size: var(--sv-font-sm); font-weight: 600; }
+.unheard-header .unheard-mark::after { inset: -4px -8px; }
+/* The balloon is the row's own width cap already: it sizes to its text like any other, never past it. */
+.unheard[data-open] { justify-items: start; }
+.unheard[data-open] .chat-bubble { max-width: 100%; }
