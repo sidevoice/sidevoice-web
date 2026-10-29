@@ -1204,6 +1204,7 @@ export const messages = {
   "wizard.prepare.continueWaiting": "Prepare this computer to continue.",
   "wizard.mic.checkAgain": "Check again",
   "wizard.mic.openSettings": "Open System Settings",
+  "wizard.mic.openSettingsWindows": "Open Windows Settings",
   // The permissions screen (PermissionsStep, Settings › Permissions).
   "perm.mic.why": "Needed so your agent can hear you",
   "perm.state.none": "Nothing to allow here",

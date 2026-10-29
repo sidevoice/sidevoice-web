@@ -1175,6 +1175,7 @@ export const messages: Messages = {
   "wizard.prepare.continueWaiting": "Préparez cet ordinateur pour continuer.",
   "wizard.mic.checkAgain": "Vérifier à nouveau",
   "wizard.mic.openSettings": "Ouvrir Réglages Système",
+  "wizard.mic.openSettingsWindows": "Ouvrir les paramètres Windows",
   "perm.mic.why": "Nécessaire pour que votre agent vous entende",
   "perm.state.none": "Rien à autoriser ici",
   "wizard.turnIntro": "Comment Sidevoice sait que vous avez fini de parler. Vous pouvez le modifier dans Réglages → Appel.",

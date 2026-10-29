@@ -207,7 +207,7 @@ test.each(["setup", "settings"])("Windows %s: the privacy button uses the settin
   await act(async () => { fireEvent.click(await screen.findByRole("button", { name: "Allow microphone" })); });
   expect(document.querySelector(".wizard-mic-help")).toHaveTextContent("Microphone access");
   expect(document.querySelector(".wizard-mic-help")).toHaveTextContent("Let desktop apps access your microphone");
-  fireEvent.click(screen.getByRole("button", { name: "Open System Settings" }));
+  fireEvent.click(screen.getByRole("button", { name: "Open Windows Settings" }));
   expect(openSettings).toHaveBeenCalledTimes(1);
   expect(getUserMedia).toHaveBeenCalledTimes(1);
   expect(screen.getByRole("button", { name: "Check again" })).toBeInTheDocument();
@@ -216,11 +216,11 @@ test.each(["setup", "settings"])("Windows %s: the privacy button uses the settin
   await waitFor(() => expect(document.querySelector(".perm-badge")).toHaveTextContent("Allowed"));
 });
 
-test("no microphone found in the desktop app on Windows: the alert says what to do, with Open System Settings", () => {
+test("no microphone found in the desktop app on Windows: the alert says what to do, with Open Windows Settings", () => {
   const openSettings = vi.fn(() => Promise.resolve());
   render(<PermissionsStep microphone={snapshot("missing", { asker: "app" })} openSettings={openSettings} t={t} platform="windows" />);
   expect(document.querySelector(".wizard-mic-help")).toHaveTextContent("Connect a microphone or turn one on, then check again.");
-  fireEvent.click(screen.getByRole("button", { name: "Open System Settings" }));
+  fireEvent.click(screen.getByRole("button", { name: "Open Windows Settings" }));
   expect(openSettings).toHaveBeenCalled();
 });
 
@@ -238,9 +238,20 @@ test("focus on the settings button inside the alert moves to the badge once the 
   const openSettings = () => Promise.resolve();
   for (const blocked of ["missing", "denied"] as const) {
     const { rerender } = render(<PermissionsStep microphone={snapshot(blocked, { asker: "app" })} openSettings={openSettings} t={t} platform="windows" />);
-    screen.getByRole("button", { name: "Open System Settings" }).focus();
+    screen.getByRole("button", { name: "Open Windows Settings" }).focus();
     rerender(<PermissionsStep microphone={snapshot("granted", { asker: "app" })} openSettings={openSettings} t={t} platform="windows" />);
     expect(document.activeElement).toBe(document.querySelector(".perm-badge-focus"));
     cleanup();
   }
+});
+
+test("blocked in the desktop app on Windows: the alert names the Windows setting, and its button opens Windows Settings", () => {
+  const openSettings = vi.fn(() => Promise.resolve());
+  render(<PermissionsStep microphone={snapshot("denied", { asker: "app" })} openSettings={openSettings} t={t} platform="windows" />);
+  const help = document.querySelector(".wizard-mic-help");
+  expect(help).toHaveTextContent("Settings › Privacy & security › Microphone");
+  expect(help).toHaveTextContent("Let desktop apps access your microphone");
+  expect(help).not.toHaveTextContent("System Settings");
+  fireEvent.click(screen.getByRole("button", { name: "Open Windows Settings" }));
+  expect(openSettings).toHaveBeenCalledTimes(1);
 });
