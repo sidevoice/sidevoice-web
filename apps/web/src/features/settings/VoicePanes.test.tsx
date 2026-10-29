@@ -796,19 +796,22 @@ test("the Model list: each model that can be chosen with its download size at th
   expect(listOptions("turn-model").map((option) => option.detail)).toEqual(["9 MB · CPU"]);
 });
 
-/* Models no engine here can run (sidevoice-web: variants "unrunnable-models"): hidden in A, disabled with why in B. */
-const unrunnable = (id: string, family: string) => local(id, family, ["stt"], { builds: [withoutClass(build(id + "/int8", { available: false, accelerator: undefined, reasons: [{ code: "backend-not-in-this-build", params: {} }] }))] });
-const withParakeet = [{ ...catalogs[0], models: [...(catalogs[0] as unknown as { models: unknown[] }).models, unrunnable("parakeet-a", "parakeet"), unrunnable("parakeet-b", "parakeet")] }, ...catalogs.slice(1)] as unknown as CatalogView[];
+/* Models no engine here can run (variant "unrunnable-models"): hidden in hide, disabled with why in disable. */
+const gone = (id: string, family: string, code = "backend-not-in-this-build") => local(id, family, ["stt"], { installed: false, builds: [withoutClass(build(id + "/int8", { available: false, accelerator: undefined, installed: false, reasons: [{ code, params: {} }] }))] });
+const localWith = (...extra: unknown[]) => [{ ...catalogs[0], models: [...(catalogs[0] as unknown as { models: unknown[] }).models, ...extra] }, ...catalogs.slice(1)] as unknown as CatalogView[];
+// A family with none that runs, and a mixed one whose first model cannot run.
+const withParakeet = localWith(gone("parakeet-a", "parakeet"), gone("parakeet-b", "parakeet"), gone("mixed-a", "mixed"), local("mixed-b", "mixed", ["stt"]));
 const useVariantValue = (value: string) => localStorage.setItem("sidevoice.variants", JSON.stringify({ "unrunnable-models": value }));
+const ready = () => within(document.getElementById("stt-model-card")!).queryByText("Ready");
 
 test("variant hide: a family and a model that nothing here can run are not offered", () => {
   useVariantValue("hide");
   renderPane({ voiceCatalogue: { state: "ready", catalogs: withParakeet, error: "" } });
-  expect(listOptions("stt-family").map((option) => option.value)).toEqual(["whisper", "moonshine"]);
+  expect(listOptions("stt-family").map((option) => option.value)).toEqual(["whisper", "moonshine", "mixed"]);
   expect(listOptions("stt-model").map((option) => option.value)).toEqual(["whisper-base"]);
 });
 
-test("variant disable: they are listed greyed out with why, and a family changed never picks a model that does not run", () => {
+test("variant disable: they are listed greyed out with why, and a family changed picks a model that runs, never one that does not", () => {
   useVariantValue("disable");
   const { actions } = renderPane({ voiceCatalogue: { state: "ready", catalogs: withParakeet, error: "" } });
   const parakeet = listOptions("stt-family").find((option) => option.value === "parakeet")!;
@@ -816,10 +819,41 @@ test("variant disable: they are listed greyed out with why, and a family changed
   expect(listOptions("stt-model").find((option) => option.value === "whisper-large")!.disabled).toBe(true);
   chooseOption("stt-family", "parakeet");
   expect(actions.editVoice).not.toHaveBeenCalled();
+  chooseOption("stt-family", "mixed");
+  expect(actions.editVoice).toHaveBeenCalledWith({ stt: { model: "mixed-b" } });
 });
 
-test("a chosen model that does not run here is neither downloaded nor offered a download", () => {
+test("a chosen model that does not run here is kept as chosen, with no Ready badge and no download", () => {
   const draft = { ...defaultVoiceSettings(), stt: { ...defaultVoiceSettings().stt, catalog: "local", model: "parakeet-a" } };
-  renderPane({ voiceCatalogue: { state: "ready", catalogs: withParakeet, error: "" }, voiceSettings: draft, voiceDraft: draft });
+  const { actions } = renderPane({ voiceCatalogue: { state: "ready", catalogs: withParakeet, error: "" }, voiceSettings: draft, voiceDraft: draft });
+  expect(ready()).toBeNull();
   expect(document.getElementById("stt-model-download")).toBeNull();
+  expect(document.getElementById("stt-model")!.textContent).toContain("parakeet-a");
+  expect(actions.editVoice).not.toHaveBeenCalled();
+});
+
+test("a build on disk that no longer runs is not Ready: the build that runs is offered for download, nothing is deleted", () => {
+  const stale = local("stale-model", "stale", ["stt"], { builds: [
+    build("stale/cuda", { available: false, accelerator: undefined, installed: true, reasons: [{ code: "build-accelerator", params: {} }] }),
+    build("stale/cpu", { installed: false, downloadBytes: 40e6 })] , recommendedBuild: "stale/cuda" });
+  const draft = { ...defaultVoiceSettings(), stt: { ...defaultVoiceSettings().stt, catalog: "local", model: "stale-model", build: "stale/cuda" } };
+  const { actions } = renderPane({ voiceCatalogue: { state: "ready", catalogs: localWith(stale), error: "" }, voiceSettings: draft, voiceDraft: draft });
+  expect(ready()).toBeNull();
+  expect(document.getElementById("stt-model-download")).not.toBeNull();
+  expect(actions.editVoice).not.toHaveBeenCalled();
+});
+
+test("Advanced lists every model, those that do not run here with why, whatever the chosen model is: one with no builds, or a provider's", () => {
+  const bare = local("bare-model", "bare", ["stt"], { builds: [] });
+  const draft = { ...defaultVoiceSettings(), stt: { ...defaultVoiceSettings().stt, catalog: "local", model: "bare-model" } };
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: localWith(bare, gone("parakeet-a", "parakeet")), error: "" }, voiceSettings: draft, voiceDraft: draft });
+  const open = () => fireEvent.click(document.querySelector("#stt-model-card .model-runtime-toggle")!);
+  open();
+  const row = (id: string) => [...document.querySelectorAll("#stt-model-card .model-runtime-families li li")].find((item) => item.textContent?.startsWith(id))?.textContent;
+  expect(row("parakeet-a")).toBe("parakeet-aDoesn't run in this browser");
+  cleanup();
+  const remote = { ...defaultVoiceSettings(), stt: { ...defaultVoiceSettings().stt, catalog: "elevenlabs", model: "scribe_v2" } };
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: localWith(gone("parakeet-a", "parakeet")), error: "" }, voiceSettings: remote, voiceDraft: remote });
+  open();
+  expect(row("whisper-base")).toContain("Runs here");
 });

@@ -231,21 +231,23 @@ export function runs(model) {
 }
 
 /**
- * Where a local model that does not run here could run, read off why its builds do not (the engine says that for this
- * device only, so this is an inference, not something it reports): `gpu` (an accelerator is missing), `desktop` (in a
- * browser, when its engine is not in this build or it needs more memory than a page can use), `resources` (memory or
- * cores), else `none`. Null for a model that runs here.
+ * Why a local model does not run here, in the kinds the engine's own reason codes name (its first build with reasons,
+ * as unfitNote reads them), each once: `accelerator`, `browser` (its engine is not in this web build) or `app` (not in
+ * this version of the app), `memory`, `cores`; `none` when it gives no reason. Nothing is said of where else it might
+ * run. Null for a model that runs here.
  * @param {CatalogModel} model
  * @param {boolean} inApp Whether this is the desktop app, rather than a browser.
- * @returns {'gpu' | 'desktop' | 'resources' | 'none' | null}
+ * @returns {('accelerator' | 'browser' | 'app' | 'memory' | 'cores' | 'none')[] | null}
  */
-export function whereItRuns(model, inApp) {
+export function whyNotHere(model, inApp) {
   if (runs(model)) return null;
-  const codes = (model.builds ?? []).flatMap((build) => build.reasons.map((reason) => reason.code));
-  if (codes.some((code) => code === 'no-accelerator' || code === 'build-accelerator')) return 'gpu';
-  if (!inApp && codes.length && codes.every((code) => code === 'backend-not-in-this-build' || code === 'wasm-memory')) return 'desktop';
-  if (codes.some((code) => code === 'memory' || code === 'cores' || code === 'wasm-memory')) return 'resources';
-  return 'none';
+  const kinds = {
+    'no-accelerator': 'accelerator', 'build-accelerator': 'accelerator', memory: 'memory', 'wasm-memory': 'memory', cores: 'cores',
+    'backend-not-in-this-build': inApp ? 'app' : 'browser',
+  };
+  const codes = (model.builds ?? []).find((build) => build.reasons?.length)?.reasons.map((reason) => reason.code) ?? [];
+  const found = [...new Set(codes.map((code) => kinds[code]).filter(Boolean))];
+  return found.length ? found : ['none'];
 }
 
 /** Why a local model does not run here: its first build's reason codes. */

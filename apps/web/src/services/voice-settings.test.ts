@@ -205,14 +205,15 @@ test("kept turn numbers survive normalising; one out of the voice's bounds takes
   expect(settings.turn).toEqual(TURN_TUNING);
 });
 
-test("whereItRuns reads where a model that does not run here could run, from why its builds do not", async () => {
-  const { whereItRuns } = await import("./voice-settings.js");
+test("whyNotHere names why a model does not run here from the engine's own reasons, and nothing about elsewhere", async () => {
+  const { whyNotHere } = await import("./voice-settings.js");
   const model = (...codes: string[]) => ({ id: "m", capabilities: ["stt"], languages: [], voices: [], builds: [{ id: "b", available: false, reasons: codes.map((code) => ({ code, params: {} })) }] }) as never;
   const runsHere = { id: "m", capabilities: ["stt"], languages: [], voices: [], builds: [{ id: "b", available: true, reasons: [] }] } as never;
-  expect(whereItRuns(runsHere, false)).toBeNull();
-  expect(whereItRuns(model("build-accelerator"), true)).toBe("gpu");
-  expect(whereItRuns(model("backend-not-in-this-build"), false)).toBe("desktop");
-  expect(whereItRuns(model("wasm-memory"), false)).toBe("desktop");
-  expect(whereItRuns(model("backend-not-in-this-build"), true)).toBe("none");
-  expect(whereItRuns(model("memory"), true)).toBe("resources");
+  expect(whyNotHere(runsHere, false)).toBeNull();
+  expect(whyNotHere(model("build-accelerator"), true)).toEqual(["accelerator"]);
+  expect(whyNotHere(model("backend-not-in-this-build"), false)).toEqual(["browser"]);
+  expect(whyNotHere(model("backend-not-in-this-build"), true)).toEqual(["app"]);
+  expect(whyNotHere(model("wasm-memory", "memory", "cores"), false)).toEqual(["memory", "cores"]);
+  expect(whyNotHere(model(), true)).toEqual(["none"]);
+  expect(whyNotHere(model("something-new"), true)).toEqual(["none"]);
 });

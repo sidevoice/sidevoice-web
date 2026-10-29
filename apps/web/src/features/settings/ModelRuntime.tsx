@@ -6,7 +6,7 @@ import type { ModelBuild } from "@sidevoice/engine";
 import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 import type { ModelState } from "./ModelSetup";
 import { buildSizes, describeBuild, engineOf } from "./model-facts";
-import { whereItRuns } from "../../services/voice-settings.js";
+import { whyNotHere } from "../../services/voice-settings.js";
 import type { CatalogModel } from "../../services/model-catalogs.js";
 
 /* How a model of this device runs, under its block, folded until asked for: what this device offers (a graphics card
@@ -41,10 +41,10 @@ function AllModels({ task, t }: { task: "stt" | "tts"; t: Translate }) {
         {[...families].map(([family, list]) => <li key={family}>
           <strong>{family.charAt(0).toUpperCase() + family.slice(1)}</strong>
           <ul>{list.map((model) => {
-            const where = whereItRuns(model, inApp);
-            return <li key={model.id} data-runs={where === null || undefined}>
+            const why = whyNotHere(model, inApp);
+            return <li key={model.id} data-runs={why === null || undefined}>
               <span>{model.id}</span>
-              {where === null ? <Badge tone="positive">{t("runtime.all.runs")}</Badge> : <Badge>{t(("runtime.where." + where) as MessageKey)}</Badge>}
+              {why === null ? <Badge tone="positive">{t("runtime.all.runs")}</Badge> : <Badge>{why.map((kind) => t(("runtime.where." + kind) as MessageKey)).join("; ")}</Badge>}
             </li>;
           })}</ul>
         </li>)}
@@ -58,7 +58,8 @@ export function ModelRuntime({ task, state, locked }: { task: "stt" | "tts"; sta
   const [open, setOpen] = useState(false);
   const panel = useId();
   const builds = state.model?.builds ?? [];
-  if (!state.local || !builds.length) return null;
+  // The builds are this model's, where it is one of this device's; the list of every model is always there.
+  const hasBuilds = state.local && builds.length > 0;
   const recommended = state.model?.recommendedBuild;
   const choose = (build: string | null) => window.sidevoiceActions?.editVoice({ [task]: { build } });
   const option = (value: string | null, title: string, detail: string, badges: { text: string; tone: "accent" | "positive" | "neutral" }[], available = true, why = "") => {
@@ -87,20 +88,20 @@ export function ModelRuntime({ task, state, locked }: { task: "stt" | "tts"; sta
           <ChevronIcon size={16} className={open ? "model-runtime-chevron-open" : undefined} />{t("runtime.advanced")}
         </button>
         {/* Its line, closed or open: engine and precision; the spec sheet says its hardware and sizes. */}
-        <span className="model-runtime-summary">{state.build ? engineOf(state.build) : ""}</span>
+        <span className="model-runtime-summary">{hasBuilds && state.build ? engineOf(state.build) : ""}</span>
       </div>
       {open && <div className="model-runtime-panel" id={panel}>
         {/* What this is, and that most people can leave it. */}
-        <p className="model-runtime-info">{t("runtime.info")}</p>
+        {hasBuilds && <p className="model-runtime-info">{t("runtime.info")}</p>}
         <DeviceLine t={t} />
-        <fieldset className="model-runtime-options">
+        {hasBuilds && <fieldset className="model-runtime-options">
           <legend className="sr-only">{t("runtime.title")}</legend>
           {option(null, t("runtime.auto"), auto ? describe(auto) + " · " + sizes(auto) : t("runtime.autoHint"), [])}
           {builds.map((build) => option(build.id, describe(build), sizes(build), [
             ...(build.id === recommended ? [{ text: t("runtime.recommended"), tone: "accent" as const }] : []),
             ...(build.installed ? [{ text: t("runtime.onDisk"), tone: "positive" as const }] : []),
           ], build.available, reasons(build)))}
-        </fieldset>
+        </fieldset>}
         <AllModels task={task} t={t} />
         {locked && <p className="model-runtime-device">{t("voice.prepare.lockedHint")}</p>}
       </div>}

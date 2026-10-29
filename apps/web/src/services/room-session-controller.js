@@ -16,7 +16,7 @@ import {pageVoice,beginBrowserAudioActivation} from './voice-module.js';
 import {readCallPreferences} from './call-preferences.ts';
 import {clampDeviceName,deviceNameProblem} from './device-name-rules.js';
 import {readDeleteUnused,writeDeleteUnused,staleModels} from './model-housekeeping.js';
-import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,voiceSettingsToLoad,endOfTurnModel,runs,readyVoiceSettings,modelReady,voiceHalves,voiceInput,voiceOutput} from './voice-settings.js';
+import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,voiceSettingsToLoad,endOfTurnModel,readyVoiceSettings,modelReady,voiceHalves,voiceInput,voiceOutput} from './voice-settings.js';
 import {createTurnRelay} from './turn-relay.js';
 import {turnMessage,playbackReport,sayingRange} from './voice-room.js';
 import {replyEligibility} from './reply-eligibility.js';
@@ -2520,9 +2520,11 @@ async function installVoiceModel(task){
  const turn=task==='end-of-turn'?endOfTurnModel(state.voiceCatalogue.catalogs,(state.voiceDraft||state.voiceSettings)?.turn_model):null;
  const slot=turn?{catalog:'local',model:turn.id}:(state.voiceDraft||state.voiceSettings)?.[task];if(!slot)return;
  const model=state.voiceCatalogue.catalogs.find(c=>c.id===slot.catalog)?.models.find(m=>m.id===slot.model);
-// A model no build of which runs here is never downloaded, whoever asks.
- if(model&&!runs(model))return;
- const build=(slot.build&&model?.builds?.find(b=>b.id===slot.build))??model?.builds?.find(b=>b.id===model.recommendedBuild)??model?.builds?.find(b=>b.available);
+// Only a build that runs here is downloaded: the one chosen when it does, else the recommended one, else the first. With
+ // none, the refusal is said as a failed install (the slot shows it), never silence.
+ const chosen=slot.build?model?.builds?.find(b=>b.id===slot.build):undefined;
+ const build=(chosen?.available?chosen:undefined)??model?.builds?.find(b=>b.id===model.recommendedBuild&&b.available)??model?.builds?.find(b=>b.available);
+ if(model?.builds&&!build){roomStore.patch({voiceInstall:{task,model:slot.model,state:'failed',fraction:null,...installFailure(Object.assign(Error('no-build-available'),{code:'no-build-available'}))}});return}
  voiceInstall?.abort();const abort=voiceInstall=new AbortController();
  const at=fraction=>roomStore.patch({voiceInstall:{task,model:slot.model,state:'running',fraction,error:''}});
  at(null);
