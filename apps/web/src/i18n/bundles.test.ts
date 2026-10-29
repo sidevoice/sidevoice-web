@@ -34,23 +34,11 @@ test.each([...locales.keys()])("the %s catalogue: exactly English's keys, the sa
     expect(placeholders(text), key).toEqual(placeholders(english[key]));
   }
 });
-test("partial labels agree in French, Italian and Polish", () => {
-  for(const [language,partial] of [
-    ["fr","Caractères entendus : 1/1"],
-    ["it","Caratteri ascoltati: 1/1"],
-    ["pl","Usłyszane znaki: 1/1"],
-  ] as const){
-    const t=translator(language);
-    expect(t("messages.audio.partial",{heard:1,total:1})).toBe(partial);
-  }
-});
 test("unknown hearing copy names the sound and measured extent", () => {
   expect(translator("fr")("messages.audio.unknown")).toBe("Audio interrompu · Partie écoutée inconnue");
   expect(translator("fr")("messages.audio.notPlayed")).toBe("Audio non lu");
 });
 test("H7 Japanese hearing marks describe delivery without claiming intelligibility", () => {
   const t = translator("ja");
-  expect(t("messages.audio.partial", { heard: 2, total: 4 })).toBe("4文字中2文字を聴取済み");
-  expect(t("messages.audio.notHeard")).toBe("未聴取");
   expect(t("messages.audio.unconfirmed")).toBe("聴取状況は未確認");
 });

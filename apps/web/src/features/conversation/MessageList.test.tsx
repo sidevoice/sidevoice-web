@@ -62,15 +62,17 @@ test("an interrupted reply says so to a screen reader too", () => {
 
 test("T01/T06/T12 marks use confirmed scalar extent and never infer hearing from reading text", () => {
   const rows = [
-    message({segment: "partial", text: "é🐙ab", interrupted: true, hearing: "partial", heard_chars: 2}),
+    message({segment: "partial", text: "é🐙 ab", interrupted: true, hearing: "partial", heard_chars: 2}),
     message({segment: "unknown", text: "unknown", interrupted: true, hearing: null, hearing_unconfirmed: true, heard_chars: null}),
     message({segment: "unplayed", text: "unplayed", audio: "text_only", audio_reason: "voice_off", hearing: "not_heard"}),
     message({segment: "newer", text: "never started", audio: "interrupted", interrupted: true, audio_reason: "newer_turn", hearing: "not_heard", heard_chars: 0}),
     message({segment: "skipped", text: "skipped", audio: "interrupted", hearing: "heard"}),
   ];
   const {container} = render(<MessageList conversation={view(rows)} />);
-  expect([...container.querySelectorAll(".audio-fate-mark")].map(node=>node.textContent))
-    .toEqual(["2 of 4 characters heard", "Hearing not confirmed", "Not heard", "Not heard"]);
+  // Cut at the extent in characters (a pictogram is one) and carried to the end of its word; never-played replies are marks.
+  expect(container.querySelector(".cut-heard")?.textContent).toBe("é🐙");
+  expect([...container.querySelectorAll(".audio-fate-mark")].map(node=>node.textContent)).toEqual(["Hearing not confirmed"]);
+  expect(container.querySelectorAll(".unheard")).toHaveLength(2);
 });
 test("T14 partial and unknown playback failures explain failure without claiming silence", () => {
   const failed = (heard_chars: number | null) => ({audio: "failed", audio_reason: "playback_failed", heard_chars,
@@ -79,7 +81,7 @@ test("T14 partial and unknown playback failures explain failure without claiming
     message({segment: "partial-failure", text: "é🐙ab", ...failed(2), audioNote: audioNote(failed(2))}),
     message({segment: "unknown-failure", text: "Unknown", ...failed(null), audioNote: audioNote(failed(null))}),
   ])} />);
-  expect([...container.querySelectorAll(".audio-fate-mark")].map(node => node.textContent)).toEqual(["2 of 4 characters heard", "Hearing not confirmed"]);
+  expect([...container.querySelectorAll(".audio-fate-mark")].map(node => node.textContent)).toEqual(["Hearing not confirmed"]);
   expect([...container.querySelectorAll(".chat-audio-note")].map(node => node.textContent)).toEqual(["Playback failed", "Playback failed"]);
 });
 test("F8 core admission reasons for inactive and disconnected audiences are explained", () => {
@@ -237,4 +239,75 @@ test("a reply whose audio status this version does not know is drawn as plain te
   const { container } = render(<MessageList conversation={view([message({ segment: "a:voice:9", text: "Nueva", replayable: true, playback: undefined })])} />);
   expect(container.querySelector(".karaoke-text")?.getAttribute("data-playback")).toBe("complete");
   expect(screen.getByRole("button", { name: translator()("messages.listenAgain") })).toBeInTheDocument();
+});
+
+const LONG = "I fixed the clock fixture and the suite passes. Tell me if you want it in its own commit.";
+const CUT_AT = "I fixed the clock fixture".length;
+
+test("a reply cut part-way shows what was heard and a cut marker, the rest folded until it is opened", () => {
+  const { container } = render(<MessageList conversation={view([message({ segment: "cut", text: LONG, hearing: "partial", heard_chars: CUT_AT, interrupted: true })])} />);
+  expect(container.querySelector(".cut-heard")?.textContent).toBe("I fixed the clock fixture");
+  expect(container.querySelector(".cut-rest")).toBeNull();
+  expect(container.querySelector(".audio-fate-mark")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Interrupted · Show the rest" }));
+  expect(container.querySelector(".cut-rest")?.textContent).toBe("and the suite passes. Tell me if you want it in its own commit.");
+  fireEvent.click(screen.getByRole("button", { name: "Interrupted · Hide the rest" }));
+  expect(container.querySelector(".cut-rest")).toBeNull();
+});
+
+test("a cut inside a word is carried to its end, and a cut with nothing left unheard is a whole reply", () => {
+  const { container, rerender } = render(<MessageList conversation={view([message({ segment: "word", text: LONG, hearing: "partial", heard_chars: 4 })])} />);
+  expect(container.querySelector(".cut-heard")?.textContent).toBe("I fixed");
+  rerender(<MessageList conversation={view([message({ segment: "word", text: LONG, hearing: "partial", heard_chars: [...LONG].length })])} />);
+  expect(container.querySelector(".cut-marker")).toBeNull();
+});
+
+test("a reply that never played is a small mark in the run that opens to its text, and the face stays with the balloons", () => {
+  const { container } = render(<MessageList conversation={view([
+    message({ segment: "a", text: "Heard first", hearing: "heard", heard_chars: 11 }),
+    message({ segment: "b", text: LONG, hearing: "not_heard", heard_chars: 0, time: base + 1_000 }),
+  ])} />);
+  expect(container.querySelectorAll(".message-group")).toHaveLength(1);
+  expect(container.querySelectorAll(".chat-bubble")).toHaveLength(1);
+  // The only balloon is the run's foot, so it wears the face; the mark does not.
+  expect(container.querySelector(".chat-bubble")).toHaveAttribute("data-position", "only");
+  expect(container.querySelectorAll(".ui-avatar")).toHaveLength(1);
+  // Folded it is the row's first words; opened, the reply is a balloon like any other under the row.
+  fireEvent.click(screen.getByRole("button", { name: "Not played · Show the reply" }));
+  expect(container.querySelectorAll(".chat-bubble")).toHaveLength(2);
+  expect(screen.getByRole("article", { name: `Agente: ${LONG}` })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Not played · Hide the reply" })).toHaveAttribute("aria-expanded", "true");
+});
+
+test("a reply that is playing keeps its whole balloon with the karaoke, whatever its earlier hearing says", () => {
+  const { container } = render(<MessageList conversation={view([message({ segment: "now", text: LONG, hearing: "not_heard", playback: "playing", karaoke: { from: 5, to: 5 } })])} />);
+  expect(container.querySelector(".unheard")).toBeNull();
+  expect(container.querySelector(".karaoke-text")).toHaveAttribute("data-playback", "playing");
+});
+
+test("a cut in Chinese falls on a word boundary the platform knows, not on whitespace that is not there", () => {
+  const text = "你好世界。下一句话。";
+  const { container } = render(<MessageList conversation={view([message({ segment: "zh", text, hearing: "partial", heard_chars: 2 })])} />);
+  expect(typeof Intl.Segmenter).toBe("function");
+  expect(container.querySelector(".cut-marker")).not.toBeNull();
+  expect(container.querySelector(".cut-heard")?.textContent).toBe("你好");
+});
+
+test("a cut in the middle of a Latin word is carried to the word's end", () => {
+  const { container } = render(<MessageList conversation={view([message({ segment: "mid", text: "The migration is ready now", hearing: "partial", heard_chars: 8 })])} />);
+  expect(container.querySelector(".cut-heard")?.textContent).toBe("The migration");
+  fireEvent.click(screen.getByRole("button", { name: "Interrupted · Show the rest" }));
+  expect(container.querySelector(".cut-rest")?.textContent).toBe("is ready now");
+});
+
+test("a never-played reply's opened mark keeps listen again and its failure explanation", () => {
+  const replayReply = vi.fn();
+  window.sidevoiceActions = { replayReply } as never;
+  const failed = { audio: "failed", audio_reason: "playback_failed", heard_chars: 0, hearing: "not_heard" as const };
+  render(<MessageList conversation={view([message({ segment: "nf", text: "Never started", replayable: true, ...failed, audioNote: audioNote(failed) })])} />);
+  expect(screen.queryByRole("button", { name: "Listen again" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: /Not played/ }));
+  expect(screen.getByText("Playback failed")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Listen again" }));
+  expect(replayReply).toHaveBeenCalledWith("nf");
 });

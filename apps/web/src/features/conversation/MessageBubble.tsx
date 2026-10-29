@@ -1,10 +1,13 @@
+import type { ReactNode } from "react";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { Button } from "../../components/ui/Button";
-import { ListenAgainIcon, PendingIcon, ReadIcon, SentIcon, UncertainIcon } from "../../components/ui/Icons";
+import { PendingIcon, ReadIcon, SentIcon, UncertainIcon } from "../../components/ui/Icons";
 import type { ChatMessage } from "../../state/room-types";
 import { receiptView } from "../../state/room-session-state.js";
 import { translator } from "../../i18n/translator";
 import { KaraokeText } from "./KaraokeText";
+import { ListenAgain } from "./ListenAgain";
+import { CutText, hearingOf } from "./UnheardReply";
 import { speakerName } from "./group-messages";
 import { uiLocale } from "../../i18n/locale";
 
@@ -20,31 +23,28 @@ export function DeliveryMark({ state }: { state: string }) {
 
 /* No sender's name on a bubble (2026-10-11): the side says who — the agent at the left, the person at the right —
  * and the agent's face sits at the foot of its run. The name stays in what a screen reader is told. */
-export function MessageBubble({ message, position }: { message: ChatMessage; position: "only" | "first" | "middle" | "last" }) {
+export function MessageBubble({ message, position, header }: { message: ChatMessage; position: "only" | "first" | "middle" | "last"; header?: ReactNode }) {
   const t = translator();
   // A delivery status this version does not know (sidevoice-core#112) shows no mark: it has no words to say.
   const delivery = message.role === "user" && message.delivery && receiptView(message.delivery).label ? message.delivery : null;
   const replay = message.replayable && message.role === "assistant" && message.playback !== "playing" && message.playback !== "pending";
-  const total = [...message.text].length;
-  const audioMark = message.role !== "assistant" ? null
-    : message.hearing === "heard" ? null
-      : message.hearing === "partial" && Number.isInteger(message.heard_chars)
-        ? t("messages.audio.partial", { heard: message.heard_chars!, total })
-        : message.hearing === "not_heard" ? t("messages.audio.notHeard")
-          : message.hearing_unconfirmed ? t("messages.audio.unconfirmed") : null;
+  const hearing = hearingOf(message);
+  // How far it played is drawn, not worded (UnheardReply): only a hearing the room could not confirm keeps its words.
+  const audioMark = message.role === "assistant" && message.hearing_unconfirmed && message.hearing !== "heard" ? t("messages.audio.unconfirmed") : null;
   const label = t(message.interrupted && !message.globally_heard ? "messages.interrupted" : "messages.message", { name: speakerName(message, t), text: message.text });
   return (
     <article className="chat-bubble" data-role={message.role} data-position={position} data-draft={message.draft || undefined}
       data-interrupted={message.interrupted && !message.globally_heard || undefined} aria-label={label}>
-      <KaraokeText text={message.text} range={message.karaoke} playback={message.playback} />
+      {header}
+      {hearing.kind === "cut" ? <CutText heard={hearing.heard} rest={hearing.rest} />
+        : <KaraokeText text={message.text} range={message.karaoke} playback={message.playback} />}
       {message.cancellable && <Tooltip action content={t("messages.cancel")}>
         <Button variant="ghost" tone="danger" size="sm" className="cancel-input" onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("messages.cancel")}</Button>
       </Tooltip>}
       {(!message.draft || replay || delivery) && <div className="chat-meta">
         {audioMark && <span className="audio-fate-mark" title={audioMark}>{audioMark}</span>}
         {!message.draft && <time dateTime={new Date(message.time).toISOString()} title={new Date(message.time).toLocaleString(uiLocale())}>{new Date(message.time).toLocaleTimeString(uiLocale(), { hour: "2-digit", minute: "2-digit" })}</time>}
-        {replay && <Button variant="ghost" tone="neutral" size="icon-sm" className="listen-again" aria-label={t("messages.listenAgain")} title={t("messages.listenAgain")}
-          onClick={() => void window.sidevoiceActions?.replayReply(message.segment)}><ListenAgainIcon size={12} /></Button>}
+        {replay && <ListenAgain message={message} />}
         {delivery && <span className="receipt delivery" data-state={delivery} title={receiptView(delivery).label} aria-label={receiptView(delivery).label}><DeliveryMark state={delivery} /></span>}
       </div>}
       {message.deliveryNote && <span className="chat-audio-note">{message.deliveryNote}</span>}
