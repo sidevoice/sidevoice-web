@@ -41,11 +41,7 @@ export function RoomProvider({ children, store: suppliedStore, runtime = true }:
     // Without the runtime (the journeys' storyboard) the store is only what was seeded.
     if (started.current || !runtime) return;
     started.current = true;
-    // Telemetry first, so `window.sidevoiceTelemetry` exists before the controller opens a call.
-    // It is a facade: the OpenTelemetry SDK itself only loads if the room names a collector.
-    controllerImport ??= import("../services/telemetry")
-      .catch(() => undefined)
-      .then(() => import("../services/room-session-controller.js"));
+    controllerImport ??= import("../services/room-session-controller.js");
     // What could not load is said in words; what it said, behind Details.
     void controllerImport.catch((error: unknown) => {
       window.sidevoiceUI?.setBootError(errorMessage(error, { generic: translator()("app.startFailed") }));

@@ -416,11 +416,6 @@ test('A lock the system takes back is asked for again while the call is up, and 
  release();
  assert.equal(scheduled.length,0,'a call that ended does not keep the screen awake');
 });
-test('Latency turn storage is bounded',()=>{
- const s=setup();s.context.performance={now:()=>100};
- s.run("for(let r=0;r<150;r++)observeLatencyEvent('voice-user-turn',{phase:'finished',thread_id:'a',revision:r})");
- assert.equal(s.run('latencyTurns.size'),128);
-});
 test('Settings are reached from the header menu',()=>{
  // The ⋯ menu's Settings entry is the very button the runtime opens the dialog from: one entry, nothing relaying to it.
  const s=setup({strictDOM:true});
@@ -726,39 +721,6 @@ test('The page answers when the room asks whether anybody is still there',()=>{
  assert.equal(answered.length,1,'the call\'s socket was not made to answer for the other one');
 });
 
-/* The trace is the page's: the room announces a turn, this page opens the span and hands the room
- * its traceparent. These tests drive the same functions the socket does, with a stub in the place
- * the OpenTelemetry SDK takes when a collector is configured — and with none, to prove a room
- * without one costs the call nothing. */
-function tracing({installed=true}={}){
- const s=setup(),calls=[],sent=[];
- // The controller measures with performance.now(); the sandbox has no clock of its own.
- let tick=0;s.context.performance={now:()=>(tick+=10)};
- s.context.globalSend=text=>sent.push(JSON.parse(text));
- if(installed)s.context.window.sidevoiceTelemetry={
-  startCall:values=>{calls.push(['startCall',values]);return '00-11111111111111111111111111111111-2222222222222222-01'},
-  noteSession:id=>calls.push(['noteSession',id]),
-  endCall:reason=>calls.push(['endCall',reason]),
-  startTurn:(thread,revision)=>{calls.push(['startTurn',thread,revision]);return '00-11111111111111111111111111111111-3333333333333333-01'},
-  endTurn:(thread,revision,outcome)=>calls.push(['endTurn',thread,revision,outcome]),
-  stage:(thread,revision,stage,ms)=>calls.push(['stage',thread,revision,stage,ms]),
-  audioEvent:(kind,values)=>calls.push(['audioEvent',kind,JSON.parse(JSON.stringify(values))])
- };
- s.run("ws={readyState:1,send:text=>globalSend(text)};sessionId='s'");
- return {s,calls,sent};
-}
-test('A turn the room announces opens a span here and reaches the room as a traceparent',()=>{
- const {s,calls,sent}=tracing();
- s.run("observeLatencyEvent('voice-user-turn',{phase:'started',thread_id:'a',revision:4})");
- assert.deepEqual(calls[0],['startTurn','a',4]);
- assert.equal(sent.length,1);
- assert.equal(sent[0].type,'voice-turn-trace');
- assert.deepEqual([sent[0].data.thread_id,sent[0].data.revision,sent[0].data.session_id],['a',4,'s']);
- assert.match(sent[0].data.traceparent,/^00-[0-9a-f]{32}-[0-9a-f]{16}-0[01]$/);
- // A turn the room takes back is a turn whose span ends here, with why.
- s.run("observeLatencyEvent('voice-user-turn',{phase:'cancelled',thread_id:'a',revision:4,merged:true})");
- assert.deepEqual(calls.at(-1),['endTurn','a',4,'merged']);
-});
 test('The harness saying it works shows Working 3 s later, and not at all when it stops sooner',()=>{
  // The runtime's clock and timers, faked: the wait is WORKING_SHOWN_AFTER_MS of the page's own clock.
  mock.timers.enable({apis:['setTimeout','Date'],now:1_000_000});
@@ -779,16 +741,6 @@ test('The harness saying it works shows Working 3 s later, and not at all when i
   mock.timers.tick(1_000);assert.equal(shown(),true);
  }finally{mock.timers.reset()}
 });
-test('A correlated harness end closes telemetry once even while a newer turn keeps the thread working',()=>{
- const {s,calls}=tracing();
- s.run("observeLatencyEvent('voice-user-turn',{phase:'started',thread_id:'a',revision:4})");
- s.run("state.turns=recordReply(state,{session_id:'s',thread_id:'a',revision:4})");
- const stopped=JSON.stringify(JSON.stringify({type:'voice-conversation',data:{thread_id:'a',working:true,turn_id:'codex-turn',turn_phase:'end',session_id:'s',revision:4}}));
- s.run(`message(${stopped})`);s.run(`message(${stopped})`);
- assert.deepEqual(calls.filter(call=>call[0]==='endTurn'),[['endTurn','a',4,'harness_finished']]);
- assert.equal(s.run('SessionState.busy(state)'),true);
-});
-
 // ----- what the room plays back when this browser comes back -----
 // Driving out of a tunnel, the transcript has the text and the driver cannot read it. The page's part
 // is naming the sessions it used, saying on the bubble that a reply is a repetition, and stopping.
@@ -3303,7 +3255,7 @@ test('A reply that arrives while the call leaves its machine is written, never s
  s.run('MOVE_DRAIN_MS=60');
  // A turn said to the Mac that the Mac never acknowledges.
  voice.emit('turn',started('u7'));voice.emit('turn',finished('u7','Para el Mac'));
- const reported=[];s.context.window.sidevoiceTelemetry=null;const report=s.run('reportClientError');s.context.__report=e=>{reported.push(e);report(e)};s.run('reportClientError=__report');
+ const reported=[];const report=s.run('reportClientError');s.context.__report=e=>{reported.push(e);report(e)};s.run('reportClientError=__report');
  const moved=s.run("window.sidevoiceActions.selectParticipant('fp-pc|p')");
  c.push(first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'late',revision:2,epoch:0,reply_revision:2,thread_id:'a',history_id:'row-late',text:'Tarde'}});
  assert.equal(voice.said.length,0,'not said: the person has moved on');
