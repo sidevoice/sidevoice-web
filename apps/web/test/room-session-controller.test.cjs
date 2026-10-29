@@ -3150,7 +3150,7 @@ test('A model the slot names but that is not on this device installs, its progre
   builds:[{id:'kokoro/q8',backend:'transformers-js',precision:'q8',downloadBytes:92e6,memoryMb:300,available:true,reasons:[],installed:false}]}]}];
  const engine=fakeEngine(catalogs),progress=[];let finish,fail;
  engine.install=(model,{build,engine:backend,onProgress,signal})=>{engine.calls.push(['install',model,build,backend]);signal.addEventListener('abort',()=>fail(Object.assign(Error('x'),{code:'install-cancelled'})));
-  return new Promise((resolve,reject)=>{finish=()=>{onProgress({fraction:0.5,done:46e6,total:92e6});progress.push(s.run('state.voiceInstall'));catalogs[0].models[0].installed=true;resolve()};fail=reject})};
+  return new Promise((resolve,reject)=>{finish=()=>{onProgress({fraction:0.5,done:46e6,total:92e6});progress.push(s.run('state.voiceInstall'));catalogs[0].models[0].installed=true;catalogs[0].models[0].builds[0].installed=true;resolve()};fail=reject})};
  const voice=withVoice(s,fakeVoice(),engine);
  s.run("$('settings-open').onclick()");await settleSoon();
  s.run("window.sidevoiceActions.editVoice({tts:{catalog:'local',model:'kokoro-82m-v1.0'}})");

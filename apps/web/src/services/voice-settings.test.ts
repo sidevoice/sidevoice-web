@@ -1,12 +1,12 @@
 import { expect, test } from "vitest";
-import { TURN_TUNING, defaultVoiceSettings, editVoiceSettings, readVoiceSettings, readyVoiceSettings, remoteProviders, voiceChoices, voiceEndOfTurn, voiceHalves, voiceInput, voiceOutput, voiceSettingsToLoad, writeVoiceSettings, VOICE_SETTINGS_KEY } from "./voice-settings.js";
+import { TURN_TUNING, defaultVoiceSettings, editVoiceSettings, readVoiceSettings, readyVoiceSettings, remoteProviders, voiceChoices, voiceEndOfTurn, voiceHalves, voiceInput, voiceOutput, voiceSettingsToLoad, modelReady, writeVoiceSettings, VOICE_SETTINGS_KEY } from "./voice-settings.js";
 import type { CatalogView } from "./model-catalogs.js";
 
 /* The voice settings this device keeps, and the choices the pane offers from the engine's catalogues. */
 
 const build = (id: string, extra: Record<string, unknown> = {}) => ({ id, backend: "sherpa-onnx", precision: "int8", downloadBytes: 80e6, memoryMb: 200, available: true, reasons: [], installed: false, ...extra });
 const local = (id: string, family: string, capabilities: string[], extra: Record<string, unknown> = {}) =>
-  ({ id, family, capabilities, parametersM: 1, license: "MIT", languages: ["es", "en"], voices: [], installed: true, builds: [build(id + "/int8")], ...extra });
+  ({ id, family, capabilities, parametersM: 1, license: "MIT", languages: ["es", "en"], voices: [], installed: true, builds: [build(id + "/int8", { installed: true })], ...extra });
 const CATALOGS = [
   { id: "local", name: null, status: { stale: false }, models: [
     local("whisper-base", "whisper", ["stt"]),
@@ -216,4 +216,18 @@ test("whyNotHere names why a model does not run here from the engine's own reaso
   expect(whyNotHere(model("wasm-memory", "memory", "cores"), false)).toEqual(["memory", "cores"]);
   expect(whyNotHere(model(), true)).toEqual(["none"]);
   expect(whyNotHere(model("something-new"), true)).toEqual(["none"]);
+});
+
+test("a chosen build that no longer runs gives way to the engine's own choice: ready, loaded and shown agree", () => {
+  const build = (id: string, available: boolean, installed: boolean) => ({ id, backend: "sherpa-onnx", precision: "q8", downloadBytes: 1, memoryMb: 1, available, installed, reasons: available ? [] : [{ code: "build-accelerator", params: {} }] });
+  const catalogs = (cpuInstalled: boolean) => [{ id: "local", name: null, status: { stale: false }, models: [{ id: "stale-model", family: "stale", capabilities: ["tts"], languages: [], voices: [], installed: true,
+    builds: [build("stale/cuda", false, true), build("stale/cpu", true, cpuInstalled)] }] }] as unknown as CatalogView[];
+  const settings = { ...defaultVoiceSettings(), tts: { ...defaultVoiceSettings().tts, catalog: "local", model: "stale-model", build: "stale/cuda" } };
+  // The CPU build is not on disk: the CUDA one that is cannot be used, so the model is not ready.
+  expect(modelReady(settings, "tts", catalogs(false))).toBe(false);
+  // The fallback is downloaded: ready, and the voice is loaded without the stale build id.
+  expect(modelReady(settings, "tts", catalogs(true))).toBe(true);
+  expect(voiceOutput(voiceSettingsToLoad(settings, catalogs(true))).tts).toEqual({ catalog: "local", model: "stale-model" });
+  // A build that does run stays as chosen.
+  expect(voiceOutput(voiceSettingsToLoad({ ...settings, tts: { ...settings.tts, build: "stale/cpu" } }, catalogs(true))).tts).toEqual({ catalog: "local", model: "stale-model", build: "stale/cpu" });
 });

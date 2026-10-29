@@ -16,6 +16,7 @@ import { translator } from "./i18n/translator";
 
 import { startPageTheme } from "./lib/theme";
 import { startMotion } from "./lib/motion";
+import { forgetVariant } from "./lib/variants";
 
 // Uncaught errors are reported to the room before anything else is loaded: the controller owns the
 // socket, so until it exists the reports wait here.
@@ -37,6 +38,9 @@ startPageTheme();
 startMotion();
 
 const root = createRoot(document.getElementById("root")!);
+
+// Decided variants: their stored choice is inert, and goes.
+forgetVariant("unrunnable-models");
 
 declare const __BUILD_ID__: string;
 const buildId = typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : "dev";

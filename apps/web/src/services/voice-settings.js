@@ -331,8 +331,24 @@ export function vadModel(catalogs) {
  * @returns {DeviceVoiceSettings}
  */
 export function voiceSettingsHere(settings, catalogs) {
-  if (settings.end_of_turn !== 'smart-turn' || !catalogs.some((catalog) => catalog.id === LOCAL_CATALOG) || endOfTurnModel(catalogs, settings.turn_model)) return settings;
-  return { ...settings, end_of_turn: 'silence' };
+  const here = { ...settings, stt: withUsableBuild(settings.stt, catalogs), tts: withUsableBuild(settings.tts, catalogs) };
+  if (here.end_of_turn !== 'smart-turn' || !catalogs.some((catalog) => catalog.id === LOCAL_CATALOG) || endOfTurnModel(catalogs, here.turn_model)) return here;
+  return { ...here, end_of_turn: 'silence' };
+}
+
+/**
+ * A slot whose chosen build does not run here as the engine's own choice again (no build): what is loaded, what is
+ * ready and what Advanced shows then agree, whatever build is on disk. A build the catalogue does not list stays, as
+ * does anything of a provider's.
+ * @param {DeviceVoiceSettings['stt']} slot
+ * @param {CatalogView[]} catalogs
+ */
+function withUsableBuild(slot, catalogs) {
+  if (!slot.build || slot.catalog !== LOCAL_CATALOG) return slot;
+  const build = catalogs.find((catalog) => catalog.id === LOCAL_CATALOG)?.models.find((model) => model.id === slot.model)?.builds?.find((candidate) => candidate.id === slot.build);
+  if (!build || build.available) return slot;
+  const { build: _unusable, ...rest } = slot;
+  return rest;
 }
 
 /**
@@ -455,8 +471,9 @@ export function modelReady(settings, task, catalogs) {
   const model = catalogs.find((catalog) => catalog.id === slot.catalog)?.models.find((candidate) => candidate.id === slot.model);
   if (!model) return false;
   if (slot.catalog !== LOCAL_CATALOG) return true;
-  const chosen = slot.build ? model.builds?.find((build) => build.id === slot.build) : null;
-  return chosen ? chosen.installed : model.installed === true || !!model.builds?.some((build) => build.installed);
+  if (!runs(model)) return false;
+  const chosen = withUsableBuild(slot, catalogs).build ? model.builds?.find((build) => build.id === slot.build) : null;
+  return chosen ? chosen.installed : model.builds?.some((build) => typeof build.installed === 'boolean') ? model.builds.some((build) => build.installed && build.available) : model.installed === true;
 }
 
 /**

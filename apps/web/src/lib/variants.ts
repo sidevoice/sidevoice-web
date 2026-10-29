@@ -27,3 +27,14 @@ export function useVariant<Value extends string>(name: string, values: readonly 
   };
   return useSyncExternalStore(subscribe, pick, () => values[0]);
 }
+
+/** Forgets the stored value of a variant that was decided: its choice is inert, and the key would only linger. */
+export function forgetVariant(name: string) {
+  try {
+    const stored = read();
+    if (!(name in stored)) return;
+    delete stored[name];
+    if (Object.keys(stored).length) globalThis.localStorage?.setItem(VARIANTS_KEY, JSON.stringify(stored));
+    else globalThis.localStorage?.removeItem(VARIANTS_KEY);
+  } catch { /* storage blocked: nothing was kept */ }
+}
