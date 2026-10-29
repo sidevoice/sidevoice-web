@@ -1417,6 +1417,8 @@ export const messages = {
   "messages.audio.unknown": "Audio stopped · Played amount unknown",
   "messages.audio.skipped": "Skipped",
   "messages.cut.label": "Cut off",
+  "messages.cut.here": "Interrupted here",
+  "messages.cut.interrupted": "Interrupted",
   "messages.cut.show": "Show the rest",
   "messages.cut.hide": "Hide the rest",
   "messages.unheard.show": "Show the reply",

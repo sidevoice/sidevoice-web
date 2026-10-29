@@ -1375,6 +1375,8 @@ export const messages: Messages = {
   "messages.audio.unknown": "音频已停止 · 已播放长度未知",
   "messages.audio.skipped": "已跳过",
   "messages.cut.label": "已中断",
+  "messages.cut.here": "在此中断",
+  "messages.cut.interrupted": "已中断",
   "messages.cut.show": "显示其余部分",
   "messages.cut.hide": "隐藏其余部分",
   "messages.unheard.show": "显示回复",
