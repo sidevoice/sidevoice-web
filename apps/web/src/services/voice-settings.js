@@ -226,8 +226,26 @@ function offered(catalog, capability) {
 }
 
 /** Whether `model` can be used here: a remote one always (its provider runs it), a local one when a build of it runs. */
-function runs(model) {
+export function runs(model) {
   return !model.builds || model.builds.some((build) => build.available);
+}
+
+/**
+ * Where a local model that does not run here could run, read off why its builds do not (the engine says that for this
+ * device only, so this is an inference, not something it reports): `gpu` (an accelerator is missing), `desktop` (in a
+ * browser, when its engine is not in this build or it needs more memory than a page can use), `resources` (memory or
+ * cores), else `none`. Null for a model that runs here.
+ * @param {CatalogModel} model
+ * @param {boolean} inApp Whether this is the desktop app, rather than a browser.
+ * @returns {'gpu' | 'desktop' | 'resources' | 'none' | null}
+ */
+export function whereItRuns(model, inApp) {
+  if (runs(model)) return null;
+  const codes = (model.builds ?? []).flatMap((build) => build.reasons.map((reason) => reason.code));
+  if (codes.some((code) => code === 'no-accelerator' || code === 'build-accelerator')) return 'gpu';
+  if (!inApp && codes.length && codes.every((code) => code === 'backend-not-in-this-build' || code === 'wasm-memory')) return 'desktop';
+  if (codes.some((code) => code === 'memory' || code === 'cores' || code === 'wasm-memory')) return 'resources';
+  return 'none';
 }
 
 /** Why a local model does not run here: its first build's reason codes. */
@@ -267,10 +285,10 @@ function slotChoices(catalogs, capability, slot) {
   const catalog = catalogs.find((candidate) => candidate.id === slot.catalog);
   const models = offered(catalog, capability);
   const options = models.map((model) => ({
-    id: model.id, group: model.family ?? null, disabled: !runs(model) && model.id !== slot.model, note: runs(model) ? null : unfitNote(model),
+    id: model.id, group: model.family ?? null, disabled: !runs(model) && model.id !== slot.model, runs: runs(model), note: runs(model) ? null : unfitNote(model),
   }));
   const model = models.find((candidate) => candidate.id === slot.model) ?? null;
-  if (!model && slot.model) options.unshift({ id: slot.model, group: null, disabled: false, note: { key: 'voice.model.missing' } });
+  if (!model && slot.model) options.unshift({ id: slot.model, group: null, disabled: false, runs: true, note: { key: 'voice.model.missing' } });
   return { sources, options, model };
 }
 

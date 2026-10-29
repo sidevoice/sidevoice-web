@@ -3,7 +3,7 @@ import { useRoomStore } from "../../state/room-store";
 import { createMicLevelChannel } from "../../state/mic-level";
 import { Button } from "../../components/ui/Button";
 import { Popover } from "../../components/ui/Popover";
-import { endOfTurnModel, type DeviceVoiceSettings as Settings } from "../../services/voice-settings.js";
+import { endOfTurnModel, runs, type DeviceVoiceSettings as Settings } from "../../services/voice-settings.js";
 import type { Translate, MessageKey } from "../../i18n/translator";
 import type { PrepareStatus } from "./ModelPrepare";
 import { MAX_TAKE_MS } from "../../services/voice-trial.js";
@@ -49,9 +49,11 @@ export function useModelState(task: Task | "end-of-turn", draft: Settings | null
   const installing = mine?.state === "running";
   const failure = mine?.state === "failed" ? mine.error : "";
   const failureDetails = mine?.state === "failed" ? mine.details ?? "" : "";
-  const ready = !!model && installed && !needsKey;
+  // A model no build of which runs here is neither downloaded nor ready: its note says why (voiceChoices).
+  const unrunnable = !!model && !runs(model);
+  const ready = !!model && installed && !needsKey && !unrunnable;
   // Downloaded in full, it is checked before the install ends; then the catalogues are read again to see it there.
-  const status: PrepareStatus | null = !model || needsKey ? null
+  const status: PrepareStatus | null = !model || needsKey || unrunnable ? null
     : installing ? ((mine?.fraction ?? 0) >= 1 ? "verifying" : "downloading")
     : failure ? "failed"
     : ready ? "ready"

@@ -64,9 +64,9 @@ test("each slot offers this device first, then each provider, one with no models
     { id: "openai", local: false, name: "OpenAI", disabled: true, note: { key: "voice.catalog.reason", params: { code: "credential-missing" } } },
   ]);
   expect(choices.stt.options).toEqual([
-    { id: "whisper-base", group: "whisper", disabled: false, note: null },
-    { id: "whisper-large", group: "whisper", disabled: true, note: { key: "voice.model.unfit", reasons: ["memory"] } },
-    { id: "moonshine-tiny", group: "moonshine", disabled: false, note: null },
+    { id: "whisper-base", group: "whisper", disabled: false, runs: true, note: null },
+    { id: "whisper-large", group: "whisper", disabled: true, runs: false, note: { key: "voice.model.unfit", reasons: ["memory"] } },
+    { id: "moonshine-tiny", group: "moonshine", disabled: false, runs: true, note: null },
   ]);
   expect(choices.stt.languages).toEqual(["es", "en"]);
   expect(choices.tts.speed).toEqual({ min: 0.5, max: 2 });
@@ -77,7 +77,7 @@ test("each slot offers this device first, then each provider, one with no models
 test("a remote slot: the provider's models, its voices by name, languages for the person to pick, and its words when it refuses", () => {
   const settings = { ...defaultVoiceSettings(), stt: { catalog: "elevenlabs", model: "scribe_v2", language: null }, tts: { catalog: "elevenlabs", model: "eleven_flash_v2_5", voice: null, speed: 1 } };
   const choices = voiceChoices(CATALOGS, settings, ["es", "en", "fr"]);
-  expect(choices.stt.options).toEqual([{ id: "scribe_v2", group: null, disabled: false, note: null }]);
+  expect(choices.stt.options).toEqual([{ id: "scribe_v2", group: null, disabled: false, runs: true, note: null }]);
   expect(choices.stt.languages).toEqual(["es", "en", "fr"]);
   expect(choices.tts.voices).toEqual([{ id: "v1", name: "Rachel", languages: ["en"], gender: null }]);
   expect(choices.tts.speed).toEqual({ min: 0.7, max: 1.2 });
@@ -89,7 +89,7 @@ test("a kept model its catalogue no longer lists stays chosen and says so; smart
   const settings = { ...defaultVoiceSettings(), stt: { catalog: "local", model: "parakeet", language: null } };
   const withTurns = CATALOGS.map((catalog) => catalog.id === "local" ? { ...catalog, models: [...catalog.models, local("smart-turn-v3", "smart-turn", ["end-of-turn"])] } : catalog) as CatalogView[];
   const choices = voiceChoices(withTurns, settings);
-  expect(choices.stt.options[0]).toEqual({ id: "parakeet", group: null, disabled: false, note: { key: "voice.model.missing" } });
+  expect(choices.stt.options[0]).toEqual({ id: "parakeet", group: null, disabled: false, runs: true, note: { key: "voice.model.missing" } });
   expect(choices.endOfTurn).toEqual({ smartTurn: true, note: null });
   const gone = voiceChoices(CATALOGS, { ...settings, stt: { catalog: "deepgram", model: "nova", language: null } });
   expect(gone.stt.sources.at(-1)).toEqual({ id: "deepgram", local: false, name: null, disabled: false, note: { key: "voice.catalog.missing" } });
@@ -203,4 +203,16 @@ test("kept turn numbers survive normalising; one out of the voice's bounds takes
   expect(edited.turn).toEqual({ ...TURN_TUNING, barge_in_min_speech: 1.2, listening_bar: { quiet: 0.45, playing: 0.6 } });
   expect(editVoiceSettings(settings, { turn: { speech_start_ms: 99999 } }).turn).toEqual(TURN_TUNING);
   expect(settings.turn).toEqual(TURN_TUNING);
+});
+
+test("whereItRuns reads where a model that does not run here could run, from why its builds do not", async () => {
+  const { whereItRuns } = await import("./voice-settings.js");
+  const model = (...codes: string[]) => ({ id: "m", capabilities: ["stt"], languages: [], voices: [], builds: [{ id: "b", available: false, reasons: codes.map((code) => ({ code, params: {} })) }] }) as never;
+  const runsHere = { id: "m", capabilities: ["stt"], languages: [], voices: [], builds: [{ id: "b", available: true, reasons: [] }] } as never;
+  expect(whereItRuns(runsHere, false)).toBeNull();
+  expect(whereItRuns(model("build-accelerator"), true)).toBe("gpu");
+  expect(whereItRuns(model("backend-not-in-this-build"), false)).toBe("desktop");
+  expect(whereItRuns(model("wasm-memory"), false)).toBe("desktop");
+  expect(whereItRuns(model("backend-not-in-this-build"), true)).toBe("none");
+  expect(whereItRuns(model("memory"), true)).toBe("resources");
 });

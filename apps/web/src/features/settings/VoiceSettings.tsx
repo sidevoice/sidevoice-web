@@ -26,6 +26,7 @@ import { ModelLanguageNotice, ModelLanguages } from "./ModelLanguages";
 import { languageName } from "./model-languages";
 import { listedOption } from "./model-facts";
 import type { ModelBuild } from "@sidevoice/engine";
+import { useUnrunnablePolicy } from "./unrunnable-policy";
 
 /* The call's voice as the person chooses it, for what transcribes and for what speaks: where it runs — this device, or
  * a remote provider — then, on this device, a family of models and one of them, made ready here (ModelPrepare); then
@@ -52,7 +53,7 @@ function noteText(t: Translate, note: Note | null | undefined) {
 }
 
 type Source = { id: string; local: boolean; name: string | null; disabled: boolean; note: Note | null };
-type Option = { id: string; group: string | null; disabled: boolean; note: Note | null };
+type Option = { id: string; group: string | null; disabled: boolean; runs: boolean; note: Note | null };
 type Task = "stt" | "tts";
 
 type Edit = Parameters<NonNullable<typeof window.sidevoiceActions>["editVoice"]>[0];
@@ -96,18 +97,26 @@ function ModelPickers({ task, draft, options, locked, needsKey, t }: { task: Tas
   const facts = optionFacts(t);
   // This device's models as its catalogue lists them, for their facts; a provider's say none.
   const listed: Listed[] = draft[task].catalog === "local" ? catalogs.find((catalog) => catalog.id === "local")?.models ?? [] : [];
+  const policy = useUnrunnablePolicy();
   const families = [...new Set(options.map((option) => option.group).filter((group): group is string => !!group))];
   const current = options.find((option) => option.id === draft[task].model);
   const family = current?.group ?? null;
-  const shown = families.length ? options.filter((option) => option.group === family || (!option.group && option.id === draft[task].model)) : options;
+  // What runs here is the engine's word (voiceChoices): a family with no model that does is one nobody can pick from,
+  // hidden or listed disabled with why, as the variant says; the one in use stays so the list can show it.
+  const familyRuns = (name: string) => options.some((option) => option.group === name && option.runs);
+  const shownFamilies = policy === "hide" ? families.filter((name) => familyRuns(name) || name === family) : families;
+  const inFamily = families.length ? options.filter((option) => option.group === family || (!option.group && option.id === draft[task].model)) : options;
+  const shown = policy === "hide" ? inFamily.filter((option) => option.runs || option.id === draft[task].model) : inFamily;
+  // Only a model that runs here is ever picked for the person.
   const pickFamily = (next: string) => {
-    const first = options.find((option) => option.group === next && !option.disabled) ?? options.find((option) => option.group === next);
+    const first = options.find((option) => option.group === next && option.runs);
     if (first) edit({ [task]: { model: first.id } });
   };
   return <>
-    {families.length > 0 && <Field label={t("voice.family")}>
+    {shownFamilies.length > 0 && <Field label={t("voice.family")}>
       <Select id={task + "-family"} value={family ?? ""} disabled={locked || needsKey} onValueChange={pickFamily} placeholder={t("voice.family.none")}
-        options={families.map((name) => ({ value: name, label: familyName(name) }))} />
+        options={shownFamilies.map((name) => familyRuns(name) ? { value: name, label: familyName(name) }
+          : { value: name, label: familyName(name), disabled: true, reason: t("voice.family.unfit") })} />
     </Field>}
     <Field label={t("voice.model")}>
       <Select id={task + "-model"} value={needsKey ? "" : draft[task].model} disabled={locked || needsKey} placeholder={needsKey ? t("voice.prepare.badge.needsKey") : undefined}
@@ -270,6 +279,7 @@ export function TurnChoices({ draft, setup = false, active = true, turnTry }: { 
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
   const turnModels = useMemo(() => endOfTurnModels(catalogs), [catalogs]);
   const listFacts = optionFacts(t);
+  const policy = useUnrunnablePolicy();
   const saved = useRoomStore((state) => state.facts.voiceSettings);
   // What ends turns until the chosen model is ready: the smart model in use when it is on disk, else silence — Smart
   // kept without its model too (voiceSettingsToLoad). As the slots say it, outside the setup (nothing is in use there).
@@ -295,7 +305,7 @@ export function TurnChoices({ draft, setup = false, active = true, turnTry }: { 
           pickers={(locked) => <Field label={t("voice.model")}>
             {/* Just the models: one today, more later; no families or runtime here. */}
             <Select id="turn-model" value={turn.model!.id} disabled={locked} onValueChange={(model) => edit({ turn_model: model })}
-              options={turnModels.map((model: Listed) => {
+              options={turnModels.filter((model: Listed) => policy === "disable" || model.id === turn.model!.id || model.builds?.some((build) => build.available)).map((model: Listed) => {
                 const disabled = !model.builds?.some((build) => build.available);
                 return { value: model.id, label: model.id, disabled, ...listFacts(model, disabled) };
               })} />

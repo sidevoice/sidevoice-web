@@ -795,3 +795,31 @@ test("the Model list: each model that can be chosen with its download size at th
   renderPane({ voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
   expect(listOptions("turn-model").map((option) => option.detail)).toEqual(["9 MB · CPU"]);
 });
+
+/* Models no engine here can run (sidevoice-web: variants "unrunnable-models"): hidden in A, disabled with why in B. */
+const unrunnable = (id: string, family: string) => local(id, family, ["stt"], { builds: [withoutClass(build(id + "/int8", { available: false, accelerator: undefined, reasons: [{ code: "backend-not-in-this-build", params: {} }] }))] });
+const withParakeet = [{ ...catalogs[0], models: [...(catalogs[0] as unknown as { models: unknown[] }).models, unrunnable("parakeet-a", "parakeet"), unrunnable("parakeet-b", "parakeet")] }, ...catalogs.slice(1)] as unknown as CatalogView[];
+const useVariantValue = (value: string) => localStorage.setItem("sidevoice.variants", JSON.stringify({ "unrunnable-models": value }));
+
+test("variant hide: a family and a model that nothing here can run are not offered", () => {
+  useVariantValue("hide");
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: withParakeet, error: "" } });
+  expect(listOptions("stt-family").map((option) => option.value)).toEqual(["whisper", "moonshine"]);
+  expect(listOptions("stt-model").map((option) => option.value)).toEqual(["whisper-base"]);
+});
+
+test("variant disable: they are listed greyed out with why, and a family changed never picks a model that does not run", () => {
+  useVariantValue("disable");
+  const { actions } = renderPane({ voiceCatalogue: { state: "ready", catalogs: withParakeet, error: "" } });
+  const parakeet = listOptions("stt-family").find((option) => option.value === "parakeet")!;
+  expect([parakeet.disabled, parakeet.detail]).toEqual([true, "None of its models run here"]);
+  expect(listOptions("stt-model").find((option) => option.value === "whisper-large")!.disabled).toBe(true);
+  chooseOption("stt-family", "parakeet");
+  expect(actions.editVoice).not.toHaveBeenCalled();
+});
+
+test("a chosen model that does not run here is neither downloaded nor offered a download", () => {
+  const draft = { ...defaultVoiceSettings(), stt: { ...defaultVoiceSettings().stt, catalog: "local", model: "parakeet-a" } };
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: withParakeet, error: "" }, voiceSettings: draft, voiceDraft: draft });
+  expect(document.getElementById("stt-model-download")).toBeNull();
+});

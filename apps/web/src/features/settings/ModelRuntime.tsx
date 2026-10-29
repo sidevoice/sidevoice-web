@@ -6,6 +6,8 @@ import type { ModelBuild } from "@sidevoice/engine";
 import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 import type { ModelState } from "./ModelSetup";
 import { buildSizes, describeBuild, engineOf } from "./model-facts";
+import { whereItRuns } from "../../services/voice-settings.js";
+import type { CatalogModel } from "../../services/model-catalogs.js";
 
 /* How a model of this device runs, under its block, folded until asked for: what this device offers (a graphics card
  * the browser can use, its memory and cores — read at once, no benchmark) and each build of the model the engine has —
@@ -22,6 +24,33 @@ function DeviceLine({ t }: { t: Translate }) {
     nav.deviceMemory ? t("runtime.device.memory", { gb: nav.deviceMemory }) : "",
     nav.hardwareConcurrency ? t("runtime.device.cores", { n: nav.hardwareConcurrency }) : ""].filter(Boolean);
   return <p className="model-runtime-device">{t("runtime.device", { what: parts.join(" · ") })}</p>;
+}
+
+/** Every model of this device's catalogue for the task, grouped by family, the ones that do not run here too, each with
+ *  where it does run when that can be told: read only, nothing here is chosen or downloaded. */
+function AllModels({ task, t }: { task: "stt" | "tts"; t: Translate }) {
+  const inApp = !!useRoomStore((state) => state.facts.inApp);
+  const models = useRoomStore((state) => state.facts.voiceCatalogue.catalogs.find((catalog) => catalog.id === "local")?.models) as CatalogModel[] | undefined;
+  const families = new Map<string, CatalogModel[]>();
+  for (const model of models ?? []) if (model.capabilities.includes(task)) families.set(model.family ?? "", [...(families.get(model.family ?? "") ?? []), model]);
+  if (!families.size) return null;
+  return (
+    <div className="model-runtime-all">
+      <p className="model-runtime-info">{t("runtime.all.title")}</p>
+      <ul className="model-runtime-families">
+        {[...families].map(([family, list]) => <li key={family}>
+          <strong>{family.charAt(0).toUpperCase() + family.slice(1)}</strong>
+          <ul>{list.map((model) => {
+            const where = whereItRuns(model, inApp);
+            return <li key={model.id} data-runs={where === null || undefined}>
+              <span>{model.id}</span>
+              {where === null ? <Badge tone="positive">{t("runtime.all.runs")}</Badge> : <Badge>{t(("runtime.where." + where) as MessageKey)}</Badge>}
+            </li>;
+          })}</ul>
+        </li>)}
+      </ul>
+    </div>
+  );
 }
 
 export function ModelRuntime({ task, state, locked }: { task: "stt" | "tts"; state: ModelState; locked: boolean }) {
@@ -72,6 +101,7 @@ export function ModelRuntime({ task, state, locked }: { task: "stt" | "tts"; sta
             ...(build.installed ? [{ text: t("runtime.onDisk"), tone: "positive" as const }] : []),
           ], build.available, reasons(build)))}
         </fieldset>
+        <AllModels task={task} t={t} />
         {locked && <p className="model-runtime-device">{t("voice.prepare.lockedHint")}</p>}
       </div>}
     </div>
