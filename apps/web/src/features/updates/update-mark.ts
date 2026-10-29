@@ -10,13 +10,25 @@ const KEY = "sidevoice.updateSeen";
 const listeners = new Set<() => void>();
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => listeners.delete(listener); };
 let cache: string | null | undefined;
+/** An update with no version cannot be told from the next one with none, so its acknowledgement is not kept: it lasts
+ *  while that update does. */
+let unidentifiedSeen = false;
 function read(): string | null {
+  if (unidentifiedSeen) return "";
   if (cache === undefined) { try { cache = localStorage.getItem(KEY); } catch { cache = null; } }
   return cache;
 }
 function write(version: string) {
-  cache = version;
-  try { localStorage.setItem(KEY, version); } catch { /* Kept for this load only. */ }
+  if (version === "") unidentifiedSeen = true;
+  else {
+    cache = version;
+    try { localStorage.setItem(KEY, version); } catch { /* Kept for this load only. */ }
+  }
+  for (const listener of [...listeners]) listener();
+}
+function forgetUnidentified() {
+  if (!unidentifiedSeen) return;
+  unidentifiedSeen = false;
   for (const listener of [...listeners]) listener();
 }
 
@@ -36,12 +48,16 @@ export function useUpdateMark(): boolean {
 /** Called by Settings while its Updates section is in view (`inView`): that version is seen. */
 export function useSeeUpdates(inView: boolean) {
   const version = useNoticedVersion();
-  useEffect(() => { if (inView && version !== null && version !== read()) write(version); }, [inView, version]);
+  useEffect(() => {
+    if (version === null) forgetUnidentified();
+    else if (inView && version !== read()) write(version);
+  }, [inView, version]);
 }
 
 /** Forgets what was seen (tests). */
 export function resetUpdateSeen() {
   cache = undefined;
+  unidentifiedSeen = false;
   try { localStorage.removeItem(KEY); } catch { /* Nothing to forget. */ }
   for (const listener of [...listeners]) listener();
 }

@@ -75,3 +75,20 @@ test("the gear wears the update's dot after attention and a count", () => {
   expect(mark({ count: 0, attention: true, update: true })).toBe("attention");
   expect(mark({ count: 0 })).toBeNull();
 });
+
+test("an update without a version is acknowledged only while it lasts: the next one without a version marks again", async () => {
+  const { store, fake, dialog } = open({ status: { state: "ready" } });
+  act(() => { dialog.setAttribute("open", ""); });
+  await settle();
+  expect(marked()).toBe(true);
+  act(() => { store.patch({ settingsSection: "updates" } as never); });
+  await settle();
+  expect(marked()).toBe(false);
+  expect(localStorage.getItem("sidevoice.updateSeen")).toBeNull();
+  // It is installed, and a later one arrives, also unidentified.
+  act(() => { store.patch({ settingsSection: "general" } as never); fake.push({ state: "idle" }); });
+  await settle();
+  act(() => { fake.push({ state: "ready" }); });
+  await settle();
+  expect(marked()).toBe(true);
+});
