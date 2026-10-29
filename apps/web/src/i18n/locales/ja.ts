@@ -1144,7 +1144,7 @@ export const messages: Messages = {
   "wizard.mic.stillMissing": "まだマイクが見つかりません。",
   "wizard.mic.denied.title": "Sidevoice がマイクを使えません",
   "wizard.mic.denied.app": "システム設定 › プライバシーとセキュリティ › マイク を開き、Sidevoice をオンにしてから、もう一度確認してください。",
-  "wizard.mic.denied.windows": "設定 › プライバシーとセキュリティ › マイク を開き、「マイクへのアクセス」と「デスクトップ アプリがマイクにアクセスできるようにする」をオンにしてから、もう一度確認してください。",
+  "wizard.mic.denied.windows": "設定 › プライバシーとセキュリティ › マイク を開き、「マイクへのアクセス」と「デスクトップ アプリにマイクへのアクセスを許可する」をオンにしてから、もう一度確認してください。",
   "wizard.mic.denied.linux": "システムのプライバシーとサウンドの設定で Sidevoice がマイクを使えるか確認してから、もう一度確認してください。",
   "wizard.mic.denied.site": "このサイトで許可してください：アドレスの横にあるサイト設定のアイコンを選び、マイクを「許可」にしてから、もう一度確認してください。",
   "wizard.mic.denied.siteMac": "すでに許可済みですか？Mac がブラウザをブロックしている可能性があります：システム設定 › プライバシーとセキュリティ › マイク。",

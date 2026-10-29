@@ -1146,7 +1146,7 @@ export const messages: Messages = {
   "wizard.mic.stillMissing": "Immer noch kein Mikrofon gefunden.",
   "wizard.mic.denied.title": "Sidevoice kann das Mikrofon nicht verwenden",
   "wizard.mic.denied.app": "Öffne Systemeinstellungen › Datenschutz & Sicherheit › Mikrofon und aktiviere Sidevoice. Prüfe dann erneut.",
-  "wizard.mic.denied.windows": "Öffne Einstellungen › Datenschutz und Sicherheit › Mikrofon und aktiviere „Mikrofonzugriff“ und „Desktop-Apps den Zugriff auf Ihr Mikrofon erlauben“. Prüfe dann erneut.",
+  "wizard.mic.denied.windows": "Öffne Einstellungen › Datenschutz und Sicherheit › Mikrofon und aktiviere „Mikrofonzugriff“ und „Zulassen, dass Desktop-Apps auf Ihr Mikrofon zugreifen“. Prüfe dann erneut.",
   "wizard.mic.denied.linux": "Prüfe, ob die Datenschutz- und Toneinstellungen deines Systems Sidevoice das Mikrofon verwenden lassen. Prüfe dann erneut.",
   "wizard.mic.denied.site": "Erlaube es für diese Seite: Wähle das Symbol für die Website-Einstellungen neben der Adresse, stelle Mikrofon auf Zulassen und prüfe dann erneut.",
   "wizard.mic.denied.siteMac": "Dort schon erlaubt? Dann blockiert vielleicht dein Mac den Browser: Systemeinstellungen › Datenschutz & Sicherheit › Mikrofon.",
