@@ -255,7 +255,6 @@
 /* Small to the eye, not to a finger. */
 .unheard-mark::after { content: ""; position: absolute; inset: -4px 0; }
 .unheard-mark:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: var(--sv-radius-sm); }
-.unheard-rule { flex: none; width: 20px; border-top: 1px solid var(--sv-border); }
 .unheard-icon { position: relative; flex: none; width: 16px; height: 16px; }
 .unheard-icon svg { position: absolute; inset: 0; transition: opacity 140ms, transform 140ms; }
 .unheard-chevron { opacity: 0; transform: rotate(-45deg) scale(.7); }

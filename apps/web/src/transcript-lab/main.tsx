@@ -8,13 +8,12 @@ import "./transcript-lab.css";
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MessageList } from "../features/conversation/MessageList";
-import { UNHEARD_MARKS, UNHEARD_MARK_VARIANT } from "../features/conversation/UnheardMark";
-import { VARIANTS_KEY, useVariant } from "../lib/variants";
+import { VARIANTS_KEY } from "../lib/variants";
 import type { ChatMessage, ConversationView } from "../state/room-types";
 
 /* The transcript lab (transcript-lab.html, served by the dev server only): the real transcript on mock replies, one
- * panel to switch between the states a reply can settle into and between the variants of each open visual choice
- * (sidevoice-web#182). The variants are the ones the playground preview's VARIANTS panel writes too. */
+ * panel to switch between the states a reply can settle into (sidevoice-web#182), in either theme and at the widths the
+ * transcript has. */
 
 const NOW = Date.now();
 const LONG = "I went through the failing tests and found the cause: the fixture builds the clock before the timezone is set, so every run after midnight UTC drifts by a day. I fixed the order, added a test that pins the clock, and the whole suite passes locally. Tell me if you want it in its own commit.";
@@ -72,29 +71,12 @@ function scenario(id: StateId, at: number, settled: "playing" | "heard" | "cut")
 const params = new URLSearchParams(location.search);
 const WIDTHS = [["phone", 380], ["panel", 420], ["wide", 560]] as const;
 
-/** A choice that was made is code, and a stored value that is no longer an option is dropped. */
-function pruneVariants() {
+/** The choices that were open here are code now: their stored values are dropped. */
+for (const name of ["transcript-unheard-mark", "transcript-cut-marker"]) {
   try {
     const all = JSON.parse(localStorage.getItem(VARIANTS_KEY) || "{}");
-    delete all["transcript-cut-marker"];
-    if (!(UNHEARD_MARKS as readonly string[]).includes(all[UNHEARD_MARK_VARIANT])) delete all[UNHEARD_MARK_VARIANT];
-    localStorage.setItem(VARIANTS_KEY, JSON.stringify(all));
+    if (name in all) { delete all[name]; localStorage.setItem(VARIANTS_KEY, JSON.stringify(all)); }
   } catch { localStorage.removeItem(VARIANTS_KEY); }
-}
-pruneVariants();
-
-function setVariant(name: string, value: string) {
-  let all: Record<string, string> = {};
-  try { all = JSON.parse(localStorage.getItem(VARIANTS_KEY) || "{}"); } catch { /* start over */ }
-  localStorage.setItem(VARIANTS_KEY, JSON.stringify({ ...all, [name]: value }));
-  window.dispatchEvent(new StorageEvent("storage", { key: VARIANTS_KEY }));
-}
-
-function Choice<Value extends string>({ name, title, values }: { name: string; title: string; values: readonly Value[] }) {
-  const current = useVariant(name, values);
-  return <fieldset><legend>{title}</legend>
-    {values.map((value) => <label key={value}><input type="radio" name={name} checked={value === current} onChange={() => setVariant(name, value)} /> {value}</label>)}
-  </fieldset>;
 }
 
 function Lab() {
@@ -140,7 +122,6 @@ function Lab() {
           <span>{settled === "playing" ? "playing…" : settled === "heard" ? "settled: heard" : "settled: cut"}</span>
         </div>}
       </fieldset>
-      <Choice name={UNHEARD_MARK_VARIANT} title="Never played: the mark" values={UNHEARD_MARKS} />
       <fieldset><legend>Theme</legend>
         {(["light", "dark"] as const).map((value) => <label key={value}><input type="radio" name="theme" checked={theme === value} onChange={() => setTheme(value)} /> {value}</label>)}
       </fieldset>
