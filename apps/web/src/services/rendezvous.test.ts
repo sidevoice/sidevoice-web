@@ -66,17 +66,16 @@ test("asking the target: a failure, or anything that is not a node, is no answer
   expect(await askTarget("https://blackhole.example", hangs, 5)).toBeNull();
 });
 
-test("a conversation's request, and this device's pairing, go to the node; telemetry to the target", () => {
+test("a conversation's request, and this device's pairing, go to the node; the room's own paths to the target", () => {
   for (const path of ["/api/presentation", "/api/presentation?session_id=s", "/api/presentation/history?session_id=s", "/api/presentation/integrations/openai", "/api/presentation/client-error",
     "/api/device/identity?nonce=n", "/api/device/devices/d-1", "/api/models/catalog", "/api/host/agents", "/api/host/agents/codex/connect"])
     expect([path, isNodePath(path)]).toEqual([path, true]);
-  for (const path of ["/api/connectors", "/api/connectors/pairing-code", "/api/connectors/c-1", "/api/telemetry", "/api/presentationx", "/api/devices", "/api/modelsx", "/voice-browser/room-client.js"])
+  for (const path of ["/api/connectors", "/api/connectors/pairing-code", "/api/connectors/c-1", "/api/presentationx", "/api/devices", "/api/modelsx", "/voice-browser/room-client.js"])
     expect([path, isNodePath(path)]).toEqual([path, false]);
 
   expect(routeUrl("/api/presentation/participants?session_id=s", "", "/nodes/mac")).toBe("/nodes/mac/api/presentation/participants?session_id=s");
   expect(routeUrl("/api/connectors", "", "/nodes/mac")).toBe("/api/connectors");
   expect(routeUrl("/api/presentation", "https://room.example", "https://room.example/nodes/mac")).toBe("https://room.example/nodes/mac/api/presentation");
-  expect(routeUrl("/api/telemetry", "https://room.example", "https://room.example/nodes/mac")).toBe("https://room.example/api/telemetry");
   // A node that serves the page itself keeps every path relative.
   expect(routeUrl("/api/presentation/select", "", "")).toBe("/api/presentation/select");
   // No machine: nothing of a node can be asked, while the room's own endpoints still answer.

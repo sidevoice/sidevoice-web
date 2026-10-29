@@ -1,7 +1,7 @@
 /* Where this page talks to, and nothing else (the node side: sidevoice-core `server/rendezvous.py`, `server/devices.py`).
  *
- * Two addresses. The *target* is the one the page was pointed at: a room, or a node directly. Telemetry is the
- * target's. The *node base* is where the conversations and the call live: the node this device is paired with,
+ * Two addresses. The *target* is the one the page was pointed at: a room, or a node directly.
+ * The *node base* is where the conversations and the call live: the node this device is paired with,
  * reached directly or through a room's relay — whichever address proved it is that node (device-pairing.js).
  * Every `/api/presentation…` and `/api/device…` request and the call socket go to the node base.
  *

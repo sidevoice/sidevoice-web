@@ -80,7 +80,7 @@ function installFailure(error){const words=voiceError(error,'download');return {
 // room carries its own session: the answer is about this browser and no other. Only the call's machine knows it.
 function roomQuery(path,fp=state.callNode){return state.sessionId&&fp===state.callNode?path+(path.includes('?')?'&':'?')+'session_id='+encodeURIComponent(state.sessionId):path}
 /* Where each request goes (`rendezvous.js`, `device-pairing.js`): a conversation's, the call and this device's own
- * pairing to the machine it belongs to; telemetry to the target. Every paired machine is reached at once, each at its
+ * pairing to the machine it belongs to. Every paired machine is reached at once, each at its
  * own node base: an address that proved — with the key pinned when pairing — that it is that machine. Until one has
  * there is none, null, and nothing of that machine is asked: every such request carries that pairing's token. */
 const target=pageTarget();
@@ -1526,13 +1526,6 @@ const latencyTurns=new Map();
 let latencyActiveTurn=null;
 function latencyNow(){return globalThis.performance?.now?.()}
 function latencyKey(thread,revision){return JSON.stringify([state.sessionId,thread,revision])}
-// The turn's root span is this page's: the room announces the turn, this browser opens the span and
-// hands the room its W3C traceparent, so every stage the room measures hangs from the same trace.
-function openTurnTrace(threadId,revision){
- const traceparent=window.sidevoiceTelemetry?.startTurn?.(threadId,revision,{});
- if(!traceparent||!state.ws||state.ws.readyState!==1||!state.sessionId)return;
- try{state.ws.send(JSON.stringify({type:'voice-turn-trace',data:{session_id:state.sessionId,thread_id:threadId,revision,traceparent}}))}catch{}
-}
 const latencyRevisions=new Map();
 function observeLatencyEvent(type,data){
  const now=latencyNow();if(!Number.isFinite(now))return;
@@ -1543,8 +1536,8 @@ function observeLatencyEvent(type,data){
   if(revision==null)return;
   data={...data,revision};
   const key=latencyKey(data.thread_id,data.revision);
-  if(data.phase==='started'){latencyActiveTurn=key;if(!latencyTurns.has(key))latencyTurns.set(key,{});openTurnTrace(data.thread_id,data.revision)}
-  if(data.phase==='cancelled'){latencyTurns.delete(key);if(latencyActiveTurn===key)latencyActiveTurn=null;window.sidevoiceTelemetry?.endTurn?.(data.thread_id,data.revision,data.merged?'merged':'cancelled')}
+  if(data.phase==='started'){latencyActiveTurn=key;if(!latencyTurns.has(key))latencyTurns.set(key,{})}
+  if(data.phase==='cancelled'){latencyTurns.delete(key);if(latencyActiveTurn===key)latencyActiveTurn=null}
   if(data.phase==='finished'){const turn=latencyTurns.get(key)||{};turn.finished=now;latencyTurns.set(key,turn)}
   if(latencyTurns.size>128)latencyTurns.delete(latencyTurns.keys().next().value);
  }
@@ -1630,8 +1623,6 @@ function recordMessage(raw, socket) {
                 const previous = state.turns[id] || {};
                 state.turns = { ...state.turns, [id]: { ...previous, session: d.session_id,
                     thread: key, settled: true, harnessEnded: true } };
-                if (!previous.harnessEnded)
-                    window.sidevoiceTelemetry?.endTurn?.(d.thread_id, d.revision, 'harness_finished');
             }
         }
     }
@@ -1943,7 +1934,7 @@ function openSession(socket,hello={},fp=state.callNode,token=null){return new Pr
   roomRefusal().then(admission=>fail(admissionFailure(admission,broken),admission?.admitted===false))};
  socket.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type!=='voice-session'){if(m.type==='error'){refusal=m.data?refusalError(m.data):refusal;refused=m.data?.reason||refused}message(e.data,socket);return}state.roomInfo=m.data?.room||state.roomInfo;clearTimeout(timer);resolve(m.data)}})}
 function disconnect() {
-    window.sidevoiceTelemetry?.endCall?.('left');audioLog.callEnded();
+    audioLog.callEnded();
     // A deliberate hang-up is this app's not-heard choice for replies still pending. Offer the
     // semantic frames on the live socket before closing it; a lost frame remains unconfirmed.
     for(const said of replies.values())if(!said.terminal){if(said.action!=='user_skipped')said.action='call_ended';reportHearing(said,{status:'unplayed'})}
@@ -2163,10 +2154,7 @@ async function joinRoom(epoch,context){
  socket.token=protocols[1].slice('sidevoice.token.'.length);
  state.ws=socket;
  let session;
- // The hello carries this browser's call span, so the room's own spans are inside it instead of
- // being a second trace about the same call. With no collector configured there is no span to carry.
- const traceparent=window.sidevoiceTelemetry?.startCall?.({});
- try{session=await openSession(socket,{conversation:rememberedOn(fp),ui_language:devicePreferences().ui_language,speech:speechOutput==='on'?{on:true}:{on:false,reason:speechOutput},...(context.resume?{resume:context.resume}:{}),...(traceparent?{telemetry:{traceparent}}:{})},fp,socket.token)}
+ try{session=await openSession(socket,{conversation:rememberedOn(fp),ui_language:devicePreferences().ui_language,speech:speechOutput==='on'?{on:true}:{on:false,reason:speechOutput},...(context.resume?{resume:context.resume}:{})},fp,socket.token)}
  // A join that failed leaves nothing behind. A room that is not told keeps the seat for the length of its keepalive
  // budget while the page tries again, so one local failure became a reconnect loop that ate the room's seats one every
  // thirty seconds (2026-09-22).
@@ -2189,7 +2177,6 @@ async function joinRoom(epoch,context){
  keepTicket(true);
  // From here this socket speaks for the session: the outbox may use it.
  socket.session=state.sessionId;
- window.sidevoiceTelemetry?.noteSession?.(state.sessionId);
  return session;
 }
 // The room took the call back only when it says so for the very session this page asked for.
@@ -2209,7 +2196,6 @@ async function settleRejoin(epoch,hold){
 async function lostConnection(event,epoch,token=null){
  if(epoch!==connectEpoch||state.reconnecting)return;
  state.ws=null;keepTicket(true);
- window.sidevoiceTelemetry?.endCall?.('connection_lost');
  // Nothing the call is doing stops with its socket: the voice goes on hearing and speaking — a reply already here plays
  // to its end however long the room is away (#220) — and what it reports waits in the outbox. The room parks the
  // session meanwhile, so its turn and its history stay as they are here too.
@@ -2322,7 +2308,7 @@ function leaveSession(){
  writtenHearing.clear();
  const socket=state.ws;
  if(socket){socket.onclose=socket.onmessage=socket.onerror=null;try{socket.close(1000)}catch{}}
- window.sidevoiceTelemetry?.endCall?.('moved');audioLog.callEnded();
+ audioLog.callEnded();
  resumeToken=null;lastSeq=0;keepTicket(true);outboxHold=null;relay.reset();replies.clear();callSessions.clear();
  roomStore.batch(()=>{
   state.ws=null;state.sessionId=null;state.roomBinding=null;state.roomRevision=0;

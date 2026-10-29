@@ -102,8 +102,7 @@ export const CONNECTOR_PROTOCOL_VERSION = 1 as const;
 /* ----- telemetry: the vocabulary the room and the page share -----
  *
  * The stages of a turn, and everything a span about one is allowed to say. Both halves implement
- * this list: `apps/web/src/services/telemetry-types.ts` imports it, and sidevoice-core's
- * `control/telemetry.py` repeats it because Python cannot read this file — a test there asserts the two
+ * this list; sidevoice-core's `control/telemetry.py` repeats it because Python cannot read this file — a test there asserts the two
  * agree, so the contract has one owner and the copy cannot drift in silence.
  *
  * A stage name is the same thing three times over: the span, the histogram, and the row of the
@@ -153,5 +152,3 @@ export const TELEMETRY_ATTRIBUTES = [
 
 export type TelemetryAttribute = (typeof TELEMETRY_ATTRIBUTES)[number];
 
-/** Where the page posts its OTLP batches. The room forwards them; the page never sees a collector. */
-export const TELEMETRY_API = "/api/telemetry" as const;
