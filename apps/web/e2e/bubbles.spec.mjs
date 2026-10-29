@@ -1,24 +1,27 @@
 import { test, expect } from "@playwright/test";
 
-test("a reply cut off keeps its mark over the soft card's shadow, in both themes", async ({ page }) => {
+test("a reply cut off draws its cut marker over its heard text, in both themes", async ({ page }) => {
   await page.goto("/voice/");
   await page.evaluate(() => {
     const host = document.createElement("div");
     host.className = "call-layout";
     host.innerHTML = `<div class="chat-bubble" data-role="assistant" data-position="only">Complete</div>
-      <div class="chat-bubble" data-role="assistant" data-position="only" data-interrupted="true">Interrupted</div>
-      <div class="chat-bubble" data-role="user" data-position="only">Person</div>`;
+      <div class="chat-bubble" data-role="assistant" data-position="only" data-interrupted="true"><span class="cut-text" data-variant="pill"><span class="cut-heard">Interrupted</span>
+        <button class="cut-marker" data-variant="pill" aria-expanded="false">Cut off</button></span></div>`;
     document.body.append(host);
   });
   for (const theme of ["light", "dark"]) {
     const paints = await page.evaluate((theme) => {
       document.documentElement.dataset.theme = theme;
       const [complete, interrupted] = document.querySelectorAll(".call-layout .chat-bubble");
-      return { complete: getComputedStyle(complete).boxShadow, interrupted: getComputedStyle(interrupted).boxShadow };
+      const marker = getComputedStyle(interrupted.querySelector(".cut-marker"));
+      return { complete: getComputedStyle(complete).boxShadow, interrupted: getComputedStyle(interrupted).boxShadow, shape: marker.boxShadow, fill: marker.backgroundColor };
     }, theme);
     expect(paints.complete, theme).not.toBe("none");
-    expect(paints.interrupted, theme).not.toBe(paints.complete);
-    expect(paints.interrupted, theme).toContain("inset");
+    // The balloon is the same as a complete one: the cut is the marker's, a pill with its own fill and edge.
+    expect(paints.interrupted, theme).toBe(paints.complete);
+    expect(paints.shape, theme).toContain("inset");
+    expect(paints.fill, theme).not.toBe("rgba(0, 0, 0, 0)");
   }
 });
 

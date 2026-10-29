@@ -1,10 +1,11 @@
 import { Tooltip } from "../../components/ui/Tooltip";
 import { Button } from "../../components/ui/Button";
-import { ListenAgainIcon, PendingIcon, ReadIcon, SentIcon, UncertainIcon } from "../../components/ui/Icons";
+import { PendingIcon, ReadIcon, SentIcon, UncertainIcon } from "../../components/ui/Icons";
 import type { ChatMessage } from "../../state/room-types";
 import { receiptView } from "../../state/room-session-state.js";
 import { translator } from "../../i18n/translator";
 import { KaraokeText } from "./KaraokeText";
+import { ListenAgain } from "./ListenAgain";
 import { CutText, hearingOf } from "./UnheardReply";
 import { speakerName } from "./group-messages";
 import { uiLocale } from "../../i18n/locale";
@@ -41,8 +42,7 @@ export function MessageBubble({ message, position }: { message: ChatMessage; pos
       {(!message.draft || replay || delivery) && <div className="chat-meta">
         {audioMark && <span className="audio-fate-mark" title={audioMark}>{audioMark}</span>}
         {!message.draft && <time dateTime={new Date(message.time).toISOString()} title={new Date(message.time).toLocaleString(uiLocale())}>{new Date(message.time).toLocaleTimeString(uiLocale(), { hour: "2-digit", minute: "2-digit" })}</time>}
-        {replay && <Button variant="ghost" tone="neutral" size="icon-sm" className="listen-again" aria-label={t("messages.listenAgain")} title={t("messages.listenAgain")}
-          onClick={() => void window.sidevoiceActions?.replayReply(message.segment)}><ListenAgainIcon size={12} /></Button>}
+        {replay && <ListenAgain message={message} />}
         {delivery && <span className="receipt delivery" data-state={delivery} title={receiptView(delivery).label} aria-label={receiptView(delivery).label}><DeliveryMark state={delivery} /></span>}
       </div>}
       {message.deliveryNote && <span className="chat-audio-note">{message.deliveryNote}</span>}

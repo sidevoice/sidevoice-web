@@ -5,6 +5,7 @@ import { translator } from "../../i18n/translator";
 import { uiLocale } from "../../i18n/locale";
 import type { ChatMessage } from "../../state/room-types";
 import { wordEnd } from "./KaraokeText";
+import { ListenAgain } from "./ListenAgain";
 
 /* How a reply settles once it has played (issue #182): heard whole, cut part-way, or never played. While it plays the
  * bubble is the karaoke's, whole, so nothing here applies until playback is over. Open visual choices, compared on the
@@ -13,6 +14,19 @@ export const UNHEARD_MARKS = ["dot", "line", "ghost"] as const;
 export const CUT_MARKERS = ["pill", "bar", "rule"] as const;
 export const UNHEARD_MARK_VARIANT = "transcript-unheard-mark";
 export const CUT_MARKER_VARIANT = "transcript-cut-marker";
+
+/** The cut, carried to the end of the word it falls in: the language's own word boundaries where the platform has them
+ *  (CJK has no spaces), whitespace otherwise. */
+export function cutEnd(text: string, at: number) {
+  const Segmenter = (Intl as { Segmenter?: typeof Intl.Segmenter }).Segmenter;
+  if (!Segmenter) return wordEnd(text, at);
+  for (const part of new Segmenter(uiLocale(), { granularity: "word" }).segment(text)) {
+    if (part.index >= at) break;
+    const end = part.index + part.segment.length;
+    if (end > at) return part.isWordLike ? end : at;
+  }
+  return at;
+}
 
 export type Hearing = { kind: "whole" } | { kind: "never" } | { kind: "cut"; heard: string; rest: string };
 
@@ -26,7 +40,7 @@ export function hearingOf(message: ChatMessage): Hearing {
   const count = message.heard_chars!;
   if (count <= 0) return { kind: "never" };
   if (count >= scalars.length) return { kind: "whole" };
-  const at = wordEnd(message.text, scalars.slice(0, count).join("").length);
+  const at = cutEnd(message.text, scalars.slice(0, count).join("").length);
   const rest = message.text.slice(at).trimStart();
   return rest ? { kind: "cut", heard: message.text.slice(0, at).trimEnd(), rest } : { kind: "whole" };
 }
@@ -55,6 +69,7 @@ export function UnheardMark({ message }: { message: ChatMessage }) {
   const variant = useVariant(UNHEARD_MARK_VARIANT, UNHEARD_MARKS);
   const [open, setOpen] = useState(false);
   const label = t("messages.audio.notPlayed");
+  const replay = message.replayable && message.role === "assistant";
   const action = t(open ? "messages.unheard.hide" : "messages.unheard.show");
   return <div className="unheard" data-variant={variant} data-open={open || undefined} data-segment={message.segment || undefined}>
     <button type="button" className="unheard-mark" aria-expanded={open} title={`${label} · ${action}`} aria-label={`${label} · ${action}`} onClick={() => setOpen(!open)}>
@@ -62,9 +77,14 @@ export function UnheardMark({ message }: { message: ChatMessage }) {
       <span className="unheard-chip"><UnplayedIcon size={12} />{variant !== "dot" && <span className="unheard-snippet">{message.text}</span>}</span>
       {variant === "line" && <span className="unheard-rule" aria-hidden="true" />}
     </button>
-    {open && <p className="unheard-text">
-      {message.text}
-      <time dateTime={new Date(message.time).toISOString()}>{new Date(message.time).toLocaleTimeString(uiLocale(), { hour: "2-digit", minute: "2-digit" })}</time>
-    </p>}
+    {open && <div className="unheard-body">
+      <p className="unheard-text">
+        {message.text}
+        <time dateTime={new Date(message.time).toISOString()}>{new Date(message.time).toLocaleTimeString(uiLocale(), { hour: "2-digit", minute: "2-digit" })}</time>
+        {replay && <ListenAgain message={message} />}
+      </p>
+      {message.deliveryNote && <span className="chat-audio-note">{message.deliveryNote}</span>}
+      {message.audioNote && <span className="chat-audio-note">{message.audioNote}</span>}
+    </div>}
   </div>;
 }

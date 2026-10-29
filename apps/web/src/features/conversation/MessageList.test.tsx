@@ -249,9 +249,9 @@ test("a reply cut part-way shows what was heard and a cut marker, the rest folde
   expect(container.querySelector(".cut-heard")?.textContent).toBe("I fixed the clock fixture");
   expect(container.querySelector(".cut-rest")).toBeNull();
   expect(container.querySelector(".audio-fate-mark")).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Cut · Show the rest" }));
+  fireEvent.click(screen.getByRole("button", { name: "Cut off · Show the rest" }));
   expect(container.querySelector(".cut-rest")?.textContent).toBe("and the suite passes. Tell me if you want it in its own commit.");
-  fireEvent.click(screen.getByRole("button", { name: "Cut · Hide the rest" }));
+  fireEvent.click(screen.getByRole("button", { name: "Cut off · Hide the rest" }));
   expect(container.querySelector(".cut-rest")).toBeNull();
 });
 
@@ -281,4 +281,31 @@ test("a reply that is playing keeps its whole balloon with the karaoke, whatever
   const { container } = render(<MessageList conversation={view([message({ segment: "now", text: LONG, hearing: "not_heard", playback: "playing", karaoke: { from: 5, to: 5 } })])} />);
   expect(container.querySelector(".unheard")).toBeNull();
   expect(container.querySelector(".karaoke-text")).toHaveAttribute("data-playback", "playing");
+});
+
+test("a cut in Chinese falls on a word boundary the platform knows, not on whitespace that is not there", () => {
+  const text = "你好世界。下一句话。";
+  const { container } = render(<MessageList conversation={view([message({ segment: "zh", text, hearing: "partial", heard_chars: 2 })])} />);
+  expect(typeof Intl.Segmenter).toBe("function");
+  expect(container.querySelector(".cut-marker")).not.toBeNull();
+  expect(container.querySelector(".cut-heard")?.textContent).toBe("你好");
+});
+
+test("a cut in the middle of a Latin word is carried to the word's end", () => {
+  const { container } = render(<MessageList conversation={view([message({ segment: "mid", text: "The migration is ready now", hearing: "partial", heard_chars: 8 })])} />);
+  expect(container.querySelector(".cut-heard")?.textContent).toBe("The migration");
+  fireEvent.click(screen.getByRole("button", { name: "Cut off · Show the rest" }));
+  expect(container.querySelector(".cut-rest")?.textContent).toBe("is ready now");
+});
+
+test("a never-played reply's opened mark keeps listen again and its failure explanation", () => {
+  const replayReply = vi.fn();
+  window.sidevoiceActions = { replayReply } as never;
+  const failed = { audio: "failed", audio_reason: "playback_failed", heard_chars: 0, hearing: "not_heard" as const };
+  render(<MessageList conversation={view([message({ segment: "nf", text: "Never started", replayable: true, ...failed, audioNote: audioNote(failed) })])} />);
+  expect(screen.queryByRole("button", { name: "Listen again" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: /Not played/ }));
+  expect(screen.getByText("Playback failed")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Listen again" }));
+  expect(replayReply).toHaveBeenCalledWith("nf");
 });
