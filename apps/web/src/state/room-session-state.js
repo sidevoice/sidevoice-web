@@ -1,3 +1,4 @@
+import { listeningPort } from '../services/device-pairing.js';
 // The session's facts and pure projections. No DOM, storage, audio engine or clock reads here.
 export const PRESENCE_DELIVERED_DELAY_MS = 1500;
 /* How long a conversation works without a break before it shows as working (the operator, 2026-10-14): its words, its
@@ -403,17 +404,6 @@ export function participantsView(s) {
             model: p.engine?.model || null, effort: p.engine?.effort || null,
             activityNote: [experimentalNote(p), workingCapabilityNote(p)].filter(Boolean).join(' ') || null, detail: p.reach?.detail ? (p.reach.detail + (p.reach.remedy ? '\n\n' + p.reach.remedy : '')) : undefined };
     });
-}
-/** The port the machine's Core listens on, as its pairing advertises it: the first address that carries one. */
-export function listeningPort(urls) {
-    for (const url of urls || []) {
-        try {
-            const { port } = new URL(url);
-            if (port) return Number(port);
-        }
-        catch { /* not an address */ }
-    }
-    return null;
 }
 /** The machines this device is paired with, each as one row: its name, how this device reaches it, and since when.
  *  Every one of them is live at once: none is "the one in use". A pairing the machine revoked stays listed, saying so,

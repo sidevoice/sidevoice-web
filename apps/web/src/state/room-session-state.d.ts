@@ -230,7 +230,6 @@ export function working(s: SessionFacts, thread?: string | null): boolean;
 export function busySince(s: SessionFacts, at: number): Record<string, number>;
 /** When the next conversation busy for a while is due to show as working; null when none is waiting. */
 export function workingDeadline(s: SessionFacts): number | null;
-export function listeningPort(urls: string[] | undefined): number | null;
 export function machinesView(s: SessionFacts): MachineView[];
 /** A conversation as the page knows it: the machine (fingerprint) and the room's thread, as one key. */
 export function conversationKey(node: string | null | undefined, thread: string | null | undefined): string | null;
