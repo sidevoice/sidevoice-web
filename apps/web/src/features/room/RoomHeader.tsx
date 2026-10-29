@@ -6,6 +6,7 @@ import { useRoomStore } from "../../state/room-store";
 import { useLayoutEffect, useReducer, useRef, useState, type RefObject } from "react";
 import { GearNewMark, useHighlights } from "../highlights/highlights";
 import { useSettingsAttention } from "../settings/settings-attention";
+import { useUpdateMark } from "../updates/update-mark";
 import type { ParticipantView } from "../../state/room-types";
 import { translator, type Translate } from "../../i18n/translator";
 import { ConversationAvatar } from "../call/ConversationAvatar";
@@ -151,12 +152,13 @@ function HeaderConversations({ t, blocked }: { t: Translate; blocked: boolean })
 function SettingsButton({ t }: { t: Translate }) {
   const news = useHighlights();
   const attention = useSettingsAttention();
-  const label = attention ? t("settings.attention") : news.length ? t("highlights.gear", { n: news.length }) : t("header.settings");
+  const update = useUpdateMark();
+  const label = attention ? t("settings.attention") : news.length ? t("highlights.gear", { n: news.length }) : update ? t("settings.updateAvailable") : t("header.settings");
   return (
     <span className="header-settings">
       {/* Settings' own trigger (aria-controls) on a phone: focus comes back here when what opened Settings has gone. */}
       <Button id="settings-open" variant="ghost" tone="neutral" size="icon" aria-label={label} title={label} aria-haspopup="dialog" aria-controls="language-settings">
-        <SettingsIcon size={20} /><GearNewMark count={news.length} attention={attention} />
+        <SettingsIcon size={20} /><GearNewMark count={news.length} attention={attention} update={update} />
       </Button>
     </span>
   );

@@ -151,10 +151,11 @@ export function NewAtEnd({ isNew, spoken }: { isNew: boolean | number; spoken?: 
 
 /** The Settings gear's mark, with `count` things new under it: how many, on its corner — never a dot, which beside the
  *  conversations' avatars would read as a state. The gear's own name says it in words. */
-export function GearNewMark({ count, attention = false }: { count: number; attention?: boolean }) {
+export function GearNewMark({ count, attention = false, update = false }: { count: number; attention?: boolean; update?: boolean }) {
   // Something needing the person outranks what is new: the warning dot in the count's place.
   if (attention) return <span className="settings-notice settings-attention" data-mark="attention" aria-hidden="true" />;
-  if (count <= 0) return null;
+  // An update waiting (the app's, unseen in Updates) is the accent's dot, after the count.
+  if (count <= 0) return update ? <span className="settings-notice" data-mark="update" aria-hidden="true" /> : null;
   return <span className="settings-notice" data-mark="count" aria-hidden="true">{count}</span>;
 }
 

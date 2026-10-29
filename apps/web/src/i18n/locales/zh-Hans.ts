@@ -800,6 +800,8 @@ export const messages: Messages = {
   "voice.prepare.announceReady": "{model} 已就绪",
   "settings.title": "设置",
   "settings.attention": "设置 · 有项目需要你处理",
+  "settings.updateAvailable": "设置 · 有可用更新",
+  "updates.navAvailable": "，有可用更新",
   "settings.close": "关闭设置并返回你的对话",
   "settings.sections": "设置分区",
   "settings.section.general": "通用",
