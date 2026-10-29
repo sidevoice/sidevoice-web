@@ -169,3 +169,10 @@
   .model-sheet { grid-template-columns: minmax(0, 1fr); row-gap: 0; }
   .model-sheet dd + dt { margin-top: var(--sv-space-1-5); }
 }
+
+/* Advanced: every model of the catalogue, by family, with where it runs (ModelRuntime's AllModels). */
+.model-runtime-all { margin-top: var(--space-3, 12px); }
+.model-runtime-families, .model-runtime-families ul { list-style: none; margin: 0; padding: 0; }
+.model-runtime-families > li { margin-top: var(--space-2, 8px); }
+.model-runtime-families ul li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2, 8px); padding: 2px 0 2px var(--space-3, 12px); }
+.model-runtime-families ul li:not([data-runs]) > span { opacity: 0.7; }

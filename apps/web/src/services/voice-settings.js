@@ -226,8 +226,28 @@ function offered(catalog, capability) {
 }
 
 /** Whether `model` can be used here: a remote one always (its provider runs it), a local one when a build of it runs. */
-function runs(model) {
+export function runs(model) {
   return !model.builds || model.builds.some((build) => build.available);
+}
+
+/**
+ * Why a local model does not run here, in the kinds the engine's own reason codes name (its first build with reasons,
+ * as unfitNote reads them), each once: `accelerator`, `browser` (its engine is not in this web build) or `app` (not in
+ * this version of the app), `memory`, `cores`; `none` when it gives no reason. Nothing is said of where else it might
+ * run. Null for a model that runs here.
+ * @param {CatalogModel} model
+ * @param {boolean} inApp Whether this is the desktop app, rather than a browser.
+ * @returns {('accelerator' | 'browser' | 'app' | 'memory' | 'cores' | 'none')[] | null}
+ */
+export function whyNotHere(model, inApp) {
+  if (runs(model)) return null;
+  const kinds = {
+    'no-accelerator': 'accelerator', 'build-accelerator': 'accelerator', memory: 'memory', 'wasm-memory': 'memory', cores: 'cores',
+    'backend-not-in-this-build': inApp ? 'app' : 'browser',
+  };
+  const codes = (model.builds ?? []).find((build) => build.reasons?.length)?.reasons.map((reason) => reason.code) ?? [];
+  const found = [...new Set(codes.map((code) => kinds[code]).filter(Boolean))];
+  return found.length ? found : ['none'];
 }
 
 /** Why a local model does not run here: its first build's reason codes. */
@@ -267,10 +287,10 @@ function slotChoices(catalogs, capability, slot) {
   const catalog = catalogs.find((candidate) => candidate.id === slot.catalog);
   const models = offered(catalog, capability);
   const options = models.map((model) => ({
-    id: model.id, group: model.family ?? null, disabled: !runs(model) && model.id !== slot.model, note: runs(model) ? null : unfitNote(model),
+    id: model.id, group: model.family ?? null, disabled: !runs(model) && model.id !== slot.model, runs: runs(model), note: runs(model) ? null : unfitNote(model),
   }));
   const model = models.find((candidate) => candidate.id === slot.model) ?? null;
-  if (!model && slot.model) options.unshift({ id: slot.model, group: null, disabled: false, note: { key: 'voice.model.missing' } });
+  if (!model && slot.model) options.unshift({ id: slot.model, group: null, disabled: false, runs: true, note: { key: 'voice.model.missing' } });
   return { sources, options, model };
 }
 
@@ -311,8 +331,24 @@ export function vadModel(catalogs) {
  * @returns {DeviceVoiceSettings}
  */
 export function voiceSettingsHere(settings, catalogs) {
-  if (settings.end_of_turn !== 'smart-turn' || !catalogs.some((catalog) => catalog.id === LOCAL_CATALOG) || endOfTurnModel(catalogs, settings.turn_model)) return settings;
-  return { ...settings, end_of_turn: 'silence' };
+  const here = { ...settings, stt: withUsableBuild(settings.stt, catalogs), tts: withUsableBuild(settings.tts, catalogs) };
+  if (here.end_of_turn !== 'smart-turn' || !catalogs.some((catalog) => catalog.id === LOCAL_CATALOG) || endOfTurnModel(catalogs, here.turn_model)) return here;
+  return { ...here, end_of_turn: 'silence' };
+}
+
+/**
+ * A slot whose chosen build does not run here as the engine's own choice again (no build): what is loaded, what is
+ * ready and what Advanced shows then agree, whatever build is on disk. A build the catalogue does not list stays, as
+ * does anything of a provider's.
+ * @param {DeviceVoiceSettings['stt']} slot
+ * @param {CatalogView[]} catalogs
+ */
+function withUsableBuild(slot, catalogs) {
+  if (!slot.build || slot.catalog !== LOCAL_CATALOG) return slot;
+  const build = catalogs.find((catalog) => catalog.id === LOCAL_CATALOG)?.models.find((model) => model.id === slot.model)?.builds?.find((candidate) => candidate.id === slot.build);
+  if (!build || build.available) return slot;
+  const { build: _unusable, ...rest } = slot;
+  return rest;
 }
 
 /**
@@ -435,8 +471,9 @@ export function modelReady(settings, task, catalogs) {
   const model = catalogs.find((catalog) => catalog.id === slot.catalog)?.models.find((candidate) => candidate.id === slot.model);
   if (!model) return false;
   if (slot.catalog !== LOCAL_CATALOG) return true;
-  const chosen = slot.build ? model.builds?.find((build) => build.id === slot.build) : null;
-  return chosen ? chosen.installed : model.installed === true || !!model.builds?.some((build) => build.installed);
+  if (!runs(model)) return false;
+  const chosen = withUsableBuild(slot, catalogs).build ? model.builds?.find((build) => build.id === slot.build) : null;
+  return chosen ? chosen.installed : model.builds?.some((build) => typeof build.installed === 'boolean') ? model.builds.some((build) => build.installed && build.available) : model.installed === true;
 }
 
 /**

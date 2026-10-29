@@ -1,12 +1,12 @@
 import { expect, test } from "vitest";
-import { TURN_TUNING, defaultVoiceSettings, editVoiceSettings, readVoiceSettings, readyVoiceSettings, remoteProviders, voiceChoices, voiceEndOfTurn, voiceHalves, voiceInput, voiceOutput, voiceSettingsToLoad, writeVoiceSettings, VOICE_SETTINGS_KEY } from "./voice-settings.js";
+import { TURN_TUNING, defaultVoiceSettings, editVoiceSettings, readVoiceSettings, readyVoiceSettings, remoteProviders, voiceChoices, voiceEndOfTurn, voiceHalves, voiceInput, voiceOutput, voiceSettingsToLoad, modelReady, writeVoiceSettings, VOICE_SETTINGS_KEY } from "./voice-settings.js";
 import type { CatalogView } from "./model-catalogs.js";
 
 /* The voice settings this device keeps, and the choices the pane offers from the engine's catalogues. */
 
 const build = (id: string, extra: Record<string, unknown> = {}) => ({ id, backend: "sherpa-onnx", precision: "int8", downloadBytes: 80e6, memoryMb: 200, available: true, reasons: [], installed: false, ...extra });
 const local = (id: string, family: string, capabilities: string[], extra: Record<string, unknown> = {}) =>
-  ({ id, family, capabilities, parametersM: 1, license: "MIT", languages: ["es", "en"], voices: [], installed: true, builds: [build(id + "/int8")], ...extra });
+  ({ id, family, capabilities, parametersM: 1, license: "MIT", languages: ["es", "en"], voices: [], installed: true, builds: [build(id + "/int8", { installed: true })], ...extra });
 const CATALOGS = [
   { id: "local", name: null, status: { stale: false }, models: [
     local("whisper-base", "whisper", ["stt"]),
@@ -64,9 +64,9 @@ test("each slot offers this device first, then each provider, one with no models
     { id: "openai", local: false, name: "OpenAI", disabled: true, note: { key: "voice.catalog.reason", params: { code: "credential-missing" } } },
   ]);
   expect(choices.stt.options).toEqual([
-    { id: "whisper-base", group: "whisper", disabled: false, note: null },
-    { id: "whisper-large", group: "whisper", disabled: true, note: { key: "voice.model.unfit", reasons: ["memory"] } },
-    { id: "moonshine-tiny", group: "moonshine", disabled: false, note: null },
+    { id: "whisper-base", group: "whisper", disabled: false, runs: true, note: null },
+    { id: "whisper-large", group: "whisper", disabled: true, runs: false, note: { key: "voice.model.unfit", reasons: ["memory"] } },
+    { id: "moonshine-tiny", group: "moonshine", disabled: false, runs: true, note: null },
   ]);
   expect(choices.stt.languages).toEqual(["es", "en"]);
   expect(choices.tts.speed).toEqual({ min: 0.5, max: 2 });
@@ -77,7 +77,7 @@ test("each slot offers this device first, then each provider, one with no models
 test("a remote slot: the provider's models, its voices by name, languages for the person to pick, and its words when it refuses", () => {
   const settings = { ...defaultVoiceSettings(), stt: { catalog: "elevenlabs", model: "scribe_v2", language: null }, tts: { catalog: "elevenlabs", model: "eleven_flash_v2_5", voice: null, speed: 1 } };
   const choices = voiceChoices(CATALOGS, settings, ["es", "en", "fr"]);
-  expect(choices.stt.options).toEqual([{ id: "scribe_v2", group: null, disabled: false, note: null }]);
+  expect(choices.stt.options).toEqual([{ id: "scribe_v2", group: null, disabled: false, runs: true, note: null }]);
   expect(choices.stt.languages).toEqual(["es", "en", "fr"]);
   expect(choices.tts.voices).toEqual([{ id: "v1", name: "Rachel", languages: ["en"], gender: null }]);
   expect(choices.tts.speed).toEqual({ min: 0.7, max: 1.2 });
@@ -89,7 +89,7 @@ test("a kept model its catalogue no longer lists stays chosen and says so; smart
   const settings = { ...defaultVoiceSettings(), stt: { catalog: "local", model: "parakeet", language: null } };
   const withTurns = CATALOGS.map((catalog) => catalog.id === "local" ? { ...catalog, models: [...catalog.models, local("smart-turn-v3", "smart-turn", ["end-of-turn"])] } : catalog) as CatalogView[];
   const choices = voiceChoices(withTurns, settings);
-  expect(choices.stt.options[0]).toEqual({ id: "parakeet", group: null, disabled: false, note: { key: "voice.model.missing" } });
+  expect(choices.stt.options[0]).toEqual({ id: "parakeet", group: null, disabled: false, runs: true, note: { key: "voice.model.missing" } });
   expect(choices.endOfTurn).toEqual({ smartTurn: true, note: null });
   const gone = voiceChoices(CATALOGS, { ...settings, stt: { catalog: "deepgram", model: "nova", language: null } });
   expect(gone.stt.sources.at(-1)).toEqual({ id: "deepgram", local: false, name: null, disabled: false, note: { key: "voice.catalog.missing" } });
@@ -203,4 +203,31 @@ test("kept turn numbers survive normalising; one out of the voice's bounds takes
   expect(edited.turn).toEqual({ ...TURN_TUNING, barge_in_min_speech: 1.2, listening_bar: { quiet: 0.45, playing: 0.6 } });
   expect(editVoiceSettings(settings, { turn: { speech_start_ms: 99999 } }).turn).toEqual(TURN_TUNING);
   expect(settings.turn).toEqual(TURN_TUNING);
+});
+
+test("whyNotHere names why a model does not run here from the engine's own reasons, and nothing about elsewhere", async () => {
+  const { whyNotHere } = await import("./voice-settings.js");
+  const model = (...codes: string[]) => ({ id: "m", capabilities: ["stt"], languages: [], voices: [], builds: [{ id: "b", available: false, reasons: codes.map((code) => ({ code, params: {} })) }] }) as never;
+  const runsHere = { id: "m", capabilities: ["stt"], languages: [], voices: [], builds: [{ id: "b", available: true, reasons: [] }] } as never;
+  expect(whyNotHere(runsHere, false)).toBeNull();
+  expect(whyNotHere(model("build-accelerator"), true)).toEqual(["accelerator"]);
+  expect(whyNotHere(model("backend-not-in-this-build"), false)).toEqual(["browser"]);
+  expect(whyNotHere(model("backend-not-in-this-build"), true)).toEqual(["app"]);
+  expect(whyNotHere(model("wasm-memory", "memory", "cores"), false)).toEqual(["memory", "cores"]);
+  expect(whyNotHere(model(), true)).toEqual(["none"]);
+  expect(whyNotHere(model("something-new"), true)).toEqual(["none"]);
+});
+
+test("a chosen build that no longer runs gives way to the engine's own choice: ready, loaded and shown agree", () => {
+  const build = (id: string, available: boolean, installed: boolean) => ({ id, backend: "sherpa-onnx", precision: "q8", downloadBytes: 1, memoryMb: 1, available, installed, reasons: available ? [] : [{ code: "build-accelerator", params: {} }] });
+  const catalogs = (cpuInstalled: boolean) => [{ id: "local", name: null, status: { stale: false }, models: [{ id: "stale-model", family: "stale", capabilities: ["tts"], languages: [], voices: [], installed: true,
+    builds: [build("stale/cuda", false, true), build("stale/cpu", true, cpuInstalled)] }] }] as unknown as CatalogView[];
+  const settings = { ...defaultVoiceSettings(), tts: { ...defaultVoiceSettings().tts, catalog: "local", model: "stale-model", build: "stale/cuda" } };
+  // The CPU build is not on disk: the CUDA one that is cannot be used, so the model is not ready.
+  expect(modelReady(settings, "tts", catalogs(false))).toBe(false);
+  // The fallback is downloaded: ready, and the voice is loaded without the stale build id.
+  expect(modelReady(settings, "tts", catalogs(true))).toBe(true);
+  expect(voiceOutput(voiceSettingsToLoad(settings, catalogs(true))).tts).toEqual({ catalog: "local", model: "stale-model" });
+  // A build that does run stays as chosen.
+  expect(voiceOutput(voiceSettingsToLoad({ ...settings, tts: { ...settings.tts, build: "stale/cpu" } }, catalogs(true))).tts).toEqual({ catalog: "local", model: "stale-model", build: "stale/cpu" });
 });

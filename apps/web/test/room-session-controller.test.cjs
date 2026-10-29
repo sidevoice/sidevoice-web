@@ -3102,7 +3102,7 @@ test('A model the slot names but that is not on this device installs, its progre
   builds:[{id:'kokoro/q8',backend:'transformers-js',precision:'q8',downloadBytes:92e6,memoryMb:300,available:true,reasons:[],installed:false}]}]}];
  const engine=fakeEngine(catalogs),progress=[];let finish,fail;
  engine.install=(model,{build,engine:backend,onProgress,signal})=>{engine.calls.push(['install',model,build,backend]);signal.addEventListener('abort',()=>fail(Object.assign(Error('x'),{code:'install-cancelled'})));
-  return new Promise((resolve,reject)=>{finish=()=>{onProgress({fraction:0.5,done:46e6,total:92e6});progress.push(s.run('state.voiceInstall'));catalogs[0].models[0].installed=true;resolve()};fail=reject})};
+  return new Promise((resolve,reject)=>{finish=()=>{onProgress({fraction:0.5,done:46e6,total:92e6});progress.push(s.run('state.voiceInstall'));catalogs[0].models[0].installed=true;catalogs[0].models[0].builds[0].installed=true;resolve()};fail=reject})};
  const voice=withVoice(s,fakeVoice(),engine);
  s.run("$('settings-open').onclick()");await settleSoon();
  s.run("window.sidevoiceActions.editVoice({tts:{catalog:'local',model:'kokoro-82m-v1.0'}})");
@@ -3129,6 +3129,25 @@ test('A model the slot names but that is not on this device installs, its progre
  assert.equal(s.run('state.voiceInstall.state'),'failed');
  assert.equal(s.run('state.voiceInstall.error'),'The model could not be downloaded. Check the connection and try again.');
  assert.equal(s.run('state.voiceInstall.details'),'net','what the engine said is only a detail');
+});
+
+test('A model whose builds no longer run here is refused with a failed install, and a chosen build that does not run gives way to one that does',async()=>{
+ const s=setup({strictDOM:true});s.context.localStorage.setItem('sidevoice.settings','{}');
+ const build=(id,available,backend='sherpa-onnx')=>({id,backend,precision:'q8',downloadBytes:92e6,memoryMb:300,available,reasons:available?[]:[{code:'build-accelerator',params:{}}],installed:false});
+ const catalogs=[{id:'local',name:null,status:{stale:false},models:[
+  {id:'kokoro-82m-v1.0',family:'kokoro',capabilities:['tts'],languages:['es'],voices:[],installed:false,recommendedBuild:'kokoro/cuda',builds:[build('kokoro/cuda',false),build('kokoro/cpu',true)]},
+  {id:'qwen3-tts',family:'qwen3-tts',capabilities:['tts'],languages:['es'],voices:[],installed:false,recommendedBuild:'qwen/cuda',builds:[build('qwen/cuda',false)]}]}];
+ const engine=fakeEngine(catalogs);engine.install=async(model,{build:id})=>{engine.calls.push(['install',model,id])};
+ withVoice(s,fakeVoice(),engine);
+ s.run("$('settings-open').onclick()");await settleSoon();
+ s.run("window.sidevoiceActions.editVoice({tts:{catalog:'local',model:'qwen3-tts'}})");
+ await s.run("window.sidevoiceActions.installVoiceModel('tts')");
+ assert.equal(engine.calls.some(([name])=>name==='install'),false,'nothing is downloaded for a model that runs nowhere here');
+ assert.equal(s.run('state.voiceInstall.state'),'failed','and the refusal is said, not silent');
+ assert.equal(s.run('state.voiceInstall.error'),'That model cannot run on this device. Choose another.');
+ s.run("window.sidevoiceActions.editVoice({tts:{catalog:'local',model:'kokoro-82m-v1.0',build:'kokoro/cuda'}})");
+ await s.run("window.sidevoiceActions.installVoiceModel('tts')");
+ assert.deepEqual(engine.calls.find(([name])=>name==='install'),['install','kokoro-82m-v1.0','kokoro/cpu'],'the build that runs, not the chosen one that does not');
 });
 
 test('A model chosen before it is on this device waits: the one in use stays, and it switches once its install is done',async()=>{

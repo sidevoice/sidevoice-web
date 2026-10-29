@@ -65,15 +65,12 @@ test("a slot's source comes first: this device, then each provider; one without 
   expect(actions.editVoice).toHaveBeenCalledWith({ stt: { catalog: "elevenlabs" } });
 });
 
-test("then the source's models, this device's family first and then a model of it, one that does not run here disabled with why", () => {
+test("then the source's models, this device's family first and then a model of it, one that does not run here left out", () => {
   const { actions } = renderPane();
   expect(listOptions("stt-family").map((option) => [option.value, option.label])).toEqual([["whisper", "Whisper"], ["moonshine", "Moonshine"]]);
-  expect(listOptions("stt-model").map((option) => option.value)).toEqual(["whisper-base", "whisper-large"]);
+  expect(listOptions("stt-model").map((option) => option.value)).toEqual(["whisper-base"]);
   chooseOption("stt-family", "moonshine");
   expect(actions.editVoice).toHaveBeenCalledWith({ stt: { model: "moonshine-tiny" } });
-  const large = listOptions("stt-model").find((option) => option.value === "whisper-large")!;
-  expect(large.disabled).toBe(true);
-  expect([large.label, large.detail]).toEqual(["whisper-large", "does not run here: it does not fit in this device's memory"]);
 });
 
 test("the voice and the speed range are the model's; smart-turn says why it cannot be chosen; a change says it restarts the voice", () => {
@@ -780,18 +777,67 @@ test("the build a model runs as, with Automatic, is the engine's: one installed 
 
 test("the Model list: each model that can be chosen with its download size at the end of its name's line, its hardware under it", () => {
   renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true), error: "" } });
-  // The size is not read from the line's end: its description says it first, to screen readers. One that cannot be
-  // chosen keeps why.
-  expect(listOptions("stt-model").map((option) => option.detail)).toEqual(["1 MB · GPU · Metal", "does not run here: it does not fit in this device's memory"]);
+  // The size is not read from the line's end: its description says it first, to screen readers. One that cannot run
+  // here is not in the list.
+  expect(listOptions("stt-model").map((option) => option.detail)).toEqual(["1 MB · GPU · Metal"]);
   fireEvent.click(document.getElementById("stt-model")!);
   const row = (value: string) => document.querySelector(`[role=option][data-value="${value}"]`)!;
   expect(row("whisper-base").querySelector(".ui-select-item-badge .model-list-size")).toHaveTextContent(/^1 MB$/);
   expect(row("whisper-base").querySelector(".ui-select-item-badge .model-list-size")).toHaveAttribute("aria-hidden", "true");
   expect(row("whisper-base").querySelector(".ui-select-item-description .model-hardware-name")).toHaveTextContent(/^· Metal$/);
-  expect(row("whisper-large").querySelector(".ui-select-item-badge")).toBeNull();
   fireEvent.keyDown(document.querySelector("[role=listbox]")!, { key: "Escape" });
   expect(document.getElementById("stt-model")).toHaveTextContent(/^whisper-base$/);
   cleanup();
   renderPane({ voiceCatalogue: { state: "ready", catalogs: withTurnModel(), error: "" } });
   expect(listOptions("turn-model").map((option) => option.detail)).toEqual(["9 MB · CPU"]);
+});
+
+/* Models no engine here can run: left out of the main view, listed in Advanced with why. */
+const gone = (id: string, family: string, code = "backend-not-in-this-build") => local(id, family, ["stt"], { installed: false, builds: [withoutClass(build(id + "/int8", { available: false, accelerator: undefined, installed: false, reasons: [{ code, params: {} }] }))] });
+const localWith = (...extra: unknown[]) => [{ ...catalogs[0], models: [...(catalogs[0] as unknown as { models: unknown[] }).models, ...extra] }, ...catalogs.slice(1)] as unknown as CatalogView[];
+// A family with none that runs, and a mixed one whose first model cannot run.
+const withParakeet = localWith(gone("parakeet-a", "parakeet"), gone("parakeet-b", "parakeet"), gone("mixed-a", "mixed"), local("mixed-b", "mixed", ["stt"]));
+const ready = () => within(document.getElementById("stt-model-card")!).queryByText("Ready");
+
+test("a family and a model that nothing here can run are not offered; a family changed picks one that runs", () => {
+  const { actions } = renderPane({ voiceCatalogue: { state: "ready", catalogs: withParakeet, error: "" } });
+  expect(listOptions("stt-family").map((option) => option.value)).toEqual(["whisper", "moonshine", "mixed"]);
+  expect(listOptions("stt-model").map((option) => option.value)).toEqual(["whisper-base"]);
+  chooseOption("stt-family", "mixed");
+  expect(actions.editVoice).toHaveBeenCalledWith({ stt: { model: "mixed-b" } });
+});
+
+test("a chosen model that does not run here is kept as chosen, with no Ready badge and no download", () => {
+  const draft = { ...defaultVoiceSettings(), stt: { ...defaultVoiceSettings().stt, catalog: "local", model: "parakeet-a" } };
+  const { actions } = renderPane({ voiceCatalogue: { state: "ready", catalogs: withParakeet, error: "" }, voiceSettings: draft, voiceDraft: draft });
+  expect(ready()).toBeNull();
+  expect(document.getElementById("stt-model-download")).toBeNull();
+  expect(document.getElementById("stt-model")!.textContent).toContain("parakeet-a");
+  expect(actions.editVoice).not.toHaveBeenCalled();
+});
+
+test("a build on disk that no longer runs is not Ready: the build that runs is offered for download, nothing is deleted", () => {
+  const stale = local("stale-model", "stale", ["stt"], { builds: [
+    build("stale/cuda", { available: false, accelerator: undefined, installed: true, reasons: [{ code: "build-accelerator", params: {} }] }),
+    build("stale/cpu", { installed: false, downloadBytes: 40e6 })] , recommendedBuild: "stale/cuda" });
+  const draft = { ...defaultVoiceSettings(), stt: { ...defaultVoiceSettings().stt, catalog: "local", model: "stale-model", build: "stale/cuda" } };
+  const { actions } = renderPane({ voiceCatalogue: { state: "ready", catalogs: localWith(stale), error: "" }, voiceSettings: draft, voiceDraft: draft });
+  expect(ready()).toBeNull();
+  expect(document.getElementById("stt-model-download")).not.toBeNull();
+  expect(actions.editVoice).not.toHaveBeenCalled();
+});
+
+test("Advanced lists every model, those that do not run here with why, whatever the chosen model is: one with no builds, or a provider's", () => {
+  const bare = local("bare-model", "bare", ["stt"], { builds: [] });
+  const draft = { ...defaultVoiceSettings(), stt: { ...defaultVoiceSettings().stt, catalog: "local", model: "bare-model" } };
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: localWith(bare, gone("parakeet-a", "parakeet")), error: "" }, voiceSettings: draft, voiceDraft: draft });
+  const open = () => fireEvent.click(document.querySelector("#stt-model-card .model-runtime-toggle")!);
+  open();
+  const row = (id: string) => [...document.querySelectorAll("#stt-model-card .model-runtime-families li li")].find((item) => item.textContent?.startsWith(id))?.textContent;
+  expect(row("parakeet-a")).toBe("parakeet-aDoesn't run in this browser");
+  cleanup();
+  const remote = { ...defaultVoiceSettings(), stt: { ...defaultVoiceSettings().stt, catalog: "elevenlabs", model: "scribe_v2" } };
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: localWith(gone("parakeet-a", "parakeet")), error: "" }, voiceSettings: remote, voiceDraft: remote });
+  open();
+  expect(row("whisper-base")).toContain("Runs here");
 });

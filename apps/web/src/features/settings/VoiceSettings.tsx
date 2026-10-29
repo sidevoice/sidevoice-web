@@ -52,7 +52,7 @@ function noteText(t: Translate, note: Note | null | undefined) {
 }
 
 type Source = { id: string; local: boolean; name: string | null; disabled: boolean; note: Note | null };
-type Option = { id: string; group: string | null; disabled: boolean; note: Note | null };
+type Option = { id: string; group: string | null; disabled: boolean; runs: boolean; note: Note | null };
 type Task = "stt" | "tts";
 
 type Edit = Parameters<NonNullable<typeof window.sidevoiceActions>["editVoice"]>[0];
@@ -99,15 +99,21 @@ function ModelPickers({ task, draft, options, locked, needsKey, t }: { task: Tas
   const families = [...new Set(options.map((option) => option.group).filter((group): group is string => !!group))];
   const current = options.find((option) => option.id === draft[task].model);
   const family = current?.group ?? null;
-  const shown = families.length ? options.filter((option) => option.group === family || (!option.group && option.id === draft[task].model)) : options;
+  // What runs here is the engine's word (voiceChoices): a family with no model that does, and a model that does not, are
+  // left out of the main view (Advanced lists them, with why); the one in use stays so the list can show it.
+  const familyRuns = (name: string) => options.some((option) => option.group === name && option.runs);
+  const shownFamilies = families.filter((name) => familyRuns(name) || name === family);
+  const inFamily = families.length ? options.filter((option) => option.group === family || (!option.group && option.id === draft[task].model)) : options;
+  const shown = inFamily.filter((option) => option.runs || option.id === draft[task].model);
+  // Only a model that runs here is ever picked for the person.
   const pickFamily = (next: string) => {
-    const first = options.find((option) => option.group === next && !option.disabled) ?? options.find((option) => option.group === next);
+    const first = options.find((option) => option.group === next && option.runs);
     if (first) edit({ [task]: { model: first.id } });
   };
   return <>
-    {families.length > 0 && <Field label={t("voice.family")}>
+    {shownFamilies.length > 0 && <Field label={t("voice.family")}>
       <Select id={task + "-family"} value={family ?? ""} disabled={locked || needsKey} onValueChange={pickFamily} placeholder={t("voice.family.none")}
-        options={families.map((name) => ({ value: name, label: familyName(name) }))} />
+        options={shownFamilies.map((name) => ({ value: name, label: familyName(name) }))} />
     </Field>}
     <Field label={t("voice.model")}>
       <Select id={task + "-model"} value={needsKey ? "" : draft[task].model} disabled={locked || needsKey} placeholder={needsKey ? t("voice.prepare.badge.needsKey") : undefined}
@@ -295,7 +301,7 @@ export function TurnChoices({ draft, setup = false, active = true, turnTry }: { 
           pickers={(locked) => <Field label={t("voice.model")}>
             {/* Just the models: one today, more later; no families or runtime here. */}
             <Select id="turn-model" value={turn.model!.id} disabled={locked} onValueChange={(model) => edit({ turn_model: model })}
-              options={turnModels.map((model: Listed) => {
+              options={turnModels.filter((model: Listed) => model.id === turn.model!.id || model.builds?.some((build) => build.available)).map((model: Listed) => {
                 const disabled = !model.builds?.some((build) => build.available);
                 return { value: model.id, label: model.id, disabled, ...listFacts(model, disabled) };
               })} />

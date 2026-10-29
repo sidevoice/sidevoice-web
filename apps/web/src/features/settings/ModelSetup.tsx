@@ -3,7 +3,7 @@ import { useRoomStore } from "../../state/room-store";
 import { createMicLevelChannel } from "../../state/mic-level";
 import { Button } from "../../components/ui/Button";
 import { Popover } from "../../components/ui/Popover";
-import { endOfTurnModel, type DeviceVoiceSettings as Settings } from "../../services/voice-settings.js";
+import { endOfTurnModel, runs, type DeviceVoiceSettings as Settings } from "../../services/voice-settings.js";
 import type { Translate, MessageKey } from "../../i18n/translator";
 import type { PrepareStatus } from "./ModelPrepare";
 import { MAX_TAKE_MS } from "../../services/voice-trial.js";
@@ -41,17 +41,24 @@ export function useModelState(task: Task | "end-of-turn", draft: Settings | null
   // The build it runs as, as the engine loads it: the one chosen (Settings, "How it runs"); with Automatic, one installed
   // that runs here (the first, in the catalogue's order), else the engine's recommended one — what a download fetches
   // (WebEngine.load). The catalogue says no more: which hardware it ran on once loaded is not reported.
-  const chosen = slot?.build ? model?.builds?.find((candidate) => candidate.id === slot.build) : undefined;
+  // Only a build that runs here counts, installed or not: one chosen or installed that no longer runs is not this model's
+  // state, and the build that does is offered instead (its download); nothing is deleted.
+  const chosen = slot?.build ? model?.builds?.find((candidate) => candidate.id === slot.build && candidate.available) : undefined;
   const build = chosen ?? model?.builds?.find((candidate) => candidate.installed && candidate.available)
-    ?? model?.builds?.find((candidate) => candidate.id === model.recommendedBuild) ?? model?.builds?.find((candidate) => candidate.available);
-  const installed = !!model && (!local || (chosen ? chosen.installed : model.installed === true || !!model.builds?.some((candidate) => candidate.installed)));
+    ?? model?.builds?.find((candidate) => candidate.id === model.recommendedBuild && candidate.available) ?? model?.builds?.find((candidate) => candidate.available);
+  const installed = !!model && (!local || (chosen ? chosen.installed
+    : model.builds?.some((candidate) => typeof candidate.installed === "boolean") ? model.builds.some((candidate) => candidate.installed && candidate.available)
+    : model.installed === true && !!model.builds?.some((candidate) => candidate.available)));
   const mine = install && install.task === task && install.model === slot?.model ? install : null;
   const installing = mine?.state === "running";
   const failure = mine?.state === "failed" ? mine.error : "";
   const failureDetails = mine?.state === "failed" ? mine.details ?? "" : "";
-  const ready = !!model && installed && !needsKey;
+  // A model no build of which runs here is neither downloaded nor ready: its note says why (voiceChoices). A failure the
+  // install itself reported (a refused download too) is still said.
+  const unrunnable = !!model && !runs(model);
+  const ready = !!model && installed && !needsKey && !unrunnable;
   // Downloaded in full, it is checked before the install ends; then the catalogues are read again to see it there.
-  const status: PrepareStatus | null = !model || needsKey ? null
+  const status: PrepareStatus | null = !model || needsKey || (unrunnable && !failure) ? null
     : installing ? ((mine?.fraction ?? 0) >= 1 ? "verifying" : "downloading")
     : failure ? "failed"
     : ready ? "ready"
