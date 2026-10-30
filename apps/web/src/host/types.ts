@@ -33,6 +33,26 @@ export interface HostIdentity {
   deviceName(): string | null;
 }
 
+/** The page's own microphone and Web Audio, begun in the Join gesture before models or chunks are awaited. */
+export interface AudioActivation {
+  context: AudioContext;
+  resumed: Promise<void>;
+  stream: Promise<MediaStream>;
+  release(): void;
+}
+
+/** The call's voice and the models it chooses from: the app's when it runs them, else this page's own. */
+export interface VoiceMember {
+  /** The call's voice, `@sidevoice/voice's` seam. */
+  host(): Promise<VoiceHost>;
+  /** The engine's catalogues and the provider keys, the web's seam (services/model-catalogs.js). */
+  catalogs(): Promise<ModelCatalogs>;
+  /** Begins the microphone and Web Audio inside the Join gesture, where the page runs the voice; null where the app does. */
+  activate(input: string | null): AudioActivation | null;
+  /** Where the models run and the provider keys are kept. */
+  readonly runs: "page" | "app";
+}
+
 /** The voice and the models an app runs for the page (`host.voice` and `host.engine`): there only when the app, not the
  *  page, runs them. */
 export interface AppVoice {
@@ -304,7 +324,7 @@ export interface Host {
   identity: HostIdentity;
   /** What the app offers under `microphone`, as it says it: the permission bridge, or only the settings link. */
   microphone: Partial<MicrophoneBridge> | null;
-  voice: AppVoice | null;
+  voice: VoiceMember;
   presence: HostPresence;
   storage: HostStorage | null;
   reach: ReachTransport;

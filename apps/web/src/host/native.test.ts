@@ -1,5 +1,6 @@
 import { describe, expect, onTestFinished, test } from "vitest";
 import { cardSeam, host } from ".";
+import { nativeHost } from "./native";
 
 const withHost = (members: Record<string, unknown> | undefined) => {
   Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: members && { host: members } });
@@ -13,7 +14,8 @@ describe("a page outside an app", () => {
     expect(outside.identity.build).toBeNull();
     expect(outside.identity.deviceName()).toBeNull();
     expect(outside.presence.media).toBe("page");
-    for (const member of [outside.microphone, outside.voice, outside.storage, outside.localHost, outside.reset, outside.muteShortcut,
+    expect(outside.voice.runs).toBe("page");
+    for (const member of [outside.microphone, outside.storage, outside.localHost, outside.reset, outside.muteShortcut,
       outside.callControls, outside.updater, outside.debug]) expect(member).toBeNull();
     expect(cardSeam()).toBeNull();
   });
@@ -119,10 +121,12 @@ describe("voice", () => {
     const voice = { call: () => {} };
     const engine = { catalogs: async () => [] };
     withHost({ voice, engine });
-    expect(host().voice?.voice).toBe(voice);
-    expect(host().voice?.engine).toBe(engine);
+    expect(nativeHost().voice?.voice).toBe(voice);
+    expect(nativeHost().voice?.engine).toBe(engine);
+    expect(host().voice.runs).toBe("app");
     withHost({ engine });
-    expect(host().voice).toBeNull();
+    expect(nativeHost().voice).toBeNull();
+    expect(host().voice.runs).toBe("page");
   });
 });
 

@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { beginBrowserAudioActivation, pageVoice } from "./voice-module.js";
+import { beginBrowserAudioActivation, pageVoice } from "./browser-voice.js";
 import type { VoiceHost, VoiceModelSource } from "@sidevoice/voice";
 
 /* Where the page's voice and its models' catalogues come from: the desktop app's, or one engine on this page. */

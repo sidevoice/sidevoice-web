@@ -13,7 +13,6 @@ import {probeSiteStorage} from './site-storage.js';
 import {tryTranscription,tryVoice,tryEndOfTurn} from './voice-trial.js';
 import {systemLanguage,SPEECH_LANGUAGES} from './system-language.js';
 import {createOutbox} from './outbox.js';
-import {pageVoice,beginBrowserAudioActivation} from './voice-module.js';
 import {readCallPreferences} from './call-preferences.ts';
 import {clampDeviceName,deviceNameProblem} from './device-name-rules.js';
 import {readDeleteUnused,writeDeleteUnused,staleModels} from './model-housekeeping.js';
@@ -34,7 +33,7 @@ let lastMicLevel=0,lastPlaybackLevel=0;
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
 // What this browser speaks in a call: the language of its system, among those the voice handles.
-roomStore.patch({speechLanguage:systemLanguage(SPEECH_LANGUAGES),inApp:pageHost().voice!==null});
+roomStore.patch({speechLanguage:systemLanguage(SPEECH_LANGUAGES),inApp:pageHost().voice.runs==='app'});
 // Whether this browser lets the page keep anything: when it does not, one message says so, rather than each store
 // failing on its own (`site-storage.js`).
 void probeSiteStorage().then(probe=>roomStore.patch({storageBlocked:probe.blocked}),()=>{});
@@ -405,7 +404,7 @@ let holding=false,spaceDown=false;
 // How long a call may go without a sign of a person before it asks, and then leaves.
 var IDLE_MS=15*60*1000,IDLE_WARN_MS=60*1000,lastPersonSignal=Date.now(),idleWarned=false,idleTimer=null;
 let screenHeld=false,wakeRequest=null,wakeEpoch=0,wakeRetries=0,stopWatchingLock=null;
-/* ----- the call's voice (`voice-module.js`): it hears the person and says the replies; the page only carries what it
+/* ----- the call's voice (`host().voice`): it hears the person and says the replies; the page only carries what it
  * reports to the room, and hands it what the room sends ----- */
 let voice=null;
 let voiceOwner=null;
@@ -2307,15 +2306,14 @@ async function replayReply(historyId){
 }
 
 /* ----- the voice's settings and the remote providers' keys: this device's, never the room's -----
- * One voice for the page, and the engine's catalogues it chooses models from (`voice-module.js`): the settings pane
+ * One voice for the page, and the engine's catalogues it chooses models from (`host().voice`): the settings pane
  * lists the catalogues and keeps keys with the engine, and every call of this page drives the voice. A key goes from
  * the pane to the engine's host and nowhere else (the desktop app keeps it in the system keychain, a browser in this
  * page's storage), and the engine hands it to the provider. */
-const page=pageVoice();
 let voiceHostOpening=null,catalogsOpening=null;
-function voiceHost(){return voiceHostOpening??=page.voice().then(host=>{void watchAudioDevices(host).catch(()=>{});return host}).catch(error=>{voiceHostOpening=null;throw error})}
+function voiceHost(){return voiceHostOpening??=pageHost().voice.host().then(host=>{void watchAudioDevices(host).catch(()=>{});return host}).catch(error=>{voiceHostOpening=null;throw error})}
 async function trialVoiceHost(ms){const opening=voiceHost();try{return await within(opening,ms,'trial-preparation-timeout')}catch(error){if(error?.code==='trial-preparation-timeout'&&voiceHostOpening===opening)voiceHostOpening=null;throw error}}
-function modelCatalogs(){return catalogsOpening??=page.catalogs().catch(error=>{catalogsOpening=null;throw error})}
+function modelCatalogs(){return catalogsOpening??=pageHost().voice.catalogs().catch(error=>{catalogsOpening=null;throw error})}
 async function keptProviderKeys(models,catalogs){return Object.fromEntries(await Promise.all(remoteProviders(catalogs).map(async({id})=>[id,await models.hasCredential(id).catch(()=>null)])))}
 async function loadVoiceCatalogue(){
  roomStore.patch({voiceCatalogue:{...state.voiceCatalogue,state:'loading',error:''}});
@@ -2401,7 +2399,7 @@ async function tryVoiceSettings(task,{text='',language=null,keep=true,onListenin
  refuseTryInCall();
  const preparationMs=task==='stt'?(state.voiceDraft||state.voiceSettings)?.stt?.catalog==='local'?90000:20000:0;
  const preparationDeadline=Date.now()+preparationMs;
- const activation=task==='stt'&&pageHost().voice===null?beginBrowserAudioActivation(state.audioDevices?.input):null;
+ const activation=task==='stt'?pageHost().voice.activate(state.audioDevices?.input??null):null;
  voiceTry?.abort();const abort=voiceTry=new AbortController();
  // Stop on a transcription try ends its take with what was said (finishVoiceTry), rather than dropping it.
  const finish=voiceTryFinish=new AbortController();

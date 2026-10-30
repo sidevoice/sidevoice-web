@@ -48,7 +48,7 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
   const bridge = microphoneBridge();
   const settings = host().microphone;
   const mic = pageMicrophone(win);
-  const inAppCall = host().voice !== null;
+  const inAppCall = host().voice.runs === "app";
   // The app asks where it runs the call; a page in such an app is never given the microphone, and an app too old to
   // ask leaves it to its call: nothing to ask here. Elsewhere, the page asks where it can.
   const asker: MicrophoneSnapshot["asker"] = bridge ? "app" : "page";

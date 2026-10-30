@@ -1,6 +1,7 @@
 import type { Host } from "./types";
 import { pageMicrophone as microphoneOfPage } from "./browser-microphone";
 import { browserRemote, browserScreenAwake } from "./browser-presence";
+import { beginBrowserAudioActivation, pageVoice } from "./browser-voice.js";
 import { browserReach, reachOfOrigin as reachOfPage } from "./browser-reach";
 import { parseBrowser } from "./identity";
 import { nativeCardSeam, nativeHost } from "./native";
@@ -17,6 +18,10 @@ export const pageMicrophone = microphoneOfPage;
 /** The transport of a page served from an origin: what a pairing judged against that origin may do. */
 export const reachOfOrigin = reachOfPage;
 
+/** This page's one voice and one engine, made the first time either is asked for. */
+let page: ReturnType<typeof pageVoice> | null = null;
+const pageOfVoice = () => (page ??= pageVoice({ app: () => nativeHost().voice }));
+
 /** The page's host, as it is now: an app may inject its members after the page's script runs, so this is read where it is
  *  needed and not kept. The one way into anything the browser or an app offers beyond the page itself. */
 export function host(): Host {
@@ -26,6 +31,12 @@ export function host(): Host {
     ...app,
     identity: { ...app.identity, get os() { return parseBrowser().os; } },
     reach: browserReach(),
+    voice: {
+      runs: app.voice ? "app" : "page",
+      host: () => pageOfVoice().voice(),
+      catalogs: () => pageOfVoice().catalogs(),
+      activate: (input) => app.voice ? null : beginBrowserAudioActivation(input),
+    },
     presence: {
       media: app.presence.media,
       get remote() { return app.presence.media === "page" ? browserRemote() : null; },
