@@ -2,7 +2,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import { KEYBOARD_QUERY, ShortcutsSettings, acceleratorOf, useShortcutsSection } from "./ShortcutsSettings";
 import { translator } from "../../i18n/translator";
-import type { MuteShortcut, MuteShortcutBridge } from "../../services/desktop-host";
+import type { MuteShortcut, MuteShortcutBridge } from "../../host";
 
 /* Shortcuts, by where they work: the desktop app's global mute shortcut, set by pressing it; the keys the room answers
  * while it is in front, listed read only; the section only where one of them can be pressed. */

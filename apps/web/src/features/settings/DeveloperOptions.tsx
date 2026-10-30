@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { Group, Row, Section } from "../../components/ui/Card";
 import { Switch } from "../../components/ui/Switch";
-import { desktopDebugBridge, type DebugSwitch, type DesktopDebugBridge } from "../../services/desktop-host";
+import { host, type DebugSwitch, type HostDebugBridge } from "../../host";
 import { setAnimatedThumbnails, useAnimatedThumbnails } from "../../lib/animated-thumbnails";
 import { setDeveloperMode, useDeveloperMode } from "./developer-mode";
 import { TurnTuningDev } from "./TurnTuningDev";
@@ -26,7 +26,7 @@ const DEBUG_SWITCHES: { name: DebugSwitch; label: string; description: ReactNode
 
 /** One debugging switch. It moves at once, as the other switches do, and goes back with a line saying so if the app
  *  refuses; one that is still being changed ignores another click. */
-function DebugSwitchRow({ debug, name, label, description }: { debug: DesktopDebugBridge; name: DebugSwitch; label: string; description: ReactNode }) {
+function DebugSwitchRow({ debug, name, label, description }: { debug: HostDebugBridge; name: DebugSwitch; label: string; description: ReactNode }) {
   // The app's word when the switch appeared; after that, what it took of the last change.
   const [on, setOn] = useState(() => debug[name]);
   const [failed, setFailed] = useState(false);
@@ -51,7 +51,7 @@ function DebugSwitchRow({ debug, name, label, description }: { debug: DesktopDeb
 export function DeveloperOptions() {
   const mode = useDeveloperMode();
   const animated = useAnimatedThumbnails();
-  const debug = desktopDebugBridge();
+  const debug = host().debug;
   const switches = debug ? DEBUG_SWITCHES.filter(({ name }) => debug.available.includes(name)) : [];
   return <Section id="developer" title={DEVELOPER_OPTIONS_TITLE} description="Tools for testing Sidevoice. English only, and not part of the normal app.">
     {mode && <Group>

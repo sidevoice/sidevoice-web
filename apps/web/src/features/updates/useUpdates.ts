@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { host, type AppUpdater, type UpdateMode, type UpdaterFailure, type UpdaterStatus } from "../../host";
 import { useRoomStore } from "../../state/room-store";
 import type { MachineView } from "../../state/room-types";
 
@@ -32,35 +33,6 @@ export const UPDATE_PLACE = {
   thisComputer: "updates-this-computer",
   machine: (pairingId: string) => "updates-machine-" + pairingId,
 };
-
-export type UpdateMode = "automatic" | "manual";
-export type UpdaterFailure = "update-check-failed" | "update-download-failed" | "update-install-failed" | "update-cancel-failed";
-export interface UpdaterStatus {
-  state: "idle" | "available" | "downloading" | "ready";
-  version?: string;
-  /** While downloading: 0 to 1. */
-  progress?: number;
-  error?: { code: UpdaterFailure };
-}
-/** The desktop app's updater (sidevoice-desktop #56: a release's, and for now a nightly's; a development build or an
- *  older app has none, and then nothing of it shows: whatever its channel, it is the updater that says). Each method
- *  is looked for before it is used. Automatic downloads an update by itself; manual says one exists and `download`
- *  fetches it. `cancel` stops a download in progress (sidevoice-desktop #91): the partial is removed and the status is
- *  `available` again, the update still known. `restart` installs a ready one at once. */
-export interface AppUpdater {
-  settings?(): Promise<{ mode: UpdateMode }>;
-  setMode?(mode: UpdateMode): Promise<{ mode: UpdateMode }>;
-  status(): Promise<UpdaterStatus>;
-  subscribe?(listener: (status: UpdaterStatus) => void): () => void;
-  check?(): Promise<UpdaterStatus>;
-  download?(): Promise<UpdaterStatus>;
-  cancel(): Promise<void>;
-  restart?(): Promise<void>;
-}
-export function appUpdater(): AppUpdater | null {
-  const host = (globalThis.window as unknown as { __sidevoiceDesktop?: { host?: { updater?: AppUpdater } } } | undefined)?.__sidevoiceDesktop?.host;
-  return host?.updater && typeof host.updater.status === "function" ? host.updater : null;
-}
 
 /* When the app last checked successfully: the seam does not say, so this page keeps it — a check it asked for that did
  * not fail, or an update the app's own check found while the page listened. */
@@ -99,7 +71,7 @@ function modeKnown(updater: AppUpdater, mode: UpdateMode) {
  *  it, its mode, when it last checked, and its actions. Without an updater, `updater` is null and nothing else is
  *  used. */
 export function useAppUpdate() {
-  const [updater] = useState(appUpdater);
+  const [updater] = useState(() => host().updater);
   const [status, setStatus] = useState<UpdaterStatus | null>(null);
   const [mode, setModeShown] = useState<UpdateMode | null>(() => updater ? knownModes.get(updater) ?? null : null);
   const [cancelledVersion, setCancelledVersion] = useState(() => updater ? cancelledVersions.get(updater) ?? null : null);

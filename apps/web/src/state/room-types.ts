@@ -99,7 +99,7 @@ export interface MachineView {
   state: "connected" | "checking" | "offline" | "revoked" | "failed";
   /** Whether this row is the app-owned local host, which is projected from the desktop bridge. */
   local?: boolean;
-  localStatus?: import("../services/desktop-host").LocalHostStatusName | string;
+  localStatus?: import("../host").LocalHostStatusName | string;
   /** The addresses its pairing advertises. */
   urls?: string[];
 }

@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { App } from "./App";
 import { createRoomStore } from "../state/room-store";
 import { localHostInstallController } from "../services/local-host-install";
-import type { LocalHostStatus } from "../services/desktop-host";
+import type { LocalHostStatus } from "../host";
 
 vi.mock("../services/room-session-controller.js", () => ({}));
 

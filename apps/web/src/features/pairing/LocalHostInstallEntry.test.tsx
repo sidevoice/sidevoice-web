@@ -1,7 +1,7 @@
 import { expect, test, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Button } from "../../components/ui/Button";
-import type { LocalHostBridge, LocalHostInstallOperation, LocalHostStatus } from "../../services/desktop-host";
+import type { LocalHostBridge, LocalHostInstallOperation, LocalHostStatus } from "../../host";
 import { createLocalHostInstallController } from "../../services/local-host-install";
 import { NoMachineScreen } from "./NoMachineScreen";
 import { LocalHostInstallEntry } from "./LocalHostInstallEntry";

@@ -6,7 +6,7 @@ import { SettingsDialog } from "./SettingsDialog";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import type { PairingSummary } from "../../services/device-pairing.js";
-import type { LocalHostStatus } from "../../services/desktop-host";
+import type { LocalHostStatus } from "../../host";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 afterEach(() => { cleanup(); localStorage.removeItem("sidevoice.settings"); localStorage.removeItem("sidevoice.deviceName"); });

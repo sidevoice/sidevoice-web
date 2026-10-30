@@ -9,7 +9,7 @@ import { Switch } from "../../components/ui/Switch";
 import { Badge } from "../../components/ui/Badge";
 import { Section } from "../../components/ui/Card";
 import "./machines.css";
-import { desktopBuild, localHostBridge, type LocalHostStatus } from "../../services/desktop-host";
+import { host, type LocalHostStatus } from "../../host";
 import type { HostDeviceView, MachineView } from "../../state/room-types";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { LocalHostInstallEntry } from "../pairing/LocalHostInstallEntry";
@@ -386,7 +386,7 @@ function LocalHostStatusPanel({ machine, status, titleId }: { machine: MachineVi
     // Its buttons change with the state: the focus goes back to the card's title rather than to the page.
     finally { setBusy(null); requestAnimationFrame(() => document.getElementById(titleId)?.focus()); }
   }
-  const bridge = localHostBridge();
+  const bridge = host().localHost;
   const canSetLogin = typeof bridge?.setStartAtLogin === "function";
   async function setLogin(enabled: boolean) {
     if (busy || !bridge?.setStartAtLogin) return;
@@ -467,7 +467,7 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [deviceNote, setDeviceNote] = useState("");
   const deviceEpoch = useRef(0);
-  const bridge = localHostBridge();
+  const bridge = host().localHost;
   const local = !!machine.local;
   const usable = machine.state === "connected" && !!machine.pairingId;
   const list = () => local ? window.sidevoiceActions?.localHostDevices?.() : window.sidevoiceActions?.machineDevices?.(machine.pairingId!);

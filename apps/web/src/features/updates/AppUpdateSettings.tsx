@@ -3,12 +3,13 @@ import { Button } from "../../components/ui/Button";
 import { ErrorText } from "../../components/ui/ErrorText";
 import { ProgressBar } from "../../components/ui/ProgressBar";
 import { Segmented } from "../../components/ui/Tabs";
-import { desktopBuild } from "../../services/desktop-host";
+import { host } from "../../host";
 import { RoomStoreContext } from "../../state/room-store";
 import { updaterFailure } from "../settings/error-message";
 import { useDeveloperModeGesture } from "../settings/developer-mode";
 import { translator, type Translate } from "../../i18n/translator";
-import { UPDATE_PLACE, useAppUpdate, type UpdateMode, type UpdaterStatus } from "./useUpdates";
+import { UPDATE_PLACE, useAppUpdate } from "./useUpdates";
+import type { UpdateMode, UpdaterStatus } from "../../host";
 import "./updates.css";
 import { uiLocale } from "../../i18n/locale";
 
@@ -83,7 +84,7 @@ export function AppUpdateSettings({ service, onRestart, current }: { service?: R
   const checking = busy === "check" || update.checking;
   // Up to date once a check went through, while nothing waits and nothing failed: the app idle, its service current.
   const upToDateNow = (current ?? (status?.state === "idle" && !status.error && checkedAt != null)) && !checkError;
-  const installed = desktopBuild()?.version || null;
+  const installed = host().identity.build?.version || null;
   const name = installed ? t("updates.row.current", { version: installed }) : t("updates.row.app");
   return <>
     {can.mode && mode && <div className="app-update-setting">

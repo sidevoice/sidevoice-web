@@ -1,7 +1,8 @@
 import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,noMachine,reachNote,unreached,conversationKey,conversationOf,personKey,displayTitle,focusedThread,viewedThread as viewedOf,reachOf,NO_VIEW} from '../state/room-session-state.js';
 import {pageTarget,targetAnswers,routeUrl,callSocketUrl,isNodePath,askTarget} from './rendezvous.js';
 import {readPairingState,projectPairings,writePairings,withPairing,withoutPairing,revokedPairing,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
-import {localHostBridge,desktopDataBridge,normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
+import {normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
+import {host as pageHost} from '../host/index.ts';
 import {createHostAgentsController} from './host-agents.ts';
 import {withoutLost} from './audio-choice.ts';
 import {currentDeviceName} from '../state/device-name.ts';
@@ -33,7 +34,7 @@ let lastMicLevel=0,lastPlaybackLevel=0;
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
 // What this browser speaks in a call: the language of its system, among those the voice handles.
-roomStore.patch({speechLanguage:systemLanguage(SPEECH_LANGUAGES),inApp:!!window.__sidevoiceDesktop?.host?.voice});
+roomStore.patch({speechLanguage:systemLanguage(SPEECH_LANGUAGES),inApp:pageHost().voice!==null});
 // Whether this browser lets the page keep anything: when it does not, one message says so, rather than each store
 // failing on its own (`site-storage.js`).
 void probeSiteStorage().then(probe=>roomStore.patch({storageBlocked:probe.blocked}),()=>{});
@@ -110,7 +111,7 @@ function rememberCards(fp,people){
 function forgetCard(fp,thread){
  rememberedCards=rememberedCards.filter(row=>row.node!==fp||row.thread_id!==thread);saveCards();
 }
-const nativeData=desktopDataBridge();
+const nativeData=pageHost().storage;
 const pairingStorage=nativeData?null:pageStorage(),storedPairingState=readPairingState(pairingStorage);
 let nativePairingsReady=!nativeData,nativePendingRevokes=[];
 let nativeTransactionQueue=Promise.resolve();
@@ -121,7 +122,7 @@ function nativeTransaction(action){
 }
 let localPairing=null;
 let pairings={list:storedPairingState.list};
-const desktopLocalHost=localHostBridge();
+const desktopLocalHost=pageHost().localHost;
 roomStore.patch({localHostAvailable:!!desktopLocalHost});
 // What this device calls a machine, if the person renamed it here (a hostname they would rather not read): this
 // device's alone, shown everywhere here in place of the machine's own name, which stays as `machine_host`.
@@ -2398,7 +2399,7 @@ async function tryVoiceSettings(task,{text='',language=null,keep=true,onListenin
  refuseTryInCall();
  const preparationMs=task==='stt'?(state.voiceDraft||state.voiceSettings)?.stt?.catalog==='local'?90000:20000:0;
  const preparationDeadline=Date.now()+preparationMs;
- const activation=task==='stt'&&!window.__sidevoiceDesktop?.host?.voice?beginBrowserAudioActivation(state.audioDevices?.input):null;
+ const activation=task==='stt'&&pageHost().voice===null?beginBrowserAudioActivation(state.audioDevices?.input):null;
  voiceTry?.abort();const abort=voiceTry=new AbortController();
  // Stop on a transcription try ends its take with what was said (finishVoiceTry), rather than dropping it.
  const finish=voiceTryFinish=new AbortController();
@@ -2703,7 +2704,7 @@ function faintLoop(){
 function primeNowPlaying(){
  // Created and started inside the Join click: iOS lets an element play only from a gesture the first time.
  // Not in the desktop app on a Mac: the app is the Now Playing app there, and this element would compete with it.
- if(window.__sidevoiceDesktop?.host?.mediaKeys==='native'||nowPlaying||typeof Audio==='undefined'||typeof navigator==='undefined'||!navigator.mediaSession)return;
+ if(pageHost().presence.media==='app'||nowPlaying||typeof Audio==='undefined'||typeof navigator==='undefined'||!navigator.mediaSession)return;
  try{
   const element=new Audio();element.loop=true;element.setAttribute('playsinline','');
   element.src=URL.createObjectURL(faintLoop());nowPlaying=element;
@@ -2722,7 +2723,7 @@ function applyLockScreen(on){
  lockScreenOn=on;
  // In the desktop app on a Mac the app answers the headset's buttons itself (sidevoice-desktop src/headset.rs):
  // handlers here too would toggle the microphone twice on one click.
- const session=typeof navigator!=='undefined'&&window.__sidevoiceDesktop?.host?.mediaKeys!=='native'?navigator.mediaSession:null;
+ const session=typeof navigator!=='undefined'&&pageHost().presence.media!=='app'?navigator.mediaSession:null;
  if(session){
   // A click arrives as play or pause, whichever the platform thinks is next. "Play" always means open the
   // microphone; "pause" toggles it, because a click may reach us as pause even while muted.

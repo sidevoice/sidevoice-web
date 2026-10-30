@@ -1,10 +1,10 @@
 import {
-  localHostBridge,
+  host,
   type LocalHostBridge,
   type LocalHostBridgeError,
   type LocalHostInstallProgress,
   type LocalHostStatus,
-} from "./desktop-host";
+} from "../host";
 import { redactFreeText } from "../lib/redact";
 
 export type LocalHostInstallSnapshot =
@@ -99,7 +99,7 @@ export interface LocalHostInstallController {
 
 /** One renderer-side install job shared by the room and Machines entry points. Native remains the authority
  * for install locking, cancellation boundaries and host projection. */
-export function createLocalHostInstallController(bridgeProvider: () => LocalHostBridge | null = localHostBridge): LocalHostInstallController {
+export function createLocalHostInstallController(bridgeProvider: () => LocalHostBridge | null = () => host().localHost): LocalHostInstallController {
   let snapshot: LocalHostInstallSnapshot = IDLE;
   let attempt = 0;
   let activeBridge: LocalHostBridge | null = null;

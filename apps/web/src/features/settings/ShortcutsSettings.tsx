@@ -1,7 +1,7 @@
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { Button } from "../../components/ui/Button";
 import { Group, Row, Section } from "../../components/ui/Card";
-import { muteShortcutBridge, type MuteShortcut } from "../../services/desktop-host";
+import { host, type MuteShortcut } from "../../host";
 import type { Translate } from "../../i18n/translator";
 import { Keys, ShortcutKeys } from "../../components/ui/Keycaps";
 import { SHORTCUTS } from "../../state/shortcuts";
@@ -25,7 +25,7 @@ export function useShortcutsSection() {
 }
 
 export function ShortcutsSettings({ t }: { t: Translate }) {
-  const global = muteShortcutBridge() !== null;
+  const global = host().muteShortcut !== null;
   return <Section id="shortcuts" title={t("settings.section.shortcuts")} description={t("settings.shortcuts.description")}>
     {global && <Group title={t("settings.shortcuts.global")}><MuteShortcutRow t={t} /></Group>}
     <PageShortcuts t={t} />
@@ -56,7 +56,7 @@ export function acceleratorOf(event: Pick<KeyboardEvent, "key" | "metaKey" | "ct
 /** The desktop app's global mute shortcut: the keys as they read, Change (recording the next combination) and Clear; a
  *  shortcut another app has, with others to pick; a clash with VoiceOver said under it. */
 function MuteShortcutRow({ t }: { t: Translate }) {
-  const bridge = muteShortcutBridge()!;
+  const bridge = host().muteShortcut!;
   const [now, setNow] = useState<MuteShortcut | null>(null);
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState("");

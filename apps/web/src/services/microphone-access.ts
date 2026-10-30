@@ -1,4 +1,4 @@
-import { desktopHost } from "./desktop-host";
+import { host, type MicrophoneBridge } from "../host";
 
 /* Whether this page may use the microphone, and asking for it (web#129): the first-run setup asks early, in a step of
  * its own, so voice never silently fails for a permission nobody asked for. Where the desktop app runs the voice call
@@ -26,20 +26,6 @@ export interface MicrophoneSnapshot {
   from: MicrophoneState | null;
 }
 
-/** Desktop microphone capabilities: macOS owns permission; Windows offers only the settings link. */
-interface MicrophoneSettingsBridge {
-  openSettings?(): Promise<void>;
-}
-
-/** The desktop app's native microphone permission (sidevoice-desktop `host.microphone`, macOS). */
-export interface MicrophoneBridge extends MicrophoneSettingsBridge {
-  /** `missing`: not denied, and the system lists no audio input device. */
-  state(): Promise<"prompt" | "granted" | "denied" | "missing">;
-  request(): Promise<"granted" | "denied" | "missing">;
-  /** Tells when the system's answer changes (the person changed it in the system's settings); returns how to stop. */
-  onChange?(listener: () => void): () => void;
-}
-
 export interface MicrophoneAccess {
   getSnapshot(): MicrophoneSnapshot;
   subscribe(listener: () => void): () => void;
@@ -53,7 +39,7 @@ export interface MicrophoneAccess {
 }
 
 export function microphoneBridge(): MicrophoneBridge | null {
-  const bridge = desktopHost()?.microphone as Partial<MicrophoneBridge> | undefined;
+  const bridge = host().microphone;
   return bridge && typeof bridge.state === "function" && typeof bridge.request === "function" ? bridge as MicrophoneBridge : null;
 }
 
@@ -88,9 +74,9 @@ function pageAnswer(media: MediaDevices): PageAnswer {
 export function createMicrophoneAccess(win: Window & typeof globalThis = window): MicrophoneAccess {
   const listeners = new Set<() => void>();
   const bridge = microphoneBridge();
-  const settings = desktopHost()?.microphone as MicrophoneSettingsBridge | undefined;
+  const settings = host().microphone;
   const media = win.navigator?.mediaDevices;
-  const inAppCall = !!desktopHost()?.voice;
+  const inAppCall = host().voice !== null;
   // The app asks where it runs the call; a page in such an app is never given the microphone, and an app too old to
   // ask leaves it to its call: nothing to ask here. Elsewhere, the page asks where it can.
   const asker: MicrophoneSnapshot["asker"] = bridge ? "app" : "page";

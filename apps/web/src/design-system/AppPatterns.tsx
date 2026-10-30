@@ -24,7 +24,7 @@ import { ModelPrepare } from "../features/settings/ModelPrepare";
 import { machineStatus } from "../features/settings/machine-status";
 import { MachineState, machineEntryName } from "../features/settings/MachineState";
 import type { MachineView } from "../state/room-types";
-import type { LocalHostStatus } from "../services/desktop-host";
+import type { LocalHostStatus } from "../host";
 import { NewConversation } from "../features/room/NewConversation";
 import { CONNECTOR_INSTALL, CONNECTOR_PAIR_DEVICE } from "../features/pairing/connector-commands";
 

@@ -1,4 +1,4 @@
-import type { LocalHostStatus } from "../../services/desktop-host";
+import type { LocalHostStatus } from "../../host";
 import type { MachineView } from "../../state/room-types";
 import type { Translate } from "../../i18n/translator";
 

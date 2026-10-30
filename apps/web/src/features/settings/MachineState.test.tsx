@@ -7,7 +7,7 @@ import { createRoomStore } from "../../state/room-store";
 import { VARIANTS_KEY } from "../../lib/variants";
 import type { DetectedAgent, HostAgentsState } from "../../state/room-types";
 import type { PairingSummary } from "../../services/device-pairing.js";
-import type { LocalHostStatus } from "../../services/desktop-host";
+import type { LocalHostStatus } from "../../host";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 afterEach(() => { cleanup(); localStorage.removeItem(VARIANTS_KEY); localStorage.removeItem("sidevoice.settings"); localStorage.removeItem("sidevoice.highlights"); });

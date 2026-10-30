@@ -7,7 +7,7 @@ import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import type { HostDeviceView } from "../../state/room-types";
 import type { PairingSummary } from "../../services/device-pairing.js";
-import type { LocalHostBridge, LocalHostStatus, LocalHostVersion, LocalPairingCode } from "../../services/desktop-host";
+import type { LocalHostBridge, LocalHostStatus, LocalHostVersion, LocalPairingCode } from "../../host";
 import { fakeUpdater } from "../../test/updater";
 import { localHostInstallController } from "../../services/local-host-install";
 import { CONNECTOR_INSTALL } from "../pairing/connector-commands";

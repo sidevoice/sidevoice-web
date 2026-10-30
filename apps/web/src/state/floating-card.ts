@@ -3,7 +3,7 @@ import { useSyncExternalStore } from "react";
 /* The desktop app's floating call card, as this device keeps it (Settings → Floating card): its format and its starting
  * size. The room's Settings writes them, the card's page (call-controls.html, the same origin) reads them and hears a
  * change through the storage event. Where the card sits, its default corner and a size the person dragged it to are the
- * desktop app's own (services/desktop-host.ts CallControlsBridge). Captions are state/captions.ts. Decided in
+ * desktop app's own (host/types.ts CallControlsBridge). Captions are state/captions.ts. Decided in
  * sidevoice-playground#131 (briefs/UX-DECISIONS-2026-10-19.md "Call card: final"). */
 
 export type CardFormat = "card" | "pip" | "avatar";

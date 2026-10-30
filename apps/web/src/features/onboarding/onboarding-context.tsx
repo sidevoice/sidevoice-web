@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { localHostBridge } from "../../services/desktop-host";
+import { host } from "../../host";
 import { createMicrophoneAccess, type MicrophoneSnapshot } from "../../services/microphone-access";
 import {
   createOnboardingRepository,
@@ -131,7 +131,7 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
   const roomStore = useContext(RoomStoreContext);
   if (!roomStore) throw new Error("OnboardingProvider must be inside RoomProvider");
   const repository = useMemo(() => given ?? createOnboardingRepository(), [given]);
-  const canHostAgents = !!localHostBridge();
+  const canHostAgents = !!host().localHost;
   // Read once, as the provider mounts: the room is shown or kept back from the first render.
   const [initial] = useState(() => {
     try { return { record: repository.read(), error: null }; }

@@ -24,7 +24,7 @@ import { VoiceSetupCard } from "../features/call/VoiceSetupCard";
 import { useRoomStore } from "../state/room-store";
 import type { OnboardingRepository, OnboardingStep } from "../services/onboarding-state";
 import { useUiLanguage } from "../i18n/use-ui-language";
-import { callControlsBridge } from "../services/desktop-host";
+import { host } from "../host";
 import { reportStage } from "../features/call/stage-visibility";
 
 function RoomContent() {
@@ -45,7 +45,7 @@ function RoomContent() {
 
   // The desktop app's floating card shows while the stage is out of view: the page says when it shows it (Settings does not).
   useEffect(() => {
-    const bridge = callControlsBridge();
+    const bridge = host().callControls;
     if (!bridge?.setStageVisible) return;
     return reportStage((visible, rect) => bridge.setStageVisible?.(visible, rect));
   }, []);

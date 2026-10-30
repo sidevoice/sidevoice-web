@@ -4,7 +4,7 @@ import { Button } from "../../components/ui/Button";
 import { Dialog } from "../../components/ui/Dialog";
 import { Group, Row } from "../../components/ui/Card";
 import { useRoomStore } from "../../state/room-store";
-import { desktopResetBridge, desktopUninstallBridge, type DesktopResetBridge } from "../../services/desktop-host";
+import { host, type ResetBridge } from "../../host";
 import { translator, type MessageKey } from "../../i18n/translator";
 
 const steps: Record<string, MessageKey> = {
@@ -14,7 +14,7 @@ const steps: Record<string, MessageKey> = {
   agents: "data.step.agents", app: "data.step.appBundle",
 };
 
-type Report = Awaited<ReturnType<DesktopResetBridge["resetReport"]>>;
+type Report = Awaited<ReturnType<ResetBridge["resetReport"]>>;
 
 function FailedItems({ failed }: { failed: { step: string; key: string; agent?: string }[] }) {
   const t = translator();
@@ -25,7 +25,7 @@ function FailedItems({ failed }: { failed: { step: string; key: string; agent?: 
 
 /** Shown on first-run too: Settings is hidden behind onboarding after the helper relaunches. */
 export function ResetReportNotice() {
-  const data = desktopResetBridge();
+  const data = host().reset;
   const t = translator();
   const [report, setReport] = useState<Report>(null);
   const [error, setError] = useState(false);
@@ -69,7 +69,7 @@ const COPY: Record<"deleteAll" | "uninstall", ActionCopy> = {
 
 /** One destructive row: its red button opens a short confirmation (what happens in one sentence, what stays behind a
  *  disclosure); the app then asks once more natively and quits to finish. */
-type Started = Pick<Awaited<ReturnType<DesktopResetBridge["deleteAll"]>>, "pending" | "failed" | "agents">;
+type Started = Pick<Awaited<ReturnType<ResetBridge["deleteAll"]>>, "pending" | "failed" | "agents">;
 
 function DangerAction({ action, run, inCall }: { action: keyof typeof COPY; run: () => Promise<Started>; inCall: boolean }) {
   const t = translator();
@@ -131,15 +131,15 @@ function DangerAction({ action, run, inCall }: { action: keyof typeof COPY; run:
 /** The last group of Settings › Advanced, in red (operator, 2026-10-16: not a section of its own): what deletes
  *  Sidevoice's data, and, where the app can, Sidevoice itself. Only where the app can delete its data (a browser can't). */
 export function DangerZone() {
-  const data = desktopResetBridge();
-  const uninstall = desktopUninstallBridge();
+  const data = host().reset;
+  const uninstall = data?.uninstall ? data : null;
   const t = translator();
   const inCall = useRoomStore((state) => Boolean(state.facts.ws || state.facts.reconnecting));
   if (!data) return null;
   return <div className="danger-zone">
     <Group className="danger-group" title={t("settings.section.danger")}>
       <DangerAction action="deleteAll" run={() => data.deleteAll()} inCall={inCall} />
-      {uninstall && <DangerAction action="uninstall" run={() => uninstall.uninstall()} inCall={inCall} />}
+      {uninstall && <DangerAction action="uninstall" run={() => uninstall.uninstall!()} inCall={inCall} />}
     </Group>
     {inCall && <p className="data-reset-note" role="status">{t("data.endCall")}</p>}
   </div>;

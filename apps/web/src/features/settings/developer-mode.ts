@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { desktopBuild } from "../../services/desktop-host";
+import { host } from "../../host";
 
 /* Developer mode (operator, 2026-10-21): a hidden switch, in nightly builds only, that adds "Developer options" to
  * Settings. Android's way in: click the version in Settings › Updates ten times within five seconds; the same again
  * turns it off. It is kept on this device (localStorage) so it stays across restarts.
  *
- * "Nightly" is the desktop app's own word for its build (`host.build.channel`, desktopBuild(): the one Updates already
+ * "Nightly" is the desktop app's own word for its build (`host.build.channel`, host().identity.build: the one Updates already
  * reads to say "Nightly" under the version), not a second signal: a release, a development build, a build that says
  * nothing and the plain web all read as not nightly, and the gesture does nothing there. */
 
@@ -19,7 +19,7 @@ export const NOTE_MS = 4000;
 
 /** This build is a nightly, as the desktop app says it. */
 export function isNightlyBuild(): boolean {
-  return desktopBuild()?.channel === "nightly";
+  return host().identity.build?.channel === "nightly";
 }
 
 function storage(): Storage | null {

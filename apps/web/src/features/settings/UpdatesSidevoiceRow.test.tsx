@@ -5,7 +5,7 @@ import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import { fakeUpdater } from "../../test/updater";
 import type { PairingSummary } from "../../services/device-pairing.js";
-import type { LocalHostStatus, LocalHostVersion } from "../../services/desktop-host";
+import type { LocalHostStatus, LocalHostVersion } from "../../host";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 afterEach(() => {

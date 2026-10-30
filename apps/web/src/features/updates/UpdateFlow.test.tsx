@@ -6,9 +6,9 @@ import { fakeUpdater } from "../../test/updater";
 import { CallStage } from "../call/CallStage";
 import { SettingsDialog } from "../settings/SettingsDialog";
 import { UpdateNotice } from "./UpdateNotice";
-import type { UpdateMode, UpdaterStatus } from "./useUpdates";
+import type { UpdateMode, UpdaterStatus } from "../../host";
 import type { PairingSummary } from "../../services/device-pairing.js";
-import type { LocalHostStatus, LocalHostVersion } from "../../services/desktop-host";
+import type { LocalHostStatus, LocalHostVersion } from "../../host";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 afterEach(() => {

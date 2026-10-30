@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { AppUpdater, UpdateMode, UpdaterStatus } from "../features/updates/useUpdates";
+import type { AppUpdater, UpdateMode, UpdaterStatus } from "../host";
 
 type Method = Exclude<keyof AppUpdater, "status">;
 

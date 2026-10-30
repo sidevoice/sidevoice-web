@@ -195,7 +195,7 @@ test("Settings › Permissions trusts a successful stream when Safari's query re
 
 test.each(["setup", "settings"])("Windows %s: the privacy button uses the settings-only bridge; Check again still asks the webview", async (place) => {
   const openSettings = vi.fn(async () => {});
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { microphone: { openSettings } } } });
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { build: { channel: "release", version: "0.3.0" }, microphone: { openSettings } } } });
   vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
   const { getUserMedia } = browser("prompt");
   getUserMedia.mockRejectedValueOnce(Object.assign(new Error("blocked"), { name: "NotAllowedError" }));
