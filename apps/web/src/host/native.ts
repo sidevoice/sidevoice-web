@@ -1,5 +1,5 @@
 import type {
-  AppBuild, AppUpdater, AppVoice, CallControlsBridge, Host, HostDebugBridge, HostIdentity, HostStorage, LocalHostBridge, MicrophoneBridge,
+  AppBuild, AppUpdater, AppVoice, CallControlsBridge, Host, HostDebugBridge, HostIdentity, HostPresence, HostStorage, LocalHostBridge, MicrophoneBridge,
   MuteShortcutBridge, ResetBridge,
 } from "./types";
 
@@ -35,7 +35,7 @@ function build(app: Injected | undefined): AppBuild | null {
 
 /** The members an app offers through the global it injects, `null` for the rest; the identity here is what the app says
  *  (its build, its computer's name), the system being the browser's to tell. */
-export type NativeHost = Omit<Host, "identity"> & { identity: Omit<HostIdentity, "os"> };
+export type NativeHost = Omit<Host, "identity" | "presence"> & { identity: Omit<HostIdentity, "os">; presence: Pick<HostPresence, "media"> };
 
 export function nativeHost(): NativeHost {
   const app = injected();
