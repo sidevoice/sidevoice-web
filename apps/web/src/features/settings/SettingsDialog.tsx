@@ -136,7 +136,7 @@ function CallSettings({ t, microphone }: { t: Translate; microphone: MicrophoneS
       </Row>
     </Group>
     {/* The desktop app keeps its computer awake as any app does; holding the screen on is for a browser or a phone. */}
-    {awake && <Group title={t("settings.call.device")}>
+    {awake && host().identity.build === null && <Group title={t("settings.call.device")}>
       <Row label={t("settings.call.keepAwake")} description={awake.supported ? t("settings.call.keepAwakeHint") : t("settings.call.keepAwakeUnsupported")}>
         <Switch checked={prefs.keepAwake && awake.supported} disabled={!awake.supported} onChange={(keepAwake) => set({ keepAwake })} aria-label={t("settings.call.keepAwake")} />
       </Row>

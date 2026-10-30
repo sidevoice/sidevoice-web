@@ -120,12 +120,12 @@ describe("the screen's lock", () => {
     return sentinel;
   };
 
-  test("a browser says whether it has one, and an app that keeps its computer awake has none to offer", () => {
+  test("a browser says whether it has one, and an app hosting the page does not change what the page can hold", () => {
     expect(host().presence.screenAwake?.supported).toBe(false);
     Object.defineProperty(navigator, "wakeLock", { configurable: true, value: { request: vi.fn() } });
     expect(host().presence.screenAwake?.supported).toBe(true);
     Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { build: { channel: "release", version: "0.3.0" } } } });
-    expect(host().presence.screenAwake).toBeNull();
+    expect(host().presence.screenAwake?.supported).toBe(true);
   });
 
   test("is unsupported without a wake lock, failed when it is refused, and held when it is granted", async () => {
@@ -145,6 +145,29 @@ describe("the screen's lock", () => {
     Object.defineProperty(navigator, "wakeLock", { configurable: true, value: { request } });
     void host().presence.screenAwake!.acquire();
     expect(request).toHaveBeenCalledWith("screen");
+  });
+
+  test("a request granted after a release lets its own lock go and never takes the place of a later one's", async () => {
+    const awake = host().presence.screenAwake!;
+    const grants: ((granted: unknown) => void)[] = [];
+    Object.defineProperty(navigator, "wakeLock", { configurable: true, value: { request: vi.fn(() => new Promise((resolve) => grants.push(resolve))) } });
+    const told = vi.fn();
+    const stop = awake.onReleased(told);
+    const first = awake.acquire();
+    awake.release();
+    const second = awake.acquire();
+    const early = lock(), late = lock();
+    grants[1](early);
+    await expect(second).resolves.toBe("held");
+    grants[0](late);
+    await expect(first).resolves.toBe("held");
+    await Promise.resolve();
+    expect(late.release).toHaveBeenCalledTimes(1);
+    expect(early.release).not.toHaveBeenCalled();
+    expect(told).not.toHaveBeenCalled();
+    awake.release();
+    expect(early.release).toHaveBeenCalledTimes(1);
+    stop();
   });
 
   test("tells when the system takes the lock back, and not when it was let go by the page", async () => {
