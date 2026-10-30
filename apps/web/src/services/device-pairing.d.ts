@@ -49,7 +49,6 @@ export interface IdentityDeps {
 }
 
 export const PAIRING_CODE_PREFIX: string;
-export const PAIRINGS_KEY: string;
 export const IDENTITY_PREFIX: string;
 export const VERIFIED_FOR_MS: number;
 export const IDENTITY_TIMEOUT_MS: number;
@@ -95,10 +94,7 @@ export function firstProven(candidates: CandidateBase[], expected: { fp: string;
 export function redeemPairingCode(code: string, options?: { name?: string; address?: string; target?: string; about?: TargetAbout | null; origin?: string; reach?: { plainHttpPrivate: boolean };
   get?: typeof fetch; subtle?: SubtleCrypto; now?: number ; insecure?: boolean }): Promise<{ pairing: Pairing; base: CandidateBase & { publicKey: string } }>;
 export function deviceName(nav?: { userAgent?: string; platform?: string; userAgentData?: { platform?: string } }): string;
-export function readPairings(storage: Pick<Storage, "getItem"> | null | undefined): Pairings;
-export function readPairingState(storage: Pick<Storage, "getItem"> | null | undefined): Pairings;
 export function projectPairings(stored: Pairings, localPairing: Pairing | null): Pairings;
-export function writePairings(storage: Pick<Storage, "setItem">, pairings: Pairings): boolean;
 export function withPairing(pairings: Pairings, pairing: Pairing): Pairings;
 export function withoutPairing(pairings: Pairings, fp: string): Pairings;
 export function revokedPairing(pairings: Pairings, fp: string): Pairings;
