@@ -24,8 +24,7 @@ export function host(): Host {
     presence: {
       media: app.presence.media,
       get remote() { return app.presence.media === "page" ? browserRemote() : null; },
-      // An app keeps its computer awake as any app does: Settings has never offered the page's lock there.
-      get screenAwake() { return app.identity.build === null ? browserScreenAwake() : null; },
+      get screenAwake() { return browserScreenAwake(); },
     },
   };
 }

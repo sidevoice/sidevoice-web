@@ -59,7 +59,8 @@ export interface RemoteControls {
 export interface ScreenAwake {
   /** Whether this browser can hold the screen at all. */
   readonly supported: boolean;
-  /** Asks for the lock, inside the gesture that started the call when there is one. */
+  /** Asks for the lock, inside the gesture that started the call when there is one. A request granted after a `release()`
+   *  lets its own lock go and answers `held` all the same: the one that released has moved on and does not use it. */
   acquire(): Promise<"held" | "unsupported" | "failed">;
   release(): void;
   /** The system took the lock back on its own (a screen that locked once, a route change). Returns how to stop. */
@@ -73,7 +74,7 @@ export interface HostPresence {
   readonly media: "page" | "app";
   /** The page's own, where `media` is `page` and the browser has a Media Session; null where the app owns the media. */
   remote: RemoteControls | null;
-  /** The page's own, null where the host decides: an app keeps its computer awake as any app does. */
+  /** The page's own. Null would be a host that decides for itself; none says so yet. */
   screenAwake: ScreenAwake | null;
 }
 

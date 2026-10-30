@@ -538,6 +538,46 @@ test('A lock that ends with the call is released, and a late grant is released t
  await new Promise(resolve=>setImmediate(resolve));
  assert.equal(released,1);assert.equal(s.run('screenLock.state'),'');
 });
+test('A request that outlives a hang-up and a rejoin lets its own lock go, and never takes the new call\'s',async()=>{
+ const s=setup();const grants=[],released=[];
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
+ s.context.navigator={wakeLock:{request:()=>new Promise(resolve=>grants.push(resolve))}};
+ const lock=name=>({release:async()=>{released.push(name)},addEventListener(){}});
+ s.run('ws={}');
+ const first=s.run('keepScreenAwake()');
+ s.run('ws=null;releaseScreenWakeLock()');
+ s.run('ws={}');
+ const second=s.run('keepScreenAwake()');
+ assert.equal(grants.length,2,'the rejoin asks again, the first request still pending');
+ grants[1](lock('second'));await second;
+ assert.equal(s.run('screenHeld'),true);assert.equal(s.run('screenLock.state'),'on');
+ grants[0](lock('first'));await first;
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.deepEqual(released,['first'],'the late one is let go, and only that one');
+ assert.equal(s.run('screenHeld'),true,'the new call still holds its own');assert.equal(s.run('screenLock.state'),'on');
+ s.run('ws=null;releaseScreenWakeLock()');
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.deepEqual(released.sort(),['first','second'],'the final hang-up releases the new call\'s lock');
+});
+test('A loop made before the app took the lock screen is stopped at hang-up all the same',()=>{
+ const s=setup();const {handlers}=mediaSession(s);const elements=nowPlayingLoop(s);
+ s.run('primeNowPlaying()');
+ assert.equal(elements.length,1);assert.equal(elements[0].paused,false);
+ s.context.window.__sidevoiceDesktop={host:{mediaKeys:'native'}};
+ s.run('applyLockScreen(true)');
+ assert.deepEqual(handlers,{},'the app answers the headset: nothing is set here');
+ s.run('applyLockScreen(false)');
+ assert.equal(elements[0].paused,true,'whoever owns the lock screen now, the loop that exists is stopped');
+});
+test('The screen is held in the desktop app too, when keeping it on was chosen: hiding the row is not turning it off',async()=>{
+ const s=setup();let requests=0;
+ s.context.window.__sidevoiceDesktop={host:{build:{channel:'release',version:'0.3.0'}}};
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
+ s.context.navigator={wakeLock:{request:async()=>{requests++;return {release:async()=>{},addEventListener(){}}}}};
+ s.run('ws={}');
+ await s.run('keepScreenAwake()');
+ assert.equal(requests,1);assert.equal(s.run('screenLock.state'),'on');
+});
 test('Settings are reached from the header menu',()=>{
  // The ⋯ menu's Settings entry is the very button the runtime opens the dialog from: one entry, nothing relaying to it.
  const s=setup({strictDOM:true});

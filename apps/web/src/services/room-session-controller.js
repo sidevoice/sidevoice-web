@@ -431,7 +431,9 @@ async function keepScreenAwake(){
   const outcome=await awake.acquire();
   if(outcome==='unsupported'){showScreenLock('off','session.screen.unsupported');return}
   if(outcome==='failed'){showScreenLock('off','session.screen.failed');return}
-  if(epoch!==wakeEpoch||document.hidden){awake.release();return}
+  // Released while it was asking: the host let that lock go itself, and what it released is not this call's to use.
+  if(epoch!==wakeEpoch)return;
+  if(document.hidden){awake.release();return}
   screenHeld=true;wakeRetries=0;showScreenLock('on','session.screen.on');
   // The system takes the lock back on its own — a screen that locked once, a route change. While the call is up and
   // the room is on screen, ask again.
@@ -2689,10 +2691,14 @@ window.sidevoiceActions={
 // ----- the lock screen and the headphones' button (sidevoice/sidevoice-web#8) -----
 // The host supplies the tile and the button (host/browser-presence.ts: the Media Session and, on iOS, a faint looping
 // element that owns the tile). Here is what the call decides: when it shows there, and what a click does to it.
+// What this page has made on the lock screen, whoever owns it by the time the call ends: the app may be found after the
+// loop was made, and a hang-up stops what exists.
+let usedRemote=null;
 function primeNowPlaying(){
  // Created and started inside the Join click. Not where the app owns the lock screen (the Mac app): the app is the Now
  // Playing app there, and this element would compete with it.
- pageHost().presence.remote?.prime();
+ const remote=pageHost().presence.remote;
+ if(remote){usedRemote=remote;remote.prime()}
 }
 function micLive(){return !!voice&&state.micEnabled}
 let lockScreenOn=false,lockScreenTitle='',stopRemote=null;
@@ -2713,8 +2719,9 @@ function applyLockScreen(on){
  // here too would toggle the microphone twice on one click.
  const remote=pageHost().presence.remote;
  stopRemote?.();stopRemote=null;
+ if(!on){for(const made of new Set([remote,usedRemote]))made?.clear();usedRemote=null;return}
  if(!remote)return;
- if(!on){remote.clear();return}
+ usedRemote=remote;
  lockScreenTitle=conversationTitle(targetId())||'Llamada';
  stopRemote=remote.onCommand(remoteCommand);
  syncNowPlaying();
