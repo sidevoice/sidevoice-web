@@ -8,6 +8,8 @@ import { BODIES, SLOTS, asMatchable, bodyOf, conflict, matches, partOf, partsIn,
 const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
 const ids = (v: unknown): string[] => (Array.isArray(v) ? v : typeof v === "string" ? [v] : []).filter((x): x is string => typeof x === "string" && x !== "" && x !== "none");
 
+const tintsOf = (v: unknown): Record<string, string> | undefined => (v && typeof v === "object" ? (Object.fromEntries(Object.entries(v).filter(([, c]) => typeof c === "string")) as Record<string, string>) : undefined);
+
 export function normalizeSpec(input: SpecInput, keep?: string): Spec {
   const raw = (input ?? {}) as Record<string, unknown>;
   const parts: Record<string, string | string[]> = {};
@@ -28,6 +30,7 @@ export function normalizeSpec(input: SpecInput, keep?: string): Spec {
     shape: typeof raw.shape === "string" ? raw.shape : "bicho",
     name: typeof raw.name === "string" ? raw.name : "bicho",
     ...(raw.shiny ? { shiny: true } : {}),
+    ...(tintsOf(raw.tints) ? { tints: tintsOf(raw.tints) } : {}),
   };
   return resolve(spec, keep);
 }
@@ -119,11 +122,20 @@ export const available = (spec: Spec, slot: string, id: string) => idsIn(withPar
 
 /* ---------- colour and traits ---------- */
 
-export interface Colors { body: string; belly: string; dark: string; spot: string }
+export interface Colors { body: string; belly: string; dark: string; spot: string; horn: string; gold: string; pink: string }
 
 export function colorsOf(spec: Spec): Colors {
   const { hue: h, sat: s, light: l } = spec.shiny ? { hue: 45, sat: 88, light: 58 } : spec.color;
-  return { body: hsl(h, s, l), belly: hsl(h, Math.max(20, s - 15), Math.min(94, l + 20)), dark: hsl(h, Math.max(0, s - 10), Math.max(12, l - 22)), spot: hsl((spec.color.hue + spec.color.spot) % 360, 80, 68) };
+  const t = spec.shiny ? undefined : spec.tints;
+  return {
+    body: hsl(h, s, l),
+    belly: t?.belly ?? hsl(h, Math.max(20, s - 15), Math.min(94, l + 20)),
+    dark: t?.dark ?? hsl(h, Math.max(0, s - 10), Math.max(12, l - 22)),
+    spot: t?.spot ?? hsl((spec.color.hue + spec.color.spot) % 360, 80, 68),
+    horn: t?.horn ?? "#fff3d6",
+    gold: t?.gold ?? "#f5c242",
+    pink: t?.pink ?? "#f6a9bb",
+  };
 }
 
 export function traitsOf(spec: Spec) {

@@ -428,7 +428,6 @@ const FORK = (() => {
 const CROWN = { slot: "top", at: "crown", socket: [60, 42] as P };
 
 export default batch({
-  label: "B07 Golosinas",
 
   parts: [
     /* ---------- tops ---------- */
@@ -476,92 +475,5 @@ export default batch({
       layer: LAYER.arms - 0.5,
       draw: { pieces: [{ d: FORK, c: SILVER }] },
     },
-  ],
-
-  families: [
-    {
-      id: "snacks", label: "Golosinas", weight: 9,
-      color: { hue: [0, 360], sat: [30, 45], light: [78, 88], spot: 150 },
-      // Every snack may blush, wear a bib (B10) or hold a fork (B14: both cut, they had become the commonest neckwear and
-      // held item of the whole cast).
-      pools: { cheeks: { p: 0.45, pick: { blush: 10, "shy-lines": 3 } }, neckwear: { p: 0.05, pick: { bib: 10 } }, held: { p: 0.03, pick: { fork: 10 } } },
-      // Lent to other families' bichos only: a cherry or a pat of butter on the head, sprinkles.
-      cross: { top: { cherry: 10, butter: 4 }, pattern: { sprinkles: 8 } },
-    },
-  ],
-
-  // Every snack has arms (B14's arms rule): nubs, or the cartoon gloves of a food mascot (B06's mitts).
-  members: [
-    {
-      // A rice ball with its nori.
-      id: "onigiri", family: "snacks", label: "onigiri", bodies: "tri",
-      fixed: { pattern: ["nori"], legs: "feet", arms: { nubs: 10, mitts: 4 } },
-      pools: { eyes: { button: 10, two: 6, sleepy: 4 }, mouth: { tiny: 10, smile: 8, cat: 6, pout: 3, wavy: 3 }, cheeks: { p: 0.7, pick: { blush: 10, "shy-lines": 4 } } },
-      color: { hue: [0, 360], sat: 8, light: 92, spot: 150 },
-    },
-    {
-      id: "tostada", family: "snacks", label: "tostada", bodies: "box",
-      fixed: { pattern: ["crust"], top: "butter", arms: { nubs: 10, mitts: 4 }, legs: "feet" },
-      pools: { eyes: { two: 10, button: 8, sparkle: 4, googly: 4 }, mouth: { smile: 10, grin: 6, tongue: 5, buck: 4, smirk: 3 } },
-      color: { hue: [34, 40], sat: 55, light: 72, spot: 180 },
-    },
-    {
-      // A squishy rice cake: button eyes and rosy cheeks, often no feet at all; now and then a cherry on top (B14: the cherry
-      // was only lent to other families, and almost never landed).
-      id: "mochi", family: "snacks", label: "mochi", bodies: "blob",
-      fixed: { eyes: "button", cheeks: "blush", arms: "nubs" },
-      pools: { mouth: { tiny: 10, cat: 8, smile: 6, pout: 4, wavy: 3 }, legs: { p: 0.4, pick: "feet" }, top: { p: 0.2, pick: { cherry: 10 } } },
-      color: { hue: [0, 360], sat: 35, light: 86, spot: 150 },
-    },
-    {
-      id: "fresita", family: "snacks", label: "fresita", bodies: "round",
-      fixed: { top: "calyx", pattern: ["seeds"], legs: "feet", arms: { nubs: 10, mitts: 4 } },
-      pools: { eyes: { two: 10, button: 8, sparkle: 6, lashes: 3 }, mouth: { smile: 10, tiny: 8, cat: 6, buck: 3 }, cheeks: { p: 0.5, pick: "blush" } },
-      // Reds either side of 0; the spot lands on the greens, for the leaves.
-      color: [{ hue: [350, 359], sat: 70, light: 58, spot: 122 }, { hue: [0, 5], sat: 70, light: 58, spot: 118 }],
-    },
-    {
-      id: "empanadilla", family: "snacks", label: "empanadilla", bodies: "wide",
-      fixed: { top: "pleats", legs: "feet", arms: { nubs: 10, mitts: 4 } },
-      pools: { eyes: { two: 10, button: 8, sleepy: 6 }, mouth: { smile: 10, cat: 6, tiny: 6, tongue: 4, smirk: 3 }, cheeks: { p: 0.6, pick: { blush: 10, freckles: 4 } } },
-      color: { hue: [38, 42], sat: 30, light: 86, spot: 180 },
-    },
-    {
-      // A flan: caramel on top, sometimes crowned with a cherry.
-      id: "flan", family: "snacks", label: "flan", bodies: "pill",
-      fixed: { legs: "feet", arms: { nubs: 10, mitts: 4 } },
-      pools: { top: { caramel: 10, "caramel-cherry": 6 }, eyes: { two: 10, button: 8, sparkle: 6, sleepy: 4 }, mouth: { smile: 10, tiny: 8, cat: 5, wavy: 4, tongue: 4 }, cheeks: { p: 0.5, pick: "blush" } },
-      // Custard yellow; the spot is a cherry red.
-      color: { hue: [43, 47], sat: 80, light: 70, spot: 300 },
-    },
-    {
-      // A cupcake: a swirl of frosting in any colour over the cake, a paper cup round the bottom.
-      id: "magdalena", family: "snacks", label: "magdalena", bodies: "pill",
-      fixed: { top: "frosting", pattern: ["wrapper"], legs: "feet", arms: { nubs: 10, mitts: 4 } },
-      pools: { pattern: { p: 0.45, pick: "sprinkles" }, eyes: { two: 10, sparkle: 8, button: 6, lashes: 3 }, mouth: { smile: 10, tiny: 6, tongue: 6, grin: 4 }, cheeks: { p: 0.5, pick: "blush" } },
-      color: [
-        { weight: 2, hue: [22, 30], sat: [40, 52], light: [44, 52], spot: [70, 290] },
-        { weight: 2, hue: [36, 44], sat: [55, 68], light: [66, 74], spot: [70, 290] },
-        { weight: 1, hue: [348, 356], sat: [45, 55], light: [50, 58], spot: [70, 290] },
-      ],
-    },
-    {
-      // An egg whose top has cracked open like a lid.
-      id: "huevito", family: "snacks", label: "huevito", bodies: "drop",
-      fixed: { top: "eggshell", legs: "feet", arms: "nubs" },
-      pools: { pattern: { p: 0.45, pick: "crack" }, eyes: { two: 10, button: 8, sleepy: 5, googly: 4 }, mouth: { smile: 10, tiny: 8, wavy: 5, pout: 4 }, cheeks: { p: 0.5, pick: "blush" } },
-      color: [{ hue: [30, 50], sat: [6, 12], light: [92, 94], spot: 180 }, { hue: [34, 42], sat: [40, 55], light: [84, 88], spot: 180 }],
-    },
-  ],
-
-  showcase: [
-    "bicho:snacks/flan:b07-guinda?top=caramel-cherry",
-    "bicho:snacks/magdalena:b07-virutas?pattern=sprinkles",
-    "bicho:snacks/huevito:b07-grieta?pattern=crack",
-    "bicho:snacks/fresita:b07-alta?body=tall",
-    "bicho:furry/bear:b07-tenedor?held=fork&headgear=none",
-    "bicho:monsters/monster:b07-guinda?top=cherry&eyes=two&headgear=none",
-    "bicho:sprouts/brotecito:b07-virutas?top=none&pattern=sprinkles",
-    "bicho:monsters/monster:b07-mantequilla?eyes=two&headgear=none&top=butter",
   ],
 });

@@ -18,7 +18,7 @@ import { present } from "./spec";
  *   type    a little laptop in front, hands tapping at its sides; bits of code fly out (the one code-flavoured style)
  *
  * The hammer needs a free hand on the right: a bicho without hands, or one holding something, gets the others
- * (`worksFor`). Frozen figures (the `v3:` and `monstruo:` seeds) and the mascots get no `data-work`: they keep the
+ * (`worksFor`). The mascots get no `data-work`: they keep the
  * classic crank. (Juggling and the cauldron moved to idle, as pastimes: idle.ts.)
  *
  * A desk in front (the stage scene's: the client sets `data-desk` on the root) covers the figure below `DESK_Y`, where

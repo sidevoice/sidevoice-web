@@ -55,8 +55,8 @@ export default batch({
     { id: "cyclops", slot: "eyes", label: "cíclope", tags: ["one-eye"], draw: (ctx) => toon([eye(ctx, 0, 0, 12)]) },
     { id: "three", slot: "eyes", label: "tres", tags: ["many-eyes"], draw: (ctx) => { const s = ctx.rig.spread; return toon([eye(ctx, -s - 2, 2, 7), eye(ctx, 0, -6, 8), eye(ctx, s + 2, 2, 7)]); } },
     { id: "wonky", slot: "eyes", label: "desparejos", draw: (ctx) => { const s = ctx.rig.spread; return toon([eye(ctx, -s, 0, 10), eye(ctx, s + 1, 2, 6.5)]); } },
-    // Legacy (the old robot's face plate): weight 0, so the v4 roller never pools it, not even to fill a required slot.
-    // It stays for `v3:` seeds, which name it, and for stored specs and the editor.
+    // Legacy (the old robot's face plate): weight 0, so the generator never picks it.
+    // It stays for stored specs and the editor.
     { id: "led", slot: "eyes", label: "LED", weight: 0, excludes: ["cheeks", "eyewear"], draw: led },
 
     /* ---------- mouths (every mouth gives a rest and an open shape) ---------- */
@@ -98,7 +98,7 @@ export default batch({
       },
     },
     {
-      // Legacy, like the LED eyes: weight 0 keeps it out of every v4 roll; `v3:` seeds still draw it.
+      // Legacy, like the LED eyes: weight 0 keeps it out of every roll.
       id: "led", slot: "mouth", label: "LED", weight: 0,
       draw: (ctx) => {
         const { x, y } = mouthAt(ctx);

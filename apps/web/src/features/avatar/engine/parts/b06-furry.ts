@@ -265,23 +265,22 @@ const PIG_TAIL = "M80 90C87.5 92 94.5 90.5 94.5 85C94.5 80.5 89 80 88.5 84C88 88
 const PAW_ARM = smoothLoop([[35, 70.4], [28, 71], [21.8, 73.6], [17, 78.2], [15, 84], [17.6, 89.6], [23.6, 91], [28.4, 87.4], [30.6, 82.4], [35, 80.6]]);
 
 export default batch({
-  label: "B06 Peluditos",
 
   parts: [
     /* ---------- ears (top) ---------- */
     {
       // Big round mouse ears with pink insides: the strongest 28 px cue after the bunny's.
-      id: "ears-mouse", slot: "top", label: "orejas de ratón", at: "earL", socket: [40.8, 42], group: "ear", jitter: EAR_JIT,
+      id: "ears-mouse", tags: ["ears"], slot: "top", label: "orejas de ratón", at: "earL", socket: [40.8, 42], group: "ear", jitter: EAR_JIT,
       draw: { pieces: [{ d: ellipse(33.5, 30.5, 14, 14), c: "body" }, { d: ellipse(34.2, 31.6, 8.8, 8.8), c: "pink", layer: LAYER.top + 0.5 }] },
     },
     {
       // Floppy dog ears hanging from the upper sides of the head, in the dark paint. They cover the temples, where
       // headphone cups and earmuffs would sit (`blocks-temples`), and a band would cut through the lop's fold (`blocks-band`).
-      id: "ears-floppy", slot: "top", label: "orejas caídas", tags: ["blocks-band", "blocks-temples"], draw: (ctx) => hanging(ctx, "floppy"),
+      id: "ears-floppy", slot: "top", label: "orejas caídas", tags: ["blocks-band", "blocks-temples", "ears"], draw: (ctx) => hanging(ctx, "floppy"),
     },
     {
       // Small pig ears, the tip folded forward over the pink.
-      id: "ears-pig", slot: "top", label: "orejas de cerdito", at: "earL", socket: [40.8, 42], group: "ear", noise: 1, jitter: EAR_JIT,
+      id: "ears-pig", tags: ["ears"], slot: "top", label: "orejas de cerdito", at: "earL", socket: [40.8, 42], group: "ear", noise: 1, jitter: EAR_JIT,
       draw: {
         pieces: [
           { d: "M32.5 48Q27.6 40 29.4 33.6L38.8 30.2Q45.6 33.4 52 39.5Z", c: "body" },
@@ -292,7 +291,7 @@ export default batch({
     },
     {
       // Raccoon ears: short rounded points, splayed out, dark with a pale middle.
-      id: "ears-pointy", slot: "top", label: "orejas de mapache", at: "earL", socket: [40.8, 42], jitter: { rot: 4 }, tags: [DARK_LIMBS],
+      id: "ears-pointy", slot: "top", label: "orejas de mapache", at: "earL", socket: [40.8, 42], jitter: { rot: 4 }, tags: [DARK_LIMBS, "ears"],
       draw: (ctx) => ({
         pieces: [
           { d: "M31 51Q25 36 25.6 27.4Q26 23 30 24.4Q43 29 53 40Z", c: darkPart(ctx.spec) },
@@ -302,11 +301,11 @@ export default batch({
     },
     {
       // The lop rabbit's ears (uncommon): a soft fold on the crown, then long ears hanging outside the cheeks.
-      id: "ears-lop", slot: "top", label: "orejas de belier", rarity: "uncommon", tags: ["blocks-band", "blocks-temples"], draw: (ctx) => hanging(ctx, "lop"),
+      id: "ears-lop", slot: "top", label: "orejas de belier", rarity: "uncommon", tags: ["blocks-band", "blocks-temples", "ears"], draw: (ctx) => hanging(ctx, "lop"),
     },
     {
       // The bear's ears painted black, for the panda (on its white coat the dark role would only be a pale grey).
-      id: "ears-panda", slot: "top", label: "orejas de panda", at: "earL", socket: [40.8, 42], tags: [DARK_LIMBS],
+      id: "ears-panda", slot: "top", label: "orejas de panda", at: "earL", socket: [40.8, 42], tags: [DARK_LIMBS, "ears"],
       draw: (ctx) => ({ pieces: [{ d: "M38 22Q26 22 26 34Q26 46 38 46Q50 46 50 34Q50 22 38 22Z", c: darkPart(ctx.spec) }] }),
     },
 
@@ -383,107 +382,5 @@ export default batch({
     /* ---------- patterns ---------- */
     { id: "patch", slot: "pattern", label: "parche", draw: patch },
     { id: "moon-chest", slot: "pattern", label: "luna en el pecho", excludes: ["pattern:belly|fur-tips"], draw: moonChest },
-  ],
-
-  members: [
-    {
-      id: "raton", family: "furry", label: "ratón", bodies: { blob: 1, round: 1 },
-      fixed: { top: "ears-mouse", mouth: "buck", legs: "feet", arms: { nubs: 10, paws: 6 } },
-      // The tail is a pool, not fixed, so the rare roll can swap it for the squirrel's plume.
-      pools: {
-        tail: { mouse: 10, squirrel: 0 }, eyes: { button: 10, two: 6, sparkle: 4 }, nose: { button: 10, nose: 5, heart: 4 },
-        cheeks: { p: 0.45, pick: { pouches: 10, blush: 6 } }, pattern: { p: 0.4, pick: "belly" },
-      },
-      color: [
-        { weight: 3, hue: [205, 230], sat: [6, 12], light: [58, 70], spot: 160 },
-        { weight: 2, hue: [24, 34], sat: [20, 32], light: [52, 62], spot: 160 },
-        { weight: 1, hue: 40, sat: 8, light: [90, 93], spot: 160 },
-      ],
-    },
-    {
-      id: "perrito", family: "furry", label: "perrito", bodies: { round: 3, blob: 1 },
-      fixed: { top: "ears-floppy", nose: "snout-dog", arms: { paws: 10, nubs: 8 } },
-      pools: {
-        mouth: { tongue: 10, smile: 8, cat: 3 }, eyes: { two: 10, button: 6, sparkle: 4, sleepy: 3 },
-        pattern: { p: 0.45, pick: "patch" }, tail: { p: 0.55, pick: "cat" },
-        legs: { paws: 10, feet: 6 },
-        neckwear: { p: 0.3, pick: { "bell-collar": 10, bandana: 6 } },
-      },
-      color: [
-        { weight: 3, hue: [26, 38], sat: [40, 58], light: [52, 64], spot: 160 },
-        { weight: 2, hue: [30, 42], sat: [26, 40], light: [76, 84], spot: 160 },
-        { weight: 1, hue: 35, sat: 8, light: [90, 93], spot: 160 },
-      ],
-    },
-    {
-      id: "panda", family: "furry", label: "panda", bodies: { round: 2, pear: 1 },
-      fixed: { top: "ears-panda", marks: "eyepatch", arms: "paws", legs: "paws" },
-      // No button or hollow eyes: black dots vanish on the black patches. Small eyes in big patches are the panda's look:
-      // one of the few members that keep the beady eyes (B14).
-      pools: {
-        eyes: { beady: 10, two: 6, sparkle: 4 }, mouth: { cat: 10, smile: 6, tiny: 6 }, nose: { button: 10, nose: 4 },
-        tail: { p: 0.5, pick: "puff" }, cheeks: { p: 0.3, pick: "blush" }, held: { p: 0.15, pick: { "umbrella-leaf": 10 } },
-      },
-      color: { hue: [30, 50], sat: [4, 8], light: [93, 95], spot: 160 },
-    },
-    {
-      id: "mapache", family: "furry", label: "mapache", bodies: { round: 3, blob: 1 },
-      fixed: { top: "ears-pointy", marks: "mask", tail: "ringed", arms: { mitts: 10, paws: 8 } },
-      pools: {
-        mouth: { smirk: 10, cat: 8, smile: 4 }, eyes: { two: 10, sparkle: 4, sleepy: 4 }, nose: { button: 10, nose: 3 },
-        legs: { paws: 10, feet: 6 }, pattern: { p: 0.5, pick: "belly" },
-      },
-      // A pale grey coat, so the mask, the ears, the tail's rings and the paws all get the near-black paint.
-      color: { hue: [212, 236], sat: [6, 12], light: [74, 80], spot: 160 },
-    },
-    {
-      id: "cerdito", family: "furry", label: "cerdito", bodies: { wide: 3, round: 1 },
-      fixed: { top: "ears-pig", nose: "snout-pig", tail: "curl", arms: "nubs" },
-      pools: {
-        eyes: { button: 10, two: 8, sleepy: 3 }, mouth: { smile: 10, tiny: 6, cat: 4, tongue: 4 },
-        cheeks: { p: 0.6, pick: "blush" }, legs: "feet",
-      },
-      color: { hue: [344, 358], sat: [48, 62], light: [70, 77], spot: 160 },
-    },
-    {
-      id: "erizo", family: "furry", label: "erizo", bodies: { pear: 3, round: 1 },
-      // The hedgehog's little eyes (catalogue F2): it keeps the beady eyes beside the button ones (B14).
-      fixed: { back: "quills", nose: "button", arms: "paws" },
-      pools: {
-        eyes: { button: 10, beady: 7 }, mouth: { smile: 10, tiny: 8, cat: 4 }, marks: { p: 0.5, pick: "face-patch" },
-        cheeks: { p: 0.4, pick: "blush" }, legs: { feet: 10, paws: 6 },
-      },
-      color: { hue: [26, 36], sat: [30, 44], light: [60, 72], spot: 160 },
-    },
-    {
-      // The moon bear: a black bear with a cream crescent on its chest and a pale muzzle. The core bear rolls the muzzle
-      // too (see `extend`), but never a black coat, and the crescent only reads right on one (on the core bear's white
-      // coat it would be a grey V, in place of its belly), so the moon bear keeps a member of its own.
-      id: "oso-luna", family: "furry", label: "oso luna", weight: 6, bodies: { round: 3, pear: 1 },
-      fixed: { top: "bear", eyes: "beady", mouth: "cat", nose: "muzzle", pattern: ["moon-chest"], legs: "feet", arms: { nubs: 10, paws: 6 } },
-      color: { hue: [240, 270], sat: [8, 16], light: [24, 32], spot: 160 },
-    },
-  ],
-
-  // The catalogue's pools for the core members (§1.2 F2), which live in core-species.ts. The lop rabbit is now a bunny
-  // with lop ears (a fixed option: they are its signature, never dropped) and maybe a pom-pom; it used to be a member of
-  // its own here, with nothing else to tell it apart.
-  // B14: the cat and the bunny now have arms (paws as an option), and the furry family's rare is the squirrel's plume (p 0:
-  // only the rare roll picks it, for a furry bicho whose tail is not its signature).
-  extend: [
-    { family: "furry", member: "cat", fixed: { arms: { paws: 12 } }, pools: { pattern: { p: 0.55, pick: { patch: 6 } }, neckwear: { p: 0.15, pick: "bell-collar" } } },
-    { family: "furry", member: "bunny", fixed: { top: { "ears-lop": 3 }, arms: { paws: 6 } }, pools: { tail: { p: 0.4, pick: "puff" } } },
-    { family: "furry", member: "bear", fixed: { nose: { muzzle: 4 } } },
-    { family: "furry", pools: { tail: { p: 0, pick: { squirrel: 1 } } } },
-  ],
-
-  showcase: [
-    "bicho:furry/cat:b06-calico?pattern=patch",
-    "bicho:furry/bunny:b06-lop?top=ears-lop&tail=puff",
-    "bicho:furry/bear:b06-luna?nose=muzzle&pattern=moon-chest",
-    "bicho:furry/raton:b06-ardilla?tail=squirrel",
-    "bicho:furry/fox:b06-guantes?arms=mitts",
-    "bicho:furry/bear:b06-patitas?arms=paws&legs=paws",
-    "bicho:monsters/monster:b06-erizo?back=quills",
   ],
 });

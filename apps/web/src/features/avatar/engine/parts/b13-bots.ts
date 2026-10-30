@@ -1,12 +1,12 @@
-import { INK, LAYER, SOFT_INK, batch, ellipse, eyeAt, eyePair, n, spanAt, type BodyDef, type ColorRule, type Ctx, type Drawing, type Eye, type Piece, type Rng } from "../bichos/kit";
+import { INK, LAYER, SOFT_INK, batch, ellipse, eyeAt, eyePair, n, spanAt, type BodyDef, type Ctx, type Drawing, type Eye, type Piece, type Rng } from "../bichos/kit";
 
 /* B13 Bots (docs/catalogue.md F10, reworked after the operator's robot feedback).
  *
  * Robot parts are modular: robot eyes are only eyes and a robot mouth is only a mouth. There is no screen plate behind
  * them, so they work on any body, and any other eyes and mouths work on the robot bodies. Each LED eye sits in its own
  * small ink socket (its "sclera"), which keeps it readable on a pale coat; a tinted visor is a separate, optional face
- * accessory (`eyewear: visor-glass`). The core `led` eyes keep their old screen, untouched, for the `v3:` seeds; the
- * robot member rolls these plate-free eyes instead (see `extend`).
+ * accessory (`eyewear: visor-glass`). The core `led` eyes (the old screen) are retired (weight 0); a robot rolls these
+ * plate-free eyes.
  *
  * Robots feel alive in each mood, with the shared keyframes only:
  * - speaking: the LED mouths flash a different row of equaliser bars on every word (beat a / beat b);
@@ -419,20 +419,7 @@ function visorGlass(ctx: Ctx): Drawing {
   };
 }
 
-/* ---------- colours ---------- */
-
-/** Clean toy-robot paints: aqua, sky, mint, coral, butter, lilac, and silver-white. The spot lands opposite. */
-const BOT_COLORS: ColorRule[] = [
-  { weight: 3, hue: { pick: [184, 196, 206] }, sat: [50, 62], light: [62, 70], spot: 180 },
-  { weight: 2, hue: { pick: [150, 165] }, sat: [40, 52], light: [64, 72], spot: 180 },
-  { weight: 2, hue: { pick: [8, 18, 28] }, sat: [62, 74], light: [62, 68], spot: 180 },
-  { weight: 2, hue: { pick: [42, 50] }, sat: [70, 80], light: [62, 68], spot: 180 },
-  { weight: 1, hue: { pick: [272, 290] }, sat: [36, 48], light: [66, 72], spot: 180 },
-  { weight: 2, hue: [200, 230], sat: [6, 12], light: [80, 86], spot: 160 },
-];
-
 export default batch({
-  label: "B13 Robots",
   // The robots' highlights run where the arms join (a can's down its side, a tv's round its corner): under the arms.
   bodies: BODIES.map((body) => ({ ...body, glossUnder: true })),
 
@@ -626,81 +613,6 @@ export default batch({
     { id: "visor-glass", slot: "eyewear", label: "visera de cristal", rarity: "uncommon", excludes: ["#many-eyes", "#stalks"], draw: visorGlass },
   ],
 
-  members: [
-    {
-      // A tin-can bot: hex nut, rivets, clamp arms.
-      id: "latita", family: "bots", label: "latita", bodies: { can: 3, pill: 1 },
-      fixed: { top: "bolt", pattern: ["rivets"], arms: "bot", legs: { feet: 10, wheels: 4, springs: 4 } },
-      pools: { eyes: { "led-dot": 10, visor: 6, "led-pill": 5, "led-heart": 1 }, mouth: { "led-bar": 10, grill: 6, "led-smile": 6 } },
-      color: BOT_COLORS,
-    },
-    {
-      // An old TV set on legs, with a V antenna.
-      id: "tele", family: "bots", label: "tele", bodies: "tv",
-      fixed: { top: "rabbit-ears", legs: "stick|feet", arms: { bot: 10, nubs: 6 } },
-      pools: { eyes: { "led-square": 10, "led-dot": 5, "led-pill": 4, "led-heart": 1 }, mouth: { grill: 10, "led-bar": 6, "led-smile": 5 } },
-      color: BOT_COLORS,
-    },
-    {
-      // A little drone: a rotor on top, a jet underneath.
-      id: "dron", family: "bots", label: "dron", bodies: { orb: 3, dome: 2 },
-      fixed: { top: "propeller", legs: "hover", arms: "bot" },
-      pools: { eyes: { visor: 10, lens: 8, "led-dot": 4 }, mouth: { "led-bar": 8, "led-smile": 8 } },
-      color: BOT_COLORS,
-    },
-    {
-      // A floating ball with a camera eye and a radar dish (and, rarely, one wheel).
-      id: "orbe", family: "bots", label: "orbe", bodies: "orb",
-      fixed: { eyes: "lens", top: "dish", arms: { bot: 10, nubs: 8 } },
-      pools: { mouth: { "led-smile": 8, "led-bar": 6, grill: 4 }, legs: { p: 0.35, pick: { hover: 10, wheel: 1 } } },
-      color: BOT_COLORS,
-    },
-    {
-      // A boiler bot: a chimney that puffs, a lamp panel, treads.
-      id: "calderita", family: "bots", label: "calderita", bodies: { wide: 3, box: 1 },
-      fixed: { top: "chimney", pattern: ["panel"], legs: { treads: 10, feet: 5 }, arms: { bot: 6, nubs: 4 } },
-      pools: { eyes: { "led-dot": 8, "led-square": 6, button: 3 }, mouth: { grill: 8, "led-bar": 6, "led-smile": 4 } },
-      color: BOT_COLORS,
-    },
-    {
-      // The classic two-box robot with a big head.
-      id: "cabezon", family: "bots", label: "cabezón", bodies: "stack",
-      fixed: { top: { antenna: 10, coil: 8, beacon: 5, dials: 6 }, arms: { bot: 10, nubs: 6 }, legs: { treads: 6, feet: 6, springs: 4, wheels: 4 } },
-      pools: { eyes: { "led-dot": 10, "led-pill": 8, "led-square": 8, visor: 4, "led-heart": 1 }, mouth: { "led-bar": 10, "led-smile": 8, grill: 6 }, pattern: { p: 0.7, pick: { panel: 10, rivets: 5 } } },
-      color: BOT_COLORS,
-    },
-    {
-      // A dome-headed rover: a beacon on top, wheels or treads below.
-      id: "cupula", family: "bots", label: "cúpula", bodies: "domehead",
-      fixed: { top: { beacon: 10, dish: 5, propeller: 3 }, legs: { treads: 8, wheels: 8 }, arms: { bot: 8, nubs: 4 } },
-      pools: { eyes: { lens: 10, visor: 6, "led-dot": 6 }, mouth: { grill: 8, "led-bar": 6, "led-smile": 6 }, pattern: { p: 0.5, pick: { panel: 8, rivets: 6 } } },
-      color: BOT_COLORS,
-    },
-  ],
-
-  extend: [
-    // Every bot may blush and, now and then, carry a wind-up key (lent to other families through the cross roll too: pools a
-    // file adds to a family are its members' only, so the key is lent through `cross`).
-    { family: "bots", pools: { cheeks: { p: 0.2, pick: "blush" }, back: { p: 0.1, pick: "windup" } }, cross: { back: { windup: 10 } } },
-    {
-      // The core robot keeps its member, with plate-free LED faces, more heads, arms and wheels. Its old screen face (`led`
-      // eyes and mouth: the plate) is legacy: the core member no longer names it and the parts weigh 0, so no v4 seed
-      // reaches it; `v3:` seeds keep it through their own prefix. The faces are pools (always filled: required slots),
-      // so the rare roll may light up LED hearts.
-      family: "bots", member: "robot",
-      fixed: {
-        top: { coil: 6, beacon: 4, dials: 4, "rabbit-ears": 3, bolt: 3 },
-        arms: { bot: 8 },
-        legs: { wheels: 5, treads: 4, springs: 3 },
-      },
-      pools: {
-        eyes: { "led-dot": 46, "led-pill": 38, "led-square": 34, visor: 18, lens: 14, "led-heart": 1 },
-        mouth: { "led-bar": 40, "led-smile": 34, grill: 26 },
-        pattern: { p: 0.5, pick: { rivets: 10, panel: 8 } },
-      },
-    },
-  ],
-
   css: `
     /* asleep = idle without a pastime (the mascots', the frozen figures') or the nap: the quiet pose and the pastimes stay awake */
     /* LED faces: one expression per mood (normal, busy while working, happy while waiting), dimmed when powered down */
@@ -793,19 +705,4 @@ export default batch({
     &[data-mood=working] .pg-b13-key { animation: bx-spin 1.2s linear infinite }
     &[data-mood=waiting] .pg-b13-key { animation: bx-tick 1.3s cubic-bezier(.3,1.6,.5,1) infinite }
   `,
-
-  // Ten "robotitos" for the examples row: every robot body, the heads (antenna, V antenna, rotor, dish, nut, chimney,
-  // spring, beacon), treads, wheels, springs and a jet, and every LED face. One seed each, picked for a varied palette.
-  showcase: [
-    "bicho:bots/cabezon:tic?top=antenna&eyes=led-dot&mouth=led-smile&legs=treads&pattern=panel&arms=bot",
-    "bicho:bots/tele:chispa?eyes=led-square&mouth=grill&arms=none",
-    "bicho:bots/dron:zum?eyes=visor&mouth=led-smile&arms=none",
-    "bicho:bots/orbe:coco?legs=hover&mouth=led-bar&arms=none",
-    "bicho:bots/latita:rayo?eyes=led-pill&mouth=led-bar&legs=springs&eyewear=none",
-    "bicho:bots/cupula:tuerca?top=beacon&eyes=lens&mouth=grill&legs=wheels&pattern=panel",
-    "bicho:bots/calderita:limon?eyes=led-square&mouth=grill&held=none",
-    "bicho:bots/robot:bop?eyes=led-pill&mouth=led-smile&legs=wheels&arms=bot",
-    "bicho:bots/cabezon:nube?top=coil&eyes=led-pill&mouth=led-bar&legs=springs&eyewear=none",
-    "bicho:bots/robot:pixel?eyes=led-heart&mouth=led-smile&top=beacon&legs=treads",
-  ],
 });

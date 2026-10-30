@@ -196,7 +196,6 @@ const CACTUS_ARM = "M37 71L27.2 71C26.2 71 25.6 70.4 25.6 69.4L25.6 61C25.6 57.4
 const ROOT = "M49.5 92C54 97.4 66 97.4 70.5 92C69.6 99.4 65 104.2 61.6 108.4C60.4 110 58.4 111.4 56.6 110.6C58.8 109.6 59.8 107.2 59 105C56 101.6 51.4 97.4 49.5 92Z";
 
 export default batch({
-  label: "B02 Brotes",
 
   parts: [
     /* ---------- the sprout ladder and its cousins (top, crown). Each stays within ~30 of its foot: the drop's crown
@@ -303,104 +302,5 @@ export default batch({
     /* ---------- patterns ---------- */
     { id: "prickles", slot: "pattern", label: "pinchitos", lod: 1, draw: prickles },
     { id: "ribs", slot: "pattern", label: "gajos", lod: 1, draw: ribs },
-  ],
-
-  families: [
-    {
-      id: "sprouts", label: "Brotes", weight: 10,
-      color: { hue: [80, 150], sat: [35, 60], light: [50, 66], spot: [190, 230] },
-      // Pools every member shares (and that other families can borrow): soft cheeks. Arms are each member's own (B14's
-      // arms rule: every member fixes them, leaf arms included), so the family no longer lends leaf arms. The daisy and the
-      // four-leaf clover are the family's rares (p 0: only the rare roll picks them, for a sprout whose top is not fixed).
-      pools: { cheeks: { p: 0.4, pick: { blush: 10, freckles: 6 } }, top: { p: 0, pick: { "sprout-flower": 1, "clover-four": 1 } } },
-      // Only for other families (the cross-family roll): the sprout ladder's common steps, as brotecito weighs them.
-      cross: { top: { sprout: 12, "sprout-single": 7, "sprout-seedling": 5, "sprout-vine": 4, "sprout-bud": 4 } },
-    },
-  ],
-
-  members: [
-    {
-      // The ladder: the existing sprout (common), a bud (uncommon), a daisy (rare), plus the other leafy shapes. It weighs
-      // 14 like the other existing templates: it wears the operator's favourite. Rares are listed so the rare roll
-      // (1 in 12) finds them; the normal fill never rolls a rare part, whatever its weight.
-      id: "brotecito", family: "sprouts", label: "brotecito", weight: 14, bodies: { round: 1, blob: 1 },
-      fixed: { arms: { leaf: 10, nubs: 4 }, legs: "feet" },
-      pools: {
-        top: { sprout: 12, "sprout-single": 7, "sprout-seedling": 5, "sprout-vine": 4, "sprout-bud": 4, "sprout-flower": 0 },
-        eyes: { two: 10, button: 8, sparkle: 6, sleepy: 3 },
-        mouth: { smile: 10, tongue: 5, cat: 5, tiny: 6 },
-        pattern: { p: 0.3, pick: "belly" },
-      },
-      color: [
-        { weight: 3, hue: [90, 165], sat: [38, 56], light: [54, 66], spot: [185, 215] },
-        { weight: 2, hue: [135, 160], sat: [38, 56], light: [54, 66], spot: 300 },
-        { weight: 2, hue: [22, 48], sat: [50, 66], light: [62, 72], spot: [75, 105] },
-        { weight: 1, hue: [328, 350], sat: [45, 60], light: [66, 74], spot: [120, 145] },
-      ],
-    },
-    {
-      id: "rabanito", family: "sprouts", label: "rabanito", bodies: "round",
-      fixed: { top: "leafy-tuft", legs: "root", arms: { nubs: 10, leaf: 8 } },
-      pools: { eyes: ["two", "button", "sparkle"], mouth: ["smile", "tongue", "cat"], cheeks: { p: 0.7, pick: "blush" }, pattern: { p: 0.5, pick: "belly" } },
-      color: [{ weight: 4, hue: [336, 354], sat: [55, 68], light: [56, 64], spot: [118, 138] }, { weight: 1, hue: [40, 55], sat: [18, 26], light: [86, 90], spot: [60, 85] }],
-    },
-    {
-      id: "setita", family: "sprouts", label: "setita", bodies: { pill: 4, tall: 1 },
-      fixed: { top: "cap-mushroom", legs: "feet", arms: "nubs" },
-      pools: { eyes: ["button", "two"], mouth: ["smile", "tiny", "cat"] },
-      color: [
-        { weight: 3, hue: [38, 50], sat: [28, 40], light: [80, 86], spot: 300 },
-        { weight: 1, hue: [30, 45], sat: [25, 35], light: [80, 86], spot: [165, 240] },
-        { weight: 1, hue: [330, 350], sat: [18, 26], light: [84, 88], spot: [65, 80] },
-      ],
-    },
-    {
-      id: "bellota", family: "sprouts", label: "bellota", bodies: { drop: 4, round: 1 },
-      fixed: { top: "cap-acorn", legs: "feet", arms: "nubs" },
-      pools: { eyes: { button: 10, two: 6, sleepy: 4 }, mouth: ["smile", "cat", "tiny"] },
-      color: { hue: [24, 36], sat: [42, 58], light: [50, 60], spot: [150, 200] },
-    },
-    {
-      id: "cactus", family: "sprouts", label: "cactus", bodies: { pill: 4, tall: 1 },
-      fixed: { arms: "cactus", top: "cactus-flower", pattern: ["prickles"], legs: "feet" },
-      pools: { eyes: { two: 10, button: 10, sleepy: 4 }, mouth: ["tiny", "smile"] },
-      color: { hue: [95, 150], sat: [35, 55], light: [45, 60], spot: [180, 220] },
-    },
-    {
-      id: "capullo", family: "sprouts", label: "capullo", bodies: "tall",
-      fixed: { top: "tulip", arms: "leaf", legs: "feet" },
-      pools: { eyes: ["sparkle", "two"], mouth: ["smile", "cat", "tiny"], cheeks: { p: 0.5, pick: "blush" } },
-      color: [{ weight: 3, hue: [85, 140], sat: [35, 55], light: [52, 64], spot: [195, 235] }, { weight: 1, hue: [100, 125], sat: [35, 55], light: [52, 64], spot: 300 }],
-    },
-    {
-      // Four leaves only from the rare roll, so the clover's top is a pool, not fixed.
-      id: "trebol", family: "sprouts", label: "trébol", bodies: "round",
-      fixed: { arms: { leaf: 10, nubs: 6 }, legs: "feet" },
-      pools: { top: { clover: 10, "clover-four": 0 }, eyes: { two: 10, button: 8, sparkle: 4 }, mouth: ["smile", "tongue"], cheeks: { p: 0.6, pick: { freckles: 10, blush: 4 } } },
-      color: { hue: [150, 176], sat: [36, 52], light: [56, 66], spot: 300 },
-    },
-    {
-      id: "calabacita", family: "sprouts", label: "calabacita", bodies: "wide",
-      fixed: { top: "stem-curl", pattern: ["ribs"], legs: "feet", arms: { leaf: 10, nubs: 6 } },
-      // A jack-o'-lantern: grin and saw (B04), fangs and a smile now and then.
-      pools: { eyes: { two: 10, button: 6, googly: 3 }, mouth: { grin: 10, saw: 10, fangs: 4, smile: 2 } },
-      color: { hue: [20, 34], sat: [72, 86], light: [55, 62], spot: [80, 100] },
-    },
-  ],
-
-  // The daisy is also the pond's rare (p 0: only the rare roll picks it, for a pond bicho whose top is free: a raindrop's
-  // sprout in bloom, a flower on a turtle's head).
-  extend: [{ family: "pond", pools: { top: { p: 0, pick: { "sprout-flower": 1 } } } }],
-
-  showcase: [
-    "bicho:sprouts/brotecito:a?top=sprout-single",
-    "bicho:sprouts/brotecito:b?top=sprout-bud",
-    "bicho:sprouts/brotecito:c?top=sprout-flower",
-    "bicho:sprouts/brotecito:d?top=sprout-seedling",
-    "bicho:sprouts/brotecito:e?top=sprout-vine",
-    "bicho:sprouts/trebol:f?top=clover-four",
-    "bicho:monsters/monster:g?top=sprout-bud",
-    "bicho:pond/frog:h?arms=leaf",
-    "bicho:monsters/monster:m?top=cap-mushroom",
   ],
 });

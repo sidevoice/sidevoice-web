@@ -2,7 +2,7 @@ import type { Size } from "./engine/core";
 import { idlesFor, type Idle } from "./engine/bichos/idle";
 import type { Spec } from "./engine/bichos/kit";
 import { renderSpec } from "./engine/bichos/render";
-import { specFromSeed } from "./engine/bichos/seed";
+import { specFromSeed } from "./engine/bichos/generate";
 import { normalizeSpec } from "./engine/bichos/spec";
 import { worksFor, type Work } from "./engine/bichos/work";
 import { renderMascot } from "./engine/styles/bichos";
@@ -33,7 +33,7 @@ export interface Drawing {
 }
 
 const specs = new Map<string, Spec>();
-/** The bicho a conversation's seed rolls (the engine's v4 roller). */
+/** The bicho a conversation's seed rolls (the engine's generator: archetype, body, parts, palette). */
 export function bichoSpec(seed: string): Spec {
   let spec = specs.get(seed);
   if (!spec) specs.set(seed, (spec = specFromSeed(seed)));
@@ -42,7 +42,7 @@ export function bichoSpec(seed: string): Spec {
 
 const people = new Map<string, Spec>();
 /** The person's bicho: the old person avatar redrawn in the cast's style — a round body, two eyes, a smile and a
- *  beanie, in the blue no agent's old avatar wore. Pinned as a spec, so the roller never moves it. */
+ *  beanie, in the blue no agent's old avatar wore. Pinned as a spec, so the generator never moves it. */
 export function personSpec(hold?: "microphone"): Spec {
   const key = hold ?? "";
   const known = people.get(key);

@@ -2,8 +2,7 @@ import { n, uid, type AvatarStyle, type Drawn, type Size } from "../core";
 import { flatten } from "../bichos/kit";
 import { profileOf, props, renderSpec, spotsOf } from "../bichos/render";
 import { IDLE_CSS } from "../bichos/idle";
-import { BATCHES, CSS as PARTS_CSS } from "../bichos/registry";
-import { specFromSeed } from "../bichos/seed";
+import { CSS as PARTS_CSS } from "../bichos/registry";
 import { HARNESSES, mascot, type Harness } from "./mascots";
 
 /* What every figure shares: the mascot frame and the CSS (moods, sizes, shared groups). A mascot is drawn only when
@@ -12,7 +11,7 @@ import { HARNESSES, mascot, type Harness } from "./mascots";
 
 export { renderSpec } from "../bichos/render";
 export { normalizeSpec } from "../bichos/spec";
-export { specFromSeed } from "../bichos/seed";
+export { specFromSeed } from "../bichos/generate";
 export type { Spec } from "../bichos/kit";
 
 /** A mascot's cues go beside its mark the way a bicho's go beside its silhouette: from the mark's hull (mascots.ts). */
@@ -179,7 +178,7 @@ const BASE_CSS = `
     &[data-mood=working] .pg-claw-r { animation: bx-claw-r .25s steps(2) infinite .12s }
 
     /* working styles (src/bichos/work.ts). The client sets data-work on the root when the bicho starts working and
-       swaps it for another every 20–30 s; a root without it (the mascots, the frozen v3:/monstruo: figures) keeps the
+       swaps it for another every 20–30 s; a root without it (the mascots) keeps the
        crank above, untouched. Each style keys its own keyframes for the shared groups (squash, arms, .look, brows), so
        every part that joins them follows. On every change the body hops (bx-bounce), the old props pop out and the new
        ones pop in; the style's loops start after the hop (.5s). The cog pair keeps turning through every style: it's

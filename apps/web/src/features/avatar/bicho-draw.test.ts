@@ -2,8 +2,10 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { expect, test } from "vitest";
 import { avatarFor, PERSON_AVATAR, SIDEVOICE_MASCOT } from "./avatar-spec";
-import { avatarColor, drawAvatar, engineSize, withOwnIds } from "./bicho-draw";
-import { BATCHES, FAMILIES, MEMBERS, PREFIXES } from "./engine/bichos/registry";
+import { avatarColor, bichoSpec, drawAvatar, engineSize, withOwnIds } from "./bicho-draw";
+import type { Spec } from "./engine/bichos/kit";
+import { renderSpec } from "./engine/bichos/render";
+import { normalizeSpec } from "./engine/bichos/spec";
 import { HARNESSES, mascot } from "./engine/styles/mascots";
 
 const ids = (html: string) => [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
@@ -23,7 +25,7 @@ test("every copy of a drawing has ids of its own, and refers only to its own", (
 test("a conversation's bicho is the same drawing on every device; its tone tints what is behind it", () => {
   const drawing = drawAvatar(avatarFor("7f3c2a91-thread"), "stage");
   expect(drawing.html.startsWith("<svg viewBox=\"0 0 120 120\"")).toBe(true);
-  expect(drawing.html).toContain('data-kind="round"');
+  expect(drawing.html).toContain(`data-kind="${bichoSpec("7f3c2a91-thread").body}"`);
   expect(drawing.tone).toBe(avatarColor(avatarFor("7f3c2a91-thread")));
   expect(drawing.tone).toMatch(/^#[0-9a-f]{6}$/);
   // A bicho with free hands can take any working style; a small one draws only each style's big cue.
@@ -36,8 +38,8 @@ test("a conversation's bicho is the same drawing on every device; its tone tints
 });
 
 /** Where in the drawing the body's gloss stroke and each arm's group start, from the figure's fills on. */
-function paintOrder(seed: string) {
-  const html = drawAvatar(avatarFor(seed), "stage").html;
+function paintOrder(spec: Spec) {
+  const html = renderSpec(spec, "stage").html;
   const fills = html.slice(html.indexOf('<g class="fills">'));
   return { gloss: fills.indexOf('class="shine"'), left: fills.indexOf('class="pg-arm-l"'), right: fills.indexOf('class="pg-arm-r"') };
 }
@@ -48,13 +50,13 @@ test("a robot's arm is painted over the body's gloss, so the highlight is never 
   const robots = [...["can", "tv", "orb", "stack", "domehead"].flatMap((body) => ["bot", "nubs"].map((arms) => [body, arms])),
     ...["box", "pill", "dome", "wide"].map((body) => [body, "bot"])];
   for (const [body, arms] of robots) {
-    const { gloss, left, right } = paintOrder(`bicho:bots/robot:t?body=${body}&arms=${arms}`);
+    const { gloss, left, right } = paintOrder(normalizeSpec({ body, parts: { eyes: "two", mouth: "smile", arms, legs: "stick" }, shape: "t", name: "robot" }));
     expect(gloss, `${body} ${arms}`).toBeGreaterThan(-1);
     expect(left, `${body} ${arms}`).toBeGreaterThan(gloss);
     expect(right, `${body} ${arms}`).toBeGreaterThan(gloss);
   }
   // Every other bicho keeps its gloss on top of its arms, as it always was.
-  const { gloss, left, right } = paintOrder("7f3c2a91-thread");
+  const { gloss, left, right } = paintOrder(normalizeSpec({ body: "round", parts: { eyes: "two", mouth: "smile", arms: "nubs", legs: "feet" }, shape: "t", name: "round" }));
   expect(left).toBeGreaterThan(-1);
   expect(gloss).toBeGreaterThan(Math.max(left, right));
 });
@@ -73,14 +75,14 @@ test("only the Sidevoice mascot ships, and only by name: a seed that spells a ha
   expect(sidevoice.html).toContain('data-kind="sidevoice"');
   expect(sidevoice.html).toContain("data-logo");
   expect(sidevoice.works).toEqual([]);
-  for (const seed of ["sidevoice", "claude", "clawd", "openclaw", "codex", "gemini", "copilot", "cursor", "cline", "ollama", "harness:claude", "Claude", "v3:a1", "monstruo:x"]) {
+  for (const seed of ["sidevoice", "claude", "clawd", "openclaw", "codex", "gemini", "copilot", "cursor", "cline", "ollama", "harness:claude", "Claude"]) {
     const drawing = drawAvatar(avatarFor(seed), "small");
     expect(drawing.html, seed).not.toContain("data-logo");
     expect(drawing.html, seed).not.toContain(`data-kind="${seed}"`);
   }
 });
 
-test("nothing of the lab's third-party mascots, its Beyond batch or its frozen rollers is in the app", () => {
+test("nothing of the lab's third-party mascots or its Beyond batch is in the app", () => {
   const engine = resolve(process.cwd(), "src/features/avatar/engine");
   const files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => entry.isDirectory() ? files(join(dir, entry.name)) : [join(dir, entry.name)]);
   const sources = files(engine).filter((file) => file.endsWith(".ts"));
@@ -93,8 +95,4 @@ test("nothing of the lab's third-party mascots, its Beyond batch or its frozen r
   }
   const stylesheet = readFileSync(resolve(process.cwd(), "src/styles/bichos.css"), "utf8");
   expect(stylesheet).not.toMatch(/\.pg-(?:rays|star|wheel)\b|\.pg-(?:gk|pi|oc|cl|cp|cu|km|ol|lm|ds|mi|qw|ws)-/);
-  expect(FAMILIES.map((family) => family.id)).not.toContain("beyond");
-  expect(MEMBERS.some((member) => member.family === "beyond" || /b16/.test(member.file))).toBe(false);
-  expect(BATCHES.some((batch) => /b16/.test(batch.file))).toBe(false);
-  expect([...PREFIXES.keys()]).toEqual([]);
 });

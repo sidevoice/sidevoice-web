@@ -10,7 +10,7 @@ export default batch({
     { id: "tail", label: "Cola", order: 36, none: "sin cola", layer: LAYER.tail, noise: 2 },
     // Also a gear slot for worn back pieces (the cape, the backpack): only parts tagged `gear` are gear, so the gear step
     // never hands out quills or a shell. It is tried 0.3 as often as the other gear slots (B14: a cape is loud).
-    { id: "back", label: "Espalda", order: 38, none: "nada", layer: LAYER.back, noise: 2, gear: "back", gearTag: "gear", gearWeight: 0.3 },
+    { id: "back", label: "Espalda", order: 38, none: "nada", layer: LAYER.back, noise: 2, gear: "back" },
   ],
   parts: [
     {
