@@ -44,6 +44,8 @@ export function RoomProvider({ children, store: suppliedStore, runtime = true }:
     controllerImport ??= import("../services/room-session-controller.js");
     // What could not load is said in words; what it said, behind Details.
     void controllerImport.catch((error: unknown) => {
+      // A page that is already gone (a test whose environment was torn down while the runtime was loading) has no one to tell.
+      if (typeof window === "undefined") return;
       window.sidevoiceUI?.setBootError(errorMessage(error, { generic: translator()("app.startFailed") }));
     });
   }, [store, runtime]);
