@@ -23,6 +23,21 @@ test("the same identity and decision replay; another decision or identity does n
   expect(take("a", "x")).not.toEqual(take("b", "x"));
 });
 
+test("rejection sampling: a bound that does not divide 2³² is drawn by the reference loop, and is not skewed toward the low end", () => {
+  const bound = 3 * 2 ** 30, limit = 2 ** 32 - (2 ** 32 % bound);
+  const stream = rng("reject", "check"), reference = rng("reject", "check");
+  let low = 0, rejected = 0;
+  for (let i = 0; i < 6000; i += 1) {
+    let x = reference.uint32();
+    while (x >= limit) { x = reference.uint32(); rejected += 1; }
+    const got = stream.below(bound);
+    expect(got).toBe(x % bound);
+    if (got < 2 ** 30) low += 1;
+  }
+  expect(rejected).toBeGreaterThan(500); // a quarter of the draws are over the limit
+  expect(Math.abs(low / 6000 - 1 / 3)).toBeLessThan(0.03); // a plain modulo would give one half
+});
+
 test("a bounded pick is uniform: rejection sampling, no modulo bias", () => {
   const r = rng("uniform", "check"), counts = new Array(6).fill(0);
   for (let i = 0; i < 60000; i += 1) counts[r.below(6)] += 1;

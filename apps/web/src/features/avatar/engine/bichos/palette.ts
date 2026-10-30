@@ -88,7 +88,7 @@ function lchToRgb({ L, C, h }: Lch): [number, number, number] {
   return [0.5, 0.5, 0.5];
 }
 
-const hex = (c: Lch) => "#" + lchToRgb(c).map((v) => Math.round(v * 255).toString(16).padStart(2, "0")).join("");
+const hexOf = (c: Lch) => "#" + lchToRgb(c).map((v) => Math.round(v * 255).toString(16).padStart(2, "0")).join("");
 const luminance = ([r, g, b]: number[]) => 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
 const INK_LUMINANCE = luminance(hslToRgb(...INK_HSL));
 const contrastOf = (rgb: number[]) => (luminance(rgb) + 0.05) / (INK_LUMINANCE + 0.05);
@@ -98,6 +98,8 @@ export const inkContrast = (h: number, s: number, l: number) => contrastOf(hslTo
 export const inkContrastLch = (c: Lch) => contrastOf(lchToRgb(c));
 /** The colour as painted, lightened in steps until it keeps the ink contrast (a little over the minimum, so rounding to 8 bits cannot take it under). */
 const legible = (c: Lch): Lch => { let x = rgbToLch(lchToRgb(c)); for (let i = 0; i < 40 && inkContrastLch(x) < MIN_CONTRAST + 0.05; i += 1) x = rgbToLch(lchToRgb({ ...x, L: x.L + 0.02 })); return x; };
+/** The hex a colour is painted as: every tint goes through here, so every role keeps the ink contrast (checked on the rounded value). */
+const hex = (c: Lch) => hexOf(legible(c));
 const deltaE = (a: Lch, b: Lch) => {
   const p = (c: Lch) => [c.L, c.C * Math.cos(rad(c.h)), c.C * Math.sin(rad(c.h))];
   const [x, y] = [p(a), p(b)];

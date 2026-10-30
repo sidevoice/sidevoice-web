@@ -254,12 +254,12 @@ export const ARCHETYPES: readonly ArchetypeDef[] = [
       },
       roca: {
         weight: 1, element: [{ weight: 2, hue: [20, 45], sat: [10, 22], light: [52, 62] }, { weight: 1, hue: [215, 260], sat: [8, 16], light: [54, 62] }], bodies: weights("wide:3 blob:2 box:1 pill:1 round:1 pear:1"),
-        top: slot(1, tier("rock-crown", "horns-nub spikes bone-horns", "horn-uni")), mouth: slot(1, tier("smile grin gap teeth", "stitch tusks saw")), arms: slot(1, tier("nubs", "claws noodle")),
+        top: slot(1, tier("rock-crown", "horns-nub spikes")), mouth: slot(1, tier("smile grin gap teeth", "stitch tusks saw")), arms: slot(1, tier("nubs", "claws noodle")),
         legs: slot(1, tier("feet", "boots many")), tail: slot(0.2, tier("dino", "ringed")), back: slot(0.15, tier("", "spines", "plates")), pattern: slot(0.9, tier("specks", "grooves facets spots")),
       },
       cristal: {
         weight: 1, element: [{ hue: { pick: [180, 200, 270, 290, 320] }, sat: [40, 58], light: [70, 80] }], bodies: weights("round:2 tri:2 pear:1 tall:1 drop:1"),
-        top: slot(1, tier("crystals", "star horn-uni spikes", "halo")), mouth: slot(1, tier("smile tiny grin")), arms: slot(1, tier("nubs", "mitts")),
+        top: slot(1, tier("crystals", "star spikes")), mouth: slot(1, tier("smile tiny grin")), arms: slot(1, tier("nubs", "mitts")),
         legs: slot(1, tier("feet", "boots")), tail: slot(0.2, tier("", "spiral")), pattern: slot(0.9, tier("facets", "specks frost")),
       },
       aire: {
@@ -270,12 +270,12 @@ export const ARCHETYPES: readonly ArchetypeDef[] = [
       },
       chispa: {
         weight: 1, element: [{ weight: 3, hue: [48, 56], sat: [88, 96], light: [60, 66] }, { weight: 1, hue: [250, 275], sat: [45, 60], light: [54, 62] }], bodies: weights("round:2 blob:2 pear:1 drop:1 pill:1 tall:1"),
-        top: slot(1, tier("lightning", "bolt antennae-bent spikes", "star")), mouth: slot(1, tier("grin smile tongue", "fangs tiny")), arms: slot(1, tier("nubs", "noodle")),
+        top: slot(1, tier("lightning", "bolt spikes")), mouth: slot(1, tier("grin smile tongue", "fangs tiny")), arms: slot(1, tier("nubs", "noodle")),
         legs: slot(1, tier("feet", "cloud-base wisp@round|drop|dome")), tail: slot(0.6, tier("bolt-tail", "ember-tail")), pattern: slot(0.1, tier("specks")),
       },
       hielo: {
         weight: 1, element: [{ hue: [190, 215], sat: [40, 60], light: [76, 84] }], bodies: weights("round:3 drop:2 tall:1 pear:1 tri:1"),
-        top: slot(1, tier("ice-shards", "crystals cloud-puffs tuft", "halo")), mouth: slot(1, tier("smile tiny", "tongue grin")), arms: slot(1, tier("nubs", "mitts")),
+        top: slot(1, tier("ice-shards", "crystals cloud-puffs tuft")), mouth: slot(1, tier("smile tiny", "tongue grin")), arms: slot(1, tier("nubs", "mitts")),
         legs: slot(1, tier("feet", "boots")), tail: slot(0.25, tier("puff", "curl")), pattern: slot(0.9, tier("frost", "specks facets")),
       },
       hoja: {
@@ -285,17 +285,17 @@ export const ARCHETYPES: readonly ArchetypeDef[] = [
       },
       magma: {
         weight: 1, element: [{ hue: [0, 25], sat: [14, 30], light: [44, 52] }], bodies: weights("blob:2 round:2 wide:1 pear:1 pill:1"),
-        top: slot(1, tier("crater", "horns-nub spikes horns", "bone-horns")), mouth: slot(1, tier("grin fangs smile saw", "teeth gap")), arms: slot(1, tier("nubs", "claws")),
+        top: slot(1, tier("crater", "horns-nub spikes")), mouth: slot(1, tier("grin fangs smile saw", "teeth gap")), arms: slot(1, tier("nubs", "claws")),
         legs: slot(1, tier("feet", "boots")), tail: slot(0.3, tier("devil", "dragon ember-tail")), back: slot(0.15, tier("", "spines")), pattern: slot(1, tier("lava-cracks", "specks")),
       },
       estrella: {
         weight: 1, element: [{ hue: [42, 52], sat: [80, 92], light: [64, 72] }], bodies: weights("round:3 drop:1 tri:1 pear:1"),
-        top: slot(1, tier("star", "antennae-bobble", "halo")), mouth: slot(1, tier("smile grin tiny", "tongue")), arms: slot(1, tier("nubs", "wing")),
+        top: slot(1, tier("star", "spikes", "halo")), mouth: slot(1, tier("smile grin tiny", "tongue")), arms: slot(1, tier("nubs", "wing")),
         legs: slot(1, tier("feet", "cloud-base")), tail: slot(0.35, tier("glow", "bolt-tail")), pattern: none, marks: slot(0.3, tier("forehead-star")),
       },
       hollin: {
         weight: 0.8, element: [{ hue: [240, 290], sat: [6, 14], light: [56, 64] }], bodies: weights("round:3 blob:1 pear:1"),
-        top: slot(0.4, tier("", "tuft antennae-bobble spikes")), mouth: slot(1, tier("smile tiny wavy")), arms: slot(1, tier("nubs", "noodle paws")), legs: slot(1, tier("feet", "stick")), tail: slot(0.25, tier("puff")),
+        top: slot(0.4, tier("", "tuft spikes")), mouth: slot(1, tier("smile tiny wavy")), arms: slot(1, tier("nubs", "noodle paws")), legs: slot(1, tier("feet", "stick")), tail: slot(0.25, tier("puff")),
         back: slot(1, tier("fuzz")), pattern: none,
       },
     },
@@ -335,6 +335,8 @@ export const POLICY = {
   monocleOnCyclops: 0.45,
   /** Accessories: none 30%, one 50%, two 20%. */
   accessories: [0.3, 0.5, 0.2],
+  /** The legendary gold palette: one in 200. */
+  shinyOdds: 1 / 200,
   /** Tries before a creature falls back to its archetype's safe core. */
   attempts: 8,
 } as const;

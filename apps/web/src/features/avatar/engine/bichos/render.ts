@@ -187,7 +187,7 @@ export function renderSpec(spec: Spec, size: Size): Drawn {
   const rig = rigOf(body, rng(spec.shape, "shape"));
   const parts = drawable(spec);
   /** A piece's paint, repainted from the spec's tints when its slot has some for that role. */
-  const tinted = (slot: string, c: Paint): Paint => ((c === "body" || c === "belly" || c === "dark") && spec.tints?.[`${slot}-${c}`] ? `var(--bx-t-${slot}-${c})` : c);
+  const tinted = (slot: string, c: Paint): Paint => ((c === "body" || c === "belly" || c === "dark") && !spec.shiny && spec.tints?.[`${slot}-${c}`] ? `var(--bx-t-${slot}-${c})` : c);
   const gradients = new Map<string, string>();
   /** The cast's shade for a paint (a role, "#rrggbb" or any CSS colour): one gradient per paint per bicho, shared by
    * its pieces and by `ctx.shade` (markup in `over`). */

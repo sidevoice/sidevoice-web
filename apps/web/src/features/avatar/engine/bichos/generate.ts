@@ -103,7 +103,7 @@ function accessorize(b: Build, r: Rng, eyes: Entry | undefined, ledFace: boolean
     if (slot === "eyewear") {
       if (tags.includes("many-eyes") || ledFace) pool = [];
       else if (oneEye) pool = pool.filter((e) => e.id === "monocle");
-      else pool = pool.filter((e) => (r.next() < POLICY.moustache ? e.id === "mustache" : (POLICY.glasses as readonly string[]).includes(e.id)));
+      else { const moustache = r.next() < POLICY.moustache; pool = pool.filter((e) => (moustache ? e.id === "mustache" : (POLICY.glasses as readonly string[]).includes(e.id))); }
     }
     pool = pool.filter((e) => e.rarity !== "rare" || e.weight !== undefined || r.next() < POLICY.rareAccessory);
     if (tryPick(b, r, pool.map((e) => ({ e, w: popularity(e) })))) added += 1;
@@ -161,7 +161,8 @@ function attempt(identity: string, kind: Kind, n: number): Spec & { family: stri
 
   const has = (slot: string) => !!b.parts[slot];
   const palette = rollPalette(stream("palette"), stream("roles"), { families: kind.families, element: kind.element, present: { arms: has("arms"), legs: has("legs"), tail: has("tail"), back: has("back"), top: has("top") } });
-  return { body, parts: b.parts, color: palette.color, shape: identity, name: kind.id, tints: palette.tints, family: palette.family, scheme: palette.scheme };
+  const shiny = rng(identity, n ? `shiny#${n}` : "shiny").chance(POLICY.shinyOdds);
+  return { body, parts: b.parts, color: palette.color, shape: identity, name: kind.id, tints: palette.tints, ...(shiny ? { shiny: true } : {}), family: palette.family, scheme: palette.scheme };
 }
 
 /** Why a creature is not valid (empty: it is). The sampler checks every roll with it; tests check the sampler with it. */

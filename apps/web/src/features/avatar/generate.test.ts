@@ -175,11 +175,17 @@ describe("distribution", () => {
     for (const r of rolls()) {
       schemes.set(r.scheme, (schemes.get(r.scheme) ?? 0) + 1);
       const t = r.spec.tints ?? {};
-      for (const [k, v] of Object.entries(t)) if (/-body$|^spot$/.test(k) && k !== "spot" && inkHex(v) < 3.5) dim.push(`${k} ${v}`);
+      for (const [k, v] of Object.entries(t)) if (inkHex(v) < 3.5) dim.push(`${k} ${v}`);
       if (r.spec.parts.arms && r.spec.parts.legs && t["arms-body"] !== t["legs-body"]) dim.push(`arms ${t["arms-body"]} legs ${t["legs-body"]}`);
     }
     expect(dim.slice(0, 5)).toEqual([]);
     for (const [scheme, w] of [["analogous", 34], ["complementary", 24], ["split", 14], ["triadic", 6], ["tonal", 22]] as const) expect(Math.abs(share(schemes.get(scheme) ?? 0) * 100 - w)).toBeLessThan(2.5);
+  });
+
+  test("one creature in about 200 is shiny (the gold palette)", () => {
+    const shiny = rolls().filter((r) => r.spec.shiny).length / ONE;
+    expect(shiny).toBeGreaterThan(0.002);
+    expect(shiny).toBeLessThan(0.009);
   });
 
   test("elementals: each sub-type has many bodies, crests, tails, arms and legs, not one look", { timeout: 60_000 }, () => {
