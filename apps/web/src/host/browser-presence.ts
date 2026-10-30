@@ -94,14 +94,19 @@ let awake: ScreenAwake | null = null;
 export function browserScreenAwake(): ScreenAwake {
   if (awake) return awake;
   let held: WakeLockSentinel | null = null;
+  // Which asking a request belongs to: every release ends one. A request that is granted after the asking it belongs to has
+  // ended lets its own lock go, and never takes the place of the lock a later asking holds.
+  let generation = 0;
   const listeners = new Set<() => void>();
   awake = {
     get supported() { return typeof navigator !== "undefined" && "wakeLock" in navigator; },
     async acquire() {
       if (!globalThis.navigator?.wakeLock?.request) return "unsupported";
+      const mine = generation;
       try {
         // Inside the gesture that started the call, when there is one: Safari grants the lock to the tap.
         const lock = await navigator.wakeLock.request("screen");
+        if (mine !== generation) { lock.release().catch(() => {}); return "held"; }
         held = lock;
         // The system takes the lock back on its own: a screen that locked once, a route change. Only the lock held now
         // is told of; one this host let go of itself is not.
@@ -114,6 +119,7 @@ export function browserScreenAwake(): ScreenAwake {
       } catch { return "failed"; }
     },
     release() {
+      ++generation;
       const lock = held;
       held = null;
       if (lock) lock.release().catch(() => {});

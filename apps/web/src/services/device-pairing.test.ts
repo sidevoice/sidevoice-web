@@ -1,10 +1,11 @@
 import { expect, test, vi } from "vitest";
 import {
   base64ToBytes, bytesToBase64url, machineAddress, candidateBases, decodePairingCode, deviceName, fingerprintOf, firstProven,
-  pairingSummary, proveIdentity, projectPairings, readPairingState, readPairings, redeemPairingCode, revokedPairing, secureBase, verifyIdentitySignature,
-  withPairing, withoutPairing, writePairings, NO_WEBCRYPTO, PAIRINGS_KEY, type Pairing,
+  pairingSummary, proveIdentity, projectPairings, redeemPairingCode, revokedPairing, secureBase, verifyIdentitySignature,
+  withPairing, withoutPairing, NO_WEBCRYPTO, type Pairing,
   listeningPort, privateHost, previewPairingCode, PAIRING_HTTP_PRIVATE, PAIRING_HTTP_ONLY, PAIRING_HTTP_BLOCKED,
 } from "./device-pairing.js";
+import { PAIRINGS_KEY, pagePairings } from "../host/browser-storage";
 
 // jsdom's window has no WebCrypto of its own; node's is what the tests run on, handed in where it is used.
 const subtle = globalThis.crypto.subtle;
@@ -360,7 +361,10 @@ test("a pair answer whose key is not the code's is not kept", async () => {
   await expect(redeemPairingCode(codeFor(payload(node)), { get, subtle, now: NOW })).rejects.toThrow(/no es la del código/);
 });
 
-// ----- the pairings this device keeps -----
+// ----- the pairing book: what is done to the machines this device is paired with -----
+// Kept, in a browser, by host/browser-storage.ts under the same key and in the same format.
+const pairingsIn = (storage: object | null) => pagePairings(() => storage as never);
+const readPairings = (storage: object | null) => projectPairings(pairingsIn(storage).readState(), null);
 const pairing = (fp: string, extra: Partial<Pairing> = {}): Pairing => ({ fp, public_key: "pk-" + fp, host: fp + "-host", urls: [],
   device_id: "d-" + fp, token: "t-" + fp, paired_at: 1, ...extra });
 
@@ -376,7 +380,7 @@ test("several pairings, all of them kept across reloads, newest first", () => {
   expect(book.list.find((p) => p.fp === "a")?.revoked).toBe(true);
   book = withPairing(book, pairing("a", { token: "t-new" }));
   expect(book.list.map((p) => [p.fp, p.token, !!p.revoked])).toEqual([["a", "t-new", false], ["b", "t-b", false]]);
-  writePairings(storage, book);
+  pairingsIn(storage).write(book);
   expect(readPairings(storage)).toEqual(book);
   // No machine is "the one in use": nothing of the kind is stored.
   expect(JSON.parse(saved[PAIRINGS_KEY])).not.toHaveProperty("in_use");
@@ -398,11 +402,11 @@ test("the local host is projected first and its proxy credential never reaches p
   };
   const storage = { getItem: (key: string) => saved[key] ?? null, setItem: (key: string, value: string) => { saved[key] = value; } };
   const local = pairing("local-fp", { local: true, host: "Mac", token: "session-secret", urls: ["http://127.0.0.1:40000"] });
-  const stored = readPairingState(storage);
+  const stored = pairingsIn(storage).readState();
   expect(stored.list.map((item) => item.fp)).toEqual(["remote-fp"]);
   const projected = projectPairings(stored, local);
   expect(projected.list.map((item) => item.fp)).toEqual(["local-fp", "remote-fp"]);
-  writePairings(storage, projected);
+  pairingsIn(storage).write(projected);
   const persisted = JSON.parse(saved[PAIRINGS_KEY]);
   expect(persisted.pairings.map((item: Pairing) => item.fp)).toEqual(["remote-fp"]);
   expect(JSON.stringify(persisted)).not.toContain("session-secret");
