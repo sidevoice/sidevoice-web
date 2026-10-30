@@ -11,7 +11,7 @@
  * tested alone. Only `export function|async function|const`: the controller's node tests inline this file. */
 import { patiently } from './rendezvous.js';
 import { clampDeviceName } from './device-name-rules.js';
-import { describeBrowser } from '../host/index.ts';
+import { describeBrowser, host, reachOfOrigin } from '../host/index.ts';
 export const PAIRING_CODE_PREFIX = 'SV1.';
 export const PAIRINGS_KEY = 'sidevoice.pairings';
 export const IDENTITY_PREFIX = 'sidevoice-node-identity:';
@@ -142,21 +142,22 @@ function plainAddress(written, address, code) {
 /** Plain http:// written to a private-network address is that address without encryption, asked for on purpose: no
  *  https attempt first, and reached only once the person agrees (`insecure`; until then PAIRING_HTTP_PRIVATE), never
  *  from a page served over https (PAIRING_HTTP_BLOCKED). Written to any other address, it is refused (ADDRESS_INSECURE). */
-export function machineAddress(text, { insecure = false, origin = '' } = {}) {
+export function machineAddress(text, { insecure = false, origin = '', reach } = {}) {
     const raw = String(text ?? '').trim();
     if (!raw) return null;
     const base = httpUrl(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : 'https://' + raw);
     if (!base) throw pairingError(ADDRESS_INVALID);
     if (secureBase(base)) return base;
     if (!secureBase(base, '', { insecure: true })) throw pairingError(ADDRESS_INSECURE);
-    if (plainHttpBlocked(origin)) throw pairingError(PAIRING_HTTP_BLOCKED);
+    if (plainHttpBlocked(origin, reach)) throw pairingError(PAIRING_HTTP_BLOCKED);
     if (!insecure) throw pairingError(PAIRING_HTTP_PRIVATE);
     return base;
 }
 /** Whether this page may not ask another machine anything over plain http: served over https, it may not (mixed
  *  content). `origin` is the page's; the one it runs on when not given. */
-function plainHttpBlocked(origin) {
-    return /^https:/.test(origin || globalThis.location?.origin || '');
+function plainHttpBlocked(origin, reach) {
+    // What the host's transport reports; for a page judged against an origin it is given (a test, a relative base), that origin's.
+    return !(reach ?? (origin ? reachOfOrigin(origin) : host().reach)).plainHttpPrivate;
 }
 const PLAINTEXT = 'Este código solo lleva a la máquina por http sin cifrar, y el emparejamiento solo viaja por https (o dentro de este mismo equipo). Configura la máquina con una dirección https y pide un código nuevo.';
 
@@ -295,12 +296,12 @@ export async function firstProven(candidates, expected, deps = {}, started = new
 // ----- redeeming a code -----
 /** Pair this device with the node a code names, at the address the person typed if any: find an address that proves it is that node, hand it the
  *  one-time secret there and nowhere else, and keep the token only if the key it returns is the code's. */
-export async function redeemPairingCode(code, { name = '', address = '', target = '', about = null, origin = '', get = globalThis.fetch, subtle, now = Date.now(), insecure = false } = {}) {
+export async function redeemPairingCode(code, { name = '', address = '', target = '', about = null, origin = '', reach, get = globalThis.fetch, subtle, now = Date.now(), insecure = false } = {}) {
     // The address the person typed comes first, and is kept with the pairing: it is where they know the machine is.
     // It is trusted no more than the code's own: the machine there proves it is the code's before the secret goes.
     // Agreed to (`insecure`), a private address is reached over plain http instead, and the pairing says so for good.
     // Written with http:// to a private address, it is that already (machineAddress).
-    const written = machineAddress(address, { insecure, origin });
+    const written = machineAddress(address, { insecure, origin, reach });
     const plain = insecure && written && privateHost(new URL(written).hostname) ? plainAddress(written, address, code) : null;
     const typed = plain ?? written;
     const decoded = decodePairingCode(code, now, { address: typed });
@@ -311,7 +312,7 @@ export async function redeemPairingCode(code, { name = '', address = '', target 
     if (!place && written && !plain) {
         const privateAddress = privateHost(new URL(written).hostname);
         // Over https, this page may not ask over plain http at all (mixed content): say what would work.
-        if (privateAddress && plainHttpBlocked(origin)) throw pairingError(PAIRING_HTTP_BLOCKED);
+        if (privateAddress && plainHttpBlocked(origin, reach)) throw pairingError(PAIRING_HTTP_BLOCKED);
         if (await answersPlainHttp(written, plainAddress(written, address, code), get)) throw pairingError(privateAddress ? PAIRING_HTTP_PRIVATE : PAIRING_HTTP_ONLY);
     }
     if (!place) throw pairingError('No se pudo llegar a ' + called + ' por ningún camino. Comprueba que está encendida y vuelve a intentarlo.', 'unreachable');

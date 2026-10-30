@@ -67,6 +67,12 @@ export interface ScreenAwake {
 }
 
 /** The lock screen and the screen's lock, three separate responsibilities. */
+/** What the host's transport can do, and only that. */
+export interface ReachTransport {
+  /** Whether this host can send plain http to a private address at all. A page served over https cannot (mixed content). */
+  readonly plainHttpPrivate: boolean;
+}
+
 export interface HostPresence {
   /** Who owns the lock screen's media: `app` when the app answers the headset and shows Now Playing itself (macOS), so the
    *  page makes no media element and registers no Media Session. */
@@ -301,6 +307,7 @@ export interface Host {
   voice: AppVoice | null;
   presence: HostPresence;
   storage: HostStorage | null;
+  reach: ReachTransport;
   localHost: LocalHostBridge | null;
   reset: ResetBridge | null;
   muteShortcut: MuteShortcutBridge | null;

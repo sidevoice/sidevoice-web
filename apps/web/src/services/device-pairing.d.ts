@@ -69,8 +69,9 @@ export const PAIRING_HTTP_ONLY: "pairing-http-only";
 export const PAIRING_HTTP_PRIVATE: "pairing-http-private";
 export const PAIRING_HTTP_BLOCKED: "pairing-http-blocked";
 /** A typed address as a base (device-pairing.js): https unless it says otherwise; http:// to a private-network address
- *  only once agreed to (`insecure`), and never from a page served over https (`origin`, the page's by default). */
-export function machineAddress(text: string, options?: { insecure?: boolean; origin?: string }): string | null;
+ *  only once agreed to (`insecure`), and never from a host whose transport cannot send plain http (`reach`; the host's by
+ *  default, or the page's `origin` judged as a browser does). */
+export function machineAddress(text: string, options?: { insecure?: boolean; origin?: string; reach?: { plainHttpPrivate: boolean } }): string | null;
 export function decodePairingCode(code: string, now?: number, options?: { address?: string | null }): PairingCodePayload;
 /** What a code says as it is pasted (device-pairing.js): whose, until when, whether another device can tell where its
  *  machine is, and its private-network addresses over plain http as host:port. */
@@ -91,7 +92,7 @@ export function candidateBases(pairing: { fp: string; urls: string[]; insecure?:
   context?: { target?: string; about?: TargetAbout | null; origin?: string }): CandidateBase[];
 export function firstProven(candidates: CandidateBase[], expected: { fp: string; public_key?: string | null }, deps?: IdentityDeps,
   started?: Map<string, Promise<unknown>>): Promise<(CandidateBase & { publicKey: string }) | null>;
-export function redeemPairingCode(code: string, options?: { name?: string; address?: string; target?: string; about?: TargetAbout | null; origin?: string;
+export function redeemPairingCode(code: string, options?: { name?: string; address?: string; target?: string; about?: TargetAbout | null; origin?: string; reach?: { plainHttpPrivate: boolean };
   get?: typeof fetch; subtle?: SubtleCrypto; now?: number ; insecure?: boolean }): Promise<{ pairing: Pairing; base: CandidateBase & { publicKey: string } }>;
 export function deviceName(nav?: { userAgent?: string; platform?: string; userAgentData?: { platform?: string } }): string;
 export function readPairings(storage: Pick<Storage, "getItem"> | null | undefined): Pairings;

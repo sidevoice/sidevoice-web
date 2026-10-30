@@ -1,6 +1,7 @@
 import type { Host } from "./types";
 import { pageMicrophone as microphoneOfPage } from "./browser-microphone";
 import { browserRemote, browserScreenAwake } from "./browser-presence";
+import { browserReach, reachOfOrigin as reachOfPage } from "./browser-reach";
 import { parseBrowser } from "./identity";
 import { nativeCardSeam, nativeHost } from "./native";
 
@@ -13,6 +14,9 @@ export const describeBrowser = parseBrowser;
 /** The browser's side of the microphone: the mechanisms only, for `MicrophoneAccess` to build the states a person sees on. */
 export const pageMicrophone = microphoneOfPage;
 
+/** The transport of a page served from an origin: what a pairing judged against that origin may do. */
+export const reachOfOrigin = reachOfPage;
+
 /** The page's host, as it is now: an app may inject its members after the page's script runs, so this is read where it is
  *  needed and not kept. The one way into anything the browser or an app offers beyond the page itself. */
 export function host(): Host {
@@ -21,6 +25,7 @@ export function host(): Host {
   return {
     ...app,
     identity: { ...app.identity, get os() { return parseBrowser().os; } },
+    reach: browserReach(),
     presence: {
       media: app.presence.media,
       get remote() { return app.presence.media === "page" ? browserRemote() : null; },

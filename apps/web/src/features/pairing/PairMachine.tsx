@@ -6,6 +6,7 @@ import { Field } from "../../components/ui/Field";
 import { CheckIcon, ChevronIcon } from "../../components/ui/Icons";
 import { InfoTip } from "../../components/ui/InfoTip";
 import { Input, Textarea } from "../../components/ui/Input";
+import { host as hostOfPage } from "../../host";
 import { currentDeviceName } from "../../state/device-name";
 import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 import { errorMessage, failureParts, type ErrorMessage } from "../settings/error-message";
@@ -198,7 +199,7 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
     if (typed) {
       // http:// to a private-network address goes straight to agreeing to no encryption, with no https attempt; to any
       // other, it is refused under the field (machineAddress).
-      try { machineAddress(typed); } catch (reason) { refuse(failure(reason, t), host, typed); return; }
+      try { machineAddress(typed, { reach: hostOfPage().reach }); } catch (reason) { refuse(failure(reason, t), host, typed); return; }
     }
     await redeem(seen, typed, false);
   }
