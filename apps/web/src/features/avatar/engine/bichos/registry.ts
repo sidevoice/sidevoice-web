@@ -1,6 +1,6 @@
-import { ANCHORS, EMITTED, type Batch, type BodyDef, type Extension, type FamilyDef, type MemberDef, type PartDef, type Pool, type SlotDef, type SpecInput, type Weighted } from "./kit";
+import { ANCHORS, EMITTED, type Batch, type BodyDef, type PartDef, type SlotDef } from "./kit";
 
-/* Every file in src/parts/ is found here, so a designer adds bodies, parts, families and members by adding a file and
+/* Every file in src/parts/ is found here, so a designer adds bodies and parts by adding a file and
  * never edits a shared one. Files load core-* first, then the rest in name order (b01-…, b02-…). Problems are logged
  * (console.error for what is skipped, console.warn for references to parts that may come from a later batch). */
 
@@ -10,24 +10,9 @@ const paths = Object.keys(files).sort((a, b) => rank(a) - rank(b) || a.localeCom
 const fileName = (path: string) => path.replace(/^.*\//, "").replace(/\.ts$/, "");
 
 export interface Entry extends PartDef { key: string; file: string; seq: number }
-/** Pools other files add (`extend`), per slot, in file order. */
-export type Added = Record<string, (Pool | Weighted)[]>;
-export interface Member extends MemberDef {
-  file: string;
-  /** Pools added by other files: they add to `pools`. */
-  added?: Added;
-  /** Options added by other files to a fixed single slot, by weight. */
-  addedFixed?: Record<string, Record<string, number>>;
-}
-export interface Family extends FamilyDef { file: string; added?: Added; addedCross?: Added }
-export interface BatchInfo { file: string; label: string; members: Member[]; showcase: string[] }
 
 export const SLOTS: SlotDef[] = [];
 export const BODIES: BodyDef[] = [];
-export const FAMILIES: Family[] = [];
-export const MEMBERS: Member[] = [];
-export const BATCHES: BatchInfo[] = [];
-export const PREFIXES = new Map<string, (rest: string) => SpecInput>();
 const slotMap = new Map<string, SlotDef>();
 const bodyMap = new Map<string, BodyDef>();
 const partMap = new Map<string, Entry>();
@@ -35,7 +20,6 @@ const bySlot = new Map<string, Entry[]>();
 let css = "";
 
 const pending: { file: string; part: PartDef }[] = [];
-const extensions: { file: string; ext: Extension }[] = [];
 for (const path of paths) {
   const file = fileName(path), b = files[path].default;
   if (!b) { console.error(`[bichos] ${file}: no default export (use \`export default batch({...})\`)`); continue; }
@@ -49,23 +33,7 @@ for (const path of paths) {
     else { bodyMap.set(body.id, body); BODIES.push(body); }
   }
   for (const part of b.parts ?? []) pending.push({ file, part });
-  for (const f of b.families ?? []) {
-    if (FAMILIES.some((x) => x.id === f.id)) console.error(`[bichos] ${file}: family "${f.id}" already exists`);
-    else FAMILIES.push({ ...f, file });
-  }
-  const members: Member[] = [];
-  for (const m of b.members ?? []) {
-    if (MEMBERS.some((x) => x.family === m.family && x.id === m.id)) { console.error(`[bichos] ${file}: member "${m.family}/${m.id}" already exists`); continue; }
-    members.push({ ...m, file });
-  }
-  MEMBERS.push(...members);
-  for (const [name, fn] of Object.entries(b.prefixes ?? {})) {
-    if (PREFIXES.has(name.toLowerCase()) || name.toLowerCase() === "bicho") console.error(`[bichos] ${file}: seed prefix "${name}" already exists`);
-    else PREFIXES.set(name.toLowerCase(), fn);
-  }
-  for (const ext of b.extend ?? []) extensions.push({ file, ext });
   if (b.css) css += `\n/* ${file} */\n${b.css}`;
-  if (members.length || b.showcase?.length) BATCHES.push({ file, label: b.label ?? file, members, showcase: b.showcase ?? [] });
 }
 SLOTS.sort((a, b) => a.order - b.order);
 
@@ -96,35 +64,6 @@ const checkRef = (where: string, ref: string) => {
 };
 for (const e of partMap.values()) for (const ref of [...(e.requires ?? []), ...(e.excludes ?? []), ...(e.hides ?? [])]) checkRef(`${e.file} ${e.key}`, ref);
 for (const b of BODIES) for (const ref of [...(b.requires ?? []), ...(b.excludes ?? []), ...(b.hides ?? [])]) checkRef(`body ${b.id}`, ref);
-for (const m of MEMBERS) {
-  if (!FAMILIES.some((f) => f.id === m.family)) console.error(`[bichos] ${m.file}: member "${m.id}" names unknown family "${m.family}"`);
-  for (const slot of [...Object.keys(m.fixed ?? {}), ...Object.keys(m.pools ?? {})]) if (!slotMap.has(slot)) console.error(`[bichos] ${m.file}: member "${m.id}" uses unknown slot "${slot}"`);
-}
-
-// Extensions, once every file is in: a batch adds options to a family or a member declared elsewhere (B06's patch on
-// the core cat, B08's wings lent by the birds family). The base definitions are left as they were written.
-const addTo = (to: Added, from: Record<string, Pool | Weighted> | undefined) => { for (const [slot, p] of Object.entries(from ?? {})) (to[slot] ??= []).push(p); };
-for (const { file, ext } of extensions) {
-  const where = `${file}: extend ${ext.family}${ext.member ? `/${ext.member}` : ""}`;
-  const fam = FAMILIES.find((f) => f.id === ext.family);
-  if (!fam) { console.error(`[bichos] ${where}: unknown family`); continue; }
-  for (const slot of [...Object.keys(ext.fixed ?? {}), ...Object.keys(ext.pools ?? {}), ...Object.keys(ext.cross ?? {})]) if (!slotMap.has(slot)) console.error(`[bichos] ${where}: unknown slot "${slot}"`);
-  if (!ext.member) {
-    if (ext.fixed) console.error(`[bichos] ${where}: \`fixed\` needs a member`);
-    addTo((fam.added ??= {}), ext.pools);
-    addTo((fam.addedCross ??= {}), ext.cross);
-    continue;
-  }
-  const m = MEMBERS.find((x) => x.family === ext.family && x.id === ext.member);
-  if (!m) { console.error(`[bichos] ${where}: unknown member`); continue; }
-  if (ext.cross) console.error(`[bichos] ${where}: \`cross\` is for families`);
-  addTo((m.added ??= {}), ext.pools);
-  for (const [slot, opts] of Object.entries(ext.fixed ?? {})) {
-    const base = m.fixed?.[slot];
-    if (slotMap.get(slot)?.multi || !base || Array.isArray(base)) { console.error(`[bichos] ${where}: fixed "${slot}" must be a single slot the member fixes`); continue; }
-    m.addedFixed = { ...m.addedFixed, [slot]: { ...m.addedFixed?.[slot], ...opts } };
-  }
-}
 
 export const CSS = css;
 export const slotOf = (id: string) => slotMap.get(id);

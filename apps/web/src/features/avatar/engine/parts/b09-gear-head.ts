@@ -615,7 +615,6 @@ function mustache(ctx: Ctx): Drawing {
 const CLIP_EXCLUDES = ["#stalks", "#blocks-clips", "top:bone-clip"];
 
 export default batch({
-  label: "B09 Accesorios I: cabeza y cara",
 
   parts: [
     /* ---------- headgear: hats ---------- */
@@ -652,31 +651,6 @@ export default batch({
     { id: "star-glasses", slot: "eyewear", label: "gafas de estrella", rarity: "rare", weight: 0.25, rides: "eyes", excludes: ["#many-eyes"], draw: starGlasses },
     // Every beak carries `beak`, the core one too (B08 also excludes the mustache from its side).
     { id: "mustache", slot: "eyewear", label: "bigote", excludes: ["#beak"], draw: mustache },
-  ],
-
-  showcase: [
-    "bicho:monsters/monster:b09-fiesta?headgear=party-hat&eyes=two",
-    "bicho:furry/cat:b09-chistera?headgear=tophat&eyewear=monocle",
-    "bicho:furry/fox:b09-boina?headgear=beret&eyewear=mustache",
-    "bicho:furry/bear:b09-chef?headgear=chef-hat&eyewear=mustache",
-    "bicho:bots/robot:b09-obra?headgear=hardhat&earwear=none",
-    "bicho:pond/frog:b09-pescador?headgear=bucket",
-    "bicho:furry/cat:b09-xx-morado?headgear=xx-bucket-purple",
-    "bicho:monsters/monster:b09-xx-lima?headgear=xx-bucket-lime&eyes=two",
-    "bicho:furry/bear:b09-xx-naranja?headgear=xx-bucket-orange",
-    "bicho:furry/bunny:b09-paja?headgear=straw",
-    "bicho:monsters/monster:b09-hoja?headgear=leaf-hat&top=none&eyes=two",
-    "bicho:monsters/monster:b09-helice?headgear=propeller-cap&eyes=cyclops",
-    "bicho:furry/cat:b09-lazo?headgear=hairbow",
-    "bicho:furry/bear:b09-margarita?headgear=flower-clip",
-    "bicho:furry/fox:b09-orejeras?earwear=earmuffs&neckwear=scarf",
-    "bicho:monsters/monster:b09-sol?eyewear=sunglasses&eyes=three",
-    "bicho:furry/cat:b09-sol2?eyewear=sunglasses",
-    "bicho:monsters/monster:b09-aviador?eyewear=goggles&eyes=two&headgear=none",
-    "bicho:monsters/monster:b09-estrellas?eyewear=star-glasses&eyes=two",
-    // Two at once (the roller never puts two items above the eyes, but a face item may join a head item).
-    "bicho:furry/bunny:b09-invierno?earwear=earmuffs&eyewear=sunglasses",
-    "bicho:monsters/monster:b09-piloto?headgear=propeller-cap&eyewear=goggles&eyes=two",
   ],
 
   css: `

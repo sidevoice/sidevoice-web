@@ -83,7 +83,7 @@ function feather(base: P, deg: number, len: number, w: number, bend = 0): string
 
 const BEAK = "#f2b13c", BEAK_DEEP = "#c98420", MOUTH = "#3a0f22", TONGUE = "#ff6f91";
 /** The hen's comb and wattles: the crown's gem red, a fixed colour already in the cast. The spot role can't reach a red
- * (the roller keeps it within 300° of the coat, at light 68: a pink at best). */
+ * (the palette keeps it within 300° of the coat, at light 68: a pink at best). */
 const COMB_RED = "#e5483a";
 const edge = (w: number) => `stroke="${INK}" stroke-width="${n(w)}" stroke-linejoin="round"`;
 const shape = (d: string, fill: string, w: number) => `<path fill="${fill}" ${edge(w)} d="${d}"/>`;
@@ -283,7 +283,6 @@ function paddle(x: number, y: number, s: number): string {
 const TAIL = { high: feather([80, 90], 12, 32, 5, 2.2), low: feather([81, 92], 58, 28, 4.8, 2), mid: feather([80.5, 91], 34, 34, 5.6, 2.4) };
 
 export default batch({
-  label: "B08 Plumíferos",
 
   parts: [
     /* ---------- beaks ---------- */
@@ -340,75 +339,5 @@ export default batch({
 
     /* ---------- pattern ---------- */
     { id: "tux", slot: "pattern", label: "frac", tags: ["clipped"], excludes: ["#clipped", "pattern:belly|fur-tips|moon-chest|ribcage"], draw: tux },
-  ],
-
-  members: [
-    {
-      id: "pollito", family: "birds", label: "pollito", bodies: { pear: 2, drop: 1 },
-      fixed: { top: "feather-curl", mouth: "beak-small", arms: "wing", legs: "bird" },
-      pools: { eyes: { button: 10, sparkle: 6, two: 6, sleepy: 3 }, cheeks: { p: 0.5, pick: "blush" } },
-      color: { hue: [46, 54], sat: [82, 92], light: [62, 70], spot: 180 },
-    },
-    {
-      id: "pinguino", family: "birds", label: "pingüino", bodies: "pear",
-      fixed: { pattern: ["tux"], arms: "flipper", mouth: "beak-small", legs: "bird" },
-      pools: { eyes: { two: 10, button: 8, sparkle: 6, googly: 3 }, cheeks: { p: 0.4, pick: "blush" }, neckwear: { p: 0.35, pick: "scarf" } },
-      color: [{ weight: 4, hue: [205, 235], sat: [20, 38], light: [26, 36], spot: 180 }, { weight: 1, hue: [198, 210], sat: [38, 48], light: [44, 50], spot: 180 }],
-    },
-    {
-      id: "patito", family: "birds", label: "patito", bodies: "wide",
-      fixed: { mouth: "bill", legs: "webbed", arms: "wing" },
-      pools: { eyes: { button: 10, two: 8, googly: 4, sleepy: 3 }, cheeks: { p: 0.35, pick: "blush" }, tail: { p: 0.3, pick: "feathers" }, headgear: { p: 0.2, pick: "bucket" } },
-      color: [{ weight: 4, hue: [48, 56], sat: [85, 95], light: [58, 66], spot: 180 }, { weight: 2, hue: 40, sat: 8, light: 90, spot: 180 }, { weight: 1, hue: [140, 160], sat: [40, 50], light: [44, 50], spot: 180 }],
-    },
-    {
-      // The beak is a pool (B14, queue item 28): the normal roll always takes the hooked beak (a rare part only comes from
-      // the rare roll), and the rare roll may swap in the toucan's. The noise budget never drops a required slot's pick.
-      id: "loro", family: "birds", label: "loro", bodies: "round",
-      fixed: { top: "crest", tail: "feathers", legs: "bird", arms: "wing" },
-      pools: { mouth: { "beak-hook": 10, "beak-big": 1 }, eyes: { two: 10, googly: 8, sparkle: 6, "wide-set": 4 }, cheeks: { p: 0.4, pick: { blush: 10, swirls: 4 } } },
-      color: { hue: { pick: [0, 8, 120, 135, 200, 215, 48] }, sat: [78, 88], light: [52, 60], spot: { pick: [60, 180, 210] } },
-    },
-    {
-      id: "gallinita", family: "birds", label: "gallinita", bodies: "pear",
-      fixed: { top: "comb", mouth: "beak-small", tail: "feathers", arms: "wing", legs: "bird" },
-      pools: { eyes: { button: 10, two: 6, lashes: 4, sleepy: 3 }, cheeks: { p: 0.3, pick: { blush: 10, freckles: 5 } } },
-      // White, golden and brown hens; the spot is the middle tail feather (pink, or teal on the brown one).
-      color: [
-        { weight: 2, hue: [52, 58], sat: [8, 14], light: [88, 92], spot: 300 },
-        { weight: 1, hue: [44, 50], sat: [55, 65], light: [62, 68], spot: 300 },
-        { weight: 1, hue: [20, 28], sat: [42, 52], light: [46, 54], spot: 190 },
-      ],
-    },
-    {
-      id: "tucan", family: "birds", label: "tucán", weight: 3, bodies: "round",
-      fixed: { mouth: "beak-big", pattern: ["tux"], arms: "wing", legs: "bird" },
-      pools: { eyes: { two: 10, sparkle: 6, button: 4 }, tail: { p: 0.4, pick: "feathers" } },
-      color: { hue: [215, 235], sat: [12, 22], light: [22, 30], spot: { pick: [148, 156, 164] } },
-    },
-  ],
-
-  // The birds lend their crests, curl and tail feathers to other families' bichos (the cross roll). They no longer lend
-  // wings for arms (B14): every bicho now has arms, so the arms slot is never open for the cross roll (only the jellyfish
-  // and the octopus, which have no use for wings). The owls may roll wings for arms (a fixed option: they always have arms).
-  extend: [
-    { family: "birds", cross: { top: { crest: 10, "feather-curl": 8 }, tail: "feathers" } },
-    { family: "birds", member: "owl", fixed: { arms: { wing: 8 } } },
-    { family: "birds", member: "mochuelo", fixed: { arms: { wing: 8 } } },
-  ],
-
-  // The birds' parts on other bichos (and two birds with gear), so the row shows them travelling.
-  showcase: [
-    "bicho:birds/owl:b08-buho?arms=wing&legs=bird",
-    "bicho:birds/pinguino:b08-bufanda?neckwear=scarf",
-    "bicho:birds/pollito:b08-gallito?top=comb&tail=feathers",
-    "bicho:monsters/monster:b08-cresta?top=crest",
-    "bicho:furry/bear:b08-pico?mouth=bill&nose=none",
-    "bicho:bots/robot:b08-frac?pattern=tux",
-    "bicho:furry/cat:b08-alas?arms=wing&tail=feathers",
-    "bicho:pond/frog:b08-aletas?arms=flipper&legs=webbed",
-    "bicho:monsters/monster:b08-loro?mouth=beak-hook",
-    "bicho:monsters/monster:b08-tucan?mouth=beak-big&body=round",
-    "bicho:birds/pollito:b08-micro?held=microphone",
   ],
 });

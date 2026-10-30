@@ -206,7 +206,6 @@ const muzzleAt = ({ rig }: Ctx) => rig.at.muzzle;
 const NOSE = { layer: LAYER.nose } as const;
 
 export default batch({
-  label: "B03 Caras I: ojos y narices",
   parts: [
     /* ---------- eyes ---------- */
     { id: "button", slot: "eyes", label: "botón", draw: button },
@@ -262,42 +261,6 @@ export default batch({
       ...NOSE, id: "bulb", slot: "nose", label: "narizota", noise: 1,
       draw: (ctx) => { const { x, y } = muzzleAt(ctx), cy = y - 2.6; return { pieces: [{ d: ellipse(x, cy, 5.6, 5), c: "spot", ink: "inner", stroke: 2.4 }, gloss(x - 2, cy - 1.9, 1.8, 1.2)] }; },
     },
-  ],
-
-  /* Where these eyes and noses roll beyond the members that name them (B14, queue item 6). Family pools merge into each
-   * member's (the member's own weights stay the main pick; a fixed slot is untouched); the core members, whose eyes and
-   * noses are fixed in core-species.ts, get weighted options beside them. `four` is a rare part: it only comes from the
-   * rare roll, for a monster or a bug whose eyes are not its signature. The bear keeps its beady eyes. */
-  extend: [
-    { family: "monsters", pools: { eyes: { four: 1 }, nose: { p: 0.15, pick: { bulb: 10, nostrils: 4 } } } },
-    { family: "monsters", member: "monster", pools: { eyes: { googly: 5, "wide-set": 5, sleepy: 3 } } },
-    { family: "monsters", member: "flotin", pools: { eyes: { googly: 5, "wide-set": 4, hollow: 3 } } },
-    { family: "pond", pools: { eyes: { sleepy: 3, googly: 3 }, nose: { p: 0.12, pick: { nostrils: 10, button: 4 } } } },
-    { family: "sea", pools: { eyes: { sleepy: 3, "wide-set": 3 } } },
-    { family: "bugs", pools: { eyes: { googly: 4, "wide-set": 3, four: 1 } } },
-    { family: "spirits", pools: { eyes: { sleepy: 4, hollow: 3 } } },
-    { family: "elementals", pools: { eyes: { sleepy: 3, googly: 3, "wide-set": 2 } } },
-    { family: "snacks", pools: { nose: { p: 0.1, pick: { heart: 10, button: 6 } } } },
-    { family: "sprouts", pools: { nose: { p: 0.1, pick: { button: 10, heart: 5 } } } },
-    { family: "furry", member: "cat", fixed: { eyes: { sparkle: 4, sleepy: 4 }, nose: { heart: 3 } } },
-    { family: "furry", member: "fox", pools: { eyes: { sleepy: 6, sparkle: 4 } } },
-    { family: "furry", member: "bunny", fixed: { eyes: { sparkle: 5, lashes: 3 }, nose: { heart: 4 } } },
-    { family: "furry", member: "bear", fixed: { nose: { button: 8 } } },
-    { family: "pond", member: "frog", fixed: { eyes: { button: 6 } } },
-  ],
-
-  showcase: [
-    "bicho:monsters/monster:b03-boton?eyes=button&nose=button&eyewear=none",
-    "bicho:furry/bunny:b03-brillo?eyes=sparkle&nose=heart&eyewear=none",
-    "bicho:furry/cat:b03-sueno?eyes=sleepy&eyewear=none",
-    "bicho:monsters/monster:b03-lejos?eyes=wide-set&nose=bulb&eyewear=none",
-    "bicho:monsters/monster:b03-loco?eyes=googly&nose=nostrils&eyewear=none",
-    "bicho:furry/fox:b03-pestanas?eyes=lashes&nose=button&eyewear=none",
-    "bicho:pond/frog:b03-hueco?eyes=hollow&nose=nostrils&eyewear=none",
-    "bicho:monsters/monster:b03-cuatro?eyes=four&eyewear=none",
-    "bicho:furry/bear:b03-hocico?nose=muzzle&eyewear=none&headgear=none",
-    "bicho:furry/bear:b03-cerdo?body=wide&nose=snout-pig&eyes=beady&eyewear=none",
-    "bicho:furry/bear:b03-perro?nose=snout-dog&eyes=button&eyewear=none",
   ],
 
   css: `

@@ -283,7 +283,6 @@ const EAR_LONG = "M42 48.5C36.4 37 33.4 24 35.4 9.6C40.6 15 47.6 23 51.6 31C54 3
 const EAR_LONG_IN = "M44.6 42.6C40.8 34 39 25.6 39.6 17.4C43.4 21.8 47.6 27.6 50.2 33C51.8 36.2 52.8 39 53 41.4Z";
 
 export default batch({
-  label: "B05 Monstruos+",
 
   parts: [
     /* ---------- bones (top) ---------- */
@@ -346,7 +345,7 @@ export default batch({
       },
     },
     {
-      id: "ears-long", slot: "top", label: "orejas largas", at: "crownL", socket: [47.9, 44], group: "ear", tags: ["tall", "blocks-band"], jitter: { rot: 5, size: 0.05 },
+      id: "ears-long", slot: "top", label: "orejas largas", at: "crownL", socket: [47.9, 44], group: "ear", tags: ["tall", "blocks-band", "ears"], jitter: { rot: 5, size: 0.05 },
       // Pink inside, or the lighter body tone on a pink coat.
       draw: ({ spec }) => ({ pieces: [{ d: EAR_LONG, c: "body" }, { d: EAR_LONG_IN, c: pinkCoat(spec) ? "belly" : "pink", ink: "inner" }] }),
     },
@@ -363,100 +362,5 @@ export default batch({
     /* ---------- patterns ---------- */
     { id: "fur-tips", slot: "pattern", label: "pelaje", excludes: ["pattern:belly"], draw: furTips },
     { id: "ribcage", slot: "pattern", label: "costillas", lod: 1, excludes: ["pattern:belly|fur-tips"], draw: ribcage },
-  ],
-
-  /* Seven new monsters (catalogue §1.2 F1). Every member names its eyes and mouth: the required slots would otherwise
-   * take any part. Mouths from B04 (fang-single, grin, smirk, stitch, saw, buck) keep an older mouth at a low weight, for
-   * variety; the ogre's tusks are its signature, so they are fixed (B14, queue item 17). Every member fixes its arms (B14:
-   * every rolled bicho has an arm-like limb). The new tops that no member signs (antlers, ram horns, bone horns, long ears,
-   * mohawk) reach seeds through these pools and the core monster's (`extend`). */
-  members: [
-    {
-      // One big eye under a unicorn's horn.
-      id: "ciclope", family: "monsters", label: "cíclope", bodies: "round",
-      fixed: { eyes: "cyclops", top: "horn-uni", legs: "feet", arms: { nubs: 10, noodle: 6 } },
-      pools: { mouth: { gap: 10, grin: 10, "fang-single": 10, fangs: 2 }, pattern: { p: 0.5, pick: { spots: 10, belly: 5 } } },
-    },
-    {
-      // Bones on the head: through the skull, as a hair clip, or as horns; a skeleton print on the belly sometimes. A
-      // deeper coat than the family's, so the bone-white reads.
-      id: "huesitos", family: "monsters", label: "huesitos", bodies: { blob: 1, round: 1 },
-      fixed: { arms: "nubs", legs: "feet" },
-      pools: {
-        top: { "bone-through": 10, "bone-clip": 7, "bone-horns": 7 },
-        eyes: { two: 10, hollow: 6, wonky: 5, button: 4 },
-        mouth: { stitch: 10, teeth: 8, grin: 8, gap: 2 },
-        pattern: { p: 0.55, pick: { ribcage: 10, spots: 5, patch: 4 } },
-      },
-      color: { hue: [0, 360], sat: [55, 78], light: [46, 58], spot: { pick: [150, 180, 210] } },
-    },
-    {
-      // A shaggy coat and a cowlick (or long ears, ram horns, antlers), lanky arms more often than not.
-      id: "peludo", family: "monsters", label: "peludo", bodies: "pear",
-      fixed: { pattern: ["fur-tips"], legs: "feet", arms: { noodle: 8, nubs: 6 } },
-      pools: {
-        top: { tuft: 10, "ears-long": 6, "horns-ram": 5, antlers: 4 },
-        eyes: { two: 10, googly: 6, sleepy: 4 },
-        mouth: { fangs: 10, buck: 10 },
-      },
-      color: { hue: [0, 360], sat: [45, 70], light: [52, 64], spot: { pick: [150, 180, 210, 40] } },
-    },
-    {
-      // A squat ogre: tusks, two stubby horns, a big nose, little eyes. Mostly swamp greens, sometimes plum.
-      id: "ogrito", family: "monsters", label: "ogrito", bodies: "wide",
-      // Little eyes are part of the ogre's look: one of the few members that keep the beady eyes.
-      fixed: { top: "horns-nub", mouth: "tusks", arms: "nubs", legs: "feet" },
-      pools: { nose: { p: 0.7, pick: "bulb" }, eyes: { beady: 10, wonky: 8 }, pattern: { p: 0.3, pick: "spots" } },
-      color: [{ weight: 3, hue: [70, 135], sat: [38, 58], light: [48, 58] }, { weight: 1, hue: [255, 295], sat: [35, 50], light: [52, 60] }],
-    },
-    {
-      // A triangle with spines down its back, and a crest or a mohawk on top more often than not.
-      id: "pinchito", family: "monsters", label: "pinchito", bodies: "tri",
-      fixed: { back: "spines", arms: "nubs", legs: "feet" },
-      pools: { top: { p: 0.6, pick: { spikes: 10, mohawk: 10 } }, mouth: { saw: 10, fangs: 10 }, eyes: { two: 10, three: 5, wonky: 5, "wide-set": 4 } },
-    },
-    {
-      // A slime: a drop with goo running off its head, no feet. Lime, cyan or bubblegum.
-      id: "babosin", family: "monsters", label: "babosín", bodies: "drop",
-      fixed: { top: "drip", arms: { nubs: 10, noodle: 4 } },
-      pools: { eyes: { two: 10, wonky: 8, button: 8, googly: 4 }, mouth: { tongue: 10, smile: 10 }, cheeks: { p: 0.3, pick: "blush" } },
-      color: [
-        { weight: 2, hue: [75, 150], sat: [60, 80], light: [55, 65] },
-        { weight: 1, hue: [170, 200], sat: [55, 75], light: [55, 65] },
-        { weight: 1, hue: [290, 335], sat: [55, 75], light: [60, 68] },
-      ],
-    },
-    {
-      // A little devil: stubby horns, a tail with a heart tip, a sly mouth. Reds and purples.
-      id: "diablillo", family: "monsters", label: "diablillo", bodies: "round",
-      fixed: { top: "horns-nub", tail: "devil", arms: "nubs", legs: "feet" },
-      pools: { mouth: { smirk: 10, "fang-single": 10, fangs: 3 }, eyes: { two: 10, sleepy: 6, sparkle: 3 } },
-      color: [
-        { weight: 3, hue: [348, 360], sat: [70, 84], light: [52, 60], spot: { pick: [60, 180] } },
-        { weight: 1, hue: [0, 8], sat: [70, 84], light: [52, 60], spot: { pick: [60, 180] } },
-        { weight: 2, hue: [275, 305], sat: [55, 70], light: [50, 58], spot: { pick: [60, 180] } },
-      ],
-    },
-  ],
-
-  extend: [
-    // Lent to other families' bichos only (the cross-family roll): the monsters' small tops.
-    { family: "monsters", cross: { top: { "horns-nub": 10, tuft: 8, "bone-horns": 5, "bone-clip": 5, "bone-through": 4 } } },
-    // The classic monster (and its floating cousin) rolls the tops no member signs, beside its horns, antenna, spikes and
-    // ears (same p as its own pool).
-    { family: "monsters", member: "monster", pools: { top: { p: 0.8, pick: { antlers: 3, "horns-ram": 3, mohawk: 3, "ears-long": 3, "bone-horns": 2 } } } },
-    { family: "monsters", member: "flotin", pools: { top: { p: 0.8, pick: { "ears-long": 3, mohawk: 3, antlers: 2 } } } },
-  ],
-
-  // The parts on other bichos: what no member signs, and a few cross-overs.
-  showcase: [
-    "bicho:monsters/monster:b05-cornamenta?top=antlers&eyes=two",
-    "bicho:monsters/monster:b05-carnero?top=horns-ram&body=round&eyes=two",
-    "bicho:monsters/monster:b05-huesos?top=bone-horns&pattern=ribcage&body=tall",
-    "bicho:monsters/monster:b05-cresta?top=mohawk&back=spines&eyes=two",
-    "bicho:monsters/monster:b05-melena?top=tuft&pattern=fur-tips&arms=noodle&body=tall",
-    "bicho:monsters/flotin:b05-orejas?top=ears-long&eyes=two",
-    "bicho:pond/frog:b05-fideos?arms=noodle",
-    "bicho:furry/fox:b05-diablo?tail=devil",
   ],
 });

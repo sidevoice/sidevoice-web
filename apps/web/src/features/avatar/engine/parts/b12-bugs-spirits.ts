@@ -444,7 +444,6 @@ const ON_FLOAT = ["body:dome|drop|round|orb"];
 const ANT ={ slot: "top", at: "crownL", socket: [47.9, 44] as P, group: "ant", tags: ["tall", "blocks-band"], jitter: { rot: 6, size: 0.06 } };
 
 export default batch({
-  label: "B12 Bichitos y espíritus",
 
   parts: [
     /* ---------- tops ---------- */
@@ -497,22 +496,22 @@ export default batch({
 
     /* ---------- back ---------- */
     {
-      id: "wings-bee", slot: "back", label: "alas de abeja", at: "backL", socket: [32.8, 56], group: "wing", jitter: { rot: 5, size: 0.05 },
+      id: "wings-bee", tags: ["wings"], slot: "back", label: "alas de abeja", at: "backL", socket: [32.8, 56], group: "wing", jitter: { rot: 5, size: 0.05 },
       draw: { pieces: [{ d: BEE_WING_LOW, c: "belly" }, { d: BEE_WING, c: "belly" }, { d: BEE_VEIN, c: "body", w: 1.4, flat: true, layer: ON_BACK, lod: 1 }] },
     },
     {
-      id: "wings-butterfly", slot: "back", label: "alas de mariposa", at: "backL", socket: [32.8, 56], group: "b12-bfly", noise: 3, jitter: { rot: 4, size: 0.05 },
+      id: "wings-butterfly", tags: ["wings"], slot: "back", label: "alas de mariposa", at: "backL", socket: [32.8, 56], group: "b12-bfly", noise: 3, jitter: { rot: 4, size: 0.05 },
       draw: { pieces: [{ d: BFLY_HIND, c: "spot" }, { d: BFLY_FORE, c: "spot" }, ...BFLY_SPOTS.map((d): Piece => ({ d, c: "belly", stroke: 1.5, layer: ON_BACK }))] },
     },
     {
-      id: "wings-bat", slot: "back", label: "alas de dragón", at: "backL", socket: [32.8, 56], group: "wing", jitter: { rot: 5, size: 0.05 },
+      id: "wings-bat", tags: ["wings"], slot: "back", label: "alas de dragón", at: "backL", socket: [32.8, 56], group: "wing", jitter: { rot: 5, size: 0.05 },
       draw: (ctx) => {
         const c: Paint = isDarkCoat(ctx.spec) ? "spot" : "dark";
         return { pieces: [{ d: BAT_WING, c }, { d: BAT_BONES, c: c === "spot" ? "dark" : "body", w: 1.6, flat: true, layer: ON_BACK, lod: 1 }] };
       },
     },
     {
-      id: "wings-angel", slot: "back", label: "alas de ángel", at: "backL", socket: [32.8, 56], group: "wing", rarity: "rare", noise: 3, jitter: { rot: 4 },
+      id: "wings-angel", tags: ["wings"], slot: "back", label: "alas de ángel", at: "backL", socket: [32.8, 56], group: "wing", rarity: "rare", noise: 3, jitter: { rot: 4 },
       draw: (ctx) => ({ pieces: [{ d: ANGEL_WING, c: "belly" }, { d: ANGEL_ROWS, c: isPaleCoat(ctx.spec) ? "dark" : "body", w: 1.4, flat: true, layer: ON_BACK, lod: 2 }] }),
     },
     { id: "shell-ladybug", slot: "back", label: "caparazón de mariquita", draw: shellLadybug },
@@ -544,162 +543,6 @@ export default batch({
     /* ---------- patterns ---------- */
     { id: "bands", slot: "pattern", label: "rayas de abeja", tags: ["clipped"], excludes: ["#clipped", "pattern:belly|fur-tips|moon-chest|ribcage|grooves|segments"], draw: bands },
     { id: "segments", slot: "pattern", label: "anillos de oruga", excludes: ["pattern:ribs|scales"], draw: segments },
-  ],
-
-  families: [
-    // Bugs (catalogue §1.2 F7): antennae and back wings. They lend the bobble antennae and the bee's wings to other
-    // families' bichos through the cross-family roll (a cat with bee wings).
-    {
-      id: "bugs", label: "Bichitos", weight: 9, color: { hue: [0, 360], sat: [50, 75], light: [48, 64], spot: 180 },
-      pools: { cheeks: { p: 0.35, pick: { blush: 10, freckles: 4 } } },
-      cross: { top: { "antennae-bobble": 10, "antennae-feather": 4 }, back: { "wings-bee": 10, "wings-butterfly": 4 } },
-    },
-    // Spirits (catalogue §1.2 F9): near-white or pastel, floating, the rare halo, star and angel wings. The rare roll finds
-    // those in the family's pools (p 0: never rolled otherwise; the rare roll weighs them by their own `weight`, 1). They
-    // lend the flame, the cloud puffs, bat wings and the dragon's tail.
-    {
-      id: "spirits", label: "Espíritus", weight: 8,
-      color: [{ weight: 2, hue: [0, 360], sat: [0, 8], light: [88, 92], spot: 210 }, { weight: 3, hue: [0, 360], sat: [35, 58], light: [72, 82], spot: 210 }],
-      pools: { top: { p: 0, pick: ["halo", "star"] }, back: { p: 0, pick: ["wings-angel"] }, cheeks: { p: 0.45, pick: "blush" } },
-      cross: { top: { flame: 4, "cloud-puffs": 3 }, back: { "wings-bat": 6 }, tail: { dragon: 6 } },
-    },
-  ],
-
-  members: [
-    /* ---------- bugs (bichitos) ---------- */
-    {
-      // A charcoal head, a coral-red shell with dark spots, bobble antennae.
-      id: "mariquita", family: "bugs", label: "mariquita", bodies: "round",
-      fixed: { back: "shell-ladybug", top: "antennae-bobble", legs: "feet", arms: "nubs" },
-      pools: { eyes: { two: 10, sparkle: 6, "wide-set": 3 }, mouth: { smile: 10, tiny: 6, tongue: 3 }, cheeks: { p: 0.5, pick: "blush" } },
-      color: { hue: [250, 270], sat: [14, 26], light: [36, 42], spot: [93, 106] },
-    },
-    {
-      id: "abejita", family: "bugs", label: "abejita", bodies: "round",
-      fixed: { pattern: ["bands"], back: "wings-bee", tail: "stinger", arms: "nubs", legs: "feet" },
-      pools: {
-        // Antennae on most bees (B14: a bee without them reads as a striped ball); the bobble ones, elbowed now and then.
-        eyes: { two: 10, button: 6, sparkle: 4, googly: 3 }, mouth: { smile: 10, buck: 4, tongue: 4, tiny: 3 },
-        top: { p: 0.85, pick: { "antennae-bobble": 10, "antennae-bent": 3 } }, held: { p: 0.15, pick: "flower" },
-      },
-      color: { hue: [40, 48], sat: [78, 90], light: [56, 62], spot: 180 },
-    },
-    {
-      id: "oruga", family: "bugs", label: "oruga", bodies: "wide",
-      fixed: { pattern: ["segments"], legs: "many", top: "antennae-bobble", arms: "nubs" },
-      pools: { eyes: { two: 10, button: 8, googly: 4, sleepy: 3 }, mouth: { smile: 10, tiny: 6, buck: 3 }, cheeks: { p: 0.5, pick: "blush" } },
-      color: { hue: [78, 125], sat: [50, 68], light: [52, 62], spot: { pick: [200, 230, 290] } },
-    },
-    {
-      id: "polilla", family: "bugs", label: "polilla", bodies: "tall",
-      fixed: { back: "wings-butterfly", top: "antennae-feather", legs: "feet", arms: "nubs" },
-      pools: { eyes: { sparkle: 10, two: 8, lashes: 5, sleepy: 3 }, mouth: { smile: 10, tiny: 8 }, cheeks: { p: 0.5, pick: "blush" } },
-      color: { hue: [0, 360], sat: [35, 55], light: [62, 74], spot: { pick: [120, 150, 180, 210] } },
-    },
-    {
-      // A dusky body so the gold glow shows.
-      id: "luciernaga", family: "bugs", label: "luciérnaga", bodies: "round",
-      fixed: { tail: "glow", back: "wings-bee", legs: "feet", arms: "nubs" },
-      pools: { eyes: { two: 10, sparkle: 6, sleepy: 4 }, mouth: { smile: 10, tiny: 6 }, cheeks: { p: 0.4, pick: "blush" } },
-      color: { hue: [210, 260], sat: [30, 45], light: [40, 48], spot: 180 },
-    },
-    {
-      // A deep jewel-toned body under a horn and glossy wing cases.
-      id: "escarabajo", family: "bugs", label: "escarabajo", bodies: { round: 3, box: 1 },
-      fixed: { top: "horn-beetle", back: "elytra", arms: "nubs", legs: "feet" },
-      pools: { eyes: { two: 10, wonky: 3, googly: 3 }, mouth: { smile: 10, fangs: 4, grin: 4, buck: 2 } },
-      color: { hue: [150, 290], sat: [35, 55], light: [40, 48], spot: 180 },
-    },
-    {
-      // Red-brown or charcoal, elbowed feelers, wiry legs; sometimes carrying a backpack.
-      id: "hormiguita", family: "bugs", label: "hormiguita", bodies: "pear",
-      fixed: { top: "antennae-bent", legs: "stick", arms: "nubs" },
-      pools: { eyes: { two: 10, button: 6 }, mouth: { smile: 10, buck: 5, tiny: 5, grin: 3 }, back: { p: 0.2, pick: "backpack" } },
-      color: [{ weight: 2, hue: [4, 20], sat: [50, 66], light: [44, 52], spot: 180 }, { weight: 1, hue: [250, 280], sat: [10, 20], light: [40, 46], spot: 160 }],
-    },
-
-    /* ---------- spirits (espíritus) ---------- */
-    {
-      // The scalloped hem is the classic ghost; about one in three trails a wisp instead (B14; the wisp stays: it is also
-      // hojarasca's).
-      id: "fantasmita", family: "spirits", label: "fantasmita", bodies: "dome",
-      fixed: { legs: { hem: 10, wisp: 5 }, arms: "nubs" },
-      pools: { eyes: { two: 10, hollow: 7, cyclops: 4, sparkle: 3 }, mouth: { smile: 10, tiny: 6, tongue: 5, wavy: 3 }, cheeks: { p: 0.6, pick: "blush" }, neckwear: { p: 0.12, pick: "bow" } },
-      color: [{ weight: 3, hue: [0, 360], sat: [0, 8], light: [89, 93], spot: 210 }, { weight: 1, hue: [180, 300], sat: [30, 45], light: [80, 86], spot: 210 }],
-    },
-    {
-      // A cloud: puffs for a head, no feet; sometimes holding a leaf umbrella.
-      id: "nubecita", family: "spirits", label: "nubecita", bodies: "wide",
-      fixed: { top: "cloud-puffs", arms: "nubs" },
-      pools: { eyes: { two: 10, sleepy: 6, button: 6, sparkle: 3 }, mouth: { smile: 10, tiny: 8 }, cheeks: { p: 0.75, pick: "blush" }, held: { p: 0.25, pick: "umbrella-leaf" } },
-      color: [{ weight: 2, hue: [195, 225], sat: [40, 60], light: [80, 86], spot: 210 }, { weight: 2, hue: [0, 360], sat: [0, 6], light: [91, 94], spot: 210 }, { weight: 1, hue: [300, 345], sat: [40, 55], light: [82, 88], spot: 210 }],
-    },
-    {
-      id: "dragoncito", family: "spirits", label: "dragoncito", bodies: "round",
-      fixed: { back: "wings-bat", tail: "dragon", top: "horns-nub", arms: "nubs", legs: "feet" },
-      pools: { nose: { p: 0.7, pick: "nostrils" }, eyes: { two: 10, sparkle: 4, googly: 3 }, mouth: { smile: 10, "fang-single": 8, fangs: 5, tongue: 3 }, pattern: { p: 0.6, pick: "belly" } },
-      color: [{ weight: 2, hue: [95, 165], sat: [45, 62], light: [52, 60], spot: 180 }, { weight: 1, hue: [265, 300], sat: [40, 55], light: [54, 62], spot: 180 }, { weight: 1, hue: [0, 12], sat: [65, 80], light: [52, 58], spot: 180 }],
-    },
-    {
-      // A pastel pony with a mane in the spot colour. The unicorn is a fixed option (B14 keeps it so: it is the pony's own
-      // variant, never a swap the rare roll could make elsewhere), about one pony in eight, and it reads "raro" (the horned
-      // mane is a rare part).
-      id: "poni", family: "spirits", label: "poni", bodies: "tall",
-      fixed: { top: { mane: 10, "mane-uni": 1.4 }, legs: "feet", arms: "nubs" },
-      pools: {
-        eyes: { lashes: 10, sparkle: 8, two: 6 }, mouth: { smile: 10, tiny: 6 }, cheeks: { p: 0.7, pick: "blush" },
-        nose: { p: 0.3, pick: "nostrils" }, headgear: { p: 0.15, pick: { "flower-clip": 10, hairbow: 10 } },
-      },
-      color: { hue: [0, 360], sat: [38, 58], light: [74, 84], spot: { pick: [120, 150, 180, 210, 240] } },
-    },
-    {
-      // White fur, a blue-grey face, a cowlick; a scarf or earmuffs sometimes.
-      id: "yeti", family: "spirits", label: "yeti", bodies: "pear",
-      fixed: { top: "tuft", marks: "face-patch", arms: "nubs", legs: "feet" },
-      pools: { eyes: { two: 10, button: 5, sleepy: 3 }, mouth: { fangs: 10, smile: 8, buck: 5, grin: 4 }, pattern: { p: 0.4, pick: "fur-tips" }, neckwear: { p: 0.2, pick: "scarf" }, earwear: { p: 0.12, pick: "earmuffs" } },
-      color: { hue: [195, 220], sat: [8, 16], light: [86, 92], spot: 210 },
-    },
-    {
-      // A forest spirit: near-white with a sage tint, hollow eyes and a tiny mouth.
-      id: "kodama", family: "spirits", label: "kodama", bodies: "tall",
-      fixed: { eyes: "hollow", mouth: "tiny", arms: "nubs" },
-      pools: { legs: { p: 0.7, pick: "feet" }, cheeks: { p: 0.25, pick: "blush" }, headgear: { p: 0.15, pick: "leaf-hat" } },
-      color: { hue: [80, 120], sat: [8, 16], light: [86, 92], spot: 210 },
-    },
-    {
-      // The rare star sprite: gold, a star on its head, sparkly eyes.
-      id: "estrellita", family: "spirits", label: "estrellita", weight: 3, bodies: "round",
-      fixed: { top: "star", arms: "nubs", legs: "feet" },
-      pools: { eyes: { sparkle: 10, two: 5 }, mouth: { smile: 10, tiny: 5 }, cheeks: { p: 0.8, pick: "blush" }, held: { p: 0.15, pick: "wand" } },
-      color: { hue: [42, 52], sat: [80, 92], light: [64, 72], spot: 210 },
-    },
-  ],
-
-  // Rares for two families that had none of their own (B14): a sea bicho may wear the gold star (a starfish of sorts), a
-  // bird the halo. p 0: only the rare roll picks them, for a bicho whose top is free.
-  extend: [
-    { family: "sea", pools: { top: { p: 0, pick: { star: 1 } } } },
-    { family: "birds", pools: { top: { p: 0, pick: { halo: 1 } } } },
-  ],
-
-  // The parts on other families' bichos, and a few members with gear that suits them.
-  showcase: [
-    "bicho:furry/cat:b12-abeja?back=wings-bee",
-    "bicho:pond/frog:b12-mariposa?back=wings-butterfly",
-    "bicho:monsters/monster:b12-dragon?back=wings-bat&tail=dragon&eyes=two",
-    "bicho:spirits/fantasmita:b12-angel?back=wings-angel&top=halo",
-    "bicho:bots/robot:b12-escarabajo?back=elytra&top=horn-beetle",
-    "bicho:furry/bear:b12-mariquita?back=shell-ladybug",
-    "bicho:monsters/monster:b12-rayas?pattern=bands&tail=stinger&eyes=two",
-    "bicho:furry/fox:b12-luz?tail=glow",
-    "bicho:sprouts/brotecito:b12-patas?legs=stick",
-    "bicho:monsters/flotin:b12-sabana?legs=hem",
-    "bicho:snacks/mochi:b12-nube?top=cloud-puffs",
-    "bicho:monsters/monster:b12-fuego?top=flame&body=round&eyes=two",
-    "bicho:spirits/poni:b12-unicornio?top=mane-uni",
-    "bicho:spirits/nubecita:b12-paraguas?arms=nubs&held=umbrella-leaf",
-    "bicho:bugs/abejita:b12-flor?held=flower",
-    "bicho:spirits/kodama:b12-aureola?top=halo",
   ],
 
   css: `

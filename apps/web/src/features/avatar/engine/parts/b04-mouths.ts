@@ -515,7 +515,6 @@ const MOUTH_PART = { slot: "mouth" } as const;
 const ON_SKIN = { layer: LAYER.skin } as const;
 
 export default batch({
-  label: "B04 Caras II: bocas, mofletes y marcas",
 
   parts: [
     /* ---------- mouths ---------- */
@@ -546,48 +545,5 @@ export default batch({
     { ...ON_SKIN, id: "forehead-gem", slot: "marks", label: "gema", rarity: "rare", excludes: ["eyes:led|visor|led-heart|cyclops|three", "pattern:stripes|ribs"], draw: foreheadGem },
     { ...ON_SKIN, id: "forehead-star", slot: "marks", label: "estrellita", lod: 1, excludes: ["eyes:led|visor|led-heart|cyclops|three", "pattern:stripes|ribs"], draw: foreheadStar },
     { ...ON_SKIN, id: "bandaid", slot: "marks", label: "tirita", excludes: ["eyes:led|visor|led-heart"], draw: bandaid },
-  ],
-
-  /* Where these mouths, cheeks and marks roll beyond the members that name them (B14, queue item 11). Family pools merge
-   * into each member's: a mouth pool adds options beside the member's own (fixed mouths are untouched), a cheeks pool keeps
-   * the family's blush chance and adds the new cheeks beside the blush, a marks pool gives a few bichos a plaster or a
-   * forehead star. The gem is rare: only the rare roll gives it (to a monster, a spirit or an elemental). */
-  extend: [
-    { family: "monsters", pools: { marks: { p: 0.1, pick: { bandaid: 10, "face-stripes": 6, "forehead-gem": 1 } }, cheeks: { p: 0.12, pick: { freckles: 10, "shy-lines": 4 } } } },
-    { family: "monsters", member: "monster", pools: { mouth: { grin: 5, "fang-single": 4, smirk: 3, wavy: 2 } } },
-    { family: "monsters", member: "flotin", pools: { mouth: { grin: 5, "fang-single": 4, wavy: 3 } } },
-    { family: "furry", pools: { cheeks: { p: 0.2, pick: { blush: 10, freckles: 4, swirls: 3, "shy-lines": 3, pouches: 3 } }, marks: { p: 0.05, pick: { bandaid: 10, "forehead-star": 5 } } } },
-    { family: "birds", pools: { cheeks: { p: 0.25, pick: { blush: 10, freckles: 4, swirls: 3 } } } },
-    { family: "pond", pools: { mouth: { tiny: 4, grin: 4, wavy: 3 }, cheeks: { p: 0.3, pick: { blush: 10, freckles: 5, "shy-lines": 3 } } } },
-    { family: "sea", pools: { mouth: { wavy: 3, smirk: 2 }, cheeks: { p: 0.3, pick: { blush: 10, "shy-lines": 4, swirls: 3 } } } },
-    { family: "bugs", pools: { mouth: { wavy: 3, smirk: 2 }, cheeks: { p: 0.35, pick: { "shy-lines": 3, swirls: 2 } } } },
-    { family: "spirits", pools: { mouth: { wavy: 3, smirk: 2 }, cheeks: { p: 0.45, pick: { "shy-lines": 4, swirls: 3 } }, marks: { p: 0.08, pick: { "forehead-star": 10, "forehead-gem": 1 } } } },
-    { family: "elementals", pools: { cheeks: { p: 0.4, pick: { "shy-lines": 4, freckles: 3 } }, marks: { p: 0.08, pick: { "forehead-star": 10, "forehead-gem": 1 } } } },
-    { family: "snacks", pools: { cheeks: { p: 0.45, pick: { swirls: 3, freckles: 3 } } } },
-    { family: "sprouts", pools: { cheeks: { p: 0.4, pick: { "shy-lines": 3 } } } },
-  ],
-
-  showcase: [
-    "bicho:furry/bear:b04-paletas?mouth=buck&body=round",
-    "bicho:monsters/monster:b04-ogro?mouth=tusks&body=wide",
-    "bicho:monsters/monster:b04-colmillo?mouth=fang-single",
-    "bicho:sprouts/calabacita:b04-sonrisota?mouth=grin",
-    "bicho:furry/fox:b04-picara?mouth=smirk",
-    "bicho:sprouts/setita:b04-boquita?mouth=tiny",
-    "bicho:monsters/monster:b04-cosida?mouth=stitch&body=round",
-    "bicho:sprouts/calabacita:b04-sierra?mouth=saw",
-    "bicho:furry/bunny:b04-nerviosa?mouth=wavy",
-    "bicho:pond/frog:b04-morritos?mouth=pout",
-    "bicho:sprouts/trebol:b04-pecas?cheeks=freckles",
-    "bicho:furry/bunny:b04-espirales?cheeks=swirls",
-    "bicho:furry/cat:b04-sonrojo?cheeks=shy-lines",
-    "bicho:furry/bear:b04-carrillos?cheeks=pouches&mouth=buck",
-    "bicho:furry/cat:b04-antifaz9?marks=mask&mouth=smirk",
-    "bicho:furry/bear:b04-panda8?marks=eyepatch",
-    "bicho:furry/cat:b04-tigre3?marks=face-stripes",
-    "bicho:monsters/monster:b04-careta?marks=face-patch&body=pear",
-    "bicho:monsters/monster:b04-gema?marks=forehead-gem&eyes=two",
-    "bicho:furry/fox:b04-estrella?marks=forehead-star",
-    "bicho:monsters/monster:b04-tirita?marks=bandaid&mouth=smirk",
   ],
 });

@@ -1,6 +1,6 @@
-import { hash, n, rng, uid, type Drawn, type Size } from "../core";
+import { n, rng, uid, type Drawn, type Size } from "../core";
 import { shade } from "../styles/mascots";
-import { INK, LAYER, flatten, mirrorPath, outlineLoops, type Anchor, type Ctx, type Drawing, type Eye, type Face, type Lod, type Piece, type Pt, type Spec } from "./kit";
+import { INK, LAYER, flatten, mirrorPath, outlineLoops, type Anchor, type Ctx, type Drawing, type Eye, type Face, type Lod, type Paint, type Piece, type Pt, type Spec } from "./kit";
 import { REF, defaultShine, place, rigOf, type Placement } from "./rig";
 import { BODIES, asMatchable, bodyOf, hides, matches, slotOf, type Entry } from "./registry";
 import { colorsOf, present, traitsOf } from "./spec";
@@ -148,7 +148,7 @@ export function props(s: Spots, size: Size): string {
       ${size === "stage" ? `<g transform="${at(60, s.top + 21)}"><g class="enter-burst"><path d="${burst}"/></g></g>` : ""}`;
 }
 
-const FIXED: Record<string, string> = { pink: "#f6a9bb", ink: INK };
+const FIXED: Record<string, string> = { pink: "var(--bx-pink)", ink: INK };
 const ROLES = new Set(["body", "belly", "dark", "spot", "horn", "gold", "pink", "ink"]);
 
 /** A group a piece sits in, and its pivot (none: the group's CSS sets it). */
@@ -178,17 +178,22 @@ function plannedEyes(parts: Entry[], ctx: Ctx): Eye[] {
   return (typeof e.draw === "function" ? e.draw(ctx) : e.draw).eyes ?? [];
 }
 
+/** Per-slot colour variables (`--bx-t-<slot>-<role>`) of a spec's tints. */
+const slotVars = (spec: Spec) => Object.entries(spec.tints ?? {}).filter(([k]) => k.includes("-")).map(([k, v]) => `;--bx-t-${k}:${v}`).join("");
+
 export function renderSpec(spec: Spec, size: Size): Drawn {
   const id = uid("bx");
   const body = bodyOf(spec.body) ?? BODIES[0];
   const rig = rigOf(body, rng(spec.shape, "shape"));
   const parts = drawable(spec);
+  /** A piece's paint, repainted from the spec's tints when its slot has some for that role. */
+  const tinted = (slot: string, c: Paint): Paint => ((c === "body" || c === "belly" || c === "dark") && spec.tints?.[`${slot}-${c}`] ? `var(--bx-t-${slot}-${c})` : c);
   const gradients = new Map<string, string>();
   /** The cast's shade for a paint (a role, "#rrggbb" or any CSS colour): one gradient per paint per bicho, shared by
    * its pieces and by `ctx.shade` (markup in `over`). */
   const paint = (c: string) => {
     const literal = c.startsWith("#"), role = ROLES.has(c);
-    return { key: literal ? `h${c.slice(1)}` : role ? c : `c${hash(c).toString(36)}`, css: literal ? c : role ? FIXED[c] ?? `var(--bx-${c})` : c };
+    return { key: literal ? `h${c.slice(1)}` : role ? c : `c${c.replace(/[^a-z0-9]+/gi, "-")}`, css: literal ? c : role ? FIXED[c] ?? `var(--bx-${c})` : c };
   };
   const gradient = (c: string) => {
     const { key, css } = paint(c);
@@ -253,7 +258,7 @@ export function renderSpec(spec: Spec, size: Size): Drawn {
       };
       for (const p0 of d.pieces ?? []) {
         const p = mirrored ? { ...p0, d: mirrorPath(p0.d) } : p0;
-        laid.push({ p: { ...p, ink: p.ink ?? e.ink }, layer: p.layer ?? layer, seq: e.seq, t: pl?.t ?? "", gs: groupsOf(p0), map: pl?.map });
+        laid.push({ p: { ...p, ink: p.ink ?? e.ink, c: tinted(e.slot, p.c) }, layer: p.layer ?? layer, seq: e.seq, t: pl?.t ?? "", gs: groupsOf(p0), map: pl?.map });
       }
       // A riding part's markup rides with its pieces (eyewear on moving eye stalks); other parts' markup stays put.
       const ride: Grp | undefined = rides && inherit?.g ? { g: inherit.g, o: inherit.o } : undefined;
@@ -301,7 +306,7 @@ export function renderSpec(spec: Spec, size: Size): Drawn {
   const colors = colorsOf(spec);
   const fill = (p: Piece, placed: boolean) => {
     if (FIXED[p.c]) return FIXED[p.c];
-    if (p.flat || p.w) return p.c.startsWith("#") ? p.c : `var(--bx-${p.c})`;
+    if (p.flat || p.w) return p.c.startsWith("#") || p.c.startsWith("var(") ? p.c : `var(--bx-${p.c})`;
     return p.span === "body" && !placed ? bodyGradient(p.c) : gradient(p.c);
   };
   const piece = (l: Laid, outline: boolean) => {
@@ -358,7 +363,7 @@ export function renderSpec(spec: Spec, size: Size): Drawn {
     return { loops: l.map ? loops.map((loop) => loop.map(([x, y]) => l.map!(x, y))) : loops, r: l.p.w ? (l.p.w + 7) / 2 : 3.5 };
   }));
 
-  const html = `<svg viewBox="0 0 120 120" aria-hidden="true" style="--bx-body:${colors.body};--bx-belly:${colors.belly};--bx-dark:${colors.dark};--bx-spot:${colors.spot};--bx-horn:#fff3d6;--bx-gold:#f5c242${work.vars}${idle.vars}" data-kind="${body.id}">
+  const html = `<svg viewBox="0 0 120 120" aria-hidden="true" style="--bx-body:${colors.body};--bx-belly:${colors.belly};--bx-dark:${colors.dark};--bx-spot:${colors.spot};--bx-horn:${colors.horn};--bx-gold:${colors.gold};--bx-pink:${colors.pink}${slotVars(spec)}${work.vars}${idle.vars}" data-kind="${body.id}">
       <defs>${defs}</defs>
       <ellipse class="ground" cx="${n(rig.at.ground.x)}" cy="${rig.at.ground.y}" rx="${n(shadow.rx ?? rig.half * 0.85)}" ry="${n(shadow.ry ?? 4.5)}"${shadow.opacity !== undefined ? ` opacity="${n(shadow.opacity)}"` : ""}/>
       <g class="fig"><g class="squash">

@@ -131,7 +131,7 @@
 .sv-avatar[data-style=bichos][data-mood=working] .pg-claw-l { animation: bx-claw .25s steps(2) infinite }
 .sv-avatar[data-style=bichos][data-mood=working] .pg-claw-r { animation: bx-claw-r .25s steps(2) infinite .12s }
 /* working styles (src/bichos/work.ts). The client sets data-work on the root when the bicho starts working and
-   swaps it for another every 20–30 s; a root without it (the mascots, the frozen v3:/monstruo: figures) keeps the
+   swaps it for another every 20–30 s; a root without it (the mascots) keeps the
    crank above, untouched. Each style keys its own keyframes for the shared groups (squash, arms, .look, brows), so
    every part that joins them follows. On every change the body hops (bx-bounce), the old props pop out and the new
    ones pop in; the style's loops start after the hop (.5s). The cog pair keeps turning through every style: it's
@@ -597,7 +597,7 @@
 .sv-avatar[data-style=bichos][data-mood=working] .b15-twinkles > *:nth-child(2) { animation-delay: .3s }
 .sv-avatar[data-style=bichos][data-mood=working] .b15-gusts > * { animation: bx-puff 1s ease-out infinite }
 /* idle (src/bichos/idle.ts). The client sets data-idle on the root while the bicho is idle: quiet, then now and then
-   one pastime for its own while, then quiet again. A root without it (the mascots, the frozen v3:/monstruo: figures)
+   one pastime for its own while, then quiet again. A root without it (the mascots)
    keeps the old sleep, untouched. On every change the old props pop out and the new ones pop in. Arm angles come
    from the renderer (--idl-*), and the rail gets none, so its arms stay at rest. */
 .sv-avatar[data-style=bichos]:not([data-idle]) .idl-props { display: none }

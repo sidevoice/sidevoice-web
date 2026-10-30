@@ -1,4 +1,4 @@
-import { SWATCHES, batch, smoothLoop, type ColorRule, type Rng } from "../bichos/kit";
+import { batch, smoothLoop, type Rng } from "../bichos/kit";
 
 /* B01 Bodies: pear, drop, tri, dome and pill (docs/catalogue.md §0.2).
  *
@@ -16,9 +16,6 @@ const silhouette = (prof: Profile, w: number, wy = 0.5) => (r: Rng) => {
   return smoothLoop([...right, ...left].map(([x, y]): [number, number] => [60 + (x - 60) * (1 + r.range(-w, w)), y + r.range(-wy, wy)]));
 };
 
-/** The cat's coats and the owl's paper card stock, as the existing templates use them (core-species.ts). */
-const COATS: ColorRule[] = [{ hue: 28, sat: 80, light: 60, spot: 160 }, { hue: 220, sat: 10, light: 62, spot: 160 }, { hue: 260, sat: 18, light: 30, spot: 160 }, { hue: 35, sat: 45, light: 80, spot: 160 }];
-const PAPER: ColorRule[] = SWATCHES.slice(0, 7).map(([, hue, sat, light]) => ({ hue, sat, light, spot: 160 }));
 
 /* ---------- profiles ---------- */
 
@@ -34,7 +31,6 @@ const DOME: Profile = [[34, 0], [35.4, 9], [38.8, 17], [44.5, 24.4], [51.5, 29.4
 const PILL: Profile = [[30, 0], [31.2, 7.6], [34, 13.8], [38.5, 18.6], [45, 22.4], [53, 24], [62, 24.2], [74, 24.2], [83, 23.8], [89, 21.8], [93.6, 17.6], [96.4, 10.6], [97.2, 0]];
 
 export default batch({
-  label: "B01 Cuerpos",
   /* Anchor overrides follow one rule: a part lands on each body as it lands on the reference body. Ear sockets sit on
    * the outline, the crown 4 units under the outline's top (as on the existing bodies), horn and bunny sockets ~4 units
    * inside it, and shoulders 4–6 units inside the edge at the arm line. Tops on the crown keep 0.94 of their size; hats
@@ -127,61 +123,5 @@ export default batch({
       },
       shine: () => "M43.5 45 Q46.5 40.4 55.5 36.5",
     },
-  ],
-
-  /* One member per body, built only from parts that exist today, so seeds roll the new bodies straight away. The
-   * catalogue's own members for these bodies (chick, slime, onigiri, ghost, cactus…) come with the batches that own
-   * their signature parts. These weigh 8: a little under the catalogue's new members (10); the chubby bear 6 (B14: with the
-   * core bear, the moon bear and the panda, bears were a quarter of the furry family). */
-  members: [
-    {
-      // A chubby bear: all of it settles in the bottom.
-      id: "oso-panzon", family: "furry", label: "osito panzón", weight: 6, bodies: "pear",
-      fixed: { top: "bear", eyes: "beady", mouth: "cat", pattern: ["belly"], nose: "nose", arms: "nubs", legs: "feet" },
-      pools: { cheeks: { p: 0.35, pick: "blush" }, pins: { p: 0.4, pick: "pins" } },
-      color: [{ weight: 1, hue: 0, sat: 0, light: 92, spot: 160 }, { weight: 4, hue: [24, 40], sat: [40, 55], light: [48, 60], spot: 160 }],
-    },
-    {
-      // The long cat: the cat, stretched into a capsule.
-      id: "gato-largo", family: "furry", label: "gato largo", weight: 8, bodies: "pill",
-      fixed: { top: "cat", eyes: "two", mouth: "cat", tail: "cat", pattern: ["belly"], marks: "whiskers", nose: "nose", arms: { nubs: 10, paws: 8 }, legs: "feet" },
-      pools: { pattern: { p: 0.5, pick: "stripes" } },
-      color: COATS,
-    },
-    {
-      // A little owl: tufts on a triangle are already an owl.
-      id: "mochuelo", family: "birds", label: "mochuelo", weight: 8, bodies: "tri",
-      fixed: { top: "owl", eyes: "big", mouth: "beak", pattern: ["belly"], arms: "nubs", legs: "feet" },
-      pools: { pins: { p: 0.5, pick: "pins" } },
-      color: PAPER,
-    },
-    {
-      // A raindrop from the puddle, sometimes sprouting.
-      id: "gotita", family: "pond", label: "gotita", weight: 8, bodies: "drop",
-      fixed: { arms: "nubs", legs: "feet" },
-      pools: { eyes: { two: 10, button: 6, sparkle: 4 }, mouth: ["smile", "tongue", "gap"], cheeks: { p: 0.7, pick: "blush" }, top: { p: 0.25, pick: "sprout" } },
-      // Water blues; the spot lands on greens for the sprout's leaves.
-      color: { hue: [185, 215], sat: [60, 75], light: [60, 70], spot: 270 },
-    },
-    {
-      // A floating bell of a monster: no feet, all horns and teeth.
-      id: "flotin", family: "monsters", label: "flotín", weight: 8, bodies: "dome",
-      fixed: { arms: "nubs", pattern: ["spots"] },
-      pools: { top: { p: 0.8, pick: ["horns", "antenna", "spikes", "ears"] }, eyes: ["two", "cyclops", "three", "wonky"], mouth: ["fangs", "teeth", "gap", "tongue", "smile"] },
-    },
-  ],
-
-  // The existing templates on the new bodies, with a few tops and gear, so the lab row shows every body at work.
-  showcase: [
-    "bicho:monsters/monster:pera?body=pear&top=horns&eyes=two",
-    "bicho:birds/owl:pera?body=pear",
-    "bicho:furry/bunny:gota?body=drop",
-    "bicho:furry/fox:gota?body=drop&eyes=two",
-    "bicho:furry/cat:tri?body=tri&neckwear=bow",
-    "bicho:monsters/monster:tri?body=tri&top=spikes&eyes=three&headgear=none",
-    "bicho:bots/robot:campana?body=dome",
-    "bicho:furry/bear:campana?body=dome&headgear=crown",
-    "bicho:pond/frog:capsula?body=pill",
-    "bicho:monsters/monster:capsula?body=pill&top=antenna&eyes=cyclops&mouth=fangs",
   ],
 });

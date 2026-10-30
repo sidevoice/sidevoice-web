@@ -1,49 +1,72 @@
-/* What every style shares: the seed (the conversation's identity, hashed exactly like sidevoice-web's avatar-spec),
- * a seeded random stream per seed, and the contract a style fulfils. A style draws once per seed and size; how it
+/* What every style shares: the seed (the conversation's identity), a seeded random stream per decision, and the contract a style fulfils. A style draws once per seed and size; how it
  * moves is CSS keyed on the root's `data-mood`, `data-size` and `data-beat`, like the web's avatar. */
 
 export type Mood = "idle" | "speaking" | "listening" | "working" | "waiting";
 export type Size = "stage" | "sidebar" | "rail";
 
-/** FNV-1a + Murmur3 finish: the same hash as sidevoice-web's avatar-spec.ts. */
-export function hash(text: string) {
-  let value = 0x811c9dc5;
-  for (let index = 0; index < text.length; index += 1) {
-    value ^= text.charCodeAt(index);
-    value = Math.imul(value, 0x01000193);
-  }
-  value ^= value >>> 16;
-  value = Math.imul(value, 0x85ebca6b);
-  value ^= value >>> 13;
-  value = Math.imul(value, 0xc2b2ae35);
-  value ^= value >>> 16;
-  return value >>> 0;
-}
+import { sha256 } from "@noble/hashes/sha2.js";
+
+/** The generator's version: part of every stream's key, so a new one rolls every identity afresh. */
+export const GENERATOR_VERSION = "avatar-v5";
 
 export interface Rng {
   /** 0 ≤ n < 1 */
   next(): number;
+  /** The next 32 random bits. */
+  uint32(): number;
+  /** An integer in [0, bound), by rejection sampling: no modulo bias. */
+  below(bound: number): number;
   range(min: number, max: number): number;
   int(min: number, maxInclusive: number): number;
   pick<T>(options: readonly T[]): T;
   chance(p: number): boolean;
 }
 
-/** mulberry32 over the seed's hash, salted per part so adding a part never shifts another. */
+const MASK64 = (1n << 64n) - 1n;
+const PCG_MULT = 6364136223846793005n;
+const u64le = (bytes: Uint8Array, at: number) => {
+  let v = 0n;
+  for (let i = 7; i >= 0; i -= 1) v = (v << 8n) | BigInt(bytes[at + i]);
+  return v;
+};
+
+/** PCG32 (XSH RR, 64-bit state, 63-bit stream), initialised and stepped exactly as the reference `pcg32_srandom_r`
+ * and `pcg32_random_r`, in BigInt so no 64-bit value passes through a double. */
+export function pcg32(initState: bigint, initSequence: bigint): () => number {
+  let inc = ((initSequence << 1n) | 1n) & MASK64;
+  let state = 0n;
+  const step = () => { const old = state; state = (old * PCG_MULT + inc) & MASK64; return old; };
+  step();
+  state = (state + initState) & MASK64;
+  step();
+  return () => {
+    const old = step();
+    const xorshifted = Number((((old >> 18n) ^ old) >> 27n) & 0xffffffffn);
+    const rot = Number(old >> 59n);
+    return ((xorshifted >>> rot) | (xorshifted << (-rot & 31))) >>> 0;
+  };
+}
+
+/** The stream of one decision of one identity: SHA-256 of the whole versioned tuple (never a 32-bit digest of the
+ * identity first, so two identities cannot share a state), its first 8 bytes the PCG32 state, the next 8 its sequence. */
 export function rng(seed: string, part = ""): Rng {
-  let state = hash(seed + "\u0000" + part);
-  const next = () => {
-    state = (state + 0x6d2b79f5) | 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  const digest = sha256(new TextEncoder().encode(JSON.stringify([GENERATOR_VERSION, seed, part])));
+  const uint32 = pcg32(u64le(digest, 0), u64le(digest, 8));
+  const next = () => uint32() / 4294967296;
+  const below = (bound: number) => {
+    if (bound <= 1) return 0;
+    const limit = 4294967296 - (4294967296 % bound);
+    let x = uint32();
+    while (x >= limit) x = uint32();
+    return x % bound;
   };
   return {
     next,
+    uint32,
+    below,
     range: (min, max) => min + next() * (max - min),
-    int: (min, max) => min + Math.floor(next() * (max - min + 1)),
-    pick: (options) => options[Math.floor(next() * options.length)],
+    int: (min, max) => min + below(max - min + 1),
+    pick: (options) => options[below(options.length)],
     chance: (p) => next() < p,
   };
 }

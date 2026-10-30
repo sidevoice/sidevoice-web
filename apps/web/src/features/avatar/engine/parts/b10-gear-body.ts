@@ -530,7 +530,6 @@ function boot(x: number, y: number, s: number) {
 /* ---------- the batch ---------- */
 
 export default batch({
-  label: "B10 Accesorios II",
 
   parts: [
     /* ---------- neckwear ---------- */
@@ -607,34 +606,4 @@ export default batch({
     &[data-mood=working] .pg-b10-steam path { animation: bx-puff 1.2s ease-out infinite }
     &[data-mood=working] .pg-b10-steam path + path { animation-delay: .5s }
   `,
-
-  // Boots ride `legs`, which members fix, so they are a weighted option beside the member's feet (about one in ten), on the
-  // members they suit (B14): rain boots in the pond, garden boots on the sprouts, snow boots on the yeti and the snowflake,
-  // Puss in Boots, cowboy boots on the cactus, work boots on the pebble.
-  extend: [
-    ...([["furry", "cat"], ["monsters", "monster"], ["pond", "frog"], ["pond", "gotita"], ["pond", "ajolote"], ["sprouts", "cactus"], ["sprouts", "brotecito"], ["sprouts", "setita"], ["snacks", "fresita"], ["spirits", "yeti"], ["elementals", "copito"], ["elementals", "pedrusco"]] as const)
-      .map(([family, member]) => ({ family, member, fixed: { legs: { boots: 1.1 } } })),
-    // Members whose legs are a pool.
-    { family: "furry", member: "perrito", pools: { legs: { boots: 2 } } },
-    { family: "furry", member: "mapache", pools: { legs: { boots: 2 } } },
-  ],
-
-  showcase: [
-    "bicho:furry/bear:b10-micro?held=microphone&pins=none",
-    "bicho:monsters/monster:b10-cantante?eyes=two&held=microphone&arms=noodle&neckwear=bow",
-    "bicho:furry/perrito:b10-cascabel?neckwear=bell-collar",
-    "bicho:furry/perrito:b10-panuelo?neckwear=bandana",
-    "bicho:furry/fox:b10-corbata?neckwear=necktie&arms=mitts",
-    "bicho:pond/frog:b10-flores?neckwear=lei&held=balloon&arms=nubs&pins=none",
-    "bicho:snacks/flan:b10-babero?neckwear=bib&held=lollipop",
-    "bicho:furry/bunny:b10-medalla?neckwear=medal&held=flower&arms=nubs&pins=none",
-    "bicho:furry/panda:b10-paraguas?held=umbrella-leaf",
-    "bicho:furry/bear:b10-taza?held=mug&arms=paws&neckwear=scarf",
-    "bicho:furry/cat:b10-corazon?held=heart&arms=paws&neckwear=none",
-    "bicho:monsters/monster:b10-varita?held=wand&back=cape",
-    "bicho:furry/fox:b10-capa?back=cape&headgear=none",
-    "bicho:sprouts/brotecito:b10-mochila?back=backpack&arms=nubs",
-    "bicho:bots/robot:b10-cohete?back=jetpack",
-    "bicho:furry/bunny:b10-botas?legs=boots&pins=none",
-  ],
 });

@@ -89,7 +89,7 @@ export default batch({
     { id: "headgear", label: "Sombrero", row: "Accesorios", order: 72, evaluate: 43, layer: LAYER.worn, noise: 2, gear: "head", trait: true },
     // Tried a little over half as often as the other gear slots (B14): the earmuffs fit nearly any head and had become the
     // commonest gear item of the cast.
-    { id: "earwear", label: "Orejeras", row: "Accesorios", order: 74, layer: LAYER.worn, noise: 2, gear: "head", gearWeight: 0.6, trait: true },
+    { id: "earwear", label: "Orejeras", row: "Accesorios", order: 74, layer: LAYER.worn, noise: 2, gear: "head", trait: true },
     { id: "pins", label: "Encuadernadores", row: "Accesorios", order: 76, layer: LAYER.worn, noise: 1, trait: true },
     { id: "eyewear", label: "Gafas", row: "Accesorios", order: 78, layer: LAYER.worn, noise: 1, gear: "face", trait: true },
     // Held items need an arm with a hand: declare `requires: ["#hand"]` and join `handR` (or `handL`, `pair: false`).

@@ -551,7 +551,6 @@ const CROWN = ["blocks-band", "blocks-clips"];
 /* ---------- the batch ---------- */
 
 export default batch({
-  label: "B15 Elementales",
 
   parts: [
     /* ---------- tops ---------- */
@@ -637,116 +636,6 @@ export default batch({
       id: "fatuo", slot: "held", label: "fuego fatuo", rarity: "uncommon", pair: false, requires: ["#hand"], rides: "handL", upright: true,
       lod: 2, layer: LAYER.arms - 0.5, draw: fatuo,
     },
-  ],
-
-  families: [
-    // Elementals: one element each, read by one signature part. They lend their element tops, the glowing patterns and
-    // the two tails to other families' bichos through the cross-family roll (a cat with a lightning bolt, a bear with
-    // frost).
-    {
-      id: "elementals", label: "Elementales", weight: 8, color: { hue: [0, 360], sat: [55, 75], light: [56, 66], spot: 180 },
-      pools: { cheeks: { p: 0.4, pick: "blush" } },
-      cross: {
-        top: { lightning: 5, crystals: 4, "ice-shards": 3, "leaf-flame": 3, swirl: 2 },
-        pattern: { frost: 3, "lava-cracks": 2, facets: 2 },
-        tail: { "ember-tail": 4, "bolt-tail": 4 },
-        legs: { "cloud-base": 2 },
-      },
-    },
-  ],
-
-  members: [
-    {
-      // Fire: B12's flame on a teardrop (moved here from the spirits, unchanged).
-      id: "llamita", family: "elementals", label: "llamita", bodies: "drop",
-      fixed: { top: "flame", arms: "nubs", legs: "feet" },
-      pools: { eyes: { two: 10, sparkle: 5, button: 5, googly: 3 }, mouth: { smile: 10, grin: 5, tongue: 4, tiny: 3 }, cheeks: { p: 0.5, pick: "blush" } },
-      color: { hue: [14, 40], sat: [86, 95], light: [55, 61], spot: 210 },
-    },
-    {
-      // Water: a wave breaking over its head, rising out of a puddle of itself.
-      id: "olita", family: "elementals", label: "olita", bodies: { round: 3, blob: 2 },
-      fixed: { top: "wave", legs: { puddle: 10, feet: 3 }, arms: "nubs" },
-      pools: { eyes: { two: 10, sparkle: 6, googly: 3 }, mouth: { smile: 10, tongue: 6, wavy: 4, tiny: 3 }, cheeks: { p: 0.5, pick: "blush" } },
-      color: { hue: [190, 215], sat: [62, 78], light: [58, 66], spot: 160 },
-    },
-    {
-      // Earth: a pebble with a crown of stones and granite specks.
-      id: "pedrusco", family: "elementals", label: "pedrusco", bodies: { wide: 3, blob: 2, box: 1 },
-      fixed: { top: "rock-crown", pattern: ["specks"], arms: "nubs", legs: "feet" },
-      pools: { eyes: { two: 10, sleepy: 6, button: 5, wonky: 3 }, mouth: { smile: 10, grin: 5, stitch: 4, gap: 3, teeth: 3 } },
-      color: [{ weight: 2, hue: [20, 45], sat: [10, 22], light: [52, 62], spot: 100 }, { weight: 1, hue: [215, 260], sat: [8, 16], light: [54, 62], spot: 100 }],
-    },
-    {
-      // Crystal: a quartz, faceted all over, with a cluster of crystals on its head.
-      id: "cuarzo", family: "elementals", label: "cuarzo", bodies: { round: 2, tri: 2, pear: 1 },
-      fixed: { top: "crystals", pattern: ["facets"], arms: "nubs", legs: "feet" },
-      pools: { eyes: { sparkle: 10, two: 8, lashes: 3 }, mouth: { smile: 10, tiny: 6, grin: 3 }, cheeks: { p: 0.5, pick: "blush" } },
-      color: { hue: { pick: [180, 200, 270, 290, 320] }, sat: [40, 58], light: [70, 80], spot: { pick: [270, 90, 120] } },
-    },
-    {
-      // Air: a breeze with a swirl over its head, spinning on a tornado.
-      id: "remolino", family: "elementals", label: "remolino", bodies: { round: 3, drop: 2 },
-      fixed: { top: "swirl", legs: { tornado: 10, "cloud-base": 3 }, arms: "nubs" },
-      pools: { eyes: { two: 10, sleepy: 6, sparkle: 4, button: 4 }, mouth: { smile: 10, tiny: 6, wavy: 4 }, cheeks: { p: 0.6, pick: "blush" } },
-      color: { hue: [170, 210], sat: [30, 50], light: [80, 88], spot: 180 },
-    },
-    {
-      // Lightning: a spark with a bolt on its head and a bolt for a tail; now and then it rides a cloud.
-      id: "chispita", family: "elementals", label: "chispita", bodies: { round: 3, blob: 1 },
-      fixed: { top: "lightning", tail: "bolt-tail", arms: "nubs", legs: { feet: 10, "cloud-base": 3 } },
-      pools: { eyes: { two: 10, sparkle: 6, googly: 4, "wide-set": 3 }, mouth: { grin: 10, smile: 8, tongue: 5, fangs: 3 }, cheeks: { p: 0.6, pick: "blush" } },
-      color: [{ weight: 3, hue: [48, 56], sat: [88, 96], light: [60, 66], spot: 180 }, { weight: 1, hue: [250, 275], sat: [45, 60], light: [54, 62], spot: 180 }],
-    },
-    {
-      // Ice: a snowflake sprite with ice shards on its head and frost round its base.
-      id: "copito", family: "elementals", label: "copito", bodies: { round: 3, drop: 2, tall: 1 },
-      fixed: { top: "ice-shards", pattern: ["frost"], arms: "nubs", legs: "feet" },
-      pools: { eyes: { two: 10, sparkle: 6, button: 5, sleepy: 3 }, mouth: { smile: 10, tiny: 7, tongue: 3 }, cheeks: { p: 0.7, pick: "blush" }, neckwear: { p: 0.15, pick: "scarf" } },
-      color: { hue: [190, 215], sat: [40, 60], light: [76, 84], spot: 150 },
-    },
-    {
-      // A leaf-wisp: a forest wisp whose flame is made of leaves, green and autumn, trailing a wisp.
-      id: "hojarasca", family: "elementals", label: "hojarasca", bodies: { drop: 3, dome: 2 },
-      fixed: { top: "leaf-flame", legs: { wisp: 10, feet: 3 }, arms: "nubs" },
-      pools: { eyes: { two: 10, hollow: 6, button: 5, sleepy: 3 }, mouth: { smile: 10, tiny: 8 }, cheeks: { p: 0.5, pick: "blush" }, held: { p: 0.2, pick: "fatuo" } },
-      color: { hue: [90, 140], sat: [38, 55], light: [62, 72], spot: { pick: [265, 280] } },
-    },
-    {
-      // Magma: a lump of basalt with lava glowing in its cracks and a crater on its head.
-      id: "magmita", family: "elementals", label: "magmita", bodies: { blob: 2, round: 2, wide: 1 },
-      fixed: { top: "crater", pattern: ["lava-cracks"], arms: "nubs", legs: "feet" },
-      pools: { eyes: { two: 10, sparkle: 4, wonky: 3 }, mouth: { grin: 10, fangs: 6, smile: 6, saw: 3 } },
-      color: { hue: [0, 25], sat: [14, 26], light: [37, 43], spot: 180 },
-    },
-    {
-      // Soot: Spirited Away's susuwatari, a fuzzball with two big eyes; sometimes carrying a wisp of fire.
-      id: "hollin", family: "elementals", label: "hollín", bodies: "round",
-      fixed: { back: "fuzz", eyes: { two: 10, googly: 4, "wide-set": 3 }, arms: "nubs", legs: "feet" },
-      pools: { mouth: { tiny: 10, smile: 6, gap: 3 }, held: { p: 0.25, pick: "fatuo" } },
-      color: { hue: [240, 290], sat: [6, 14], light: [26, 32], spot: 130 },
-    },
-  ],
-
-  // Elements on members declared in other files (each adds a weighted option or a pool there).
-  extend: [
-    // Some droplets sit in a puddle; some little dragons carry a flame on their tail; some yetis are frosted.
-    { family: "pond", member: "gotita", fixed: { legs: { puddle: 4 } } },
-    { family: "spirits", member: "dragoncito", fixed: { tail: { "ember-tail": 4 } } },
-    { family: "spirits", member: "yeti", pools: { pattern: { p: 0.25, pick: "frost" } } },
-  ],
-
-  // The parts on other families' bichos (gear that would cover them pinned off).
-  showcase: [
-    "bicho:monsters/monster:b15-rayo?top=lightning&tail=bolt-tail&eyes=two&headgear=none",
-    "bicho:furry/bear:b15-escarcha?top=ice-shards&pattern=frost",
-    "bicho:pond/gotita:b15-charco?legs=puddle",
-    "bicho:spirits/dragoncito:b15-cola?tail=ember-tail",
-    "bicho:monsters/flotin:b15-tornado?top=swirl&legs=tornado",
-    "bicho:bots/robot:b15-nube?legs=cloud-base&top=lightning",
-    "bicho:furry/cat:b15-geoda?top=crystals&pattern=facets",
-    "bicho:spirits/fantasmita:b15-fatuo?held=fatuo&headgear=none",
-    "bicho:monsters/monster:b15-volcan?top=crater&pattern=lava-cracks&body=round&neckwear=none",
   ],
 
   css: `

@@ -25,7 +25,7 @@ import { present } from "./spec";
  *
  * Juggle, soup, water and fish need a hand in each arm, free: a bicho without hands (armless, fins, flippers, claws,
  * tentacles, leaves), or one holding something, gets the others (`idlesFor`). Bubbles draws its wand only on free
- * hands. Frozen figures (`v3:`, `monstruo:`) and the mascots get no `data-idle`: they keep the old sleep.
+ * hands. The mascots get no `data-idle`: they keep the old sleep.
  *
  * Everything but the nap is awake: the eyes are open (`.eyes`, never `.eyes-closed`), the colour is full, the ears
  * and tops stand, the zz are gone. Props are stage-only, except the big cue of each pastime (`keep-small`, so the
@@ -433,7 +433,7 @@ const HOP = "bx-bounce .5s cubic-bezier(.3,1.6,.5,1)";
 
 export const IDLE_CSS = `
     /* idle (src/bichos/idle.ts). The client sets data-idle on the root while the bicho is idle: quiet, then now and then
-       one pastime for its own while, then quiet again. A root without it (the mascots, the frozen v3:/monstruo: figures)
+       one pastime for its own while, then quiet again. A root without it (the mascots)
        keeps the old sleep, untouched. On every change the old props pop out and the new ones pop in. Arm angles come
        from the renderer (--idl-*), and the rail gets none, so its arms stay at rest. */
     &:not([data-idle]) .idl-props { display: none }

@@ -10,7 +10,7 @@ export const INK = "#1b1428";
 /** The colour a piece is painted in. body, belly, dark and spot follow the bicho's colour; horn, gold, pink and ink are
  * fixed. A literal "#rrggbb" is allowed for the odd fixed colour (it gets the same shading), but prefer a role. */
 export type Role = "body" | "belly" | "dark" | "spot" | "horn" | "gold" | "pink" | "ink";
-export type Paint = Role | `#${string}`;
+export type Paint = Role | `#${string}` | `var(${string})`;
 
 /* ---------- bodies, frames and anchors ---------- */
 
@@ -152,6 +152,9 @@ export interface Spec {
   name: string;
   /** The legendary palette (gold body). */
   shiny?: boolean;
+  /** Colours beyond the base (palette.ts): `<slot>-body|belly|dark` repaint the body, belly and dark pieces of that slot's
+   * parts; `belly`, `dark`, `spot`, `pink`, `gold` and `horn` replace the shared materials. */
+  tints?: Record<string, string>;
 }
 
 /** What a part's draw function gets. */
@@ -202,16 +205,16 @@ export interface PartDef {
   jitter?: Jitter;
   /** Refs: "slot:id", "slot:a|b|c", "slot" (anything in it), "#tag", "body:id". */
   requires?: string[];
-  /** Can't coexist (symmetric: either side declaring it is enough). The seed roller and the editor enforce it. */
+  /** Can't coexist (symmetric: either side declaring it is enough). The generator and the editor enforce it. */
   excludes?: string[];
-  /** Not drawn while this part is (the editor allows the combo; the roller avoids it). */
+  /** Not drawn while this part is (the editor allows the combo; the generator avoids it). */
   hides?: string[];
   tags?: string[];
   /** 0 face basics, 1 small decor, 2 protrudes from the silhouette, 3 loud. Default from the slot. */
   noise?: number;
-  /** Uncommon parts weigh 4 instead of 10 in pools; rare parts only come from the rare roll (1 in 12). */
+  /** Uncommon parts weigh 4 instead of 10 where the generator picks among a slot's parts; rare ones 1.2. */
   rarity?: "uncommon" | "rare";
-  /** Pool weight when a pool lists the part without one (default 10, uncommon 4). */
+  /** How often it comes up among a slot's parts, instead of its tier's weight; 0 retires it from every roll. */
   weight?: number;
 }
 
@@ -221,7 +224,7 @@ export interface SlotDef {
   label: string;
   /** Evaluation order: emitters before readers (top before eyes, eyes before eyewear, arms before held). Ties in draw order follow it too. */
   order: number;
-  /** Evaluation order when it must differ from `order` (draw ties, editor rows and the roller keep `order`). Headgear
+  /** Evaluation order when it must differ from `order` (draw ties, editor rows and the generator keep `order`). Headgear
    * runs at 43: after the eyes (a hat seats itself over them), before marks (they step clear of its brim). */
   evaluate?: number;
   /** Editor row this slot shares (e.g. "Detalles", "Accesorios"); default its own row. */
@@ -235,13 +238,9 @@ export interface SlotDef {
   none?: string;
   layer: number;
   noise?: number;
-  /** A gear slot for the seed roller's gear step; slots with the same region never both get gear ("head"). */
+  /** The accessory zone of a worn or held slot (head, neck, face, hand): a creature wears one accessory per zone. The
+   * back's "back" is not one: back parts are structure, picked by the archetype. */
   gear?: string;
-  /** How often the gear step tries this slot first, against 1 for the others (default 1). */
-  gearWeight?: number;
-  /** A gear slot that also holds body parts (back: quills, shells): only its parts with this tag are gear, for the gear
-   * step and the rare roll (the cape, the backpack and the jetpack carry `gear`). */
-  gearTag?: string;
   /** Its parts are named in the traits line. */
   trait?: boolean;
 }
@@ -254,78 +253,15 @@ export interface SlotDef {
  *   cyclops eye. */
 export const LAYER = { back: 8, tail: 10, top: 20, legs: 25, body: 30, skin: 30.5, face: 50, nose: 55, decor: 60, worn: 70, float: 75, arms: 80, held: 85 } as const;
 
-/* ---------- families and members (the seed roller's templates) ---------- */
-
-/** "id", ["a", "b"] (part weights), or { a: 3, b: 1 }. */
-export type Weighted = string | string[] | Record<string, number>;
-/** A slot a member may fill: `p` is the chance it is filled at all (default 1). */
-export interface Pool { p?: number; pick: Weighted }
-export type Num = number | [number, number] | { pick: number[] };
-export interface ColorRule { weight?: number; hue?: Num; sat?: Num; light?: Num; spot?: Num }
-
-export interface FamilyDef {
-  id: string;
-  label: string;
-  weight: number;
-  color?: ColorRule | ColorRule[];
-  /** Added to every member's pools; other families borrow them too, through the cross-family roll. */
-  pools?: Record<string, Pool | Weighted>;
-  /** Offered only to other families' bichos, through the cross-family roll; never to this family's own members. A
-   * slot here replaces the same slot of `pools` in that roll. */
-  cross?: Record<string, Pool | Weighted>;
-}
-
-export interface MemberDef {
-  id: string;
-  family: string;
-  /** Spanish: the editor's template chip and the bicho's name. */
-  label: string;
-  /** Default 10; the existing templates weigh 14, rare members 3. */
-  weight?: number;
-  bodies: Weighted;
-  /** Always present (the signature parts plus fixed defaults). Multi slots take a list. "a|b" is a fallback list: the
-   * first id that exists wins (a part from a later batch, with a stand-in until it lands). A single slot may also take
-   * weighted options, `{ bunny: 10, "ears-lop": 3 }`: one of them is always there, never dropped or replaced. */
-  fixed?: Record<string, string | string[] | Record<string, number>>;
-  pools?: Record<string, Pool | Weighted>;
-  /** Overrides the family's colour rule. */
-  color?: ColorRule | ColorRule[];
-}
-
-/** Options a batch adds to a family or a member declared in another file (B06 lends the core cat its patch). The file
- * that owns the parts says where they roll; the base definition stays where it is. */
-export interface Extension {
-  family: string;
-  /** Omitted: the family itself (its `pools` and `cross`). */
-  member?: string;
-  /** More options for a member's fixed single slot, by weight (the base pick weighs its part's weight). */
-  fixed?: Record<string, Record<string, number>>;
-  /** More pools: they add to the existing ones like a family's pools add to a member's (the highest `p` wins, each id
-   * keeps its highest weight), so give `p` when the slot already has a pool. */
-  pools?: Record<string, Pool | Weighted>;
-  /** Families only: more cross pools (see `FamilyDef.cross`). */
-  cross?: Record<string, Pool | Weighted>;
-}
-
 /** Old or new spec JSON; the loader adapts it. */
 export type SpecInput = Partial<Spec> | Record<string, unknown>;
 
 export interface Batch {
-  /** Lab row title for this file's showcase. */
-  label?: string;
   slots?: SlotDef[];
   bodies?: BodyDef[];
   parts?: PartDef[];
-  families?: FamilyDef[];
-  members?: MemberDef[];
-  /** Options for families and members declared in other files. */
-  extend?: Extension[];
-  /** Seed prefixes: "monstruo:<rest>" → prefixes.monstruo(rest). */
-  prefixes?: Record<string, (rest: string) => SpecInput>;
   /** Injected under `.av[data-style=bichos]`, with `&` nesting and top-level @keyframes. */
   css?: string;
-  /** Seeds shown as a lab row (try "bicho:<family>/<member>:<seed>?slot=id"). Members get a row on their own. */
-  showcase?: string[];
 }
 
 /** Types the default export of a part file. */

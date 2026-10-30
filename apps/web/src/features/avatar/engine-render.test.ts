@@ -4,8 +4,8 @@ import { backdropFromSeed, backdropSvg } from "./engine/backdrop";
 import { uid, type Size } from "./engine/core";
 import { deskFromSeed, deskSvg } from "./engine/desk";
 import { renderSpec } from "./engine/bichos/render";
-import { BODIES, FAMILIES, MEMBERS } from "./engine/bichos/registry";
-import { specFromSeed } from "./engine/bichos/seed";
+import { KINDS } from "./engine/bichos/archetypes";
+import { roll, specFromSeed } from "./engine/bichos/generate";
 import { normalizeSpec } from "./engine/bichos/spec";
 import { renderMascot } from "./engine/styles/bichos";
 
@@ -32,18 +32,18 @@ function stable(prefix: "bx" | "bd", draw: () => string): string {
 const line = (name: string, html: string) => `${name} ${createHash("sha256").update(html).digest("hex").slice(0, 16)} ${html.length}`;
 
 function sample(): string[] {
-  // Conversation ids as the app has them, an odd one, every body kind pinned, and every member of every family.
-  const families = FAMILIES.filter((family) => MEMBERS.some((member) => member.family === family.id));
+  // Conversation ids as the app has them, an odd one, and every kind (archetype and sub-type) rolled a few times.
   const seeds = [
     ...Array.from({ length: 40 }, (_, i) => `thread-${i}`),
     "t-login", "7f3c2a91-thread", "Ünïcødé ✓",
-    ...BODIES.map((body, i) => `bicho:${families[i % families.length].id}:body-${i}?body=${body.id}`),
-    ...MEMBERS.map((member) => `bicho:${member.family}/${member.id}:sample`),
   ];
   const lines: string[] = [];
-  for (const seed of seeds) {
-    const spec = specFromSeed(seed);
-    for (const size of SIZES) lines.push(line(`${seed} ${size}`, stable("bx", () => renderSpec(spec, size).html)));
+  const drawings = [
+    ...seeds.map((seed) => ({ name: seed, spec: specFromSeed(seed) })),
+    ...KINDS.flatMap((kind) => [1, 2, 3].map((i) => ({ name: `${kind.id}#${i}`, spec: roll(`sample-${i}`, kind.id).spec }))),
+  ];
+  for (const { name, spec } of drawings) {
+    for (const size of SIZES) lines.push(line(`${name} ${size}`, stable("bx", () => renderSpec(spec, size).html)));
   }
   // The scenes a seed also rolls: its backdrop (on each theme) and its desk.
   for (const seed of seeds.slice(0, 20)) {

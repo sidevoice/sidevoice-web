@@ -1,19 +1,16 @@
 import { expect, test } from "vitest";
 import { renderSpec } from "./engine/bichos/render";
-import { specFromSeed } from "./engine/bichos/seed";
+import { normalizeSpec } from "./engine/bichos/spec";
 
-/* The XX bucket (b09-gear-head.ts): the operator's hat, one part per puff colour, asked for by name in a seed. */
+/* The XX bucket (b09-gear-head.ts): the operator's hat, one part per puff colour, worn by a creature put together by hand. */
 
 const COLOURS = { purple: "#9b5de5", lime: "#c6f36b", orange: "#ff6a2b" } as const;
-const seeds = {
-  purple: "bicho:furry/cat:b09-xx-morado?headgear=xx-bucket-purple",
-  lime: "bicho:monsters/monster:b09-xx-lima?headgear=xx-bucket-lime&eyes=two",
-  orange: "bicho:furry/bear:b09-xx-naranja?headgear=xx-bucket-orange",
-} as const;
+/** A creature wearing it, as the editor would put one together. */
+const wearing = (colour: string) => normalizeSpec({ body: "round", parts: { eyes: "two", mouth: "smile", arms: "nubs", legs: "feet", headgear: `xx-bucket-${colour}` }, color: { hue: 28, sat: 80, light: 60, spot: 160 }, shape: `b09-xx-${colour}`, name: "xx" });
 
 for (const [colour, puff] of Object.entries(COLOURS) as [keyof typeof COLOURS, string][]) {
   test(`the ${colour} XX bucket: its puff face over the ink at every size, the splatter only where it reads`, () => {
-    const spec = specFromSeed(seeds[colour]);
+    const spec = wearing(colour);
     expect(spec.parts.headgear).toBe(`xx-bucket-${colour}`);
     const stage = renderSpec(spec, "stage").html, sidebar = renderSpec(spec, "sidebar").html, rail = renderSpec(spec, "rail").html;
     for (const html of [stage, sidebar, rail]) {
