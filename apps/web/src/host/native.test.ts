@@ -15,14 +15,15 @@ describe("a page outside an app", () => {
     expect(outside.identity.deviceName()).toBeNull();
     expect(outside.presence.media).toBe("page");
     expect(outside.voice.runs).toBe("page");
-    for (const member of [outside.microphone, outside.storage, outside.localHost, outside.reset, outside.muteShortcut,
+    expect(nativeHost().storage).toBeNull();
+    for (const member of [outside.microphone, outside.localHost, outside.reset, outside.muteShortcut,
       outside.callControls, outside.updater, outside.debug]) expect(member).toBeNull();
     expect(cardSeam()).toBeNull();
   });
 
   test("an app that has injected an empty host offers nothing either", () => {
     withHost({});
-    expect(host().storage).toBeNull();
+    expect(nativeHost().storage).toBeNull();
     expect(host().localHost).toBeNull();
   });
 });
@@ -43,7 +44,7 @@ describe("storage and reset", () => {
 
   test("pairings are the app's to keep on every OS, and the reset is offered only where the app can do it", () => {
     withHost({ pairings });
-    expect(host().storage?.pairings).toBe(pairings);
+    expect(host().storage.pairings).toBe(pairings);
     expect(host().reset).toBeNull();
     withHost({ pairings, reset });
     expect(host().reset).toBe(reset);
@@ -51,12 +52,12 @@ describe("storage and reset", () => {
 
   test("a store without the functions the page calls is none", () => {
     withHost({ pairings: { read: async () => ({}) } });
-    expect(host().storage).toBeNull();
+    expect(nativeHost().storage).toBeNull();
   });
 
   test("a reset does not depend on the app keeping pairings", () => {
     withHost({ reset });
-    expect(host().storage).toBeNull();
+    expect(nativeHost().storage).toBeNull();
     expect(host().reset).toBe(reset);
   });
 
@@ -69,7 +70,7 @@ describe("storage and reset", () => {
 
   test("the old shape, a data member that holds both, is not read", () => {
     withHost({ data: { pairings, ...reset } });
-    expect(host().storage).toBeNull();
+    expect(nativeHost().storage).toBeNull();
     expect(host().reset).toBeNull();
   });
 });

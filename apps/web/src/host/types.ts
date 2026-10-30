@@ -79,7 +79,8 @@ export interface RemoteControls {
 export interface ScreenAwake {
   /** Whether this browser can hold the screen at all. */
   readonly supported: boolean;
-  /** Asks for the lock, inside the gesture that started the call when there is one. */
+  /** Asks for the lock, inside the gesture that started the call when there is one. A request granted after a `release()`
+   *  lets its own lock go and answers `held` all the same: the one that released has moved on and does not use it. */
   acquire(): Promise<"held" | "unsupported" | "failed">;
   release(): void;
   /** The system took the lock back on its own (a screen that locked once, a route change). Returns how to stop. */
@@ -99,7 +100,7 @@ export interface HostPresence {
   readonly media: "page" | "app";
   /** The page's own, where `media` is `page` and the browser has a Media Session; null where the app owns the media. */
   remote: RemoteControls | null;
-  /** The page's own, null where the host decides: an app keeps its computer awake as any app does. */
+  /** The page's own. Null would be a host that decides for itself; none says so yet. */
   screenAwake: ScreenAwake | null;
 }
 
@@ -128,8 +129,22 @@ export interface PairingsStore {
   write(value: PairingsRecord & { pendingRevokes: Pairing[] }): Promise<void>;
 }
 
+/** The pairings kept in this page's own storage, which only a browser's is. It reads at once, so the page starts with the
+ *  machines it has and not an empty list; it writes as well as it can, and a store that refuses still pairs for this
+ *  visit (the caller tells the person); and the machines that could not be told are read live, as another tab left them. */
+export interface PagePairings {
+  readState(): { list: Pairing[] };
+  /** False when the browser kept nothing; the pairing still happens. */
+  write(book: { list: Pairing[] }): boolean;
+  readRevokes(): Pairing[];
+  writeRevokes(list: Pairing[]): void;
+}
+
 export interface HostStorage {
   pairings: PairingsStore;
+  /** Present where the host keeps the pairings in this page's own storage: the browser's. The app's are `pairings` alone,
+   *  read and written asynchronously, and a write it refuses fails the change. */
+  page?: PagePairings;
 }
 
 export type LocalHostStatusName = "absent" | "installing" | "not-installed" | "stopped-by-person" | "starting" |
@@ -326,7 +341,7 @@ export interface Host {
   microphone: Partial<MicrophoneBridge> | null;
   voice: VoiceMember;
   presence: HostPresence;
-  storage: HostStorage | null;
+  storage: HostStorage;
   reach: ReachTransport;
   localHost: LocalHostBridge | null;
   reset: ResetBridge | null;
