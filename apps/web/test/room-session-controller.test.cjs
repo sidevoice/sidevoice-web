@@ -416,6 +416,128 @@ test('A lock the system takes back is asked for again while the call is up, and 
  release();
  assert.equal(scheduled.length,0,'a call that ended does not keep the screen awake');
 });
+// ----- call presence: what the lock screen, the headset and the screen lock keep doing, whoever provides them -----
+// The page's Media Session, as a call sets it up: handlers per action, and the tile's metadata.
+function mediaSession(s,{playing=true}={}){
+ const handlers={},session={metadata:null,setActionHandler(action,fn){handlers[action]=fn}};
+ s.context.navigator={mediaSession:session};
+ s.context.MediaMetadata=class{constructor(init){Object.assign(this,init)}};
+ const voice=fakeVoice();s.context.__voice=voice;
+ s.run("voice=__voice;ws={};conversationCalls.set('test',{call:__voice});micEnabled="+playing);
+ return {handlers,session,voice};
+}
+// The faint loop the lock screen takes for Now Playing, as an element a test can see play and pause.
+function nowPlayingLoop(s){
+ const elements=[];
+ s.context.Blob=Blob;
+ s.context.Audio=class{constructor(){this.paused=true;this.attributes={};elements.push(this)}
+  setAttribute(name,value){this.attributes[name]=value}play(){this.paused=false;return Promise.resolve()}pause(){this.paused=true}};
+ return elements;
+}
+test('Lock screen: play opens the microphone, and leaves it open if it was',()=>{
+ const s=setup();const {handlers}=mediaSession(s);
+ s.run('applyLockScreen(true)');
+ handlers.play();assert.equal(s.run('micEnabled'),true,'play while unmuted stays unmuted');
+ s.run('micEnabled=false');handlers.play();assert.equal(s.run('micEnabled'),true,'play while muted unmutes');
+});
+test('Lock screen: pause toggles the microphone, because a click may arrive as pause even while muted',()=>{
+ const s=setup();const {handlers}=mediaSession(s);
+ s.run('applyLockScreen(true)');
+ handlers.pause();assert.equal(s.run('micEnabled'),false,'pause while open mutes');
+ handlers.pause();assert.equal(s.run('micEnabled'),true,'pause while muted unmutes');
+});
+test('Lock screen: togglemicrophone follows isActivating when the browser says it, and toggles when it does not',()=>{
+ const s=setup();const {handlers}=mediaSession(s);
+ s.run('applyLockScreen(true)');
+ handlers.togglemicrophone({isActivating:false});assert.equal(s.run('micEnabled'),false);
+ handlers.togglemicrophone({isActivating:true});assert.equal(s.run('micEnabled'),true);
+ handlers.togglemicrophone({isActivating:true});assert.equal(s.run('micEnabled'),true,'activating while open stays open');
+ handlers.togglemicrophone({});assert.equal(s.run('micEnabled'),false,'no word of it: a toggle');
+ handlers.togglemicrophone();assert.equal(s.run('micEnabled'),true);
+});
+test('Lock screen: the tile is the call\'s, set while it is up and gone when it ends',()=>{
+ const s=setup();const {handlers,session}=mediaSession(s);
+ s.run('applyLockScreen(true)');
+ assert.deepEqual(['play','pause','togglemicrophone'].map(action=>typeof handlers[action]),['function','function','function']);
+ assert.equal(session.metadata.title,'Sidevoice');
+ s.run('applyLockScreen(false)');
+ assert.deepEqual(['play','pause','togglemicrophone'].map(action=>handlers[action]),[null,null,null]);
+ assert.equal(session.metadata,null);
+});
+test('Lock screen: an action the browser does not know leaves the others set',()=>{
+ const s=setup();const {handlers,session}=mediaSession(s);
+ session.setActionHandler=(action,fn)=>{if(action==='togglemicrophone')throw new TypeError('unsupported');handlers[action]=fn};
+ s.run('applyLockScreen(true)');
+ assert.equal(typeof handlers.play,'function');assert.equal(typeof handlers.pause,'function');
+ assert.equal(session.metadata.title,'Sidevoice');
+});
+test('Now Playing: a faint loop plays while the microphone is open and the call is up, and is paused while muted',()=>{
+ const s=setup();const {handlers}=mediaSession(s);const elements=nowPlayingLoop(s);
+ s.run('primeNowPlaying()');
+ assert.equal(elements.length,1);assert.equal(elements[0].loop,true);assert.equal(elements[0].attributes.playsinline,'');
+ s.run('primeNowPlaying()');assert.equal(elements.length,1,'one element for the page');
+ s.run('applyLockScreen(true)');assert.equal(elements[0].paused,false,'open: playing');
+ handlers.pause();assert.equal(elements[0].paused,true,'muted: paused');
+ handlers.play();assert.equal(elements[0].paused,false);
+ s.run('applyLockScreen(false)');assert.equal(elements[0].paused,true,'no call: paused');
+});
+test('Now Playing: none without a Media Session, and none where the app owns the lock screen',()=>{
+ const s=setup();const elements=nowPlayingLoop(s);
+ s.context.navigator={};s.run('primeNowPlaying()');
+ assert.equal(elements.length,0,'no Media Session: no tile to own');
+ const {handlers,session}=mediaSession(s);
+ s.context.window.__sidevoiceDesktop={host:{mediaKeys:'native'}};
+ s.run('primeNowPlaying()');s.run('applyLockScreen(true)');
+ assert.equal(elements.length,0,'the app is the Now Playing app: this element would compete with it');
+ assert.deepEqual(handlers,{},'and handlers here would toggle the microphone twice on one click');
+ assert.equal(session.metadata,null);
+});
+test('A lock the system takes back when the page hides is asked for again once it shows',async()=>{
+ const s=setup();let requests=0,release=null;const scheduled=[];
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
+ s.context.setTimeout=fn=>{scheduled.push(fn);return 0};
+ s.context.navigator={wakeLock:{request:async()=>{requests++;return {release:async()=>{},addEventListener:(name,fn)=>{if(name==='release')release=fn}}}}};
+ s.run('ws={}');
+ await s.run('keepScreenAwake()');
+ assert.equal(requests,1);assert.equal(s.run('screenLock.state'),'on');
+ s.context.document.hidden=true;release();
+ assert.equal(s.run('screenLock.state'),'off');assert.equal(s.run('screenLock.note'),'session.screen.released');
+ assert.equal(scheduled.length,0,'a page that is hidden does not ask again');
+ await s.run('keepScreenAwake()');assert.equal(requests,1,'nor does a sign of the call while it is hidden');
+ s.context.document.hidden=false;await s.dispatch('visibilitychange',{});
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(requests,2,'showing the page asks again');assert.equal(s.run('screenLock.state'),'on');
+});
+test('A browser with no wake lock says so',async()=>{
+ const s=setup();
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
+ s.context.navigator={};s.run('ws={}');
+ await s.run('keepScreenAwake()');
+ assert.equal(s.run('screenLock.state'),'off');assert.equal(s.run('screenLock.note'),'session.screen.unsupported');
+});
+test('A refused lock is asked for again by the next sign of the page, and the retry holds',async()=>{
+ const s=setup();let requests=0;
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
+ s.context.navigator={wakeLock:{request:async()=>{if(++requests===1)throw Error('NotAllowedError');return {release:async()=>{},addEventListener(){}}}}};
+ s.run('ws={}');
+ await s.run('keepScreenAwake()');
+ assert.equal(s.run('screenLock.note'),'session.screen.failed');assert.equal(requests,1);
+ await s.run('keepScreenAwake()');
+ assert.equal(requests,2,'nothing retries by itself, the next sign does');
+ assert.equal(s.run('screenLock.state'),'on');assert.equal(s.run('screenLock.note'),'session.screen.on');
+});
+test('A lock that ends with the call is released, and a late grant is released too',async()=>{
+ const s=setup();let grant,released=0;
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
+ s.context.navigator={wakeLock:{request:()=>new Promise(resolve=>grant=resolve)}};
+ s.run('ws={}');
+ const held=s.run('keepScreenAwake()');
+ grant({release:async()=>{released++},addEventListener(){}});await held;
+ assert.equal(s.run('screenLock.state'),'on');
+ s.run('ws=null;releaseScreenWakeLock()');
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(released,1);assert.equal(s.run('screenLock.state'),'');
+});
 test('Settings are reached from the header menu',()=>{
  // The ⋯ menu's Settings entry is the very button the runtime opens the dialog from: one entry, nothing relaying to it.
  const s=setup({strictDOM:true});
