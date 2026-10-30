@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.14.0](https://github.com/sidevoice/sidevoice-web/compare/v0.13.0...v0.14.0) (2026-10-30)
+
+
+### Features
+
+* **avatar:** archetype-based creature generation ([#393](https://github.com/sidevoice/sidevoice-web/issues/393)) ([34b8874](https://github.com/sidevoice/sidevoice-web/commit/34b88745d22bc5b81d85ed571324337cd7463725))
+* **machines:** show the port a machine's Core listens on ([#388](https://github.com/sidevoice/sidevoice-web/issues/388)) ([ed047c0](https://github.com/sidevoice/sidevoice-web/commit/ed047c03096c3e48f5b704088ae113f9d3156582))
+* **models:** hide families and models that can't run here ([#389](https://github.com/sidevoice/sidevoice-web/issues/389)) ([fd973c7](https://github.com/sidevoice/sidevoice-web/commit/fd973c74a4f2a1919df7ee9eadd01085815f9679))
+* **onboarding:** show how to allow microphone access on Windows ([#385](https://github.com/sidevoice/sidevoice-web/issues/385)) ([3e0125d](https://github.com/sidevoice/sidevoice-web/commit/3e0125dcbd5dc363317b4dc647ca5c9a8ac5fdf8))
+* **settings:** mark an available app update on the gear and the Updates entry ([#390](https://github.com/sidevoice/sidevoice-web/issues/390)) ([f89df5a](https://github.com/sidevoice/sidevoice-web/commit/f89df5a03601947dab63fb2d06a4bd92d3416c46))
+* **transcript:** lighter treatment for unheard and cut replies (variants) ([#386](https://github.com/sidevoice/sidevoice-web/issues/386)) ([a211668](https://github.com/sidevoice/sidevoice-web/commit/a211668911939fcf9bdc6b0f9dc7da331820701f))
+
+
+### Bug Fixes
+
+* **telemetry:** stop probing the room's removed /api/telemetry ([#391](https://github.com/sidevoice/sidevoice-web/issues/391)) ([5edf78f](https://github.com/sidevoice/sidevoice-web/commit/5edf78f91080363e07ffda9e05c4bb2d9c523640))
+
 ## [0.13.0](https://github.com/sidevoice/sidevoice-web/compare/v0.12.0...v0.13.0) (2026-10-28)
 
 
