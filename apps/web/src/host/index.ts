@@ -1,11 +1,16 @@
 import type { Host } from "./types";
+import { pageMicrophone as microphoneOfPage } from "./browser-microphone";
 import { parseBrowser } from "./identity";
 import { nativeCardSeam, nativeHost } from "./native";
 
 export type * from "./types";
+export type { PageAnswer, PageMicrophone, PermissionView } from "./browser-microphone";
 
 /** What the browser says of itself: its system and its name, as a device name says them; `os` is the host's. */
 export const describeBrowser = parseBrowser;
+
+/** The browser's side of the microphone: the mechanisms only, for `MicrophoneAccess` to build the states a person sees on. */
+export const pageMicrophone = microphoneOfPage;
 
 /** The page's host, as it is now: an app may inject its members after the page's script runs, so this is read where it is
  *  needed and not kept. The one way into anything the browser or an app offers beyond the page itself. */

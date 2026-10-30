@@ -1,4 +1,4 @@
-import { host, type MicrophoneBridge } from "../host";
+import { host, pageMicrophone, type MicrophoneBridge, type PermissionView } from "../host";
 
 /* Whether this page may use the microphone, and asking for it (web#129): the first-run setup asks early, in a step of
  * its own, so voice never silently fails for a permission nobody asked for. Where the desktop app runs the voice call
@@ -43,48 +43,20 @@ export function microphoneBridge(): MicrophoneBridge | null {
   return bridge && typeof bridge.state === "function" && typeof bridge.request === "function" ? bridge as MicrophoneBridge : null;
 }
 
-type PermissionView = { state: string; addEventListener?(type: "change", listener: () => void): void; removeEventListener?(type: "change", listener: () => void): void };
-
-/** A failed open never proves that audio can be captured. */
-function refusal(error: unknown): "missing" | "denied" {
-  const name = (error as { name?: string } | null)?.name ?? "";
-  if (name === "NotFoundError" || name === "OverconstrainedError" || name === "DevicesNotFoundError") return "missing";
-  if (name === "NotReadableError" || name === "TrackStartError") return "missing";
-  return "denied";
-}
-
-/** A prompt closed without an answer, where the browser says so (Chromium: "Permission dismissed"); any other refusal
- *  is one. The permission's query cannot tell: iPhone Safari keeps it at "prompt" through the person's Don't Allow. */
-function dismissed(error: unknown) {
-  const { name, message } = (error ?? {}) as { name?: string; message?: string };
-  return name === "NotAllowedError" && /dismissed/i.test(message ?? "");
-}
-
-/** What the page's own `getUserMedia` last answered, shared by every reader of the page (the call's, Settings', the
- *  device list's): the browser's word on the microphone, which its permission query is not (iPhone Safari keeps that at
- *  "prompt", with no change event, once allowed; web#231). Kept per page, by its media devices. */
-interface PageAnswer { answer: "granted" | "denied" | "missing" | null; readers: Set<() => void> }
-const pageAnswers = new WeakMap<MediaDevices, PageAnswer>();
-function pageAnswer(media: MediaDevices): PageAnswer {
-  let page = pageAnswers.get(media);
-  if (!page) pageAnswers.set(media, page = { answer: null, readers: new Set() });
-  return page;
-}
-
 export function createMicrophoneAccess(win: Window & typeof globalThis = window): MicrophoneAccess {
   const listeners = new Set<() => void>();
   const bridge = microphoneBridge();
   const settings = host().microphone;
-  const media = win.navigator?.mediaDevices;
+  const mic = pageMicrophone(win);
   const inAppCall = host().voice !== null;
   // The app asks where it runs the call; a page in such an app is never given the microphone, and an app too old to
   // ask leaves it to its call: nothing to ask here. Elsewhere, the page asks where it can.
   const asker: MicrophoneSnapshot["asker"] = bridge ? "app" : "page";
-  const askable = !!bridge || (!inAppCall && typeof media?.getUserMedia === "function");
+  const askable = !!bridge || (!inAppCall && !!mic?.canAsk);
   let snapshot: MicrophoneSnapshot = { state: askable ? "checking" : "none", asker, known: !!bridge, dismissed: false, unchanged: false, from: null };
   let status: PermissionView | null = null;
   // A browser permission query is a hint. WebKit can report denied after getUserMedia has opened a stream.
-  const page = askable && !bridge ? pageAnswer(media!) : null;
+  const page = askable && !bridge ? mic : null;
   let disposed = false;
   // Only the newest read or request writes the state: a slow one never overwrites a later answer.
   let run = 0;
@@ -115,21 +87,12 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
     if (!askable) return;
     if (!bridge) {
       try {
-        status = await win.navigator.permissions?.query({ name: "microphone" as PermissionName }) ?? null;
+        status = await page!.permission();
         status?.addEventListener?.("change", onChange);
       } catch { status = null; }
       set({ known: !!status });
     }
     await check();
-  }
-
-  /** Whether a microphone is plugged in, as the device list says (it lists them without permission); null where it cannot say. */
-  async function devices(): Promise<boolean | null> {
-    if (typeof media?.enumerateDevices !== "function") return null;
-    try {
-      const list = await media.enumerateDevices();
-      return list.some((device) => device.kind === "audioinput");
-    } catch { return null; }
   }
 
   async function check() {
@@ -144,7 +107,7 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
       // The app's own read is the system's answer: authoritative, in every direction.
       state = now ?? (before === "granted" || before === "denied" || before === "missing" ? before : "prompt");
     } else {
-      const plugged = await devices();
+      const plugged = await page!.plugged();
       if (mine !== run) return;
       // An opened stream is the browser's word, over a device list that may list none once it is let go (iPhone Safari).
       const answer = page!.answer;
@@ -171,18 +134,10 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
         return;
       }
     } else {
-      try {
-        // Called in the tap itself, before any await: iPhone Safari asks only from a gesture.
-        const stream = await media!.getUserMedia({ audio: true });
-        const audio = stream.getAudioTracks?.() ?? stream.getTracks();
-        if (!audio.length || audio.every((track) => track.readyState === "ended")) {
-          for (const track of stream.getTracks()) track.stop();
-          throw new DOMException("No live audio track", "NotFoundError");
-        }
-        // Only the permission was wanted: the microphone is let go at once.
-        for (const track of stream.getTracks()) track.stop();
-        answer = "granted";
-      } catch (error) { answer = refusal(error); closed = dismissed(error); }
+      // Called in the tap itself, before any await: iPhone Safari asks only from a gesture.
+      const opened = await page!.open();
+      closed = opened === "dismissed";
+      answer = opened === "dismissed" ? "denied" : opened;
     }
     if (mine !== run) return;
     if (page) {
@@ -197,11 +152,12 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
   // Back from the system's settings or the browser's: read it again, whatever it was.
   const onReturn = () => { if (win.document?.visibilityState !== "hidden" && snapshot.state !== "requesting") void check(); };
   let unwatchBridge: (() => void) | undefined;
+  let unwatchDevices: (() => void) | undefined;
   if (askable) {
     win.addEventListener?.("focus", onReturn);
     win.document?.addEventListener?.("visibilitychange", onReturn);
     // A microphone plugged in or out.
-    media?.addEventListener?.("devicechange", onDeviceChange);
+    unwatchDevices = mic?.onDeviceChange(onDeviceChange);
     // Another reader of the page asked: its answer is this page's too.
     page?.readers.add(onChange);
     // The app says when the system's answer changes, where it can.
@@ -218,7 +174,7 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
     dispose() {
       disposed = true;
       status?.removeEventListener?.("change", onChange);
-      media?.removeEventListener?.("devicechange", onDeviceChange);
+      unwatchDevices?.();
       page?.readers.delete(onChange);
       unwatchBridge?.();
       win.removeEventListener?.("focus", onReturn);
