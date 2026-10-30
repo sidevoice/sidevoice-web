@@ -20,8 +20,10 @@ Rules for any coding agent (and person) working in this repository.
 
 The web runs in a browser or inside an app (the desktop app, later the mobile one), and asks for what the host offers
 through `host()` (`apps/web/src/host`), never from the host directly. Only `src/host` names a host mechanism: the object an
-app injects (`window.__sidevoiceHost`, and the `__sidevoiceDesktop` it replaces), what the browser says of itself (`navigator.userAgent`, `platform`,
-`userAgentData`), the Media Session, the wake lock, and the microphone's `getUserMedia`. `npm run lint` rejects them
+app injects (`window.__sidevoiceHost`, and the `__sidevoiceDesktop` it replaces), the browser's `navigator` beyond its
+clipboard, language, storage, devices and permissions (it cannot be aliased, passed or destructured: the user agent, the
+platform, the Media Session, the wake lock), and the microphone's `getUserMedia`. And only `host()` (`src/host/index`) and
+the host's types are imported from outside `src/host`, never what is behind them. `npm run lint` rejects all of it
 anywhere else, and no comment switches it off; a test or the dev harness that stands in for an app injects through
 `src/host/testing.ts`. A new thing a host can do is a new member of `Host` (`src/host/types.ts`), not a new check in a
 component.

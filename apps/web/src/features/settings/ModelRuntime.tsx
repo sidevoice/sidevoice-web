@@ -9,6 +9,11 @@ import { buildSizes, describeBuild, engineOf } from "./model-facts";
 import { whyNotHere } from "../../services/voice-settings.js";
 import type { CatalogModel } from "../../services/model-catalogs.js";
 
+/** What a browser tells of this device that lib.dom does not know yet. */
+declare global {
+  interface Navigator { deviceMemory?: number; gpu?: unknown }
+}
+
 /* How a model of this device runs, under its block, folded until asked for: what this device offers (a graphics card
  * the browser can use, its memory and cores — read at once, no benchmark) and each build of the model the engine has —
  * its engine, precision and what it runs on, its download and memory, whether it is the recommended one, on disk, or
@@ -18,11 +23,10 @@ import type { CatalogModel } from "../../services/model-catalogs.js";
 /** This device as the engine sees it in a browser: a graphics card it can use, memory and cores. */
 function DeviceLine({ t }: { t: Translate }) {
   const inApp = useRoomStore((state) => state.facts.inApp);
-  if (inApp || typeof navigator === "undefined") return null;
-  const nav = navigator as Navigator & { deviceMemory?: number; gpu?: unknown };
-  const parts = [nav.gpu ? t("runtime.device.gpu") : t("runtime.device.noGpu"),
-    nav.deviceMemory ? t("runtime.device.memory", { gb: nav.deviceMemory }) : "",
-    nav.hardwareConcurrency ? t("runtime.device.cores", { n: nav.hardwareConcurrency }) : ""].filter(Boolean);
+  if (inApp) return null;
+  const parts = [globalThis.navigator?.gpu ? t("runtime.device.gpu") : t("runtime.device.noGpu"),
+    globalThis.navigator?.deviceMemory ? t("runtime.device.memory", { gb: globalThis.navigator.deviceMemory }) : "",
+    globalThis.navigator?.hardwareConcurrency ? t("runtime.device.cores", { n: globalThis.navigator.hardwareConcurrency }) : ""].filter(Boolean);
   return <p className="model-runtime-device">{t("runtime.device", { what: parts.join(" · ") })}</p>;
 }
 

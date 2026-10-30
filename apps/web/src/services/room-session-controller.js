@@ -2054,9 +2054,8 @@ function microphoneHint(granted){
  hintedAt=at;giveMicrophones();
 }
 try{
- const navigatorOfPage=window.navigator;
- navigatorOfPage?.mediaDevices?.addEventListener?.('devicechange',()=>microphoneHint(false));
- navigatorOfPage?.permissions?.query?.({name:'microphone'}).then(status=>status?.addEventListener?.('change',()=>{if(status.state==='granted')microphoneHint(true)}),()=>{});
+ window.navigator?.mediaDevices?.addEventListener?.('devicechange',()=>microphoneHint(false));
+ window.navigator?.permissions?.query?.({name:'microphone'}).then(status=>status?.addEventListener?.('change',()=>{if(status.state==='granted')microphoneHint(true)}),()=>{});
 }catch{}
 /* A call without its input half takes it back live (the voice's `update`), without rejoining: the microphone it was
  * missing can be had. The change comes at the next turn; the mute the person chose stays. */
