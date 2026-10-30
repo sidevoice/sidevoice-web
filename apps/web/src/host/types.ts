@@ -88,12 +88,22 @@ export interface MicrophoneBridge {
   onChange?(listener: () => void): () => void;
 }
 
-/** The pairings this device keeps, where the app keeps them (private remote pairings: every desktop build). */
+/** What this device keeps of its machines: the remote pairings (never the local host's, which the app projects), and the
+ *  machines it forgot without being able to tell them, to tell again (their token is still good there until then). */
+export interface PairingsRecord {
+  pairings: Pairing[];
+  pendingRevokes?: Pairing[];
+}
+
+/** The pairings this device keeps, where the app keeps them (private remote pairings: every desktop build). A write that
+ *  fails rejects, and the change it was part of does not happen. */
+export interface PairingsStore {
+  read(): Promise<PairingsRecord>;
+  write(value: PairingsRecord & { pendingRevokes: Pairing[] }): Promise<void>;
+}
+
 export interface HostStorage {
-  pairings: {
-    read(): Promise<{ pairings: Pairing[]; pendingRevokes?: Pairing[] }>;
-    write(value: { pairings: Pairing[]; pendingRevokes: Pairing[] }): Promise<void>;
-  };
+  pairings: PairingsStore;
 }
 
 export type LocalHostStatusName = "absent" | "installing" | "not-installed" | "stopped-by-person" | "starting" |

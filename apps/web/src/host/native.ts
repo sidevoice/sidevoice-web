@@ -1,6 +1,6 @@
 import type {
   AppBuild, AppUpdater, AppVoice, CallControlsBridge, Host, HostDebugBridge, HostIdentity, HostPresence, HostStorage, LocalHostBridge, MicrophoneBridge,
-  MuteShortcutBridge, ResetBridge,
+  MuteShortcutBridge, PairingsStore, ResetBridge,
 } from "./types";
 
 /* What an app injects into its page, as the app does today: `window.__sidevoiceDesktop.host`, one optional member per
@@ -40,7 +40,7 @@ export type NativeHost = Omit<Host, "identity" | "presence"> & { identity: Omit<
 export function nativeHost(): NativeHost {
   const app = injected();
   const data = app?.data as Record<string, unknown> | undefined;
-  const pairings = data?.pairings as HostStorage["pairings"] | undefined;
+  const pairings = data?.pairings as PairingsStore | undefined;
   const storage: HostStorage | null = pairings && typeof pairings.read === "function" && typeof pairings.write === "function" ? { pairings } : null;
   const debug = app?.debug as Partial<HostDebugBridge> | undefined;
   const microphone = app?.microphone as Partial<MicrophoneBridge> | undefined;

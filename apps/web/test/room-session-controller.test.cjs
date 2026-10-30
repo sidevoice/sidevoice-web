@@ -538,6 +538,47 @@ test('A lock that ends with the call is released, and a late grant is released t
  await new Promise(resolve=>setImmediate(resolve));
  assert.equal(released,1);assert.equal(s.run('screenLock.state'),'');
 });
+// ----- where the pairings are kept: this browser's storage, or the app's (`host().storage`) -----
+// The two are not the same kind of store, and the page relies on it: a browser's is read at once and written as well as it
+// can be, an app's is read and written asynchronously and a write it refuses fails the change. These pin both.
+test('A browser starts with the machines it keeps, with nothing awaited',()=>{
+ const s=setup();
+ assert.deepEqual(Array.from(s.run('pairings.list.map(p=>p.fp)')),['fp-mac']);
+ assert.equal(s.run('nativePairingsReady'),true);
+});
+test('A browser that keeps nothing still pairs for this visit, and says so',async()=>{
+ const s=setup();
+ s.context.localStorage.setItem=()=>{throw Error('QuotaExceededError')};
+ s.context.__next={...PAIRED,fp:'fp-new',device_id:'dev-2'};
+ await s.run('keepPairings(current=>withPairing(current,__next))');
+ assert.deepEqual(Array.from(s.run('pairings.list.map(p=>p.fp)')),['fp-new','fp-mac'],'the machine is there for this visit');
+ assert.match(s.elements.get('error')?.textContent??'',/./,'and the person is told it will not be kept');
+});
+test('An app that cannot keep a pairing fails the change: the machine is not added',async()=>{
+ let full=false;
+ const data={pairings:{read:async()=>({pairings:[PAIRED],pendingRevokes:[]}),write:()=>full?Promise.reject(Error('disk full')):Promise.resolve()}};
+ const s=setup({paired:false,nativeData:data});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ s.context.__next={...PAIRED,fp:'fp-new',device_id:'dev-2'};
+ full=true;
+ await assert.rejects(s.run('keepPairings(current=>withPairing(current,__next))'),{key:'data.pairings-write'});
+ full=false;
+ assert.deepEqual(Array.from(s.run('pairings.list.map(p=>p.fp)')),['fp-mac']);
+});
+test('A browser reads the machines it could not tell when it asks, and an app keeps them with its pairings',async()=>{
+ const s=setup();
+ const pending={fp:'fp-gone',device_id:'d',token:'t',urls:['http://127.0.0.1:1'],public_key:'pk',host:'gone'};
+ s.saved['sidevoice.pending-revokes']=JSON.stringify([pending]);
+ assert.deepEqual(Array.from(s.run('pendingRevokes().map(p=>p.fp)')),['fp-gone'],'live from the page\'s storage, as another tab left it');
+ const writes=[];
+ const data={pairings:{read:async()=>({pairings:[PAIRED],pendingRevokes:[pending]}),write:value=>{writes.push(value);return Promise.resolve()}}};
+ const app=setup({paired:false,nativeData:data});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.deepEqual(Array.from(app.run('pendingRevokes().map(p=>p.fp)')),['fp-gone']);
+ await app.run('writePendingRevokes([])');
+ assert.deepEqual(Array.from(writes.at(-1).pendingRevokes),[],'one record, written whole');
+ assert.deepEqual(Array.from(writes.at(-1).pairings.map(p=>p.fp)),['fp-mac']);
+});
 test('Settings are reached from the header menu',()=>{
  // The ⋯ menu's Settings entry is the very button the runtime opens the dialog from: one entry, nothing relaying to it.
  const s=setup({strictDOM:true});
