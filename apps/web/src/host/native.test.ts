@@ -1,10 +1,10 @@
 import { describe, expect, onTestFinished, test } from "vitest";
-import { cardSeam, host } from ".";
+import { cardSeam, describeBrowser, host, reachOfOrigin } from ".";
 import { nativeHost } from "./native";
 
 const withHost = (members: Record<string, unknown> | undefined) => {
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: members && { host: members } });
-  onTestFinished(() => { Reflect.deleteProperty(window, "__sidevoiceDesktop"); });
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: members && { host: members } });
+  onTestFinished(() => { Reflect.deleteProperty(window, "__sidevoiceHost"); });
 };
 
 describe("a page outside an app", () => {
@@ -39,27 +39,38 @@ describe("a host that arrives after the page's script", () => {
 
 describe("storage and reset", () => {
   const pairings = { read: async () => ({ pairings: [], pendingRevokes: [] }), write: async () => {} };
+  const reset = { deleteAll: async () => ({}), resetReport: async () => null };
 
-  test("native pairings are selected on Windows and Linux without the macOS reset capability", () => {
-    withHost({ data: { pairings } });
+  test("pairings are the app's to keep on every OS, and the reset is offered only where the app can do it", () => {
+    withHost({ pairings });
     expect(host().storage?.pairings).toBe(pairings);
     expect(host().reset).toBeNull();
-    withHost({ data: { pairings, deleteAll: async () => ({}), resetReport: async () => null } });
-    expect(host().reset).not.toBeNull();
+    withHost({ pairings, reset });
+    expect(host().reset).toBe(reset);
   });
 
-  test("a reset without the pairings that go with it is none", () => {
-    withHost({ data: { deleteAll: async () => ({}), resetReport: async () => null } });
+  test("a store without the functions the page calls is none", () => {
+    withHost({ pairings: { read: async () => ({}) } });
     expect(host().storage).toBeNull();
-    expect(host().reset).toBeNull();
+  });
+
+  test("a reset does not depend on the app keeping pairings", () => {
+    withHost({ reset });
+    expect(host().storage).toBeNull();
+    expect(host().reset).toBe(reset);
   });
 
   test("uninstall is the reset's, where the app has it", () => {
-    const data = { pairings, deleteAll: async () => ({}), resetReport: async () => null };
-    withHost({ data });
+    withHost({ reset });
     expect(host().reset?.uninstall).toBeUndefined();
-    withHost({ data: { ...data, uninstall: async () => ({}) } });
+    withHost({ reset: { ...reset, uninstall: async () => ({}) } });
     expect(typeof host().reset?.uninstall).toBe("function");
+  });
+
+  test("the old shape, a data member that holds both, is not read", () => {
+    withHost({ data: { pairings, ...reset } });
+    expect(host().storage).toBeNull();
+    expect(host().reset).toBeNull();
   });
 });
 
@@ -98,21 +109,54 @@ describe("identity", () => {
   });
 
   test("the computer's name is trimmed, and none when it is empty or not text", () => {
-    withHost({ computerName: "  Mac de Ana " });
+    withHost({ deviceName: "  Mac de Ana " });
     expect(host().identity.deviceName()).toBe("Mac de Ana");
-    withHost({ computerName: "   " });
+    withHost({ deviceName: "   " });
     expect(host().identity.deviceName()).toBeNull();
-    withHost({ computerName: 7 });
+    withHost({ deviceName: 7 });
     expect(host().identity.deviceName()).toBeNull();
   });
 });
 
 describe("presence", () => {
-  test("the app owns the lock screen's media where it says its media keys are native", () => {
-    withHost({ mediaKeys: "native" });
+  test("the app owns the lock screen's media where it says so", () => {
+    withHost({ presence: { media: "app" } });
     expect(host().presence.media).toBe("app");
-    withHost({ mediaKeys: "page" });
+    withHost({ presence: { media: "page" } });
     expect(host().presence.media).toBe("page");
+    withHost({ mediaKeys: "native" });
+    expect(host().presence.media).toBe("page");
+  });
+});
+
+describe("the system and the transport", () => {
+  test("an app says its system, and the browser's reading stands where it says none or one this page does not know", () => {
+    withHost({ os: "ios" });
+    expect(host().identity.os).toBe("ios");
+    withHost({ os: "plan9" });
+    expect(host().identity.os).toBe(describeBrowser().os);
+    withHost({});
+    expect(host().identity.os).toBe(describeBrowser().os);
+  });
+
+  test("an app says whether its transport sends plain http to a private address, and the browser's stands where it does not", () => {
+    withHost({ reach: { plainHttpPrivate: true } });
+    expect(host().reach.plainHttpPrivate).toBe(true);
+    withHost({ reach: { plainHttpPrivate: false } });
+    expect(host().reach.plainHttpPrivate).toBe(false);
+    withHost({ reach: { plainHttpPrivate: "yes" } });
+    expect(host().reach.plainHttpPrivate).toBe(reachOfOrigin(window.location.origin).plainHttpPrivate);
+  });
+});
+
+describe("the old name", () => {
+  test("is not read: the web and the app ship together", () => {
+    Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { build: { channel: "release", version: "0.3.0" }, localHost: {
+      state: async () => ({}), subscribe: () => () => {}, pairing: async () => null } } } });
+    onTestFinished(() => { Reflect.deleteProperty(window, "__sidevoiceDesktop"); });
+    expect(host().identity.build).toBeNull();
+    expect(host().localHost).toBeNull();
+    expect(cardSeam()).toBeNull();
   });
 });
 

@@ -12,7 +12,7 @@ import { PermissionsSettings } from "../settings/PermissionsSettings";
 const t = translator("en");
 afterEach(() => {
   cleanup();
-  delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
+  delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost;
   delete (navigator as { mediaDevices?: unknown }).mediaDevices;
   delete (navigator as { permissions?: unknown }).permissions;
   vi.restoreAllMocks();
@@ -195,7 +195,7 @@ test("Settings › Permissions trusts a successful stream when Safari's query re
 
 test.each(["setup", "settings"])("Windows %s: the privacy button uses the settings-only bridge; Check again still asks the webview", async (place) => {
   const openSettings = vi.fn(async () => {});
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { build: { channel: "release", version: "0.3.0" }, microphone: { openSettings } } } });
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel: "release", version: "0.3.0" }, microphone: { openSettings } } } });
   vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
   const { getUserMedia } = browser("prompt");
   getUserMedia.mockRejectedValueOnce(Object.assign(new Error("blocked"), { name: "NotAllowedError" }));

@@ -29,8 +29,8 @@ export function host(): Host {
   // Each member is read when it is asked for, and not before: the user agent is parsed for the caller that wants the system.
   return {
     ...app,
-    identity: { ...app.identity, get os() { return parseBrowser().os; } },
-    reach: browserReach(),
+    identity: { ...app.identity, get os() { return app.identity.os ?? parseBrowser().os; } },
+    reach: app.reach ?? browserReach(),
     voice: {
       runs: app.voice ? "app" : "page",
       host: () => pageOfVoice().voice(),

@@ -96,8 +96,8 @@ test("a code is recognised as it is pasted, and redeemed under this device's nam
 
 test("the default pairing name follows the English UI language", async () => {
   const previousName = navigator.userAgent;
-  const previousHost = window.__sidevoiceDesktop;
-  delete window.__sidevoiceDesktop;
+  const previousHost = window.__sidevoiceHost;
+  delete window.__sidevoiceHost;
   Object.defineProperty(navigator, "userAgent", { configurable: true,
     value: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1" });
   try {
@@ -109,8 +109,8 @@ test("the default pairing name follows the English UI language", async () => {
     expect(pairDevice).toHaveBeenCalledWith(pasted, "Safari on iPhone", "");
   } finally {
     Object.defineProperty(navigator, "userAgent", { configurable: true, value: previousName });
-    if (previousHost) window.__sidevoiceDesktop = previousHost;
-    else delete window.__sidevoiceDesktop;
+    if (previousHost) window.__sidevoiceHost = previousHost;
+    else delete window.__sidevoiceHost;
   }
 });
 

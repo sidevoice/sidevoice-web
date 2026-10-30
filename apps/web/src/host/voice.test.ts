@@ -2,10 +2,10 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { host } from ".";
 
 const withHost = (members: Record<string, unknown> | undefined) => {
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: members && { host: members } });
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: members && { host: members } });
 };
 
-afterEach(() => { Reflect.deleteProperty(window, "__sidevoiceDesktop"); vi.unstubAllGlobals(); });
+afterEach(() => { Reflect.deleteProperty(window, "__sidevoiceHost"); vi.unstubAllGlobals(); });
 
 describe("the page's voice and catalogues", () => {
   test("run on the page unless an app runs them", () => {

@@ -33,7 +33,7 @@ const newAgent = (): HostAgentsState => ({ status: "ready", error: null, busy: {
 } as DetectedAgent], scanned_at: "2026-10-02T10:00:00Z", custom: { command: "c", snippet: "{}", version: "1" } } });
 
 function open(facts: Record<string, unknown> = {}, pairings = [local, paired(), lab, old]) {
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => running), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install: vi.fn(),
   } } } });
   window.sidevoiceActions = { openPairing: vi.fn(), localHostDevices: vi.fn().mockResolvedValue([]), machineDevices: vi.fn().mockResolvedValue([]),

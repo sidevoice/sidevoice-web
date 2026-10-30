@@ -11,12 +11,12 @@ const en = translator("en");
 const es = translator("es");
 
 afterEach(() => {
-  delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
+  delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost;
   vi.restoreAllMocks();
 });
 
 function inApp(host: Record<string, unknown>) {
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host } });
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host } });
 }
 
 /** A device with a mouse or a trackpad (a keyboard all but certain), or a phone's touch alone. */
@@ -55,7 +55,7 @@ test("Shortcuts is hidden for now (sidevoice-web#148), with a keyboard, in the d
   expect(renderHook(() => useShortcutsSection()).result.current).toBe(false);
   inApp({ muteShortcut: muteBridge().bridge });
   expect(renderHook(() => useShortcutsSection()).result.current).toBe(false);
-  delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
+  delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost;
   keyboard(true);
   expect(renderHook(() => useShortcutsSection()).result.current).toBe(false);
 });

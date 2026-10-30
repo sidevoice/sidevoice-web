@@ -9,7 +9,7 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   localStorage.clear();
-  delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
+  delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost;
 });
 
 /* Developer mode (operator, 2026-10-21): Android's way in. Ten clicks on the version within five seconds turn it on in a
@@ -17,7 +17,7 @@ afterEach(() => {
 
 /** The desktop app as its bridge says its build (`host.build`); null, a browser. */
 function inApp(channel: string | null) {
-  if (channel) Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { build: { channel, version: "0.2.1-nightly.608" } } } });
+  if (channel) Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel, version: "0.2.1-nightly.608" } } } });
 }
 
 /** The version text of Updates, wired as AppUpdateSettings wires it, with what a person could see of developer mode. */
@@ -172,7 +172,7 @@ test("a stored on does nothing outside a nightly: the same origin opened by a re
   setDeveloperMode(true);
   setDeveloperMode(false);
   expect(localStorage.getItem(DEVELOPER_MODE_KEY)).toBe("1");
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { build: { channel: "nightly", version: "0.2.1-nightly.608" } } } });
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel: "nightly", version: "0.2.1-nightly.608" } } } });
   expect(developerModeOn()).toBe(true);
 });
 

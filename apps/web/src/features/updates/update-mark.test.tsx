@@ -11,7 +11,7 @@ vi.mock("../../services/room-session-controller.js", () => ({}));
 afterEach(() => {
   cleanup();
   resetUpdateSeen();
-  delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
+  delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost;
 });
 
 /* The Updates entry in Settings' navigation wears the update's mark while the app has an update the room's notice says
@@ -19,7 +19,7 @@ afterEach(() => {
 
 function open(updater: Parameters<typeof fakeUpdater>[0]) {
   const fake = fakeUpdater(updater);
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { build: { channel: "release", version: "0.3.0" }, updater: fake.updater } } });
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel: "release", version: "0.3.0" }, updater: fake.updater } } });
   window.sidevoiceActions = { openPairing: vi.fn(), loadHostAgents: vi.fn(), loadMachineInfo: vi.fn() } as unknown as typeof window.sidevoiceActions;
   const store = createRoomStore();
   act(() => { store.patch({ machinesReady: true, inApp: true, settingsSection: "general" } as never); });

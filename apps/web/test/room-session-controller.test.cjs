@@ -9,7 +9,7 @@ function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:nu
  if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element(match[1]));for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','stats-recognition','stats-response'])elements.set(id,new Element(id))}
  const saved=siteData??(stored?{'sidevoice.pairings':JSON.stringify(stored)}:{});
  const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element(id))}return elements.get(id)},body:new Element('body'),createElement:()=>new Element(),addEventListener:(name,fn)=>(documentHandlers[name]??=[]).push(fn)},window:{addEventListener:(name,fn)=>handlers[name]=fn},MutationObserver:class{constructor(fn){observers.push(fn)}observe(){}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
- if(localHost||nativeData)context.window.__sidevoiceDesktop={host:{...(localHost?{localHost}:{}),...(nativeData?{data:nativeData}:{})}};
+ if(localHost||nativeData)context.window.__sidevoiceHost={host:{...(localHost?{localHost}:{}),...(nativeData?{pairings:nativeData.pairings}:{})}};
  // The outbox's storage across reloads, and this tab's scope in it.
  if(indexedDB)context.indexedDB=indexedDB;
  if(outboxScope)context.sessionStorage={getItem:key=>key==='sidevoice.outbox-scope'?outboxScope:null,setItem(){}};
@@ -486,7 +486,7 @@ test('Now Playing: none without a Media Session, and none where the app owns the
  s.context.navigator={};s.run('primeNowPlaying()');
  assert.equal(elements.length,0,'no Media Session: no tile to own');
  const {handlers,session}=mediaSession(s);
- s.context.window.__sidevoiceDesktop={host:{mediaKeys:'native'}};
+ s.context.window.__sidevoiceHost={host:{presence:{media:'app'}}};
  s.run('primeNowPlaying()');s.run('applyLockScreen(true)');
  assert.equal(elements.length,0,'the app is the Now Playing app: this element would compete with it');
  assert.deepEqual(handlers,{},'and handlers here would toggle the microphone twice on one click');
@@ -1527,7 +1527,7 @@ function fakeEngine(catalogs){
   setCredential:async(provider,key)=>{calls.push(['setCredential',provider,key]);if(key)keys[provider]=true;else delete keys[provider]},hasCredential:async provider=>!!keys[provider]};
 }
 // The desktop app's place for the voice is where the page finds it: `null` is a page with no voice at all.
-function withVoice(s,voice,engine){const desktop=s.context.window.__sidevoiceDesktop||{};s.context.window.__sidevoiceDesktop={...desktop,host:{...desktop.host,...(voice?{voice}:{}),...(engine?{engine}:{})}};return voice}
+function withVoice(s,voice,engine){const desktop=s.context.window.__sidevoiceHost||{};s.context.window.__sidevoiceHost={...desktop,host:{...desktop.host,...(voice?{voice}:{}),...(engine?{engine}:{})}};return voice}
 function joining(s,{admission={admitted:true,reason:null,message:null,clients:1,max:8},start,voice=fakeVoice({start})}={}){
  const sockets=socketsOf(s);
  s.context.crypto={randomUUID:()=>'hello-id'};

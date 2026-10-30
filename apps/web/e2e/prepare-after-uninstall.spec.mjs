@@ -24,7 +24,7 @@ async function mockLocalHost(page) {
         rejectInstall?.({ key: "install.network", step: "download" });
       },
     };
-    window.__sidevoiceDesktop = { host: { voice: {}, localHost: {
+    window.__sidevoiceHost = { host: { voice: {}, localHost: {
       state: async () => status,
       subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
       pairing: async () => pairing,

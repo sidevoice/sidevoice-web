@@ -6,10 +6,10 @@ import { createRoomStore } from "../../state/room-store";
 import { translator } from "../../i18n/translator";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
-afterEach(() => { delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; localStorage.clear(); });
+afterEach(() => { delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; localStorage.clear(); });
 
 function inApp(callControls: Record<string, unknown>) {
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { callControls } } });
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { callControls } } });
 }
 const base = () => ({
   settings: vi.fn(async () => ({ alwaysShown: false })),

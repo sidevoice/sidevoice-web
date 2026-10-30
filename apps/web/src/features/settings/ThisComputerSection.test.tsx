@@ -22,7 +22,7 @@ const local = paired({ fp: "fp-local", host: "MacBook", local: true, urls: ["htt
 const running: LocalHostStatus = { state: "running", reachable: true, installed: true, service: "launchd", core: { version: "0.1.0", api: 1 }, calls: 0 };
 
 function open(pairings: PairingSummary[], facts: Record<string, unknown> = {}) {
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => running), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install: vi.fn(),
   } } } });
   window.sidevoiceActions = { openPairing: vi.fn(), localHostDevices: vi.fn().mockResolvedValue([]), machineDevices: vi.fn().mockResolvedValue([]),

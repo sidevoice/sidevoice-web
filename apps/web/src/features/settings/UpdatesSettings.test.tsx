@@ -17,7 +17,7 @@ afterEach(() => {
   cleanup();
   // A restart into the app's update asks the service to follow (one row): never into the next test.
   for (const key of ["sidevoice.settings", CHECKED, "sidevoice.update-continue"]) localStorage.removeItem(key);
-  delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
+  delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost;
 });
 
 /* Updates (decided): a Settings section of their own, holding everything that updates, each row with its action right
@@ -72,7 +72,7 @@ function open({ build = RELEASE, updater, section = "this-computer", machines = 
   const fake = fakeUpdater(updater || undefined);
   prepare?.(fake);
   const version = typeof service === "function" ? vi.fn(service) : vi.fn(async () => service!);
-  if (build) Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { build,
+  if (build) Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build,
     ...(withUpdater ? { updater: fake.updater } : {}),
     localHost: { state: vi.fn(async () => status), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install: vi.fn(),
       ...(service ? { version, update } : {}) } } } });
@@ -253,7 +253,7 @@ test("This device says what it always said of the app's update, whatever Updates
   act(() => auto.fake.push({ state: "ready", version }));
   expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Update available$/);
   cleanup();
-  delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
+  delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost;
   const manual = open({ updater: { mode: "manual", status: { state: "available", version } } });
   await settle();
   expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Update available$/);
@@ -378,7 +378,7 @@ test("automatic: a background download is cancelled from Settings and from the r
     await act(async () => { fireEvent.click(within(noticeBox()).getByRole("button", { name: "Download" })); });
     expect(fake.updater.download).toHaveBeenCalledTimes(1);
     cleanup();
-    delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
+    delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost;
   }
 });
 
@@ -421,7 +421,7 @@ test("focus stays on the action it was on when the app says available before it 
     await act(async () => { answer(); });
     expect(document.activeElement).toBe(within(home()).getByRole("button", { name: "Download" }));
     cleanup();
-    delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
+    delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost;
   }
 });
 

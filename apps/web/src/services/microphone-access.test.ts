@@ -26,7 +26,7 @@ function browser(initial: PermissionState, inputs = 1) {
 afterEach(() => {
   delete (navigator as { mediaDevices?: unknown }).mediaDevices;
   delete (navigator as { permissions?: unknown }).permissions;
-  delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
+  delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost;
 });
 
 const stateOf = (access: ReturnType<typeof createMicrophoneAccess>) => () => access.getSnapshot().state;
@@ -141,7 +141,7 @@ test("window focus reads the state again", async () => {
 test("the app's state is authoritative: its change events move it with no probe", async () => {
   let system: "prompt" | "granted" | "denied" = "denied";
   const listeners = new Set<() => void>();
-  (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop = { host: { voice: {}, microphone: {
+  (window as { __sidevoiceHost?: unknown }).__sidevoiceHost = { host: { voice: {}, microphone: {
     state: async () => system,
     request: async () => system === "granted" ? "granted" : "denied",
     onChange: (listener: () => void) => { listeners.add(listener); return () => listeners.delete(listener); },
@@ -159,7 +159,7 @@ test("the app's state is authoritative: its change events move it with no probe"
 test("the app's \"missing\" is the missing state, in both directions", async () => {
   let system: "prompt" | "granted" | "denied" | "missing" = "granted";
   const listeners = new Set<() => void>();
-  (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop = { host: { voice: {}, microphone: {
+  (window as { __sidevoiceHost?: unknown }).__sidevoiceHost = { host: { voice: {}, microphone: {
     state: async () => system,
     request: async () => system === "granted" ? "granted" : "denied",
     onChange: (listener: () => void) => { listeners.add(listener); return () => listeners.delete(listener); },
@@ -177,7 +177,7 @@ test("the app's \"missing\" is the missing state, in both directions", async () 
 test("the app's request keeps \"missing\", and a failed request invents no denial", async () => {
   let system: "granted" | "denied" | "missing" = "missing";
   let fail = false;
-  (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop = { host: { voice: {}, microphone: {
+  (window as { __sidevoiceHost?: unknown }).__sidevoiceHost = { host: { voice: {}, microphone: {
     state: async () => system,
     request: async () => { if (fail) throw new Error("native"); return system; },
   } } };
@@ -194,7 +194,7 @@ test("the app's request keeps \"missing\", and a failed request invents no denia
 test("a settings-only desktop bridge leaves permission with the webview and offers the privacy button", async () => {
   const b = browser("prompt");
   const openSettings = vi.fn(async () => {});
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { microphone: { openSettings } } } });
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { microphone: { openSettings } } } });
   const access = createMicrophoneAccess();
   await waitFor(() => expect(access.getSnapshot()).toMatchObject({ state: "prompt", asker: "page" }));
   expect(b.media.getUserMedia).not.toHaveBeenCalled();
@@ -217,7 +217,7 @@ test("a settings-only desktop bridge leaves permission with the webview and offe
 test("no callable settings capability means no settings button", () => {
   browser("prompt");
   for (const microphone of [undefined, {}, { openSettings: true }]) {
-    Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { microphone } } });
+    Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { microphone } } });
     const access = createMicrophoneAccess();
     expect(access.openSettings).toBeNull();
     access.dispose();

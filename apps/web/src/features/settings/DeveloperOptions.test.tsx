@@ -8,7 +8,7 @@ import type { DebugSwitch } from "../../host";
 afterEach(() => {
   cleanup();
   localStorage.clear();
-  delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
+  delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost;
 });
 
 /* Developer options' debugging switches (`host.debug`, sidevoice-desktop #168): Web Inspector, Compositing borders and
@@ -28,7 +28,7 @@ function withDebug({ available = ALL, initial = {}, set }: { available?: DebugSw
     get repaintCounters() { return held.repaintCounters; },
     set: vi.fn(async (name: DebugSwitch, on: boolean) => { if (set) await set(name, on, held); else held[name] = on; }),
   };
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { build: { channel: "nightly", version: "0.2.1-nightly.608" }, debug } } });
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel: "nightly", version: "0.2.1-nightly.608" }, debug } } });
   return { debug, held };
 }
 
@@ -101,7 +101,7 @@ test.each([
   ["no list of switches", { inspectable: true, set: async () => {} }],
   ["no way to set them", { available: ALL }],
 ])("with %s there is no Rendering group", (_, debug) => {
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { debug } } });
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { debug } } });
   mount();
   expect(screen.queryAllByRole("switch")).toEqual([]);
   expect(groups()).not.toContain("Rendering");

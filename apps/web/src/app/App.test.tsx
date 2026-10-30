@@ -27,7 +27,7 @@ test("keeps local setup visible through native projection, and puts it away once
     return Object.assign(promise, { job: `app-job-${install.mock.calls.length}` });
   });
   const agents = vi.fn();
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => ({ state: "absent" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null),
     install, agents,
   } } } });
@@ -80,7 +80,7 @@ test("remote room controls stay available when remote pairing succeeds during lo
   act(() => localHostInstallController.clear());
   let resolveInstall!: (status: LocalHostStatus) => void;
   const install = vi.fn(() => Object.assign(new Promise<LocalHostStatus>((resolve) => { resolveInstall = resolve; }), { job: "remote-transition-job" }));
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => ({ state: "absent" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install,
     cancel: vi.fn(async () => true),
   } } } });
@@ -114,7 +114,7 @@ test("a failed local host projected during setup returns to the normal room and 
   let rejectInstall!: (error: unknown) => void;
   const restart = vi.fn(async () => undefined);
   const install = vi.fn(() => Object.assign(new Promise<LocalHostStatus>((_resolve, reject) => { rejectInstall = reject; }), { job: "failed-projection-job" }));
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => ({ state: "absent" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install, restart,
   } } } });
   window.sidevoiceActions = {} as unknown as typeof window.sidevoiceActions;

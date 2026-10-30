@@ -33,7 +33,7 @@ beforeEach(() => {
   };
   window.sidevoiceActions = actions as unknown as SidevoiceActions;
 });
-afterEach(() => { delete window.sidevoiceActions; delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; vi.restoreAllMocks(); localStorage.removeItem(ONBOARDING_STORAGE_KEY); });
+afterEach(() => { delete window.sidevoiceActions; delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; vi.restoreAllMocks(); localStorage.removeItem(ONBOARDING_STORAGE_KEY); });
 
 /** The setup at its transcription step, its machine answering. */
 function transcriptionStep() {
@@ -102,7 +102,7 @@ test("Try it in the block and Try it in the footer are one action: one try each 
 test("preparing this computer, the setup offers no other machine in any state of the install: Back is the way there", async () => {
   let settle!: { resolve(status: unknown): void; reject(error: unknown): void };
   const install = vi.fn(() => Object.assign(new Promise((resolve, reject) => { settle = { resolve, reject }; }), { job: "prep-job" }));
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => ({ state: "absent" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install,
   } } } });
   localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "agents" }));
@@ -135,7 +135,7 @@ test("preparing this computer, the setup offers no other machine in any state of
 test("an install that fails says what failed and opens I'll do it myself by itself, Retry still there; a retry hides both ways while it runs, a cancel brings them back", async () => {
   let settle!: { resolve(status: unknown): void; reject(error: unknown): void };
   const install = vi.fn(() => Object.assign(new Promise((resolve, reject) => { settle = { resolve, reject }; }), { job: "prep-job" }));
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => ({ state: "absent" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install,
   } } } });
   localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "agents" }));
@@ -174,7 +174,7 @@ test("an install that fails says what failed and opens I'll do it myself by itse
 
 test("installed here but not running, preparing this computer offers what starts it: never the install, nor its command", async () => {
   const install = vi.fn(), start = vi.fn(async () => undefined), restart = vi.fn(async () => undefined), serviceInstall = vi.fn(async () => undefined);
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => ({ state: "stopped-by-person" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install, start, restart, serviceInstall,
   } } } });
   localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "agents" }));
@@ -213,7 +213,7 @@ test("installed here but not running, preparing this computer offers what starts
 
 test("incompatible here, preparing this computer says so, ending on Update it:, and the install command follows", async () => {
   // The desktop app as it ships: no install of its own, so the command is shown as is (#101).
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => ({ state: "incompatible" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null),
     start: vi.fn(), restart: vi.fn(), serviceInstall: vi.fn(),
   } } } });

@@ -157,7 +157,7 @@ test("a recorded settings try delivers the package take through the real trial a
       call.onTurn((turn) => { if (turn.phase === "started") window.__turnStarted = true; });
       return call;
     } };
-    window.__sidevoiceDesktop = { host: { voice: host } };
+    window.__sidevoiceHost = { host: { voice: host } };
     const model = (id, capability) => ({ id, family: "fake", capabilities: [capability], languages: ["en"], voices: [], installed: true,
       builds: [{ id: id + "/test", backend: "test", precision: "test", accelerator: "cpu", available: true, installed: true, reasons: [] }] });
     const settings = { stt: { catalog: "local", model: "fake-stt", language: null }, tts: { catalog: "local", model: "fake-tts", voice: null, speed: 1 }, end_of_turn: "silence", patience: "normal", idle_unload_minutes: 10,

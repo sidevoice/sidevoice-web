@@ -39,7 +39,7 @@ beforeEach(() => {
   window.sidevoiceActions = actions as unknown as SidevoiceActions;
 });
 // A desktop app a test stood in for goes with it: the next test is in a browser unless it says otherwise.
-afterEach(() => { delete window.sidevoiceActions; delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; vi.restoreAllMocks(); });
+afterEach(() => { delete window.sidevoiceActions; delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; vi.restoreAllMocks(); });
 
 function room() {
   const store = createRoomStore();
@@ -296,7 +296,7 @@ test("a model not on this device is downloaded first, in its block as in Setting
 test("preparing this computer never offers Prepare again: the install, then waiting for it to answer, then its agents", async () => {
   let finish!: (status: unknown) => void;
   const install = vi.fn(() => Object.assign(new Promise((resolve) => { finish = resolve; }), { job: "prep-job" }));
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => ({ state: "absent" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install,
   } } } });
   localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "agents" }));
@@ -325,7 +325,7 @@ test("preparing this computer never offers Prepare again: the install, then wait
 });
 
 test("where the app does not install Sidevoice itself, preparing this computer is the install command, then it waits for this computer and moves on", () => {
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => ({ state: "absent" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null),
   } } } });
   localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "agents" }));
@@ -356,7 +356,7 @@ test("where the app does not install Sidevoice itself, preparing this computer i
 
 test("where the app installs Sidevoice itself, the command is the other way, under I'll do it myself: closed until opened, then the command and the wait, and on by itself once it answers", async () => {
   const install = vi.fn();
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => ({ state: "absent" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install,
   } } } });
   localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "agents" }));
@@ -497,7 +497,7 @@ test("Back from the last step lands on each step before it and stays there, on a
 }, WHOLE_APP_MS);
 
 test("Back from the last step lands on each step before it and stays there, on this computer's path", async () => {
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => ({ state: "running", installed: true, reachable: true })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install: vi.fn(),
   } } } });
   localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "agents", agents_done: true, chosen: CHOSEN }));
@@ -515,7 +515,7 @@ test("Back from the last step lands on each step before it and stays there, on t
 }, WHOLE_APP_MS);
 
 test("on another machine's path in the desktop app too, going on and Back pass its pairing once the machine answers", async () => {
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => ({ state: "absent", installed: false, reachable: false })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install: vi.fn(),
   } } } });
   localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "remote", chosen: CHOSEN }));

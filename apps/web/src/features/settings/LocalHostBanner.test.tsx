@@ -16,7 +16,7 @@ const local: PairingSummary = { fp: "fp-local", host: "MacBook", urls: ["http://
 
 function bridge() {
   const restart = vi.fn().mockResolvedValue(undefined);
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => ({ state: "failed" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), restart,
     start: vi.fn(), serviceInstall: vi.fn(), reconnect: vi.fn(),
   } } } });
@@ -39,7 +39,7 @@ test("this computer's service in a state this app does not know says so, and off
 
 test("stopped, the banner says only that, and offers Start", async () => {
   const restart = vi.fn().mockResolvedValue(undefined), start = vi.fn().mockResolvedValue(undefined);
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => ({ state: "stopped-by-person" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), restart, start,
   } } } });
   const store = createRoomStore();
@@ -72,7 +72,7 @@ test("uninstall clears the unavailable banner; Retry only restarts a failed inst
 
 test("a failed preparation reports its install error without an installed-service banner", async () => {
   act(() => localHostInstallController.clear());
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => ({ state: "absent" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null),
     install: vi.fn(() => Object.assign(Promise.reject({ key: "install.network", step: "download" }), { job: "failed-install" })),
     restart: vi.fn(async () => undefined),

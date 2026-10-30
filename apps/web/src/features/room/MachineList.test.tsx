@@ -23,7 +23,7 @@ const local = paired({ fp: "fp-local", host: "MacBook", local: true, urls: ["htt
 const running: LocalHostStatus = { state: "running", reachable: true, installed: true, service: "launchd", core: { version: "0.1.0", api: 1 }, calls: 0 };
 
 function setBridge(bridge: Partial<LocalHostBridge>) {
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => running), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), ...bridge,
   } } } });
 }
@@ -754,7 +754,7 @@ test("Cancel closes Forget's question without forgetting, and the focus goes bac
 function buildBridge(build: Record<string, unknown> | undefined, withUpdater = false) {
   const version: LocalHostVersion = { bridge: 3, bundled: { version: "0.9.1" }, installed: {}, core_api: 2, update: "available" };
   setBridge({ version: vi.fn(async () => version), update: vi.fn().mockResolvedValue(running) });
-  const desktop = (window as unknown as { __sidevoiceDesktop: { host: Record<string, unknown> } }).__sidevoiceDesktop;
+  const desktop = (window as unknown as { __sidevoiceHost: { host: Record<string, unknown> } }).__sidevoiceHost;
   desktop.host.build = build;
   if (withUpdater) desktop.host.updater = fakeUpdater({ mode: "manual", status: { state: "available", version: "0.5.0" } }).updater;
   actions();
