@@ -13,7 +13,6 @@ import { patiently } from './rendezvous.js';
 import { clampDeviceName } from './device-name-rules.js';
 import { describeBrowser } from '../host/index.ts';
 export const PAIRING_CODE_PREFIX = 'SV1.';
-export const PAIRINGS_KEY = 'sidevoice.pairings';
 export const IDENTITY_PREFIX = 'sidevoice-node-identity:';
 /** How long an address that proved itself is trusted without asking again. */
 export const VERIFIED_FOR_MS = 5 * 60 * 1000;
@@ -352,31 +351,12 @@ export function deviceName(nav) {
     return system ? (app || 'Browser') + ' on ' + system : 'Sidevoice';
 }
 
-// ----- the pairings this device keeps -----
-function validPairing(p) {
-    return !!p && typeof p === 'object' && typeof p.fp === 'string' && typeof p.token === 'string' && typeof p.public_key === 'string' &&
-        typeof p.device_id === 'string' && Array.isArray(p.urls);
-}
-/** Several pairings, every one of them live: `{list}`, newest first. What storage cannot give back is no pairing. */
-export function readPairings(storage) {
-    return projectPairings(readPairingState(storage), null);
-}
-/** Stored pairings never contain the desktop-owned local host: the bridge projects it (`projectPairings`). */
-export function readPairingState(storage) {
-    try {
-        const stored = JSON.parse(storage?.getItem(PAIRINGS_KEY) || 'null');
-        return { list: Array.isArray(stored?.pairings) ? stored.pairings.filter(validPairing) : [] };
-    } catch { return { list: [] }; }
-}
+// ----- the pairing book: what is done to the machines this device is paired with (where they are kept: host/browser-storage.ts, or the app) -----
 /** The desktop's verified local pairing wins over a stale code pairing with the same fingerprint, and comes first. */
 export function projectPairings(stored, localPairing) {
     const fp = localPairing?.local ? localPairing.fp : null;
     const remote = (stored?.list || []).filter(p => !p.local && p.fp !== fp);
     return { list: localPairing?.local ? [localPairing, ...remote] : remote };
-}
-export function writePairings(storage, pairings) {
-    try { storage.setItem(PAIRINGS_KEY, JSON.stringify({ pairings: pairings.list.filter(p => !p.local) })); return true; }
-    catch { return false; }
 }
 /** A new pairing replaces any older one with the same node. */
 export function withPairing(pairings, pairing) {

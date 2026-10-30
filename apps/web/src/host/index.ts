@@ -1,6 +1,7 @@
 import type { Host } from "./types";
 import { pageMicrophone as microphoneOfPage } from "./browser-microphone";
 import { browserRemote, browserScreenAwake } from "./browser-presence";
+import { browserStorage } from "./browser-storage";
 import { parseBrowser } from "./identity";
 import { nativeCardSeam, nativeHost } from "./native";
 
@@ -20,6 +21,8 @@ export function host(): Host {
   // Each member is read when it is asked for, and not before: the user agent is parsed for the caller that wants the system.
   return {
     ...app,
+    // The app's when it keeps them; else this browser's own storage.
+    storage: app.storage ?? browserStorage(),
     identity: { ...app.identity, get os() { return parseBrowser().os; } },
     presence: {
       media: app.presence.media,

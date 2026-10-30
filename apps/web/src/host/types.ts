@@ -102,8 +102,22 @@ export interface PairingsStore {
   write(value: PairingsRecord & { pendingRevokes: Pairing[] }): Promise<void>;
 }
 
+/** The pairings kept in this page's own storage, which only a browser's is. It reads at once, so the page starts with the
+ *  machines it has and not an empty list; it writes as well as it can, and a store that refuses still pairs for this
+ *  visit (the caller tells the person); and the machines that could not be told are read live, as another tab left them. */
+export interface PagePairings {
+  readState(): { list: Pairing[] };
+  /** False when the browser kept nothing; the pairing still happens. */
+  write(book: { list: Pairing[] }): boolean;
+  readRevokes(): Pairing[];
+  writeRevokes(list: Pairing[]): void;
+}
+
 export interface HostStorage {
   pairings: PairingsStore;
+  /** Present where the host keeps the pairings in this page's own storage: the browser's. The app's are `pairings` alone,
+   *  read and written asynchronously, and a write it refuses fails the change. */
+  page?: PagePairings;
 }
 
 export type LocalHostStatusName = "absent" | "installing" | "not-installed" | "stopped-by-person" | "starting" |
@@ -300,7 +314,7 @@ export interface Host {
   microphone: Partial<MicrophoneBridge> | null;
   voice: AppVoice | null;
   presence: HostPresence;
-  storage: HostStorage | null;
+  storage: HostStorage;
   localHost: LocalHostBridge | null;
   reset: ResetBridge | null;
   muteShortcut: MuteShortcutBridge | null;

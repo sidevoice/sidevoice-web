@@ -1,6 +1,6 @@
 import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,noMachine,reachNote,unreached,conversationKey,conversationOf,personKey,displayTitle,focusedThread,viewedThread as viewedOf,reachOf,NO_VIEW} from '../state/room-session-state.js';
 import {pageTarget,targetAnswers,routeUrl,callSocketUrl,isNodePath,askTarget} from './rendezvous.js';
-import {readPairingState,projectPairings,writePairings,withPairing,withoutPairing,revokedPairing,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
+import {projectPairings,withPairing,withoutPairing,revokedPairing,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
 import {host as pageHost} from '../host/index.ts';
 import {createHostAgentsController} from './host-agents.ts';
@@ -111,8 +111,11 @@ function rememberCards(fp,people){
 function forgetCard(fp,thread){
  rememberedCards=rememberedCards.filter(row=>row.node!==fp||row.thread_id!==thread);saveCards();
 }
-const nativeData=pageHost().storage;
-const pairingStorage=nativeData?null:pageStorage(),storedPairingState=readPairingState(pairingStorage);
+// The machines this device keeps: the app's, read and written asynchronously, or this browser's own storage, read at
+// once and written as well as it can be (host/browser-storage.ts).
+const hostStorage=pageHost().storage;
+const pageBook=hostStorage.page??null,nativeData=pageBook?null:hostStorage;
+const storedPairingState=pageBook?pageBook.readState():{list:[]};
 let nativePairingsReady=!nativeData,nativePendingRevokes=[];
 let nativeTransactionQueue=Promise.resolve();
 function nativeTransaction(action){
@@ -157,7 +160,7 @@ async function writePairingProjection(projected=pairings,pending=nativePendingRe
   const value={pairings:projected.list.filter(p=>!p.local),pendingRevokes:pending};
   try{await nativeData.pairings.write(value)}
   catch{setRoomError(translator()('data.pairingsWriteFailed'));throw Object.assign(Error('data.pairings-write'),{key:'data.pairings-write'})}
- }else if(pairingStorage&&!writePairings(pairingStorage,projected)){setRoomError(translator()('data.pairingsWriteFailed'))}
+ }else if(pageBook&&!pageBook.write(projected)){setRoomError(translator()('data.pairingsWriteFailed'))}
 }
 async function persistPairingProjection(){
  if(nativeData)await nativeTransaction(()=>writePairingProjection(pairings,nativePendingRevokes));
@@ -1125,8 +1128,7 @@ async function forgetMachine(fp){
 }
 // A forgotten machine that could not be told: its token is still good there until it is. What is needed to tell it is
 // kept (this device's storage, as the pairing was) and tried again — on start, and every few minutes — until it hears.
-const PENDING_REVOKES_KEY='sidevoice.pending-revokes';
-function pendingRevokes(){if(nativeData)return nativePendingRevokes;try{const kept=JSON.parse(pageStorage()?.getItem(PENDING_REVOKES_KEY)||'[]');return Array.isArray(kept)?kept.filter(p=>p&&typeof p.fp==='string'&&typeof p.token==='string'&&typeof p.device_id==='string'):[]}catch{return []}}
+function pendingRevokes(){return nativeData?nativePendingRevokes:pageBook.readRevokes()}
 async function writePendingRevokes(list){
  if(nativeData)return nativeTransaction(async()=>{
   const next=typeof list==='function'?list(nativePendingRevokes):list;
@@ -1134,7 +1136,7 @@ async function writePendingRevokes(list){
   nativePendingRevokes=next;publishPairings();
  });
  if(typeof list==='function')list=list(pendingRevokes());
- try{if(list.length)pageStorage()?.setItem(PENDING_REVOKES_KEY,JSON.stringify(list));else pageStorage()?.removeItem(PENDING_REVOKES_KEY)}catch{}
+ pageBook.writeRevokes(list);
 }
 async function keepPendingRevoke(pairing){
  const {fp,device_id,token,urls,public_key,host,insecure}=pairing;
