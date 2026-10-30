@@ -4,7 +4,6 @@ import { App } from "../../app/App";
 import { createRoomStore } from "../../state/room-store";
 import { defaultVoiceSettings } from "../../services/voice-settings.js";
 import { ONBOARDING_STORAGE_KEY } from "../../services/onboarding-state";
-import { devicePlatform } from "../../services/microphone-access";
 import type { SidevoiceActions } from "../../state/room-types";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
@@ -273,12 +272,3 @@ test("nothing to ask: an app that asks for itself when its call opens, or a page
   await setup();
   expect(title()).toHaveTextContent("Set up transcription");
 }, WHOLE_APP_MS);
-
-test("where its settings are: the platform the page runs on, a phone none", () => {
-  const nav = (platform: string, userAgent = "", maxTouchPoints = 0) => ({ platform, userAgent, maxTouchPoints }) as Navigator;
-  expect(devicePlatform(nav("MacIntel"))).toBe("mac");
-  expect(devicePlatform(nav("MacIntel", "", 5))).toBe("other");
-  expect(devicePlatform(nav("Win32"))).toBe("windows");
-  expect(devicePlatform(nav("Linux x86_64"))).toBe("linux");
-  expect(devicePlatform(nav("Linux armv8l", "Mozilla/5.0 (Linux; Android 14)"))).toBe("other");
-});

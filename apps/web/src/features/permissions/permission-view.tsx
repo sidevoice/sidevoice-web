@@ -3,8 +3,8 @@ import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { CheckIcon } from "../../components/ui/Icons";
-import { host } from "../../host";
-import { createMicrophoneAccess, devicePlatform, type MicrophoneAccess, type MicrophoneSnapshot } from "../../services/microphone-access";
+import { host, type HostOS } from "../../host";
+import { createMicrophoneAccess, type MicrophoneAccess, type MicrophoneSnapshot } from "../../services/microphone-access";
 import type { MessageKey, Translate } from "../../i18n/translator";
 import "./permissions.css";
 
@@ -14,7 +14,7 @@ import "./permissions.css";
  * notifies or listens to keys system-wide. Each permission is one row — its name, why in one line, where it stands, and
  * what can be done — so another can join the list without a new screen. */
 
-export type Platform = ReturnType<typeof devicePlatform>;
+export type Platform = HostOS;
 
 /** The microphone's row, read from where it stands. */
 export interface MicrophoneView {
@@ -35,12 +35,12 @@ export interface MicrophoneView {
 /** How to allow a blocked microphone, where this page runs: the lines to show. */
 function howToAllow(asker: MicrophoneSnapshot["asker"], inDesktopApp: boolean, platform: Platform): MessageKey[] {
   if (asker === "app") return [platform === "windows" ? "wizard.mic.denied.windows" : "wizard.mic.denied.app"];
-  if (inDesktopApp) return [platform === "windows" ? "wizard.mic.denied.windows" : platform === "mac" ? "wizard.mic.denied.app" : "wizard.mic.denied.linux"];
-  const system: MessageKey | null = platform === "mac" ? "wizard.mic.denied.siteMac" : platform === "windows" ? "wizard.mic.denied.siteWindows" : null;
+  if (inDesktopApp) return [platform === "windows" ? "wizard.mic.denied.windows" : platform === "macos" ? "wizard.mic.denied.app" : "wizard.mic.denied.linux"];
+  const system: MessageKey | null = platform === "macos" ? "wizard.mic.denied.siteMac" : platform === "windows" ? "wizard.mic.denied.siteWindows" : null;
   return system ? ["wizard.mic.denied.site", system] : ["wizard.mic.denied.site"];
 }
 
-export function microphoneView(microphone: MicrophoneSnapshot, platform: Platform = devicePlatform(), inDesktopApp = host().identity.build !== null): MicrophoneView {
+export function microphoneView(microphone: MicrophoneSnapshot, platform: Platform = host().identity.os, inDesktopApp = host().identity.build !== null): MicrophoneView {
   const { asker, dismissed } = microphone;
   const state = microphone.state === "requesting" && (microphone.from === "denied" || microphone.from === "missing") ? microphone.from : microphone.state;
   const fromSystem = asker === "app";
