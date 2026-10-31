@@ -26,7 +26,9 @@ platform, the Media Session, the wake lock), and the microphone's `getUserMedia`
 the host's types are imported from outside `src/host`, never what is behind them. `npm run lint` rejects all of it
 anywhere else (CommonJS too, `require` and `import.meta.glob` included), and no comment switches it off; a test or the dev harness that stands in for an app injects through
 `src/host/testing.ts`. A new thing a host can do is a new member of `Host` (`src/host/types.ts`), not a new check in a
-component. The lint is a convention guard, not a sandbox: a name put together or fetched at run time
+component. Nor does the page ask which system it runs on: `Host` has no `os`, and what a system decides about
+the page's words is answered resolved (`microphone.help(language)`, `identity.shortcutModifier`, `identity.deviceName()`);
+the browser's own answers live in `src/host` and an app's in the app, so a new platform never touches the web. The lint is a convention guard, not a sandbox: a name put together or fetched at run time
 (`Reflect.get(window, "navigator")`, `window["navi" + "gator"]`, `eval`) is not caught, and neither is a `require` of a path
 built at run time.
 
