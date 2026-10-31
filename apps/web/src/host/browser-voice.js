@@ -5,11 +5,10 @@
  * interfaces, `VoiceHost` and `ModelCatalogs`, and nothing else of audio or models.
  *
  * Both packages are loaded the first time the page needs either, each in its own chunk, and the page makes one engine. */
-import { engineVoiceSource, voiceRefusal } from './voice-source.ts';
-import { engineCatalogs, localStorageCredentials } from './model-catalogs.js';
-import { engineFailureCode } from './failure-code.js';
-import { audioDiagnostics } from './audio-diagnostics.ts';
-import { host as pageHost } from '../host/index.ts';
+import { engineVoiceSource, voiceRefusal } from '../services/voice-source.ts';
+import { engineCatalogs, localStorageCredentials } from '../services/model-catalogs.js';
+import { engineFailureCode } from '../services/failure-code.js';
+import { audioDiagnostics } from '../services/audio-diagnostics.ts';
 
 /** The page as the engine's host: what this browser can run models on, and the provider keys `credentials` keeps. */
 export async function browserHost(navigator, credentials) {
@@ -27,7 +26,9 @@ export async function browserHost(navigator, credentials) {
 
 const loadPackages = () => Promise.all([import('@sidevoice/voice'), import('@sidevoice/engine')]);
 
-/** Begin microphone permission and Web Audio in the button's user gesture, before models or chunks are awaited. */
+/** Begin microphone permission and Web Audio in the button's user gesture, before models or chunks are awaited.
+ * @param {string | null} [input] The microphone chosen, by its device id; the system's default when none.
+ * @returns {{context: AudioContext, resumed: Promise<void>, stream: Promise<MediaStream>, release(): void} | null} */
 export function beginBrowserAudioActivation(input = null) {
   if (!globalThis.navigator?.mediaDevices?.getUserMedia || !globalThis.AudioContext) return null;
   const context = new AudioContext();
@@ -83,13 +84,14 @@ function browserParts(load) {
 
 /**
  * The page's voice and its models' catalogues: the desktop app's when there is one, else this page's own.
- * @param {{host?: any, load?: () => Promise<any[]>}} [options] The desktop app's host, and how the packages load.
- * @returns {{voice: () => Promise<import('@sidevoice/voice').VoiceHost>, catalogs: () => Promise<import('./model-catalogs.js').ModelCatalogs>}}
+ * @param {{host?: any, load?: () => Promise<any[]>, app?: () => any}} [options] The app's host given outright (a test), how the packages
+ *   load, and where the app's voice is found when it is asked for.
+ * @returns {{voice: () => Promise<import('@sidevoice/voice').VoiceHost>, catalogs: () => Promise<import('../services/model-catalogs.js').ModelCatalogs>}}
  */
-export function pageVoice({ host: given, load = loadPackages } = {}) {
+export function pageVoice({ host: given, load = loadPackages, app = () => null } = {}) {
   let parts = null;
   // The desktop app's host as it is when asked for: it may be installed after this page's script runs.
-  const appHost = () => given ?? pageHost().voice;
+  const appHost = () => given ?? app();
   const browser = () => (parts ??= browserParts(load).catch((error) => { parts = null; throw error; }));
   return {
     async voice() {

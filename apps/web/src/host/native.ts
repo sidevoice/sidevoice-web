@@ -35,11 +35,13 @@ function build(app: Injected | undefined): AppBuild | null {
 
 /** The members an app offers through the global it injects, `null` for the rest; the identity here is what the app says
  *  (its build, its computer's name), the system being the browser's to tell. */
-export type NativeHost = Omit<Host, "identity" | "presence" | "reach" | "storage"> & {
+export type NativeHost = Omit<Host, "identity" | "presence" | "reach" | "storage" | "voice"> & {
   identity: Omit<HostIdentity, "os">;
   presence: Pick<HostPresence, "media">;
   /** The app's pairings; null where it keeps none for the page. */
   storage: { pairings: PairingsStore } | null;
+  /** The voice and the models the app runs for the page; null where the page runs them. */
+  voice: AppVoice | null;
 };
 
 export function nativeHost(): NativeHost {
