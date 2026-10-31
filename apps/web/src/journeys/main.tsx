@@ -10,6 +10,7 @@ import { App } from "../app/App";
 import { createRoomStore } from "../state/room-store";
 import { createOnboardingRepository, emptyOnboardingRecord } from "../services/onboarding-state";
 import { BASE_FACTS, JOURNEYS, type Shot } from "./shots";
+import { installApp, installedMembers } from "../host/testing";
 
 /* The journeys' storyboard (journeys.html, served by the dev server only): every screen and state of the app laid out
  * as the person meets them, on a phone and a desktop, light and dark, each captioned. Not interactive: each frame is
@@ -41,20 +42,18 @@ function renderShot(shot: Shot) {
   };
   if (shot.updater) {
     const { status, mode = "automatic" } = shot.updater;
-    (window as unknown as { __sidevoiceDesktop: unknown }).__sidevoiceDesktop = { host: { updater: {
+    installApp({ updater: {
       status: async () => status, settings: async () => ({ mode }), setMode: async () => ({ mode }), subscribe: () => noop,
-      check: async () => status, download: async () => status, cancel: async () => undefined, restart: later } } };
+      check: async () => status, download: async () => status, cancel: async () => undefined, restart: later } });
   }
   if (shot.floatingCard) {
-    const host = (window as unknown as { __sidevoiceDesktop?: { host: Record<string, unknown> } }).__sidevoiceDesktop?.host ?? {};
-    (window as unknown as { __sidevoiceDesktop: unknown }).__sidevoiceDesktop = { host: { ...host, callControls: {
+    installApp({ ...installedMembers(), callControls: {
       settings: async () => ({ alwaysShown: false, corner: "tr", moved: true }), setAlwaysShown: async (alwaysShown: boolean) => ({ alwaysShown }),
-      setCorner: async (corner: string) => ({ corner }), resetPlace: later, preview: noop } } };
+      setCorner: async (corner: string) => ({ corner }), resetPlace: later, preview: noop } });
   }
   if (shot.desktop) {
     const status = shot.desktop.state as Record<string, unknown>;
-    const host = (window as unknown as { __sidevoiceDesktop?: { host: Record<string, unknown> } }).__sidevoiceDesktop?.host ?? {};
-    (window as unknown as { __sidevoiceDesktop: unknown }).__sidevoiceDesktop = { host: { ...host, localHost: {
+    installApp({ ...installedMembers(), localHost: {
       state: async () => status, subscribe: () => noop, pairing: async () => null,
       start: later, stop: later, restart: later, serviceInstall: later, serviceUninstall: later, agents: async () => ({ agents: [
         { id: "claude-code", label: "Claude Code", version: "2.4" }, { id: "codex", label: "Codex", version: "0.157" }] }),
@@ -63,7 +62,7 @@ function renderShot(shot: Shot) {
       // Installing Sidevoice from the app, where a shot asks for it: running on, or failing at its download.
       ...(shot.desktop.install ? { install: () => Object.assign(shot.desktop!.install === "fails"
         ? new Promise((_, reject) => setTimeout(() => reject({ key: "install.network", step: "download" }), 0)) : new Promise(noop), { job: "j" }) } : {}),
-    } } };
+    } });
   }
   // The actions the runtime would bind: here they do nothing — but those the shot gives (a try that listens) — and a
   // pairing code is refused as the shot says.

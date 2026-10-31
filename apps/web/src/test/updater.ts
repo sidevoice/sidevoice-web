@@ -1,5 +1,6 @@
 import { vi } from "vitest";
 import type { AppUpdater, UpdateMode, UpdaterStatus } from "../host";
+import { installApp } from "../host/testing";
 
 type Method = Exclude<keyof AppUpdater, "status">;
 
@@ -32,5 +33,5 @@ export function fakeUpdater({ status = { state: "idle" }, mode = "automatic", wi
 /** The desktop host this page finds: `host` (its local host, its build…) with `updater`, or none (a nightly, a
  *  development build, an app older than the updater). */
 export function withUpdater(updater: Partial<AppUpdater> | undefined, host: Record<string, unknown> = {}) {
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { ...host, ...(updater ? { updater } : {}) } } });
+  installApp({ ...host, ...(updater ? { updater } : {}) });
 }

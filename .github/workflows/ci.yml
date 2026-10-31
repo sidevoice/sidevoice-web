@@ -27,6 +27,8 @@ jobs:
       - uses: ./.github/actions/setup
       # The page and its packages are built before the suites run, so they test what a deployment serves.
       - run: npm run build
+      # Only src/host names a host mechanism (apps/web/lint/host-rules.mjs).
+      - run: npm run lint
       - run: npm test
       - run: node scripts/release.mjs dist
 
