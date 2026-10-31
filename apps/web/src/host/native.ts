@@ -10,7 +10,7 @@ import type {
  * through as they are: a live getter stays live. `version` says which contract the app speaks; `snapshot()` and `run()` are
  * the app's presence protocol, which it reads and calls and the page does not touch.
  *
- * There is no other name: the web and the app ship together, and the one they used before (`__sidevoiceHost`) is not read. */
+ * There is no other name: the web and the app ship together, and the one they used before (`__sidevoiceDesktop`) is not read. */
 declare global {
   interface Window {
     __sidevoiceHost?: { version?: number; host?: Record<string, unknown> } & Record<string, unknown>;
