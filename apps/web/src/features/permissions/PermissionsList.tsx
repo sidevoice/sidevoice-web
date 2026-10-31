@@ -6,7 +6,8 @@ import { PERSON_AVATAR, type AvatarSpec } from "../avatar/avatar-spec";
 import { stillAvatar } from "../avatar/avatar-state";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
 import { announcement, MicrophoneBadge, MicrophoneHowTo, microphoneAction, MIC_HELP_ID, microphoneView, type MicrophoneView, type Platform } from "./permission-view";
-import { devicePlatform, type MicrophoneSnapshot } from "../../services/microphone-access";
+import { host } from "../../host";
+import type { MicrophoneSnapshot } from "../../services/microphone-access";
 import type { Translate } from "../../i18n/translator";
 
 /* What Sidevoice needs allowed, one look wherever it is asked (operator, 2026-10-16): the setup's permissions step and
@@ -53,7 +54,7 @@ function MicrophoneRow({ microphone, view, onRequest, openSettings, t, actionId,
 /** The person's bicho with the microphone in its hand, once it is allowed. */
 const PERSON_WITH_MIC: AvatarSpec = { kind: "person", hold: "microphone" };
 
-export function PermissionsList({ microphone, openSettings, onRequest, t, platform = devicePlatform(), actionId = "wizard-mic-action", helpId = MIC_HELP_ID }: {
+export function PermissionsList({ microphone, openSettings, onRequest, t, platform = host().identity.os, actionId = "wizard-mic-action", helpId = MIC_HELP_ID }: {
   microphone: MicrophoneSnapshot; openSettings: (() => Promise<void>) | null; onRequest(): void; t: Translate; platform?: Platform; actionId?: string; helpId?: string;
 }) {
   const view = microphoneView(microphone, platform);

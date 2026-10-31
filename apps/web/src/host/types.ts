@@ -21,7 +21,12 @@ export interface AppBuild {
   date?: string | null;
 }
 
+/** The system a page runs on, for factual copy only (where the microphone's settings are, which keys a shortcut shows): never
+ *  a switch for what is available. `other` where the page cannot tell. */
+export type HostOS = "macos" | "windows" | "linux" | "ios" | "android" | "other";
+
 export interface HostIdentity {
+  readonly os: HostOS;
   /** The app hosting this page, or null in a browser (or an app too old to say). */
   readonly build: AppBuild | null;
   /** What the computer calls itself where the app knows it ("Mac de Ana"); null in a browser. */

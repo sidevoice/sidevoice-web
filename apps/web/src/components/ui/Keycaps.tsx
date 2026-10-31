@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { deviceKind } from "../../state/device-name";
+import { host } from "../../host";
 import { shortcutCombo, type ShortcutId } from "../../state/shortcuts";
 import { translator, type Translate } from "../../i18n/translator";
 
@@ -13,7 +13,7 @@ export function Keys({ combo, state }: { combo: string; state?: string }) {
   </kbd>;
 }
 
-export const isMac = () => /^(Mac|iPhone|iPad)$/.test(deviceKind().os);
+export const isMac = () => { const { os } = host().identity; return os === "macos" || os === "ios"; };
 
 /** A room shortcut's key caps, as this system writes them. */
 export function ShortcutKeys({ id, t = translator() }: { id: ShortcutId; t?: Translate }) {

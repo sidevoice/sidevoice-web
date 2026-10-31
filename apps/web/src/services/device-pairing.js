@@ -11,6 +11,7 @@
  * tested alone. Only `export function|async function|const`: the controller's node tests inline this file. */
 import { patiently } from './rendezvous.js';
 import { clampDeviceName } from './device-name-rules.js';
+import { describeBrowser } from '../host/index.ts';
 export const PAIRING_CODE_PREFIX = 'SV1.';
 export const PAIRINGS_KEY = 'sidevoice.pairings';
 export const IDENTITY_PREFIX = 'sidevoice-node-identity:';
@@ -346,12 +347,9 @@ async function answersPlainHttp(base, plainBase, get) {
 }
 
 /** What this device calls itself when it pairs, unless the person says otherwise. */
-export function deviceName(nav = globalThis.navigator) {
-    const text = String(nav?.userAgent || '') + ' ' + String(nav?.userAgentData?.platform || nav?.platform || '');
-    const where = /iPhone/.test(text) ? 'iPhone' : /iPad/.test(text) ? 'iPad' : /Android/.test(text) ? 'Android'
-        : /Mac/.test(text) ? 'Mac' : /Win/.test(text) ? 'Windows' : /CrOS/.test(text) ? 'ChromeOS' : /Linux/.test(text) ? 'Linux' : '';
-    const browser = /Edg\//.test(text) ? 'Edge' : /Firefox\/|FxiOS/.test(text) ? 'Firefox' : /CriOS|Chrome\//.test(text) ? 'Chrome' : /Safari\//.test(text) ? 'Safari' : 'Browser';
-    return where ? browser + ' on ' + where : 'Sidevoice';
+export function deviceName(nav) {
+    const { app, system } = describeBrowser(nav);
+    return system ? (app || 'Browser') + ' on ' + system : 'Sidevoice';
 }
 
 // ----- the pairings this device keeps -----

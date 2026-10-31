@@ -227,14 +227,3 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
     },
   };
 }
-
-/** The platform the person is on, for where its microphone settings are; `other` where the page cannot tell. */
-export function devicePlatform(nav: Navigator | undefined = globalThis.navigator): "mac" | "windows" | "linux" | "other" {
-  const said = `${(nav as Navigator & { userAgentData?: { platform?: string } } | undefined)?.userAgentData?.platform ?? ""} ${nav?.platform ?? ""} ${nav?.userAgent ?? ""}`.toLowerCase();
-  // A phone says it is Linux (Android) or a Mac (iPad): its microphone is the browser's alone.
-  if (/android|iphone|ipad|ipod/.test(said) || (/mac/.test(said) && (nav?.maxTouchPoints ?? 0) > 1)) return "other";
-  if (/mac/.test(said)) return "mac";
-  if (/win/.test(said)) return "windows";
-  if (/linux|x11|cros/.test(said)) return "linux";
-  return "other";
-}

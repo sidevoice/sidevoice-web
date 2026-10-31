@@ -1,5 +1,5 @@
 import type {
-  AppBuild, AppUpdater, AppVoice, CallControlsBridge, Host, HostDebugBridge, HostStorage, LocalHostBridge, MicrophoneBridge,
+  AppBuild, AppUpdater, AppVoice, CallControlsBridge, Host, HostDebugBridge, HostIdentity, HostStorage, LocalHostBridge, MicrophoneBridge,
   MuteShortcutBridge, ResetBridge,
 } from "./types";
 
@@ -33,8 +33,11 @@ function build(app: Injected | undefined): AppBuild | null {
   return { channel, version: text(found.version) ?? "", commit: text(found.commit), date: text(found.date) };
 }
 
-/** What the page's host is today, read from the global an app injects: the members an app offers, `null` for the rest. */
-export function nativeHost(): Host {
+/** The members an app offers through the global it injects, `null` for the rest; the identity here is what the app says
+ *  (its build, its computer's name), the system being the browser's to tell. */
+export type NativeHost = Omit<Host, "identity"> & { identity: Omit<HostIdentity, "os"> };
+
+export function nativeHost(): NativeHost {
   const app = injected();
   const data = app?.data as Record<string, unknown> | undefined;
   const pairings = data?.pairings as HostStorage["pairings"] | undefined;
