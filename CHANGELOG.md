@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.15.0](https://github.com/sidevoice/sidevoice-web/compare/v0.14.0...v0.15.0) (2026-10-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* **host:** the app's members come from window.__sidevoiceHost ([#411](https://github.com/sidevoice/sidevoice-web/issues/411))
+
+### Features
+
+* **host:** the app's members come from window.__sidevoiceHost ([#411](https://github.com/sidevoice/sidevoice-web/issues/411)) ([4daa217](https://github.com/sidevoice/sidevoice-web/commit/4daa217bad458a41f828a8ed5f4d23b2c242d182))
+
 ## [0.14.0](https://github.com/sidevoice/sidevoice-web/compare/v0.13.0...v0.14.0) (2026-10-30)
 
 
