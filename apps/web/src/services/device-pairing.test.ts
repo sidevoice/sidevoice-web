@@ -290,7 +290,7 @@ test("redeeming: the secret goes only where the code's node proved itself, and t
 });
 
 test("a typed address is https unless it says otherwise; plain http as is to this computer, to a private network only by consent", () => {
-  const why = (text: string, options: { insecure?: boolean; origin?: string } = {}) => {
+  const why = (text: string, options: { insecure?: boolean; origin?: string; reach?: { plainHttpPrivate: boolean } } = {}) => {
     try { return machineAddress(text, { origin: "http://localhost:5173", ...options }); } catch (error) { return (error as Error).message; }
   };
   expect(why("")).toBeNull();
@@ -305,6 +305,13 @@ test("a typed address is https unless it says otherwise; plain http as is to thi
   // A page served over https cannot ask over plain http at all, consent or not.
   expect(why("http://192.168.1.20:8768", { origin: "https://room.example" })).toBe(PAIRING_HTTP_BLOCKED);
   expect(why("http://192.168.1.20:8768", { origin: "https://room.example", insecure: true })).toBe(PAIRING_HTTP_BLOCKED);
+  // What the host's transport reports decides it, over the page's origin: a host that cannot send plain http blocks it from any
+  // origin, and one that can does not let an https origin block it.
+  expect(why("http://192.168.1.20:8768", { reach: { plainHttpPrivate: false }, insecure: true })).toBe(PAIRING_HTTP_BLOCKED);
+  expect(why("http://192.168.1.20:8768", { reach: { plainHttpPrivate: false }, origin: "http://localhost:5173", insecure: true })).toBe(PAIRING_HTTP_BLOCKED);
+  expect(why("http://192.168.1.20:8768", { reach: { plainHttpPrivate: true }, origin: "https://room.example", insecure: true })).toBe("http://192.168.1.20:8768");
+  // Public http stays forbidden whatever the transport can do: the policy is the pairing's, not the host's.
+  expect(why("http://203.0.113.5:8768", { reach: { plainHttpPrivate: true }, insecure: true })).toBe("address-insecure");
   // http:// to a public address or a name: refused, consent or not.
   for (const text of ["http://203.0.113.5:8768", "http://mac.example", "http://nuc:8768"]) {
     expect(why(text), text).toBe("address-insecure");
