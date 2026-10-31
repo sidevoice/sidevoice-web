@@ -25,7 +25,7 @@ import { harnessName, StageHeading } from "./CallDetails";
 import { useConversationAvatar, useConversationAvatars, useMovingCopy } from "./conversation-avatars";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { errorLine } from "../settings/error-message";
-import { desktopHost } from "../../services/desktop-host";
+import { host } from "../../host";
 import { useCaptions } from "../../state/captions";
 import { useStageRef } from "./stage-visibility";
 
@@ -191,7 +191,7 @@ export function StageTile({ card = false }: { card?: boolean }) {
           background around it (useSceneScale fits it in its slot; call-view.css names the shapes). What the tile says —
           the name, the voice models, the replies, the badge — is laid on the tile, at its corners. */
       <div ref={sceneRef} className="stage-slot">
-      <div ref={stageRef} className="stage-tile" data-mood={avatar.mood} data-app={desktopHost() ? "" : undefined} data-card={card || undefined} style={avatarTone(tone) as CSSProperties}>
+      <div ref={stageRef} className="stage-tile" data-mood={avatar.mood} data-app={host().identity.build ? "" : undefined} data-card={card || undefined} style={avatarTone(tone) as CSSProperties}>
         <div className="stage-canvas">
           <div className="stage-scene">
             <StageBackdrop seed={stage.threadId} tone={tone} live />

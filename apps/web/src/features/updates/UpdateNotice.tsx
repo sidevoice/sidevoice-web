@@ -8,7 +8,8 @@ import { RoomStoreContext } from "../../state/room-store";
 import { updaterFailure } from "../settings/error-message";
 import { translator, type Translate } from "../../i18n/translator";
 import { openSettings } from "../settings/open-settings";
-import { continueAfterRestart, UPDATE_PLACE, useUpdates, type UpdaterStatus } from "./useUpdates";
+import { continueAfterRestart, UPDATE_PLACE, useUpdates } from "./useUpdates";
+import type { UpdaterStatus } from "../../host";
 import "./updates.css";
 
 /* Where the room says an update waits, on a desktop (a phone has none: its page picks up a new version when next

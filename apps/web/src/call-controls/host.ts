@@ -1,8 +1,9 @@
-/* The desktop app's call controls card talks to the app through one seam, `window.__sidevoiceDesktop.host.callControls`,
+/* The desktop app's call controls card talks to the app through one seam, the host's call controls seam (`cardSeam()`),
  * which the app injects into the card's window (sidevoice-desktop bridge/call-controls-bridge.js, docs/BRIDGE.md →
  * "The call controls card"). The card never sees the room page: the app relays the call to it and carries its
  * buttons back. Outside the app the seam is absent and the page shows nothing. The playground's preview gives the card
  * page the same seam, fed from the room frame beside it (preview/mock/card-host.mjs). */
+import { cardSeam } from "../host";
 import type { AgentState, AudioDeviceOption, AudioDevices, CallCardView, CallEnded, CardFacts } from "../state/room-session-state.js";
 
 export type { AgentState, AudioDeviceOption, AudioDevices, CallEnded };
@@ -85,12 +86,6 @@ export interface CallControlsHost {
   drag(phase: "start" | "move" | "end"): void;
 }
 
-declare global {
-  interface Window {
-    __sidevoiceDesktop?: { host?: { callControls?: CallControlsHost } & Record<string, unknown> } & Record<string, unknown>;
-  }
-}
-
 export function callControlsHost(): CallControlsHost | null {
-  return window.__sidevoiceDesktop?.host?.callControls ?? null;
+  return cardSeam() as CallControlsHost | null;
 }

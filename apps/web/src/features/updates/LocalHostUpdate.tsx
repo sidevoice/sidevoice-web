@@ -1,7 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "../../components/ui/Button";
 import { ErrorText } from "../../components/ui/ErrorText";
-import { localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion } from "../../services/desktop-host";
+import { host, type LocalHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion } from "../../host";
 import { normalizeLocalHostBridgeError } from "../../services/local-host-install";
 import { translator } from "../../i18n/translator";
 import { localHostBridgeError, safeLocalHostCount } from "../settings/local-host-status";
@@ -13,7 +13,7 @@ import { UPDATE_PLACE } from "./useUpdates";
 
 /* One report for every place that says it (Updates' row, This device's line), so they never disagree: asked of this
  * bridge once per state of its service (its state, its core's version and API), and set again by an Update. */
-type LocalBridge = NonNullable<ReturnType<typeof localHostBridge>>;
+type LocalBridge = LocalHostBridge;
 const shared: { bridge: LocalBridge | null; key: string | null; report: LocalHostVersion | null; checking: boolean; at: number } = { bridge: null, key: null, report: null, checking: false, at: 0 };
 const listeners = new Set<() => void>();
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
@@ -33,7 +33,7 @@ function ask(bridge: LocalBridge, key: string) {
  *  say of it — an Update, or what stands in the way — so its place shows only then. */
 export function useLocalHostUpdate(status: LocalHostStatus | null) {
   useSyncExternalStore(subscribe, () => shared.at, () => shared.at);
-  const bridge = localHostBridge();
+  const bridge = host().localHost;
   const usable = !!status && typeof bridge?.version === "function" && typeof bridge.update === "function";
   const key = usable ? [status.state, status.core?.version, status.core?.api].join("|") : null;
   useEffect(() => { if (key && bridge) ask(bridge, key); }, [key, bridge]);
@@ -68,13 +68,13 @@ export function LocalHostUpdateControl({ status, update, continuing = false, onC
   }, [continuing, report?.update, waitingForCalls, busy, error]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function refreshVersion() {
-    const nextBridge = localHostBridge();
+    const nextBridge = host().localHost;
     if (typeof nextBridge?.version !== "function") return;
     try { setReport(await nextBridge.version()); } catch { setReport(null); }
   }
 
   async function run() {
-    const nextBridge = localHostBridge();
+    const nextBridge = host().localHost;
     if (report?.update !== "available" || typeof nextBridge?.version !== "function" || typeof nextBridge.update !== "function" || busy) return;
     setBusy(true);setError(null);setNote("");
     try {

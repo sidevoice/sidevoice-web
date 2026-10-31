@@ -6,7 +6,7 @@ import { translator } from "../../i18n/translator";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import type { PairingSummary } from "../../services/device-pairing.js";
-import type { LocalHostStatus } from "../../services/desktop-host";
+import type { LocalHostStatus } from "../../host";
 import { localHostInstallController } from "../../services/local-host-install";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));

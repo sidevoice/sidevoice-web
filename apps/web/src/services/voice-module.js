@@ -9,6 +9,7 @@ import { engineVoiceSource, voiceRefusal } from './voice-source.ts';
 import { engineCatalogs, localStorageCredentials } from './model-catalogs.js';
 import { engineFailureCode } from './failure-code.js';
 import { audioDiagnostics } from './audio-diagnostics.ts';
+import { host as pageHost } from '../host/index.ts';
 
 /** The page as the engine's host: what this browser can run models on, and the provider keys `credentials` keeps. */
 export async function browserHost(navigator, credentials) {
@@ -88,7 +89,7 @@ function browserParts(load) {
 export function pageVoice({ host: given, load = loadPackages } = {}) {
   let parts = null;
   // The desktop app's host as it is when asked for: it may be installed after this page's script runs.
-  const appHost = () => given ?? globalThis.window?.__sidevoiceDesktop?.host;
+  const appHost = () => given ?? pageHost().voice;
   const browser = () => (parts ??= browserParts(load).catch((error) => { parts = null; throw error; }));
   return {
     async voice() {

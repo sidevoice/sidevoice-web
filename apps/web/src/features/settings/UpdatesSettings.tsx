@@ -1,12 +1,13 @@
 import { useContext, useState, type ReactNode } from "react";
 import { Group, Section } from "../../components/ui/Card";
 import { Snippet } from "../../components/ui/Snippet";
-import { DESKTOP_NIGHTLY_URL, desktopBuild, type DesktopBuild } from "../../services/desktop-host";
+import { DESKTOP_NIGHTLY_URL } from "../../services/desktop-host";
+import { host, type AppBuild } from "../../host";
 import { RoomStoreContext } from "../../state/room-store";
 import { AppUpdateSettings } from "../updates/AppUpdateSettings";
 import { LocalHostUpdateControl } from "../updates/LocalHostUpdate";
 import { useThisComputerUpdate } from "../updates/useThisComputerUpdate";
-import { appUpdater, continueAfterRestart, continued, continuing, UPDATE_PLACE, useOutdatedMachines } from "../updates/useUpdates";
+import { continueAfterRestart, continued, continuing, UPDATE_PLACE, useOutdatedMachines } from "../updates/useUpdates";
 import { translator, type Translate } from "../../i18n/translator";
 import { useDeveloperModeGesture } from "./developer-mode";
 import "./updates-settings.css";
@@ -26,12 +27,12 @@ import "./updates-settings.css";
 /** Whether Settings has Updates: in the desktop app (its build or its updater), or wherever a machine is behind. */
 export function useUpdatesSection() {
   const outdated = useOutdatedMachines().length > 0;
-  return desktopBuild() !== null || appUpdater() !== null || outdated;
+  return host().identity.build !== null || host().updater !== null || outdated;
 }
 
 /** A nightly or development app, under its version: what it is, and — a nightly with no updater of its own — that it is
  *  updated by hand, from its page. One with an updater (desktop #56 gives nightlies one, for now) updates as a release. */
-export function DesktopBuildNote({ build, updater, t }: { build: DesktopBuild | null; updater: boolean; t: Translate }) {
+export function DesktopBuildNote({ build, updater, t }: { build: AppBuild | null; updater: boolean; t: Translate }) {
   if (build?.channel === "nightly") return <div className="host-status-build">
     {[t("hosts.build.nightly"), build.commit?.slice(0, 7), build.date?.slice(0, 10)].filter(Boolean).join(" · ")}
     {!updater && <>{" — "}<a href={DESKTOP_NIGHTLY_URL} target="_blank" rel="noreferrer">{t("hosts.build.byHand")}<span className="sr-only"> {t("keys.newTab")}</span></a></>}
@@ -73,8 +74,8 @@ function PartVersion({ hint, version, upToDate, note, t }: { hint?: string; vers
  *  an empty card. */
 export function UpdatesSettings() {
   const t = translator();
-  const build = desktopBuild();
-  const updater = appUpdater() !== null;
+  const build = host().identity.build;
+  const updater = host().updater !== null;
   const app = build !== null || updater;
   const outdated = useOutdatedMachines();
   const here = useThisComputerUpdate();

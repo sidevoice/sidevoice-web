@@ -1,5 +1,5 @@
-import type { LocalHostBridge, LocalHostBridgeError, LocalHostStatus, LocalHostStatusName } from "../../services/desktop-host";
-import { localHostBridge } from "../../services/desktop-host";
+import type { LocalHostBridge, LocalHostBridgeError, LocalHostStatus, LocalHostStatusName } from "../../host";
+import { host } from "../../host";
 import type { MessageKey, Translate } from "../../i18n/translator";
 import { errorMessage, type ErrorMessage } from "./error-message";
 
@@ -175,7 +175,7 @@ const methodFor = {
 } as const;
 export type LocalHostAction = keyof typeof methodFor;
 
-export function canRunLocalHostAction(action: LocalHostAction, bridge = localHostBridge()): bridge is LocalHostBridge {
+export function canRunLocalHostAction(action: LocalHostAction, bridge = host().localHost): bridge is LocalHostBridge {
   return !!bridge && typeof bridge[methodFor[action]] === "function";
 }
 
@@ -183,7 +183,7 @@ export function canRunLocalHostAction(action: LocalHostAction, bridge = localHos
  *  service is not set up (setting it up starts it), Retry (a restart, never the install again) while it retries or
  *  once it failed, Reconnect once it no longer recognizes this app; none while it runs or starts, nor where nothing is
  *  installed. */
-export function localHostRecovery(status: LocalHostStatus, bridge = localHostBridge()): { action: LocalHostAction; label: MessageKey } | null {
+export function localHostRecovery(status: LocalHostStatus, bridge = host().localHost): { action: LocalHostAction; label: MessageKey } | null {
   const recovery: { action: LocalHostAction; label: MessageKey } | null =
     status.state === "not-installed" ? { action: "serviceInstall", label: "hosts.start" }
       : status.state === "stopped-by-person" ? { action: "start", label: "hosts.start" }
@@ -192,7 +192,7 @@ export function localHostRecovery(status: LocalHostStatus, bridge = localHostBri
   return recovery && canRunLocalHostAction(recovery.action, bridge) ? recovery : null;
 }
 
-export async function runLocalHostAction(action: LocalHostAction, bridge = localHostBridge()) {
+export async function runLocalHostAction(action: LocalHostAction, bridge = host().localHost) {
   if (!bridge) return false;
   const method = bridge[methodFor[action]];
   if (typeof method !== "function") return false;

@@ -8,9 +8,9 @@ import { CallStage } from "../call/CallStage";
 import { ConversationSidebar } from "../room/ConversationSidebar";
 import { SettingsDialog } from "../settings/SettingsDialog";
 import { UpdateNotice } from "./UpdateNotice";
-import type { UpdaterStatus } from "./useUpdates";
+import type { UpdaterStatus } from "../../host";
 import type { PairingSummary } from "../../services/device-pairing.js";
-import type { LocalHostStatus, LocalHostVersion } from "../../services/desktop-host";
+import type { LocalHostStatus, LocalHostVersion } from "../../host";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 afterEach(() => {

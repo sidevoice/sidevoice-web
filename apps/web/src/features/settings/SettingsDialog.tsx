@@ -19,7 +19,7 @@ import { DangerZone } from "./DangerZone";
 import { AudioDeviceRows } from "../call/AudioDevices";
 import { DeviceNameField } from "./DeviceNameField";
 import { FloatingCardSettings, useFloatingCardSection } from "./FloatingCardSettings";
-import { desktopHost } from "../../services/desktop-host";
+import { host } from "../../host";
 import { PermissionsSettings } from "./PermissionsSettings";
 import { useMicrophoneAccess } from "../permissions/permission-view";
 import type { MicrophoneSnapshot } from "../../services/microphone-access";
@@ -136,7 +136,7 @@ function CallSettings({ t, microphone }: { t: Translate; microphone: MicrophoneS
       </Row>
     </Group>
     {/* The desktop app keeps its computer awake as any app does; holding the screen on is for a browser or a phone. */}
-    {!desktopHost() && <Group title={t("settings.call.device")}>
+    {host().identity.build === null && <Group title={t("settings.call.device")}>
       <Row label={t("settings.call.keepAwake")} description={wakeLock ? t("settings.call.keepAwakeHint") : t("settings.call.keepAwakeUnsupported")}>
         <Switch checked={prefs.keepAwake && wakeLock} disabled={!wakeLock} onChange={(keepAwake) => set({ keepAwake })} aria-label={t("settings.call.keepAwake")} />
       </Row>

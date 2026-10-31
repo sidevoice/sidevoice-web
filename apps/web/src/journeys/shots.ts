@@ -3,7 +3,7 @@ import { defaultVoiceSettings } from "../services/voice-settings.js";
 import { WORKING_SHOWN_AFTER_MS } from "../state/room-session-state.js";
 import { emptyOnboardingRecord, type OnboardingRecord, type OnboardingStep } from "../services/onboarding-state";
 import type { PairingSummary } from "../services/device-pairing.js";
-import type { UpdateMode, UpdaterStatus } from "../features/updates/useUpdates";
+import type { UpdateMode, UpdaterStatus } from "../host";
 import type { AgentReadinessStatus, TrialProgress } from "../state/room-types";
 
 /* Every screen the storyboard shows (journeys.html): each a state of the real app, seeded — the room's facts, the

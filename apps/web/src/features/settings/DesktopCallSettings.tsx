@@ -1,19 +1,19 @@
 import { useEffect, useState } from "react";
 import { Row } from "../../components/ui/Card";
 import { Switch } from "../../components/ui/Switch";
-import { callControlsBridge } from "../../services/desktop-host";
+import { host } from "../../host";
 import type { Translate } from "../../i18n/translator";
 
 /* The desktop app's own call setting, a row among Call's others, inside the app only and where the app offers it:
  * whether the call controls — the floating card — show always, or only while the app is minimised. Its global mute
  * shortcut is in Shortcuts (ShortcutsSettings.tsx). */
 export function DesktopCallSettings({ t, disabled = false, onChange }: { t: Translate; disabled?: boolean; onChange?(on: boolean): void }) {
-  if (!callControlsBridge()) return null;
+  if (!host().callControls) return null;
   return <AlwaysShownRow t={t} disabled={disabled} onChange={onChange} />;
 }
 
 function AlwaysShownRow({ t, disabled, onChange }: { t: Translate; disabled: boolean; onChange?(on: boolean): void }) {
-  const bridge = callControlsBridge()!;
+  const bridge = host().callControls!;
   const [on, setOn] = useState<boolean | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {

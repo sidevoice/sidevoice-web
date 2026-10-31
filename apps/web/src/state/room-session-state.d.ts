@@ -61,7 +61,7 @@ export interface SessionFacts {
   /** The machine whose page Settings → Machines shows (MachineNav); null is the first on a desktop, and the list of them
    *  on a phone. */
   machinesView: { machine: string | null };
- localHostAvailable: boolean; localHostStatus: import('../services/desktop-host').LocalHostStatus;
+ localHostAvailable: boolean; localHostStatus: import('../host').LocalHostStatus;
  /** Each paired machine's reach, and — where the machine says (core GET /api/host/status: a contract gap) — its
   *  Sidevoice version. */
  /** `update`: the machine's Sidevoice is older than the latest, and the command that updates it there where it names one

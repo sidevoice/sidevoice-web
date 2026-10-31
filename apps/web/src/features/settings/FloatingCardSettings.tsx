@@ -7,7 +7,7 @@ import { CharacterAvatar } from "../avatar/CharacterAvatar";
 import { stillAvatar } from "../avatar/avatar-state";
 import { avatarFor, avatarTone, SIDEVOICE_MASCOT } from "../avatar/avatar-spec";
 import { avatarColor } from "../avatar/bicho-draw";
-import { callControlsBridge, type CallControlsBridge } from "../../services/desktop-host";
+import { host, type CallControlsBridge } from "../../host";
 import { useRoomStore } from "../../state/room-store";
 import { CARD_CORNERS, CARD_FORMATS, CARD_SIZES, setFloatingCard, useFloatingCard, type CardCorner, type CardFormat } from "../../state/floating-card";
 import { DesktopCallSettings } from "./DesktopCallSettings";
@@ -26,11 +26,11 @@ const FORMAT_WORDS: Record<CardFormat, { name: MessageKey; hint: MessageKey }> =
 
 /** Shown only inside the app, where it offers the floating card. */
 export function useFloatingCardSection(): boolean {
-  return !!callControlsBridge();
+  return !!host().callControls;
 }
 
 export function FloatingCardSettings({ t }: { t: Translate }) {
-  const bridge = callControlsBridge();
+  const bridge = host().callControls;
   const prefs = useFloatingCard();
   const [app, setApp] = useState<{ corner?: CardCorner; moved?: boolean; enabled?: boolean; alwaysShown?: boolean } | null>(null);
   // Leaving Settings ends a preview showing at once.

@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { machineStatus } from "./machine-status";
 import { translator } from "../../i18n/translator";
-import type { LocalHostStatus, LocalHostStatusName } from "../../services/desktop-host";
+import type { LocalHostStatus, LocalHostStatusName } from "../../host";
 import type { MachineView } from "../../state/room-types";
 
 /* One function words a machine's state everywhere (spec R5): a remote machine by how it is reached, this computer by

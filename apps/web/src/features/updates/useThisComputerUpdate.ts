@@ -1,4 +1,4 @@
-import { desktopBuild } from "../../services/desktop-host";
+import { host } from "../../host";
 import { useRoomStore } from "../../state/room-store";
 import { safeLocalHostStatusDetails } from "../settings/local-host-status";
 import { useLocalHostUpdate } from "./LocalHostUpdate";
@@ -14,7 +14,7 @@ type PartState = "pending" | "current" | "unknown" | "none";
  *  not failed; the service as the app bundles it); null where that is not known. `place`: where its update is acted on
  *  in Settings › Updates. The service's own number and update are its row's to say (`service`). */
 export function useThisComputerUpdate() {
-  const build = desktopBuild();
+  const build = host().identity.build;
   const app = useAppUpdate();
   const local = useRoomStore((state) => state.machines.find((machine) => machine.local) ?? null);
   const status = useRoomStore((state) => state.facts.localHostStatus);

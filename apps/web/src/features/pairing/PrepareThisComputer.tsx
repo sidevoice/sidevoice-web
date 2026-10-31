@@ -2,7 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "../../components/ui/Button";
 import { DisclosureButton } from "../../components/ui/DisclosureButton";
 import { translator } from "../../i18n/translator";
-import { localHostBridge } from "../../services/desktop-host";
+import { host } from "../../host";
 import {
   isVisibleLocalHostInstall,
   localHostInstallController,
@@ -25,7 +25,7 @@ export function PrepareThisComputer({ id, controller = localHostInstallControlle
 }) {
   const t = translator();
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
-  const installs = typeof localHostBridge()?.install === "function";
+  const installs = typeof host().localHost?.install === "function";
   const failed = snapshot.phase === "failed";
   const [open, setOpen] = useState(failed);
   useEffect(() => { if (failed) setOpen(true); }, [failed]);

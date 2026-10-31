@@ -2,7 +2,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { DesktopCallSettings } from "./DesktopCallSettings";
 import { translator } from "../../i18n/translator";
-import type { CallControlsBridge } from "../../services/desktop-host";
+import type { CallControlsBridge } from "../../host";
 
 const en = translator("en");
 const es = translator("es");

@@ -3,7 +3,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { CheckIcon } from "../../components/ui/Icons";
-import { desktopHost } from "../../services/desktop-host";
+import { host } from "../../host";
 import { createMicrophoneAccess, devicePlatform, type MicrophoneAccess, type MicrophoneSnapshot } from "../../services/microphone-access";
 import type { MessageKey, Translate } from "../../i18n/translator";
 import "./permissions.css";
@@ -40,7 +40,7 @@ function howToAllow(asker: MicrophoneSnapshot["asker"], inDesktopApp: boolean, p
   return system ? ["wizard.mic.denied.site", system] : ["wizard.mic.denied.site"];
 }
 
-export function microphoneView(microphone: MicrophoneSnapshot, platform: Platform = devicePlatform(), inDesktopApp = !!desktopHost()): MicrophoneView {
+export function microphoneView(microphone: MicrophoneSnapshot, platform: Platform = devicePlatform(), inDesktopApp = host().identity.build !== null): MicrophoneView {
   const { asker, dismissed } = microphone;
   const state = microphone.state === "requesting" && (microphone.from === "denied" || microphone.from === "missing") ? microphone.from : microphone.state;
   const fromSystem = asker === "app";

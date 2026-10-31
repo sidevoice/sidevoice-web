@@ -3,7 +3,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ProgressBar } from "../../components/ui/ProgressBar";
 import { cn } from "../../lib/cn";
-import { localHostBridge, type LocalHostInstallProgress } from "../../services/desktop-host";
+import { host, type LocalHostInstallProgress } from "../../host";
 import {
   isVisibleLocalHostInstall,
   localHostInstallController,
@@ -35,7 +35,7 @@ function formatMegabytes(bytes: number) {
  *  place the offer among their own actions (the no-machine screen, the first-run setup's footer). */
 export function useLocalInstallOffer(controller: LocalHostInstallController = localHostInstallController) {
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
-  const supported = typeof localHostBridge()?.install === "function";
+  const supported = typeof host().localHost?.install === "function";
   return { supported, offered: supported && !isVisibleLocalHostInstall(snapshot) };
 }
 
@@ -57,7 +57,7 @@ export function LocalHostInstallEntry({
 }) {
   const t = translator();
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
-  const bridge = localHostBridge();
+  const bridge = host().localHost;
   const supportsInstall = typeof bridge?.install === "function";
   const showingAttempt = isVisibleLocalHostInstall(snapshot, source);
   const attemptActive = isVisibleLocalHostInstall(snapshot);

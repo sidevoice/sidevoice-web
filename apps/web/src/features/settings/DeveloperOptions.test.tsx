@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { DeveloperOptions } from "./DeveloperOptions";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
-import type { DebugSwitch } from "../../services/desktop-host";
+import type { DebugSwitch } from "../../host";
 
 afterEach(() => {
   cleanup();

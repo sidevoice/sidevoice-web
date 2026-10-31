@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import type { LocalHostBridge, LocalHostInstallOperation, LocalHostStatus } from "./desktop-host";
+import type { LocalHostBridge, LocalHostInstallOperation, LocalHostStatus } from "../host";
 import { createLocalHostInstallController } from "./local-host-install";
 
 const running: LocalHostStatus = { state: "running", reachable: true, installed: true };

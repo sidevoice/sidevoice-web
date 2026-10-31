@@ -5,9 +5,10 @@ import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import { fakeUpdater } from "../../test/updater";
 import { UpdateNotice } from "../updates/UpdateNotice";
-import { SIDEVOICE_UPDATE_COMMAND, type UpdaterStatus } from "../updates/useUpdates";
+import { SIDEVOICE_UPDATE_COMMAND } from "../updates/useUpdates";
+import type { UpdaterStatus } from "../../host";
 import type { PairingSummary } from "../../services/device-pairing.js";
-import type { LocalHostStatus, LocalHostVersion } from "../../services/desktop-host";
+import type { LocalHostStatus, LocalHostVersion } from "../../host";
 import { DEVELOPER_MODE_KEY } from "./developer-mode";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));

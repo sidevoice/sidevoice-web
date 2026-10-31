@@ -8,7 +8,7 @@ import { createRoomStore } from "../../state/room-store";
 import { defaultVoiceSettings } from "../../services/voice-settings.js";
 import type { CatalogView } from "../../services/model-catalogs.js";
 import type { PairingSummary } from "../../services/device-pairing.js";
-import type { LocalHostStatus } from "../../services/desktop-host";
+import type { LocalHostStatus } from "../../host";
 import type { HostAgentsState } from "../../state/room-types";
 import { SETTINGS_PHONE_QUERY, useSectionShown } from "./settings-levels";
 import { openSettings } from "./open-settings";
