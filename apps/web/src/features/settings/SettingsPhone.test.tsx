@@ -274,7 +274,7 @@ test("an agent's request opens at its machine's page, its Agents focused", async
 });
 
 test("This device's rename goes to General in place of its page: Back still goes to the list", async () => {
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => running), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install: vi.fn(),
   } } } });
   room({ pairings: [LOCAL, NUC], inApp: true, localHostAvailable: true, localHostStatus: running });
@@ -371,9 +371,9 @@ test("a section is on show only at its page on a phone (a try there stops at the
 
 
 test("Developer options is a row of the list below Advanced, with no line under it, once developer mode is on in a nightly", async () => {
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { build: { channel: "nightly", version: "0.2.1-nightly.608" } } } });
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel: "nightly", version: "0.2.1-nightly.608" } } } });
   localStorage.setItem(DEVELOPER_MODE_KEY, "1");
-  onTestFinished(() => { localStorage.clear(); delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; });
+  onTestFinished(() => { localStorage.clear(); delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; });
   room();
   await open();
   const labels = [...nav().querySelectorAll(".settings-menu-label")].map((label) => label.textContent);

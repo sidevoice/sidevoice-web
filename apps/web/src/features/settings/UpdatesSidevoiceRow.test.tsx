@@ -11,7 +11,7 @@ vi.mock("../../services/room-session-controller.js", () => ({}));
 afterEach(() => {
   cleanup();
   for (const key of ["sidevoice.update-continue", "sidevoice.updates-checked-at"]) localStorage.removeItem(key);
-  delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
+  delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost;
 });
 
 /* This computer in Updates (decided): ONE row, Sidevoice, in one state — Automatic or Manual first; then the version
@@ -32,7 +32,7 @@ function open({ updater = {}, service = CURRENT, status = running, update = vi.f
   service?: LocalHostVersion | (() => Promise<LocalHostVersion>); status?: LocalHostStatus; update?: ReturnType<typeof vi.fn> } = {}) {
   const fake = fakeUpdater(updater);
   const version = vi.fn(typeof service === "function" ? service : async () => service);
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { build: { channel: "release", version: "0.3.0" }, updater: fake.updater,
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel: "release", version: "0.3.0" }, updater: fake.updater,
     localHost: { state: vi.fn(async () => status), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install: vi.fn(), version, update } } } });
   window.sidevoiceActions = { openPairing: vi.fn(), localHostDevices: vi.fn().mockResolvedValue([]), machineDevices: vi.fn().mockResolvedValue([]),
     loadHostAgents: vi.fn(), loadMachineInfo: vi.fn() } as unknown as typeof window.sidevoiceActions;

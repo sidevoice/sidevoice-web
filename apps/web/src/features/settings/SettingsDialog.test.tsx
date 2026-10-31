@@ -61,11 +61,11 @@ function withKeyboard() {
 /** The desktop app, as its bridge shows it: the global mute shortcut and the call controls' setting. */
 function inDesktopApp() {
   const shortcut = { accelerator: "Cmd+Shift+M", label: "⇧⌘M", state: "on", alternatives: [], voiceOver: false };
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: {
     muteShortcut: { get: vi.fn(async () => shortcut), set: vi.fn(async () => shortcut) },
     callControls: { settings: vi.fn(async () => ({ alwaysShown: false })), setAlwaysShown: vi.fn(async (alwaysShown: boolean) => ({ alwaysShown })) },
   } } });
-  onTestFinished(() => { delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; });
+  onTestFinished(() => { delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; });
 }
 
 const navLabels = () => [...document.querySelectorAll(".settings-nav > button")].map((button) => button.textContent);
@@ -105,8 +105,8 @@ test("in the desktop app Shortcuts is hidden too, and the floating card has its 
 function withReset({ uninstall }: { uninstall: boolean }) {
   const data = { pairings: { read: vi.fn(async () => ({ pairings: [] })), write: vi.fn(async () => {}) },
     deleteAll: vi.fn(), resetReport: vi.fn(async () => null), ...(uninstall ? { uninstall: vi.fn() } : {}) };
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { data } } });
-  onTestFinished(() => { delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; });
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { pairings: data.pairings, reset: data } } });
+  onTestFinished(() => { delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; });
 }
 
 test("a browser has no Danger zone, and no section of its own anywhere", () => {
@@ -371,11 +371,11 @@ test("Permissions wears the warning dot while the microphone is not allowed, sai
  *  on this device, or not. */
 function withDeveloperMode({ channel = "nightly", on = true, debug = true }: { channel?: string | null; on?: boolean; debug?: boolean } = {}) {
   if (channel) {
-    Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { build: { channel, version: "0.2.1-nightly.608" },
+    Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel, version: "0.2.1-nightly.608" },
       ...(debug ? { debug: { available: ["inspectable", "compositingBorders", "repaintCounters"], inspectable: false, compositingBorders: false, repaintCounters: false, set: vi.fn(async () => {}) } } : {}) } } });
   }
   if (on) localStorage.setItem(DEVELOPER_MODE_KEY, "1");
-  onTestFinished(() => { localStorage.clear(); delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; });
+  onTestFinished(() => { localStorage.clear(); delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; });
 }
 
 test("with developer mode on in a nightly, Developer options is below Advanced and holds the turn tuning, which Advanced no longer has", () => {
@@ -458,7 +458,7 @@ test("developer mode turned off while another section shows leaves that section 
 
 test("a section shown again reads the app's switches as it holds them now, not as they were", () => {
   withDeveloperMode();
-  const { debug } = (window as unknown as { __sidevoiceDesktop: { host: { debug: { compositingBorders: boolean } } } }).__sidevoiceDesktop.host;
+  const { debug } = (window as unknown as { __sidevoiceHost: { host: { debug: { compositingBorders: boolean } } } }).__sidevoiceHost.host;
   open("whisper-base");
   fireEvent.click(document.getElementById("settings-developer")!);
   expect(screen.getByRole("switch", { name: "Compositing borders" })).toHaveAttribute("aria-checked", "false");

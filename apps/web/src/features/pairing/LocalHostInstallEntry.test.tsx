@@ -24,7 +24,7 @@ function operation(job: string, promise: Promise<LocalHostStatus>) {
 }
 
 function setBridge(bridge: Partial<LocalHostBridge>) {
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => ({ state: "absent" as const })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), ...bridge,
   } } } });
 }

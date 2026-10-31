@@ -29,7 +29,7 @@ afterEach(() => {
   host().presence.remote?.clear();
   delete (navigator as { mediaSession?: unknown }).mediaSession;
   delete (navigator as { wakeLock?: unknown }).wakeLock;
-  Reflect.deleteProperty(window, "__sidevoiceDesktop");
+  Reflect.deleteProperty(window, "__sidevoiceHost");
   vi.unstubAllGlobals();
 });
 
@@ -38,7 +38,7 @@ describe("the lock screen and the headset", () => {
     expect(host().presence.remote).toBeNull();
     mediaSession();
     expect(host().presence.remote).not.toBeNull();
-    Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { mediaKeys: "native" } } });
+    Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { presence: { media: "app" } } } });
     expect(host().presence.media).toBe("app");
     expect(host().presence.remote).toBeNull();
   });
@@ -124,7 +124,7 @@ describe("the screen's lock", () => {
     expect(host().presence.screenAwake?.supported).toBe(false);
     Object.defineProperty(navigator, "wakeLock", { configurable: true, value: { request: vi.fn() } });
     expect(host().presence.screenAwake?.supported).toBe(true);
-    Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { build: { channel: "release", version: "0.3.0" } } } });
+    Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel: "release", version: "0.3.0" } } } });
     expect(host().presence.screenAwake?.supported).toBe(true);
   });
 

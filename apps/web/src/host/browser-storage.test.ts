@@ -66,10 +66,10 @@ describe("the browser's host storage", () => {
   test("is the page's where no app keeps the pairings, and the app's where it does", () => {
     expect(host().storage.page).toBeDefined();
     const pairings = { read: async () => ({ pairings: [] }), write: async () => {} };
-    Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { data: { pairings } } } });
+    Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { pairings } } });
     try {
       expect(host().storage.pairings).toBe(pairings);
       expect(host().storage.page).toBeUndefined();
-    } finally { Reflect.deleteProperty(window, "__sidevoiceDesktop"); }
+    } finally { Reflect.deleteProperty(window, "__sidevoiceHost"); }
   });
 });

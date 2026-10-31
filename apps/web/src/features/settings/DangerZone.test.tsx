@@ -5,7 +5,7 @@ import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import { setUiLanguage } from "../../i18n/translator";
 
-afterEach(() => { cleanup(); Reflect.deleteProperty(window, "__sidevoiceDesktop"); });
+afterEach(() => { cleanup(); Reflect.deleteProperty(window, "__sidevoiceHost"); });
 
 function bridge(result: unknown = null, { uninstall = false } = {}) {
   const data = {
@@ -14,7 +14,7 @@ function bridge(result: unknown = null, { uninstall = false } = {}) {
     resetReport: vi.fn(async () => result),
     ...(uninstall ? { uninstall: vi.fn(async () => ({ state: "needs-quit", service: "removed", agents: {}, failed: [], pending: ["app-data", "app"] })) } : {}),
   };
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { data } } });
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { pairings: data.pairings, reset: data } } });
   return data as typeof data & { uninstall: ReturnType<typeof vi.fn> };
 }
 

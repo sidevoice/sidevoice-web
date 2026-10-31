@@ -32,8 +32,8 @@ export function host(): Host {
     ...app,
     // The app's when it keeps them; else this browser's own storage.
     storage: app.storage ?? browserStorage(),
-    identity: { ...app.identity, get os() { return parseBrowser().os; } },
-    reach: browserReach(),
+    identity: { ...app.identity, get os() { return app.identity.os ?? parseBrowser().os; } },
+    reach: app.reach ?? browserReach(),
     voice: {
       runs: app.voice ? "app" : "page",
       host: () => pageOfVoice().voice(),

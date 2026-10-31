@@ -41,7 +41,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   delete window.sidevoiceActions;
-  delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
+  delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost;
   delete (navigator as { mediaDevices?: unknown }).mediaDevices;
   delete (navigator as { permissions?: unknown }).permissions;
   localStorage.removeItem(ONBOARDING_STORAGE_KEY);
@@ -251,7 +251,7 @@ test("none connected: No microphone found, and Check again finds one", async () 
 test("in the desktop app on a Mac: the system's permission through the app, its settings opened from the step", async () => {
   let state: "prompt" | "granted" | "denied" = "denied";
   const microphone = { state: vi.fn(async () => state), request: vi.fn(async () => state === "granted" ? "granted" : "denied"), openSettings: vi.fn(async () => {}) };
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { voice: {}, microphone } } });
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { voice: {}, microphone } } });
   await setup();
   expect(title()).toHaveTextContent("Permissions");
   expect(wizard().getByText(/System Settings › Privacy & Security › Microphone and turn on Sidevoice/)).toBeInTheDocument();
@@ -268,7 +268,7 @@ test("in the desktop app on a Mac: the system's permission through the app, its 
 }, WHOLE_APP_MS);
 
 test("nothing to ask: an app that asks for itself when its call opens, or a page with no microphone API, goes straight to transcription", async () => {
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { voice: {} } } });
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { voice: {} } } });
   await setup();
   expect(title()).toHaveTextContent("Set up transcription");
 }, WHOLE_APP_MS);

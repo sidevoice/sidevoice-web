@@ -151,7 +151,7 @@ export async function openCard(context, { state = "listening", format = "pip", s
     const state = { call: { ...call, version: 2, since: Date.now() - 65_000 }, level: level ? 40 : 0, pointerInside: expanded ? true : null, alwaysExpanded: expanded,
       muteShortcut: "Ctrl+Alt+M", playback: { level: 0, threadId: null }, place: { vertical: "upper", horizontal: "right" }, size: null };
     window.__cardState = state;
-    window.__sidevoiceDesktop = { host: { callControls: {
+    window.__sidevoiceHost = { host: { callControls: {
       subscribe(listener) { window.__cardListener = listener; listener(window.__cardState); return () => {}; },
       run() {}, layout() {}, drag() {}, resize() {},
     } } };

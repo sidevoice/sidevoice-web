@@ -253,7 +253,7 @@ export interface ResetBridge {
   deleteAll(): Promise<ResetOutcome & { state: "needs-restart" | "partial" }>;
   resetReport(): Promise<null | { state: "complete" | "partial"; completed: string[]; failed: { step: string; key: string; agent?: string }[]; agents: Record<string, unknown> }>;
   /** Uninstall: the reset, then the app itself moved to the Trash once it quits; not relaunched (sidevoice-desktop
-   *  `host.data.uninstall`, macOS). Resolves like `deleteAll()`, with `"app"` pending; refuses `reset.app-unremovable` for
+   *  `host.reset.uninstall`, macOS). Resolves like `deleteAll()`, with `"app"` pending; refuses `reset.app-unremovable` for
    *  a copy that cannot remove itself (a disk image), before anything is deleted. */
   uninstall?(): Promise<ResetOutcome & { state: "needs-quit" | "partial" }>;
 }

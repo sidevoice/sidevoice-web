@@ -16,7 +16,7 @@ afterEach(() => {
   vi.useRealTimers();
   for (const key of ["sidevoice.variants", "sidevoice.settings", "sidevoice.updates-checked-at", "sidevoice.update-continue"]) localStorage.removeItem(key);
   sessionStorage.removeItem("sidevoice.update-notice-hidden");
-  delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
+  delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost;
   delete (window as { sidevoiceActions?: unknown }).sidevoiceActions;
 });
 
@@ -66,7 +66,7 @@ function app(mode: UpdateMode, { finds = true }: { finds?: boolean } = {}) {
   };
   fake.updater.check.mockImplementation(check);
   fake.updater.download.mockImplementation(async () => download());
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { build: { channel: "release", version: "0.3.0" }, updater: fake.updater,
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel: "release", version: "0.3.0" }, updater: fake.updater,
     localHost: { state: vi.fn(async () => running), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install: vi.fn(), version: vi.fn(async () => CURRENT), update: vi.fn() } } } });
   window.sidevoiceActions = { openPairing: vi.fn(), localHostDevices: vi.fn().mockResolvedValue([]), machineDevices: vi.fn().mockResolvedValue([]),
     loadHostAgents: vi.fn(), loadMachineInfo: vi.fn(), loadVoiceCatalogue: vi.fn() } as unknown as typeof window.sidevoiceActions;

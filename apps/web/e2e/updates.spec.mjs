@@ -31,7 +31,7 @@ async function withUpdater(page, language, first = STATES[0], stored = null) {
     let now = first;
     const listeners = new Set();
     window.__pushUpdate = (next) => { now = next; for (const listener of listeners) listener(next); };
-    window.__sidevoiceDesktop = { host: {
+    window.__sidevoiceHost = { host: {
       build: { channel: "release", version: "0.9.0", commit: "abcdef0123456789", date: "2026-10-13T08:00:00Z" },
       updater: {
         settings: async () => ({ mode: "manual" }), setMode: async (mode) => ({ mode }),

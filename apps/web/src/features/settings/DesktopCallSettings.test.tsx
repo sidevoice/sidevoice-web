@@ -7,10 +7,10 @@ import type { CallControlsBridge } from "../../host";
 const en = translator("en");
 const es = translator("es");
 
-afterEach(() => { delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; });
+afterEach(() => { delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; });
 
 function inApp(host: Record<string, unknown>) {
-  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host } });
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host } });
 }
 
 function controlsBridge(alwaysShown = false, fail = false) {
