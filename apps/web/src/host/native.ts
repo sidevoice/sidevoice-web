@@ -1,5 +1,5 @@
 import type {
-  AppBuild, AppUpdater, AppVoice, CallControlsBridge, Host, HostDebugBridge, HostIdentity, HostOS, HostPresence, HostStorage, LocalHostBridge,
+  AppBuild, AppUpdater, AppVoice, CallControlsBridge, Host, HostDebugBridge, HostIdentity, HostPresence, HostStorage, LocalHostBridge,
   MicrophoneBridge, MuteShortcutBridge, PairingsStore, ReachTransport, ResetBridge,
 } from "./types";
 
@@ -37,12 +37,14 @@ function build(app: Injected | undefined): AppBuild | null {
   return { channel, version: text(found.version) ?? "", commit: text(found.commit), date: text(found.date) };
 }
 
-const SYSTEMS: readonly HostOS[] = ["macos", "windows", "linux", "ios", "android", "other"];
+const named = (value: unknown) => typeof value === "string" && value.trim() ? value.trim() : null;
 
 /** The members an app offers through the global it injects, `null` for the rest; the identity here is what the app says
- *  (its build, its computer's name, its system), the browser's to tell where it does not. */
-export type NativeHost = Omit<Host, "identity" | "presence" | "reach" | "storage" | "voice"> & {
-  identity: Omit<HostIdentity, "os"> & { os: HostOS | null };
+ *  (its build, its computer's name, its shortcut modifier), the browser's to tell where it does not. */
+export type NativeHost = Omit<Host, "identity" | "microphone" | "presence" | "reach" | "storage" | "voice"> & {
+  identity: Omit<HostIdentity, "deviceName" | "shortcutModifier"> & { deviceName(): string | null; shortcutModifier: string | null };
+  /** The app's permission bridge, and its help for a blocked one when it words it. */
+  microphone: Partial<MicrophoneBridge> | null;
   presence: Pick<HostPresence, "media">;
   /** What the app says of its transport; null where it says nothing. */
   reach: ReachTransport | null;
@@ -63,12 +65,9 @@ export function nativeHost(): NativeHost {
   const updater = app?.updater as AppUpdater | undefined;
   return {
     identity: {
-      os: SYSTEMS.find((system) => system === app?.os) ?? null,
       build: build(app),
-      deviceName() {
-        const name = app?.deviceName;
-        return typeof name === "string" && name.trim() ? name.trim() : null;
-      },
+      deviceName: () => named(app?.deviceName),
+      shortcutModifier: named(app?.shortcutModifier),
     },
     microphone: microphone && typeof microphone === "object" ? microphone : null,
     voice: app?.voice ? { voice: app.voice as AppVoice["voice"], engine: app.engine as AppVoice["engine"] } : null,

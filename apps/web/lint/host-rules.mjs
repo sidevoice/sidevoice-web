@@ -8,6 +8,14 @@
  * for each: optional chaining, `window.` against `globalThis.`, bracket access, an alias, a destructuring, `in`, and every
  * way of importing (`import`, `export ... from`, `import()`, `require()`, `import.meta.glob()`, `import()` types).
  *
+ * A third rule closes the last way to ask which system the page runs on (D-HOST-OS, sidevoice-desktop#289): the host has no `os`, so
+ * nothing outside `src/host` reads one (`host().identity.os`, a destructured `os`) or imports anything shaped like one from
+ * it (`HostOS`, `Platform`, `describeBrowser`, `isMac`). What a system decides about the page's words is answered by the host,
+ * resolved: `microphone.help(language)`, `identity.shortcutModifier`, `identity.deviceName()`. A new platform touches its app.
+ *
+ * The `identity` it looks for is any one by that name (`x.identity.os`, `const { os } = identity`): the lint cannot tell the
+ * host's from another object's, and a field of that name is the one to rename.
+ *
  * Known limitations, which nothing here chases:
  *  - A name put together or fetched at run time: `Reflect.get(window, "navigator")`, `window["navi" + "gator"]`,
  *    `window[name]`, `eval`, `new Function`, and the same for the injected global's name.
@@ -30,6 +38,7 @@ const OF_THOSE = `MemberExpression:matches([computed=false][property.name=/^(${M
 const INJECTED_MESSAGE = "Only src/host names the object an app injects (window.__sidevoiceHost, and the __sidevoiceDesktop it replaces): ask host() for the member you need.";
 const NAVIGATOR_MESSAGE = "Only src/host holds the browser's navigator beyond its clipboard, language, storage, devices and permissions: ask host() (identity, presence, microphone). It cannot be aliased, passed, destructured or tested with `in`.";
 const MICROPHONE_MESSAGE = "Only src/host opens the microphone: ask host() (microphone, voice).";
+const OS_MESSAGE = "Nothing outside src/host asks which system the page runs on: host() answers what a system decides, resolved (microphone.help(language), identity.shortcutModifier, identity.deviceName()). A new platform touches its app, not the web.";
 const IMPORT_MESSAGE = "Only host() (src/host/index) and the host's types are imported from outside src/host; what is behind them is not.";
 
 /** One read of one of the members above: `navigator.clipboard`, `navigator?.["storage"]`. */
@@ -55,6 +64,13 @@ const navigatorRule = {
   },
 };
 
+// A name shaped like a question about the system: imported from the host's index or its types, it is the ask the host no longer answers.
+const OS_SHAPED = "^(?:.*(?:OS|Os|Platform|UserAgent)|describeBrowser|parseBrowser|isMac|isWindows|isLinux|isIos|isAndroid)$";
+const OS_NAME = `/${OS_SHAPED}/`;
+const OS_MEMBER = "/^(os|platform)$/";
+// The host's two public doors, as a module path (the slash is \x2f, as below).
+const PUBLIC_HOST = "(^|\\x2f)host(\\x2f(index|types)(\\.[jt]sx?)?)?$";
+
 // What inside src/host may not be imported: everything but its index and its types (and, for the harness and the test
 // helpers that stand in for an app, `testing`). The slash is \x2f so that the same text is a selector's regex.
 const internal = (allowed) => `(^|\\x2f)host\\x2f(?!(${allowed})(\\.[jt]sx?)?$).+`;
@@ -72,6 +88,10 @@ const restrictions = (allowed) => [
   { selector: "MemberExpression:matches([property.name='getUserMedia'], [property.value='getUserMedia'])", message: MICROPHONE_MESSAGE },
   { selector: "ObjectPattern > Property:matches([key.name='getUserMedia'], [key.value='getUserMedia'])", message: MICROPHONE_MESSAGE },
   { selector: "BinaryExpression[operator='in'][left.value='getUserMedia']", message: MICROPHONE_MESSAGE },
+  // The system the page runs on: `identity.os` (read, or taken out of the identity), and an OS-shaped name of the host's.
+  { selector: `MemberExpression:matches([computed=false][property.name=${OS_MEMBER}], [computed=true][property.value=${OS_MEMBER}]):matches([object.property.name='identity'], [object.name='identity'])`, message: OS_MESSAGE },
+  { selector: `VariableDeclarator:matches([init.property.name='identity'], [init.name='identity']) > ObjectPattern > Property:matches([key.name=${OS_MEMBER}], [key.value=${OS_MEMBER}])`, message: OS_MESSAGE },
+  { selector: `TSImportType[argument.literal.value=/${PUBLIC_HOST}/][qualifier.name=${OS_NAME}]`, message: OS_MESSAGE },
   // Importing what is behind host(): a dynamic import, `require`, a glob, and a type that names the module
   // (`import("../host/native").X`). Static imports and re-exports are `no-restricted-imports`'.
   { selector: `ImportExpression[source.value=/${internal(allowed)}/]`, message: IMPORT_MESSAGE },
@@ -83,7 +103,10 @@ const restrictions = (allowed) => [
 const rules = (allowed) => ({
   "host/navigator": "error",
   "no-restricted-syntax": ["error", ...restrictions(allowed)],
-  "no-restricted-imports": ["error", { patterns: [{ regex: internal(allowed), message: IMPORT_MESSAGE }] }],
+  "no-restricted-imports": ["error", { patterns: [
+    { regex: internal(allowed), message: IMPORT_MESSAGE },
+    { regex: PUBLIC_HOST, importNamePattern: OS_SHAPED, message: OS_MESSAGE },
+  ] }],
 });
 
 const scope = {

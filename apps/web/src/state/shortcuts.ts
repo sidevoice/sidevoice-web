@@ -47,12 +47,13 @@ export function shortcutOf(event: KeyEventLike, context: { typing: boolean }): S
   return null;
 }
 
-/** The combination as it is written on this system: "⌘D", "⌘S", "Ctrl+S"; `space` is the word for Space. */
-export function shortcutCombo(id: ShortcutId, mac: boolean, space = "Space"): string {
+/** The combination as the host's modifier writes it: "⌘D", "Ctrl+S". `modifier` is the host's label for the mod key, `space` the
+ *  word for Space. A symbol (⌘) is written against its key, shift's as well (⇧); a word (Ctrl) is joined to it with a "+". */
+export function shortcutCombo(id: ShortcutId, modifier: string, space = "Space"): string {
   const entry = shortcut(id);
   const key = entry.key === "Space" ? space : entry.key;
-  if (mac) return (entry.shift ? "⇧" : "") + (entry.mod ? "⌘" : "") + key;
-  return [entry.mod && "Ctrl", entry.shift && "Shift", key].filter(Boolean).join("+");
+  if (/^\p{S}$/u.test(modifier)) return (entry.shift ? "⇧" : "") + (entry.mod ? modifier : "") + key;
+  return [entry.mod && modifier, entry.shift && "Shift", key].filter(Boolean).join("+");
 }
 
 /** The same for `aria-keyshortcuts`: "Meta+D Control+D" (a mod key is either). */

@@ -250,7 +250,9 @@ test("none connected: No microphone found, and Check again finds one", async () 
 
 test("in the desktop app on a Mac: the system's permission through the app, its settings opened from the step", async () => {
   let state: "prompt" | "granted" | "denied" = "denied";
-  const microphone = { state: vi.fn(async () => state), request: vi.fn(async () => state === "granted" ? "granted" : "denied"), openSettings: vi.fn(async () => {}) };
+  const microphone = { state: vi.fn(async () => state), request: vi.fn(async () => state === "granted" ? "granted" : "denied"), openSettings: vi.fn(async () => {}),
+    // The app words its own help for its system; the step shows it as it is.
+    help: () => ({ steps: ["Open System Settings › Privacy & Security › Microphone and turn on Sidevoice. Then check again."], openSettings: "Open System Settings" }) };
   Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { voice: {}, microphone } } });
   await setup();
   expect(title()).toHaveTextContent("Permissions");

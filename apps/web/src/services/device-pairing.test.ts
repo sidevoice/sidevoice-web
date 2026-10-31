@@ -1,6 +1,6 @@
 import { expect, test, vi } from "vitest";
 import {
-  base64ToBytes, bytesToBase64url, machineAddress, candidateBases, decodePairingCode, deviceName, fingerprintOf, firstProven,
+  base64ToBytes, bytesToBase64url, machineAddress, candidateBases, decodePairingCode, fingerprintOf, firstProven,
   pairingSummary, proveIdentity, projectPairings, redeemPairingCode, revokedPairing, secureBase, verifyIdentitySignature,
   withPairing, withoutPairing, NO_WEBCRYPTO, type Pairing,
   listeningPort, privateHost, previewPairingCode, PAIRING_HTTP_PRIVATE, PAIRING_HTTP_ONLY, PAIRING_HTTP_BLOCKED,
@@ -417,17 +417,6 @@ test("a bridge-owned local host wins over a duplicate stored code pairing", () =
   const local = pairing("same-fp", { local: true, device_id: "native-local-device", token: "native-proxy-secret" });
   const projected = projectPairings({ list: [duplicate, pairing("remote-fp")] }, local);
   expect(projected.list.map((item) => item.device_id)).toEqual(["native-local-device", "d-remote-fp"]);
-});
-
-test("a device names itself after what it is, unless the person says otherwise", () => {
-  // "{browser} on {system}"; a browser it can't tell is a Browser; nothing to tell, Sidevoice.
-  expect(deviceName({ userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1" })).toBe("Safari on iPhone");
-  expect(deviceName({ userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36", platform: "MacIntel" })).toBe("Chrome on Mac");
-  expect(deviceName({ userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0" })).toBe("Edge on Windows");
-  expect(deviceName({ userAgent: "Mozilla/5.0 (Android 14; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0" })).toBe("Firefox on Android");
-  expect(deviceName({ userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)" })).toBe("Browser on iPhone");
-  expect(deviceName({ userAgent: "", userAgentData: { platform: "Windows" } })).toBe("Browser on Windows");
-  expect(deviceName({})).toBe("Sidevoice");
 });
 
 // ----- plain http, on a private network, by consent -----

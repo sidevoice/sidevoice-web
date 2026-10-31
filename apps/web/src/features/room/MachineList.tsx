@@ -226,7 +226,7 @@ export function ThisComputerSettings() {
   // Titled with this device's name; renaming it is General's (its one place), where the pencil takes you. Follows the
   // name as it is set, so a rename made while this page is mounted (the setup's) shows at once.
   useRoomStore((state) => state.facts.deviceName);
-  const name = currentDeviceName((_, params) => t("pair.deviceNameBrowser", params));
+  const name = currentDeviceName();
   const rename = () => store?.patch({ settingsSection: "general", settingsFocus: "device-name" });
   return (
     <Section id="this-computer" title={<span className="this-device-title">{name}
@@ -473,7 +473,7 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
   const list = () => local ? window.sidevoiceActions?.localHostDevices?.() : window.sidevoiceActions?.machineDevices?.(machine.pairingId!);
   // This device by the name it has here (its setting, else its default), however the machine last heard it.
   useRoomStore((state) => state.facts.deviceName);
-  const ownName = currentDeviceName((_, params) => t("pair.deviceNameBrowser", params));
+  const ownName = currentDeviceName();
   const shownName = (device: HostDeviceView) => (device.current && ownName) || device.name || t("hosts.devices.thisDevice");
   const drop = (id: string) => local ? window.sidevoiceActions?.revokeLocalHostDevice?.(id) : window.sidevoiceActions?.revokeMachineDevice?.(machine.pairingId!, id);
   const pairingKey = machine.pairingId || "";

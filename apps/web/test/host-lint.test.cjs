@@ -96,7 +96,32 @@ const imports=[
  ['a glob with a type argument','const all = import.meta.glob<unknown>("../host/**", { eager: true });'],
  ['an eager glob','const all = import.meta.globEager("../host/browser-*.ts");'],
 ];
+// The host has no `os` (D-HOST-OS): nothing outside it asks which system the page runs on, and nothing OS-shaped is imported from it.
+const system=[
+ ['identity.os read','const os = host().identity.os;'],
+ ['identity.os, optional','const os = host()?.identity?.os;'],
+ ['identity.os, bracketed','const os = host().identity["os"];'],
+ ['identity.platform','const where = host().identity.platform;'],
+ ['os taken out of the identity','const { os } = host().identity;'],
+ ['os taken out of the identity, renamed','const { os: system } = host().identity;'],
+ ['os taken out of the identity, by a string key','const { "os": system } = host().identity;'],
+ ['identity taken out of the host, os read','const { identity } = host(); const os = identity.os;'],
+ ['a test of the system, mac','const mac = host().identity.os === "macos";'],
+ ['HostOS imported','import { host, type HostOS } from "../host";'],
+ ['HostOS imported from the types','import type { HostOS } from "../host/types";'],
+ ['HostOS imported from the index','import { HostOS } from "../../host/index.ts";'],
+ ['HostOS re-exported','export type { HostOS } from "../host";'],
+ ['HostOS named by an import type','type System = import("../host").HostOS;'],
+ ['a Platform of the host','import type { Platform } from "../host";'],
+ ['a name ending in OS','import type { BrowserOS } from "../host";'],
+ ['a name ending in Platform','import { hostPlatform } from "../host";'],
+ ['the browser reading','import { describeBrowser } from "../host";'],
+ ['the browser parser','import { parseBrowser } from "../host/index";'],
+ ['isMac','import { isMac } from "../host";'],
+ ['isMac, from a component','import { isMac } from "../host/types";'],
+];
 const lintFixtures=[
+ ['which system the page runs on',system],
  ['the global an app injects',injected],
  ['the browser\'s navigator, held, aliased, passed, destructured or read beyond what is not the host\'s',navigator],
  ['the microphone\'s stream',microphone],
@@ -142,12 +167,29 @@ test('JavaScript and TSX are held to it as TypeScript is',async()=>{
  assert.ok((await lint('export const A = () => <b>{navigator.userAgent}</b>;','src/features/Example.tsx')).length>0);
 });
 test('src/host is the only place that names them, and the tests that stand in for an app are not held to it',async()=>{
- const all=[...injected,...navigator,...microphone,...imports];
+ const all=[...injected,...navigator,...microphone,...imports,...system];
  for(const [name,code] of all){
   assert.deepEqual(await lint(code,'src/host/example.ts'),[],'inside the host: '+name);
   assert.deepEqual(await lint(code,'src/features/example.test.tsx'),[],'a test: '+name);
   assert.deepEqual(await lint(code,'src/features/settings/with-microphone.test-util.ts'),[],'a test utility: '+name);
  }
+});
+test('A name that only looks like the system is not refused: a machine\'s platform, an icon, what the host does give',async()=>{
+ const fine=[
+  'const where = machine.platform;',
+  'const row = { os: "linux" }; const a = row.os;',
+  'const { os } = machine;',
+  'const a = host().identity.shortcutModifier;',
+  'const a = host().identity.deviceName();',
+  'const help = host().microphone.help("es");',
+  'import { PlatformIcon } from "../components/ui/Icons";',
+  'import { host, type Host, type MicrophoneHelp } from "../host";',
+  'import type { HostIdentity, HostMicrophone } from "../host/types";',
+  'import { isMachine, osOfMachine } from "../services/machines";',
+  'export type { Host } from "../host";',
+  'type Help = import("../host").MicrophoneHelp;',
+ ];
+ for(const code of fine)assert.deepEqual(await lint(code,OUTSIDE),[],code);
 });
 test('What the page reads of navigator that is not a host\'s passes: its clipboard, language, storage, devices and permissions',async()=>{
  const fine=[

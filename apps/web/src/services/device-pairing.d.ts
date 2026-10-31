@@ -93,7 +93,6 @@ export function firstProven(candidates: CandidateBase[], expected: { fp: string;
   started?: Map<string, Promise<unknown>>): Promise<(CandidateBase & { publicKey: string }) | null>;
 export function redeemPairingCode(code: string, options?: { name?: string; address?: string; target?: string; about?: TargetAbout | null; origin?: string; reach?: { plainHttpPrivate: boolean };
   get?: typeof fetch; subtle?: SubtleCrypto; now?: number ; insecure?: boolean }): Promise<{ pairing: Pairing; base: CandidateBase & { publicKey: string } }>;
-export function deviceName(nav?: { userAgent?: string; platform?: string; userAgentData?: { platform?: string } }): string;
 export function projectPairings(stored: Pairings, localPairing: Pairing | null): Pairings;
 export function withPairing(pairings: Pairings, pairing: Pairing): Pairings;
 export function withoutPairing(pairings: Pairings, fp: string): Pairings;

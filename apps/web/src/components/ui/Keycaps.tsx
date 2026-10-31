@@ -13,11 +13,9 @@ export function Keys({ combo, state }: { combo: string; state?: string }) {
   </kbd>;
 }
 
-export const isMac = () => { const { os } = host().identity; return os === "macos" || os === "ios"; };
-
-/** A room shortcut's key caps, as this system writes them. */
+/** A room shortcut's key caps, written with the modifier this host uses. */
 export function ShortcutKeys({ id, t = translator() }: { id: ShortcutId; t?: Translate }) {
-  return <Keys combo={shortcutCombo(id, isMac(), t("settings.shortcuts.space"))} />;
+  return <Keys combo={shortcutCombo(id, host().identity.shortcutModifier, t("settings.shortcuts.space"))} />;
 }
 
 /** A tooltip's content: the label, then the keys that do the same, e.g. "Skip  [S]". */

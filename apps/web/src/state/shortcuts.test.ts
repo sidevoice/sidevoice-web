@@ -32,12 +32,14 @@ test("the held key is the runtime's, not the handler's", () => {
   expect(shortcutOf(press("Space"), free)).toBeNull();
 });
 
-test("combos are written as each system writes them, and for aria-keyshortcuts", () => {
-  expect(shortcutCombo("mute", true)).toBe("⌘D");
-  expect(shortcutCombo("mute", false)).toBe("Ctrl+D");
-  expect(shortcutCombo("skip", true)).toBe("⌘S");
-  expect(shortcutCombo("skip", false)).toBe("Ctrl+S");
-  expect(shortcutCombo("holdToTalk", false, "Espacio")).toBe("Espacio");
+test("combos are written with the host's modifier, and for aria-keyshortcuts", () => {
+  expect(shortcutCombo("mute", "⌘")).toBe("⌘D");
+  expect(shortcutCombo("mute", "Ctrl")).toBe("Ctrl+D");
+  expect(shortcutCombo("skip", "⌘")).toBe("⌘S");
+  expect(shortcutCombo("skip", "Ctrl")).toBe("Ctrl+S");
+  expect(shortcutCombo("holdToTalk", "Ctrl", "Espacio")).toBe("Espacio");
+  // A modifier that is a word, in whatever language the host writes it, is joined with a plus.
+  expect(shortcutCombo("mute", "Strg")).toBe("Strg+D");
   expect(ariaKeyShortcuts("mute")).toBe("Meta+D Control+D");
   expect(ariaKeyShortcuts("skip")).toBe("Meta+S Control+S");
 });
