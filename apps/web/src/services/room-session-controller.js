@@ -1100,7 +1100,7 @@ async function pairingRefused(fp,{call=false,token=null,asked=false}={}){
 // A code, redeemed where the machine proves it is itself: from then on one more machine, live at once, call or not.
 async function pairDevice(code,name,address='',{insecure=false}={}){
  const about=await describeTarget();if(about)targetAbout=about;
- const t=translator(),defaultName=currentDeviceName((kind,params)=>t('pair.deviceNameBrowser',params));
+ const defaultName=currentDeviceName();
  const {pairing,base}=await redeemPairingCode(code,{name:name||defaultName,address,target,about,origin:location.origin,reach:pageHost().reach,get:fetch,insecure});
  if(localPairing?.fp===pairing.fp){
   try{await fetch(base.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token))}catch{}

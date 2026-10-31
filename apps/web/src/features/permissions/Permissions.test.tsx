@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { translator } from "../../i18n/translator";
+import { setUiLanguage, translator } from "../../i18n/translator";
 import type { MicrophoneSnapshot } from "../../services/microphone-access";
 import { createMicrophoneAccess } from "../../services/microphone-access";
 import { MicrophoneContinue, PermissionsStep } from "../onboarding/PermissionsStep";
@@ -23,6 +23,14 @@ const snapshot = (state: MicrophoneSnapshot["state"], extra: Partial<MicrophoneS
   ({ state, asker: "page", known: true, dismissed: false, unchanged: false, from: null, ...extra });
 const list = () => document.querySelector(".perm-list")!;
 
+/* An app words its own help for the system it runs on; the page shows it as it is. This stands in for the desktop on Windows. */
+const WINDOWS_APP_HELP = {
+  steps: ["Open Settings › Privacy & security › Microphone and turn on “Microphone access” and “Let desktop apps access your microphone”. Then check again."],
+  openSettings: "Open Windows Settings",
+};
+const appWords = (help: unknown, extra: Record<string, unknown> = {}) =>
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel: "release", version: "0.3.0" }, microphone: { help: () => help, ...extra } } } });
+
 test("one row says where the microphone stands: its name and why, Allow microphone at the right, the green badge once allowed; blocked, how to allow it", () => {
   const cases: [MicrophoneSnapshot, string | null][] = [
     [snapshot("prompt"), "Allow microphone"],
@@ -32,7 +40,7 @@ test("one row says where the microphone stands: its name and why, Allow micropho
     [snapshot("missing"), "Check again"],
   ];
   for (const [microphone, button] of cases) {
-    render(<PermissionsStep microphone={microphone} openSettings={null} t={t} platform="other" />);
+    render(<PermissionsStep microphone={microphone} openSettings={null} t={t} />);
     expect(list()).toHaveTextContent("Microphone");
     expect(list()).toHaveTextContent("Needed so your agent can hear you");
     if (button) expect(list().querySelector("#wizard-mic-action")).toHaveTextContent(button);
@@ -46,7 +54,7 @@ test("one row says where the microphone stands: its name and why, Allow micropho
 });
 
 test("no Refresh status in the setup; blocked, the footer's action is described by the how-to, which is a live alert", () => {
-  render(<PermissionsStep microphone={snapshot("denied")} openSettings={null} t={t} platform="other" />);
+  render(<PermissionsStep microphone={snapshot("denied")} openSettings={null} t={t} />);
   expect(screen.queryByRole("button", { name: "Refresh status" })).toBeNull();
   expect(document.querySelector(".wizard-mic-help")).toHaveAttribute("role", "alert");
   // The card's one control is described by the how-to, which sits in the same block.
@@ -65,7 +73,7 @@ test("the bicho is calm in every state and its wrapper follows the permission st
     [snapshot("denied"), "denied"], [snapshot("requesting", { from: "denied" }), "denied"], [snapshot("missing"), "missing"],
   ];
   for (const [microphone, state] of cases) {
-    render(<PermissionsStep microphone={microphone} openSettings={null} t={t} platform="other" />);
+    render(<PermissionsStep microphone={microphone} openSettings={null} t={t} />);
     expect(document.querySelector(".perm-hero-figure .sv-avatar")).toHaveAttribute("data-avatar-state", "present");
     expect(document.querySelector(".perm-hero-figure")).toHaveAttribute("data-state", state);
     expect(list()).toHaveAttribute("data-state", state);
@@ -75,13 +83,13 @@ test("the bicho is calm in every state and its wrapper follows the permission st
 
 test("the row's button follows the state (Allow microphone, Check again); once allowed it is the green badge, which keeps focus", () => {
   const onRequest = vi.fn();
-  const view = render(<PermissionsStep microphone={snapshot("prompt")} openSettings={null} t={t} platform="other" onRequest={onRequest} />);
+  const view = render(<PermissionsStep microphone={snapshot("prompt")} openSettings={null} t={t} onRequest={onRequest} />);
   const control = screen.getByRole("button", { name: "Allow microphone" });
   fireEvent.click(control);
   expect(onRequest).toHaveBeenCalledTimes(1);
-  view.rerender(<PermissionsStep microphone={snapshot("denied")} openSettings={null} t={t} platform="other" onRequest={onRequest} />);
+  view.rerender(<PermissionsStep microphone={snapshot("denied")} openSettings={null} t={t} onRequest={onRequest} />);
   expect(screen.getByRole("button", { name: "Check again" })).toBe(control);
-  view.rerender(<PermissionsStep microphone={snapshot("granted")} openSettings={null} t={t} platform="other" onRequest={onRequest} />);
+  view.rerender(<PermissionsStep microphone={snapshot("granted")} openSettings={null} t={t} onRequest={onRequest} />);
   expect(screen.queryByRole("button", { name: /Allow microphone|Check again/ })).toBeNull();
   expect(document.querySelector(".perm-badge")).toHaveTextContent("Allowed");
   expect(document.querySelector(".perm-badge-focus")).toHaveAttribute("tabindex", "-1");
@@ -195,8 +203,7 @@ test("Settings › Permissions trusts a successful stream when Safari's query re
 
 test.each(["setup", "settings"])("Windows %s: the privacy button uses the settings-only bridge; Check again still asks the webview", async (place) => {
   const openSettings = vi.fn(async () => {});
-  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel: "release", version: "0.3.0" }, microphone: { openSettings } } } });
-  vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
+  appWords(WINDOWS_APP_HELP, { openSettings });
   const { getUserMedia } = browser("prompt");
   getUserMedia.mockRejectedValueOnce(Object.assign(new Error("blocked"), { name: "NotAllowedError" }));
   function Setup() {
@@ -217,8 +224,9 @@ test.each(["setup", "settings"])("Windows %s: the privacy button uses the settin
 });
 
 test("no microphone found in the desktop app on Windows: the alert says what to do, with Open Windows Settings", () => {
+  appWords(WINDOWS_APP_HELP);
   const openSettings = vi.fn(() => Promise.resolve());
-  render(<PermissionsStep microphone={snapshot("missing", { asker: "app" })} openSettings={openSettings} t={t} platform="windows" />);
+  render(<PermissionsStep microphone={snapshot("missing", { asker: "app" })} openSettings={openSettings} t={t} />);
   expect(document.querySelector(".wizard-mic-help")).toHaveTextContent("Connect a microphone or turn one on, then check again.");
   fireEvent.click(screen.getByRole("button", { name: "Open Windows Settings" }));
   expect(openSettings).toHaveBeenCalled();
@@ -226,32 +234,72 @@ test("no microphone found in the desktop app on Windows: the alert says what to 
 
 test("none found says itself once, by the alert: the polite status stays silent until a retry finds it still missing", () => {
   const status = () => document.querySelector("[role=status][aria-live=polite]")!;
-  render(<PermissionsStep microphone={snapshot("missing")} openSettings={null} t={t} platform="windows" />);
+  render(<PermissionsStep microphone={snapshot("missing")} openSettings={null} t={t} />);
   expect(document.querySelector(".wizard-mic-help")).toHaveAttribute("role", "alert");
   expect(status()).toHaveTextContent("");
   cleanup();
-  render(<PermissionsStep microphone={snapshot("missing", { unchanged: true })} openSettings={null} t={t} platform="windows" />);
+  render(<PermissionsStep microphone={snapshot("missing", { unchanged: true })} openSettings={null} t={t} />);
   expect(status()).toHaveTextContent("Still no microphone found.");
 });
 
 test("focus on the settings button inside the alert moves to the badge once the microphone is allowed", () => {
+  appWords(WINDOWS_APP_HELP);
   const openSettings = () => Promise.resolve();
   for (const blocked of ["missing", "denied"] as const) {
-    const { rerender } = render(<PermissionsStep microphone={snapshot(blocked, { asker: "app" })} openSettings={openSettings} t={t} platform="windows" />);
+    const { rerender } = render(<PermissionsStep microphone={snapshot(blocked, { asker: "app" })} openSettings={openSettings} t={t} />);
     screen.getByRole("button", { name: "Open Windows Settings" }).focus();
-    rerender(<PermissionsStep microphone={snapshot("granted", { asker: "app" })} openSettings={openSettings} t={t} platform="windows" />);
+    rerender(<PermissionsStep microphone={snapshot("granted", { asker: "app" })} openSettings={openSettings} t={t} />);
     expect(document.activeElement).toBe(document.querySelector(".perm-badge-focus"));
     cleanup();
   }
 });
 
 test("blocked in the desktop app on Windows: the alert names the Windows setting, and its button opens Windows Settings", () => {
+  appWords(WINDOWS_APP_HELP);
   const openSettings = vi.fn(() => Promise.resolve());
-  render(<PermissionsStep microphone={snapshot("denied", { asker: "app" })} openSettings={openSettings} t={t} platform="windows" />);
+  render(<PermissionsStep microphone={snapshot("denied", { asker: "app" })} openSettings={openSettings} t={t} />);
   const help = document.querySelector(".wizard-mic-help");
   expect(help).toHaveTextContent("Settings › Privacy & security › Microphone");
   expect(help).toHaveTextContent("Let desktop apps access your microphone");
   expect(help).not.toHaveTextContent("System Settings");
   fireEvent.click(screen.getByRole("button", { name: "Open Windows Settings" }));
   expect(openSettings).toHaveBeenCalledTimes(1);
+});
+
+test("blocked, the help is the host's words, shown as they are: a system the page has never heard of needs nothing of it", () => {
+  const openSettings = vi.fn(() => Promise.resolve());
+  appWords({ steps: ["Open the Haiku preferences, then Privacy.", "Then check again."], openSettings: "Open Haiku preferences" });
+  render(<PermissionsStep microphone={snapshot("denied", { asker: "app" })} openSettings={openSettings} t={t} />);
+  const help = document.querySelector(".wizard-mic-help");
+  expect(help).toHaveTextContent("Open the Haiku preferences, then Privacy.");
+  expect(document.querySelector(".perm-also")).toHaveTextContent("Then check again.");
+  fireEvent.click(screen.getByRole("button", { name: "Open Haiku preferences" }));
+  expect(openSettings).toHaveBeenCalledTimes(1);
+});
+
+test("the host is asked in the interface's language", () => {
+  const help = vi.fn(() => ({ steps: ["Abre Ajustes."], openSettings: "Abrir Ajustes" }));
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { microphone: { help } } } });
+  setUiLanguage("es");
+  try {
+    render(<PermissionsStep microphone={snapshot("denied")} openSettings={null} t={translator("es")} />);
+    expect(help).toHaveBeenCalledWith("es");
+    expect(document.querySelector(".wizard-mic-help")).toHaveTextContent("Abre Ajustes.");
+  } finally { setUiLanguage("en"); }
+});
+
+test("an app that words nothing it can draw leaves the browser's own words, and a blocked microphone never breaks the page", () => {
+  for (const help of [() => { throw new Error("no"); }, () => ({ steps: [] }), () => ({ steps: [3] }), () => "text", undefined]) {
+    Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { microphone: { help } } } });
+    render(<PermissionsStep microphone={snapshot("denied")} openSettings={null} t={t} />);
+    expect(document.querySelector(".wizard-mic-help")).toHaveTextContent("Allow it for this site");
+    cleanup();
+  }
+});
+
+test("not blocked, the host is not asked", () => {
+  const help = vi.fn(() => ({ steps: ["x"] }));
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { microphone: { help } } } });
+  render(<PermissionsStep microphone={snapshot("granted")} openSettings={null} t={t} />);
+  expect(help).not.toHaveBeenCalled();
 });
