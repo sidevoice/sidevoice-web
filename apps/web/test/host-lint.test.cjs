@@ -89,6 +89,12 @@ const imports=[
  ['a dynamic import with its extension','const m = import("../host/browser-voice.js");'],
  ['a type that names the module','type Native = import("../host/native").NativeHost;'],
  ['the harness\'s helper, in feature code','import { installApp } from "../host/testing";'],
+ ['require','const m = require("../host/browser-presence");'],
+ ['require of the native reader, with its extension','const { nativeHost } = require("../../host/native.ts");'],
+ ['a glob of the host\'s files','const all = import.meta.glob("../host/*.ts");'],
+ ['a glob of one implementation, eager','const one = import.meta.glob(["../host/native.ts"], { eager: true });'],
+ ['a glob with a type argument','const all = import.meta.glob<unknown>("../host/**", { eager: true });'],
+ ['an eager glob','const all = import.meta.globEager("../host/browser-*.ts");'],
 ];
 const lintFixtures=[
  ['the global an app injects',injected],
@@ -96,6 +102,19 @@ const lintFixtures=[
  ['the microphone\'s stream',microphone],
  ['what is behind host()',imports],
 ];
+// Files other than .js and .ts are held to it too: CommonJS and ES modules named by their extension.
+test('CommonJS and .mjs files are held to it as the rest are',async()=>{
+ for(const filename of ['src/services/example.cjs','src/services/example.mjs']){
+  assert.ok((await lint('const n = navigator;',filename)).length>0,filename+' alias');
+  assert.ok((await lint('const a = globalThis.navigator?.wakeLock;',filename)).length>0,filename+' member');
+  assert.ok((await lint('const host = window.__sidevoiceHost;',filename)).length>0,filename+' global');
+  assert.ok((await lint('await media.getUserMedia({ audio: true });',filename)).length>0,filename+' microphone');
+  assert.deepEqual(await lint('await navigator.clipboard.writeText(text);',filename),[],filename+' allowed');
+ }
+ assert.ok((await lint('const m = require("../host/native");','src/services/example.cjs')).length>0);
+ assert.deepEqual(await lint('const { host } = require("../host");','src/services/example.cjs'),[]);
+ assert.deepEqual(await lint('const n = navigator;','src/services/example.test.cjs'),[],'a test is not');
+});
 for(const [group,fixtures] of lintFixtures){
  test('Outside src/host, '+group+' is refused in every form seen',async()=>{
   for(const [name,code] of fixtures){
@@ -170,8 +189,34 @@ test('Nothing else is refused: the same names on something that is not the host\
   'import { hostAgents } from "../services/host-agents";',
   'import { x } from "../hosts/machine";',
   'import { y } from "./host-view";',
+  'const { host } = require("../host");',
+  'const { host } = require("../host/index.js");',
+  'const all = import.meta.glob<unknown>("./locales/*.ts", { eager: true });',
+  'const index = import.meta.glob("../host/index.ts");',
+  'const other = require("../services/host-agents");',
  ];
  for(const code of fine)assert.deepEqual(await lint(code,OUTSIDE),[],code);
+});
+test('A name that is not the global navigator is not refused: a key, a method, a binding that shadows it',async()=>{
+ const fine=[
+  'const menu = { navigator: "menu" };',
+  'const menu = { navigator() { return 1; } };',
+  'class Menu { navigator = 1; navigator2() {} }',
+  'interface Shell { navigator: string }',
+  'type Shell = { navigator: string };',
+  'function open(navigator) { return navigator.userAgent; }',
+  'const open = (navigator) => navigator.platform;',
+  'function open(navigator) { return { navigator }; }',
+  'const navigator = makeNavigator(); const a = navigator.userAgent;',
+  'function open() { const navigator = fake(); return navigator.wakeLock; }',
+  'for (const navigator of navigators) run(navigator);',
+  'try { run(); } catch (navigator) { report(navigator); }',
+  'import { navigator } from "./menu"; run(navigator.userAgent);',
+ ];
+ for(const code of fine)assert.deepEqual(await lint(code,OUTSIDE),[],code);
+ // And the global still is, in the same file as a shadow.
+ assert.equal((await lint('function open(navigator) { return navigator.userAgent; }\nconst a = navigator.userAgent;',OUTSIDE)).length,1);
+ assert.equal((await lint('{ const navigator = fake(); }\nconst b = navigator;',OUTSIDE)).length,1);
 });
 test('The dev harness and the helpers tests share inject through host/testing, and take nothing else of the host\'s',async()=>{
  const harness='import { installApp, installedMembers } from "../host/testing";';
