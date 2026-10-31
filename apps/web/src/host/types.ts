@@ -89,12 +89,36 @@ export interface MicrophoneBridge {
   onChange?(listener: () => void): () => void;
 }
 
-/** The pairings this device keeps, where the app keeps them (private remote pairings: every desktop build). */
+/** What this device keeps of its machines: the remote pairings (never the local host's, which the app projects), and the
+ *  machines it forgot without being able to tell them, to tell again (their token is still good there until then). */
+export interface PairingsRecord {
+  pairings: Pairing[];
+  pendingRevokes?: Pairing[];
+}
+
+/** The pairings this device keeps, where the app keeps them (private remote pairings: every desktop build). A write that
+ *  fails rejects, and the change it was part of does not happen. */
+export interface PairingsStore {
+  read(): Promise<PairingsRecord>;
+  write(value: PairingsRecord & { pendingRevokes: Pairing[] }): Promise<void>;
+}
+
+/** The pairings kept in this page's own storage, which only a browser's is. It reads at once, so the page starts with the
+ *  machines it has and not an empty list; it writes as well as it can, and a store that refuses still pairs for this
+ *  visit (the caller tells the person); and the machines that could not be told are read live, as another tab left them. */
+export interface PagePairings {
+  readState(): { list: Pairing[] };
+  /** False when the browser kept nothing; the pairing still happens. */
+  write(book: { list: Pairing[] }): boolean;
+  readRevokes(): Pairing[];
+  writeRevokes(list: Pairing[]): void;
+}
+
 export interface HostStorage {
-  pairings: {
-    read(): Promise<{ pairings: Pairing[]; pendingRevokes?: Pairing[] }>;
-    write(value: { pairings: Pairing[]; pendingRevokes: Pairing[] }): Promise<void>;
-  };
+  pairings: PairingsStore;
+  /** Present where the host keeps the pairings in this page's own storage: the browser's. The app's are `pairings` alone,
+   *  read and written asynchronously, and a write it refuses fails the change. */
+  page?: PagePairings;
 }
 
 export type LocalHostStatusName = "absent" | "installing" | "not-installed" | "stopped-by-person" | "starting" |
@@ -291,7 +315,7 @@ export interface Host {
   microphone: Partial<MicrophoneBridge> | null;
   voice: AppVoice | null;
   presence: HostPresence;
-  storage: HostStorage | null;
+  storage: HostStorage;
   localHost: LocalHostBridge | null;
   reset: ResetBridge | null;
   muteShortcut: MuteShortcutBridge | null;

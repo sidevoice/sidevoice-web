@@ -1,5 +1,6 @@
 import { describe, expect, onTestFinished, test } from "vitest";
 import { cardSeam, host } from ".";
+import { nativeHost } from "./native";
 
 const withHost = (members: Record<string, unknown> | undefined) => {
   Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: members && { host: members } });
@@ -13,14 +14,14 @@ describe("a page outside an app", () => {
     expect(outside.identity.build).toBeNull();
     expect(outside.identity.deviceName()).toBeNull();
     expect(outside.presence.media).toBe("page");
-    for (const member of [outside.microphone, outside.voice, outside.storage, outside.localHost, outside.reset, outside.muteShortcut,
+    for (const member of [outside.microphone, outside.voice, outside.localHost, outside.reset, outside.muteShortcut,
       outside.callControls, outside.updater, outside.debug]) expect(member).toBeNull();
     expect(cardSeam()).toBeNull();
   });
 
   test("an app that has injected an empty host offers nothing either", () => {
     withHost({});
-    expect(host().storage).toBeNull();
+    expect(nativeHost().storage).toBeNull();
     expect(host().localHost).toBeNull();
   });
 });
@@ -40,7 +41,7 @@ describe("storage and reset", () => {
 
   test("native pairings are selected on Windows and Linux without the macOS reset capability", () => {
     withHost({ data: { pairings } });
-    expect(host().storage?.pairings).toBe(pairings);
+    expect(host().storage.pairings).toBe(pairings);
     expect(host().reset).toBeNull();
     withHost({ data: { pairings, deleteAll: async () => ({}), resetReport: async () => null } });
     expect(host().reset).not.toBeNull();
@@ -48,7 +49,7 @@ describe("storage and reset", () => {
 
   test("a reset without the pairings that go with it is none", () => {
     withHost({ data: { deleteAll: async () => ({}), resetReport: async () => null } });
-    expect(host().storage).toBeNull();
+    expect(nativeHost().storage).toBeNull();
     expect(host().reset).toBeNull();
   });
 

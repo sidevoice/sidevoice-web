@@ -1,6 +1,6 @@
 import type {
   AppBuild, AppUpdater, AppVoice, CallControlsBridge, Host, HostDebugBridge, HostIdentity, HostPresence, HostStorage, LocalHostBridge, MicrophoneBridge,
-  MuteShortcutBridge, ResetBridge,
+  MuteShortcutBridge, PairingsStore, ResetBridge,
 } from "./types";
 
 /* What an app injects into its page, as the app does today: `window.__sidevoiceDesktop.host`, one optional member per
@@ -35,12 +35,17 @@ function build(app: Injected | undefined): AppBuild | null {
 
 /** The members an app offers through the global it injects, `null` for the rest; the identity here is what the app says
  *  (its build, its computer's name), the system being the browser's to tell. */
-export type NativeHost = Omit<Host, "identity" | "presence"> & { identity: Omit<HostIdentity, "os">; presence: Pick<HostPresence, "media"> };
+export type NativeHost = Omit<Host, "identity" | "presence" | "storage"> & {
+  identity: Omit<HostIdentity, "os">;
+  presence: Pick<HostPresence, "media">;
+  /** The app's pairings; null where it keeps none for the page. */
+  storage: { pairings: PairingsStore } | null;
+};
 
 export function nativeHost(): NativeHost {
   const app = injected();
   const data = app?.data as Record<string, unknown> | undefined;
-  const pairings = data?.pairings as HostStorage["pairings"] | undefined;
+  const pairings = data?.pairings as PairingsStore | undefined;
   const storage: HostStorage | null = pairings && typeof pairings.read === "function" && typeof pairings.write === "function" ? { pairings } : null;
   const debug = app?.debug as Partial<HostDebugBridge> | undefined;
   const microphone = app?.microphone as Partial<MicrophoneBridge> | undefined;
