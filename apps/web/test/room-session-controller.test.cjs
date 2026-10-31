@@ -15,8 +15,8 @@ function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:nu
  if(outboxScope)context.sessionStorage={getItem:key=>key==='sidevoice.outbox-scope'?outboxScope:null,setItem(){}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. A TypeScript module is transpiled here.
- const modules={'./browser-microphone':'HostMicrophone','./identity':'HostIdentity','./native':'HostNative','../host':'Host','../host/index.ts':'Host','./audio-diagnostics.ts':'AudioDiagnostics','./audio-choice.ts':'AudioChoice','./device-name-rules.js':'DeviceNameRules','../services/device-name-rules.js':'DeviceNameRules','./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','./desktop-host':'DesktopHost','./microphone-access':'MicrophoneAccess','./microphone-access.ts':'MicrophoneAccess','./audio-device-refresh.ts':'AudioDeviceRefresh','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./locales/en':'LocaleEn','../../i18n/locales/en':'LocaleEn','./locales/es':'LocaleEs','../../i18n/locales/es':'LocaleEs','./locales/fr':'LocaleFr','../../i18n/locales/fr':'LocaleFr','./locales/it':'LocaleIt','../../i18n/locales/it':'LocaleIt','./locales/de':'LocaleDe','../../i18n/locales/de':'LocaleDe','./locales/ja':'LocaleJa','../../i18n/locales/ja':'LocaleJa','./locales/zh-Hans':'LocaleZhHans','../../i18n/locales/zh-Hans':'LocaleZhHans','./locales/pl':'LocalePl','../../i18n/locales/pl':'LocalePl','../../i18n/translator':'Translator','../i18n/translator.ts':'Translator','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./reply-eligibility.js':'ReplyEligibility','./reply-hearing-policy.js':'HearingPolicy','./voice-settings.js':'VoiceSettings','./voice-trial.js':'VoiceTrial','./call-preferences.ts':'CallPreferences','./model-housekeeping.js':'ModelHousekeeping','../features/settings/error-message.ts':'ErrorMessage','../../services/failure-code.js':'FailureCode','./working-clock.ts':'WorkingClock','../state/shortcuts.ts':'Shortcuts'};
- const files={HostMicrophone:sourceRoot+'/host/browser-microphone.ts',HostIdentity:sourceRoot+'/host/identity.ts',HostNative:sourceRoot+'/host/native.ts',Host:sourceRoot+'/host/index.ts',AudioDiagnostics:sourceRoot+'/services/audio-diagnostics.ts',AudioChoice:sourceRoot+'/services/audio-choice.ts',MicrophoneAccess:sourceRoot+'/services/microphone-access.ts',AudioDeviceRefresh:sourceRoot+'/services/audio-device-refresh.ts',Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',LocaleEn:sourceRoot+'/i18n/locales/en.ts',LocaleEs:sourceRoot+'/i18n/locales/es.ts',LocaleFr:sourceRoot+'/i18n/locales/fr.ts',LocaleIt:sourceRoot+'/i18n/locales/it.ts',LocaleDe:sourceRoot+'/i18n/locales/de.ts',LocaleJa:sourceRoot+'/i18n/locales/ja.ts',LocaleZhHans:sourceRoot+'/i18n/locales/zh-Hans.ts',LocalePl:sourceRoot+'/i18n/locales/pl.ts',Translator:sourceRoot+'/i18n/translator.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',VoiceTrial:sourceRoot+'/services/voice-trial.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',ReplyEligibility:sourceRoot+'/services/reply-eligibility.js',HearingPolicy:sourceRoot+'/services/reply-hearing-policy.js',VoiceSettings:sourceRoot+'/services/voice-settings.js',CallPreferences:sourceRoot+'/services/call-preferences.ts',ModelHousekeeping:sourceRoot+'/services/model-housekeeping.js',DeviceNameRules:sourceRoot+'/services/device-name-rules.js',ErrorMessage:sourceRoot+'/features/settings/error-message.ts',WorkingClock:sourceRoot+'/services/working-clock.ts',Shortcuts:sourceRoot+'/state/shortcuts.ts'};
+ const modules={'./browser-presence':'HostPresence','./browser-microphone':'HostMicrophone','./identity':'HostIdentity','./native':'HostNative','../host':'Host','../host/index.ts':'Host','./audio-diagnostics.ts':'AudioDiagnostics','./audio-choice.ts':'AudioChoice','./device-name-rules.js':'DeviceNameRules','../services/device-name-rules.js':'DeviceNameRules','./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','./desktop-host':'DesktopHost','./microphone-access':'MicrophoneAccess','./microphone-access.ts':'MicrophoneAccess','./audio-device-refresh.ts':'AudioDeviceRefresh','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./locales/en':'LocaleEn','../../i18n/locales/en':'LocaleEn','./locales/es':'LocaleEs','../../i18n/locales/es':'LocaleEs','./locales/fr':'LocaleFr','../../i18n/locales/fr':'LocaleFr','./locales/it':'LocaleIt','../../i18n/locales/it':'LocaleIt','./locales/de':'LocaleDe','../../i18n/locales/de':'LocaleDe','./locales/ja':'LocaleJa','../../i18n/locales/ja':'LocaleJa','./locales/zh-Hans':'LocaleZhHans','../../i18n/locales/zh-Hans':'LocaleZhHans','./locales/pl':'LocalePl','../../i18n/locales/pl':'LocalePl','../../i18n/translator':'Translator','../i18n/translator.ts':'Translator','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./reply-eligibility.js':'ReplyEligibility','./reply-hearing-policy.js':'HearingPolicy','./voice-settings.js':'VoiceSettings','./voice-trial.js':'VoiceTrial','./call-preferences.ts':'CallPreferences','./model-housekeeping.js':'ModelHousekeeping','../features/settings/error-message.ts':'ErrorMessage','../../services/failure-code.js':'FailureCode','./working-clock.ts':'WorkingClock','../state/shortcuts.ts':'Shortcuts'};
+ const files={HostPresence:sourceRoot+'/host/browser-presence.ts',HostMicrophone:sourceRoot+'/host/browser-microphone.ts',HostIdentity:sourceRoot+'/host/identity.ts',HostNative:sourceRoot+'/host/native.ts',Host:sourceRoot+'/host/index.ts',AudioDiagnostics:sourceRoot+'/services/audio-diagnostics.ts',AudioChoice:sourceRoot+'/services/audio-choice.ts',MicrophoneAccess:sourceRoot+'/services/microphone-access.ts',AudioDeviceRefresh:sourceRoot+'/services/audio-device-refresh.ts',Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',LocaleEn:sourceRoot+'/i18n/locales/en.ts',LocaleEs:sourceRoot+'/i18n/locales/es.ts',LocaleFr:sourceRoot+'/i18n/locales/fr.ts',LocaleIt:sourceRoot+'/i18n/locales/it.ts',LocaleDe:sourceRoot+'/i18n/locales/de.ts',LocaleJa:sourceRoot+'/i18n/locales/ja.ts',LocaleZhHans:sourceRoot+'/i18n/locales/zh-Hans.ts',LocalePl:sourceRoot+'/i18n/locales/pl.ts',Translator:sourceRoot+'/i18n/translator.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',VoiceTrial:sourceRoot+'/services/voice-trial.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',ReplyEligibility:sourceRoot+'/services/reply-eligibility.js',HearingPolicy:sourceRoot+'/services/reply-hearing-policy.js',VoiceSettings:sourceRoot+'/services/voice-settings.js',CallPreferences:sourceRoot+'/services/call-preferences.ts',ModelHousekeeping:sourceRoot+'/services/model-housekeeping.js',DeviceNameRules:sourceRoot+'/services/device-name-rules.js',ErrorMessage:sourceRoot+'/features/settings/error-message.ts',WorkingClock:sourceRoot+'/services/working-clock.ts',Shortcuts:sourceRoot+'/state/shortcuts.ts'};
  const imports=(source,dir)=>source.replace(/^import (\w+) from ['"](.*\.json)['"][^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
   .replace(/^import \{(.*)\} from ['"](.*)['"];\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
@@ -376,7 +376,7 @@ test('Wake lock is released if hangup wins the pending request',async()=>{
  s.run('ws=null;releaseScreenWakeLock()');
  grant({release:async()=>{released++},addEventListener(){}});
  await pending;
- assert.equal(released,1);assert.equal(s.run('screenWakeLock'),null);
+ assert.equal(released,1);assert.equal(s.run('screenHeld'),false);
 });
 test('The tap that starts the call asks for the lock, before there is a socket',async()=>{
  const s=setup();let requests=0;
@@ -415,6 +415,168 @@ test('A lock the system takes back is asked for again while the call is up, and 
  s.run('ws=null');
  release();
  assert.equal(scheduled.length,0,'a call that ended does not keep the screen awake');
+});
+// ----- call presence: what the lock screen, the headset and the screen lock keep doing, whoever provides them -----
+// The page's Media Session, as a call sets it up: handlers per action, and the tile's metadata.
+function mediaSession(s,{playing=true}={}){
+ const handlers={},session={metadata:null,setActionHandler(action,fn){handlers[action]=fn}};
+ s.context.navigator={mediaSession:session};
+ s.context.MediaMetadata=class{constructor(init){Object.assign(this,init)}};
+ const voice=fakeVoice();s.context.__voice=voice;
+ s.run("voice=__voice;ws={};conversationCalls.set('test',{call:__voice});micEnabled="+playing);
+ return {handlers,session,voice};
+}
+// The faint loop the lock screen takes for Now Playing, as an element a test can see play and pause.
+function nowPlayingLoop(s){
+ const elements=[];
+ s.context.Blob=Blob;
+ s.context.Audio=class{constructor(){this.paused=true;this.attributes={};elements.push(this)}
+  setAttribute(name,value){this.attributes[name]=value}play(){this.paused=false;return Promise.resolve()}pause(){this.paused=true}};
+ return elements;
+}
+test('Lock screen: play opens the microphone, and leaves it open if it was',()=>{
+ const s=setup();const {handlers}=mediaSession(s);
+ s.run('applyLockScreen(true)');
+ handlers.play();assert.equal(s.run('micEnabled'),true,'play while unmuted stays unmuted');
+ s.run('micEnabled=false');handlers.play();assert.equal(s.run('micEnabled'),true,'play while muted unmutes');
+});
+test('Lock screen: pause toggles the microphone, because a click may arrive as pause even while muted',()=>{
+ const s=setup();const {handlers}=mediaSession(s);
+ s.run('applyLockScreen(true)');
+ handlers.pause();assert.equal(s.run('micEnabled'),false,'pause while open mutes');
+ handlers.pause();assert.equal(s.run('micEnabled'),true,'pause while muted unmutes');
+});
+test('Lock screen: togglemicrophone follows isActivating when the browser says it, and toggles when it does not',()=>{
+ const s=setup();const {handlers}=mediaSession(s);
+ s.run('applyLockScreen(true)');
+ handlers.togglemicrophone({isActivating:false});assert.equal(s.run('micEnabled'),false);
+ handlers.togglemicrophone({isActivating:true});assert.equal(s.run('micEnabled'),true);
+ handlers.togglemicrophone({isActivating:true});assert.equal(s.run('micEnabled'),true,'activating while open stays open');
+ handlers.togglemicrophone({});assert.equal(s.run('micEnabled'),false,'no word of it: a toggle');
+ handlers.togglemicrophone();assert.equal(s.run('micEnabled'),true);
+});
+test('Lock screen: the tile is the call\'s, set while it is up and gone when it ends',()=>{
+ const s=setup();const {handlers,session}=mediaSession(s);
+ s.run('applyLockScreen(true)');
+ assert.deepEqual(['play','pause','togglemicrophone'].map(action=>typeof handlers[action]),['function','function','function']);
+ assert.equal(session.metadata.title,'Sidevoice');
+ s.run('applyLockScreen(false)');
+ assert.deepEqual(['play','pause','togglemicrophone'].map(action=>handlers[action]),[null,null,null]);
+ assert.equal(session.metadata,null);
+});
+test('Lock screen: an action the browser does not know leaves the others set',()=>{
+ const s=setup();const {handlers,session}=mediaSession(s);
+ session.setActionHandler=(action,fn)=>{if(action==='togglemicrophone')throw new TypeError('unsupported');handlers[action]=fn};
+ s.run('applyLockScreen(true)');
+ assert.equal(typeof handlers.play,'function');assert.equal(typeof handlers.pause,'function');
+ assert.equal(session.metadata.title,'Sidevoice');
+});
+test('Now Playing: a faint loop plays while the microphone is open and the call is up, and is paused while muted',()=>{
+ const s=setup();const {handlers}=mediaSession(s);const elements=nowPlayingLoop(s);
+ s.run('primeNowPlaying()');
+ assert.equal(elements.length,1);assert.equal(elements[0].loop,true);assert.equal(elements[0].attributes.playsinline,'');
+ s.run('primeNowPlaying()');assert.equal(elements.length,1,'one element for the page');
+ s.run('applyLockScreen(true)');assert.equal(elements[0].paused,false,'open: playing');
+ handlers.pause();assert.equal(elements[0].paused,true,'muted: paused');
+ handlers.play();assert.equal(elements[0].paused,false);
+ s.run('applyLockScreen(false)');assert.equal(elements[0].paused,true,'no call: paused');
+});
+test('Now Playing: none without a Media Session, and none where the app owns the lock screen',()=>{
+ const s=setup();const elements=nowPlayingLoop(s);
+ s.context.navigator={};s.run('primeNowPlaying()');
+ assert.equal(elements.length,0,'no Media Session: no tile to own');
+ const {handlers,session}=mediaSession(s);
+ s.context.window.__sidevoiceDesktop={host:{mediaKeys:'native'}};
+ s.run('primeNowPlaying()');s.run('applyLockScreen(true)');
+ assert.equal(elements.length,0,'the app is the Now Playing app: this element would compete with it');
+ assert.deepEqual(handlers,{},'and handlers here would toggle the microphone twice on one click');
+ assert.equal(session.metadata,null);
+});
+test('A lock the system takes back when the page hides is asked for again once it shows',async()=>{
+ const s=setup();let requests=0,release=null;const scheduled=[];
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
+ s.context.setTimeout=fn=>{scheduled.push(fn);return 0};
+ s.context.navigator={wakeLock:{request:async()=>{requests++;return {release:async()=>{},addEventListener:(name,fn)=>{if(name==='release')release=fn}}}}};
+ s.run('ws={}');
+ await s.run('keepScreenAwake()');
+ assert.equal(requests,1);assert.equal(s.run('screenLock.state'),'on');
+ s.context.document.hidden=true;release();
+ assert.equal(s.run('screenLock.state'),'off');assert.equal(s.run('screenLock.note'),'session.screen.released');
+ assert.equal(scheduled.length,0,'a page that is hidden does not ask again');
+ await s.run('keepScreenAwake()');assert.equal(requests,1,'nor does a sign of the call while it is hidden');
+ s.context.document.hidden=false;await s.dispatch('visibilitychange',{});
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(requests,2,'showing the page asks again');assert.equal(s.run('screenLock.state'),'on');
+});
+test('A browser with no wake lock says so',async()=>{
+ const s=setup();
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
+ s.context.navigator={};s.run('ws={}');
+ await s.run('keepScreenAwake()');
+ assert.equal(s.run('screenLock.state'),'off');assert.equal(s.run('screenLock.note'),'session.screen.unsupported');
+});
+test('A refused lock is asked for again by the next sign of the page, and the retry holds',async()=>{
+ const s=setup();let requests=0;
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
+ s.context.navigator={wakeLock:{request:async()=>{if(++requests===1)throw Error('NotAllowedError');return {release:async()=>{},addEventListener(){}}}}};
+ s.run('ws={}');
+ await s.run('keepScreenAwake()');
+ assert.equal(s.run('screenLock.note'),'session.screen.failed');assert.equal(requests,1);
+ await s.run('keepScreenAwake()');
+ assert.equal(requests,2,'nothing retries by itself, the next sign does');
+ assert.equal(s.run('screenLock.state'),'on');assert.equal(s.run('screenLock.note'),'session.screen.on');
+});
+test('A lock that ends with the call is released, and a late grant is released too',async()=>{
+ const s=setup();let grant,released=0;
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
+ s.context.navigator={wakeLock:{request:()=>new Promise(resolve=>grant=resolve)}};
+ s.run('ws={}');
+ const held=s.run('keepScreenAwake()');
+ grant({release:async()=>{released++},addEventListener(){}});await held;
+ assert.equal(s.run('screenLock.state'),'on');
+ s.run('ws=null;releaseScreenWakeLock()');
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(released,1);assert.equal(s.run('screenLock.state'),'');
+});
+test('A request that outlives a hang-up and a rejoin lets its own lock go, and never takes the new call\'s',async()=>{
+ const s=setup();const grants=[],released=[];
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
+ s.context.navigator={wakeLock:{request:()=>new Promise(resolve=>grants.push(resolve))}};
+ const lock=name=>({release:async()=>{released.push(name)},addEventListener(){}});
+ s.run('ws={}');
+ const first=s.run('keepScreenAwake()');
+ s.run('ws=null;releaseScreenWakeLock()');
+ s.run('ws={}');
+ const second=s.run('keepScreenAwake()');
+ assert.equal(grants.length,2,'the rejoin asks again, the first request still pending');
+ grants[1](lock('second'));await second;
+ assert.equal(s.run('screenHeld'),true);assert.equal(s.run('screenLock.state'),'on');
+ grants[0](lock('first'));await first;
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.deepEqual(released,['first'],'the late one is let go, and only that one');
+ assert.equal(s.run('screenHeld'),true,'the new call still holds its own');assert.equal(s.run('screenLock.state'),'on');
+ s.run('ws=null;releaseScreenWakeLock()');
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.deepEqual(released.sort(),['first','second'],'the final hang-up releases the new call\'s lock');
+});
+test('A loop made before the app took the lock screen is stopped at hang-up all the same',()=>{
+ const s=setup();const {handlers}=mediaSession(s);const elements=nowPlayingLoop(s);
+ s.run('primeNowPlaying()');
+ assert.equal(elements.length,1);assert.equal(elements[0].paused,false);
+ s.context.window.__sidevoiceDesktop={host:{mediaKeys:'native'}};
+ s.run('applyLockScreen(true)');
+ assert.deepEqual(handlers,{},'the app answers the headset: nothing is set here');
+ s.run('applyLockScreen(false)');
+ assert.equal(elements[0].paused,true,'whoever owns the lock screen now, the loop that exists is stopped');
+});
+test('The screen is held in the desktop app too, when keeping it on was chosen: hiding the row is not turning it off',async()=>{
+ const s=setup();let requests=0;
+ s.context.window.__sidevoiceDesktop={host:{build:{channel:'release',version:'0.3.0'}}};
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
+ s.context.navigator={wakeLock:{request:async()=>{requests++;return {release:async()=>{},addEventListener(){}}}}};
+ s.run('ws={}');
+ await s.run('keepScreenAwake()');
+ assert.equal(requests,1);assert.equal(s.run('screenLock.state'),'on');
 });
 test('Settings are reached from the header menu',()=>{
  // The ⋯ menu's Settings entry is the very button the runtime opens the dialog from: one entry, nothing relaying to it.

@@ -41,10 +41,41 @@ export interface AppVoice {
   engine: Partial<ModelCatalogs> | undefined;
 }
 
-/** Who owns the lock screen's media: `app` when the app answers the headset and shows Now Playing itself (macOS), so the
- *  page makes no media element and registers no Media Session. */
+/** What the lock screen or a headset asks of the call, as a state it wants and not as the platform's own buttons. */
+export type RemoteCommand = { type: "set-muted"; muted: boolean } | { type: "toggle-muted" } | { type: "hang-up" };
+
+/** The call on the lock screen and the headset: the page's Media Session and its Now Playing element where the page owns
+ *  them. The host supplies the mechanism; when to show the call, and what a command does to it, are the call's. */
+export interface RemoteControls {
+  /** Called inside the Join gesture, before anything is awaited: iOS lets an element play only from a gesture the first time. */
+  prime(): void;
+  /** Shows the call, and again as the microphone opens and closes: `live` is whether it is open, which the tile reads as playing. */
+  show(meta: { title: string; subtitle: string; live: boolean }): void;
+  clear(): void;
+  onCommand(listener: (command: RemoteCommand) => void): () => void;
+}
+
+/** Keeping the screen on: the mechanism, and whether this host has it. When to hold it is the call's. */
+export interface ScreenAwake {
+  /** Whether this browser can hold the screen at all. */
+  readonly supported: boolean;
+  /** Asks for the lock, inside the gesture that started the call when there is one. A request granted after a `release()`
+   *  lets its own lock go and answers `held` all the same: the one that released has moved on and does not use it. */
+  acquire(): Promise<"held" | "unsupported" | "failed">;
+  release(): void;
+  /** The system took the lock back on its own (a screen that locked once, a route change). Returns how to stop. */
+  onReleased(listener: () => void): () => void;
+}
+
+/** The lock screen and the screen's lock, three separate responsibilities. */
 export interface HostPresence {
+  /** Who owns the lock screen's media: `app` when the app answers the headset and shows Now Playing itself (macOS), so the
+   *  page makes no media element and registers no Media Session. */
   readonly media: "page" | "app";
+  /** The page's own, where `media` is `page` and the browser has a Media Session; null where the app owns the media. */
+  remote: RemoteControls | null;
+  /** The page's own. Null would be a host that decides for itself; none says so yet. */
+  screenAwake: ScreenAwake | null;
 }
 
 /** The app's native microphone permission (sidevoice-desktop `host.microphone`, macOS: the system's own prompt and its

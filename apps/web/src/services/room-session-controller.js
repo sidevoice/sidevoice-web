@@ -404,7 +404,7 @@ window.sidevoiceSessionId=()=>state.sessionId;
 let holding=false,spaceDown=false;
 // How long a call may go without a sign of a person before it asks, and then leaves.
 var IDLE_MS=15*60*1000,IDLE_WARN_MS=60*1000,lastPersonSignal=Date.now(),idleWarned=false,idleTimer=null;
-let screenWakeLock=null,wakeRequest=null,wakeEpoch=0,wakeRetries=0;
+let screenHeld=false,wakeRequest=null,wakeEpoch=0,wakeRetries=0,stopWatchingLock=null;
 /* ----- the call's voice (`voice-module.js`): it hears the person and says the replies; the page only carries what it
  * reports to the room, and hands it what the room sends ----- */
 let voice=null;
@@ -420,31 +420,35 @@ function showScreenLock(lockState,note){state.screenLock={state:lockState,note}}
 async function keepScreenAwake(){
  // Asked for while connecting too: Safari grants the lock to the tap that started the
  // call, and by the end of the preparation chain that gesture has expired.
- if(!(state.ws||state.connecting)||document.hidden||screenWakeLock||wakeRequest)return;
+ if(!(state.ws||state.connecting)||document.hidden||screenHeld||wakeRequest)return;
  // Settings → Advanced may leave the screen to the system: a call that goes on with it off.
  if(!readCallPreferences().keepAwake)return;
- if(!globalThis.navigator?.wakeLock?.request){showScreenLock('off','session.screen.unsupported');return}
+ // Where the host decides (an app keeps its computer awake as any app does) there is nothing to hold here.
+ const awake=pageHost().presence.screenAwake;
+ if(!awake)return;
  const epoch=wakeEpoch;
  const request=(async()=>{
-  try{
-   const lock=await navigator.wakeLock.request('screen');
-   if(epoch!==wakeEpoch||document.hidden){await lock.release();return}
-   screenWakeLock=lock;wakeRetries=0;showScreenLock('on','session.screen.on');
-   // The system takes the lock back on its own — a screen that locked once, a route
-   // change. While the call is up and the room is on screen, ask again.
-   lock.addEventListener('release',()=>{
-    if(screenWakeLock!==lock)return;
-    screenWakeLock=null;showScreenLock('off','session.screen.released');
-    if(state.ws&&!document.hidden&&wakeRetries<3){++wakeRetries;setTimeout(()=>{if(state.ws&&!document.hidden)keepScreenAwake()},1000)}
-   });
-  }catch{showScreenLock('off','session.screen.failed')}
+  const outcome=await awake.acquire();
+  if(outcome==='unsupported'){showScreenLock('off','session.screen.unsupported');return}
+  if(outcome==='failed'){showScreenLock('off','session.screen.failed');return}
+  // Released while it was asking: the host let that lock go itself, and what it released is not this call's to use.
+  if(epoch!==wakeEpoch)return;
+  if(document.hidden){awake.release();return}
+  screenHeld=true;wakeRetries=0;showScreenLock('on','session.screen.on');
+  // The system takes the lock back on its own — a screen that locked once, a route change. While the call is up and
+  // the room is on screen, ask again.
+  stopWatchingLock??=awake.onReleased(()=>{
+   if(!screenHeld)return;
+   screenHeld=false;showScreenLock('off','session.screen.released');
+   if(state.ws&&!document.hidden&&wakeRetries<3){++wakeRetries;setTimeout(()=>{if(state.ws&&!document.hidden)keepScreenAwake()},1000)}
+  });
  })();
  wakeRequest=request;
  try{await request}finally{if(wakeRequest===request)wakeRequest=null}
 }
 function releaseScreenWakeLock(){
- ++wakeEpoch;const lock=screenWakeLock;screenWakeLock=null;wakeRequest=null;wakeRetries=0;
- if(lock)lock.release().catch(()=>{});
+ ++wakeEpoch;screenHeld=false;wakeRequest=null;wakeRetries=0;
+ pageHost().presence.screenAwake?.release();
  showScreenLock('','');
 }
 let textAttempt=null;
@@ -1468,7 +1472,7 @@ function renderConnectionStats(data,roundTrip){
   [t('stats.fact.transcribing'),voiceState?String(voiceState.recognising):'—'],
   [t('stats.fact.speaker'),SPEAKER_STATES.includes(voiceState?.playback)?t('stats.speaker.'+voiceState.playback):'—'],
   [t('stats.fact.unacknowledged'),String(outbox.size)],
-  [t('stats.fact.screen'),t(screenWakeLock&&!screenWakeLock.released?'stats.enabled':'stats.unconfirmed')]
+  [t('stats.fact.screen'),t(screenHeld?'stats.enabled':'stats.unconfirmed')]
  ];
  $('stats-connection').replaceChildren(...facts.flatMap(([label,value])=>[statsCell('dt',label),statsCell('dd',value)]));
 }
@@ -2685,57 +2689,41 @@ window.sidevoiceActions={
  closePairing,
 };
 // ----- the lock screen and the headphones' button (sidevoice/sidevoice-web#8) -----
-// iOS gives the lock-screen tile — and with it what a headphone click sends — to an ordinary media element,
-// not to the live stream the call plays through (WebKit keeps calls from becoming "Now Playing" on purpose).
-// So the call owns it with an element of its own: a faint looping file, far below the microphone's
-// detector, playing while the microphone is open and paused while it is muted. A click then toggles the
-// microphone. It never touches the call's own output element, which is what echo cancellation listens to.
-let nowPlaying=null;
-function faintLoop(){
- const rate=8000,seconds=2,count=rate*seconds,bytes=new DataView(new ArrayBuffer(44+count*2));
- const text=(at,value)=>{for(let i=0;i<value.length;i++)bytes.setUint8(at+i,value.charCodeAt(i))};
- text(0,'RIFF');bytes.setUint32(4,36+count*2,true);text(8,'WAVE');text(12,'fmt ');bytes.setUint32(16,16,true);
- bytes.setUint16(20,1,true);bytes.setUint16(22,1,true);bytes.setUint32(24,rate,true);bytes.setUint32(28,rate*2,true);
- bytes.setUint16(32,2,true);bytes.setUint16(34,16,true);text(36,'data');bytes.setUint32(40,count*2,true);
- // About -80 dBFS: not digital silence, which iOS does not count as playing.
- for(let i=0;i<count;i++)bytes.setInt16(44+i*2,Math.round((Math.random()*2-1)*3),true);
- return new Blob([bytes],{type:'audio/wav'});
-}
+// The host supplies the tile and the button (host/browser-presence.ts: the Media Session and, on iOS, a faint looping
+// element that owns the tile). Here is what the call decides: when it shows there, and what a click does to it.
+// What this page has made on the lock screen, whoever owns it by the time the call ends: the app may be found after the
+// loop was made, and a hang-up stops what exists.
+let usedRemote=null;
 function primeNowPlaying(){
- // Created and started inside the Join click: iOS lets an element play only from a gesture the first time.
- // Not in the desktop app on a Mac: the app is the Now Playing app there, and this element would compete with it.
- if(pageHost().presence.media==='app'||nowPlaying||typeof Audio==='undefined'||typeof navigator==='undefined'||!navigator.mediaSession)return;
- try{
-  const element=new Audio();element.loop=true;element.setAttribute('playsinline','');
-  element.src=URL.createObjectURL(faintLoop());nowPlaying=element;
-  element.play().catch(()=>{});
- }catch{}
+ // Created and started inside the Join click. Not where the app owns the lock screen (the Mac app): the app is the Now
+ // Playing app there, and this element would compete with it.
+ const remote=pageHost().presence.remote;
+ if(remote){usedRemote=remote;remote.prime()}
 }
 function micLive(){return !!voice&&state.micEnabled}
+let lockScreenOn=false,lockScreenTitle='',stopRemote=null;
+// The tile reads as playing while the microphone is open and as paused while it is muted.
 function syncNowPlaying(){
- if(!nowPlaying)return;
- const wanted=lockScreenOn&&micLive();
- if(wanted&&nowPlaying.paused)nowPlaying.play().catch(()=>{});
- if(!wanted&&!nowPlaying.paused)nowPlaying.pause();
+ if(lockScreenOn)pageHost().presence.remote?.show({title:'Sidevoice',subtitle:lockScreenTitle,live:micLive()});
 }
-let lockScreenOn=false;
+// What the lock screen or the headset asks is a state it wants: "play" always means open the microphone; "pause"
+// toggles it, because a click may reach us as pause even while muted.
+function remoteCommand(command){
+ if(command.type==='set-muted')setMic(!command.muted);
+ else if(command.type==='toggle-muted')setMic(!micLive());
+ else if(command.type==='hang-up'&&(state.ws||state.connecting||state.reconnecting))disconnect();
+}
 function applyLockScreen(on){
  lockScreenOn=on;
- // In the desktop app on a Mac the app answers the headset's buttons itself (sidevoice-desktop src/headset.rs):
- // handlers here too would toggle the microphone twice on one click.
- const session=typeof navigator!=='undefined'&&pageHost().presence.media!=='app'?navigator.mediaSession:null;
- if(session){
-  // A click arrives as play or pause, whichever the platform thinks is next. "Play" always means open the
-  // microphone; "pause" toggles it, because a click may reach us as pause even while muted.
-  // "togglemicrophone" is where an AirPods press would arrive while the microphone is open, once Safari turns
-  // on the mute API it already has behind a flag (WebKit 54a7d6e278); Safari's own mute control uses it too.
-  const handlers={play:()=>setMic(true),pause:()=>setMic(!micLive()),
-   togglemicrophone:details=>setMic(typeof details?.isActivating==='boolean'?details.isActivating:!micLive())};
-  for(const [action,run] of Object.entries(handlers)){
-   try{session.setActionHandler(action,on?run:null)}catch{}
-  }
-  try{session.metadata=on?new MediaMetadata({title:'Sidevoice',artist:conversationTitle(targetId())||'Llamada'}):null}catch{}
- }
+ // Where the app owns the lock screen it answers the headset's buttons itself (sidevoice-desktop src/headset.rs): handlers
+ // here too would toggle the microphone twice on one click.
+ const remote=pageHost().presence.remote;
+ stopRemote?.();stopRemote=null;
+ if(!on){for(const made of new Set([remote,usedRemote]))made?.clear();usedRemote=null;return}
+ if(!remote)return;
+ usedRemote=remote;
+ lockScreenTitle=conversationTitle(targetId())||'Llamada';
+ stopRemote=remote.onCommand(remoteCommand);
  syncNowPlaying();
 }
 function toggleMic(){holding=false;setMic(!state.micEnabled)}

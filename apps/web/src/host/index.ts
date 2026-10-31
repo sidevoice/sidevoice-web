@@ -1,5 +1,6 @@
 import type { Host } from "./types";
 import { pageMicrophone as microphoneOfPage } from "./browser-microphone";
+import { browserRemote, browserScreenAwake } from "./browser-presence";
 import { parseBrowser } from "./identity";
 import { nativeCardSeam, nativeHost } from "./native";
 
@@ -16,8 +17,16 @@ export const pageMicrophone = microphoneOfPage;
  *  needed and not kept. The one way into anything the browser or an app offers beyond the page itself. */
 export function host(): Host {
   const app = nativeHost();
-  // Told when it is read, and not before: parsing the user agent is for the caller that wants the system.
-  return { ...app, identity: { ...app.identity, get os() { return parseBrowser().os; } } };
+  // Each member is read when it is asked for, and not before: the user agent is parsed for the caller that wants the system.
+  return {
+    ...app,
+    identity: { ...app.identity, get os() { return parseBrowser().os; } },
+    presence: {
+      media: app.presence.media,
+      get remote() { return app.presence.media === "page" ? browserRemote() : null; },
+      get screenAwake() { return browserScreenAwake(); },
+    },
+  };
 }
 
 /** The call controls card's seam, in the card's own window (call-controls/host.ts holds its contract). */

@@ -117,7 +117,7 @@ function CallSettings({ t, microphone }: { t: Translate; microphone: MicrophoneS
   const [prefs, setPrefs] = useState(readCallPreferences);
   useEffect(() => subscribeCallPreferences(() => setPrefs(readCallPreferences())), []);
   const set = (patch: Partial<CallPreferences>) => setPrefs(writeCallPreferences(patch));
-  const wakeLock = typeof navigator !== "undefined" && "wakeLock" in navigator;
+  const awake = host().presence.screenAwake;
   const presence: { value: PresenceSound; label: MessageKey }[] = [
     { value: "off", label: "settings.call.presence.off" }, { value: "hidden", label: "settings.call.presence.hidden" }, { value: "always", label: "settings.call.presence.always" },
   ];
@@ -136,9 +136,9 @@ function CallSettings({ t, microphone }: { t: Translate; microphone: MicrophoneS
       </Row>
     </Group>
     {/* The desktop app keeps its computer awake as any app does; holding the screen on is for a browser or a phone. */}
-    {host().identity.build === null && <Group title={t("settings.call.device")}>
-      <Row label={t("settings.call.keepAwake")} description={wakeLock ? t("settings.call.keepAwakeHint") : t("settings.call.keepAwakeUnsupported")}>
-        <Switch checked={prefs.keepAwake && wakeLock} disabled={!wakeLock} onChange={(keepAwake) => set({ keepAwake })} aria-label={t("settings.call.keepAwake")} />
+    {awake && host().identity.build === null && <Group title={t("settings.call.device")}>
+      <Row label={t("settings.call.keepAwake")} description={awake.supported ? t("settings.call.keepAwakeHint") : t("settings.call.keepAwakeUnsupported")}>
+        <Switch checked={prefs.keepAwake && awake.supported} disabled={!awake.supported} onChange={(keepAwake) => set({ keepAwake })} aria-label={t("settings.call.keepAwake")} />
       </Row>
     </Group>}
   </Section>;
