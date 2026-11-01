@@ -24,9 +24,11 @@ export function dayLabel(time: number, t: Translate, now = Date.now()) {
 /** The messages with no word lit: a transcript nobody sees. */
 const unlit = (messages: ChatMessage[]) => messages.map((message) => message.karaoke ? { ...message, karaoke: null } : message);
 
-/** `visible`: the list is on screen. Hidden, it cannot scroll, so it lands on the latest message when it shows. */
-export function MessageList({ conversation, visible = true }: { conversation: ConversationView; visible?: boolean }) {
+/** `visible`: the list is on screen. Hidden, it cannot scroll, so it lands on the latest message when it shows.
+ *  `inCall`: the person is in the call; out of it the transcript is not shown, so neither is the working bubble. */
+export function MessageList({ conversation: view, visible = true, inCall = true }: { conversation: ConversationView; visible?: boolean; inCall?: boolean }) {
   const t = translator();
+  const conversation = useMemo(() => inCall || !view.working ? view : { ...view, working: false }, [view, inCall]);
   // Closed, it does not follow the voice word by word: nobody sees the words light, and every step would write the text of a
   // box that has no layout. It lights them as it opens.
   const groups = useMemo(() => groupMessages(visible ? conversation.messages : unlit(conversation.messages)), [conversation.messages, visible]);

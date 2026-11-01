@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { useRoomStore } from "../../state/room-store";
 import { COMPACT_QUERY, NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
+import { selectInCall } from "../call/stage-view";
 import { useSurface } from "../../lib/use-surface";
 import { Button } from "../../components/ui/Button";
 import { CloseIcon } from "../../components/ui/Icons";
@@ -17,6 +18,7 @@ import "./transcript.css";
 export function TranscriptPanel() {
   const t = translator();
   const conversation = useRoomStore((state) => state.conversation);
+  const inCall = useRoomStore(selectInCall);
   const title = useRoomStore((state) => state.title);
   const open = useCallLayout((state) => state.transcriptOpen);
   const close = useCallLayout((state) => state.closeTranscript);
@@ -38,7 +40,7 @@ export function TranscriptPanel() {
           <div className="transcript-heading"><strong>{t("transcript.title")}</strong><span id="transcript-title" title={title} translate="no">{title}</span></div>
           <Button variant="ghost" tone="neutral" size="icon-sm" className="transcript-close" aria-label={t("transcript.close")} title={t("transcript.close")} onClick={close}><CloseIcon /></Button>
         </header>
-        <MessageList conversation={conversation} visible={open} />
+        <MessageList conversation={conversation} visible={open} inCall={inCall} />
         <Composer narrow={narrow} />
       </section>
       <div className="transcript-scrim" data-open={open || undefined} aria-hidden="true" onClick={close} />
