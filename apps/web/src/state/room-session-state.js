@@ -583,8 +583,6 @@ export function audioNote(r, ahead = 0) {
     // A never-started, newer-turn diagnostic has no audio explanation to add to the semantic mark.
     if (r.audio_reason === 'newer_turn' && r.heard_chars == null)
         return '';
-    if (r.audio === 'interrupted' || r.audio === 'disconnected' || r.interrupted)
-        return reason ? say('session.audio.interruptedWhy', { reason }) : say('session.audio.interrupted');
     if (r.audio === 'failed' && r.audio_reason === 'unconfirmed')
         return say('session.audio.unconfirmed');
     if (r.audio === 'failed')

@@ -29,8 +29,6 @@ export function MessageBubble({ message, position, header }: { message: ChatMess
   const delivery = message.role === "user" && message.delivery && receiptView(message.delivery).label ? message.delivery : null;
   const replay = message.replayable && message.role === "assistant" && message.playback !== "playing" && message.playback !== "pending";
   const hearing = hearingOf(message);
-  // How far it played is drawn, not worded (UnheardReply): only a hearing the room could not confirm keeps its words.
-  const audioMark = message.role === "assistant" && message.hearing_unconfirmed && message.hearing !== "heard" ? t("messages.audio.unconfirmed") : null;
   const label = t(message.interrupted && !message.globally_heard ? "messages.interrupted" : "messages.message", { name: speakerName(message, t), text: message.text });
   return (
     <article className="chat-bubble" data-role={message.role} data-position={position} data-draft={message.draft || undefined}
@@ -42,7 +40,6 @@ export function MessageBubble({ message, position, header }: { message: ChatMess
         <Button variant="ghost" tone="danger" size="sm" className="cancel-input" onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("messages.cancel")}</Button>
       </Tooltip>}
       {(!message.draft || replay || delivery) && <div className="chat-meta">
-        {audioMark && <span className="audio-fate-mark" title={audioMark}>{audioMark}</span>}
         {!message.draft && <time dateTime={new Date(message.time).toISOString()} title={new Date(message.time).toLocaleString(uiLocale())}>{new Date(message.time).toLocaleTimeString(uiLocale(), { hour: "2-digit", minute: "2-digit" })}</time>}
         {replay && <ListenAgain message={message} />}
         {delivery && <span className="receipt delivery" data-state={delivery} title={receiptView(delivery).label} aria-label={receiptView(delivery).label}><DeliveryMark state={delivery} /></span>}

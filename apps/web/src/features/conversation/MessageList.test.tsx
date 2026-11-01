@@ -63,7 +63,7 @@ test("an interrupted reply says so to a screen reader too", () => {
 test("T01/T06/T12 marks use confirmed scalar extent and never infer hearing from reading text", () => {
   const rows = [
     message({segment: "partial", text: "é🐙 ab", interrupted: true, hearing: "partial", heard_chars: 2}),
-    message({segment: "unknown", text: "unknown", interrupted: true, hearing: null, hearing_unconfirmed: true, heard_chars: null}),
+    message({segment: "unknown", text: "unknown", interrupted: true, hearing: null, heard_chars: null}),
     message({segment: "unplayed", text: "unplayed", audio: "text_only", audio_reason: "voice_off", hearing: "not_heard"}),
     message({segment: "newer", text: "never started", audio: "interrupted", interrupted: true, audio_reason: "newer_turn", hearing: "not_heard", heard_chars: 0}),
     message({segment: "skipped", text: "skipped", audio: "interrupted", hearing: "heard"}),
@@ -71,17 +71,18 @@ test("T01/T06/T12 marks use confirmed scalar extent and never infer hearing from
   const {container} = render(<MessageList conversation={view(rows)} />);
   // Cut at the extent in characters (a pictogram is one) and carried to the end of its word; never-played replies are marks.
   expect(container.querySelector(".cut-heard")?.textContent).toBe("é🐙");
-  expect([...container.querySelectorAll(".audio-fate-mark")].map(node=>node.textContent)).toEqual(["Hearing not confirmed"]);
   expect(container.querySelectorAll(".unheard")).toHaveLength(2);
+});
+test("an interrupted reply has no caption: the chip and the dimmed text say it", () => {
+  expect(audioNote({ audio: "interrupted", audio_reason: "user_interrupted", heard_chars: 2, hearing: "partial", interrupted: true })).toBe("");
 });
 test("T14 partial and unknown playback failures explain failure without claiming silence", () => {
   const failed = (heard_chars: number | null) => ({audio: "failed", audio_reason: "playback_failed", heard_chars,
-    hearing: heard_chars == null ? null : "partial" as const, hearing_unconfirmed: heard_chars == null});
+    hearing: heard_chars == null ? null : "partial" as const});
   const {container} = render(<MessageList conversation={view([
     message({segment: "partial-failure", text: "é🐙ab", ...failed(2), audioNote: audioNote(failed(2))}),
     message({segment: "unknown-failure", text: "Unknown", ...failed(null), audioNote: audioNote(failed(null))}),
   ])} />);
-  expect([...container.querySelectorAll(".audio-fate-mark")].map(node => node.textContent)).toEqual(["Hearing not confirmed"]);
   expect([...container.querySelectorAll(".chat-audio-note")].map(node => node.textContent)).toEqual(["Playback failed", "Playback failed"]);
 });
 test("F8 core admission reasons for inactive and disconnected audiences are explained", () => {
@@ -98,7 +99,6 @@ test("F8 core admission reasons for inactive and disconnected audiences are expl
 test("F9 a manually heard text-only reply no longer claims it was not played", () => {
   const core = { audio: "text_only", audio_reason: "voice_off", heard_chars: 6, hearing: "heard" as const, globally_heard: true, replayable: false };
   const { container } = render(<MessageList conversation={view([message({ segment: "manual-heard", text: "Answer", ...core, audioNote: audioNote(core) })])} />);
-  expect(container.querySelector(".audio-fate-mark")).toBeNull();
   expect(container.querySelector(".chat-audio-note")).toBeNull();
   expect(screen.getByRole("article", { name: "Agente: Answer" })).toBeInTheDocument();
 });
@@ -248,7 +248,6 @@ test("a reply cut part-way shows what was heard and a cut marker, the rest folde
   const { container } = render(<MessageList conversation={view([message({ segment: "cut", text: LONG, hearing: "partial", heard_chars: CUT_AT, interrupted: true })])} />);
   expect(container.querySelector(".cut-heard")?.textContent).toBe("I fixed the clock fixture");
   expect(container.querySelector(".cut-rest")).toBeNull();
-  expect(container.querySelector(".audio-fate-mark")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Interrupted · Show the rest" }));
   expect(container.querySelector(".cut-rest")?.textContent).toBe("and the suite passes. Tell me if you want it in its own commit.");
   fireEvent.click(screen.getByRole("button", { name: "Interrupted · Hide the rest" }));
