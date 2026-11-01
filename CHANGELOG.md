@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.1](https://github.com/sidevoice/sidevoice-web/compare/v0.15.0...v0.15.1) (2026-11-01)
+
+
+### Bug Fixes
+
+* **conversation:** drop the audio-interrupted caption and the hearing-not-confirmed mark ([#418](https://github.com/sidevoice/sidevoice-web/issues/418)) ([241a2ec](https://github.com/sidevoice/sidevoice-web/commit/241a2ec1befffcb5015392520560e48b76230d98))
+* **conversation:** hide the working bubble while the person is not in the call ([#417](https://github.com/sidevoice/sidevoice-web/issues/417)) ([5e02a07](https://github.com/sidevoice/sidevoice-web/commit/5e02a0748d961fa485331e0484ea50b01a968950))
+
 ## [0.15.0](https://github.com/sidevoice/sidevoice-web/compare/v0.14.0...v0.15.0) (2026-11-01)
 
 
