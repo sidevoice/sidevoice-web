@@ -1,7 +1,6 @@
 import { useRef } from "react";
 import { useRoomStore } from "../../state/room-store";
 import { COMPACT_QUERY, NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
-import { selectInCall } from "../call/stage-view";
 import { useSurface } from "../../lib/use-surface";
 import { Button } from "../../components/ui/Button";
 import { CloseIcon } from "../../components/ui/Icons";
@@ -18,7 +17,8 @@ import "./transcript.css";
 export function TranscriptPanel() {
   const t = translator();
   const conversation = useRoomStore((state) => state.conversation);
-  const inCall = useRoomStore(selectInCall);
+  // Admitted to the room (or getting the call back), not merely joining: selectInCall is true from the socket on.
+  const inCall = useRoomStore((state) => !!(state.facts.sessionId || state.facts.reconnecting));
   const title = useRoomStore((state) => state.title);
   const open = useCallLayout((state) => state.transcriptOpen);
   const close = useCallLayout((state) => state.closeTranscript);
