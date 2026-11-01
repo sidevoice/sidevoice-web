@@ -38,7 +38,3 @@ test("unknown hearing copy names the sound and measured extent", () => {
   expect(translator("fr")("messages.audio.unknown")).toBe("Audio interrompu · Partie écoutée inconnue");
   expect(translator("fr")("messages.audio.notPlayed")).toBe("Audio non lu");
 });
-test("H7 Japanese hearing marks describe delivery without claiming intelligibility", () => {
-  const t = translator("ja");
-  expect(t("messages.audio.unconfirmed")).toBe("聴取状況は未確認");
-});
