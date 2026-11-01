@@ -11,7 +11,7 @@
  * tested alone. Only `export function|async function|const`: the controller's node tests inline this file. */
 import { patiently } from './rendezvous.js';
 import { clampDeviceName } from './device-name-rules.js';
-import { describeBrowser, host, reachOfOrigin } from '../host/index.ts';
+import { host, reachOfOrigin } from '../host/index.ts';
 export const PAIRING_CODE_PREFIX = 'SV1.';
 export const IDENTITY_PREFIX = 'sidevoice-node-identity:';
 /** How long an address that proved itself is trusted without asking again. */
@@ -319,7 +319,7 @@ export async function redeemPairingCode(code, { name = '', address = '', target 
     try {
         // Never redirected: a 307 would hand the secret, in the body, to wherever it pointed.
         response = await get(place.base + '/api/device/pair', { method: 'POST', headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-            body: JSON.stringify({ secret: payload.secret, name: clampDeviceName(name || '') || deviceName() }), cache: 'no-store', redirect: 'error' });
+            body: JSON.stringify({ secret: payload.secret, name: clampDeviceName(name || '') || clampDeviceName(host().identity.deviceName()) }), cache: 'no-store', redirect: 'error' });
     } catch { throw pairingError('No se pudo llegar a ' + called + ' para emparejar. Vuelve a intentarlo.', 'unreachable'); }
     try { answer = await response.json(); } catch { /* no body */ }
     if (response.status === 403) throw pairingError(answer?.detail || 'Ese código ya no vale: se usó o caducó. Pide uno nuevo.', 'code-spent');
@@ -344,12 +344,6 @@ async function answersPlainHttp(base, plainBase, get) {
         const response = await patiently(get(new URL(plainBase).origin + '/api/device/identity?nonce=probe', { headers: { accept: 'application/json' }, cache: 'no-store', redirect: 'error' }), 4000);
         return !!response;
     } catch { return false; }
-}
-
-/** What this device calls itself when it pairs, unless the person says otherwise. */
-export function deviceName(nav) {
-    const { app, system } = describeBrowser(nav);
-    return system ? (app || 'Browser') + ' on ' + system : 'Sidevoice';
 }
 
 // ----- the pairing book: what is done to the machines this device is paired with (where they are kept: host/browser-storage.ts, or the app) -----

@@ -3,9 +3,9 @@ import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { CheckIcon } from "../../components/ui/Icons";
-import { host, type HostOS } from "../../host";
+import { host, type MicrophoneHelp } from "../../host";
 import { createMicrophoneAccess, type MicrophoneAccess, type MicrophoneSnapshot } from "../../services/microphone-access";
-import type { MessageKey, Translate } from "../../i18n/translator";
+import { uiLanguage, type MessageKey, type Translate } from "../../i18n/translator";
 import "./permissions.css";
 
 /* What Sidevoice needs to be allowed on this device, as the setup's permissions step and Settings › Permissions both say
@@ -13,8 +13,6 @@ import "./permissions.css";
  * key and the headset's buttons the Now Playing commands, neither of which needs macOS's Accessibility; nothing pastes,
  * notifies or listens to keys system-wide. Each permission is one row — its name, why in one line, where it stands, and
  * what can be done — so another can join the list without a new screen. */
-
-export type Platform = HostOS;
 
 /** The microphone's row, read from where it stands. */
 export interface MicrophoneView {
@@ -26,21 +24,13 @@ export interface MicrophoneView {
   label: MessageKey;
   /** A line under it: who will ask, what to answer, what happened. */
   line: MessageKey | null;
-  /** Blocked: how to allow it where this page runs, one or two lines. */
-  howTo: MessageKey[];
-  /** The button that opens the system's settings, named as this system names them. */
-  openSettings: MessageKey;
+  /** Blocked (or none found): how to allow it and the settings button's label, worded by the host for this page's place and
+   *  language and shown as it is; null while it is not blocked. */
+  help: MicrophoneHelp | null;
 }
 
-/** How to allow a blocked microphone, where this page runs: the lines to show. */
-function howToAllow(asker: MicrophoneSnapshot["asker"], inDesktopApp: boolean, platform: Platform): MessageKey[] {
-  if (asker === "app") return [platform === "windows" ? "wizard.mic.denied.windows" : "wizard.mic.denied.app"];
-  if (inDesktopApp) return [platform === "windows" ? "wizard.mic.denied.windows" : platform === "macos" ? "wizard.mic.denied.app" : "wizard.mic.denied.linux"];
-  const system: MessageKey | null = platform === "macos" ? "wizard.mic.denied.siteMac" : platform === "windows" ? "wizard.mic.denied.siteWindows" : null;
-  return system ? ["wizard.mic.denied.site", system] : ["wizard.mic.denied.site"];
-}
-
-export function microphoneView(microphone: MicrophoneSnapshot, platform: Platform = host().identity.os, inDesktopApp = host().identity.build !== null): MicrophoneView {
+/** The microphone's view. `language` is the one the host is asked to word its help in: the interface's. */
+export function microphoneView(microphone: MicrophoneSnapshot, language: string = uiLanguage()): MicrophoneView {
   const { asker, dismissed } = microphone;
   const state = microphone.state === "requesting" && (microphone.from === "denied" || microphone.from === "missing") ? microphone.from : microphone.state;
   const fromSystem = asker === "app";
@@ -50,9 +40,9 @@ export function microphoneView(microphone: MicrophoneSnapshot, platform: Platfor
   const line: MessageKey | null = state === "prompt" ? (dismissed ? "wizard.mic.dismissed" : fromSystem ? "wizard.mic.askSystem" : "wizard.mic.askBrowser")
     : state === "requesting" ? (fromSystem ? "wizard.mic.requestingSystem" : "wizard.mic.requestingBrowser")
       : state === "granted" ? "wizard.mic.granted" : state === "missing" ? "wizard.mic.missing" : null;
-  return { state, busy: microphone.state === "checking" || microphone.state === "requesting", blocked: state === "denied" || state === "missing",
-    label, line, howTo: howToAllow(asker, inDesktopApp, platform),
-    openSettings: platform === "windows" ? "wizard.mic.openSettingsWindows" : "wizard.mic.openSettings" };
+  const blocked = state === "denied" || state === "missing";
+  return { state, busy: microphone.state === "checking" || microphone.state === "requesting", blocked,
+    label, line, help: blocked ? host().microphone.help(language) : null };
 }
 
 /** What a live region says of a state: its change, not the whole screen again. */
@@ -78,14 +68,15 @@ export function MicrophoneBadge({ view, t }: { view: MicrophoneView; t: Translat
 
 /** Blocked or none found: what to do, with the system settings where the app opens them. Blocked: how to allow it where this page runs — and, where the app can open them, the system's settings. */
 export function MicrophoneHowTo({ view, openSettings, t, id = MIC_HELP_ID }: { view: MicrophoneView; openSettings: (() => Promise<void>) | null; t: Translate; id?: string }) {
-  if (!view.blocked) return null;
+  if (!view.blocked || !view.help) return null;
+  const { steps, openSettings: settingsLabel } = view.help;
   const missing = view.state === "missing";
   return <>
     <Alert tone="warning" live id={id} className="wizard-mic-help perm-help" title={t(missing ? "wizard.mic.state.missing" : "wizard.mic.denied.title")}
-      action={openSettings ? <Button type="button" variant="secondary" size="sm" id="wizard-mic-settings" onClick={() => void openSettings()}>{t(view.openSettings)}</Button> : undefined}>
-      {t(missing ? "wizard.mic.missing" : view.howTo[0])}
+      action={openSettings && settingsLabel ? <Button type="button" variant="secondary" size="sm" id="wizard-mic-settings" onClick={() => void openSettings()}>{settingsLabel}</Button> : undefined}>
+      {missing ? t("wizard.mic.missing") : steps[0]}
     </Alert>
-    {!missing && view.howTo[1] && <p className="wizard-mic-also perm-also">{t(view.howTo[1])}</p>}
+    {!missing && steps[1] && <p className="wizard-mic-also perm-also">{steps[1]}</p>}
   </>;
 }
 

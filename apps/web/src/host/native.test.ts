@@ -1,5 +1,7 @@
 import { describe, expect, onTestFinished, test } from "vitest";
-import { cardSeam, describeBrowser, host, reachOfOrigin } from ".";
+import { cardSeam, host, reachOfOrigin } from ".";
+import { browserDeviceName, browserShortcutModifier } from "./identity";
+import { translator } from "../i18n/translator";
 import { nativeHost } from "./native";
 
 const withHost = (members: Record<string, unknown> | undefined) => {
@@ -12,11 +14,11 @@ describe("a page outside an app", () => {
     withHost(undefined);
     const outside = host();
     expect(outside.identity.build).toBeNull();
-    expect(outside.identity.deviceName()).toBeNull();
+    expect(nativeHost().identity.deviceName()).toBeNull();
     expect(outside.presence.media).toBe("page");
     expect(outside.voice.runs).toBe("page");
     expect(nativeHost().storage).toBeNull();
-    for (const member of [outside.microphone, outside.localHost, outside.reset, outside.muteShortcut,
+    for (const member of [nativeHost().microphone, outside.localHost, outside.reset, outside.muteShortcut,
       outside.callControls, outside.updater, outside.debug]) expect(member).toBeNull();
     expect(cardSeam()).toBeNull();
   });
@@ -113,9 +115,18 @@ describe("identity", () => {
     withHost({ deviceName: "  Mac de Ana " });
     expect(host().identity.deviceName()).toBe("Mac de Ana");
     withHost({ deviceName: "   " });
-    expect(host().identity.deviceName()).toBeNull();
+    expect(nativeHost().identity.deviceName()).toBeNull();
     withHost({ deviceName: 7 });
-    expect(host().identity.deviceName()).toBeNull();
+    expect(nativeHost().identity.deviceName()).toBeNull();
+  });
+
+  test("a name is always there: the computer's where the app has one, else what this browser is", () => {
+    withHost({ deviceName: "Mac de Ana" });
+    expect(host().identity.deviceName()).toBe("Mac de Ana");
+    withHost({});
+    expect(host().identity.deviceName()).toBe(browserDeviceName());
+    withHost({ deviceName: "  " });
+    expect(host().identity.deviceName()).toBe(browserDeviceName());
   });
 });
 
@@ -130,14 +141,24 @@ describe("presence", () => {
   });
 });
 
-describe("the system and the transport", () => {
-  test("an app says its system, and the browser's reading stands where it says none or one this page does not know", () => {
-    withHost({ os: "ios" });
-    expect(host().identity.os).toBe("ios");
-    withHost({ os: "plan9" });
-    expect(host().identity.os).toBe(describeBrowser().os);
+describe("the shortcut modifier and the transport", () => {
+  test("an app says its modifier's label, and the browser's stands where it says none", () => {
+    withHost({ shortcutModifier: "⌘" });
+    expect(host().identity.shortcutModifier).toBe("⌘");
+    withHost({ shortcutModifier: " Strg " });
+    expect(host().identity.shortcutModifier).toBe("Strg");
+    for (const bad of ["", "  ", 7, null]) {
+      withHost({ shortcutModifier: bad });
+      expect(host().identity.shortcutModifier).toBe(browserShortcutModifier());
+    }
     withHost({});
-    expect(host().identity.os).toBe(describeBrowser().os);
+    expect(host().identity.shortcutModifier).toBe(browserShortcutModifier());
+  });
+
+  test("an app that still says `os` is not read for it: no system is asked", () => {
+    withHost({ os: "ios" });
+    expect(host().identity).not.toHaveProperty("os");
+    expect(host().identity.shortcutModifier).toBe(browserShortcutModifier());
   });
 
   test("an app says whether its transport sends plain http to a private address, and the browser's stands where it does not", () => {
@@ -201,12 +222,53 @@ describe("the members an app calls through", () => {
     expect(host().updater).toBe(updater);
   });
 
-  test("the microphone is whatever the app says, a settings link alone included", () => {
+  test("the microphone is whatever the app says, a settings link alone included, and its help is always there", () => {
     const microphone = { openSettings: async () => {} };
     withHost({ microphone });
-    expect(host().microphone).toBe(microphone);
+    expect(nativeHost().microphone).toBe(microphone);
+    expect(host().microphone.openSettings).toBe(microphone.openSettings);
+    expect(host().microphone.state).toBeUndefined();
+    expect(host().microphone.help("en").steps.length).toBeGreaterThan(0);
     withHost({ microphone: "granted" });
-    expect(host().microphone).toBeNull();
+    expect(nativeHost().microphone).toBeNull();
+    expect(host().microphone.openSettings).toBeUndefined();
+  });
+
+  test("a live member of the app's microphone stays live through the host's", () => {
+    let listening = 0;
+    const microphone = Object.freeze({ get listeners() { return listening; }, help: () => ({ steps: ["Open it."] }) });
+    withHost({ microphone });
+    listening = 2;
+    expect((host().microphone as unknown as { listeners: number }).listeners).toBe(2);
+  });
+});
+
+describe("the microphone's help", () => {
+  test("is the app's words, asked in the page's language, and shown as they are", () => {
+    const help = (language: string) => ({ steps: [language === "es" ? "Abre Ajustes." : "Open Settings."], openSettings: "Open it" });
+    withHost({ microphone: Object.freeze({ help }) });
+    expect(host().microphone.help("es")).toEqual({ steps: ["Abre Ajustes."], openSettings: "Open it" });
+    expect(host().microphone.help("en")).toEqual({ steps: ["Open Settings."], openSettings: "Open it" });
+  });
+
+  test("in a browser is the web's own, from its catalogue, in the language asked and English otherwise", () => {
+    withHost(undefined);
+    expect(host().microphone.help("en").steps[0]).toBe(translator("en")("wizard.mic.denied.site"));
+    expect(host().microphone.help("es").steps[0]).toBe(translator("es")("wizard.mic.denied.site"));
+    expect(host().microphone.help("tlh").steps[0]).toBe(translator("en")("wizard.mic.denied.site"));
+    expect(host().microphone.help("en").openSettings).toBeUndefined();
+  });
+
+  test("an answer the page cannot draw is not help: the browser's stands", () => {
+    const browser = (() => { withHost(undefined); return host().microphone.help("en"); })();
+    for (const found of [undefined, null, "text", {}, { steps: [] }, { steps: [""] }, { steps: [1] }, { steps: ["x"], openSettings: 3 }]) {
+      withHost({ microphone: { help: () => found } });
+      expect(host().microphone.help("en")).toEqual(browser);
+    }
+    withHost({ microphone: { help: () => { throw new Error("no words"); } } });
+    expect(host().microphone.help("en")).toEqual(browser);
+    withHost({ microphone: { help: "not a function" } });
+    expect(host().microphone.help("en")).toEqual(browser);
   });
 });
 

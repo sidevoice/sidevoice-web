@@ -10,7 +10,7 @@ import { clampDeviceName, deviceNameProblem } from "../../services/device-name-r
  * basics. */
 export function DeviceNameField({ id }: { id: string }) {
   const t = translator();
-  const derived = () => currentDeviceName((_, params) => t("pair.deviceNameBrowser", params));
+  const derived = () => currentDeviceName();
   const [value, setValue] = useState(derived);
   const [saved, setSaved] = useState(value);
   const [note, setNote] = useState("");

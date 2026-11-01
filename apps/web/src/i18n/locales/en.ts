@@ -1182,9 +1182,6 @@ export const messages = {
   "wizard.mic.missing": "Connect a microphone or turn one on, then check again.",
   "wizard.mic.stillMissing": "Still no microphone found.",
   "wizard.mic.denied.title": "Sidevoice can’t use the microphone",
-  "wizard.mic.denied.app": "Open System Settings › Privacy & Security › Microphone and turn on Sidevoice. Then check again.",
-  "wizard.mic.denied.windows": "Open Settings › Privacy & security › Microphone and turn on “Microphone access” and “Let desktop apps access your microphone”. Then check again.",
-  "wizard.mic.denied.linux": "Check that your system’s privacy and sound settings let Sidevoice use the microphone. Then check again.",
   "wizard.mic.denied.site": "Allow it for this site: select the site settings icon beside the web address, set Microphone to Allow, then check again.",
   "wizard.mic.denied.siteMac": "Already allowed there? Your Mac may be blocking the browser: System Settings › Privacy & Security › Microphone.",
   "wizard.mic.denied.siteWindows": "Already allowed there? Windows may be blocking the browser: Settings › Privacy & security › Microphone.",
@@ -1214,8 +1211,6 @@ export const messages = {
   "wizard.mic.continueWaiting": "Allow the microphone to continue.",
   "wizard.prepare.continueWaiting": "Prepare this computer to continue.",
   "wizard.mic.checkAgain": "Check again",
-  "wizard.mic.openSettings": "Open System Settings",
-  "wizard.mic.openSettingsWindows": "Open Windows Settings",
   // The permissions screen (PermissionsStep, Settings › Permissions).
   "perm.mic.why": "Needed so your agent can hear you",
   "perm.state.none": "Nothing to allow here",

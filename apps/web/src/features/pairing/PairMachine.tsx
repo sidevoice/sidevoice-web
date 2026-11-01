@@ -213,7 +213,7 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
     setFieldError(null);
     if (!insecure) setAlert(null);
     try {
-      const name = currentDeviceName((_, params) => t("pair.deviceNameBrowser", params));
+      const name = currentDeviceName();
       const result = insecure ? await window.sidevoiceActions?.pairDevice(code, name, typed, { insecure: true })
         : await window.sidevoiceActions?.pairDevice(code, name, typed);
       setCode("");

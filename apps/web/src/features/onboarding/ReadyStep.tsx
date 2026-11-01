@@ -42,7 +42,7 @@ export function ReadyStep({ path, machineName, title, t, live, microphoneNone = 
   const catalogName = (task: "stt" | "tts") => catalogs.find((catalog) => catalog.id === draft?.[task].catalog)?.name ?? undefined;
   const here = path !== "remote";
   // How the machines list this device, as the basics named it.
-  const deviceName = currentDeviceName((_, params) => t("pair.deviceNameBrowser", params));
+  const deviceName = currentDeviceName();
   const language = document.documentElement.lang || "en";
   // What a voice row says live: ready, its name; downloading, how far; else not there yet, and that the call area offers it.
   const voiceRow = (task: "stt" | "tts", value: string, detail?: string): { value: string; detail?: string; state: RowState } => {

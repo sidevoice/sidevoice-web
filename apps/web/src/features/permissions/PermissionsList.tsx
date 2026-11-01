@@ -5,8 +5,7 @@ import { MicrophoneIcon, MicrophoneOffIcon } from "../../components/ui/Icons";
 import { PERSON_AVATAR, type AvatarSpec } from "../avatar/avatar-spec";
 import { stillAvatar } from "../avatar/avatar-state";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
-import { announcement, MicrophoneBadge, MicrophoneHowTo, microphoneAction, MIC_HELP_ID, microphoneView, type MicrophoneView, type Platform } from "./permission-view";
-import { host } from "../../host";
+import { announcement, MicrophoneBadge, MicrophoneHowTo, microphoneAction, MIC_HELP_ID, microphoneView, type MicrophoneView } from "./permission-view";
 import type { MicrophoneSnapshot } from "../../services/microphone-access";
 import type { Translate } from "../../i18n/translator";
 
@@ -54,10 +53,10 @@ function MicrophoneRow({ microphone, view, onRequest, openSettings, t, actionId,
 /** The person's bicho with the microphone in its hand, once it is allowed. */
 const PERSON_WITH_MIC: AvatarSpec = { kind: "person", hold: "microphone" };
 
-export function PermissionsList({ microphone, openSettings, onRequest, t, platform = host().identity.os, actionId = "wizard-mic-action", helpId = MIC_HELP_ID }: {
-  microphone: MicrophoneSnapshot; openSettings: (() => Promise<void>) | null; onRequest(): void; t: Translate; platform?: Platform; actionId?: string; helpId?: string;
+export function PermissionsList({ microphone, openSettings, onRequest, t, actionId = "wizard-mic-action", helpId = MIC_HELP_ID }: {
+  microphone: MicrophoneSnapshot; openSettings: (() => Promise<void>) | null; onRequest(): void; t: Translate; actionId?: string; helpId?: string;
 }) {
-  const view = microphoneView(microphone, platform);
+  const view = microphoneView(microphone);
   return <div className="wizard-perm perm-list" data-state={view.state}>
     <span className="perm-hero-figure" data-state={view.state} aria-hidden><CharacterAvatar spec={view.state === "granted" ? PERSON_WITH_MIC : PERSON_AVATAR} state={stillAvatar("present")} size="pip" /></span>
     <Group>

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Button } from "../../components/ui/Button";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { PermissionsList } from "../permissions/PermissionsList";
-import { microphoneAction, type Platform } from "../permissions/permission-view";
+import { microphoneAction } from "../permissions/permission-view";
 import type { MicrophoneSnapshot } from "../../services/microphone-access";
 import type { Translate } from "../../i18n/translator";
 
@@ -23,10 +23,10 @@ import type { Translate } from "../../i18n/translator";
  * Calm always: the permission check lets the microphone go at once, so nothing is heard here and the bicho never acts
  * out listening (the transcription try after it tests the microphone for real). */
 
-export function PermissionsStep({ microphone, openSettings, onRequest = () => {}, t, platform }: {
-  microphone: MicrophoneSnapshot; openSettings: (() => Promise<void>) | null; onRequest?(): void; t: Translate; platform?: Platform;
+export function PermissionsStep({ microphone, openSettings, onRequest = () => {}, t }: {
+  microphone: MicrophoneSnapshot; openSettings: (() => Promise<void>) | null; onRequest?(): void; t: Translate;
 }) {
-  return <section className="wizard-mic"><PermissionsList microphone={microphone} openSettings={openSettings} onRequest={onRequest} t={t} platform={platform} /></section>;
+  return <section className="wizard-mic"><PermissionsList microphone={microphone} openSettings={openSettings} onRequest={onRequest} t={t} /></section>;
 }
 
 /** The footer's forward action: Continue, waiting until the microphone is allowed. The microphone is needed

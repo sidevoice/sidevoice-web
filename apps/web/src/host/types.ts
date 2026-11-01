@@ -21,16 +21,18 @@ export interface AppBuild {
   date?: string | null;
 }
 
-/** The system a page runs on, for factual copy only (where the microphone's settings are, which keys a shortcut shows): never
- *  a switch for what is available. `other` where the page cannot tell. */
-export type HostOS = "macos" | "windows" | "linux" | "ios" | "android" | "other";
+/* The page never asks which system it runs on (sidevoice-desktop#289, D-HOST-OS). What a system decides about the page's
+ * words is answered by the host already resolved, so a new platform touches its own app and never the web: the microphone's
+ * help (`HostMicrophone.help`), the shortcut modifier's label and the device's default name (`HostIdentity`). */
 
 export interface HostIdentity {
-  readonly os: HostOS;
   /** The app hosting this page, or null in a browser (or an app too old to say). */
   readonly build: AppBuild | null;
-  /** What the computer calls itself where the app knows it ("Mac de Ana"); null in a browser. */
-  deviceName(): string | null;
+  /** This device's default name, whole: what the computer calls itself where the app knows it ("Mac de Ana"); else what
+   *  the browser is ("Chrome on Mac", in the page's language); else "Sidevoice". The person's own choice is the page's. */
+  deviceName(): string;
+  /** The label of the modifier a shortcut is written with on this host: `⌘` or `Ctrl`. */
+  readonly shortcutModifier: string;
 }
 
 /** The page's own microphone and Web Audio, begun in the Join gesture before models or chunks are awaited. */
@@ -104,6 +106,15 @@ export interface HostPresence {
   screenAwake: ScreenAwake | null;
 }
 
+/** What a person is told when the microphone is blocked, as this host words it: for where the page runs (a browser's site
+ *  permission, a system's privacy settings), in the language it was asked for. The page shows it as it is. */
+export interface MicrophoneHelp {
+  /** How to allow it, one line or two: the first is the answer, the other comes beneath it. */
+  readonly steps: readonly string[];
+  /** The label of the button that opens the system's microphone settings, where the host has `openSettings`. */
+  readonly openSettings?: string;
+}
+
 /** The app's native microphone permission (sidevoice-desktop `host.microphone`, macOS: the system's own prompt and its
  *  answer; Windows offers only `openSettings`). `missing`: not denied, and the system lists no audio input device. */
 export interface MicrophoneBridge {
@@ -113,6 +124,15 @@ export interface MicrophoneBridge {
   openSettings?(): Promise<void>;
   /** Tells when the system's answer changes (the person changed it in the system's settings); returns how to stop. */
   onChange?(listener: () => void): () => void;
+  /** How to allow a blocked microphone on this system, in `language` (a tag: `es`, `pt-BR`), or in English where the app has
+   *  no words in it. Read as the page draws, so it answers at once. */
+  help?(language: string): MicrophoneHelp;
+}
+
+/** The host's microphone: what the app offers of the permission, and always the help for a blocked one (the browser's own
+ *  where the app has none). */
+export interface HostMicrophone extends Partial<MicrophoneBridge> {
+  help(language: string): MicrophoneHelp;
 }
 
 /** What this device keeps of its machines: the remote pairings (never the local host's, which the app projects), and the
@@ -337,8 +357,8 @@ export interface HostDebugBridge {
 
 export interface Host {
   identity: HostIdentity;
-  /** What the app offers under `microphone`, as it says it: the permission bridge, or only the settings link. */
-  microphone: Partial<MicrophoneBridge> | null;
+  /** What the app offers under `microphone`, as it says it (the permission bridge, or only the settings link), and the help. */
+  microphone: HostMicrophone;
   voice: VoiceMember;
   presence: HostPresence;
   storage: HostStorage;
