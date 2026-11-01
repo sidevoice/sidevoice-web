@@ -25,7 +25,7 @@ const geometry = (page) => page.evaluate(() => {
   return {
     width: innerWidth, height: innerHeight, header: shown ? rect(header) : null, main: rect(main),
     topOfHeaderItems: shown ? Math.min(...inner.map((box) => box.top)) : null, leftOfHeaderItems: shown ? Math.min(...inner.map((box) => box.left)) : null,
-    rightOfHeaderItems: shown ? Math.max(...inner.map((box) => box.right)) : null, bottomOfBar: controls.length ? Math.max(...controls.map((box) => box.bottom)) : null,
+    rightOfHeaderItems: shown ? Math.max(...inner.map((box) => box.right)) : null, bottomOfBar: controls.length ? Math.max(...controls.map((box) => box.bottom)) : null, barPadding: bar ? parseFloat(getComputedStyle(bar).paddingBottom) : null,
   };
 });
 
@@ -50,7 +50,10 @@ for (const [name, viewport, insets] of [["a phone", { width: 440, height: 956 },
         expect(after.leftOfHeaderItems).toBeGreaterThanOrEqual(insets.left - 0.5);
         expect(after.rightOfHeaderItems).toBeLessThanOrEqual(after.width - insets.right + 0.5);
       }
-      if (after.bottomOfBar !== null) expect(after.bottomOfBar).toBeLessThanOrEqual(after.height - insets.bottom + 0.5);
+      // The call bar is there, and its bottom padding grew by exactly the home indicator's height.
+      expect(after.bottomOfBar, "the call bar").not.toBeNull();
+      expect(after.bottomOfBar).toBeLessThanOrEqual(after.height - insets.bottom + 0.5);
+      expect(after.barPadding - before.barPadding).toBeCloseTo(insets.bottom, 0);
     });
   });
 }

@@ -1,3 +1,4 @@
+import { collisionPadding } from "../../lib/safe-area";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { useRef, useState, type ReactElement, type ReactNode, type RefObject } from "react";
 import { cn } from "../../lib/cn";
@@ -36,7 +37,7 @@ export function Popover({ trigger, anchor, label, side = "top", align = "start",
       {anchor ? <PopoverPrimitive.Anchor asChild ref={beside as RefObject<HTMLDivElement>}>{anchor}</PopoverPrimitive.Anchor>
         : <PopoverPrimitive.Trigger asChild ref={beside as RefObject<HTMLButtonElement>}>{trigger}</PopoverPrimitive.Trigger>}
       <PopoverPrimitive.Portal container={overlayContainer(provided, beside.current)}>
-        <PopoverPrimitive.Content className={cn("ui-popover", className)} side={side} align={align} sideOffset={8} collisionPadding={12} aria-label={label}>
+        <PopoverPrimitive.Content className={cn("ui-popover", className)} side={side} align={align} sideOffset={8} collisionPadding={collisionPadding()} aria-label={label}>
           {children}
         </PopoverPrimitive.Content>
       </PopoverPrimitive.Portal>

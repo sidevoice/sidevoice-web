@@ -146,7 +146,7 @@
   }
   .transcript-scrim[data-open] { opacity: 1; pointer-events: auto; }
   .call-layout > .transcript, .call-layout > .transcript:not([data-open]) {
-    display: flex; position: fixed; z-index: 31; left: 0; right: 0; bottom: 0; width: auto; height: 82dvh;
+    display: flex; position: fixed; z-index: 31; left: var(--sv-inset-left); right: var(--sv-inset-right); bottom: 0; width: auto; height: 82dvh;
     border: 1px solid var(--sv-border); border-bottom: 0; border-radius: var(--sv-radius-2xl) var(--sv-radius-2xl) 0 0; box-shadow: var(--sv-shadow-lg);
     transform: translateY(105%); visibility: hidden; transition: transform .25s ease, visibility 0s linear .25s;
   }
@@ -156,7 +156,7 @@
   .transcript-grab { display: block; flex: none; width: 36px; height: 4px; margin: var(--sv-space-2) auto 0; border-radius: 2px; background: var(--sv-border-strong); }
   .transcript-head { padding-top: var(--sv-space-2); }
   #messages { padding-inline: var(--sv-space-3); }
-  .text-composer { padding: var(--sv-space-2) var(--sv-space-3) max(var(--sv-space-3), env(safe-area-inset-bottom)); }
+  .text-composer { padding: var(--sv-space-2) var(--sv-space-3) max(var(--sv-space-3), var(--sv-inset-bottom)); }
 }
 
 /* ----- a compact desktop window (560–899px, a fine pointer: COMPACT_QUERY): no room to dock it beside the rail and a

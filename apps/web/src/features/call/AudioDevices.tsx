@@ -1,3 +1,4 @@
+import { collisionPadding } from "../../lib/safe-area";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { useContext, useEffect, useRef, useState, type PointerEvent } from "react";
 import { Button } from "../../components/ui/Button";
@@ -72,7 +73,7 @@ export function AudioDevices() {
       </PopoverPrimitive.Trigger>
       <PopoverPrimitive.Portal container={overlayContainer(provided, trigger.current)}>
         <PopoverPrimitive.Content id="audio-devices" className="ui-popover audio-devices" side="top" align="start" sideOffset={16}
-          collisionPadding={12} aria-label={t("devices.toggle")}
+          collisionPadding={collisionPadding()} aria-label={t("devices.toggle")}
           onPointerEnter={(event) => { if (event.pointerType === "mouse") wait(); }} onPointerLeave={pointerLeave}
           onPointerDown={hold} onFocus={hold}
           // Opened by the pointer, it takes no focus, and gives none back when the pointer takes it away.

@@ -1,3 +1,4 @@
+import { collisionPadding } from "../../lib/safe-area";
 import * as DropdownPrimitive from "@radix-ui/react-dropdown-menu";
 import { useRef, useState, type ReactNode } from "react";
 import { overlayContainer, useOverlayPortal } from "./Tooltip";
@@ -20,7 +21,7 @@ export function DropdownMenu({ label, trigger, children, onCloseAutoFocus }: Dro
     <DropdownPrimitive.Root open={open} onOpenChange={setOpen}>
       <DropdownPrimitive.Trigger asChild aria-label={label} ref={anchor}>{trigger}</DropdownPrimitive.Trigger>
       <DropdownPrimitive.Portal container={overlayContainer(provided, anchor.current)}>
-        <DropdownPrimitive.Content className="ui-dropdown" sideOffset={8} collisionPadding={12} aria-label={label} onCloseAutoFocus={onCloseAutoFocus}>
+        <DropdownPrimitive.Content className="ui-dropdown" sideOffset={8} collisionPadding={collisionPadding()} aria-label={label} onCloseAutoFocus={onCloseAutoFocus}>
           {children}
         </DropdownPrimitive.Content>
       </DropdownPrimitive.Portal>

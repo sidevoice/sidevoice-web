@@ -1,3 +1,4 @@
+import { collisionPadding } from "../../lib/safe-area";
 import * as ContextPrimitive from "@radix-ui/react-context-menu";
 import type { ReactNode } from "react";
 import { overlayContainer, useOverlayPortal } from "./Tooltip";
@@ -10,7 +11,7 @@ export function ContextMenu({ label, children, items }: { label: string; childre
     <ContextPrimitive.Root>
       <ContextPrimitive.Trigger asChild>{children}</ContextPrimitive.Trigger>
       <ContextPrimitive.Portal container={overlayContainer(provided, null)}>
-        <ContextPrimitive.Content className="ui-dropdown" collisionPadding={12} aria-label={label}>{items}</ContextPrimitive.Content>
+        <ContextPrimitive.Content className="ui-dropdown" collisionPadding={collisionPadding()} aria-label={label}>{items}</ContextPrimitive.Content>
       </ContextPrimitive.Portal>
     </ContextPrimitive.Root>
   );
