@@ -55,6 +55,12 @@ test("the thinking dots start the agent's next run, wearing its face", () => {
   expect(thinking.previousElementSibling).toHaveClass("ui-avatar", "chat-character");
 });
 
+test("out of the call the thinking dots are not shown, and the empty state is", () => {
+  const { container } = render(<MessageList inCall={false} conversation={{ ...view([]), working: true }} />);
+  expect(container.querySelector(".chat-bubble.thinking")).toBeNull();
+  expect(container.querySelector(".messages-empty")).not.toBeNull();
+});
+
 test("an interrupted reply says so to a screen reader too", () => {
   render(<MessageList conversation={view([message({ segment: "i", text: "Te decía que", interrupted: true })])} />);
   expect(screen.getByRole("article", { name: "Agente, interrupted: Te decía que" })).toHaveAttribute("data-interrupted", "true");

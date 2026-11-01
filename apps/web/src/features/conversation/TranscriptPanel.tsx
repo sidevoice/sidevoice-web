@@ -17,6 +17,8 @@ import "./transcript.css";
 export function TranscriptPanel() {
   const t = translator();
   const conversation = useRoomStore((state) => state.conversation);
+  // Admitted to the room (or getting the call back), not merely joining: selectInCall is true from the socket on.
+  const inCall = useRoomStore((state) => !!(state.facts.sessionId || state.facts.reconnecting));
   const title = useRoomStore((state) => state.title);
   const open = useCallLayout((state) => state.transcriptOpen);
   const close = useCallLayout((state) => state.closeTranscript);
@@ -38,7 +40,7 @@ export function TranscriptPanel() {
           <div className="transcript-heading"><strong>{t("transcript.title")}</strong><span id="transcript-title" title={title} translate="no">{title}</span></div>
           <Button variant="ghost" tone="neutral" size="icon-sm" className="transcript-close" aria-label={t("transcript.close")} title={t("transcript.close")} onClick={close}><CloseIcon /></Button>
         </header>
-        <MessageList conversation={conversation} visible={open} />
+        <MessageList conversation={conversation} visible={open} inCall={inCall} />
         <Composer narrow={narrow} />
       </section>
       <div className="transcript-scrim" data-open={open || undefined} aria-hidden="true" onClick={close} />
