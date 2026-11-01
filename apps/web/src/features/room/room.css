@@ -25,7 +25,7 @@
 .sidebar-rows .state-dot[data-state="idle"] { display: none; }
 
 /* ----- the header: the mark, and Settings at its end */
-.room-header { --dot-ring: var(--sv-bg); display: flex; align-items: center; gap: var(--sv-space-3); height: var(--sv-header-height); padding: 0 var(--sv-space-4) 0 var(--sv-space-5); border-bottom: 1px solid var(--sv-border); background: var(--sv-bg); }
+.room-header { --dot-ring: var(--sv-bg); display: flex; align-items: center; gap: var(--sv-space-3); height: calc(var(--sv-header-height) + var(--sv-inset-top)); padding: var(--sv-inset-top) var(--sv-space-4) 0 var(--sv-space-5); border-bottom: 1px solid var(--sv-border); background: var(--sv-bg); }
 .room-header .brand { display: inline-flex; align-items: center; gap: var(--sv-space-2); flex: none; font-size: var(--sv-font-lg); line-height: 1.5rem; font-weight: var(--sv-weight-bold); letter-spacing: -.01em; color: var(--sv-text); }
 .room-header .brand svg { flex: none; color: var(--sv-accent-text); }
 .header-settings { flex: none; margin-inline-start: auto; }
@@ -105,7 +105,7 @@
 /* ----- a phone */
 @media (max-width: 559px), (max-width: 899px) and (pointer: coarse) {
   /* The header keeps its place above the scrim while the list is down, and until the scrim has faded after. */
-  .room-header { position: relative; z-index: 1; gap: var(--sv-space-2); padding: 0 var(--sv-space-2) 0 var(--sv-space-4); transition: z-index 0s linear var(--sv-dur-base); }
+  .room-header { position: relative; z-index: 1; gap: var(--sv-space-2); padding: var(--sv-inset-top) var(--sv-space-2) 0 var(--sv-space-4); transition: z-index 0s linear var(--sv-dur-base); }
   .room-header[data-list-down] { z-index: 32; transition: none; }
   /* No brand on a phone: the heading stays, for a screen reader only. */
   .room-header .brand { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -139,7 +139,7 @@
   .conversations-toggle[aria-expanded="true"] .conversations-chevron { transform: rotate(180deg); }
 
   /* The list drops from under the header as a panel over the dimmed call. */
-  .conversation-sidebar { --dot-ring: var(--sv-surface); position: fixed; z-index: 31; top: var(--conversations-top, var(--sv-header-height)); left: 0; right: 0; width: auto; max-height: min(72dvh, 36rem); gap: var(--sv-space-2);
+  .conversation-sidebar { --dot-ring: var(--sv-surface); position: fixed; z-index: 31; top: var(--conversations-top, calc(var(--sv-header-height) + var(--sv-inset-top))); left: var(--sv-inset-left); right: var(--sv-inset-right); width: auto; max-height: min(72dvh, 36rem); gap: var(--sv-space-2);
     padding: var(--sv-space-2) var(--sv-space-3) var(--sv-space-4); border: 0; border-radius: 0 0 var(--sv-radius-2xl) var(--sv-radius-2xl); background: var(--sv-surface); box-shadow: var(--sv-shadow-md);
     transform: translateY(-100%); visibility: hidden; transition: transform var(--sv-dur-base) var(--sv-ease), visibility 0s linear var(--sv-dur-base); }
   .conversation-sidebar[data-open] { transform: none; visibility: visible; transition: transform var(--sv-dur-slow) var(--sv-ease); }
