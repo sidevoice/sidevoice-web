@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.1](https://github.com/sidevoice/sidevoice-web/compare/v0.17.0...v0.17.1) (2026-11-02)
+
+
+### Performance Improvements
+
+* **settings:** skip the room behind Settings, and Back without waiting on history ([#447](https://github.com/sidevoice/sidevoice-web/issues/447)) ([58b1945](https://github.com/sidevoice/sidevoice-web/commit/58b194577c0237d9bf47b4580a563fde303f3453))
+
 ## [0.17.0](https://github.com/sidevoice/sidevoice-web/compare/v0.16.1...v0.17.0) (2026-11-02)
 
 
