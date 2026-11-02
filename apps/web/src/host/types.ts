@@ -102,7 +102,8 @@ export interface HostPresence {
   readonly media: "page" | "app";
   /** The page's own, where `media` is `page` and the browser has a Media Session; null where the app owns the media. */
   remote: RemoteControls | null;
-  /** The page's own. Null would be a host that decides for itself; none says so yet. */
+  /** The app's own where it holds the screen itself (the mobile app: a phone's webview has no Screen Wake Lock that holds), else the
+   *  page's. Null would be a host that decides for itself; none says so yet. */
   screenAwake: ScreenAwake | null;
 }
 

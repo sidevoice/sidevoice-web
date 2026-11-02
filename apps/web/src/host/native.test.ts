@@ -341,3 +341,20 @@ describe("the host's message overlay", () => {
     expect(host().messages("en")).toEqual({});
   });
 });
+
+describe("the screen kept on", () => {
+  const held = { supported: true, acquire: async () => "held", release: () => {}, onReleased: () => () => {} };
+  test("an app that holds the screen itself is the one the page asks", async () => {
+    withHost({ presence: { media: "app", screenAwake: held } });
+    const awake = host().presence.screenAwake!;
+    expect(awake.supported).toBe(true);
+    expect(await awake.acquire()).toBe("held");
+  });
+  test("an app without one, or with half of one, leaves it to the browser's", () => {
+    for (const presence of [{ media: "app" }, { media: "app", screenAwake: { acquire: held.acquire } }, { media: "app", screenAwake: "yes" }]) {
+      withHost({ presence });
+      expect(host().presence.screenAwake).not.toBe(held);
+      expect(host().presence.screenAwake?.supported).toBe(typeof navigator !== "undefined" && "wakeLock" in navigator);
+    }
+  });
+});

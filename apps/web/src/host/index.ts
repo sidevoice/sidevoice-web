@@ -73,7 +73,8 @@ export function host(): Host {
     presence: {
       media: app.presence.media,
       get remote() { return app.presence.media === "page" ? browserRemote() : null; },
-      get screenAwake() { return browserScreenAwake(); },
+      // The app's when it holds the screen itself (a phone); else this browser's Screen Wake Lock.
+      get screenAwake() { return app.presence.screenAwake ?? browserScreenAwake(); },
     },
   };
 }

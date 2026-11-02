@@ -1,6 +1,6 @@
 import type {
   AppBuild, AppUpdater, AppVoice, CallControlsBridge, Host, HostDebugBridge, HostIdentity, HostPresence, HostStorage, LocalHostBridge,
-  MessageOverlay, MicrophoneBridge, MuteShortcutBridge, PairingsStore, ReachTransport, ResetBridge,
+  MessageOverlay, MicrophoneBridge, MuteShortcutBridge, PairingsStore, ReachTransport, ResetBridge, ScreenAwake,
 } from "./types";
 
 /* What an app injects into its page: `window.__sidevoiceHost`, the object the desktop and mobile apps share
@@ -45,7 +45,7 @@ export type NativeHost = Omit<Host, "identity" | "microphone" | "presence" | "re
   identity: Omit<HostIdentity, "deviceName" | "shortcutModifier"> & { deviceName(): string | null; shortcutModifier: string | null };
   /** The app's permission bridge, and its help for a blocked one when it words it. */
   microphone: Partial<MicrophoneBridge> | null;
-  presence: Pick<HostPresence, "media">;
+  presence: Pick<HostPresence, "media"> & { /** The app's own hold on the screen, where it has one (a phone's webview has no Screen Wake Lock that holds); null leaves it to the browser's. */ screenAwake: ScreenAwake | null };
   /** What the app says of its transport; null where it says nothing. */
   reach: ReachTransport | null;
   /** The app's pairings; null where it keeps none for the page. */
@@ -76,7 +76,8 @@ export function nativeHost(): NativeHost {
   const pairings = app?.pairings as PairingsStore | undefined;
   const storage: HostStorage | null = pairings && typeof pairings.read === "function" && typeof pairings.write === "function" ? { pairings } : null;
   const reach = app?.reach as Partial<ReachTransport> | undefined;
-  const presence = app?.presence as { media?: unknown } | undefined;
+  const presence = app?.presence as { media?: unknown; screenAwake?: unknown } | undefined;
+  const screenAwake = presence?.screenAwake as Partial<ScreenAwake> | undefined;
   const debug = app?.debug as Partial<HostDebugBridge> | undefined;
   const microphone = app?.microphone as Partial<MicrophoneBridge> | undefined;
   const updater = app?.updater as AppUpdater | undefined;
@@ -89,7 +90,11 @@ export function nativeHost(): NativeHost {
     },
     microphone: microphone && typeof microphone === "object" ? microphone : null,
     voice: app?.voice ? { voice: app.voice as AppVoice["voice"], engine: app.engine as AppVoice["engine"] } : null,
-    presence: { media: presence?.media === "app" ? "app" : "page" },
+    presence: {
+      media: presence?.media === "app" ? "app" : "page",
+      // Used only when it has the functions the page calls, as every member is.
+      screenAwake: screenAwake && typeof screenAwake.acquire === "function" && typeof screenAwake.release === "function" && typeof screenAwake.onReleased === "function" ? screenAwake as ScreenAwake : null,
+    },
     reach: typeof reach?.plainHttpPrivate === "boolean" ? { plainHttpPrivate: reach.plainHttpPrivate } : null,
     storage,
     localHost: member<LocalHostBridge>(app, "localHost", ["state", "subscribe", "pairing"]),
