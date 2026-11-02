@@ -53,6 +53,12 @@ main[tabindex="-1"]:focus { outline: none; }
  * dots, the poster), and goes on from where it was when the page closes. */
 #root > .room-shell:has(> .ui-dialog[data-layout="page"][open]) > :not(.ui-dialog),
 #root > .room-shell:has(> .ui-dialog[data-layout="page"][open]) > :not(.ui-dialog) * { animation-play-state: paused !important; }
+/* Nor is it styled or laid out: what Settings does (a list opening, a page sliding in) touches the whole document's style
+ * (a modal list sets the body's pointer-events; a focus change matches :has()), and the room behind it, the creatures
+ * most, made each of those cost three times what Settings alone does (a phone took seconds to open a list). Its boxes
+ * keep their sizes (`auto`: the one last drawn), so nothing in it resizes as Settings comes and goes. */
+#root > .room-shell > :not(.ui-dialog) { contain-intrinsic-size: auto none; }
+#root > .room-shell:has(> .ui-dialog[data-layout="page"][open]) > :not(.ui-dialog) { content-visibility: hidden; }
 
 .startup-error { width: min(34rem, calc(100% - 2rem)); min-height: 100dvh; margin: auto; padding: var(--sv-space-8); display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--sv-space-3); }
 .setup-main { flex: 1; display: grid; place-items: center; min-height: 0; padding: var(--sv-space-4); overflow: auto; background: var(--sv-bg-subtle); }
