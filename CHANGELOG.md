@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.17.0](https://github.com/sidevoice/sidevoice-web/compare/v0.16.1...v0.17.0) (2026-11-02)
+
+
+### Features
+
+* **settings:** unlock Developer options from the build in Advanced ([#438](https://github.com/sidevoice/sidevoice-web/issues/438)) ([f3adae4](https://github.com/sidevoice/sidevoice-web/commit/f3adae4e3f4fcea0654795ff0d81d151b0d02223))
+* **touch:** drag a phone's sheets away with the finger ([#441](https://github.com/sidevoice/sidevoice-web/issues/441)) ([99c15c8](https://github.com/sidevoice/sidevoice-web/commit/99c15c82a82fa490cf3cad04769fa330890db97e))
+
+
+### Bug Fixes
+
+* **call:** begin the thinking sound's audio in the Join tap so browsers let it play ([#443](https://github.com/sidevoice/sidevoice-web/issues/443)) ([1d6da36](https://github.com/sidevoice/sidevoice-web/commit/1d6da36dc61a7930165b559ece6835c3036c96d4))
+* **touch:** answer a finger as an app does on a phone ([#442](https://github.com/sidevoice/sidevoice-web/issues/442)) ([4518e1f](https://github.com/sidevoice/sidevoice-web/commit/4518e1f8f310963209cdd970c6d315c5c05558d4))
+
 ## [0.16.1](https://github.com/sidevoice/sidevoice-web/compare/v0.16.0...v0.16.1) (2026-11-02)
 
 
