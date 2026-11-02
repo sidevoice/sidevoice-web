@@ -35,7 +35,11 @@
   --stage-inset: calc(16 * var(--u)); --entry: clamp(36px, calc(44 * var(--u)), 56px);
   --chip-fs: clamp(11px, calc(12 * var(--u)), 15px); --name-fs: clamp(14px, calc(20 * var(--u)), 26px);
   --bubble-fs: clamp(18px, calc(25.6 * var(--u)), 34px); --bubble-lh: 1.375; --bubble-pad: 24; --peek: 20; --tail-w: calc(72 * var(--u)); --tail-h: calc(40 * var(--u));
-  --person-fs: clamp(16px, calc(22.4 * var(--u)), 28px); --person-lh: 1.4286; --person-pad-b: 12; --person-pad-i: 20; --person-live-w: 272; }
+  --person-fs: clamp(16px, calc(22.4 * var(--u)), 28px); --person-lh: 1.4286; --person-pad-b: 12; --person-pad-i: 20; --person-live-w: 272;
+  --fig-px: min(calc(var(--stage-avatar-share, .56) * 440px * var(--k, 1)), var(--stage-avatar-max, 420px)); --person-lift: 0px; }
+/* The person's balloon's height: three of its whole-pixel lines, its margins and padding. Where the balloons are laid (the
+ * tile; the desktop card's avatar balloons, call-card.css), from that place's own sizes. */
+:is(.stage-tile, .avatar-balloons) { --person-live-h: calc(3 * round(nearest, calc(var(--person-fs) * var(--person-lh)), 1px) + 16 * var(--u) + 2 * var(--person-pad-b) * var(--u)); }
 /* No conversation: the tile fills the stage rather than keeping a shape; its words keep the interface's size. */
 .stage-tile.stage-empty { --u: 1px; }
 /* The canvas the agent is drawn on keeps one shape per form factor (--stage-ratio, width over height), never whatever
@@ -53,6 +57,12 @@
   .stage-tile { --stage-inset: calc(12 * var(--u));
     --bubble-fs: clamp(18px, calc(22.4 * var(--u)), 34px); --bubble-lh: 1.4286; --bubble-pad: 20; --peek: 16; --tail-w: calc(58 * var(--u)); --tail-h: calc(32 * var(--u));
     --person-fs: clamp(16px, calc(19.2 * var(--u)), 28px); --person-lh: 1.5; --person-pad-b: 8; --person-pad-i: 16; --person-live-w: 240; }
+  /* The square leaves no room beside the agent for the person's balloon at its foot: the balloon would stand over its
+   * face. While one is up (the bars, then what was sent) the agent steps up out of its way, by as much as it covers of
+   * the face (its chin, 85 of the figure's 120, that far over the tile's foot) and a margin; the agent's own balloon
+   * follows it (.stage-top). The tile's own height is the room: nothing here moves a desktop's stage. */
+  .stage-tile:has(.person-turns .person-bubble) { --person-lift: max(0px, calc(var(--person-live-h) + var(--stage-inset) + 12 * var(--u) - 83px * var(--k, 1) - var(--fig-px) * 21 / 120)); }
+  .stage-tile .stage-agent { translate: 0 calc(var(--person-lift) / var(--k, 1) * -1); }
 }
 .stage-canvas { position: absolute; inset: 0; overflow: hidden;
   background: radial-gradient(circle at 50% 55%, color-mix(in srgb, var(--av-color, var(--sv-accent)) 18%, transparent), transparent 60%), var(--sv-stage-bg); }
@@ -71,9 +81,9 @@
  * near 20 of it (--stage-head-y: a reference, not every bicho's exact bound); idle, it grows 1.1 from 93.5. The
  * balloon's foot, its tail below it besides, sits there; from the tile's top inset down, it is laid at the bottom of
  * that room, and a balloon taller than the room starts at the top instead of leaving the tile (safe end). */
-.stage-top { --fig-px: min(calc(var(--stage-avatar-share, .56) * 440px * var(--k, 1)), var(--stage-avatar-max, 420px)); --idle-rise: 0px;
+.stage-top { --idle-rise: 0px;
   position: absolute; z-index: 2; top: var(--stage-inset); left: var(--stage-inset); right: var(--stage-inset);
-  bottom: calc(83px * var(--k, 1) + var(--fig-px) * (106 - var(--stage-head-y, 20)) / 120 + var(--idle-rise) + var(--tail-h) + 8 * var(--u));
+  bottom: calc(83px * var(--k, 1) + var(--fig-px) * (106 - var(--stage-head-y, 20)) / 120 + var(--idle-rise) + var(--person-lift) + var(--tail-h) + 8 * var(--u));
   display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); justify-items: center; pointer-events: none; }
 .stage-tile[data-mood="idle"] .stage-top { --idle-rise: calc(var(--fig-px) * (var(--stage-avatar-idle, 1.1) - 1) * (93.504 - var(--stage-head-y, 20)) / 120); }
 .stage-top > * { grid-area: 1 / 1; align-self: safe end; }
@@ -153,7 +163,7 @@
  * with their margins and the balloon's padding; it never grows or shrinks as its words move on, only with the tile
  * (its width in the slide's units, its height three of its whole-pixel lines). */
 .person-turns { --live-w: min(calc(var(--person-live-w) * var(--u)), 75cqi);
-  --live-h: calc(3 * round(nearest, calc(var(--person-fs) * var(--person-lh)), 1px) + 16 * var(--u) + 2 * var(--person-pad-b) * var(--u));
+  --live-h: var(--person-live-h);
   position: absolute; z-index: 3; right: var(--stage-inset); bottom: var(--stage-inset); display: flex; flex-direction: column; align-items: flex-end; gap: calc(8 * var(--u)); }
 /* The same balloon in the transcript's message list (MessageList): capped like the final chat bubble at 86% or 34rem,
  * drawn as the stage's for a tile of about 590px (--u); no corner to sit in, so it flows, its tail hung below it. */

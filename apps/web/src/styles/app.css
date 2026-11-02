@@ -4,6 +4,12 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 /* The screen's own edges (the notch, the status bar, the home indicator), 0 in a browser window. Named once so the shell pads by them and a test can stand in for a phone's. */
+/* Registered as lengths, so the engine resolves env() when it computes them and a script reads pixels (lib/safe-area.ts);
+ * unregistered, a custom property reads back as its text, "env(safe-area-inset-top, 0px)", which is no number. */
+@property --sv-inset-top { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --sv-inset-right { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --sv-inset-bottom { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --sv-inset-left { syntax: "<length>"; inherits: true; initial-value: 0px; }
 :root { --sv-inset-top: env(safe-area-inset-top, 0px); --sv-inset-right: env(safe-area-inset-right, 0px); --sv-inset-bottom: env(safe-area-inset-bottom, 0px); --sv-inset-left: env(safe-area-inset-left, 0px); }
 [hidden] { display: none !important; }
 html, body, #root { width: 100%; max-width: 100%; min-width: 0; height: 100%; margin: 0; }
