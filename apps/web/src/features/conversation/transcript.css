@@ -153,8 +153,12 @@
   .call-layout > .transcript[data-open] { transform: none; visibility: visible; transition: transform .25s ease; }
   /* Closed, the sheet waits off screen: what pulses in it (the thinking dots, a turn being transcribed) does not run until it is opened. */
   .call-layout > .transcript:not([data-open]) * { animation: none !important; }
-  .transcript-grab { display: block; flex: none; width: 36px; height: 4px; margin: var(--sv-space-2) auto 0; border-radius: 2px; background: var(--sv-border-strong); }
-  .transcript-head { padding-top: var(--sv-space-2); }
+  /* The grabber and the title row drag the sheet down (lib/use-sheet-drag.ts): the engine claims no pan from them, and
+     the grabber's strip is the sheet's whole width, a finger's height, its bar drawn in its middle. */
+  .transcript-grab { display: block; position: relative; flex: none; height: var(--sv-space-5); }
+  .transcript-grab::before { content: ""; position: absolute; top: var(--sv-space-2); left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: var(--sv-border-strong); }
+  .transcript-grab, .transcript-head { touch-action: none; user-select: none; -webkit-user-select: none; }
+  .transcript-head { padding-top: 0; }
   #messages { padding-inline: var(--sv-space-3); }
   .text-composer { padding: var(--sv-space-2) var(--sv-space-3) max(var(--sv-space-3), var(--sv-inset-bottom)); }
 }

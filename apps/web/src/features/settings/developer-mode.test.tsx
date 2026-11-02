@@ -12,15 +12,15 @@ afterEach(() => {
   delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost;
 });
 
-/* Developer mode (operator, 2026-10-21): Android's way in. Ten clicks on the version within five seconds turn it on in a
- * nightly build, the same again turns it off; it is kept on the device. Anywhere else the version is only text. */
+/* Developer mode (operator, 2026-10-21): Android's way in. Ten taps on the build within five seconds turn it on in a
+ * nightly build, the same again turns it off; it is kept on the device. Anywhere else the build is only text. */
 
 /** The desktop app as its bridge says its build (`host.build`); null, a browser. */
 function inApp(channel: string | null) {
   if (channel) Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel, version: "0.2.1-nightly.608" } } } });
 }
 
-/** The version text of Updates, wired as AppUpdateSettings wires it, with what a person could see of developer mode. */
+/** The build of Advanced, wired as SettingsDialog wires it, with what a person could see of developer mode. */
 function Version() {
   const { props, note } = useDeveloperModeGesture();
   const on = useDeveloperMode();
