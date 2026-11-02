@@ -44,11 +44,13 @@ export function parseBrowser(nav: NavigatorFacts | undefined = globalThis.naviga
 }
 
 /** A browser's default name for this device, whole and in the page's language: "{browser} on {system}" ("Chrome on Mac",
- *  "Safari on iPhone"), a browser it cannot tell is a Browser, and a page that says neither is "Sidevoice". */
+ *  "Safari on iPhone"); a page that names no browser (an app's web view does not) is the system alone ("iPhone"), and one
+ *  that says neither is "Sidevoice". */
 export function browserDeviceName(nav: NavigatorFacts | undefined = globalThis.navigator, say = translator()): string {
   const { app, system } = parseBrowser(nav);
   if (!app && !system) return "Sidevoice";
-  return say("pair.deviceNameBrowser", { browser: app || "Browser", os: system || "?" });
+  if (!app) return system;
+  return say("pair.deviceNameBrowser", { browser: app, os: system || "?" });
 }
 
 /** The modifier a browser's shortcuts are written with: ⌘ on the Mac and the iPhone (a keyboard on an iPad too), else Ctrl. */

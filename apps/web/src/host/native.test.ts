@@ -308,3 +308,33 @@ describe("the call controls card's seam", () => {
     expect(cardSeam()).toBe(seam);
   });
 });
+
+describe("the host's message overlay", () => {
+  test("is the app's table for a language, drawn over the catalogue by exact tag, then primary subtag, in every language", () => {
+    const tables: Record<string, Record<string, string>> = {
+      en: { "devices.speakerFixed": "Change it from Control Center." },
+      es: { "devices.speakerFixed": "Cámbialo en el Centro de control." },
+    };
+    withHost({ messages: (language: string) => tables[language] });
+    expect(translator("en")("devices.speakerFixed")).toBe("Change it from Control Center.");
+    expect(translator("es")("devices.speakerFixed")).toBe("Cámbialo en el Centro de control.");
+    expect(translator("es-419")("devices.speakerFixed")).toBe("Cámbialo en el Centro de control.");
+    // A language without a table keeps the web's own words, as does a key the table lacks.
+    expect(translator("de")("devices.speakerFixed")).toMatch(/Browser/);
+    expect(translator("en")("devices.mic")).toBe("Microphone");
+  });
+
+  test("in a browser, or from an app that gives none or something else, changes nothing", () => {
+    const browser = translator("en")("devices.speakerFixed");
+    expect(browser).toMatch(/browser/);
+    withHost(undefined);
+    expect(host().messages("en")).toEqual({});
+    withHost({ messages: () => "loud" });
+    expect(translator("en")("devices.speakerFixed")).toBe(browser);
+    withHost({ messages: () => { throw new Error("no"); } });
+    expect(translator("en")("devices.speakerFixed")).toBe(browser);
+    withHost({ messages: () => ({ "devices.speakerFixed": "", "devices.mic": 3 }) });
+    expect(translator("en")("devices.speakerFixed")).toBe(browser);
+    expect(host().messages("en")).toEqual({});
+  });
+});

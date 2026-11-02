@@ -1,6 +1,6 @@
 import type {
   AppBuild, AppUpdater, AppVoice, CallControlsBridge, Host, HostDebugBridge, HostIdentity, HostPresence, HostStorage, LocalHostBridge,
-  MicrophoneBridge, MuteShortcutBridge, PairingsStore, ReachTransport, ResetBridge,
+  MessageOverlay, MicrophoneBridge, MuteShortcutBridge, PairingsStore, ReachTransport, ResetBridge,
 } from "./types";
 
 /* What an app injects into its page: `window.__sidevoiceHost`, the object the desktop and mobile apps share
@@ -54,6 +54,18 @@ export type NativeHost = Omit<Host, "identity" | "microphone" | "presence" | "re
   voice: AppVoice | null;
 };
 
+/** The app's overlay for one language, kept to the texts the page can draw: a plain table of non-empty strings. An app
+ *  without one, a language it has none for, or one that fails, has none. */
+function overlay(app: Injected | undefined, language: string): MessageOverlay {
+  const found = app?.messages;
+  if (typeof found !== "function") return {};
+  try {
+    const table: unknown = found.call(app, language);
+    if (!table || typeof table !== "object") return {};
+    return Object.fromEntries(Object.entries(table).filter(([, text]) => typeof text === "string" && text !== ""));
+  } catch { return {}; }
+}
+
 export function nativeHost(): NativeHost {
   const app = injected();
   const pairings = app?.pairings as PairingsStore | undefined;
@@ -64,6 +76,7 @@ export function nativeHost(): NativeHost {
   const microphone = app?.microphone as Partial<MicrophoneBridge> | undefined;
   const updater = app?.updater as AppUpdater | undefined;
   return {
+    messages: (language) => overlay(app, language),
     identity: {
       build: build(app),
       deviceName: () => named(app?.deviceName),
