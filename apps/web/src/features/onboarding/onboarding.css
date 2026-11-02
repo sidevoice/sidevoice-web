@@ -139,9 +139,6 @@
 }
 /* ----- the call's own space while something is missing: one card, centred */
 .call-column--waiting { display: grid; place-items: center; padding: var(--sv-space-6); overflow: auto; }
-  display: grid; justify-items: center; gap: var(--sv-space-2); width: min(34rem, 100%); padding: var(--sv-space-10) var(--sv-space-6);
-  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-2xl); background: var(--sv-stage-bg); text-align: center;
-}
 
 /* ----- a phone, or a screen too short for the dialog: the whole screen, the footer pinned at the bottom */
 @media (max-width: 599px), (max-height: 520px) {
@@ -158,6 +155,24 @@
   .wizard-actions[data-model-step] .wizard-back { padding-inline: var(--sv-space-2); }
   .wizard-actions[data-model-step] .wizard-back-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .wizard-actions[data-model-step] > .ui-button:not(.wizard-back) { padding-inline: var(--sv-space-3); }
+  /* A footer with a quiet second action (Skip for now, Continue without trying) is one row on a phone, never a partial
+     wrap and never wider than the card: Back and the quiet action are text buttons at their own width, the main action
+     the rest, gaps and paddings tight. When even that does not fit (a narrow phone, a long language), the footer is
+     deliberately stacked instead: the main action full width on top, then Back at the start and the quiet action at
+     the end of one row. The dialog is the container, so the choice is the CSS's, by the width the footer really has. */
+  .wizard-dialog { container: wizard-dialog / inline-size; }
+  .wizard-actions:has(> .wizard-quiet) { flex-wrap: nowrap; gap: var(--sv-space-1); }
+  .wizard-actions:has(> .wizard-quiet) > .ui-button { padding-inline: var(--sv-space-3); }
+  .wizard-actions:has(> .wizard-quiet) > .wizard-back { padding-inline: var(--sv-space-2); }
+  .wizard-actions:has(> .wizard-quiet) > .wizard-quiet { flex: none; }
+  .wizard-actions:has(> .wizard-quiet) > .ui-button--primary, .wizard-actions:has(> .wizard-quiet) .wizard-slot > .ui-button { flex: 1 1 auto; min-width: 0; }
+}
+@container wizard-dialog (max-width: 23rem) {
+  .wizard-actions:has(> .wizard-quiet) { flex-wrap: wrap; row-gap: var(--sv-space-2); }
+  .wizard-actions:has(> .wizard-quiet) > .ui-button--primary, .wizard-actions:has(> .wizard-quiet) .wizard-slot > .ui-button { order: -1; flex: 1 0 100%; }
+  .wizard-actions:has(> .wizard-quiet) > .wizard-reason { order: -2; flex: 1 0 100%; white-space: normal; text-align: start; }
+  .wizard-actions:has(> .wizard-quiet) > .wizard-back { padding-inline: var(--sv-space-3); }
+  .wizard-actions[data-model-step]:has(> .wizard-quiet) .wizard-back-label { position: static; width: auto; height: auto; clip-path: none; }
 }
 /* Ready, read live: a row not there yet wears a neutral dash, never red; one downloading, nothing. */
 .wizard-recap-dash { grid-area: check; display: grid; place-items: center; width: 16px; height: 16px; color: var(--sv-text-muted); font-weight: var(--sv-weight-semibold); }
