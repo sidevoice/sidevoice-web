@@ -241,7 +241,7 @@
  * WKWebView) resolves a child's `max-height: 100%` against it as 0: the card drew as a 2px line. */
 .ui-dialog[data-layout="dialog"] .ui-dialog-surface { max-height: min(85dvh, 760px); }
 .ui-dialog[data-layout="dialog"] .ui-dialog-surface, .ui-dialog-surface--card { border: 1px solid var(--sv-border); border-radius: var(--sv-radius-2xl); box-shadow: var(--sv-shadow-lg); }
-.ui-dialog[data-layout="page"] { position: fixed; inset: 0; width: 100vw; height: 100dvh; margin: 0; }
+.ui-dialog[data-layout="page"] { position: fixed; inset: 0; width: auto; max-width: none; height: 100dvh; margin: 0; }
 .ui-dialog[data-layout="page"] .ui-dialog-surface { height: 100%; background: var(--sv-bg); }
 .ui-dialog[data-layout="page"] .ui-dialog-head { min-height: var(--sv-header-height); padding-block: var(--sv-space-3); border-bottom: 1px solid var(--sv-border); }
 .ui-dialog[data-layout="page"] .ui-dialog-title { font-size: var(--sv-font-xl); line-height: 1.625rem; }
@@ -257,12 +257,14 @@
 .ui-dialog-foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--sv-space-2); flex: none; padding: var(--sv-space-4) var(--sv-space-6); border-top: 1px solid var(--sv-border); }
 .ui-dialog-reason { margin: 0 auto 0 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 @media (max-width: 599px) {
-  .ui-dialog[data-layout="dialog"] { position: fixed; inset: 0; width: 100vw; height: 100dvh; margin: 0; }
+  /* The whole screen: stretched between the screen's edges (`inset: 0`, `width: auto`), its head, body and footer a gutter in
+   * from each side (never less than the notch's or the rounded corners' inset when the screen is turned). */
+  .ui-dialog[data-layout="dialog"] { position: fixed; inset: 0; width: auto; max-width: none; height: 100dvh; margin: 0; }
   .ui-dialog[data-layout="dialog"] .ui-dialog-surface { height: 100%; max-height: none; border: 0; border-radius: 0; box-shadow: none; }
-  .ui-dialog-head { min-height: 56px; padding: calc(var(--sv-space-3) + env(safe-area-inset-top)) var(--sv-space-4) var(--sv-space-3); }
-  .ui-dialog-body { padding: 0 var(--sv-space-4) var(--sv-space-4); }
+  .ui-dialog-head { min-height: 56px; padding: calc(var(--sv-space-3) + env(safe-area-inset-top)) max(var(--sv-space-4), env(safe-area-inset-right)) var(--sv-space-3) max(var(--sv-space-4), env(safe-area-inset-left)); }
+  .ui-dialog-body { padding: 0 max(var(--sv-space-4), env(safe-area-inset-right)) var(--sv-space-4) max(var(--sv-space-4), env(safe-area-inset-left)); }
   .ui-dialog-body--flush { padding: 0; }
-  .ui-dialog-foot { flex-wrap: wrap; padding: var(--sv-space-3) var(--sv-space-4) calc(var(--sv-space-3) + env(safe-area-inset-bottom)); }
+  .ui-dialog-foot { flex-wrap: wrap; padding: var(--sv-space-3) max(var(--sv-space-4), env(safe-area-inset-right)) calc(var(--sv-space-3) + env(safe-area-inset-bottom)) max(var(--sv-space-4), env(safe-area-inset-left)); }
   .ui-dialog-foot > .ui-button { flex: 1 1 0; }
   .ui-dialog-reason { flex: 1 0 100%; }
 }

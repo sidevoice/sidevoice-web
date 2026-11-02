@@ -22,3 +22,17 @@ test("a card dialog grows with what it holds: its cap is its own, never a percen
   // A phone's is the whole screen: the card's cap is lifted there.
   assert.match(find(phone, '.ui-dialog[data-layout="dialog"] .ui-dialog-surface').body, /height: 100%; max-height: none/);
 });
+
+// A confirmation on a phone (the setup's "Continue without a machine?") is the whole screen, and its head, body and
+// footer keep a gutter on both sides, never less than the screen's own safe-area inset.
+test("a dialog on a phone stretches between the screen's edges and keeps a gutter on both sides", () => {
+  const dialog = find(phone, '.ui-dialog[data-layout="dialog"]').body;
+  assert.match(dialog, /inset: 0/);
+  assert.match(dialog, /width: auto/);
+  assert.doesNotMatch(dialog, /100vw/, "100vw is the layout viewport's width, not the screen's");
+  for (const part of [".ui-dialog-head", ".ui-dialog-body", ".ui-dialog-foot"]) {
+    const padding = find(phone, part).body.match(/padding: ([^;]+);/)[1];
+    assert.match(padding, /max\(var\(--sv-space-4\), env\(safe-area-inset-right\)\)/, `${part}: right`);
+    assert.match(padding, /max\(var\(--sv-space-4\), env\(safe-area-inset-left\)\)/, `${part}: left`);
+  }
+});
