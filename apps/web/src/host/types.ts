@@ -105,6 +105,8 @@ export interface HostPresence {
   /** The app's own where it holds the screen itself (the mobile app: a phone's webview has no Screen Wake Lock that holds), else the
    *  page's. Null would be a host that decides for itself; none says so yet. */
   screenAwake: ScreenAwake | null;
+  /** Who holds it: the app (the desktop and mobile apps, through the platform), or the page (the browser's Screen Wake Lock). */
+  readonly screenAwakeBy: "app" | "page";
 }
 
 /** What a person is told when the microphone is blocked, as this host words it: for where the page runs (a browser's site

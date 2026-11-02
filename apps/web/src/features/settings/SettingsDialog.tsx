@@ -135,8 +135,8 @@ function CallSettings({ t, microphone }: { t: Translate; microphone: MicrophoneS
           items={presence.map((option) => ({ value: option.value, label: t(option.label) }))} />
       </Row>
     </Group>
-    {/* The desktop app keeps its computer awake as any app does; holding the screen on is for a browser or a phone. */}
-    {awake && host().identity.build === null && <Group title={t("settings.call.device")}>
+    {/* A browser holds it with its Screen Wake Lock, an app with the platform's: an app that offers none (the desktop, for now) keeps its computer awake as any app does. */}
+    {awake && (host().identity.build === null || host().presence.screenAwakeBy === "app") && <Group title={t("settings.call.device")}>
       <Row label={t("settings.call.keepAwake")} description={awake.supported ? t("settings.call.keepAwakeHint") : t("settings.call.keepAwakeUnsupported")}>
         <Switch checked={prefs.keepAwake && awake.supported} disabled={!awake.supported} onChange={(keepAwake) => set({ keepAwake })} aria-label={t("settings.call.keepAwake")} />
       </Row>

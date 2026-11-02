@@ -75,6 +75,7 @@ export function host(): Host {
       get remote() { return app.presence.media === "page" ? browserRemote() : null; },
       // The app's when it holds the screen itself (a phone); else this browser's Screen Wake Lock.
       get screenAwake() { return app.presence.screenAwake ?? browserScreenAwake(); },
+      screenAwakeBy: app.presence.screenAwake ? "app" : "page",
     },
   };
 }

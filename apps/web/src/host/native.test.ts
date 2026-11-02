@@ -349,11 +349,13 @@ describe("the screen kept on", () => {
     const awake = host().presence.screenAwake!;
     expect(awake.supported).toBe(true);
     expect(await awake.acquire()).toBe("held");
+    expect(host().presence.screenAwakeBy).toBe("app");
   });
   test("an app without one, or with half of one, leaves it to the browser's", () => {
     for (const presence of [{ media: "app" }, { media: "app", screenAwake: { acquire: held.acquire } }, { media: "app", screenAwake: "yes" }]) {
       withHost({ presence });
       expect(host().presence.screenAwake).not.toBe(held);
+      expect(host().presence.screenAwakeBy).toBe("page");
       expect(host().presence.screenAwake?.supported).toBe(typeof navigator !== "undefined" && "wakeLock" in navigator);
     }
   });
