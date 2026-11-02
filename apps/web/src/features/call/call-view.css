@@ -387,6 +387,7 @@
   border-radius: var(--sv-radius-md); background: none; color: inherit; font: inherit; letter-spacing: inherit; text-align: start; cursor: pointer;
   transition: background-color var(--sv-dur-fast) var(--sv-ease); }
 .stage-heading:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.stage-heading:active { background-image: linear-gradient(var(--sv-pressed), var(--sv-pressed)); }
 .stage-heading[aria-expanded="true"] { background: var(--sv-accent-soft); }
 /* On a phone the heading sits inside the name's frosted frame: the wash goes on that one surface, the frame itself, and
  * not on the heading inside it (two layers, one inset in the other). */
@@ -432,7 +433,7 @@
 .voice-model-state::before { content: "·"; margin-inline: .35em; }
 .voice-model[data-attention] .voice-model-state { font-weight: var(--sv-weight-semibold); color: var(--sv-text); }
 .voice-model-action { grid-column: 2; justify-self: start; }
-.ui-popover.call-details-popover { width: min(22rem, calc(100vw - 24px)); max-height: min(70dvh, 34rem); overflow: auto; padding: var(--sv-space-4); }
+.ui-popover.call-details-popover { width: min(22rem, calc(100vw - 24px)); max-height: min(70dvh, 34rem); overflow: auto; overscroll-behavior: contain; padding: var(--sv-space-4); }
 /* The sheet: the window's height at its right edge, sliding in; a phone's from its foot, as tall as it needs. */
 @media (max-width: 899px) {
 }
@@ -445,12 +446,15 @@
   background: transparent; color: var(--sv-text-muted); cursor: pointer; transition: background-color var(--sv-dur-fast) var(--sv-ease); }
 .audio-devices-toggle > * { grid-area: 1 / 1; }
 .audio-devices-toggle .audio-chevron { opacity: 0; transform: rotate(180deg); transition: opacity var(--sv-dur-fast) var(--sv-ease), transform var(--sv-dur-fast) var(--sv-ease); }
-:is(.audio-devices-toggle:hover, .audio-devices-toggle:focus-visible, .audio-devices-toggle[aria-expanded="true"], #mic-control[data-muted="true"] .audio-devices-toggle) .mic-wave { opacity: 0; }
-:is(.audio-devices-toggle:hover, .audio-devices-toggle:focus-visible, .audio-devices-toggle[aria-expanded="true"], #mic-control[data-muted="true"] .audio-devices-toggle) .audio-chevron { opacity: 1; }
+:is(.audio-devices-toggle:focus-visible, .audio-devices-toggle[aria-expanded="true"], #mic-control[data-muted="true"] .audio-devices-toggle) .mic-wave { opacity: 0; }
+@media (hover: hover) { .audio-devices-toggle:hover .mic-wave { opacity: 0; } }
+:is(.audio-devices-toggle:focus-visible, .audio-devices-toggle[aria-expanded="true"], #mic-control[data-muted="true"] .audio-devices-toggle) .audio-chevron { opacity: 1; }
+@media (hover: hover) { .audio-devices-toggle:hover .audio-chevron { opacity: 1; } }
 .audio-devices-toggle[aria-expanded="true"] .audio-chevron { transform: none; }
 #mic-control[data-muted="true"] .audio-devices-toggle { color: var(--sv-danger); }
 @media (hover: hover) { .audio-devices-toggle:hover { background: var(--sv-hover); color: var(--sv-text); } }
 .audio-devices-toggle:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.audio-devices-toggle:active { background: var(--sv-pressed); color: var(--sv-text); }
 /* A popover (.ui-popover) of the microphone and the speaker, one under the other, compact; on a phone it spans the
  * screen above the call's controls, as the bar did. */
 .ui-popover.audio-devices { width: min(18rem, calc(100vw - 24px)); padding: var(--sv-space-3) var(--sv-space-4) var(--sv-space-4); border-radius: var(--sv-radius-xl); }

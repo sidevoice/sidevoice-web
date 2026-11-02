@@ -56,7 +56,7 @@
 .pairing-address-link[aria-expanded="true"] svg:dir(rtl) { transform: none; }
 /* Open, the field has no visible label: the toggle above says what it is, the placeholder how it looks. */
 .pairing-address .ui-field-head { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.pairing-address-link:hover { color: var(--sv-text); }
+@media (hover: hover) { .pairing-address-link:hover { color: var(--sv-text); } }
 .pairing-address-link:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: var(--sv-radius-sm); }
 .pairing-status { display: flex; align-items: center; gap: var(--sv-space-1-5); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .pairing-status[data-connected] { color: var(--sv-positive); }

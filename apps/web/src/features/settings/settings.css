@@ -5,7 +5,7 @@
 
 .settings-page .ui-dialog-body--flush { display: flex; min-height: 0; }
 .settings-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); flex: 1; min-width: 0; min-height: 0; margin: 0; }
-.settings-nav { grid-column: 1; grid-row: 1 / -1; min-height: 0; padding: var(--sv-space-3); overflow: auto; border-inline-end: 1px solid var(--sv-border); background: var(--sv-bg-subtle); }
+.settings-nav { grid-column: 1; grid-row: 1 / -1; min-height: 0; padding: var(--sv-space-3); overflow: auto; overscroll-behavior: contain; border-inline-end: 1px solid var(--sv-border); background: var(--sv-bg-subtle); }
 .settings-content { grid-column: 2; grid-row: 2; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .settings-column { width: 100%; max-width: 760px; padding: var(--sv-space-8) var(--sv-space-10) var(--sv-space-12); }
 .settings-pane { min-width: 0; }
@@ -45,7 +45,7 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
 
 .provider-remove { margin: 0 0 0 48px; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
 .provider-key-link { display: inline-flex; align-items: center; gap: var(--sv-space-1); justify-self: start; font-size: var(--sv-font-sm); font-weight: 600; color: var(--sv-accent-text); text-decoration: none; }
-.provider-key-link:hover { text-decoration: underline; }
+@media (hover: hover) { .provider-key-link:hover { text-decoration: underline; } }
 /* The eye sits inside the box at its end; the box leaves it room. */
 .provider-key-input { position: relative; display: flex; align-items: center; }
 .provider-key-input .ui-input { flex: 1; padding-inline-end: 40px; }

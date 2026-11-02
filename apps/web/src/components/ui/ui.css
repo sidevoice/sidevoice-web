@@ -37,6 +37,9 @@
 .ui-button--ghost.ui-button--danger-text:not(:disabled, [aria-disabled="true"]):active { background: var(--sv-danger-soft); }
 .ui-button--danger:not(:disabled, [aria-disabled="true"]):active { background: var(--sv-danger-fill-hover); }
 @media (prefers-reduced-motion: reduce) { .ui-button:active { transform: none !important; } }
+/* On touch a small icon button reaches 44px, further than it shows (36px there, theme.css; the inset counts from inside
+ * its 1px border). */
+@media (pointer: coarse) { .ui-button--icon.ui-button--sm::after { content: ""; position: absolute; inset: -5px; } }
 /* Disabled says so in its colours, never by fading: no hover, no press, no raise. */
 .ui-button:is(:disabled, [aria-disabled="true"]):not([data-loading]) { background: var(--sv-disabled-bg); border-color: var(--sv-disabled-bg); color: var(--sv-disabled-text); box-shadow: none; cursor: not-allowed; }
 .ui-button--ghost:is(:disabled, [aria-disabled="true"]):not([data-loading]) { background: transparent; border-color: transparent; }
@@ -76,7 +79,7 @@
 .ui-input, .ui-select { height: var(--sv-control-md); padding: 0 var(--sv-space-3); }
 .ui-textarea { padding: 10px var(--sv-space-3); resize: none; overflow-y: hidden; }
 .ui-input::placeholder, .ui-textarea::placeholder { color: var(--sv-text-subtle); opacity: 1; }
-.ui-input:hover, .ui-select:hover, .ui-textarea:hover { border-color: var(--sv-text-muted); }
+@media (hover: hover) { .ui-input:hover, .ui-select:hover, .ui-textarea:hover { border-color: var(--sv-text-muted); } }
 .ui-input:focus-visible, .ui-select:focus-visible, .ui-textarea:focus-visible, .ui-input:focus, .ui-textarea:focus { outline: 2px solid var(--sv-focus); outline-offset: 1px; border-color: var(--sv-focus); }
 .ui-input[aria-invalid="true"], .ui-select[aria-invalid="true"], .ui-textarea[aria-invalid="true"] { border-color: var(--sv-danger); }
 .ui-input:read-only:not(:disabled) { background-color: var(--sv-bg-subtle); border-color: var(--sv-border); }
@@ -100,8 +103,9 @@
 .ui-card { min-width: 0; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-surface); box-shadow: var(--sv-shadow-sm); color: var(--sv-text); }
 .ui-card--padded { padding: var(--sv-space-5); }
 .ui-card--interactive { position: relative; cursor: pointer; text-align: start; font: inherit; transition: border-color var(--sv-dur-fast) var(--sv-ease); }
-.ui-card--interactive:hover { border-color: var(--sv-border-strong); }
+@media (hover: hover) { .ui-card--interactive:hover { border-color: var(--sv-border-strong); } }
 .ui-card--interactive:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.ui-card--interactive:active { background-image: linear-gradient(var(--sv-pressed), var(--sv-pressed)); }
 .ui-card[data-selected] { border-color: var(--sv-accent); box-shadow: inset 0 0 0 1px var(--sv-accent); background: var(--sv-accent-soft); }
 .ui-card-check { position: absolute; top: var(--sv-space-3); inset-inline-end: var(--sv-space-3); color: var(--sv-accent-text); }
 .ui-section { display: grid; gap: var(--sv-space-6); min-width: 0; }
@@ -154,7 +158,7 @@
   background: transparent; color: var(--sv-text-muted); font: 600 var(--sv-font-md) / 1 var(--sv-font-sans); cursor: pointer; white-space: nowrap;
 }
 .ui-tab svg { width: 16px; height: 16px; }
-.ui-tab:hover:not(:disabled) { color: var(--sv-text); }
+@media (hover: hover) { .ui-tab:hover:not(:disabled) { color: var(--sv-text); } }
 .ui-tab[aria-selected="true"] { color: var(--sv-text); box-shadow: inset 0 -2px 0 var(--sv-accent); }
 .ui-tab:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
 .ui-tab:disabled { color: var(--sv-disabled-text); cursor: not-allowed; }
@@ -166,10 +170,11 @@
   transition: background-color var(--sv-dur-base) var(--sv-ease), color var(--sv-dur-base) var(--sv-ease), box-shadow var(--sv-dur-base) var(--sv-ease);
 }
 .ui-segment svg { width: 16px; height: 16px; }
-.ui-segment:hover:not(:disabled) { color: var(--sv-text); }
+@media (hover: hover) { .ui-segment:hover:not(:disabled) { color: var(--sv-text); } }
 .ui-segment[aria-checked="true"] { background: var(--sv-surface); color: var(--sv-text); box-shadow: var(--sv-shadow-xs); }
 [data-theme="dark"] .ui-segment[aria-checked="true"] { background: var(--sv-surface-raised); }
 .ui-segment:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
+.ui-tab:not(:disabled):active, .ui-segment:not(:disabled):active { color: var(--sv-text); background-image: linear-gradient(var(--sv-pressed), var(--sv-pressed)); }
 .ui-segment:disabled { color: var(--sv-disabled-text); cursor: not-allowed; }
 .ui-segmented--sm { height: var(--sv-control-sm); }
 .ui-segmented--sm .ui-segment { padding: 0 var(--sv-space-3); font-size: var(--sv-font-xs); }
@@ -186,7 +191,7 @@
 .ui-nav-item { min-width: 0; overflow: hidden; }
 .ui-nav-item > span:not([class]) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ui-nav-item > .ui-badge { flex: none; }
-.ui-nav-item:hover { background: var(--sv-hover); color: var(--sv-text); }
+@media (hover: hover) { .ui-nav-item:hover { background: var(--sv-hover); color: var(--sv-text); } }
 .ui-nav-item[aria-current="page"] { background: var(--sv-accent-soft); color: var(--sv-accent-text); font-weight: var(--sv-weight-semibold); }
 .ui-nav-item:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
 .ui-nav-dirty { width: 6px; height: 6px; margin-inline-start: auto; border-radius: 50%; background: var(--sv-accent); }
@@ -297,6 +302,8 @@
   border-radius: var(--sv-radius-sm); color: var(--sv-text); outline: none; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
 }
 .ui-select-item[data-highlighted] { background: var(--sv-accent-soft); }
+.ui-select-item:not([data-disabled]):active { background-image: linear-gradient(var(--sv-pressed), var(--sv-pressed)); }
+.ui-select:not(:disabled):active { background-image: linear-gradient(var(--sv-pressed), var(--sv-pressed)); }
 .ui-select-item[data-state="checked"] { font-weight: var(--sv-weight-medium); }
 .ui-select-item[data-disabled] { color: var(--sv-disabled-text); cursor: not-allowed; }
 .ui-select-item-text { display: grid; flex: 1; min-width: 0; }
@@ -350,7 +357,7 @@
  * while it says how a copy went; and keyboard focus (focus-within) always shows it, so it is only ever made transparent,
  * never taken out of the tab order. */
 /* Faint until the pointer is over the snippet or the keyboard is in it. */
-.ui-copy:not(:hover, :focus-within) .ui-copy-button:not([data-state]) { background: transparent; color: var(--sv-text-subtle); }
+@media (hover: hover) { .ui-copy:not(:hover, :focus-within) .ui-copy-button:not([data-state]) { background: transparent; color: var(--sv-text-subtle); } }
 /* What the button says to a screen reader, out of sight. */
 .ui-copy-failed { position: absolute; z-index: 1; inset-block-start: calc(100% + 4px); inset-inline-end: 0; padding: 2px var(--sv-space-2); border-radius: var(--sv-radius-sm); background: var(--sv-danger-soft); color: var(--sv-danger); font-size: var(--sv-font-xs); font-weight: var(--sv-weight-semibold); white-space: nowrap; pointer-events: none; }
 .ui-copy-live { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }

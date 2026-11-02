@@ -28,7 +28,7 @@
 /* The way to an agent the list does not show: a quiet link under it, its instructions opening below. */
 .host-agent-other { display: grid; gap: var(--sv-space-2); min-width: 0; }
 .host-agent-other-link { display: inline-flex; align-items: center; gap: var(--sv-space-1); justify-self: start; padding: var(--sv-space-1) 0; border: 0; background: none; color: var(--sv-text-muted); font: inherit; font-size: var(--sv-font-sm); text-decoration: underline; text-decoration-color: var(--sv-border-strong); text-underline-offset: 3px; cursor: pointer; }
-.host-agent-other-link:hover { color: var(--sv-text); }
+@media (hover: hover) { .host-agent-other-link:hover { color: var(--sv-text); } }
 .host-agent-other-link:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: var(--sv-radius-sm); }
 .host-agent-other .host-agent-howto { margin: 0; }
 .host-agent-problem { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); padding: var(--sv-space-3) 14px; border: 1px solid color-mix(in srgb, var(--sv-danger) 30%, transparent); border-radius: var(--sv-radius-md); background: var(--sv-danger-soft); color: var(--sv-text); }

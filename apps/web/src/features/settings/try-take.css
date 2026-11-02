@@ -35,7 +35,7 @@
 /* Play inside the capsule: the icon alone, in the accent, no ring or fill of its own (a button shape inside the capsule
    reads as a second, clashing outline). */
 .try-take[data-inline] .try-take-play { border: 0; border-radius: 50%; background: transparent; color: var(--sv-accent-text); box-shadow: none; }
-.try-take[data-inline] .try-take-play:hover { background: color-mix(in srgb, var(--sv-accent) 12%, transparent); }
+@media (hover: hover) { .try-take[data-inline] .try-take-play:hover { background: color-mix(in srgb, var(--sv-accent) 12%, transparent); } }
 .try-take[data-inline] .try-take-wave { height: 24px; }
 .try-take[data-inline] .try-take-clock { min-width: 8ch; font-size: var(--sv-font-xs); }
 /* Inline marks: thin (2px) but tall, reaching past the bars almost to the capsule's edge, with a 7px cap; they name
