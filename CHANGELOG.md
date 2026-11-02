@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.16.0](https://github.com/sidevoice/sidevoice-web/compare/v0.15.3...v0.16.0) (2026-11-02)
+
+
+### Features
+
+* **i18n:** let the host overlay the catalogue with its own wording ([#428](https://github.com/sidevoice/sidevoice-web/issues/428)) ([6466f29](https://github.com/sidevoice/sidevoice-web/commit/6466f298bafac5764fd317ae6572d98aa30e44ad))
+
+
+### Bug Fixes
+
+* **i18n:** zh-Hans voice error names a request, not a permission ([#430](https://github.com/sidevoice/sidevoice-web/issues/430)) ([222b7f5](https://github.com/sidevoice/sidevoice-web/commit/222b7f57349718932f1003baa60b248b395ffb9e))
+* **stage:** open title chip is one surface on a phone ([#431](https://github.com/sidevoice/sidevoice-web/issues/431)) ([e55dbc5](https://github.com/sidevoice/sidevoice-web/commit/e55dbc5f94b785bfdaacd54843d3b5cf5b2880a7))
+
 ## [0.15.3](https://github.com/sidevoice/sidevoice-web/compare/v0.15.2...v0.15.3) (2026-11-02)
 
 
