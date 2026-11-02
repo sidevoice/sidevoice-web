@@ -16,6 +16,8 @@ html, body, #root { width: 100%; max-width: 100%; min-width: 0; height: 100%; ma
 body { overflow: hidden; background: var(--sv-bg); color: var(--sv-text); }
 #root { height: 100dvh; max-height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
 button, input, select, textarea { font: inherit; color: inherit; }
+/* A tap is a tap: no wait for a second one (double-tap to zoom) before a control answers, on any engine that still keeps it. */
+html, button, a, summary, label, [role="button"], input, select, textarea { touch-action: manipulation; }
 h1, h2, h3, h4, h5, p { margin: 0; }
 code, kbd, pre, output { font-family: var(--sv-font-mono); }
 :focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
