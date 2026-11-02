@@ -384,12 +384,17 @@
   transition: background-color var(--sv-dur-fast) var(--sv-ease); }
 .stage-heading:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
 .stage-heading[aria-expanded="true"] { background: var(--sv-accent-soft); }
+/* On a phone the heading sits inside the name's frosted frame: the wash goes on that one surface, the frame itself, and
+ * not on the heading inside it (two layers, one inset in the other). */
+.stage-name { transition: background-color var(--sv-dur-fast) var(--sv-ease); }
+.stage-name .stage-heading[aria-expanded="true"] { background: none; }
+.stage-name:has(.stage-heading[aria-expanded="true"]) { background: color-mix(in srgb, var(--sv-accent-soft) 84%, transparent); }
 .stage-heading-name { display: flex; align-items: center; gap: .3em; min-width: 0; max-width: 100%; }
 .stage-heading-name > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .stage-heading-chevron { flex: none; width: .7em; height: .7em; color: var(--sv-text-muted); transition: transform var(--sv-dur-fast) var(--sv-ease); }
 .stage-heading[aria-expanded="true"] .stage-heading-chevron { transform: rotate(180deg); }
 .stage-attention { flex: none; width: .42em; height: .42em; border-radius: 50%; background: var(--sv-warning); box-shadow: 0 0 0 2px var(--sv-surface); }
-@media (prefers-reduced-motion: reduce) { .stage-heading, .stage-heading-chevron { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .stage-name, .stage-heading, .stage-heading-chevron { transition: none; } }
 @media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
   .room-shell .stage-title { display: grid; justify-items: start; align-content: center; gap: var(--sv-space-2); }
   /* The heading takes the row, so the name gets the room there is, not its own shrink-wrapped width. */
