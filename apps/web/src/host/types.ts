@@ -102,8 +102,11 @@ export interface HostPresence {
   readonly media: "page" | "app";
   /** The page's own, where `media` is `page` and the browser has a Media Session; null where the app owns the media. */
   remote: RemoteControls | null;
-  /** The page's own. Null would be a host that decides for itself; none says so yet. */
+  /** The app's own where it holds the screen itself (the mobile app: a phone's webview has no Screen Wake Lock that holds), else the
+   *  page's. Null would be a host that decides for itself; none says so yet. */
   screenAwake: ScreenAwake | null;
+  /** Who holds it: the app (the desktop and mobile apps, through the platform), or the page (the browser's Screen Wake Lock). */
+  readonly screenAwakeBy: "app" | "page";
 }
 
 /** What a person is told when the microphone is blocked, as this host words it: for where the page runs (a browser's site
