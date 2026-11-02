@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.16.1](https://github.com/sidevoice/sidevoice-web/compare/v0.16.0...v0.16.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* **call:** fit the call bar's tray inside a phone screen ([#434](https://github.com/sidevoice/sidevoice-web/issues/434)) ([b4b3c92](https://github.com/sidevoice/sidevoice-web/commit/b4b3c92db955b8eca189f21178c14e0b1015dd11))
+* **onboarding:** keep the setup footer on one row, or stack it on purpose ([#433](https://github.com/sidevoice/sidevoice-web/issues/433)) ([3886b54](https://github.com/sidevoice/sidevoice-web/commit/3886b54f543fbd669eef732d18c128d790476112))
+
+
+### Performance Improvements
+
+* **ui:** stop hidden SVG text from costing every frame after a tap ([#436](https://github.com/sidevoice/sidevoice-web/issues/436)) ([baff09e](https://github.com/sidevoice/sidevoice-web/commit/baff09e4bcd0fc9118c42495913041a2012bfecd))
+
 ## [0.16.0](https://github.com/sidevoice/sidevoice-web/compare/v0.15.3...v0.16.0) (2026-11-02)
 
 
