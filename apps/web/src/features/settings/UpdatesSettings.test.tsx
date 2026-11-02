@@ -871,8 +871,8 @@ test("in Spanish: Automáticas (recomendado) | Manuales, Buscar actualizaciones 
   expect(pane("updates").querySelector(".host-status-build")).toHaveTextContent(/^Versión de desarrollo$/);
 });
 
-/* Developer mode (developer-mode.ts): ten clicks within five seconds on the version in Updates, in a nightly only. The
- * version is Sidevoice's installed line with the app's updater, else the Version line of this computer's card. */
+/* Developer mode (developer-mode.ts) is turned on from the build in Advanced (SettingsDialog.test.tsx), no longer from
+ * a version in Updates: there, in any build, the version is only text. */
 
 const developerKept = () => {
   onTestFinished(() => localStorage.removeItem(DEVELOPER_MODE_KEY));
@@ -880,50 +880,19 @@ const developerKept = () => {
 };
 const clickTimes = (element: Element, times: number) => { for (let i = 0; i < times; i++) fireEvent.click(element); };
 
-test("ten clicks on the installed version of a nightly turn developer mode on and add Developer options below Advanced; ten more turn it off", async () => {
+test("the versions in Updates (the installed line, the Version line with no updater, This device's card) are only text: ten clicks add nothing and keep nothing", async () => {
   const kept = developerKept();
   open({ build: NIGHTLY, section: "updates", updater: {} });
   await settle();
-  expect(navOrder().at(-1)).toBe("advanced");
-  clickTimes(installed(), 9);
-  expect(navOrder().at(-1)).toBe("advanced");
-  expect(within(installed()).queryByRole("status")).toBeNull();
-  clickTimes(installed(), 1);
-  expect(navOrder().slice(-2)).toEqual(["advanced", "developer"]);
-  expect(kept()).toBe("1");
-  // Said beside the version, and to a screen reader once.
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.10\.0-nightly · Developer mode on/);
-  expect(within(installed()).getByRole("status")).toHaveTextContent("Developer mode on");
   clickTimes(installed(), 10);
   expect(navOrder().at(-1)).toBe("advanced");
-  expect(kept()).toBeNull();
-  expect(within(installed()).getByRole("status")).toHaveTextContent("Developer mode off");
-});
-
-test("the version of a nightly with no updater is the way in too", async () => {
-  const kept = developerKept();
+  expect(within(installed()).queryByRole("status")).toBeNull();
+  cleanup();
   open({ build: NIGHTLY, section: "updates" });
   await settle();
-  const version = pane("updates").querySelector<HTMLElement>(".updates-settings-version .host-status-product")!;
-  expect(version).toHaveTextContent(/^Version 0\.10\.0-nightly/);
-  clickTimes(version, 10);
-  expect(navOrder().slice(-2)).toEqual(["advanced", "developer"]);
-  expect(kept()).toBe("1");
-  expect(within(version).getByRole("status")).toHaveTextContent("Developer mode on");
-});
-
-test.each([["release", RELEASE], ["development", DEV]])("on a %s build the version is only text: ten clicks add nothing and keep nothing", async (_, build) => {
-  const kept = developerKept();
-  open({ build, section: "updates", updater: {} });
-  await settle();
-  clickTimes(installed(), 10);
+  clickTimes(pane("updates").querySelector<HTMLElement>(".updates-settings-version .host-status-product")!, 10);
   expect(navOrder().at(-1)).toBe("advanced");
-  expect(kept()).toBeNull();
-  expect(within(installed()).queryByRole("status")).toBeNull();
-});
-
-test("This device's card does not take the gesture: its version is only text", async () => {
-  const kept = developerKept();
+  cleanup();
   open({ build: NIGHTLY, service: BUNDLED, updater: {} });
   await settle();
   await waitFor(() => expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.10\.0-nightly/));

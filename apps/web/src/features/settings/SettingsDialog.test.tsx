@@ -363,7 +363,7 @@ test("Permissions wears the warning dot while the microphone is not allowed, sai
 });
 
 /* Developer options (operator, 2026-10-21): a section below Advanced, English only, for a nightly desktop build with
- * developer mode on (turned on from Updates: developer-mode.test.tsx, UpdatesSettings.test.tsx) — or, for a browser or
+ * developer mode on (turned on from the build in Advanced: developer-mode.test.tsx, and below) — or, for a browser or
  * a playground, with the turn-tuning flag set by hand. It holds the turn tuning panel, no longer Advanced's, and the
  * debugging switches the app offers (DeveloperOptions.test.tsx). */
 
@@ -377,6 +377,41 @@ function withDeveloperMode({ channel = "nightly", on = true, debug = true }: { c
   if (on) localStorage.setItem(DEVELOPER_MODE_KEY, "1");
   onTestFinished(() => { localStorage.clear(); delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; });
 }
+
+const saidAbove = (pane: HTMLElement) => within(pane).queryAllByRole("status").map((item) => item.textContent);
+const tapBuild = (times: number) => { for (let i = 0; i < times; i++) fireEvent.click(document.getElementById("build-id")!); };
+
+test("ten taps on the build in Advanced turn a nightly's developer mode on and add Developer options; ten more turn it off", () => {
+  withDeveloperMode({ on: false });
+  open("whisper-base");
+  fireEvent.click(document.getElementById("settings-advanced")!);
+  const pane = document.getElementById("pane-advanced")!;
+  const button = document.getElementById("build-id")!.closest("button")!;
+  expect(button).toBeInstanceOf(HTMLButtonElement);
+  expect(button).toHaveAttribute("type", "button");
+  expect(navLabels().at(-1)).toBe("Advanced");
+  tapBuild(9);
+  expect(navLabels().at(-1)).toBe("Advanced");
+  expect(saidAbove(pane)).not.toContain("Developer mode");
+  tapBuild(1);
+  expect(navLabels().slice(-2)).toEqual(["Advanced", "Developer options"]);
+  expect(localStorage.getItem(DEVELOPER_MODE_KEY)).toBe("1");
+  expect(saidAbove(pane)).toContain("Developer mode on");
+  tapBuild(10);
+  expect(navLabels().at(-1)).toBe("Advanced");
+  expect(localStorage.getItem(DEVELOPER_MODE_KEY)).toBeNull();
+  expect(saidAbove(pane)).toContain("Developer mode off");
+});
+
+test.each([["release", "release"], ["development", "dev"], ["browser", null]])("on a %s build the build in Advanced is only text: ten taps add nothing and keep nothing", (_, channel) => {
+  withDeveloperMode({ channel, on: false });
+  open("whisper-base");
+  fireEvent.click(document.getElementById("settings-advanced")!);
+  expect(document.getElementById("build-id")!.closest("button")).toBeNull();
+  tapBuild(10);
+  expect(navLabels().at(-1)).toBe("Advanced");
+  expect(localStorage.getItem(DEVELOPER_MODE_KEY)).toBeNull();
+});
 
 test("with developer mode on in a nightly, Developer options is below Advanced and holds the turn tuning, which Advanced no longer has", () => {
   withDeveloperMode();
