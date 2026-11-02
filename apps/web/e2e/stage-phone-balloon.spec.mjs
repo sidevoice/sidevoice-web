@@ -62,7 +62,9 @@ async function onStage(page, theme, state) {
     // The turns' hooks read each step as they render it (a sent turn is shown only after the bars were).
     await page.waitForTimeout(250);
   }
-  // The balloons pop in over 460ms: measure them where they stand.
+  // Where a state has one, its balloon is up before it is measured (a slow runner takes its time), and it pops in over
+  // 460ms: measure it where it stands.
+  if (state !== "idle" && state !== "working") await page.locator(".stage-tile .stage-bubble, .stage-tile .person-bubble").first().waitFor({ timeout: 10_000 });
   await page.waitForTimeout(900);
 }
 
