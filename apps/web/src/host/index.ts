@@ -6,7 +6,8 @@ import { beginBrowserAudioActivation, pageVoice } from "./browser-voice.js";
 import { browserReach, reachOfOrigin as reachOfPage } from "./browser-reach";
 import { browserStorage } from "./browser-storage";
 import { browserDeviceName, browserShortcutModifier } from "./identity";
-import { nativeCardSeam, nativeHost } from "./native";
+import { messageOverlay, nativeCardSeam, nativeHost } from "./native";
+import { setMessageOverlay } from "../i18n/translator";
 
 export type * from "./types";
 export type { PageAnswer, PageMicrophone, PermissionView } from "./browser-microphone";
@@ -16,6 +17,9 @@ export const pageMicrophone = microphoneOfPage;
 
 /** The transport of a page served from an origin: what a pairing judged against that origin may do. */
 export const reachOfOrigin = reachOfPage;
+
+/* The host's wording of the texts its place changes is applied by the translator over the web's catalogue. */
+setMessageOverlay(messageOverlay);
 
 /** This page's one voice and one engine, made the first time either is asked for. */
 let page: ReturnType<typeof pageVoice> | null = null;

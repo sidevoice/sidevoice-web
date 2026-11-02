@@ -355,8 +355,17 @@ export interface HostDebugBridge {
   set(name: DebugSwitch, on: boolean): Promise<void>;
 }
 
+/** The host's wording of the texts its place changes (a phone has no browser, a Control Center, …): web catalogue keys to the
+ *  host's own text, for one language tag exactly. A host with none answers `{}`. The translator applies it over its catalogue
+ *  (i18n/translator.ts); a key the catalogue no longer has is simply never read. */
+export type MessageOverlay = Readonly<Record<string, string>>;
+/* A value of the host's table that is not a non-empty string is not a text: the translator skips it. */
+
 export interface Host {
   identity: HostIdentity;
+  /** The host's overlay for `language` (a tag: `es`, `zh-Hans`) exactly: nothing from its primary subtag or English, which
+   *  the translator tries itself. Read as the page draws, so it answers at once. */
+  messages(language: string): MessageOverlay;
   /** What the app offers under `microphone`, as it says it (the permission bridge, or only the settings link), and the help. */
   microphone: HostMicrophone;
   voice: VoiceMember;
