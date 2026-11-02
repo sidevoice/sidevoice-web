@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { useRoomStore } from "../../state/room-store";
 import { COMPACT_QUERY, NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { useSurface } from "../../lib/use-surface";
+import { useSheetDrag } from "../../lib/use-sheet-drag";
 import { Button } from "../../components/ui/Button";
 import { CloseIcon } from "../../components/ui/Icons";
 import { Composer } from "./Composer";
@@ -13,7 +14,8 @@ import "./transcript.css";
  * right on a desktop, the call narrowing to make room; a sheet from the bottom on a phone, a dialog over the dimmed
  * call that holds focus until it closes; a compact desktop window, with no room to dock it, opens it over the call from
  * the right, a dialog too (2026-10-15). It opens on the latest message, with the text box always under it. It stays
- * mounted while closed — the runtime binds the text box by its ids — and is inert then. */
+ * mounted while closed — the runtime binds the text box by its ids — and is inert then. On a phone the sheet is put
+ * away by dragging it down too, by its grabber and title or by the messages scrolled to the top (lib/use-sheet-drag). */
 export function TranscriptPanel() {
   const t = translator();
   const conversation = useRoomStore((state) => state.conversation);
@@ -26,6 +28,8 @@ export function TranscriptPanel() {
   const compact = useMedia(COMPACT_QUERY);
   const modal = (narrow || compact) && open;
   const panel = useRef<HTMLElement>(null);
+  const scrim = useRef<HTMLDivElement>(null);
+  useSheetDrag({ enabled: narrow && open, sheet: panel, edge: "bottom", handle: ".transcript-grab, .transcript-head", scroller: "#messages", scrim, onDismiss: close });
   useSurface({
     open, close, container: panel, modal,
     initialFocus: () => panel.current?.querySelector<HTMLElement>(".transcript-close"),
@@ -43,7 +47,7 @@ export function TranscriptPanel() {
         <MessageList conversation={conversation} visible={open} inCall={inCall} />
         <Composer narrow={narrow} />
       </section>
-      <div className="transcript-scrim" data-open={open || undefined} aria-hidden="true" onClick={close} />
+      <div ref={scrim} className="transcript-scrim" data-open={open || undefined} aria-hidden="true" onClick={close} />
     </>
   );
 }

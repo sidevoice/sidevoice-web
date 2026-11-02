@@ -4,6 +4,7 @@ import { DropdownMenu, DropdownMenuItem } from "../../components/ui/DropdownMenu
 import { ContextMenu, ContextMenuItem } from "../../components/ui/ContextMenu";
 import { CloseIcon, CloseUpIcon, ConversationsIcon, HarnessIcon, MoreIcon, OtherMachineIcon, SidebarCollapseIcon, SidebarExpandIcon, SettingsIcon, SidevoiceMark, ThisComputerIcon } from "../../components/ui/Icons";
 import { useSurface } from "../../lib/use-surface";
+import { useSheetDrag } from "../../lib/use-sheet-drag";
 import { COMPACT_QUERY, isNarrow, NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { GearNewMark, useHighlights } from "../highlights/highlights";
@@ -88,6 +89,9 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
   // Chosen on a phone, a conversation is in the header's row (its last slot if need be): focus goes to its avatar there,
   // not back to the chevron; on a compact desktop, to its avatar in the rail.
   const chosen = useRef<string | null>(null);
+  // A phone's list goes back up into the header when pushed up, by its title row or by the list scrolled to its end.
+  const scrim = useRef<HTMLDivElement>(null);
+  useSheetDrag({ enabled: narrow && modal, sheet: panel, edge: "top", handle: ".sidebar-head", scroller: ".sidebar-body", scrim, onDismiss: close });
   useSurface({
     open: modal, close, container: panel, modal,
     initialFocus: () => panel.current?.querySelector<HTMLElement>(".participant-row[data-selected] .person:not(:disabled)")
@@ -188,7 +192,7 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
           <SidebarSettings rail={rail} onOpen={close} />
         </div>}
       </aside>
-      <div className="conversations-scrim" data-open={open || undefined} aria-hidden="true" onClick={close} />
+      <div ref={scrim} className="conversations-scrim" data-open={open || undefined} aria-hidden="true" onClick={close} />
     </>
   );
 }

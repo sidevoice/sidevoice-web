@@ -147,6 +147,8 @@
      animation at all: a dot that starts working while the list is closed starts nothing, where a paused one would run). */
   .conversation-sidebar:not([data-open]) * { animation: none !important; }
   .conversation-sidebar .sidebar-collapse { display: none; }
+  /* Its title row pushes it back up into the header (lib/use-sheet-drag.ts): the engine claims no pan from it. */
+  .conversation-sidebar .sidebar-head { touch-action: none; user-select: none; -webkit-user-select: none; }
   /* The header's chevron (always there, turned up while the list is down) closes it, as do a tap outside and Escape: the
      sheet's own arrow stays for assistive tech only, inside the dialog. */
   .conversation-sidebar .sidebar-close { display: inline-flex; position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
