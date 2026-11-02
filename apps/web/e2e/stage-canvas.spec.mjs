@@ -47,3 +47,20 @@ test("the stage carries no voice-model chips: the title opens what the call runs
   await expect(details).toBeVisible();
   await expect(details.locator(".voice-model").first()).toBeVisible();
 });
+
+test.describe("touch", () => {
+  test.use({ hasTouch: true });
+  test("on a phone the open title is one surface: the name's frame takes the wash, the heading inside stays clear, no ring on a tap", async ({ page }) => {
+    await page.setViewportSize({ width: 440, height: 956 });
+    await canvasOnStage(page, true);
+    const heading = page.locator(".stage-name .stage-heading");
+    const frame = page.locator(".stage-name");
+    const bg = (loc) => loc.evaluate((e) => getComputedStyle(e).backgroundColor);
+    const closed = await bg(frame);
+    await heading.tap();
+    await expect(heading).toHaveAttribute("aria-expanded", "true");
+    await expect.poll(() => bg(frame)).not.toBe(closed);
+    expect(await bg(heading)).toBe("rgba(0, 0, 0, 0)");
+    expect(await heading.evaluate((e) => getComputedStyle(e).outlineStyle)).toBe("none");
+  });
+});
