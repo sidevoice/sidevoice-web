@@ -18,6 +18,20 @@ body { overflow: hidden; background: var(--sv-bg); color: var(--sv-text); }
 button, input, select, textarea { font: inherit; color: inherit; }
 /* A tap is a tap: no wait for a second one (double-tap to zoom) before a control answers, on any engine that still keeps it. */
 html, button, a, summary, label, [role="button"], input, select, textarea { touch-action: manipulation; }
+/* The page is a screen, not a document, under the finger as under the mouse: no grey flash over what is tapped (each
+ * control says it is pressed in its own colours, :active), no rubber band or pull-to-refresh of the whole page behind
+ * its fixed header and call bar (what scrolls inside it contains its own), and no text inflated by the engine when a
+ * phone turns sideways. */
+html { -webkit-tap-highlight-color: transparent; overscroll-behavior: none; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+/* Where nothing hovers (a phone, a tablet), a press holding on a control or a label does not start selecting its text
+ * or bring up the system's link and image menu, as in an app; what is there to read and keep stays selectable: what
+ * is typed, the conversation's words, and what the page offers to copy (a code, a command: they say so themselves). A
+ * mouse selects as it always did. */
+@media (hover: none) and (pointer: coarse) {
+  body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  :is(input, textarea, [contenteditable="true"], [contenteditable=""], .chat-bubble, .ui-error-details pre) { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+  img, svg { -webkit-user-drag: none; }
+}
 h1, h2, h3, h4, h5, p { margin: 0; }
 code, kbd, pre, output { font-family: var(--sv-font-mono); }
 :focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }

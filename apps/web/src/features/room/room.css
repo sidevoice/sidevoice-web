@@ -65,6 +65,7 @@
 .sidebar-rows .participant-row[data-selected] { --dot-ring: var(--sv-accent-soft); border-color: color-mix(in srgb, var(--sv-accent) 55%, var(--sv-border)); background: var(--sv-accent-soft); }
 .sidebar-rows .person { display: flex; align-items: center; gap: var(--sv-space-3); flex: 1; min-width: 0; margin: 0; padding: var(--sv-space-2) var(--sv-space-3) var(--sv-space-2) var(--sv-space-2); border: 0; border-radius: inherit; background: none; color: var(--sv-text); text-align: start; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .sidebar-rows .person:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
+.sidebar-rows .person:not(:disabled):active { background-image: linear-gradient(var(--sv-pressed), var(--sv-pressed)); }
 .sidebar-rows .person:disabled { cursor: default; opacity: .6; }
 .sidebar-rows .participant-copy { display: grid; flex: 1; min-width: 0; }
 .sidebar-rows .person-name { overflow: hidden; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
@@ -78,7 +79,8 @@
  * hovers on a touch screen, so there they are always shown. */
 .sidebar-rows .participant-more { flex: none; margin-inline-end: var(--sv-space-1); opacity: 0;
   transition: opacity var(--sv-dur-fast) var(--sv-ease), background-color var(--sv-dur-fast) var(--sv-ease), color var(--sv-dur-fast) var(--sv-ease); }
-.sidebar-rows .participant-row:is(:hover, :focus-within, [data-selected]) .participant-more, .sidebar-rows .participant-more[data-state="open"] { opacity: 1; }
+.sidebar-rows .participant-row:is(:focus-within, [data-selected]) .participant-more, .sidebar-rows .participant-more[data-state="open"] { opacity: 1; }
+@media (hover: hover) { .sidebar-rows .participant-row:hover .participant-more { opacity: 1; } }
 @media (hover: hover) { .sidebar-rows .participant-row:not([data-selected]):hover { border-color: var(--sv-border-strong); } }
 @media (hover: none), (pointer: coarse) { .sidebar-rows .participant-more { opacity: 1; } }
 
@@ -99,6 +101,8 @@
 .ui-dropdown-item[data-highlighted] { background: var(--sv-accent-soft); }
 .ui-dropdown-item[data-danger], .ui-dropdown-item[data-danger] svg { color: var(--sv-danger); }
 .ui-dropdown-item[data-danger][data-highlighted] { background: var(--sv-danger-soft); }
+/* A finger gets no highlight before it lets go: pressed, the item says so at once. */
+.ui-dropdown-item:not([data-disabled]):active { background-image: linear-gradient(var(--sv-pressed), var(--sv-pressed)); }
 .ui-dropdown-item[data-disabled] { color: var(--sv-disabled-text); cursor: default; }
 @keyframes room-menu-in { from { opacity: 0; transform: translateY(-4px); } }
 
@@ -118,6 +122,7 @@
   .header-avatar .conversation-avatar { width: 34px; height: 34px; }
   .header-avatar:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 0; }
   .header-avatar[aria-disabled="true"] { cursor: default; opacity: .6; }
+  .header-avatar:not([aria-disabled="true"]):active { background: var(--sv-pressed); }
   @media (hover: hover) { .header-avatar:not([aria-disabled="true"], [aria-pressed="true"]):hover { background: var(--sv-hover); } }
   /* The one on the stage, marked where it is: the accent's soft circle behind it, as the column's chosen row, and a short
      bar under it — a shape, not a colour alone. Neither is the focus ring, nor touches the state's dot. */
@@ -129,6 +134,10 @@
     background: none; color: var(--sv-text-muted); cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .header-new[aria-expanded="true"] { border-style: solid; border-color: var(--sv-accent); color: var(--sv-accent-text); }
   .header-new:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+  .header-new:active { background: var(--sv-pressed); }
+  /* 38px to the eye, 44px to a finger. */
+  .header-new { position: relative; }
+  .header-new::after { content: ""; position: absolute; inset: -5px; }
   @media (hover: hover) { .header-new:hover { background: var(--sv-hover); color: var(--sv-text); } }
   /* Something unread in a conversation behind the chevron: the accent's dot on its corner. */
   .conversations-cue { position: absolute; top: 6px; right: 6px; box-sizing: content-box; border: 2px solid var(--sv-bg); border-radius: 50%; pointer-events: none; }
@@ -166,7 +175,7 @@
 
 /* The list scrolls above its foot. */
 .conversation-sidebar { overflow: hidden; }
-.conversation-sidebar > .sidebar-body { flex: 1 1 auto; min-height: 0; overflow: hidden auto;
+.conversation-sidebar > .sidebar-body { flex: 1 1 auto; min-height: 0; overflow: hidden auto; overscroll-behavior: contain;
   /* Stable keeps classic scrollbars from resizing cards when the list starts overflowing. Overlay scrollbars do
      not reserve a gutter: leave padding for their thumb, outside the cards and their shadows, in either mode.
      Extend into the sidebar's outer padding so the scroll control sits beside the list, away from its cards. */

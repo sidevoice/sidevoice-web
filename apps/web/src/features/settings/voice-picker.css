@@ -8,7 +8,7 @@
 .voice-picker-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--sv-text); font: inherit; }
 .voice-picker-search input::placeholder { color: var(--sv-text-subtle); }
 .voice-picker-search .language-picker-trigger { background: var(--sv-surface-raised); }
-.voice-picker-list { max-height: min(320px, 48vh); overflow: auto; padding: 6px; }
+.voice-picker-list { max-height: min(320px, 48vh); overflow: auto; overscroll-behavior: contain; padding: 6px; }
 .voice-picker-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; padding: 6px 10px; border-radius: var(--sv-radius-sm); cursor: pointer; outline: 0; }
 .voice-picker-item[data-current] { color: var(--sv-accent-text); }
 .voice-picker-item[data-current] > svg { flex: none; }
