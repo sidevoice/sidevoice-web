@@ -230,26 +230,6 @@ export function runs(model) {
   return !model.builds || model.builds.some((build) => build.available);
 }
 
-/**
- * Why a local model does not run here, in the kinds the engine's own reason codes name (its first build with reasons,
- * as unfitNote reads them), each once: `accelerator`, `browser` (its engine is not in this web build) or `app` (not in
- * this version of the app), `memory`, `cores`; `none` when it gives no reason. Nothing is said of where else it might
- * run. Null for a model that runs here.
- * @param {CatalogModel} model
- * @param {boolean} inApp Whether this is the desktop app, rather than a browser.
- * @returns {('accelerator' | 'browser' | 'app' | 'memory' | 'cores' | 'none')[] | null}
- */
-export function whyNotHere(model, inApp) {
-  if (runs(model)) return null;
-  const kinds = {
-    'no-accelerator': 'accelerator', 'build-accelerator': 'accelerator', memory: 'memory', 'wasm-memory': 'memory', cores: 'cores',
-    'backend-not-in-this-build': inApp ? 'app' : 'browser',
-  };
-  const codes = (model.builds ?? []).find((build) => build.reasons?.length)?.reasons.map((reason) => reason.code) ?? [];
-  const found = [...new Set(codes.map((code) => kinds[code]).filter(Boolean))];
-  return found.length ? found : ['none'];
-}
-
 /** Why a local model does not run here: its first build's reason codes. */
 function unfitNote(model) {
   const reasons = (model.builds?.[0]?.reasons ?? []).map((reason) => reason.code);

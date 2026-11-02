@@ -6,8 +6,6 @@ import type { ModelBuild } from "@sidevoice/engine";
 import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 import type { ModelState } from "./ModelSetup";
 import { buildSizes, describeBuild, engineOf } from "./model-facts";
-import { whyNotHere } from "../../services/voice-settings.js";
-import type { CatalogModel } from "../../services/model-catalogs.js";
 
 /** What a browser tells of this device that lib.dom does not know yet. */
 declare global {
@@ -30,39 +28,12 @@ function DeviceLine({ t }: { t: Translate }) {
   return <p className="model-runtime-device">{t("runtime.device", { what: parts.join(" · ") })}</p>;
 }
 
-/** Every model of this device's catalogue for the task, grouped by family, the ones that do not run here too, each with
- *  where it does run when that can be told: read only, nothing here is chosen or downloaded. */
-function AllModels({ task, t }: { task: "stt" | "tts"; t: Translate }) {
-  const inApp = !!useRoomStore((state) => state.facts.inApp);
-  const models = useRoomStore((state) => state.facts.voiceCatalogue.catalogs.find((catalog) => catalog.id === "local")?.models) as CatalogModel[] | undefined;
-  const families = new Map<string, CatalogModel[]>();
-  for (const model of models ?? []) if (model.capabilities.includes(task)) families.set(model.family ?? "", [...(families.get(model.family ?? "") ?? []), model]);
-  if (!families.size) return null;
-  return (
-    <div className="model-runtime-all">
-      <p className="model-runtime-info">{t("runtime.all.title")}</p>
-      <ul className="model-runtime-families">
-        {[...families].map(([family, list]) => <li key={family}>
-          <strong>{family.charAt(0).toUpperCase() + family.slice(1)}</strong>
-          <ul>{list.map((model) => {
-            const why = whyNotHere(model, inApp);
-            return <li key={model.id} data-runs={why === null || undefined}>
-              <span>{model.id}</span>
-              {why === null ? <Badge tone="positive">{t("runtime.all.runs")}</Badge> : <Badge>{why.map((kind) => t(("runtime.where." + kind) as MessageKey)).join("; ")}</Badge>}
-            </li>;
-          })}</ul>
-        </li>)}
-      </ul>
-    </div>
-  );
-}
-
 export function ModelRuntime({ task, state, locked }: { task: "stt" | "tts"; state: ModelState; locked: boolean }) {
   const t = translator();
   const [open, setOpen] = useState(false);
   const panel = useId();
   const builds = state.model?.builds ?? [];
-  // The builds are this model's, where it is one of this device's; the list of every model is always there.
+  // The builds are this model's, where it is one of this device's.
   const hasBuilds = state.local && builds.length > 0;
   const recommended = state.model?.recommendedBuild;
   const choose = (build: string | null) => window.sidevoiceActions?.editVoice({ [task]: { build } });
@@ -106,7 +77,6 @@ export function ModelRuntime({ task, state, locked }: { task: "stt" | "tts"; sta
             ...(build.installed ? [{ text: t("runtime.onDisk"), tone: "positive" as const }] : []),
           ], build.available, reasons(build)))}
         </fieldset>}
-        <AllModels task={task} t={t} />
         {locked && <p className="model-runtime-device">{t("voice.prepare.lockedHint")}</p>}
       </div>}
     </div>
