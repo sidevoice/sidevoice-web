@@ -1,3 +1,4 @@
+import { collisionPadding } from "../../lib/safe-area";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { createContext, useContext, useRef, useState, type PropsWithChildren, type ReactElement, type ReactNode } from "react";
 
@@ -72,7 +73,7 @@ export function Tooltip({ content, children, action }: TooltipProps) {
           window.setTimeout(() => { pressing.current = false; }, 0);
         }}>{children}</TooltipPrimitive.Trigger>
       <TooltipPrimitive.Portal container={overlayContainer(provided, trigger.current)}>
-        <TooltipPrimitive.Content className="ui-tooltip" sideOffset={8} collisionPadding={12}
+        <TooltipPrimitive.Content className="ui-tooltip" sideOffset={8} collisionPadding={collisionPadding()}
           // A press on the trigger itself is its own toggle (onClick), not a press outside.
           onPointerDownOutside={(event) => { if (trigger.current?.contains(event.target as Node)) { event.preventDefault(); return; } setOpen(false); }}
           onEscapeKeyDown={() => setOpen(false)}>

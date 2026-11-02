@@ -1,3 +1,4 @@
+import { collisionPadding } from "../../lib/safe-area";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "../../lib/cn";
@@ -100,7 +101,7 @@ export function Select({ id, value, defaultValue, onValueChange, options, size =
       </SelectPrimitive.Trigger>
       <SelectPrimitive.Portal container={overlayContainer(provided, trigger.current)}>
         <SelectPrimitive.Content className="ui-select-content" data-size={size} data-theme={theme}
-          position="popper" side="bottom" align="start" sideOffset={4} collisionPadding={12}>
+          position="popper" side="bottom" align="start" sideOffset={4} collisionPadding={collisionPadding()}>
           <SelectPrimitive.ScrollUpButton className="ui-select-scroll"><MoreAboveIcon /></SelectPrimitive.ScrollUpButton>
           <SelectPrimitive.Viewport className="ui-select-viewport">
             {options.map((item, index) => isGroup(item)
