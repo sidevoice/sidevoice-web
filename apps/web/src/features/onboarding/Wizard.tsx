@@ -209,7 +209,7 @@ function ModelStepFooter({ waiting: held, reason = "", reasonQuiet, tryReason, r
   if (tried && !running) return <Button type="button" variant="primary" id="wizard-stage-action" onClick={onContinue}>{t("wizard.continue")}</Button>;
   return <>
     {line}
-    {!waiting && <Button type="button" variant="secondary" id="wizard-stage-action" onClick={goOn}>{t("wizard.continueWithoutTrying")}</Button>}
+    {!waiting && <Button type="button" variant="ghost" tone="neutral" className="wizard-quiet" id="wizard-stage-action" onClick={goOn}>{t("wizard.continueWithoutTrying")}</Button>}
     {waiting && skip}
     <Button type="button" variant="primary" id="wizard-try" {...blocked(waiting || (!running && !!tryReason))} onClick={running ? onStop : onTry}>
       {running ? t("try.stop") : t("try.tryIt")}</Button>
@@ -329,7 +329,7 @@ export function Wizard() {
   // Transcription and voice say the consequence in the skip's confirm, keeping the footer clean (operator, 2026-10-28): the line stays only as the blocked Try's screen-reader description; the turn step keeps its visible line.
   const stageSkip = stageTask ? <SkipConfirm id={`wizard-skip-${stageTask}`} title={t(stageTask === "stt" ? "wizard.skip.sttTitle" : "wizard.skip.ttsTitle")}
     body={t(stageTask === "stt" ? "wizard.skip.sttReason" : "wizard.skip.ttsReason")} onSkip={() => void skipStage(stageTask)} t={t} /> : undefined;
-  const turnSkip = turnWaits ? <Button type="button" variant="secondary" id="wizard-step-skip" onClick={() => void finishTurn()}>{t("wizard.skip.turn")}</Button> : undefined;
+  const turnSkip = turnWaits ? <Button type="button" variant="ghost" tone="neutral" className="wizard-quiet" id="wizard-step-skip" onClick={() => void finishTurn()}>{t("wizard.skip.turn")}</Button> : undefined;
   const machineWaits = ((step === "W2" && !onboarding.localReady) || (step === "W2r" && !onboarding.remoteReady));
 
   async function finishTurn() {
@@ -436,7 +436,7 @@ function SkipConfirm({ id, title, body, onSkip, t }: { id: string; title: string
   const [asking, setAsking] = useState(false);
   const back = useRef<HTMLButtonElement>(null);
   return <>
-    <Button type="button" variant="secondary" id="wizard-step-skip" onClick={() => setAsking(true)}>{t("wizard.skip.later")}</Button>
+    <Button type="button" variant="ghost" tone="neutral" className="wizard-quiet" id="wizard-step-skip" onClick={() => setAsking(true)}>{t("wizard.skip.later")}</Button>
     {asking && createPortal(<Dialog open size="sm" id={id} titleId={`${id}-title`} title={title}
       initialFocus={back} onClose={() => setAsking(false)}
       footer={<>
