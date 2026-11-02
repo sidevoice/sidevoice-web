@@ -38,16 +38,15 @@ export function useModelState(task: Task | "end-of-turn", draft: Settings | null
   const model = slot ? catalog?.models.find((candidate) => candidate.id === slot.model) ?? null : null;
   const local = slot?.catalog === "local";
   const needsKey = !!slot && !local && catalog?.status?.reason?.code === "credential-missing";
-  // The build it runs as, as the engine loads it: the one chosen (Settings, "How it runs"); with Automatic, one installed
-  // that runs here (the first, in the catalogue's order), else the engine's recommended one — what a download fetches
-  // (WebEngine.load). The catalogue says no more: which hardware it ran on once loaded is not reported.
-  // Only a build that runs here counts, installed or not: one chosen or installed that no longer runs is not this model's
-  // state, and the build that does is offered instead (its download); nothing is deleted.
+  // The build it runs as: the one chosen (Settings, "How it runs"); with Automatic, the engine's recommendation as it
+  // stands now (resolved here and in voice-source at use time, never a build that merely happens to be on disk), else the
+  // first that runs. A recommendation not on disk is offered as a download, never fetched unasked (sidevoice-web#449).
+  // Only a build that runs here counts, installed or not: one chosen that no longer runs is not this model's state, and
+  // the build that does is offered instead (its download); nothing is deleted.
   const chosen = slot?.build ? model?.builds?.find((candidate) => candidate.id === slot.build && candidate.available) : undefined;
-  const build = chosen ?? model?.builds?.find((candidate) => candidate.installed && candidate.available)
-    ?? model?.builds?.find((candidate) => candidate.id === model.recommendedBuild && candidate.available) ?? model?.builds?.find((candidate) => candidate.available);
-  const installed = !!model && (!local || (chosen ? chosen.installed
-    : model.builds?.some((candidate) => typeof candidate.installed === "boolean") ? model.builds.some((candidate) => candidate.installed && candidate.available)
+  const build = chosen ?? model?.builds?.find((candidate) => candidate.id === model.recommendedBuild && candidate.available)
+    ?? model?.builds?.find((candidate) => candidate.available);
+  const installed = !!model && (!local || (model.builds?.some((candidate) => typeof candidate.installed === "boolean") ? !!build?.installed
     : model.installed === true && !!model.builds?.some((candidate) => candidate.available)));
   const mine = install && install.task === task && install.model === slot?.model ? install : null;
   const installing = mine?.state === "running";

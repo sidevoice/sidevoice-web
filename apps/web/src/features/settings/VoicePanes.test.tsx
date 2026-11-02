@@ -768,11 +768,11 @@ test("the sheet's hardware: the class, then the technical name lighter; a GPU wi
   expect(sheetRows("stt-model-card")).toEqual([["Languages", "Spanish"], ["Size", "1 MB on this device · 1 MB in memory"], ["Status", "Ready"]]);
 });
 
-test("the build a model runs as, with Automatic, is the engine's: one installed that runs here before the recommended one", () => {
+test("the build a model runs as, with Automatic, is the recommended one, even when another is on disk (sidevoice-web#449)", () => {
   renderPane({ voiceCatalogue: { state: "ready", catalogs: withBuilds([
     build("whisper-base/fp16", { installed: false, downloadBytes: 2e6, accelerator: "metal", acceleratorClass: "gpu" }), build("whisper-base/int8"),
   ]), error: "" } });
-  expect(sheetRows("stt-model-card").slice(1, 3)).toEqual([["Runs on", "CPU"], ["Size", "1 MB on this device · 1 MB in memory"]]);
+  expect(sheetRows("stt-model-card").slice(1, 3)).toEqual([["Runs on", "GPU · Metal"], ["Size", "2 MB download · 1 MB in memory"]]);
 });
 
 test("the Model list: each model that can be chosen with its download size at the end of its name's line, its hardware under it", () => {

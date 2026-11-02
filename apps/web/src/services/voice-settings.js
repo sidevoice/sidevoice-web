@@ -452,7 +452,9 @@ export function modelReady(settings, task, catalogs) {
   if (!model) return false;
   if (slot.catalog !== LOCAL_CATALOG) return true;
   if (!runs(model)) return false;
-  const chosen = withUsableBuild(slot, catalogs).build ? model.builds?.find((build) => build.id === slot.build) : null;
+  // Automatic is the recommended build as it stands, not any one on disk: what is ready is that build's.
+  const named = withUsableBuild(slot, catalogs).build ? slot.build : model.recommendedBuild;
+  const chosen = named ? model.builds?.find((build) => build.id === named && build.available) : null;
   return chosen ? chosen.installed : model.builds?.some((build) => typeof build.installed === 'boolean') ? model.builds.some((build) => build.installed && build.available) : model.installed === true;
 }
 
