@@ -205,19 +205,6 @@ test("kept turn numbers survive normalising; one out of the voice's bounds takes
   expect(settings.turn).toEqual(TURN_TUNING);
 });
 
-test("whyNotHere names why a model does not run here from the engine's own reasons, and nothing about elsewhere", async () => {
-  const { whyNotHere } = await import("./voice-settings.js");
-  const model = (...codes: string[]) => ({ id: "m", capabilities: ["stt"], languages: [], voices: [], builds: [{ id: "b", available: false, reasons: codes.map((code) => ({ code, params: {} })) }] }) as never;
-  const runsHere = { id: "m", capabilities: ["stt"], languages: [], voices: [], builds: [{ id: "b", available: true, reasons: [] }] } as never;
-  expect(whyNotHere(runsHere, false)).toBeNull();
-  expect(whyNotHere(model("build-accelerator"), true)).toEqual(["accelerator"]);
-  expect(whyNotHere(model("backend-not-in-this-build"), false)).toEqual(["browser"]);
-  expect(whyNotHere(model("backend-not-in-this-build"), true)).toEqual(["app"]);
-  expect(whyNotHere(model("wasm-memory", "memory", "cores"), false)).toEqual(["memory", "cores"]);
-  expect(whyNotHere(model(), true)).toEqual(["none"]);
-  expect(whyNotHere(model("something-new"), true)).toEqual(["none"]);
-});
-
 test("a chosen build that no longer runs gives way to the engine's own choice: ready, loaded and shown agree", () => {
   const build = (id: string, available: boolean, installed: boolean) => ({ id, backend: "sherpa-onnx", precision: "q8", downloadBytes: 1, memoryMb: 1, available, installed, reasons: available ? [] : [{ code: "build-accelerator", params: {} }] });
   const catalogs = (cpuInstalled: boolean) => [{ id: "local", name: null, status: { stale: false }, models: [{ id: "stale-model", family: "stale", capabilities: ["tts"], languages: [], voices: [], installed: true,

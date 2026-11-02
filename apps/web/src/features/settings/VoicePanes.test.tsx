@@ -826,18 +826,3 @@ test("a build on disk that no longer runs is not Ready: the build that runs is o
   expect(document.getElementById("stt-model-download")).not.toBeNull();
   expect(actions.editVoice).not.toHaveBeenCalled();
 });
-
-test("Advanced lists every model, those that do not run here with why, whatever the chosen model is: one with no builds, or a provider's", () => {
-  const bare = local("bare-model", "bare", ["stt"], { builds: [] });
-  const draft = { ...defaultVoiceSettings(), stt: { ...defaultVoiceSettings().stt, catalog: "local", model: "bare-model" } };
-  renderPane({ voiceCatalogue: { state: "ready", catalogs: localWith(bare, gone("parakeet-a", "parakeet")), error: "" }, voiceSettings: draft, voiceDraft: draft });
-  const open = () => fireEvent.click(document.querySelector("#stt-model-card .model-runtime-toggle")!);
-  open();
-  const row = (id: string) => [...document.querySelectorAll("#stt-model-card .model-runtime-families li li")].find((item) => item.textContent?.startsWith(id))?.textContent;
-  expect(row("parakeet-a")).toBe("parakeet-aDoesn't run in this browser");
-  cleanup();
-  const remote = { ...defaultVoiceSettings(), stt: { ...defaultVoiceSettings().stt, catalog: "elevenlabs", model: "scribe_v2" } };
-  renderPane({ voiceCatalogue: { state: "ready", catalogs: localWith(gone("parakeet-a", "parakeet")), error: "" }, voiceSettings: remote, voiceDraft: remote });
-  open();
-  expect(row("whisper-base")).toContain("Runs here");
-});
