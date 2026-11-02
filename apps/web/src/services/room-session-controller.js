@@ -14,6 +14,7 @@ import {tryTranscription,tryVoice,tryEndOfTurn} from './voice-trial.js';
 import {systemLanguage,SPEECH_LANGUAGES} from './system-language.js';
 import {createOutbox} from './outbox.js';
 import {readCallPreferences} from './call-preferences.ts';
+import {primeThinkingSound} from './thinking-sound.ts';
 import {clampDeviceName,deviceNameProblem} from './device-name-rules.js';
 import {readDeleteUnused,writeDeleteUnused,staleModels} from './model-housekeeping.js';
 import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,voiceSettingsToLoad,endOfTurnModel,readyVoiceSettings,modelReady,voiceHalves,voiceInput,voiceOutput} from './voice-settings.js';
@@ -2089,7 +2090,7 @@ async function callMachine(epoch){
 async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){disconnect();return}
  // Nothing to join without a machine this device is paired with: the tap asks for a code instead.
  if(!pairings.list.some(p=>!p.revoked)){openPairing(pairings.list.length?reachNote(state):'');return}
- personSignal();primeNowPlaying();state.callEnded=null;state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();sayCallError=null;setRoomError('');joinStatus('voice');
+ personSignal();primeNowPlaying();primeBreath();state.callEnded=null;state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();sayCallError=null;setRoomError('');joinStatus('voice');
  // Whether Smart's model is on disk is the catalogue's to say (voiceSettingsToLoad): read while the machine is looked for.
  const catalogue=state.voiceCatalogue.state==='ready'?null:loadVoiceCatalogue();
  try{
@@ -2699,6 +2700,10 @@ function primeNowPlaying(){
  const remote=pageHost().presence.remote;
  if(remote){usedRemote=remote;remote.prime()}
 }
+// The thinking sound's Web Audio, begun in the Join tap too: a browser starts a page's audio only from a gesture, and the
+// breath starts when the agent works, never in one (services/thinking-sound.ts, sidevoice-web#439). Where the app runs the
+// voice, its webview starts a page's audio at any time, and nothing is made until a breath plays.
+function primeBreath(){if(pageHost().voice.runs==='page')primeThinkingSound()}
 function micLive(){return !!voice&&state.micEnabled}
 let lockScreenOn=false,lockScreenTitle='',stopRemote=null;
 // The tile reads as playing while the microphone is open and as paused while it is muted.
