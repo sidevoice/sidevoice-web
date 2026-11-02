@@ -55,10 +55,31 @@ export function onUiLanguage(listener: () => void) {
   return () => { listeners.delete(listener); };
 }
 
-/** The words of `language` (the interface's, by default), with `{name}` filled from `params`. */
+/** Where the host's wording of a language comes from: one table per language tag, exactly (host/index registers it). */
+let overlaySource: (language: string) => Readonly<Record<string, string>> = () => ({});
+
+/** Words the host gives in place of the catalogue's, for the texts its place changes. */
+export function setMessageOverlay(source: (language: string) => Readonly<Record<string, string>>) {
+  overlaySource = source;
+}
+
+/** The host's text for `key` in `language`: its table for that exact tag, else for the tag's primary subtag. The host is
+ *  asked as the text is drawn, since an app may inject itself after the page's script runs. */
+function overlaid(language: string, key: string): string | undefined {
+  for (const tag of new Set([language, language.split(/[-_]/)[0]])) {
+    const table = overlaySource(tag);
+    // Only a text is a text: a host's value that is not one leaves the catalogue's.
+    const text = Object.hasOwn(table, key) ? table[key] : undefined;
+    if (typeof text === "string" && text !== "") return text;
+  }
+  return undefined;
+}
+
+/** The words of `language` (the interface's, by default), with `{name}` filled from `params`. The host's own wording comes
+ *  first, then the language's catalogue, then English. */
 export function translator(language = uiLanguage()): Translate {
   const bundle = locales[language]?.messages ?? en;
-  return (key, params) => (bundle[key] ?? en[key] ?? key).replace(/\{(\w+)\}/g, (_, name: string) =>
+  return (key, params) => (overlaid(language, key) ?? bundle[key] ?? en[key] ?? key).replace(/\{(\w+)\}/g, (_, name: string) =>
     params?.[name] === undefined ? "" : String(params[name]));
 }
 

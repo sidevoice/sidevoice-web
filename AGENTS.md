@@ -28,7 +28,7 @@ anywhere else (CommonJS too, `require` and `import.meta.glob` included), and no 
 `src/host/testing.ts`. A new thing a host can do is a new member of `Host` (`src/host/types.ts`), not a new check in a
 component. Nor does the page ask which system it runs on: `Host` has no `os`, and what a system decides about
 the page's words is answered resolved (`microphone.help(language)`, `identity.shortcutModifier`, `identity.deviceName()`);
-the browser's own answers live in `src/host` and an app's in the app, so a new platform never touches the web. The lint is a convention guard, not a sandbox: a name put together or fetched at run time
+the browser's own answers live in `src/host` and an app's in the app, so a new platform never touches the web. A text whose words are wrong in an app (the speaker row says "This browser…") is not a new member and not a `host()` check in the component: the app overlays it. `host().messages(language)` is the app's table of web catalogue keys to its own wording, for that exact language (`{}` in a browser); the translator applies it over the catalogue (the exact tag, then its primary subtag, then the catalogue, then English), so the catalogue keeps the browser's words and the app owns the others, and a key the app overlays must exist in English (the app checks it against the web it bundles). The lint is a convention guard, not a sandbox: a name put together or fetched at run time
 (`Reflect.get(window, "navigator")`, `window["navi" + "gator"]`, `eval`) is not caught, and neither is a `require` of a path
 built at run time.
 

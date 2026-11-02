@@ -78,8 +78,8 @@ describe("what the browser's host answers from it", () => {
     const chromeMac = { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36", platform: "MacIntel" };
     expect(browserDeviceName(chromeMac, en)).toBe("Chrome on Mac");
     expect(browserDeviceName(chromeMac, es)).toBe("Chrome en Mac");
-    expect(browserDeviceName({ userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)" }, en)).toBe("Browser on iPhone");
-    expect(browserDeviceName({ userAgent: "", userAgentData: { platform: "Windows" } }, en)).toBe("Browser on Windows");
+    expect(browserDeviceName({ userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)" }, en)).toBe("iPhone");
+    expect(browserDeviceName({ userAgent: "", userAgentData: { platform: "Windows" } }, en)).toBe("Windows");
     expect(browserDeviceName({}, en)).toBe("Sidevoice");
   });
 
