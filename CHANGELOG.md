@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.3](https://github.com/sidevoice/sidevoice-web/compare/v0.15.2...v0.15.3) (2026-11-02)
+
+
+### Bug Fixes
+
+* **stage:** keep the person's balloon off the agent's face on a phone, and tooltips inside the safe areas ([#426](https://github.com/sidevoice/sidevoice-web/issues/426)) ([e937c67](https://github.com/sidevoice/sidevoice-web/commit/e937c67b39484bc538de6b2eeb5f6fd4873b4694))
+
 ## [0.15.2](https://github.com/sidevoice/sidevoice-web/compare/v0.15.1...v0.15.2) (2026-11-02)
 
 
