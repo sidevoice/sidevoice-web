@@ -70,7 +70,7 @@
 /* The agent stands on the ground (its feet, y 106 of its 120 box, on y 357 of the frame), 300px tall as in the lab
    unless the tile is too narrow for it. */
 .stage-agent { position:absolute;left:50%;top:calc(357px - var(--fig) * 106 / 120);width:var(--fig);height:var(--fig);margin-left:calc(var(--fig) / -2);
-  transform-origin:50% 77.92%;transition:transform .45s cubic-bezier(.3,1.4,.5,1),opacity .3s }
+  transform-origin:50% 77.92%;transition:transform .45s cubic-bezier(.3,1.4,.5,1),translate .3s var(--sv-ease),opacity .3s }
 /* Working, the desk slides up from below and the agent steps up behind it, a little larger, cut at the belly: its
    y 93.5 (work.ts DESK_Y, where its props rest) meets the desk's top edge at y 306.65 of the frame. */
 .stage-tile[data-mood=working] .stage-agent { transform:translateY(calc(var(--fig) * .1042 - 50.35px)) scale(1.133) }
