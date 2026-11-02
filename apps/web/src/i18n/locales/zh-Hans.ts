@@ -703,7 +703,7 @@ export const messages: Messages = {
   "keys.remove": "移除",
   "keys.saved": "密钥已保存。",
   "storage.blocked": "此浏览器阻止了此页面的网站数据。请允许它（网站设置 → Cookie 和网站数据），以便配对计算机并使用语音。",
-  "voice.error.browser": "浏览器拒绝了通话语音所需的某项权限。",
+  "voice.error.browser": "浏览器拒绝了通话语音所需的某项请求。",
   "keys.loading": "正在加载提供商…",
   "wizard.eyebrow": "初始设置",
   "wizard.title.where": "你在哪里使用智能体？",
