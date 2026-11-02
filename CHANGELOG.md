@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.2](https://github.com/sidevoice/sidevoice-web/compare/v0.15.1...v0.15.2) (2026-11-02)
+
+
+### Bug Fixes
+
+* **dialog:** keep a gutter on both sides of a dialog on a phone ([#421](https://github.com/sidevoice/sidevoice-web/issues/421)) ([23aa2ef](https://github.com/sidevoice/sidevoice-web/commit/23aa2ef25a658c9d3b1908bbdf625eee5f13b96b))
+* **room:** keep the header off the status bar and the notch ([#423](https://github.com/sidevoice/sidevoice-web/issues/423)) ([d7ca5da](https://github.com/sidevoice/sidevoice-web/commit/d7ca5da4a8f052e9743503d7bca4800e05081064))
+
 ## [0.15.1](https://github.com/sidevoice/sidevoice-web/compare/v0.15.0...v0.15.1) (2026-11-01)
 
 
