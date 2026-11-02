@@ -38,6 +38,10 @@ const STATES = {
 
 async function onStage(page, theme, state) {
   await installHarness(page, { participants: { first: [conversation] } });
+  // The call below is the page's own state, not a room's: the room would answer its binding poll (/api/presentation,
+  // on the beat and after the pick) with no binding, and the page would take the call as ended by it and clear the
+  // binding the balloon is drawn for, a moment after it was set. Nothing answers that poll here.
+  await page.route((url) => url.pathname === "/api/presentation", (route) => route.abort());
   await page.goto("/voice/");
   await page.evaluate((theme) => { document.documentElement.dataset.theme = theme; document.documentElement.style.colorScheme = theme; }, theme);
   const narrow = await page.evaluate(() => matchMedia("(max-width: 899px)").matches);
