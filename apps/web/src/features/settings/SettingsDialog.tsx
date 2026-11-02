@@ -1,4 +1,4 @@
-import { Fragment, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, memo, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { OverlayPortalProvider, Tooltip } from "../../components/ui/Tooltip";
 import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, DeveloperIcon, FloatingCardIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ShortcutsIcon, PermissionsIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon, UpdateIcon, WarningIcon } from "../../components/ui/Icons";
@@ -22,7 +22,7 @@ import { FloatingCardSettings, useFloatingCardSection } from "./FloatingCardSett
 import { host } from "../../host";
 import { PermissionsSettings } from "./PermissionsSettings";
 import { useMicrophoneAccess } from "../permissions/permission-view";
-import type { MicrophoneSnapshot } from "../../services/microphone-access";
+import type { MicrophoneAccess, MicrophoneSnapshot } from "../../services/microphone-access";
 import { ShortcutsSettings, useShortcutsSection } from "./ShortcutsSettings";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
 import { useSeeUpdates, useUpdateMark } from "../updates/update-mark";
@@ -32,7 +32,7 @@ import { Alert } from "../../components/ui/Alert";
 import { ErrorText } from "../../components/ui/ErrorText";
 import { Switch } from "../../components/ui/Switch";
 import { readCallPreferences, subscribeCallPreferences, writeCallPreferences, type CallPreferences, type PresenceSound } from "../../services/call-preferences";
-import { languageName, translator, UI_LANGUAGES, type MessageKey, type Translate } from "../../i18n/translator";
+import { languageName, translator, uiLanguage, UI_LANGUAGES, type MessageKey, type Translate } from "../../i18n/translator";
 import { ErrorBoundary } from "../../app/ErrorBoundary";
 import { remoteProviders } from "../../services/voice-settings.js";
 import { useDialogFocusReturn } from "../../lib/focus-return";
@@ -192,6 +192,31 @@ function Pane({ id, current, children }: { id: string; current: string; children
   // navigation, not tabs; the section in it is named by its own heading.
   return <div id={"pane-" + id} className="settings-pane" hidden={id !== current}><ErrorBoundary area={"settings:" + id}>{children}</ErrorBoundary></div>;
 }
+
+/** Every section's page, one shown. Drawn again only when what they are given changes, not with Settings' header and
+ *  levels: going up a level or opening a list redrew every section of Settings with it (sidevoice-web: a phone's Back
+ *  took a second). */
+const SettingsPanes = memo(function SettingsPanes({ current, language, microphone, access, floatingCardShown, permissionsShown, shortcutsShown, ownComputer, updatesShown, developerShown }: {
+  current: string; language: string; microphone: MicrophoneSnapshot | null; access: MicrophoneAccess | null; floatingCardShown: boolean; permissionsShown: boolean;
+  shortcutsShown: boolean; ownComputer: boolean; updatesShown: boolean; developerShown: boolean;
+}) {
+  const t = translator(language);
+  return <div className="settings-column">
+    <Pane id="general" current={current}><GeneralSettings t={t} /></Pane>
+    <Pane id="transcription" current={current}><SlotSection id="transcription" t={t} /></Pane>
+    <Pane id="voice" current={current}><SlotSection id="voice" t={t} /></Pane>
+    <Pane id="call" current={current}><CallSettings t={t} microphone={microphone} /></Pane>
+    {floatingCardShown && <Pane id="floating-card" current={current}><FloatingCardSettings t={t} /></Pane>}
+    {permissionsShown && <Pane id="permissions" current={current}><PermissionsSettings t={t} access={access} microphone={microphone} /></Pane>}
+    {shortcutsShown && <Pane id="shortcuts" current={current}><ShortcutsSettings t={t} /></Pane>}
+    <Pane id="providers" current={current}><ProviderKeys /></Pane>
+    {ownComputer && <Pane id="this-computer" current={current}><ThisComputerSettings /></Pane>}
+    <Pane id="machines" current={current}><MachineList /></Pane>
+    {updatesShown && <Pane id="updates" current={current}><UpdatesSettings /></Pane>}
+    <Pane id="advanced" current={current}><AdvancedSettings t={t} /></Pane>
+    {developerShown && <Pane id="developer" current={current}><DeveloperOptions /></Pane>}
+  </div>;
+});
 
 /** What a section's row in a phone's menu says under its name, where the section has one state that says whether it is
  *  set up and working: the model chosen, This device's service (as its entry words it), the providers connected, the
@@ -383,21 +408,8 @@ export function SettingsDialog() {
                 })}
             </nav>
             <div className="settings-content" ref={content} hidden={!pageShown} inert={motionOf(across, 2)?.startsWith("out") || undefined} data-motion={motionOf(across, 2)}>
-              <div className="settings-column">
-                <Pane id="general" current={current}><GeneralSettings t={t} /></Pane>
-                <Pane id="transcription" current={current}><SlotSection id="transcription" t={t} /></Pane>
-                <Pane id="voice" current={current}><SlotSection id="voice" t={t} /></Pane>
-                <Pane id="call" current={current}><CallSettings t={t} microphone={mic.microphone} /></Pane>
-                {floatingCardShown && <Pane id="floating-card" current={current}><FloatingCardSettings t={t} /></Pane>}
-                {permissionsShown && <Pane id="permissions" current={current}><PermissionsSettings t={t} access={mic.access} microphone={mic.microphone} /></Pane>}
-                {shortcutsShown && <Pane id="shortcuts" current={current}><ShortcutsSettings t={t} /></Pane>}
-                <Pane id="providers" current={current}><ProviderKeys /></Pane>
-                {ownComputer && <Pane id="this-computer" current={current}><ThisComputerSettings /></Pane>}
-                <Pane id="machines" current={current}><MachineList /></Pane>
-                {updatesShown && <Pane id="updates" current={current}><UpdatesSettings /></Pane>}
-                <Pane id="advanced" current={current}><AdvancedSettings t={t} /></Pane>
-                {developerShown && <Pane id="developer" current={current}><DeveloperOptions /></Pane>}
-              </div>
+              <SettingsPanes current={current} language={uiLanguage()} microphone={mic.microphone} access={mic.access} floatingCardShown={floatingCardShown}
+                permissionsShown={permissionsShown} shortcutsShown={shortcutsShown} ownComputer={ownComputer} updatesShown={updatesShown} developerShown={developerShown} />
             </div>
             {/* Settings' own polite region (a machine forgotten), never the call's. */}
             <p className="sr-only" role="status">{said}</p>
