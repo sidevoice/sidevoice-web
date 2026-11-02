@@ -36,8 +36,10 @@
   --chip-fs: clamp(11px, calc(12 * var(--u)), 15px); --name-fs: clamp(14px, calc(20 * var(--u)), 26px);
   --bubble-fs: clamp(18px, calc(25.6 * var(--u)), 34px); --bubble-lh: 1.375; --bubble-pad: 24; --peek: 20; --tail-w: calc(72 * var(--u)); --tail-h: calc(40 * var(--u));
   --person-fs: clamp(16px, calc(22.4 * var(--u)), 28px); --person-lh: 1.4286; --person-pad-b: 12; --person-pad-i: 20; --person-live-w: 272;
-  --fig-px: min(calc(var(--stage-avatar-share, .56) * 440px * var(--k, 1)), var(--stage-avatar-max, 420px));
-  --person-live-h: calc(3 * round(nearest, calc(var(--person-fs) * var(--person-lh)), 1px) + 16 * var(--u) + 2 * var(--person-pad-b) * var(--u)); --person-lift: 0px; }
+  --fig-px: min(calc(var(--stage-avatar-share, .56) * 440px * var(--k, 1)), var(--stage-avatar-max, 420px)); --person-lift: 0px; }
+/* The person's balloon's height: three of its whole-pixel lines, its margins and padding. Where the balloons are laid (the
+ * tile; the desktop card's avatar balloons, call-card.css), from that place's own sizes. */
+:is(.stage-tile, .avatar-balloons) { --person-live-h: calc(3 * round(nearest, calc(var(--person-fs) * var(--person-lh)), 1px) + 16 * var(--u) + 2 * var(--person-pad-b) * var(--u)); }
 /* No conversation: the tile fills the stage rather than keeping a shape; its words keep the interface's size. */
 .stage-tile.stage-empty { --u: 1px; }
 /* The canvas the agent is drawn on keeps one shape per form factor (--stage-ratio, width over height), never whatever

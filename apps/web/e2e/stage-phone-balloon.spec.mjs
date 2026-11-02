@@ -15,16 +15,25 @@ const REPLY = "I found the failing setting and fixed it. The tests pass now, and
 const conversation = { thread_id: THREAD, title: "sidevoice-web", available: true, reach: { state: "listening" }, harness: "claude-code" };
 const INSETS = { top: 59, bottom: 34, left: 0, right: 0 };
 
-/** The call as the room's runtime reports it once joined, what each state adds to it, and the stage in that state. */
+/** What each state adds to the joined call, in the order it happens: one set of facts each, patched over the last. */
+const draft = (key) => ({ segment: "u", thread: key, role: "user", text: "", name: "", time: Date.now(), session: "s1", seq: 1, draft: true });
+const listening = (key) => ({ userLive: true, userTurn: { id: "u", segment: "u", thread: key }, pendingPhase: "listening", history: [draft(key)] });
+const transcribing = (key) => ({ ...listening(key), pendingPhase: "transcribing" });
+// What was heard, sent: the bars gone, the person's words in their place (PersonTurn's SentBubble, a moment on the stage).
+const sent = (key) => ({ userLive: false, userTurn: null, pendingPhase: "", pendingText: "",
+  history: [{ ...draft(key), segment: "u-sent", text: "Run the tests and tell me what fails.", draft: false, delivery: "delivered" }] });
+const working = (key) => ({ harness: { [key]: true }, workingSince: { [key]: 0 }, now: 60_000 });
 const STATES = {
-  idle: () => ({}),
-  listening: (key) => ({ userLive: true, userTurn: { id: "u", segment: "u", thread: key }, pendingPhase: "listening",
-    history: [{ segment: "u", thread: key, role: "user", text: "", name: "", time: Date.now(), session: "s1", seq: 1, draft: true }] }),
-  transcribing: (key) => ({ userLive: true, userTurn: { id: "u", segment: "u", thread: key }, pendingPhase: "transcribing",
-    history: [{ segment: "u", thread: key, role: "user", text: "", name: "", time: Date.now(), session: "s1", seq: 1, draft: true }] }),
-  speaking: (key) => ({ botLive: true, karaokeState: { segment: "h-1", from: 0, to: 60 },
-    history: [{ segment: "h-1", thread: key, role: "assistant", text: REPLY, name: "sidevoice-web", time: Date.now(), session: "s1", seq: 1, audio: "playing" }] }),
-  working: (key) => ({ harness: { [key]: true }, workingSince: { [key]: 0 }, now: 60_000 }),
+  idle: [],
+  listening: [listening],
+  transcribing: [transcribing],
+  sent: [listening, sent],
+  speaking: [(key) => ({ botLive: true, karaokeState: { segment: "h-1", from: 0, to: 60 },
+    history: [{ segment: "h-1", thread: key, role: "assistant", text: REPLY, name: "sidevoice-web", time: Date.now(), session: "s1", seq: 1, audio: "playing" }] })],
+  working: [working],
+  // The agent at its desk (or resting), the person's turn over it.
+  "working-listening": [working, listening],
+  "working-sent": [working, listening, sent],
 };
 
 async function onStage(page, theme, state) {
@@ -45,10 +54,14 @@ async function onStage(page, theme, state) {
       voiceState: { listening: "listening", recognising: 0, playback: "idle", microphone: "live" } });
     return `${person.node}|t1`;
   });
-  await page.evaluate(({ facts, insets }) => {
-    window.sidevoiceUI.store.patch(facts);
+  await page.evaluate((insets) => {
     for (const [side, px] of Object.entries(insets)) document.documentElement.style.setProperty(`--sv-inset-${side}`, `calc(${px}px + 0px)`);
-  }, { facts: STATES[state](key), insets: INSETS });
+  }, INSETS);
+  for (const facts of STATES[state]) {
+    await page.evaluate((facts) => window.sidevoiceUI.store.patch(facts), facts(key));
+    // The turns' hooks read each step as they render it (a sent turn is shown only after the bars were).
+    await page.waitForTimeout(250);
+  }
   // The balloons pop in over 460ms: measure them where they stand.
   await page.waitForTimeout(900);
 }
@@ -70,13 +83,14 @@ for (const [name, viewport] of [["440x956", { width: 440, height: 956 }], ["390x
     test.describe(`${name} ${theme}`, () => {
       test.use({ viewport, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
 
-      for (const state of ["idle", "listening", "transcribing", "speaking", "working"]) {
+      for (const state of Object.keys(STATES)) {
         test(`${state}: the balloon keeps clear of the agent's face and inside the tile`, async ({ page }) => {
           await onStage(page, theme, state);
           if (SHOTS) { mkdirSync(SHOTS, { recursive: true }); await page.screenshot({ path: path.join(SHOTS, `${name}-${theme}-${state}.png`) }); }
           const m = await measure(page);
           expect(m.face, "the agent is on the stage").not.toBeNull();
-          if (state === "listening" || state === "transcribing" || state === "speaking") expect(m.balloons.length, "a balloon is up").toBeGreaterThan(0);
+          if (state !== "idle" && state !== "working") expect(m.balloons.length, "a balloon is up").toBeGreaterThan(0);
+          if (state.endsWith("sent")) expect(await page.locator(".stage-tile .person-bubble[data-sent]").count(), "what was sent is on the stage").toBe(1);
           for (const balloon of m.balloons) {
             expect(overlaps(balloon, m.face), `${balloon.kind} ${JSON.stringify(balloon)} over the face ${JSON.stringify(m.face)}`).toBe(false);
             expect(balloon.left, "inside the tile, left").toBeGreaterThanOrEqual(m.tile.left - 0.5);
@@ -120,10 +134,24 @@ for (const [name, viewport] of [["440x956", { width: 440, height: 956 }], ["390x
 
 test.describe("desktop", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
-  test("the desktop stage is not laid out for a phone: the balloon stays where the stage always had it", async ({ page }) => {
-    await onStage(page, "light", "listening");
-    const m = await measure(page);
-    expect(m.balloons.length).toBeGreaterThan(0);
-    if (SHOTS) { mkdirSync(SHOTS, { recursive: true }); await page.screenshot({ path: path.join(SHOTS, "1280x800-light-listening.png") }); }
-  });
+  for (const state of ["listening", "transcribing", "sent", "working-listening"]) {
+    test(`${state}: the stage is not laid out for a phone: the balloon stays in the tile's corner and the agent does not move`, async ({ page }) => {
+      await onStage(page, "light", state);
+      if (SHOTS) { mkdirSync(SHOTS, { recursive: true }); await page.screenshot({ path: path.join(SHOTS, `1280x800-light-${state}.png`) }); }
+      const m = await measure(page);
+      expect(m.balloons.length).toBe(1);
+      const [balloon] = m.balloons;
+      // At the tile's foot, on its right (beside the transcript's button, which a desktop keeps at the call bar's right):
+      // the stage's inset (16 of a 600px-tall slide, scaled by the tile) from its edges.
+      const inset = m.tile.height / 600 * 440 / 440 * 16;
+      expect(Math.abs(m.tile.right - balloon.right - inset), `right ${JSON.stringify({ balloon, tile: m.tile })}`).toBeLessThanOrEqual(2);
+      expect(Math.abs(m.tile.bottom - balloon.bottom - inset), "bottom").toBeLessThanOrEqual(2);
+      // The tile's own size for it (--person-live-w: 272 of the slide), as it always was.
+      expect(Math.abs(balloon.width - 272 * m.tile.height / 600), "width").toBeLessThanOrEqual(2);
+      // No lift: the agent keeps its place.
+      const lift = await page.evaluate(() => ({ agent: getComputedStyle(document.querySelector(".stage-agent")).translate, lift: getComputedStyle(document.querySelector(".stage-tile")).getPropertyValue("--person-lift").trim() }));
+      expect(["none", "0px", "0px 0px"], JSON.stringify(lift)).toContain(lift.agent);
+      expect(lift.lift).toBe("0px");
+    });
+  }
 });
