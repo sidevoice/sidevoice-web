@@ -11,6 +11,10 @@
 .settings-pane { min-width: 0; }
 .settings-note { margin-top: var(--sv-space-4); font-size: var(--sv-font-sm); line-height: 1.25rem; }
 .settings-build { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+/* The build of a nightly is a button (the way into Developer options): it looks as the text did. */
+button.settings-build-gesture { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: default; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+button.settings-build-gesture code { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus, currentColor); outline-offset: 2px; border-radius: 2px; }
 .settings-error { margin: 0 auto 0 0; color: var(--sv-danger); font-size: var(--sv-font-sm); }
 .settings-error:empty { display: none; }
 .settings-page .ui-dialog-reason { margin-inline: auto 0; }

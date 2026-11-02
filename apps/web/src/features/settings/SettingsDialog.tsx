@@ -40,7 +40,7 @@ import { motionOf, SettingsLevelsProvider, useSectionShown, useSettingsLevelsOf 
 import { MenuRow } from "./SettingsMenu";
 import { turnTuningDevEnabled } from "./TurnTuningDev";
 import { DEVELOPER_OPTIONS_TITLE, DeveloperOptions } from "./DeveloperOptions";
-import { useDeveloperMode } from "./developer-mode";
+import { isNightlyBuild, useDeveloperMode, useDeveloperModeGesture } from "./developer-mode";
 import { UpdatesSettings, useUpdatesSection } from "./UpdatesSettings";
 import "./settings.css";
 
@@ -155,13 +155,20 @@ function RestartNote({ t }: { t: Translate }) {
 function AdvancedSettings({ t }: { t: Translate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const build = (window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev";
+  // Ten taps on the build turn a nightly's developer mode on or off (developer-mode.ts), on every platform.
+  const developer = useDeveloperModeGesture();
   return <Section id="advanced" title={t("settings.section.advanced")} description={t("settings.advanced.description")}>
     {draft && <Group title={t("settings.advanced.models")}><IdleUnloadChoice draft={draft} /><DeleteUnusedChoice /><DownloadedModels /></Group>}
     <Group title={t("settings.general.device")}>
       <Row label={t("settings.general.reset")} description={<>{t("settings.general.deviceHint")} <span id="reset-settings-note" role="status" /></>}>
         <Button id="reset-settings" variant="ghost" tone="danger" size="sm" aria-label={t("settings.general.reset")}>{t("settings.general.resetShort")}</Button>
       </Row>
-      <Row label={t("settings.general.build")}><code id="build-id" className="settings-build">{build}</code></Row>
+      <Row label={t("settings.general.build")}>
+        {isNightlyBuild()
+          ? <button type="button" className="settings-build settings-build-gesture" {...developer.props}><code id="build-id">{build}</code></button>
+          : <code id="build-id" className="settings-build">{build}</code>}
+        {developer.note && <><span className="settings-build-note settings-build" aria-hidden>{developer.note}</span><span role="status" className="sr-only">{developer.note}</span></>}
+      </Row>
     </Group>
     {/* Last, in red: deleting Sidevoice's data or Sidevoice itself. */}
     <DangerZone />

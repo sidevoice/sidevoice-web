@@ -389,6 +389,22 @@ test("Developer options is a row of the list below Advanced, with no line under 
   expect(title()).toHaveTextContent(/^General$/);
 });
 
+test("on a phone, ten taps on the build in Advanced turn a nightly's developer mode on, from the list's page", async () => {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel: "nightly", version: "0.2.1-nightly.608" } } } });
+  onTestFinished(() => { localStorage.clear(); delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; });
+  room();
+  await open();
+  await tap(row("advanced"));
+  expect(title()).toHaveTextContent(/^Advanced$/);
+  const build = document.getElementById("build-id")!;
+  expect(build.closest("button")).not.toBeNull();
+  for (let i = 0; i < 10; i++) await tap(build);
+  expect(localStorage.getItem(DEVELOPER_MODE_KEY)).toBe("1");
+  expect(within(document.getElementById("pane-advanced")!).getAllByRole("status").map((item) => item.textContent)).toContain("Developer mode on");
+  await tapBack();
+  expect([...nav().querySelectorAll(".settings-menu-label")].map((label) => label.textContent).slice(-2)).toEqual(["Advanced", "Developer options"]);
+});
+
 test("without developer mode the list ends with Advanced", async () => {
   room();
   await open();

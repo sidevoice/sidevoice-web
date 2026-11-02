@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { host } from "../../host";
 
 /* Developer mode (operator, 2026-10-21): a hidden switch, in nightly builds only, that adds "Developer options" to
- * Settings. Android's way in: click the version in Settings › Updates ten times within five seconds; the same again
- * turns it off. It is kept on this device (localStorage) so it stays across restarts.
+ * Settings. Android's way in: tap the build in Settings › Advanced ten times within five seconds (a button, so a
+ * keyboard's Enter and Space count as taps); the same again turns it off. It works on every platform, a phone's included. It is kept on this device (localStorage) so it stays across restarts.
  *
  * "Nightly" is the desktop app's own word for its build (`host.build.channel`, host().identity.build: the one Updates already
  * reads to say "Nightly" under the version), not a second signal: a release, a development build, a build that says
@@ -14,7 +14,7 @@ export const DEVELOPER_MODE_KEY = "sidevoiceDeveloperMode";
 /** The clicks that turn developer mode on or off, and the time they all have to fall in. */
 export const TAPS_TO_TOGGLE = 10;
 export const TAP_WINDOW_MS = 5000;
-/** How long the confirmation stays beside the version. */
+/** How long the confirmation stays beside the build. */
 export const NOTE_MS = 4000;
 
 /** This build is a nightly, as the desktop app says it. */
@@ -75,7 +75,7 @@ export function createTapCounter({ taps = TAPS_TO_TOGGLE, windowMs = TAP_WINDOW_
   };
 }
 
-/** The gesture on a version: spread `props` on the text that says it, show `note` (empty, or a line of words, as a
+/** The gesture on the build: spread `props` on the button that says it, show `note` (empty, or a line of words, as a
  *  polite status) beside it. Ten clicks within five seconds toggle developer mode in a nightly; anywhere else the text
  *  is just text. A fast run of clicks does not select the word under them. */
 export function useDeveloperModeGesture() {
