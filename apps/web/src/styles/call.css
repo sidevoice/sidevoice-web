@@ -23,6 +23,18 @@
    listens; the engine turns it into a badge on a small avatar. */
 .sv-avatar[data-style=bichos]:not([data-unread]) .prop-wait,
 .sv-avatar[data-style=bichos]:is([data-mood=speaking],[data-mood=listening]) .prop-wait { display:none }
+/* The same groups' SVG text (the "!", the sleeping z's, the working glyphs) hidden on its own, not only through its group:
+   WebKit works a <text> out again (its font, its layout) on every style flush even under a display:none ancestor, and a
+   drawing holds up to ten of them: every tap that changed anything cost ~50ms per frame for the drawings alone. A text
+   that is display:none itself costs nothing. (The ones hidden by styles/bichos.css, the engine's, are the last two.) */
+.sv-avatar[data-style=bichos]:not([data-mood=working],[data-enter=working]) .prop-work text,
+.sv-avatar[data-style=bichos]:not([data-mood=listening]) .prop-listen text,
+.sv-avatar[data-style=bichos]:not([data-mood=idle],[data-mood=waiting],[data-enter=idle]) .prop-idle text,
+.sv-avatar[data-style=bichos][data-size=sidebar] :is(.prop-work,.prop-listen,.prop-idle):not(.keep-small,.badge) text,
+.sv-avatar[data-style=bichos]:not([data-unread]) .prop-wait text,
+.sv-avatar[data-style=bichos]:is([data-mood=speaking],[data-mood=listening]) .prop-wait text,
+.sv-avatar[data-style=bichos][data-unread] .zz text,
+.sv-avatar[data-style=bichos]:is([data-mood=idle],[data-mood=waiting])[data-idle]:where(:not([data-idle=nap])) .zz text { display:none }
 /* The mouth: shut unless it speaks; each spoken word (data-beat a/b) restarts the word's keyframes. */
 .sv-avatar[data-style=bichos] .m-open { opacity:0 }
 .sv-avatar[data-style=bichos][data-mood=speaking] .m-open { animation:av-talk .34s ease-in-out infinite alternate }
