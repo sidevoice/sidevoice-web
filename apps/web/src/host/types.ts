@@ -359,6 +359,7 @@ export interface HostDebugBridge {
  *  host's own text, for one language tag exactly. A host with none answers `{}`. The translator applies it over its catalogue
  *  (i18n/translator.ts); a key the catalogue no longer has is simply never read. */
 export type MessageOverlay = Readonly<Record<string, string>>;
+/* A value of the host's table that is not a non-empty string is not a text: the translator skips it. */
 
 export interface Host {
   identity: HostIdentity;

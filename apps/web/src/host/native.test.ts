@@ -335,6 +335,9 @@ describe("the host's message overlay", () => {
     expect(translator("en")("devices.speakerFixed")).toBe(browser);
     withHost({ messages: () => ({ "devices.speakerFixed": "", "devices.mic": 3 }) });
     expect(translator("en")("devices.speakerFixed")).toBe(browser);
+    expect(translator("en")("devices.mic")).toBe("Microphone");
+    withHost({ get messages() { throw new Error("no"); } });
+    expect(translator("en")("devices.speakerFixed")).toBe(browser);
     expect(host().messages("en")).toEqual({});
   });
 });

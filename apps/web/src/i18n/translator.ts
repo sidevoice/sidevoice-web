@@ -68,7 +68,9 @@ export function setMessageOverlay(source: (language: string) => Readonly<Record<
 function overlaid(language: string, key: string): string | undefined {
   for (const tag of new Set([language, language.split(/[-_]/)[0]])) {
     const table = overlaySource(tag);
-    if (Object.hasOwn(table, key)) return table[key];
+    // Only a text is a text: a host's value that is not one leaves the catalogue's.
+    const text = Object.hasOwn(table, key) ? table[key] : undefined;
+    if (typeof text === "string" && text !== "") return text;
   }
   return undefined;
 }

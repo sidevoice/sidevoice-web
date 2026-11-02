@@ -54,16 +54,21 @@ export type NativeHost = Omit<Host, "identity" | "microphone" | "presence" | "re
   voice: AppVoice | null;
 };
 
-/** The app's overlay for one language, kept to the texts the page can draw: a plain table of non-empty strings. An app
- *  without one, a language it has none for, or one that fails, has none. */
+/** The app's overlay for one language, as the app gives it (it is read as every text is drawn, so it is not copied or
+ *  filtered: the translator takes only the texts that are text). An app without one, a language it has none for, or one
+ *  that fails, has none. */
 function overlay(app: Injected | undefined, language: string): MessageOverlay {
-  const found = app?.messages;
-  if (typeof found !== "function") return {};
   try {
+    const found = app?.messages;
+    if (typeof found !== "function") return {};
     const table: unknown = found.call(app, language);
-    if (!table || typeof table !== "object") return {};
-    return Object.fromEntries(Object.entries(table).filter(([, text]) => typeof text === "string" && text !== ""));
+    return table && typeof table === "object" ? table as MessageOverlay : {};
   } catch { return {}; }
+}
+
+/** The app's overlay for `language` without the rest of the host: the translator's source. */
+export function messageOverlay(language: string): MessageOverlay {
+  return overlay(injected(), language);
 }
 
 export function nativeHost(): NativeHost {
