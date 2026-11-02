@@ -323,6 +323,10 @@
   .call-bar { grid-template-columns: minmax(0, 1fr); padding: var(--sv-space-2) var(--sv-space-2) calc(var(--sv-space-3) + var(--sv-inset-bottom)); }
   .call-bar .controls { grid-column: 1; }
   .call-bar .call-actions { gap: var(--sv-space-2); }
+  /* The tray's six buttons' widths (the microphone's pill is two, the call a little wider) share what the screen leaves,
+     down from the touch size to 40px: 360px gets 44px buttons, 412px 52px, and nothing is cut at either edge. */
+  .call-bar:not(.card-call-bar) { --sv-call-button: clamp(40px, calc((100vw - 96px) / 6), 56px); }
+  .call-bar:not(.card-call-bar) #call-controls #connect { width: calc(var(--sv-call-button) + 8px); }
 }
 /* ---------- a compact desktop window (COMPACT_QUERY): a desktop's bar, the transcript's button at its right end; the
  * join's line wraps at the tray's width rather than widening the middle column over that button ---------- */
