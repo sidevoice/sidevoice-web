@@ -4585,3 +4585,51 @@ test('The call moving to another conversation through a binding gap leaves the e
  assert.equal(s.run('SessionState.viewedThread(state)'),'fp-mac|c');
  assert.equal(s.run('focusedThread(state)'),'fp-mac|c','and foreground focus follows');
 });
+
+/* ----- an agent that leaves while its last reply sounds (sidevoice-web#462) ----- */
+// The room after core closed A: no binding, no row, A among the closed conversations.
+function agentLeaves(c){
+ c.s.context.fetch=async path=>({ok:true,status:200,json:async()=>path.includes('/participants')
+  ?{participants:[],closed_threads:['a']}:{binding:null,room:{revision:0},clients:[],call:null,messages:[]}});
+}
+const peopleOf=c=>plain(c.s.run('state.people.map(p=>[p.thread_id,p.available])'));
+const reply=(c,id)=>c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:id,text:id}});
+test('An agent that leaves while its reply plays: it is heard to the end, kept 5 s more, then the conversation goes',async()=>{
+ const c=await callOnRoom();
+ c.s.run('LEAVE_GRACE_MS=40');
+ reply(c,'last');reply(c,'queued');
+ c.voice.said[0].step({type:'playing'});
+ agentLeaves(c);
+ await c.s.run('refresh()');await settleSoon();await c.s.run('refreshPeople()');await settleSoon();
+ assert.equal(c.voice.said[0].cancelled,false,'the reply is not cut');
+ assert.deepEqual(c.voice.stopped,[],'its call is not stopped');
+ assert.deepEqual(peopleOf(c),[['a',false]],'still on screen, as gone');
+ c.voice.said[0].step({type:'done',outcome:{status:'heard'}});
+ assert.deepEqual(c.voice.said.map(s=>s.text),['last','queued'],'the queued reply follows');
+ c.voice.said[1].step({type:'playing'});c.voice.said[1].step({type:'done',outcome:{status:'heard'}});
+ await settleSoon();
+ assert.deepEqual(peopleOf(c),[['a',false]],'kept after the playback ended');
+ await new Promise(resolve=>setTimeout(resolve,80));await settleSoon();
+ assert.deepEqual(peopleOf(c),[],'then removed');
+ assert.equal(c.s.run("links.get(callNode).closed.has('a')"),true);
+ c.s.run('disconnect()');
+});
+test('An agent that leaves when nothing of its sounds or waits: the conversation closes at once',async()=>{
+ const c=await callOnRoom();
+ agentLeaves(c);
+ await c.s.run('refresh()');await settleSoon();await c.s.run('refreshPeople()');await settleSoon();
+ assert.deepEqual(peopleOf(c),[]);
+ c.s.run('disconnect()');
+});
+test('Nothing can be sent to a conversation in its leave grace',async()=>{
+ const c=await callOnRoom();
+ c.s.run('LEAVE_GRACE_MS=40');
+ reply(c,'last');c.voice.said[0].step({type:'playing'});
+ c.s.run("viewedThread='fp-mac|a'");
+ assert.equal(c.s.run('composerFor()'),'fp-mac|a','it can be written to while its agent is there');
+ agentLeaves(c);
+ await c.s.run('refreshPeople()');await settleSoon();
+ assert.equal(c.s.run('isLeaving("a")'),true);
+ assert.equal(c.s.run('composerFor()'),null,'no text box for it');
+ c.s.run('disconnect()');
+});
