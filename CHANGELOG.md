@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.2](https://github.com/sidevoice/sidevoice-web/compare/v0.17.1...v0.17.2) (2026-11-03)
+
+
+### Bug Fixes
+
+* **settings:** Automatic follows the current recommended build ([#450](https://github.com/sidevoice/sidevoice-web/issues/450)) ([4e7b789](https://github.com/sidevoice/sidevoice-web/commit/4e7b789e6a3aab680f99f123124710169b9512eb))
+
 ## [0.17.1](https://github.com/sidevoice/sidevoice-web/compare/v0.17.0...v0.17.1) (2026-11-02)
 
 
