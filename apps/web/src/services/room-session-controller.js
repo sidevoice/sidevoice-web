@@ -126,7 +126,9 @@ function parseRemovals(text){
   return Array.isArray(rows)?rows.map(row=>{const card=cardOf(row,row?.node);return card&&{node:card.node,thread_id:card.thread_id,...(typeof row.id==='string'?{id:row.id}:{}),...(row.taken===true?{taken:true}:{})}}).filter(Boolean):[];
  }catch{return []}
 }
-const readRemovals=()=>parseRemovals(pageStorage()?.getItem(REMOVALS_KEY));
+// A store that cannot be read says none, and takes no change (`changeRemovals`): a removal is never kept over what is unknown.
+const readRemovalsStrict=()=>parseRemovals(pageStorage()?.getItem(REMOVALS_KEY));
+function readRemovals(){try{return readRemovalsStrict()}catch{return []}}
 const removalKey=row=>row.node+'\0'+row.thread_id+'\0'+(row.id??'');
 let pendingRemovals=readRemovals();
 const removing=(fp,thread)=>pendingRemovals.some(row=>row.node===fp&&row.thread_id===thread);
@@ -137,7 +139,7 @@ const sameRemoval=(fp,thread,id)=>row=>row.node===fp&&row.thread_id===thread&&(i
 // 'stored' (written and read back), 'refused' (`change` said no) or 'failed' (the browser kept nothing).
 function changeRemovals(change){
  return pageHost().exclusive(REMOVALS_LOCK,()=>{
-  const next=change(readRemovals());if(next==null)return 'refused';
+  const next=change(readRemovalsStrict());if(next==null)return 'refused';
   const store=pageStorage();if(!store)return 'failed';
   const text=JSON.stringify(next);
   if(next.length)store.setItem(REMOVALS_KEY,text);else store.removeItem(REMOVALS_KEY);
@@ -161,12 +163,18 @@ function hideRemoved(fp,thread){
 // Each removal is applied once on a tab, by its id: an event delivered late, about one this tab already applied (and which may
 // have been settled, and the conversation revived and written to since), changes nothing.
 const appliedRemovals=new Set();
+// Bounded, and never at the cost of a removal still in the store: only the oldest ids the store no longer holds are let go of.
+function trimApplied(){
+ if(appliedRemovals.size<=4096)return;
+ const live=new Set(pendingRemovals.map(removalKey));
+ for(const key of appliedRemovals){if(appliedRemovals.size<=2048)break;if(!live.has(key))appliedRemovals.delete(key)}
+}
 function applyRemoval(row){
  if(!row)return;
  const key=removalKey(row);
  if(appliedRemovals.has(key))return;
  appliedRemovals.add(key);
- if(appliedRemovals.size>512)appliedRemovals.delete(appliedRemovals.values().next().value);
+ trimApplied();
  void hideRemoved(row.node,row.thread_id);
 }
 function hideAllRemoved(){for(const row of pendingRemovals)applyRemoval(row)}
@@ -1181,6 +1189,9 @@ async function refreshPeople(fp=state.callNode){
   const removedHere=new Set(pendingRemovals.filter(row=>row.node===fp).map(row=>row.thread_id));
   const settled=pendingRemovals.filter(row=>row.node===fp&&row.taken&&acknowledged.has(removalKey(row)));
   if(settled.length){
+   // Settled, they are applied as far as this tab is concerned: an event about them arriving late must not apply them
+   // to the conversation as the revival shows it.
+   for(const row of settled)appliedRemovals.add(removalKey(row));
    // Only the removals read, under the id they were read with: one made again since is another and stays.
    void changeRemovals(list=>list.filter(row=>!settled.some(done=>sameRemoval(done.node,done.thread_id,done.id)(row)&&row.taken)));
   }

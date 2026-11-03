@@ -2,13 +2,13 @@ const fs=require('node:fs'),vm=require('node:vm'),test=require('node:test'),{moc
 // This device's pairing, as the page keeps it, for every test that does not say otherwise: the machine proved itself
 // at the page's own origin a moment ago, so requests go where they always went and carry its token.
 const PAIRED={fp:'fp-mac',public_key:'pk',host:'macbook',urls:['http://127.0.0.1:8768'],device_id:'dev-1',token:'tok-1',paired_at:1};
-function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,siteData=null,localHost=null,nativeData=null,indexedDB=null,outboxScope=null,readingMode=false}={}){
+function setup({readThrows=null,strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,siteData=null,localHost=null,nativeData=null,indexedDB=null,outboxScope=null,readingMode=false}={}){
  const sourceRoot=__dirname+'/../src'; const uiSource=fs.readdirSync(sourceRoot,{recursive:true}).filter(file=>String(file).endsWith('.tsx')).map(file=>fs.readFileSync(sourceRoot+'/'+file,'utf8')).join('\n');
  class Element{constructor(id){this.id=id;this.children=[];this.dataset={};this.style={setProperty(){}};this.classList={add(){},remove(){}};this.parentElement=this;this.listeners={};this.attributes={}}addEventListener(name,fn){this.listeners[name]=fn}showModal(){this.open=true}close(){this.open=false;this.listeners.close?.()}contains(node){return node===this||this.children.includes(node)}removeAttribute(){}closest(){return null}querySelector(){return null}append(...children){this.children.push(...children)}replaceChildren(...children){this.children=[...children]}remove(){}setAttribute(name,value){this.attributes[name]=value}getAttribute(name){return this.attributes[name]}click(){this.onclick?.()}}
  const elements=new Map(),handlers={},documentHandlers={},observers=[];
  if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element(match[1]));for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','stats-recognition','stats-response'])elements.set(id,new Element(id))}
  const saved=siteData??(stored?{'sidevoice.pairings':JSON.stringify(stored)}:{});
- const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element(id))}return elements.get(id)},body:new Element('body'),createElement:()=>new Element(),addEventListener:(name,fn)=>(documentHandlers[name]??=[]).push(fn)},window:{addEventListener:(name,fn)=>handlers[name]=fn},MutationObserver:class{constructor(fn){observers.push(fn)}observe(){}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
+ const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>{if(readThrows&&key===readThrows)throw new Error('blocked');return saved[key]??null},setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element(id))}return elements.get(id)},body:new Element('body'),createElement:()=>new Element(),addEventListener:(name,fn)=>(documentHandlers[name]??=[]).push(fn)},window:{addEventListener:(name,fn)=>handlers[name]=fn},MutationObserver:class{constructor(fn){observers.push(fn)}observe(){}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
  if(localHost||nativeData)context.window.__sidevoiceHost={host:{...(localHost?{localHost}:{}),...(nativeData?{pairings:nativeData.pairings}:{})}};
  // The outbox's storage across reloads, and this tab's scope in it.
  if(indexedDB)context.indexedDB=indexedDB;
@@ -4486,6 +4486,25 @@ test('A delayed event about a removal this tab applied, settled and saw revived,
  s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r2'}]);
  s.handlers.storage({key:'sidevoice.pending-removals.v1',oldValue:null,newValue:s.saved['sidevoice.pending-removals.v1']});
  assert.equal(s.run('queuedTexts().length'),0,'a removal made again is another and applies');
+});
+test('A removal settled and revived here is applied for good: a delayed event about it cancels nothing written since (web#375)',async()=>{
+ const s=setup();await settleSoon();
+ const taken=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1',taken:true}]);
+ s.saved['sidevoice.pending-removals.v1']=taken;
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({participants:[{thread_id:'a',available:true}],closed_threads:[]})});
+ await s.run("refreshPeople('fp-mac')");await settleSoon();
+ assert.equal(s.run("linkOf('fp-mac').people.length"),1,'the machine lists it again');
+ s.run("queueText('fp-mac|a','written after the revival')");
+ s.handlers.storage({key:'sidevoice.pending-removals.v1',oldValue:taken,newValue:null});
+ assert.equal(s.run('queuedTexts().length'),1);
+});
+test('A store that cannot be read does not stop the page, and keeps no removal (web#375)',async()=>{
+ const s=setup({readThrows:'sidevoice.pending-removals.v1'});
+ assert.deepEqual(plain(s.run('readRemovals()')),[]);
+ const bn=bannerOf(s);
+ await s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");
+ assert.match(bn.now(),/could not keep the removal|browser could not keep/);
+ assert.equal(s.run('pendingRemovals.length'),0,'and nothing is hidden for it');
 });
 test('Choosing a conversation of an away machine leaves the call where it is and shows no "No machine available"',async()=>{
  const c=await callWithTwoMachines();const {s}=c,bn=bannerOf(s);
