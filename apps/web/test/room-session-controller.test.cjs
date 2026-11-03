@@ -4510,7 +4510,7 @@ test('A store that cannot be read does not stop the page, and keeps no removal (
  assert.deepEqual(plain(s.run('readRemovals()')),[]);
  const bn=bannerOf(s);
  await s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");
- assert.match(bn.now(),/could not keep the removal|browser could not keep/);
+ assert.match(bn.now(),/could not be saved/);
  assert.equal(s.run('pendingRemovals.length'),0,'and nothing is hidden for it');
 });
 test('Choosing a conversation of an away machine leaves the call where it is and shows no "No machine available"',async()=>{
