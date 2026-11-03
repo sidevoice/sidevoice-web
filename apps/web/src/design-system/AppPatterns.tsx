@@ -26,6 +26,7 @@ import { MachineState, machineEntryName } from "../features/settings/MachineStat
 import type { MachineView } from "../state/room-types";
 import type { LocalHostStatus } from "../host";
 import { NewConversation } from "../features/room/NewConversation";
+import { CONNECT_VARIANTS, ConnectYourAgent } from "../features/room/ConnectYourAgent";
 import { CONNECTOR_INSTALL, CONNECTOR_PAIR_DEVICE } from "../features/pairing/connector-commands";
 
 /* The app's whole vocabulary drawn with the design system: every surface of the room, the call, the transcript, the
@@ -520,6 +521,28 @@ function EmptyStates() {
   );
 }
 
+/** New conversation's panel, as each of its variants draws it (an open decision, sidevoice-web#463; VARIANTS `connectAgent`). */
+const CONNECT_NOTES: Record<(typeof CONNECT_VARIANTS)[number], string> = {
+  current: "Today's: title, line and the quoted phrase.",
+  creature: "A · Creature-led: the creature waits on the dark stage, one button copies.",
+  chip: "B · Chip: the phrase is a pill that copies on a tap, the tool's name in code.",
+  steps: "C · Steps: three steps, the creature waiting beside the title.",
+  minimal: "D · Minimal: a line and the phrase, nothing else.",
+};
+
+function ConnectVariants() {
+  return (
+    <div className="pt-variants" data-testid="connect-variants">
+      {CONNECT_VARIANTS.map((variant) => (
+        <figure className="pt-variant" key={variant} data-variant={variant}>
+          <div className="ui-popover pt-variant-panel"><ConnectYourAgent why variant={variant} /></div>
+          <figcaption>{CONNECT_NOTES[variant]}</figcaption>
+        </figure>
+      ))}
+    </div>
+  );
+}
+
 function Stats() {
   return (
     <DialogSurface titleId="pt-stats-title" eyebrow="Call diagnostics" title="Connection and latency" onClose={() => {}}
@@ -609,6 +632,9 @@ export function AppPatterns() {
       </Pattern>
       <Pattern title="Empty states" note="No machine yet (the first screen without setup), and the small ones inside lists.">
         <EmptyStates />
+      </Pattern>
+      <Pattern title="New conversation · connect your agent (open decision)" note="What the New conversation panel (and the setup's last step) says. The page cannot start a conversation, so it tells you what to say to your agent. Variants for sidevoice-web#463; the app shows today's until one is picked (VARIANTS connectAgent).">
+        <ConnectVariants />
       </Pattern>
       <Pattern title="Connection statistics dialog" note="The call's diagnostics: medians as figures, the connection's facts, and the last turns.">
         <Frame className="pt-frame--dialog"><Stats /></Frame>
