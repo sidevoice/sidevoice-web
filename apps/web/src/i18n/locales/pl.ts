@@ -1376,6 +1376,8 @@ export const messages: Messages = {
   "card.systemDefault": "Domyślne systemowe",
   "card.skip": "Pomiń to, co gra",
   "card.hangUp": "Rozłącz",
+  "liveActivity.skipShort": "Pomiń",
+  "liveActivity.routeName": "Wyjście audio: {route}",
   "card.yourMicrophone": "Twój mikrofon",
   "card.reach.holding": "nie może odbierać",
   "card.reach.offline": "offline",

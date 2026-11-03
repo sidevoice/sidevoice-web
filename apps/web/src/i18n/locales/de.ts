@@ -1358,6 +1358,8 @@ export const messages: Messages = {
   "card.systemDefault": "Systemstandard",
   "card.skip": "Aktuelle Wiedergabe überspringen",
   "card.hangUp": "Auflegen",
+  "liveActivity.skipShort": "Überspringen",
+  "liveActivity.routeName": "Audioausgabe: {route}",
   "card.yourMicrophone": "Dein Mikrofon",
   "card.reach.holding": "kein Empfang",
   "card.reach.offline": "offline",

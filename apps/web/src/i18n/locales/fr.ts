@@ -1355,6 +1355,8 @@ export const messages: Messages = {
   "card.systemDefault": "Par défaut du système",
   "card.skip": "Passer la lecture en cours",
   "card.hangUp": "Raccrocher",
+  "liveActivity.skipShort": "Passer",
+  "liveActivity.routeName": "Sortie audio : {route}",
   "card.yourMicrophone": "Votre micro",
   "card.reach.holding": "ne peut pas recevoir",
   "card.reach.offline": "hors ligne",
