@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.18.0](https://github.com/sidevoice/sidevoice-web/compare/v0.17.2...v0.18.0) (2026-11-03)
+
+
+### Features
+
+* **call:** project the call surface for native hosts ([#458](https://github.com/sidevoice/sidevoice-web/issues/458)) ([7f9a7d3](https://github.com/sidevoice/sidevoice-web/commit/7f9a7d36718c9ec0cb769a11eddf5fe75c02f61a))
+* **conversations:** remove a conversation locally while its machine is away ([#452](https://github.com/sidevoice/sidevoice-web/issues/452)) ([7bbafd6](https://github.com/sidevoice/sidevoice-web/commit/7bbafd6a85a24d8ce7345ea484402657968bde24))
+* **room:** let a phone app's call surface open the conversations ([#460](https://github.com/sidevoice/sidevoice-web/issues/460)) ([e51f315](https://github.com/sidevoice/sidevoice-web/commit/e51f3157377752bbb3aad3ab9f122b144fb6ae34))
+* **settings:** developer option to treat phone calls as system calls ([#457](https://github.com/sidevoice/sidevoice-web/issues/457)) ([b6fb6f4](https://github.com/sidevoice/sidevoice-web/commit/b6fb6f45e7d2cfffcd378e519b27ef8880d1d12c))
+
 ## [0.17.2](https://github.com/sidevoice/sidevoice-web/compare/v0.17.1...v0.17.2) (2026-11-03)
 
 
