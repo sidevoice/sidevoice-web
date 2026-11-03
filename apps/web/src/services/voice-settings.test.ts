@@ -218,3 +218,12 @@ test("a chosen build that no longer runs gives way to the engine's own choice: r
   // A build that does run stays as chosen.
   expect(voiceOutput(voiceSettingsToLoad({ ...settings, tts: { ...settings.tts, build: "stale/cpu" } }, catalogs(true))).tts).toEqual({ catalog: "local", model: "stale-model", build: "stale/cpu" });
 });
+
+test("Automatic is ready by the build recommended now: a new recommendation not on disk makes it not ready (sidevoice-web#449)", () => {
+  const build = (id: string, installed: boolean) => ({ id, backend: "x", precision: "q8", downloadBytes: 1, memoryMb: 1, available: true, installed, reasons: [] });
+  const catalogs = (recommendedBuild: string) => [{ id: "local", name: null, status: { stale: false }, models: [{ id: "m", family: "m", capabilities: ["stt"], languages: [], voices: [], installed: true, recommendedBuild,
+    builds: [build("m/sherpa", true), build("m/metal", false)] }] }] as unknown as CatalogView[];
+  const settings = { ...defaultVoiceSettings(), stt: { ...defaultVoiceSettings().stt, catalog: "local", model: "m" } };
+  expect(modelReady(settings, "stt", catalogs("m/sherpa"))).toBe(true);
+  expect(modelReady(settings, "stt", catalogs("m/metal"))).toBe(false);
+});

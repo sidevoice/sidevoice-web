@@ -170,3 +170,12 @@ test("loading reports progress per model", async () => {
   await source.speaker(tts());
   expect(seen).toEqual(["silero-vad", "whisper-base", "kokoro-82m-v1.0"]);
 });
+
+test("Automatic loads the build recommended now, not the one that happens to be on disk (sidevoice-web#449)", async () => {
+  const model = local("whisper-base", ["stt"], [build("whisper-base/sherpa-int8", { installed: true }), build("whisper-base/whispercpp-metal", { installed: false })]);
+  const { engine } = fakeEngine({ catalogs: { local: [{ ...model, recommendedBuild: "whisper-base/whispercpp-metal" }] } });
+  const load = vi.fn(async (id: string) => ({ id, asStt: () => ({ transcribe: async () => "hola" }) }));
+  (engine as unknown as { load: unknown }).load = load;
+  await engineVoiceSource(engine).transcriber(stt());
+  expect(load).toHaveBeenCalledWith("whisper-base", "whisper-base/whispercpp-metal", expect.any(Function));
+});

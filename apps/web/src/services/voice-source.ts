@@ -62,12 +62,12 @@ function catalogOf(engine: WebEngine, id: string): Catalog {
 
 /** Why `choice` cannot fill a slot of `capability`, as a refusal, or null when it can: its catalogue lists it, for the
  *  task, and a local one runs here. A catalogue that cannot list its models refuses with its own code. */
-async function choiceRefusal(engine: WebEngine, choice: ModelChoice, capability: Capability): Promise<Error | null> {
+async function choiceRefusal(engine: WebEngine, choice: ModelChoice, capability: Capability): Promise<{ refusal: Error | null; model?: ModelInfo }> {
   const listed = (await catalogOf(engine, choice.catalog).models(capability).catch((error: unknown) => { throw asRefusal(error); })) as ModelInfo[];
   const model = listed.find((candidate) => candidate.id === choice.model);
-  if (!model) return voiceRefusal("model-unknown");
-  if (choice.catalog === LOCAL_CATALOG && !runsHere(model as LocalModelInfo)) return voiceRefusal("model-unfit");
-  return null;
+  if (!model) return { refusal: voiceRefusal("model-unknown") };
+  if (choice.catalog === LOCAL_CATALOG && !runsHere(model as LocalModelInfo)) return { refusal: voiceRefusal("model-unfit"), model };
+  return { refusal: null, model };
 }
 
 /** The engine's VAD as the voice's: one stream, its frames as they come. */
@@ -118,7 +118,7 @@ export interface VoiceSourceOptions {
 /** The page's source of models for `createVoiceHost`, over `engine`. */
 export function engineVoiceSource(engine: WebEngine, { onProgress }: VoiceSourceOptions = {}): VoiceModelSource {
   const progress = (model: string) => (value: Progress) => onProgress?.(model, value);
-  // A build the person chose (Settings, "How it runs") is loaded as such; else the engine picks one installed that runs.
+  // A build the person chose (Settings, "How it runs") is loaded as such; with Automatic, the recommended one (see `chosen`).
   const load = (choice: ModelChoice) => ((choice.build && choice.catalog === "local"
     ? engine.load(choice.model, choice.build, progress(choice.model))
     : catalogOf(engine, choice.catalog).load(choice.model, progress(choice.model))) as Promise<Model>)
@@ -127,9 +127,12 @@ export function engineVoiceSource(engine: WebEngine, { onProgress }: VoiceSource
   const chosen = async (slot: VoiceModelChoice, capability: Capability): Promise<Model> => {
     const choice = choiceOf(slot);
     if (!choice) throw voiceRefusal("model-unknown");
-    const refusal = await choiceRefusal(engine, choice, capability);
+    const { refusal, model } = await choiceRefusal(engine, choice, capability);
     if (refusal) throw refusal;
-    return load(choice);
+    // Automatic is the recommendation as it stands now, not whichever build happens to be on disk (the engine's own
+    // choice with no build): resolved here, at use time, so a new recommendation is followed (sidevoice-web#449).
+    const recommended = choice.catalog === LOCAL_CATALOG && !choice.build ? (model as LocalModelInfo | undefined)?.recommendedBuild : undefined;
+    return load(recommended ? { ...choice, build: recommended } : choice);
   };
   return {
     async vad(): Promise<VoiceVadModel> {
