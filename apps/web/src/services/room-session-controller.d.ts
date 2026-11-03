@@ -26,6 +26,8 @@ declare global {
       playbackLevel?: import("../state/playback-level").PlaybackLevelChannel;
       /** Opens Settings at a section (the desktop card's gear: `floating-card`). */
       openSettings?(section: string): void;
+      /** Puts the conversations' list in front (a phone app's call surface: its stack of conversations tapped). */
+      openConversations?(): void;
     };
     /** The meter's analyser, pulled per animation frame by the waveform bubble; null while no call captures. */
     sidevoiceAudio?: { readWaveform(): Float32Array | null; level?(): number };
