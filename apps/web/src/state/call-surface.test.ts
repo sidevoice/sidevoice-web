@@ -2,6 +2,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { createRoomSessionStore, speakWith } from "./room-session-state.js";
 import { spokenPage, modelLabel, stillId, SURFACE_PAGE_CHARS, STILL_PX, FACE_PX } from "./call-surface.js";
 import { startCallSurface, PAGE_SURFACE_MS, type SurfaceClock } from "./call-surface-publisher";
+import { readOn } from "../features/call/speech-chunks";
 import { PAGE_MS } from "../features/call/PagedText";
 
 speakWith((key, params) => key + (params ? " " + JSON.stringify(params) : ""));
@@ -37,7 +38,7 @@ test("model as people say it, effort in the data; the others as up to three face
 test("the page names a model in one place: known ids formatted, anything else unchanged", () => {
   expect(modelLabel("claude-opus-5-5")).toBe("Opus 5.5");
   expect(modelLabel("claude-sonnet-4-5-20250929")).toBe("Sonnet 4.5");
-  expect(modelLabel("claude-opus-5")).toBe("Opus 5");
+  expect(modelLabel("claude-opus-5")).toBe("claude-opus-5");
   expect(modelLabel("gpt-6-astra")).toBe("gpt-6-astra");
   expect(modelLabel("claude-fable-9")).toBe("claude-fable-9");
   expect(modelLabel(null)).toBeNull();
@@ -288,4 +289,55 @@ test("workingSince is the call's conversation's busy start while it shows as wor
   expect(store.getState().callSurface).toMatchObject({ workingSince: 1000, words: { state: "state.working" } });
   const idle = createRoomSessionStore({ ...base } as never);
   expect(idle.getState().callSurface.workingSince).toBeNull();
+});
+
+test("a model id the page does not know passes through, never a made-up name", () => {
+  expect(modelLabel("claude-opus-999-42")).toBe("claude-opus-999-42");
+  expect(modelLabel("claude-opus-5-9")).toBe("claude-opus-5-9");
+  expect(modelLabel("claude-opus-5-5-20261101")).toBe("Opus 5.5");
+});
+
+test("workingSince is only sent in the working state: a busy conversation that is holding sends none", () => {
+  const holding = people.map((p) => p.thread_id === "a" ? { ...p, reach: { state: "holding" } } : p);
+  const store = createRoomSessionStore({ ...base, people: holding, harness: { "n|a": true }, workingSince: { "n|a": 1000 }, now: 1000 + 60_000 } as never);
+  expect(store.getState().callSurface).toMatchObject({ workingSince: null, words: { state: "state.holding" } });
+});
+
+test("the estimated reading rounds down when asked: never a character ahead of the voice", () => {
+  const first = readOn(null, "s", true, null, 0, Math.floor)!;
+  const later = readOn(first, "s", true, null, 99, Math.floor)!; // 0.099 s x 15 = 1.485 characters
+  expect(later.position).toBe(1);
+  expect(readOn(first, "s", true, null, 99)!.position).toBe(1);
+  expect(readOn(first, "s", true, null, 120, Math.floor)!.position).toBe(1); // 1.8 -> 1, where round gives 2
+  expect(readOn(first, "s", true, null, 120)!.position).toBe(2);
+});
+
+test("a host that reloads holds none of the stills: the refs go, then every PNG is sent to the new one", async () => {
+  const store = room();
+  const first = host(), second = host();
+  let current = first;
+  startCallSurface(store, { clock: clock(), bridge: () => current, draw: async (id, px) => ({ png: "png-" + id, px, k: 1 }) });
+  await vi.waitFor(() => expect(first.still).toHaveBeenCalledTimes(4));
+  current = second;
+  store.patch({ botLive: false });
+  await vi.waitFor(() => expect(second.still).toHaveBeenCalledTimes(4));
+  expect(store.getState().callSurface.still).toEqual({ id: stillId("n|a", STILL_PX), k: 1 });
+  expect(second.still).toHaveBeenCalledWith({ id: stillId("n|a", STILL_PX), png: "png-n|a", px: STILL_PX });
+});
+
+test("a still is let go of only after the snapshot stops naming it: on removal, on close and on stop", async () => {
+  const store = room();
+  const api = host();
+  const named = () => { const view = store.getState().callSurface; return [view.still?.id, ...view.others.map((o) => o.still?.id)].filter(Boolean); };
+  const forgotten: string[][] = [];
+  api.forget.mockImplementation((ids: string[]) => { forgotten.push(ids.filter((id) => named().includes(id))); });
+  const stop = startCallSurface(store, options(api, clock(), async (id, px) => ({ png: "png-" + id, px, k: 1 })));
+  await vi.waitFor(() => expect(api.still).toHaveBeenCalledTimes(4));
+  store.patch({ people: people.filter((p) => p.thread_id !== "b") });
+  expect(api.forget).toHaveBeenCalledWith([stillId("n|b", FACE_PX)]);
+  await vi.waitFor(() => expect(api.still).toHaveBeenCalledTimes(5));
+  stop();
+  expect(store.getState().facts.surfaceLive).toBeNull();
+  expect(api.forget).toHaveBeenCalledTimes(2);
+  expect(forgotten).toEqual([[], []]);
 });

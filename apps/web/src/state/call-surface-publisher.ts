@@ -43,6 +43,8 @@ export function startCallSurface(store: RoomStore, options: SurfaceOptions = {})
   const drawing = new Set<string>();
   let shown = new Map<string, { thread: string; px: number }>();
 
+  /** The host the stills were handed to: a new instance (the app reloaded) holds none of them. */
+  let host_: CallSurfaceBridge | null = null;
   const active = () => !!bridge()?.active();
   const publish = () => store.patch({ surfaceLive: { page: live.page, said: live.said, stills: live.stills } });
   const same = (a: SpokenPage | null, b: SpokenPage | null) => a?.text === b?.text && a?.lit === b?.lit;
@@ -59,11 +61,12 @@ export function startCallSurface(store: RoomStore, options: SurfaceOptions = {})
   function disengage() {
     clearTimers();
     const ids = Object.keys(live.stills);
-    if (ids.length) bridge()?.forget(ids);
     live = { page: null, said: null, stills: {} };
     reading = null; pageAt = -Infinity; seen = ""; baselined = false; callThread = undefined; shown = new Map();
     engaged = false;
+    // The snapshot first, so none names a still that is gone; then the host lets go of them.
     store.patch({ surfaceLive: null });
+    if (ids.length) host_?.forget(ids);
   }
 
   /** The call moved to another conversation: what was said, read and shown of the last one is not this one's. */
@@ -78,7 +81,7 @@ export function startCallSurface(store: RoomStore, options: SurfaceOptions = {})
   function currentPage(): SpokenPage | null {
     const state = store.getState();
     const reply = callView().saying ?? null;
-    reading = readOn(reading && reply && reading.segment === reply.segment ? reading : null, reply?.segment ?? null, !!reply && state.facts.botLive === true, reply?.karaoke ?? null, clock.now());
+    reading = readOn(reading && reply && reading.segment === reply.segment ? reading : null, reply?.segment ?? null, !!reply && state.facts.botLive === true, reply?.karaoke ?? null, clock.now(), Math.floor);
     if (!reply || !reading || reading.segment !== reply.segment) return null;
     return spokenPage(reply.text, readingPosition(reading), undefined, state.callCard.language);
   }
@@ -122,6 +125,12 @@ export function startCallSurface(store: RoomStore, options: SurfaceOptions = {})
 
   /** The stills of the conversations shown: handed to the host once each, and the ones no longer shown given back. */
   function wantStills() {
+    const now = bridge();
+    if (now !== host_) {
+      // A new host instance has none of what was handed over: the snapshot lets go of the refs, then each still goes again.
+      host_ = now;
+      if (Object.keys(live.stills).length) { live = { ...live, stills: {} }; publish(); }
+    }
     const state = store.getState();
     const current = state.callCard.conversation;
     const faces = state.participants.filter((p) => p.threadId !== current).slice(0, SURFACE_OTHERS).map((p) => p.threadId);
@@ -129,18 +138,20 @@ export function startCallSurface(store: RoomStore, options: SurfaceOptions = {})
       .map(([thread, px]) => [stillId(thread, px), { thread, px }] as const));
     const stale = Object.keys(live.stills).filter((id) => !shown.has(id));
     if (stale.length) {
-      bridge()?.forget(stale);
       live = { ...live, stills: Object.fromEntries(Object.entries(live.stills).filter(([id]) => shown.has(id))) };
       publish();
+      host_?.forget(stale);
     }
     for (const [id, { thread, px }] of shown) {
       if (live.stills[id] || drawing.has(id)) continue;
       drawing.add(id);
+      const target = host_;
       void draw(thread, px).then((still) => {
         drawing.delete(id);
         if (stopped || !engaged || !still || !shown.has(id)) return;
+        if (bridge() !== target) { wantStills(); return; } // The host changed while it drew: its own copy goes to the new one.
         // The bytes first, so a snapshot never names a still the host does not hold.
-        bridge()?.still({ id, png: still.png, px: still.px });
+        target?.still({ id, png: still.png, px: still.px });
         live = { ...live, stills: { ...live.stills, [id]: { id, k: still.k } } };
         publish();
       });
@@ -150,6 +161,7 @@ export function startCallSurface(store: RoomStore, options: SurfaceOptions = {})
   function look() {
     if (!active()) { if (engaged) disengage(); return; }
     engaged = true;
+    if (bridge() !== host_) seen = "";
     const state = store.getState();
     const { facts } = state;
     const thread = state.callCard.conversation;
@@ -175,6 +187,6 @@ export function startCallSurface(store: RoomStore, options: SurfaceOptions = {})
     stopped = true;
     stop();
     clearTimers();
-    if (engaged) { const ids = Object.keys(live.stills); if (ids.length) bridge()?.forget(ids); }
+    if (engaged) { const ids = Object.keys(live.stills); live = { page: null, said: null, stills: {} }; store.patch({ surfaceLive: null }); if (ids.length) host_?.forget(ids); }
   };
 }
