@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.0](https://github.com/sidevoice/sidevoice-web/compare/v0.18.0...v0.19.0) (2026-11-03)
+
+
+### Features
+
+* **call:** show "can't receive" on the stage, call card and header ([#459](https://github.com/sidevoice/sidevoice-web/issues/459)) ([b6210b4](https://github.com/sidevoice/sidevoice-web/commit/b6210b412fdc32c2ba6eb29c4dafd183b4bb51f8))
+
 ## [0.18.0](https://github.com/sidevoice/sidevoice-web/compare/v0.17.2...v0.18.0) (2026-11-03)
 
 
