@@ -1406,4 +1406,7 @@ export const messages: Messages = {
   "session.audio.reason.heard_elsewhere": "Ascoltato su un altro dispositivo",
   "room.failure.replayUnavailable": "La riproduzione non è disponibile mentre le risposte vocali sono disattivate o stai parlando.",
   "room.failure.inputBacklogFull": "Ci sono troppi messaggi in attesa. Riprova tra poco.",
+  "settings.developer.systemCall": "Tratta le chiamate come chiamate di sistema (CallKit / Telecom)",
+  "settings.developer.systemCall.hint": "Attivo: la chiamata è una telefonata del sistema stesso, con la sua scheda nella schermata di blocco, la schermata di chiamata e i pulsanti di cuffie o auto. Disattivo: la chiamata propria dell’app, con la sua notifica. Vale dalla chiamata successiva.",
+  "settings.developer.group.calls": "Chiamate",
 };

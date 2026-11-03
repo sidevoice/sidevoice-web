@@ -1388,4 +1388,7 @@ export const messages: Messages = {
   "session.audio.reason.heard_elsewhere": "Auf einem anderen Gerät gehört",
   "room.failure.replayUnavailable": "Während gesprochene Antworten aus sind oder du sprichst, ist die Wiedergabe nicht verfügbar.",
   "room.failure.inputBacklogFull": "Zu viele Nachrichten warten. Versuche es gleich noch einmal.",
+  "settings.developer.systemCall": "Anrufe als Systemanrufe behandeln (CallKit / Telecom)",
+  "settings.developer.systemCall.hint": "An: Der Anruf ist ein Telefonanruf des Systems selbst, mit Karte auf dem Sperrbildschirm, Anrufbildschirm und den Tasten von Headset oder Auto. Aus: der eigene Anruf der App mit eigener Benachrichtigung. Gilt ab dem nächsten Anruf.",
+  "settings.developer.group.calls": "Anrufe",
 };

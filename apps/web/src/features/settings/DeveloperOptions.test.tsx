@@ -4,6 +4,7 @@ import { DeveloperOptions } from "./DeveloperOptions";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import type { DebugSwitch } from "../../host";
+import { translator } from "../../i18n/translator";
 
 afterEach(() => {
   cleanup();
@@ -34,7 +35,7 @@ function withDebug({ available = ALL, initial = {}, set }: { available?: DebugSw
 }
 
 function mount() {
-  return render(<RoomProvider store={createRoomStore()}><DeveloperOptions /></RoomProvider>);
+  return render(<RoomProvider store={createRoomStore()}><DeveloperOptions t={translator("en")} /></RoomProvider>);
 }
 /** The switch of a row, by what it says. */
 const toggle = (name: string) => screen.getByRole("switch", { name });
@@ -232,4 +233,12 @@ test("a phone's host.debug offers one switch, Treat calls as system calls, off u
   expect(debug.set).toHaveBeenLastCalledWith("systemCall", true);
   expect(held.systemCall).toBe(true);
   expect(toggle(label)).toHaveAttribute("aria-checked", "true");
+});
+
+test("the system-call switch and its Calls group are the catalogue's words, in the language of the page", async () => {
+  withDebug({ available: ["systemCall"] });
+  cleanup();
+  render(<RoomProvider store={createRoomStore()}><DeveloperOptions t={translator("es")} /></RoomProvider>);
+  expect(groups()).toContain("Llamadas");
+  expect(screen.getAllByRole("switch").map((s) => s.getAttribute("aria-label"))).toEqual(["Tratar las llamadas como llamadas del sistema (CallKit / Telecom)"]);
 });

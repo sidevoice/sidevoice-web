@@ -214,7 +214,7 @@ const SettingsPanes = memo(function SettingsPanes({ current, language, microphon
     <Pane id="machines" current={current}><MachineList /></Pane>
     {updatesShown && <Pane id="updates" current={current}><UpdatesSettings /></Pane>}
     <Pane id="advanced" current={current}><AdvancedSettings t={t} /></Pane>
-    {developerShown && <Pane id="developer" current={current}><DeveloperOptions /></Pane>}
+    {developerShown && <Pane id="developer" current={current}><DeveloperOptions t={t} /></Pane>}
   </div>;
 });
 

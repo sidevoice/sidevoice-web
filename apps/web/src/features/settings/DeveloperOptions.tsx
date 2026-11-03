@@ -1,6 +1,8 @@
 import { useRef, useState, type ReactNode } from "react";
 import { Group, Row, Section } from "../../components/ui/Card";
 import { Switch } from "../../components/ui/Switch";
+import type { MessageKey } from "../../i18n/locales/en";
+import type { Translate } from "../../i18n/translator";
 import { host, type DebugSwitch, type HostDebugBridge } from "../../host";
 import { setAnimatedThumbnails, useAnimatedThumbnails } from "../../lib/animated-thumbnails";
 import { setDeveloperMode, useDeveloperMode } from "./developer-mode";
@@ -8,21 +10,22 @@ import { TurnTuningDev } from "./TurnTuningDev";
 
 /* Developer options: a Settings section for whoever tests Sidevoice, below Advanced. Shown while developer mode is on
  * (a nightly build; click the version in Updates ten times, developer-mode.ts) or, for a browser or a playground that
- * cannot, with the turn-tuning flag (TurnTuningDev.tsx). Deliberately English-only and outside the i18n catalogues, as
- * the turn tuning panel it holds is. */
+ * cannot, with the turn-tuning flag (TurnTuningDev.tsx). The section is deliberately English-only and outside the i18n
+ * catalogues, as the turn tuning panel it holds is; the phone's "system calls" switch is new and follows the repo's rule
+ * (every user-facing text is a catalogue key), so its words and its Calls group come from the catalogues. */
 
 export const DEVELOPER_OPTIONS_TITLE = "Developer options";
 
 /** The switches of the desktop app's `host.debug`, in the order shown, each with the words under it. The app says which
  *  of them its platform has (`available`); the others are not drawn. */
-const DEBUG_SWITCHES: { name: DebugSwitch; label: string; description: ReactNode; group: "Rendering" | "Calls" }[] = [
+const DEBUG_SWITCHES: { name: DebugSwitch; label: string | MessageKey; description: ReactNode | MessageKey; group: "Rendering" | "Calls"; translated?: true }[] = [
   { name: "inspectable", label: "Web Inspector", group: "Rendering", description: <>
     <span className="developer-howto">Safari → Settings → Advanced → “Show features for web developers”, then Develop → this Mac → Sidevoice → the room or the card.</span>
     <span className="developer-howto">In the inspector, Layers → compositing borders / paint flashing shows the CPU repaints.</span>
   </> },
   { name: "compositingBorders", label: "Compositing borders", group: "Rendering", description: "Outlines each layer the GPU composites." },
   { name: "repaintCounters", label: "Repaint counters", group: "Rendering", description: "Counts on each layer how often the CPU repainted it." },
-  { name: "systemCall", label: "Treat calls as system calls (CallKit / Telecom)", group: "Calls", description: "On: the call is a phone call of the system's own, with its lock screen card, in-call screen and headset or car buttons. Off: the app's own call, with its own notification. Takes effect on the next call." },
+  { name: "systemCall", translated: true, label: "settings.developer.systemCall", group: "Calls", description: "settings.developer.systemCall.hint" },
 ];
 
 /** One debugging switch. It moves at once, as the other switches do, and goes back with a line saying so if the app
@@ -49,7 +52,7 @@ function DebugSwitchRow({ debug, name, label, description }: { debug: HostDebugB
   </Row>;
 }
 
-export function DeveloperOptions() {
+export function DeveloperOptions({ t }: { t: Translate }) {
   const mode = useDeveloperMode();
   const animated = useAnimatedThumbnails();
   const debug = host().debug;
@@ -62,8 +65,10 @@ export function DeveloperOptions() {
     </Group>}
     {debug && (["Rendering", "Calls"] as const).map((group) => {
       const rows = switches.filter((entry) => entry.group === group);
-      return rows.length > 0 && <Group key={group} title={group}>
-        {rows.map(({ group: _, ...entry }) => <DebugSwitchRow key={entry.name} debug={debug} {...entry} />)}
+      return rows.length > 0 && <Group key={group} title={group === "Calls" ? t("settings.developer.group.calls") : group}>
+        {rows.map(({ group: _, translated, label, description, ...entry }) => translated
+          ? <DebugSwitchRow key={entry.name} debug={debug} label={t(label as MessageKey)} description={t(description as MessageKey)} {...entry} />
+          : <DebugSwitchRow key={entry.name} debug={debug} label={label} description={description as ReactNode} {...entry} />)}
       </Group>;
     })}
     {mode && <Group title="Conversations">
