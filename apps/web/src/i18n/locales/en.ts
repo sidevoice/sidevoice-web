@@ -1428,7 +1428,7 @@ export const messages = {
   "room.failure.replayUnavailable": "Playback is unavailable while spoken replies are off or you are speaking.",
   "room.failure.inputBacklogFull": "Too many messages are waiting. Try again shortly.",
   "settings.developer.systemCall": "Treat calls as system calls (CallKit / Telecom)",
-  "settings.developer.systemCall.hint": "On: the call is a phone call of the system's own, with its lock screen card, in-call screen and headset or car buttons. Off: the app's own call, with its own notification. Takes effect on the next call.",
+  "settings.developer.systemCall.hint": "On: the call uses the system's calling features, with its lock screen card, in-call screen and headset or car buttons. Off: the app's own call, with its own notification. Takes effect on the next call.",
   "settings.developer.group.calls": "Calls",
 } as const;
 

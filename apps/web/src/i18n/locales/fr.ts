@@ -1386,6 +1386,6 @@ export const messages: Messages = {
   "room.failure.replayUnavailable": "La lecture est indisponible quand les réponses vocales sont désactivées ou que vous parlez.",
   "room.failure.inputBacklogFull": "Trop de messages sont en attente. Réessayez dans un instant.",
   "settings.developer.systemCall": "Traiter les appels comme des appels système (CallKit / Telecom)",
-  "settings.developer.systemCall.hint": "Activé : l’appel est un appel téléphonique du système lui-même, avec sa carte sur l’écran de verrouillage, son écran d’appel et les boutons du casque ou de la voiture. Désactivé : l’appel propre à l’app, avec sa propre notification. Pris en compte à l’appel suivant.",
+  "settings.developer.systemCall.hint": "Activé : l’appel utilise les fonctions d’appel du système, avec sa carte sur l’écran de verrouillage, son écran d’appel et les boutons du casque ou de la voiture. Désactivé : l’appel propre à l’app, avec sa propre notification. Pris en compte à l’appel suivant.",
   "settings.developer.group.calls": "Appels",
 };
