@@ -1408,4 +1408,7 @@ export const messages: Messages = {
   "session.audio.reason.heard_elsewhere": "Odsłuchano na innym urządzeniu",
   "room.failure.replayUnavailable": "Odtwarzanie jest niedostępne, gdy odpowiedzi głosowe są wyłączone lub mówisz.",
   "room.failure.inputBacklogFull": "Zbyt wiele wiadomości czeka. Spróbuj ponownie za chwilę.",
+  "settings.developer.systemCall": "Traktuj połączenia jako połączenia systemowe (CallKit / Telecom)",
+  "settings.developer.systemCall.hint": "Włączone: połączenie korzysta z systemowych funkcji obsługi połączeń, z kartą na ekranie blokady, ekranem rozmowy i przyciskami zestawu słuchawkowego lub samochodu. Wyłączone: własne połączenie aplikacji z własnym powiadomieniem. Zadziała przy następnym połączeniu.",
+  "settings.developer.group.calls": "Połączenia",
 };

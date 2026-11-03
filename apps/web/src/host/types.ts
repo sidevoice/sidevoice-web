@@ -341,17 +341,20 @@ export interface AppUpdater {
 }
 
 /** What the app's debugging seam can switch: Safari's Web Inspector on its web views, WebKit's compositing borders (each
- *  layer the GPU draws) and its repaint counters (how often the CPU repainted each layer). */
-export type DebugSwitch = "inspectable" | "compositingBorders" | "repaintCounters";
+ *  layer the GPU draws) and its repaint counters (how often the CPU repainted each layer) on the desktop; on a phone,
+ *  whether the call is a call of the system's (CallKit, Telecom: sidevoice-desktop #393). */
+export type DebugSwitch = "inspectable" | "compositingBorders" | "repaintCounters" | "systemCall";
 /** The app's debugging seam (`host.debug`, sidevoice-desktop #168), present only in a nightly or a development build.
  *  `available` is the switches this platform has (all three on macOS, none elsewhere): the page shows only those. Each
  *  switch is a live getter, so it is read when it is needed, and again once `set` resolves, for what took. A rejection
  *  means the app did not change it. */
 export interface HostDebugBridge {
   readonly available: readonly DebugSwitch[];
-  readonly inspectable: boolean;
-  readonly compositingBorders: boolean;
-  readonly repaintCounters: boolean;
+  /** Each switch is read only when `available` lists it: the desktop has the first three, a phone `systemCall`. */
+  readonly inspectable?: boolean;
+  readonly compositingBorders?: boolean;
+  readonly repaintCounters?: boolean;
+  readonly systemCall?: boolean;
   set(name: DebugSwitch, on: boolean): Promise<void>;
 }
 

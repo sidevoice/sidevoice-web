@@ -1408,4 +1408,7 @@ export const messages: Messages = {
   "session.audio.reason.heard_elsewhere": "Escuchado en otro dispositivo",
   "room.failure.replayUnavailable": "No se puede reproducir mientras las respuestas habladas estén desactivadas o estés hablando.",
   "room.failure.inputBacklogFull": "Hay demasiados mensajes pendientes. Vuelve a intentarlo en un momento.",
+  "settings.developer.systemCall": "Tratar las llamadas como llamadas del sistema (CallKit / Telecom)",
+  "settings.developer.systemCall.hint": "Activado: la llamada utiliza las funciones de llamada del sistema, con su tarjeta en la pantalla de bloqueo, su pantalla de llamada y los botones de los auriculares o del coche. Desactivado: la llamada propia de la app, con su propia notificación. Se aplica en la próxima llamada.",
+  "settings.developer.group.calls": "Llamadas",
 };

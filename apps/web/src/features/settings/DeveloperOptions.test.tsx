@@ -4,6 +4,7 @@ import { DeveloperOptions } from "./DeveloperOptions";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import type { DebugSwitch } from "../../host";
+import { translator } from "../../i18n/translator";
 
 afterEach(() => {
   cleanup();
@@ -20,12 +21,13 @@ const ALL: DebugSwitch[] = ["inspectable", "compositingBorders", "repaintCounter
 /** The app's `host.debug`: live getters over what each switch holds, `set` taking it unless told otherwise. */
 function withDebug({ available = ALL, initial = {}, set }: { available?: DebugSwitch[]; initial?: Partial<Record<DebugSwitch, boolean>>;
   set?: (name: DebugSwitch, on: boolean, held: Record<DebugSwitch, boolean>) => Promise<void> } = {}) {
-  const held: Record<DebugSwitch, boolean> = { inspectable: false, compositingBorders: false, repaintCounters: false, ...initial };
+  const held: Record<DebugSwitch, boolean> = { inspectable: false, compositingBorders: false, repaintCounters: false, systemCall: false, ...initial };
   const debug = {
     available,
     get inspectable() { return held.inspectable; },
     get compositingBorders() { return held.compositingBorders; },
     get repaintCounters() { return held.repaintCounters; },
+    get systemCall() { return held.systemCall; },
     set: vi.fn(async (name: DebugSwitch, on: boolean) => { if (set) await set(name, on, held); else held[name] = on; }),
   };
   Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel: "nightly", version: "0.2.1-nightly.608" }, debug } } });
@@ -33,7 +35,7 @@ function withDebug({ available = ALL, initial = {}, set }: { available?: DebugSw
 }
 
 function mount() {
-  return render(<RoomProvider store={createRoomStore()}><DeveloperOptions /></RoomProvider>);
+  return render(<RoomProvider store={createRoomStore()}><DeveloperOptions t={translator("en")} /></RoomProvider>);
 }
 /** The switch of a row, by what it says. */
 const toggle = (name: string) => screen.getByRole("switch", { name });
@@ -217,4 +219,26 @@ test("Animate conversation thumbnails: shown while developer mode is on, off by 
   expect(localStorage.getItem("sidevoiceAnimatedThumbnails")).toBe("1");
   act(() => { fireEvent.click(toggle("Animate conversation thumbnails")); });
   expect(localStorage.getItem("sidevoiceAnimatedThumbnails")).toBeNull();
+});
+
+test("a phone's host.debug offers one switch, Treat calls as system calls, off until turned on, in a Calls group", async () => {
+  const { debug, held } = withDebug({ available: ["systemCall"] });
+  mount();
+  expect(groups()).toContain("Calls");
+  expect(groups()).not.toContain("Rendering");
+  expect(screen.getAllByRole("switch").map((s) => s.getAttribute("aria-label"))).toEqual(["Treat calls as system calls (CallKit / Telecom)"]);
+  const label = "Treat calls as system calls (CallKit / Telecom)";
+  expect(toggle(label)).toHaveAttribute("aria-checked", "false");
+  await act(async () => { fireEvent.click(toggle(label)); });
+  expect(debug.set).toHaveBeenLastCalledWith("systemCall", true);
+  expect(held.systemCall).toBe(true);
+  expect(toggle(label)).toHaveAttribute("aria-checked", "true");
+});
+
+test("the system-call switch and its Calls group are the catalogue's words, in the language of the page", async () => {
+  withDebug({ available: ["systemCall"] });
+  cleanup();
+  render(<RoomProvider store={createRoomStore()}><DeveloperOptions t={translator("es")} /></RoomProvider>);
+  expect(groups()).toContain("Llamadas");
+  expect(screen.getAllByRole("switch").map((s) => s.getAttribute("aria-label"))).toEqual(["Tratar las llamadas como llamadas del sistema (CallKit / Telecom)"]);
 });
