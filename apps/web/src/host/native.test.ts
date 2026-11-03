@@ -202,7 +202,7 @@ describe("the members an app calls through", () => {
       localHost: { state: async () => ({}), subscribe: () => () => {} },
       muteShortcut: { get: async () => ({}) },
       callControls: { settings: async () => ({}) },
-      callSurface: {},
+      callSurface: { active: () => true },
       updater: { cancel: async () => {} },
     });
     expect(host().localHost).toBeNull();
@@ -217,7 +217,7 @@ describe("the members an app calls through", () => {
     const muteShortcut = { get: async () => ({}), set: async () => ({}) };
     const callControls = { settings: async () => ({}), setAlwaysShown: async () => ({}) };
     const updater = { status: async () => ({}), cancel: async () => {} };
-    const callSurface = { active: () => true };
+    const callSurface = { active: () => true, still() {}, forget() {} };
     withHost({ localHost, muteShortcut, callControls, callSurface, updater });
     expect(host().callSurface).toBe(callSurface);
     expect(host().localHost).toBe(localHost);

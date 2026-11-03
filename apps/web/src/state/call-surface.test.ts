@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { createRoomSessionStore, speakWith } from "./room-session-state.js";
-import { spokenPage, SURFACE_PAGE_CHARS } from "./call-surface.js";
-import { startCallSurface, PAGE_SURFACE_MS, STILL_PX, FACE_PX, type SurfaceClock } from "./call-surface-publisher";
+import { spokenPage, modelLabel, stillId, SURFACE_PAGE_CHARS, STILL_PX, FACE_PX } from "./call-surface.js";
+import { startCallSurface, PAGE_SURFACE_MS, type SurfaceClock } from "./call-surface-publisher";
 import { PAGE_MS } from "../features/call/PagedText";
 
 speakWith((key, params) => key + (params ? " " + JSON.stringify(params) : ""));
@@ -19,43 +19,89 @@ const surface = (facts: Record<string, unknown> = {}) => createRoomSessionStore(
 
 test("the projection's shape and defaults: nothing live, nothing pending, the words resolved", () => {
   const view = surface();
-  expect(view).toMatchObject({ pendingCancellable: false, reach: "listening", page: null, said: null, stills: {} });
+  expect(view).toMatchObject({ pendingCancellable: false, reach: "listening", page: null, said: null, still: null, workingSince: null });
   expect(view.words).toMatchObject({ state: "state.resting", mute: "card.mute", skip: "liveActivity.skipShort", skipName: "card.skip", cancelSend: "stage.cancelTurn", hangUp: "card.hangUp" });
   expect(view.words.route).toBe('liveActivity.routeName {"route":"{route}"}');
 });
 
-test("model and machine come with the current conversation, the others as up to three faces and their total", () => {
+test("model as people say it, effort in the data; the others as up to three faces; the count is of all conversations", () => {
   const view = surface({ pairings: [] });
-  expect(view.model).toBe("claude-opus-5-5");
+  expect(view.model).toBe("Opus 5.5");
   expect(view.effort).toBe("high");
-  expect(view.others.total).toBe(4);
-  expect(view.others.items.map((item) => item.threadId)).toEqual(["n|b", "n|c", "n|d"]);
-  expect(view.words.conversations).toBe('card.conversationsCount {"n":4}');
+  expect(view.conversationCount).toBe(5);
+  expect(view.others.map((item) => item.threadId)).toEqual(["n|b", "n|c", "n|d"]);
+  expect(view.words.conversations).toBe('card.conversationsCount {"n":5}');
+  expect(view.words.offline).toBe("state.offline");
+});
+
+test("the page names a model in one place: known ids formatted, anything else unchanged", () => {
+  expect(modelLabel("claude-opus-5-5")).toBe("Opus 5.5");
+  expect(modelLabel("claude-sonnet-4-5-20250929")).toBe("Sonnet 4.5");
+  expect(modelLabel("claude-opus-5")).toBe("Opus 5");
+  expect(modelLabel("gpt-6-astra")).toBe("gpt-6-astra");
+  expect(modelLabel("claude-fable-9")).toBe("claude-fable-9");
+  expect(modelLabel(null)).toBeNull();
 });
 
 test("pendingCancellable is the open turn's, and the state line follows the turn, the reach and the mood", () => {
   const turn = { userTurn: { id: "t", segment: "t", thread: "n|a" } };
   expect(surface({ ...turn, pendingPhase: "transcribing" })).toMatchObject({ pendingCancellable: true, words: { state: "wave.transcribingTitle" } });
-  expect(surface({ ...turn, pendingPhase: "listening" }).words.state).toBe("wave.listeningTitle");
+  expect(surface({ ...turn, pendingPhase: "listening" }).words.state).toBe("state.listening");
   expect(surface({ botLive: true }).words.state).toBe("state.speaking");
   expect(surface({ reconnectShown: true }).words.state).toBe("state.offline");
 });
 
-test("the spoken page: at most 160 characters, cut after a word, the lit count within it, an ellipsis where more follows", () => {
+test("the spoken page: about 160 characters, cut after a whole word, an ellipsis where more follows", () => {
   expect(spokenPage("", 0)).toBeNull();
   expect(spokenPage("Hello there", 0)).toEqual({ text: "Hello there", lit: 0, more: false });
-  expect(spokenPage("Hello there", 3)).toEqual({ text: "Hello there", lit: 5, more: false }); // a word lights whole
   const text = Array.from({ length: 60 }, (_, i) => "word" + i).join(" ");
   const first = spokenPage(text, 5)!;
   expect(first.text.length).toBeLessThanOrEqual(SURFACE_PAGE_CHARS + 1);
   expect(first.text.endsWith("…")).toBe(true);
+  expect(first.text.slice(0, -1)).toMatch(/word\d+$/); // never inside a word
   expect(first.more).toBe(true);
   // Once the page's last word is lit, the next page.
   const next = spokenPage(text, first.text.length)!;
   expect(next.text.startsWith("word")).toBe(true);
   expect(next.text).not.toBe(first.text);
-  expect(next.lit).toBeLessThanOrEqual(next.text.length);
   expect(spokenPage(text, text.length)!.more).toBe(false);
+});
+
+test("lit rounds down to a word's start, never ahead of the voice", () => {
+  expect(spokenPage("Hello there", 3)).toMatchObject({ lit: 0 });
+  expect(spokenPage("Hello there", 5)).toMatchObject({ lit: 5 });
+  expect(spokenPage("Hello there", 8)).toMatchObject({ lit: 6 });
+  expect(spokenPage("Hello there", 11)).toMatchObject({ lit: 11 });
+});
+
+test("a sentence end in the last 40 characters is the better cut", () => {
+  const sentence = "This sentence ends well before the limit of a page.";
+  const text = sentence + " " + Array.from({ length: 30 }, () => "filler").join(" ");
+  const first = spokenPage(text, 0)!;
+  const plain = spokenPage(text.replace(".", ""), 0)!;
+  // The page is cut where the first sentence ends only when that falls in the window: build one that does.
+  const long = "a ".repeat(60) + "Done here. " + "b ".repeat(40);
+  const page = spokenPage(long, 0)!;
+  expect(page.text).toBe(("a ".repeat(60) + "Done here.").trimEnd() + "…");
+  expect(first.text.length).toBeLessThanOrEqual(SURFACE_PAGE_CHARS + 1);
+  expect(plain.more).toBe(true);
+});
+
+test.each([
+  ["ja", "今日はいい天気ですね。散歩に行きましょう。".repeat(12)],
+  ["zh-Hans", "今天天气很好,我们去公园散步吧。".repeat(14)],
+])("%s captions: one heard character does not light the whole run, and the page does not jump to the last", (locale, text) => {
+  const none = spokenPage(text, 0, undefined, locale)!;
+  const one = spokenPage(text, 1, undefined, locale)!;
+  expect(one.text).toBe(none.text);
+  expect(one.lit).toBeLessThan(5);
+  expect(one.text.length).toBeLessThanOrEqual(SURFACE_PAGE_CHARS + 1);
+  expect(none.more).toBe(true);
+  // Heard up to the middle of the first page: still the first page, lit never past what was heard.
+  const half = spokenPage(text, 40, undefined, locale)!;
+  expect(half.text).toBe(none.text);
+  expect(half.lit).toBeLessThanOrEqual(40);
+  expect(half.lit).toBeGreaterThan(0);
 });
 
 function clock() {
@@ -81,18 +127,25 @@ function clock() {
   return api;
 }
 
-const saying = (text: string, to = 0) => ({ role: "assistant", segment: "s1", thread: "n|a", text, time: 1, karaoke: { from: 0, to }, playback: "playing" });
+const saying = (text: string, to = 0, thread = "n|a") => ({ role: "assistant" as const, segment: "s1", thread, text, time: 1, karaoke: { from: 0, to }, playback: "playing" });
 
 function room(extra: Record<string, unknown> = {}) {
-  const store = createRoomSessionStore({ ...base, botLive: true, karaokeState: { segment: "s1", from: 0, to: 0 },
+  return createRoomSessionStore({ ...base, botLive: true, karaokeState: { segment: "s1", from: 0, to: 0 },
     history: [saying("A reply the agent is saying right now.")], ...extra } as never);
-  return store;
 }
+
+function host(on = true) {
+  const api = { on, active: () => api.on, still: vi.fn(), forget: vi.fn() };
+  return api;
+}
+const options = (api: ReturnType<typeof host>, time = clock(), draw: (id: string, px: number) => Promise<{ png: string; px: number; k: number } | null> = async () => null) => ({ clock: time, bridge: () => api, draw });
+const userMessage = (text: string, segment = "u1", thread = "n|a") => ({ role: "user" as const, name: "You", segment, thread, text, time: 5 });
 
 test("an app without a surface gets nothing published", () => {
   const store = room();
+  const api = host(false);
   const draw = vi.fn(async () => null);
-  startCallSurface(store, { clock: clock(), wanted: () => false, draw });
+  startCallSurface(store, options(api, clock(), draw));
   expect(store.getState().callSurface.page).toBeNull();
   expect(draw).not.toHaveBeenCalled();
 });
@@ -102,7 +155,7 @@ test("the page is sent at most every two seconds, and follows the voice", () => 
   const store = room();
   const pages: unknown[] = [];
   store.subscribe((now, before) => { if (now.callSurface.page !== before.callSurface.page) pages.push(now.callSurface.page); });
-  startCallSurface(store, { clock: time, wanted: () => true, draw: async () => null });
+  startCallSurface(store, options(host(), time));
   const first = store.getState().callSurface.page;
   expect(first).toMatchObject({ text: "A reply the agent is saying right now.", lit: 0 });
   const sent = pages.length;
@@ -117,11 +170,24 @@ test("the page is sent at most every two seconds, and follows the voice", () => 
   expect(store.getState().callSurface.page!.lit).toBeGreaterThan(0);
 });
 
+test("browsing another conversation, the call's own surface goes on: its captions, its Cancel Send, its said text", () => {
+  const time = clock();
+  const store = room({ viewedThread: "n|b", botLive: true });
+  startCallSurface(store, options(host(), time));
+  expect(store.getState().conversation.thread).toBe("n|b");
+  expect(store.getState().callSurface.page).toMatchObject({ text: "A reply the agent is saying right now." });
+  store.patch({ userTurn: { id: "t", segment: "t", thread: "n|a" }, pendingPhase: "transcribing" });
+  expect(store.getState().callSurface.pendingCancellable).toBe(true);
+  expect(store.getState().conversation.pendingCancellable).toBe(false);
+  store.patch({ pendingPhase: "", userTurn: null, history: [...store.getState().facts.history, userMessage("Run the tests")] });
+  expect(store.getState().callSurface.said).toBe("Run the tests");
+});
+
 test("the said text stays for three seconds", () => {
   const time = clock();
   const store = room({ botLive: false, karaokeState: null, history: [], userTurn: { id: "t", segment: "t", thread: "n|a" }, pendingPhase: "listening" });
-  startCallSurface(store, { clock: time, wanted: () => true, draw: async () => null });
-  store.patch({ pendingPhase: "", userTurn: null, history: [{ role: "user", name: "You", segment: "u1", thread: "n|a", text: "Run the tests", time: 5 }] });
+  startCallSurface(store, options(host(), time));
+  store.patch({ pendingPhase: "", userTurn: null, history: [userMessage("Run the tests")] });
   expect(store.getState().callSurface.said).toBe("Run the tests");
   time.advance(PAGE_MS - 1);
   expect(store.getState().callSurface.said).toBe("Run the tests");
@@ -130,21 +196,96 @@ test("the said text stays for three seconds", () => {
 });
 
 test("a message typed, not spoken, is not said", () => {
-  const time = clock();
   const store = room({ botLive: false, karaokeState: null, history: [] });
-  startCallSurface(store, { clock: time, wanted: () => true, draw: async () => null });
-  store.patch({ history: [{ role: "user", name: "You", segment: "u1", thread: "n|a", text: "typed", time: 5 }] });
+  startCallSurface(store, options(host()));
+  store.patch({ history: [userMessage("typed")] });
   expect(store.getState().callSurface.said).toBeNull();
 });
 
-test("stills: the current conversation at 3x its slot, up to three faces, k 1 by default, and only for the ones shown", async () => {
+test("switching the call's conversation within the three seconds drops the said text of the last one", () => {
+  const time = clock();
+  const store = room({ botLive: false, karaokeState: null, history: [], userTurn: { id: "t", segment: "t", thread: "n|a" }, pendingPhase: "listening" });
+  startCallSurface(store, options(host(), time));
+  store.patch({ pendingPhase: "", userTurn: null, history: [userMessage("Run the tests")] });
+  expect(store.getState().callSurface.said).toBe("Run the tests");
+  time.advance(1000);
+  store.patch({ roomBinding: { thread_id: "b", title: "B" } });
+  expect(store.getState().callSurface.said).toBeNull();
+  time.advance(5000);
+  expect(store.getState().callSurface.said).toBeNull();
+});
+
+test("a surface opened during a pending spoken turn does not say the last message as new", () => {
+  const store = room({ botLive: false, karaokeState: null, history: [userMessage("An older message", "u0")], userTurn: { id: "t", segment: "t", thread: "n|a" }, pendingPhase: "listening" });
+  startCallSurface(store, options(host()));
+  expect(store.getState().callSurface.said).toBeNull();
+  store.patch({ pendingPhase: "", userTurn: null, history: [userMessage("An older message", "u0"), userMessage("The new one", "u1")] });
+  expect(store.getState().callSurface.said).toBe("The new one");
+});
+
+test("when the surface closes it stops: no more pages, nothing kept, the host told to forget", async () => {
+  const time = clock();
   const store = room();
+  const api = host();
+  const draw = async (id: string, px: number) => ({ png: "png-" + id, px, k: 1 });
+  startCallSurface(store, options(api, time, draw));
+  await vi.waitFor(() => expect(Object.keys(store.getState().facts.surfaceLive!.stills).length).toBe(4));
+  api.on = false;
+  time.advance(PAGE_SURFACE_MS);
+  expect(store.getState().facts.surfaceLive).toBeNull();
+  expect(store.getState().callSurface.page).toBeNull();
+  expect(api.forget).toHaveBeenCalledWith(expect.arrayContaining([stillId("n|a", STILL_PX)]));
+  const before = store.getState();
+  time.advance(PAGE_SURFACE_MS * 5);
+  expect(store.getState()).toBe(before);
+});
+
+test("stills go by reference: the bytes cross once per id, before the snapshot that names it, and the snapshot holds only { id, k }", async () => {
+  const store = room();
+  const api = host();
   const draw = vi.fn(async (id: string, px: number) => ({ png: "png-" + id, px, k: 1 }));
-  startCallSurface(store, { clock: clock(), wanted: () => true, draw });
-  await vi.waitFor(() => expect(Object.keys(store.getState().callSurface.stills).length).toBe(4));
-  const { stills } = store.getState().callSurface;
-  expect(stills["n|a"]).toEqual({ png: "png-n|a", px: STILL_PX, k: 1 });
-  expect(stills["n|b"]!.px).toBe(FACE_PX);
-  expect(stills["n|e"]).toBeUndefined();
+  const seen: string[] = [];
+  store.subscribe((now) => { const ref = now.callSurface.still; if (ref && !seen.includes(ref.id)) { seen.push(ref.id); expect(api.still).toHaveBeenCalledWith(expect.objectContaining({ id: ref.id })); } });
+  startCallSurface(store, options(api, clock(), draw));
+  await vi.waitFor(() => expect(api.still).toHaveBeenCalledTimes(4));
+  const view = store.getState().callSurface;
+  expect(view.still).toEqual({ id: stillId("n|a", STILL_PX), k: 1 });
+  expect(view.others.map((o) => o.still)).toEqual(["n|b", "n|c", "n|d"].map((id) => ({ id: stillId(id, FACE_PX), k: 1 })));
+  expect(JSON.stringify(view)).not.toContain("png-");
+  expect(api.still).toHaveBeenCalledWith({ id: stillId("n|a", STILL_PX), png: "png-n|a", px: STILL_PX });
+  expect(api.still).toHaveBeenCalledWith({ id: stillId("n|b", FACE_PX), png: "png-n|b", px: FACE_PX });
+  // More activity does not send them again.
+  store.patch({ botLive: false });
+  store.patch({ history: [...store.getState().facts.history, userMessage("x")] });
   expect(draw).toHaveBeenCalledTimes(4);
+  expect(api.still).toHaveBeenCalledTimes(4);
+});
+
+test("stills of a removed conversation are given back and no longer kept", async () => {
+  const store = room();
+  const api = host();
+  startCallSurface(store, options(api, clock(), async (id, px) => ({ png: "png-" + id, px, k: 1 })));
+  await vi.waitFor(() => expect(api.still).toHaveBeenCalledTimes(4));
+  store.patch({ people: people.filter((p) => p.thread_id !== "b") });
+  expect(api.forget).toHaveBeenCalledWith([stillId("n|b", FACE_PX)]);
+  expect(Object.keys(store.getState().facts.surfaceLive!.stills)).not.toContain(stillId("n|b", FACE_PX));
+  await vi.waitFor(() => expect(api.still).toHaveBeenCalledTimes(5)); // "e" takes the third face
+  expect(Object.keys(store.getState().facts.surfaceLive!.stills).length).toBe(4);
+});
+
+test("switching conversation keeps the last state line until the new one lands", () => {
+  const store = createRoomSessionStore({ ...base, botLive: true } as never);
+  expect(store.getState().callSurface.words.state).toBe("state.speaking");
+  store.patch({ botLive: false, switching: true });
+  expect(store.getState().callCard.busyReason).toBe("switching");
+  expect(store.getState().callSurface.words.state).toBe("state.speaking");
+  store.patch({ switching: false });
+  expect(store.getState().callSurface.words.state).toBe("state.resting");
+});
+
+test("workingSince is the call's conversation's busy start while it shows as working, and absent otherwise", () => {
+  const store = createRoomSessionStore({ ...base, harness: { "n|a": true }, workingSince: { "n|a": 1000 }, now: 1000 + 60_000 } as never);
+  expect(store.getState().callSurface).toMatchObject({ workingSince: 1000, words: { state: "state.working" } });
+  const idle = createRoomSessionStore({ ...base } as never);
+  expect(idle.getState().callSurface.workingSince).toBeNull();
 });

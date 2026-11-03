@@ -96,7 +96,7 @@ export function nativeHost(): NativeHost {
     reset: member<ResetBridge>(app, "reset", ["deleteAll", "resetReport"]),
     muteShortcut: member<MuteShortcutBridge>(app, "muteShortcut", ["get", "set"]),
     callControls: member<CallControlsBridge>(app, "callControls", ["settings", "setAlwaysShown"]),
-    callSurface: member<CallSurfaceBridge>(app, "callSurface", ["active"]),
+    callSurface: member<CallSurfaceBridge>(app, "callSurface", ["active", "still", "forget"]),
     updater: updater && typeof updater.status === "function" ? updater : null,
     debug: debug && Array.isArray(debug.available) && typeof debug.set === "function" ? debug as HostDebugBridge : null,
   };

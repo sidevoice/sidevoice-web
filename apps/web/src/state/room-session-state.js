@@ -523,10 +523,15 @@ export function createRoomSessionStore(seed = {}) {
         const participants = participantsView(facts);
         // The desktop card's whole snapshot, from the same rows.
         const callCard = callCardView(facts, participants);
-        const conversation = conversationView(facts);
-        const next = { facts, session: sessionStatus(facts), conversation, participants,
+        const selected = selectedThread(facts);
+        // A native call surface follows the CALL's conversation, whatever is being browsed.
+        const surface = callSurfaceView(callCard, participants, facts.surfaceLive, say, {
+            pendingCancellable: !!selected && facts.userTurn?.thread === selected && !facts.cancelledInput,
+            workingSince: selected && working(facts, selected) ? facts.workingSince?.[selected] : null,
+        }, snapshot?.callSurface);
+        const next = { facts, session: sessionStatus(facts), conversation: conversationView(facts), participants,
             join: joinView(facts),
-            mic: micView(facts), call: callView(facts), callCard, callSurface: callSurfaceView(callCard, conversation, participants, facts.surfaceLive, say), title: viewedTitle(facts), screenLock: facts.screenLock,
+            mic: micView(facts), call: callView(facts), callCard, callSurface: surface, title: viewedTitle(facts), screenLock: facts.screenLock,
             enginePanel: enginePanel(facts),
             machines: machinesView(facts), pairing: { open: facts.pairingOpen, note: facts.pairingNote },
             bootError: facts.bootError };

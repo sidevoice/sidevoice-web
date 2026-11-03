@@ -361,11 +361,20 @@ export interface HostDebugBridge {
 export type MessageOverlay = Readonly<Record<string, string>>;
 /* A value of the host's table that is not a non-empty string is not a text: the translator skips it. */
 
-/** The app's native call surface (the phone's Lock Screen card, Dynamic Island, ongoing notification): it reads the room's
- *  `callSurface` (state/call-surface.d.ts) from the store, and the page publishes what costs it work (the creatures'
- *  stills, the spoken page) only while `active()`. An app without one offers none, and the page does none of that. */
+/** A creature's PNG, handed to the host once per `id` (state/call-surface.d.ts SurfaceStillRef): `png` is base64 with no
+ *  prefix, `px` its width and height. */
+export interface CallSurfaceStill { id: string; png: string; px: number }
+
+/** The app's native call surface (the phone's Lock Screen card, Dynamic Island, ongoing notification): it reads the
+ *  room's `callSurface` (state/call-surface.d.ts) from the store, and the page publishes what costs it work only while
+ *  `active()`. The creatures' stills go by reference: the snapshot carries `{ id, k }`, and the bytes cross here, once per
+ *  id and always before the snapshot that names it; the host keeps them by id until `forget`. An app without a surface
+ *  offers none, and the page does none of that. */
 export interface CallSurfaceBridge {
   active(): boolean;
+  still(still: CallSurfaceStill): void;
+  /** Ids the page no longer shows (a conversation removed, or left the faces) or every id when the surface closes. */
+  forget(ids: string[]): void;
 }
 
 export interface Host {

@@ -1,22 +1,21 @@
 import { host } from "../host";
-import { wordEnd } from "../features/conversation/KaraokeText";
+import type { CallSurfaceBridge } from "../host/types";
 import { PAGE_MS } from "../features/call/PagedText";
 import { readOn, readingPosition, type Reading } from "../features/call/speech-chunks";
-import { spokenPage, SURFACE_OTHERS, type SpokenPage, type SurfaceLive, type SurfaceStill } from "./call-surface.js";
-import { renderStill } from "./call-surface-still";
+import { spokenPage, stillId, FACE_PX, STILL_PX, SURFACE_OTHERS, type SpokenPage, type SurfaceLive } from "./call-surface.js";
+import { renderStill, type RenderedStill } from "./call-surface-still";
+import { conversationView } from "./room-session-state.js";
 import type { RoomStore } from "./room-store";
 
 /* What a native call surface needs by the clock, which the room's pure projections do not read (state/call-surface.js
  * `callSurfaceView` takes it as `surfaceLive`): the page the voice is on, sent at most every PAGE_SURFACE_MS; the person's
- * words just sent, for PAGE_MS (what the stage shows them for); and the creatures' stills. It does nothing until the host
- * has a native surface (`host().callSurface.active()`), so a page without one pays nothing. */
+ * words just sent, for PAGE_MS (what the stage shows them for); and the creatures' stills, which cross to the host once
+ * per id (CallSurfaceBridge.still) while the snapshot only refers to them. All of it follows the CALL's conversation, not
+ * the one being browsed. It does nothing until the host has a native surface (`callSurface.active()`), and gives
+ * everything back when that stops, so a page without one pays nothing. */
 
 /** The spoken page goes out at most this often: a Live Activity is rate limited and a caption needs no more. */
 export const PAGE_SURFACE_MS = 2000;
-/** The current conversation's still, in pixels: 3x the largest slot (the card's 72 pt tile). */
-export const STILL_PX = 216;
-/** The others' faces, 3x their 36 pt slot. */
-export const FACE_PX = 108;
 
 export interface SurfaceClock {
   now(): number;
@@ -26,41 +25,70 @@ export interface SurfaceClock {
 
 export interface SurfaceOptions {
   clock?: SurfaceClock;
-  wanted?: () => boolean;
-  draw?: (threadId: string, px: number) => Promise<SurfaceStill | null>;
+  bridge?: () => CallSurfaceBridge | null;
+  draw?: (threadId: string, px: number) => Promise<RenderedStill | null>;
 }
 
 const realClock: SurfaceClock = { now: () => Date.now(), setTimeout: (run, ms) => window.setTimeout(run, ms), clearTimeout: (timer) => window.clearTimeout(timer as number) };
 
 export function startCallSurface(store: RoomStore, options: SurfaceOptions = {}): () => void {
   const clock = options.clock ?? realClock;
-  const wanted = options.wanted ?? (() => !!host().callSurface?.active());
+  const bridge = options.bridge ?? (() => host().callSurface);
   const draw = options.draw ?? renderStill;
-  const live: SurfaceLive = { page: null, said: null, stills: {} };
+  let live: SurfaceLive = { page: null, said: null, stills: {} };
   let reading: Reading | null = null;
   let pageAt = -Infinity, pageTimer: unknown = null, saidTimer: unknown = null;
-  let seen = "", sentKey: string | null = null, spoke = false, sentThread: string | null | undefined;
+  let seen = "", sentKey: string | null = null, spoke = false, baselined = false, callThread: string | null | undefined;
+  let engaged = false, stopped = false;
   const drawing = new Set<string>();
-  let stopped = false;
+  let shown = new Map<string, { thread: string; px: number }>();
 
+  const active = () => !!bridge()?.active();
   const publish = () => store.patch({ surfaceLive: { page: live.page, said: live.said, stills: live.stills } });
   const same = (a: SpokenPage | null, b: SpokenPage | null) => a?.text === b?.text && a?.lit === b?.lit;
+  /** The call's conversation, whichever one is on the screen. */
+  const callView = () => conversationView({ ...store.getState().facts, viewedThread: null });
+
+  function clearTimers() {
+    if (pageTimer !== null) clock.clearTimeout(pageTimer);
+    if (saidTimer !== null) clock.clearTimeout(saidTimer);
+    pageTimer = saidTimer = null;
+  }
+
+  /** The surface closed: nothing of it is kept, in the page or in the host. */
+  function disengage() {
+    clearTimers();
+    const ids = Object.keys(live.stills);
+    if (ids.length) bridge()?.forget(ids);
+    live = { page: null, said: null, stills: {} };
+    reading = null; pageAt = -Infinity; seen = ""; baselined = false; callThread = undefined; shown = new Map();
+    engaged = false;
+    store.patch({ surfaceLive: null });
+  }
+
+  /** The call moved to another conversation: what was said, read and shown of the last one is not this one's. */
+  function reset() {
+    clearTimers();
+    reading = null; pageAt = -Infinity; baselined = false; seen = "";
+    live = { ...live, page: null, said: null };
+    publish();
+  }
 
   /** The page the voice is on now, read at the pace the stage's balloon reads it. */
   function currentPage(): SpokenPage | null {
     const state = store.getState();
-    const reply = state.conversation.thread && state.conversation.thread === state.callCard.conversation ? state.conversation.saying ?? null : null;
+    const reply = callView().saying ?? null;
     reading = readOn(reading && reply && reading.segment === reply.segment ? reading : null, reply?.segment ?? null, !!reply && state.facts.botLive === true, reply?.karaoke ?? null, clock.now());
     if (!reply || !reading || reading.segment !== reply.segment) return null;
-    const spoken = readingPosition(reading);
-    return spokenPage(reply.text, spoken === null ? 0 : wordEnd(reply.text, Math.min(spoken, reply.text.length)));
+    return spokenPage(reply.text, readingPosition(reading), undefined, state.callCard.language);
   }
 
   function flushPage() {
     pageTimer = null;
+    if (!active()) { if (engaged) disengage(); return; }
     pageAt = clock.now();
     const page = currentPage();
-    if (!same(page, live.page)) { live.page = page; publish(); }
+    if (!same(page, live.page)) { live = { ...live, page }; publish(); }
     // The words go on while the voice does: look again in a page's time.
     if (page) pageTimer = clock.setTimeout(flushPage, PAGE_SURFACE_MS);
   }
@@ -73,50 +101,65 @@ export function startCallSurface(store: RoomStore, options: SurfaceOptions = {})
 
   function said(text: string) {
     if (saidTimer !== null) clock.clearTimeout(saidTimer);
-    live.said = text;
+    live = { ...live, said: text };
     publish();
-    saidTimer = clock.setTimeout(() => { saidTimer = null; live.said = null; publish(); }, PAGE_MS);
+    saidTimer = clock.setTimeout(() => { saidTimer = null; live = { ...live, said: null }; publish(); }, PAGE_MS);
   }
 
-  /** The person's spoken turn just sent (the stage's own rule, speech-reading.ts useSentTurns): only one that was spoken, to the conversation on the stage. */
+  /** The person's spoken turn just sent (the stage's own rule, speech-reading.ts useSentTurns): only one that was spoken, to the call's conversation. What was already there when the surface opened, or when the call moved here, is the baseline, never said. */
   function watchSent() {
-    const { conversation } = store.getState();
-    if (sentThread !== conversation.thread) { sentThread = conversation.thread; sentKey = null; spoke = false; }
-    if (conversation.pendingText || conversation.pendingPhase) spoke = true;
-    const last = [...conversation.messages].reverse().find((message) => message.role === "user") ?? null;
+    const { messages, pendingText, pendingPhase } = callView();
+    const last = [...messages].reverse().find((message) => message.role === "user") ?? null;
     const key = last ? last.segment ?? String(last.time) : null;
+    if (!baselined) { baselined = true; sentKey = key; spoke = !!(pendingText || pendingPhase); return; }
+    if (pendingText || pendingPhase) spoke = true;
     if (key === sentKey) return;
-    const first = sentKey === null && !spoke;
     sentKey = key;
-    if (first || !spoke || !last?.text.trim()) return;
+    if (!spoke || !last?.text.trim()) return;
     spoke = false;
     said(last.text);
   }
 
+  /** The stills of the conversations shown: handed to the host once each, and the ones no longer shown given back. */
   function wantStills() {
     const state = store.getState();
     const current = state.callCard.conversation;
     const faces = state.participants.filter((p) => p.threadId !== current).slice(0, SURFACE_OTHERS).map((p) => p.threadId);
-    const wants: [string, number][] = [...(current ? [[current, STILL_PX] as [string, number]] : []), ...faces.map((id) => [id, FACE_PX] as [string, number])];
-    for (const [id, px] of wants) {
-      const have = live.stills[id];
-      if (have?.px === px || drawing.has(id + px)) continue;
-      drawing.add(id + px);
-      void draw(id, px).then((still) => {
-        drawing.delete(id + px);
-        if (stopped || !still) return;
-        live.stills = { ...live.stills, [id]: still };
+    shown = new Map([...(current ? [[current, STILL_PX] as const] : []), ...faces.map((id) => [id, FACE_PX] as const)]
+      .map(([thread, px]) => [stillId(thread, px), { thread, px }] as const));
+    const stale = Object.keys(live.stills).filter((id) => !shown.has(id));
+    if (stale.length) {
+      bridge()?.forget(stale);
+      live = { ...live, stills: Object.fromEntries(Object.entries(live.stills).filter(([id]) => shown.has(id))) };
+      publish();
+    }
+    for (const [id, { thread, px }] of shown) {
+      if (live.stills[id] || drawing.has(id)) continue;
+      drawing.add(id);
+      void draw(thread, px).then((still) => {
+        drawing.delete(id);
+        if (stopped || !engaged || !still || !shown.has(id)) return;
+        // The bytes first, so a snapshot never names a still the host does not hold.
+        bridge()?.still({ id, png: still.png, px: still.px });
+        live = { ...live, stills: { ...live.stills, [id]: { id, k: still.k } } };
         publish();
       });
     }
   }
 
   function look() {
-    if (!wanted()) return;
+    if (!active()) { if (engaged) disengage(); return; }
+    engaged = true;
     const state = store.getState();
-    const { conversation } = state;
-    const signature = [conversation.saying?.segment, conversation.saying?.karaoke?.to, state.facts.botLive, conversation.thread, conversation.pendingText,
-      conversation.pendingPhase, conversation.messages.length, state.callCard.conversation, state.participants.map((p) => p.threadId).join(",")].join("|");
+    const { facts } = state;
+    const thread = state.callCard.conversation;
+    if (thread !== callThread) {
+      const first = callThread === undefined;
+      callThread = thread;
+      if (!first) reset();
+    }
+    const signature = [facts.karaokeState?.segment, facts.karaokeState?.to, facts.botLive, thread, facts.userTurn?.thread, facts.pendingUserText, facts.pendingPhase,
+      facts.history.length, state.callCard.language, state.participants.map((p) => p.threadId).join(",")].join("|");
     if (signature === seen) return;
     seen = signature;
     watchSent();
@@ -131,7 +174,7 @@ export function startCallSurface(store: RoomStore, options: SurfaceOptions = {})
   return () => {
     stopped = true;
     stop();
-    if (pageTimer !== null) clock.clearTimeout(pageTimer);
-    if (saidTimer !== null) clock.clearTimeout(saidTimer);
+    clearTimers();
+    if (engaged) { const ids = Object.keys(live.stills); if (ids.length) bridge()?.forget(ids); }
   };
 }

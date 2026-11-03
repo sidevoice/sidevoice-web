@@ -1,7 +1,7 @@
 import { avatarFor, avatarTone } from "../features/avatar/avatar-spec";
 import { drawAvatar } from "../features/avatar/bicho-draw";
 import { bichosStylesheet } from "../features/avatar/engine-stylesheet";
-import type { SurfaceStill } from "./call-surface.js";
+export interface RenderedStill { png: string; px: number; k: number }
 
 /* A conversation's creature as a PNG for a native surface (HANDOVER §3): the same drawing every copy of it in the page is
  * (drawAvatar), at rest, in a square of `px` pixels, rasterised through the browser's own SVG engine. The page's rules for
@@ -33,7 +33,7 @@ export function stillMarkup(threadId: string, px: number): string {
 }
 
 /** The still as PNG (base64, no prefix), or null where the page cannot draw one (no canvas). */
-export async function renderStill(threadId: string, px: number): Promise<SurfaceStill | null> {
+export async function renderStill(threadId: string, px: number): Promise<RenderedStill | null> {
   try {
     const url = URL.createObjectURL(new Blob([stillMarkup(threadId, px)], { type: "image/svg+xml" }));
     try {
