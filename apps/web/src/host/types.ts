@@ -380,6 +380,30 @@ export interface CallSurfaceBridge {
   forget(ids: string[]): void;
 }
 
+/** What one scan of a pairing QR code came to: the text it holds (the code as the machine printed it, `SV1.…`), the person
+ *  ending it, the camera not allowed, or no camera to scan with. A scan never rejects. */
+export type CodeScan =
+  | { status: "scanned"; text: string }
+  | { status: "cancelled" }
+  | { status: "denied" }
+  | { status: "unavailable" };
+
+/** The app's camera for scanning the pairing code (sidevoice-desktop `host.codeScanner`, the mobile app; sidevoice-desktop#405).
+ *  The camera is drawn behind the page while a scan lasts, so the page shows it through and draws the viewfinder and its own
+ *  Cancel. A browser offers none: the code is typed or pasted there, as it is where an app has none. */
+export interface CodeScannerBridge {
+  /** Whether the camera is allowed: `prompt` when the person has not been asked. */
+  permission(): Promise<"granted" | "prompt" | "denied">;
+  /** Asks the system for the camera when it has not been decided; a decided answer is returned as it is. */
+  request(): Promise<"granted" | "denied">;
+  /** One scan at a time; asks for the camera first when it has not been. */
+  scan(): Promise<CodeScan>;
+  /** Ends the scan in progress: it resolves `cancelled`. */
+  cancel(): Promise<void>;
+  /** The app's page of the system's settings, where a denied camera is allowed again. */
+  openSettings(): Promise<void>;
+}
+
 export interface Host {
   identity: HostIdentity;
   /** The host's overlay for `language` (a tag: `es`, `zh-Hans`) exactly: nothing from its primary subtag or English, which
@@ -398,6 +422,8 @@ export interface Host {
   muteShortcut: MuteShortcutBridge | null;
   callControls: CallControlsBridge | null;
   callSurface: CallSurfaceBridge | null;
+  /** The mobile app's camera for the pairing QR code; null elsewhere. */
+  codeScanner: CodeScannerBridge | null;
   updater: AppUpdater | null;
   debug: HostDebugBridge | null;
 }

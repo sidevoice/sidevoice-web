@@ -15,6 +15,7 @@ import {
   type PairingCodePreview,
 } from "../../services/device-pairing.js";
 import { ConnectorSteps } from "./ConnectorSteps";
+import { ScanOverlay } from "./ScanOverlay";
 import { CONNECTOR_PAIR_DEVICE } from "./connector-commands";
 import "./pairing.css";
 
@@ -103,6 +104,13 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
   const [heard, setHeard] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const [how, setHow] = useState(false);
+  // The camera that scans the code (the mobile app's): the viewfinder is open while a scan lasts; a camera that cannot be
+  // used is said under the code, with its way out.
+  const scanner = hostOfPage().codeScanner;
+  const [scanning, setScanning] = useState(false);
+  const [scanNote, setScanNote] = useState<"denied" | "unavailable" | null>(null);
+  const scanButton = useRef<HTMLButtonElement>(null);
+  const refocusScan = useRef(false);
   // The address the code itself filled in, replaced when the code changes unless the person wrote their own.
   const prefilled = useRef("");
   const focusAddress = useRef(false);
@@ -129,6 +137,8 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
   useEffect(() => { if (alert) alertBox.current?.scrollIntoView?.({ block: "nearest" }); }, [alert]);
   // Asked to agree to no encryption, the person is taken to what it means, not to the button: the next Tab reaches it.
   useEffect(() => { if (alert?.kind === "httpPrivate" && !busy) warningTitle.current?.focus(); }, [alert, busy]);
+  // The scan ended without a code: the focus goes back to Scan, once it is enabled again.
+  useEffect(() => { if (!scanning && refocusScan.current) { refocusScan.current = false; scanButton.current?.focus(); } }, [scanning]);
   // That button gone with what replaced the warning, the focus goes back to Connect.
   useEffect(() => { if (!busy && refocusConnect.current) { refocusConnect.current = false; connectButton.current?.focus(); } }, [busy]);
 
@@ -156,6 +166,30 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
     prefilled.current = plain;
     // What was said about the code, or about an address it needed or filled in, no longer stands.
     if (fieldError && (fieldError.field === "code" || fieldError.key === "pairing.addressNeeded" || fieldError.key === "pairing.addressUnreached" || replaced)) setFieldError(null);
+  }
+
+  /** Scans the code the machine shows. The camera is asked for first, outside the viewfinder, so that a denial is said on this
+   *  screen and not behind the camera; what is scanned goes where a pasted code goes. Typing stays as it was. */
+  async function scan() {
+    if (!scanner || scanning || busy) return;
+    setScanNote(null);
+    if (await scanner.request() !== "granted") { setScanNote("denied"); return; }
+    setScanning(true);
+    const result = await scanner.scan();
+    setScanning(false);
+    switch (result.status) {
+      case "scanned": {
+        const text = result.text.trim();
+        changeCode(text);
+        // Not a Sidevoice code (any other QR): said at once under the field, where a pasted one would be said on Connect.
+        if (!readCode(text, Date.now())) { setFieldError({ field: "code", key: text ? "pairing.invalid" : "pairing.empty" }); return; }
+        connectButton.current?.focus();
+        return;
+      }
+      case "denied": setScanNote("denied"); return;
+      case "unavailable": setScanNote("unavailable"); return;
+      case "cancelled": refocusScan.current = true; return;
+    }
   }
 
   function changeAddress(next: string) {
@@ -288,6 +322,11 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
           readOnly={!!busy} spellCheck={false} autoComplete="off" autoCapitalize="off" autoCorrect="off"
           onChange={(event) => changeCode(event.currentTarget.value)} onKeyDown={enterSubmits} />
       </Field>
+      {scanner && <Button ref={scanButton} type="button" variant="secondary" className="pairing-scan" disabled={!!busy || scanning} onClick={() => void scan()}>{t("pairing.scan")}</Button>}
+      {scanNote && <Alert tone="warning" live className="pairing-scan-note" title={t(scanNote === "denied" ? "pairing.scanDenied" : "pairing.scanUnavailable")}>
+        {scanNote === "denied" && <Button variant="secondary" onClick={() => void scanner?.openSettings().catch(() => undefined)}>{t("pairing.scanSettings")}</Button>}
+      </Alert>}
+      {scanning && scanner && <ScanOverlay onCancel={() => void scanner.cancel()} />}
       <p className="sr-only" role="status">{heard}</p>
       {/* The address, a quiet link under the code that opens its field and closes it again; open by itself, and needed,
           where the code carries no usable address or its addresses did not reach the machine. */}

@@ -345,3 +345,15 @@ describe("the host's message overlay", () => {
     expect(host().messages("en")).toEqual({});
   });
 });
+
+describe("the camera for the pairing code", () => {
+  test("is the app's when it has the whole of it, and nothing in a browser", () => {
+    withHost(undefined);
+    expect(host().codeScanner).toBeNull();
+    const codeScanner = { permission: async () => "granted", request: async () => "granted", scan: async () => ({ status: "cancelled" }), cancel: async () => {}, openSettings: async () => {} };
+    withHost({ codeScanner });
+    expect(host().codeScanner).toBe(codeScanner);
+    withHost({ codeScanner: { scan: codeScanner.scan } });
+    expect(host().codeScanner).toBeNull();
+  });
+});
