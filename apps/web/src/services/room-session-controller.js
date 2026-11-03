@@ -111,19 +111,25 @@ function rememberCards(fp,people){
 function forgetCard(fp,thread){
  rememberedCards=rememberedCards.filter(row=>row.node!==fp||row.thread_id!==thread);saveCards();
 }
-/* A removal made on this device while its machine could not take it: kept, and sent when it can. Removing a conversation
- * only removes it from this device; the machine closes it for good once no device shows it any more (sidevoice-core). The
- * entry leaves the store only when the machine has taken it (or the machine is unpaired); the store is never trimmed, and a
- * removal that cannot be kept is refused rather than hidden. Every change reads the store again under one lock, so a tab
- * working from an old copy cannot overwrite another tab's entry. */
+/* A removal made on this device: kept first, then everything local is done, then it is sent. Removing a conversation only
+ * removes it from this device; the machine closes it for good once no device shows it any more (sidevoice-core). The
+ * entry is kept even when the machine is on and answers at once, so every tab converges on it; it is `taken` once the
+ * machine has it (or refused it), and leaves the store only when a participants answer asked after that settles it. The
+ * store is never trimmed, and a removal that cannot be kept is refused rather than hidden. Every change reads the store
+ * again under one lock, so a tab working from an old copy cannot overwrite another tab's entry. */
 const REMOVALS_KEY='sidevoice.pending-removals.v1',REMOVALS_LOCK='sidevoice.pending-removals',MAX_REMOVALS=256;
-const REMOVAL_RETRY_MS=2000,REMOVAL_RETRY_MAX_MS=300000;
+const REMOVAL_RETRY_MS=2000,REMOVAL_RETRY_MAX_MS=300000,REMOVAL_SEND_MS=8000;
 function readRemovals(){
- try{const rows=JSON.parse(pageStorage()?.getItem(REMOVALS_KEY)||'[]');return Array.isArray(rows)?rows.map(row=>cardOf(row,row?.node)).filter(Boolean).map(({node,thread_id})=>({node,thread_id})):[]}
- catch{return []}
+ try{
+  const rows=JSON.parse(pageStorage()?.getItem(REMOVALS_KEY)||'[]');
+  return Array.isArray(rows)?rows.map(row=>{const card=cardOf(row,row?.node);return card&&{node:card.node,thread_id:card.thread_id,...(row?.taken===true?{taken:true}:{})}}).filter(Boolean):[];
+ }catch{return []}
 }
 let pendingRemovals=readRemovals();
 const removing=(fp,thread)=>pendingRemovals.some(row=>row.node===fp&&row.thread_id===thread);
+// The durable state, as another tab left it: read where a send or a pick is about to be allowed.
+const syncRemovals=()=>{pendingRemovals=readRemovals()};
+const sameRemoval=(fp,thread)=>row=>row.node===fp&&row.thread_id===thread;
 // 'stored' (written and read back), 'refused' (`change` said no) or 'failed' (the browser kept nothing).
 function changeRemovals(change){
  return pageHost().exclusive(REMOVALS_LOCK,()=>{
@@ -135,51 +141,75 @@ function changeRemovals(change){
   pendingRemovals=next;return 'stored';
  }).catch(()=>'failed');
 }
-// One tab's change is the others' too: their rows go, and their remembered cards.
-window.addEventListener('storage',event=>{
- if(event.key!==REMOVALS_KEY)return;
- pendingRemovals=readRemovals();
- for(const row of pendingRemovals){forgetCard(row.node,row.thread_id);const link=links.get(row.node);if(link)link.people=link.people.filter(person=>person.thread_id!==row.thread_id)}
- mergePeople();
-});
+// What removing a conversation does on this tab, whichever tab removed it: its row, card and queued texts go, a pick of it is
+// let go of, and its call is stopped. Again on a tab that only hears of it, and on a load that finds it kept.
+function hideRemoved(fp,thread){
+ const key=conversationKey(fp,thread);
+ if(pick.op?.key===key)letGoOfSelect();
+ if(rememberedThread()===key)rememberThread(null);
+ forgetCard(fp,thread);
+ // Its texts that never left this device never will, under this conversation or a later one: they stay as not sent.
+ failTexts(entry=>entry.node===fp&&entry.payload.data.thread===thread);
+ const link=links.get(fp);
+ if(link){link.closed=new Set([...(link.closed||[]),thread]);link.peopleAsked++;link.people=link.people.filter(person=>person.thread_id!==thread);mergePeople()}
+ return disposeConversation(key).catch(()=>{});
+}
+function hideAllRemoved(){for(const row of pendingRemovals)void hideRemoved(row.node,row.thread_id)}
+window.addEventListener('storage',event=>{if(event.key!==REMOVALS_KEY)return;syncRemovals();hideAllRemoved()});
 // One removal to its machine: 'done' (taken, or a thread that can never be: nothing is left to send), 'later' (the machine
-// did not answer, or may when asked again) or 'refused' (it said no).
+// did not answer in time, or may when asked again) or 'refused' (it said no).
 async function sendRemoval(fp,thread){
+ const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),REMOVAL_SEND_MS);
  try{
-  const r=await request('/api/presentation/remove',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({thread_id:thread})},fp);
+  const r=await request('/api/presentation/remove',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({thread_id:thread}),signal:abort.signal},fp);
   if(r.ok)return {answer:'done'};
   const d=await r.json().catch(()=>null);
   if(r.status===400&&d?.detail?.key==='room.thread_invalid')return {answer:'done'};
   return {answer:r.status>=500||[401,408,429].includes(r.status)?'later':'refused',error:refusalError(d?.detail)};
  }catch(error){return {answer:'later',error}}
+ finally{clearTimeout(timer)}
+}
+// The machine has this removal (or will never take it): not sent again; it stays until an answer asked after this says so.
+const removalTaken=new Map();
+function takeRemoval(fp,thread){
+ removalTaken.set(conversationKey(fp,thread),links.get(fp)?.peopleAsked||0);
+ return changeRemovals(list=>list.map(row=>sameRemoval(fp,thread)(row)?{node:row.node,thread_id:row.thread_id,taken:true}:row));
 }
 // While a machine's removals are being sent it is not reconciled: its texts and the call's moves onto it wait for the round.
 const removalFlights=new Map(),removalBackoff=new Map();
 function flushRemovals(fp){
  if(removalFlights.has(fp))return removalFlights.get(fp);
- if(linkBase(fp)==null||!pendingRemovals.some(row=>row.node===fp))return Promise.resolve();
+ syncRemovals();
+ if(linkBase(fp)==null||!pendingRemovals.some(row=>row.node===fp&&!row.taken))return Promise.resolve();
  const flight=(async()=>{
   try{
-   // One tab sends at a time; another tab's round is not waited for.
-   await pageHost().exclusive(`${REMOVALS_LOCK}.flush.${fp}`,async()=>{
-    for(const row of readRemovals().filter(row=>row.node===fp)){
+   // One tab sends at a time. A tab that finds another's round going waits for it to end and reads what it left, instead of
+   // resuming with what it had.
+   const ran=await pageHost().exclusive(`${REMOVALS_LOCK}.flush.${fp}`,async()=>{
+    syncRemovals();
+    for(const row of readRemovals().filter(row=>row.node===fp&&!row.taken)){
      if(linkBase(fp)==null)break;
      const key=conversationKey(fp,row.thread_id),wait=removalBackoff.get(key);
      if(wait&&Date.now()<wait.until)continue;
-     const {answer}=await sendRemoval(fp,row.thread_id);
-     if(answer==='done'){removalBackoff.delete(key);await changeRemovals(list=>list.filter(r=>r.node!==fp||r.thread_id!==row.thread_id))}
-     else{const delay=Math.min((wait?.delay||REMOVAL_RETRY_MS/2)*2,REMOVAL_RETRY_MAX_MS);removalBackoff.set(key,{delay,until:Date.now()+delay})}
+     const {answer,error}=await sendRemoval(fp,row.thread_id);
+     if(answer==='later'){const delay=Math.min((wait?.delay||REMOVAL_RETRY_MS/2)*2,REMOVAL_RETRY_MAX_MS);removalBackoff.set(key,{delay,until:Date.now()+delay});continue}
+     removalBackoff.delete(key);
+     // The machine said no for good: nothing to retry; the next answer shows whether it still lists the conversation.
+     if(answer==='refused')setRoomError(roomError(error));
+     await takeRemoval(fp,row.thread_id);
     }
+    return true;
    },{ifAvailable:true});
+   if(!ran)await pageHost().exclusive(`${REMOVALS_LOCK}.flush.${fp}`,()=>{});
   }catch{}
-  finally{removalFlights.delete(fp);void flushTexts()}
+  finally{syncRemovals();removalFlights.delete(fp);void flushTexts()}
  })();
  removalFlights.set(fp,flight);return flight;
 }
 // The removal kept before anything is hidden: null, with the reason said, when it could not be (the store is full, or the
 // browser kept nothing), and then the row stays. An older entry is never dropped to make room.
 async function queueRemoval(to){
- const outcome=await changeRemovals(list=>list.some(row=>row.node===to.node&&row.thread_id===to.thread)?list:list.length>=MAX_REMOVALS?null:[...list,{node:to.node,thread_id:to.thread}]);
+ const outcome=await changeRemovals(list=>list.some(sameRemoval(to.node,to.thread))?list:list.length>=MAX_REMOVALS?null:[...list,{node:to.node,thread_id:to.thread}]);
  if(outcome==='stored')return 'queued';
  setRoomError(bundled(outcome==='refused'?'room.failure.removalsFull':'room.failure.removalNotKept').text);
  return null;
@@ -562,7 +592,7 @@ function outboxScope(){try{let scope=sessionStorage.getItem(OUTBOX_SCOPE_KEY);if
 const outbox=createOutbox({scope:outboxScope()});
 // What an earlier load of this tab kept may come back after the call has already flushed: it goes once it is here.
 // flushOutbox sends only on the open socket of the current session, so a hang-up or a new session meanwhile is safe.
-outbox.ready.then(()=>flushOutbox(),()=>{});
+outbox.ready.then(()=>{hideAllRemoved();flushOutbox()},()=>{});
 // While a new session's room has not said which conversation this browser is on, nothing goes on its socket.
 let outboxHold=null;
 // A message for the room, kept under the `client_msg_id` the page gives it.
@@ -764,6 +794,8 @@ function failTexts(which=()=>true){
 // changed under it, or the room is busy) or 'refused' (it said no, and will again).
 async function deliverText(entry){
  const {thread,text}=entry.payload.data;
+ syncRemovals();
+ if(removing(entry.node,thread))return 'refused';
  try{
   const r=await request('/api/presentation/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,thread_id:thread,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:entry.id})},entry.node);
   return r.ok?'sent':r.status>=500||[408,409,429].includes(r.status)?'later':'refused';
@@ -780,6 +812,8 @@ async function flushTexts(){
    const socket=state.ws;
    if(!outbox.get(entry.id))continue;
    if(entry.node!==state.callNode){failTexts(item=>item===entry);continue}
+   syncRemovals();
+   if(removing(entry.node,entry.payload.data.thread)){failTexts(item=>item===entry);continue}
    if(removalFlights.has(entry.node))break;
    if(outboxHold||!socket||socket.readyState!==WebSocket.OPEN||socket.session!==state.sessionId||state.roomBinding?.thread_id!==entry.payload.data.thread)break;
    const answer=await deliverText(entry);
@@ -793,7 +827,7 @@ async function flushTexts(){
  }finally{flushingTexts=false}
  if(sent)flushOutbox();
 }
-async function sendText(){personSignal();const input=$('text-message'),text=input?.value;if(text==null)return;const viewed=composerFor();if(state.textSending||!text.trim()||!viewed)return;if(!takesTextNow(viewed)){queueText(viewed,text);input.value='';updateComposer();return}const destination=targetThread(),key=JSON.stringify([state.sessionId,targetId(),text]);if(textAttempt?.key!==key)textAttempt={key,id:crypto.randomUUID()};const attempt=textAttempt;state.textSending=true;updateComposer();setRoomError('');try{await post('/api/presentation/text',{text,thread_id:destination,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:attempt.id});if(input.value===text)input.value='';if(textAttempt===attempt)textAttempt=null;await refreshHistory(state.callNode)}catch(e){setRoomError(roomError(e,'room',bundled('room.failure.textNotSent').text))}finally{state.textSending=false;updateComposer()}}
+async function sendText(){personSignal();const input=$('text-message'),text=input?.value;if(text==null)return;const viewed=composerFor();if(state.textSending||!text.trim()||!viewed)return;syncRemovals();if(removing(conversationOf(viewed).node,conversationOf(viewed).thread))return;if(!takesTextNow(viewed)){queueText(viewed,text);input.value='';updateComposer();return}const destination=targetThread(),key=JSON.stringify([state.sessionId,targetId(),text]);if(textAttempt?.key!==key)textAttempt={key,id:crypto.randomUUID()};const attempt=textAttempt;state.textSending=true;updateComposer();setRoomError('');try{await post('/api/presentation/text',{text,thread_id:destination,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:attempt.id});if(input.value===text)input.value='';if(textAttempt===attempt)textAttempt=null;await refreshHistory(state.callNode)}catch(e){setRoomError(roomError(e,'room',bundled('room.failure.textNotSent').text))}finally{state.textSending=false;updateComposer()}}
 // Taken where they bubble to, not on the box itself, so a box mounted after this runs sends too.
 document.addEventListener('submit',event=>{if(event.target?.id!=='text-composer')return;event.preventDefault();return sendText()});
 document.addEventListener('keydown',event=>{if(event.target?.id==='text-message'&&event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();$('text-composer')?.requestSubmit()}});
@@ -872,7 +906,9 @@ async function select(key){
  const to=conversationOf(key);
  if(!to||state.switching||key===targetId()||!state.sessionId)return;
  // A machine is not moved onto while its removals are being told to it.
- if(removalFlights.has(to.node)){await removalFlights.get(to.node);if(state.switching||!conversationOf(key)||key===targetId()||!state.sessionId)return}
+ syncRemovals();
+ if(removing(to.node,to.thread))return;
+ if(removalFlights.has(to.node)){await removalFlights.get(to.node);syncRemovals();if(removing(to.node,to.thread)||state.switching||!conversationOf(key)||key===targetId()||!state.sessionId)return}
  if(to.node!==state.callNode)return moveCall(to.node,to.thread);
  const op={id:++pick.ops,key,session:state.sessionId,node:state.callNode,epoch:connectEpoch,revision:pick.revision};
  const mine=()=>pick.op===op&&op.epoch===connectEpoch&&op.session===state.sessionId&&op.node===state.callNode;
@@ -1101,7 +1137,18 @@ async function refreshPeople(fp=state.callNode){
   for(const thread of closed)forgetCard(fp,thread);
   link.closed=closed;
   // What this device removed and its machine has not taken yet stays out of the list, whatever the answer says.
-  const hidden=thread=>closed.has(thread)||removing(fp,thread);
+  // A removal the machine has taken is settled by an answer asked after it: one that still lists the conversation means the
+  // machine shows it again (its agent connected anew), so it is shown; one that does not list it is what the machine does
+  // for a conversation this device removed, and the removal is let go of.
+  syncRemovals();
+  const listedNow=new Set(data.participants.map(person=>person.thread_id));
+  const settled=pendingRemovals.filter(row=>row.node===fp&&row.taken&&asked>(removalTaken.get(conversationKey(fp,row.thread_id))??0));
+  if(settled.length){
+   for(const row of settled)removalTaken.delete(conversationKey(fp,row.thread_id));
+   void changeRemovals(list=>list.filter(row=>!settled.some(done=>sameRemoval(done.node,done.thread_id)(row))));
+  }
+  const revived=new Set(settled.filter(row=>listedNow.has(row.thread_id)).map(row=>row.thread_id));
+  const hidden=thread=>closed.has(thread)||removing(fp,thread)&&!revived.has(thread);
   // A select of a conversation closed elsewhere is let go of, as one closed here (`closeParticipant`).
   if(pick.op?.node===fp&&!pick.op.leave&&closed.has(conversationOf(pick.op.key)?.thread))letGoOfSelect();
   // Only an answer asked after a binding went says whether it was closed (`goneAt`).
@@ -2728,23 +2775,12 @@ window.sidevoiceActions={
  },
  async closeParticipant(key){
   const to=conversationOf(key);if(!to)return;
-  // Removing a conversation takes it off this device at once, whatever its machine is doing: the machine is told now when it
-  // answers, and later when it does not (`flushRemovals`), and closes the conversation for good once no device shows it.
-  if(linkBase(to.node)!=null){
-    const {answer,error}=await sendRemoval(to.node,to.thread);
-    if(answer==='refused'){setRoomError(roomError(error));throw error}
-    if(answer==='later'&&await queueRemoval(to)==null)return;
-  }else if(await queueRemoval(to)==null)return;
-  // A select of it still on its way is let go of: its answer must not put the call back on a removed conversation.
-  if(pick.op?.key===key)letGoOfSelect();
-  // Removed, it is no pick to go back to: neither the remembered one nor one a refresh may restore before the
-  // conversations' next answer says so.
-  if(rememberedThread()===key)rememberThread(null);
-  forgetCard(to.node,to.thread);
-  // Its texts that never left this device never will, under this conversation or a later one: they stay as not sent.
-  failTexts(entry=>entry.node===to.node&&entry.payload.data.thread===to.thread);
-  const link=links.get(to.node);if(link){link.closed=new Set([...(link.closed||[]),to.thread]);link.peopleAsked++;link.people=link.people.filter(person=>person.thread_id!==to.thread);mergePeople()}
-  await disposeConversation(key);
+  // Removing a conversation takes it off this device first, whatever its machine is doing, and the same way on every tab: kept
+  // durably, hidden, its texts cancelled, its call let go of. Only then is the machine told (`flushRemovals`), now when it
+  // answers and later when it does not; it closes the conversation for good once no device shows it.
+  if(await queueRemoval(to)==null)return;
+  await hideRemoved(to.node,to.thread);
+  await flushRemovals(to.node);
   if(linkBase(to.node)!=null){if(to.node===state.callNode)await refresh();await refreshPeople(to.node);await refreshHistory(to.node)}
  },
  tryVoiceSettings,

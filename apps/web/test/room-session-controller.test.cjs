@@ -1332,17 +1332,22 @@ test('An explicit agent leave retires the card across restart; a new explicit jo
   [[node.fp+'|old','Rejoined']]);
 });
 
-test('A failed user close leaves the remembered card until Core accepts explicit leave',async()=>{
+test('A refused removal is not retried, and the next answer that still lists the conversation shows it again (web#375)',async()=>{
  const node=await fakeNode();node.tokens.add('tok-1');node.people=[{thread_id:'old',title:'Old conversation',available:true}];
  const s=setup({paired:false,stored:{pairings:[pairingOf(node,{})]}});s.context.__fp=node.fp;
  s.run("const link=linkOf(__fp);link.base='http://127.0.0.1:8768';link.reach='ok';publishLinks()");
  const net=network({at:{'http://127.0.0.1:8768':node}});s.context.fetch=net.get;
  await s.run('refreshPeople(__fp)');
- s.context.fetch=(url,init)=>url.endsWith('/api/presentation/remove')?Promise.resolve({ok:false,status:409,json:async()=>({detail:'No se encuentra'})}):net.get(url,init);
- await assert.rejects(s.run('window.sidevoiceActions.closeParticipant')(node.fp+'|old'));
- assert.deepEqual(plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')),[node.fp+'|old']);
- const restarted=setup({paired:false,siteData:s.saved});
- assert.deepEqual(plain(restarted.run('roomStore.getState().participants.map(p=>p.threadId)')),[node.fp+'|old']);
+ let removals=0;
+ s.context.fetch=(url,init)=>url.endsWith('/api/presentation/remove')?(removals++,Promise.resolve({ok:false,status:409,json:async()=>({detail:'No se encuentra'})})):net.get(url,init);
+ const bn=bannerOf(s);
+ await s.run('window.sidevoiceActions.closeParticipant')(node.fp+'|old');
+ assert.equal(removals,1);assert.ok(bn.all().length>2,'the refusal is said');
+ assert.equal(removals,1,'sent once, not retried');
+ await s.run('refreshPeople(__fp)');
+ assert.equal(removals,1);
+ assert.deepEqual(plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')),[node.fp+'|old'],'the machine still lists it');
+ assert.equal(s.run('readRemovals().length'),0,'and the removal is let go of');
 });
 
 test('Olvidar forgets the machine here at once, and asks it to revoke this device only where it proves itself',async()=>{
@@ -4368,7 +4373,9 @@ test('A pending removal is sent when its machine answers again, retried with bac
  s.run("removalBackoff.clear()");answer=200;
  await s.run("flushRemovals('fp-pc')");
  assert.equal(sent.length,2);
- assert.equal(s.run('readRemovals().length'),0,'taken: gone from the store');
+ assert.equal(s.run('readRemovals()[0].taken'),true,'taken: not sent again, kept until an answer settles it');
+ await s.run("refreshPeople('fp-pc')");
+ assert.equal(s.run('readRemovals().length'),0,'an answer asked after it lets it go');
  s.run('disconnect()');
 });
 test('A removal is refused, and the row stays, when it cannot be kept: a full store never evicts an older one (web#375)',async()=>{
@@ -4380,6 +4387,43 @@ test('A removal is refused, and the row stays, when it cannot be kept: a full st
  assert.ok(!s.run('readRemovals()').some(row=>row.thread_id==='p'));
  assert.ok(plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')).includes('fp-pc|p'),'the row stays');
  assert.match(bn.now(),/removals are waiting/);
+ s.run('disconnect()');
+});
+test('Removing is local first even when the machine is on: hidden and kept before the send answers, and the send has a timeout (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c;let signal=null;
+ const room=s.context.fetch;
+ s.context.fetch=(path,options)=>String(path).includes('/presentation/remove')?(signal=options.signal,new Promise(()=>{})):room(path,options);
+ s.run("{const link=linkOf('fp-pc');link.base='https://pc.example';link.reach='ok';link.via='node'}");
+ s.run("keepMessage('text','text',{thread:'p',text:'hello'});state.callNode;queuedTexts()[0].node='fp-pc'");
+ void s.run("window.sidevoiceActions.closeParticipant('fp-pc|p')");await settleSoon();
+ assert.ok(signal&&typeof signal.aborted==='boolean','the send can be abandoned');
+ assert.ok(!plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')).includes('fp-pc|p'),'hidden before the machine answered');
+ assert.equal(s.run('readRemovals().length'),1,'kept before it too');
+ assert.equal(s.run('queuedTexts().length'),0,'its queued texts are cancelled');
+ s.run('disconnect()');
+});
+test('A removal made in another tab is applied here: its queued text is cancelled and its row stays hidden when the machine omits it (web#375)',async()=>{
+ const s=setup();
+ s.run("queueText('fp-mac|a','must not send')");
+ assert.equal(s.run('queuedTexts().length'),1);
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'a',taken:true}]);
+ s.handlers.storage({key:'sidevoice.pending-removals.v1'});
+ assert.equal(s.run('queuedTexts().length'),0);
+ s.run("linkOf('fp-mac').people=[{thread_id:'a',available:true}]");
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({participants:[],closed_threads:[]})});
+ await s.run("refreshPeople('fp-mac')");
+ assert.equal(s.run("linkOf('fp-mac').people.length"),0,'the omitted conversation does not linger as an offline row');
+});
+test('A thread in the durable removal set cannot be picked or written to in any tab, whatever the round is doing (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,fetched=[];
+ const room=s.context.fetch;s.context.fetch=async(path,options)=>{fetched.push(String(path));return room(path,options)};
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'p'}]);
+ s.run("keepMessage('text','text',{thread:'p',text:'late'})");
+ await s.run("select('fp-mac|p')");
+ assert.ok(!fetched.some(path=>path.includes('/presentation/select')),'no pick');
+ s.run("state.callNode='fp-mac'");await s.run('flushTexts()');
+ assert.equal(s.run('queuedTexts().length'),0);
+ assert.ok(!fetched.some(path=>path.includes('/presentation/text')),'nothing written');
  s.run('disconnect()');
 });
 test('Choosing a conversation of an away machine leaves the call where it is and shows no "No machine available"',async()=>{
