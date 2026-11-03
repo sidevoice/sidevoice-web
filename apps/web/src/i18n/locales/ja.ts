@@ -1356,6 +1356,8 @@ export const messages: Messages = {
   "card.systemDefault": "システムのデフォルト",
   "card.skip": "再生中の音声をスキップ",
   "card.hangUp": "通話を終了",
+  "liveActivity.skipShort": "スキップ",
+  "liveActivity.routeName": "オーディオ出力: {route}",
   "card.yourMicrophone": "あなたのマイク",
   "card.reach.holding": "受信できません",
   "card.reach.offline": "オフライン",

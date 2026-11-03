@@ -1,4 +1,5 @@
 // The session's facts and pure projections. No DOM, storage, audio engine or clock reads here.
+import { callSurfaceView } from './call-surface.js';
 export const PRESENCE_DELIVERED_DELAY_MS = 1500;
 /* How long a conversation works without a break before it shows as working (the operator, 2026-10-14): its words, its
  * light and its avatar's work wait for it, so a plain back-and-forth does not flash Working between turns. */
@@ -32,6 +33,8 @@ export function initialSessionFacts() {
         // fact `now` above, so Working shows WORKING_SHOWN_AFTER_MS later (working).
         workingSince: {},
         figures: {}, restRelayed: false,
+        // What a native call surface reads by the clock (state/call-surface-publisher.ts): the spoken page, the said text, the stills.
+        surfaceLive: null,
         // The machines this device is paired with (never their tokens), and when they were read. Every one of them is live
         // at once (`machineLinks`).
         pairings: [], machinesAt: 0, machinesReady: false, remoteHostStatus: {},
@@ -520,9 +523,10 @@ export function createRoomSessionStore(seed = {}) {
         const participants = participantsView(facts);
         // The desktop card's whole snapshot, from the same rows.
         const callCard = callCardView(facts, participants);
-        const next = { facts, session: sessionStatus(facts), conversation: conversationView(facts), participants,
+        const conversation = conversationView(facts);
+        const next = { facts, session: sessionStatus(facts), conversation, participants,
             join: joinView(facts),
-            mic: micView(facts), call: callView(facts), callCard, title: viewedTitle(facts), screenLock: facts.screenLock,
+            mic: micView(facts), call: callView(facts), callCard, callSurface: callSurfaceView(callCard, conversation, participants, facts.surfaceLive, say), title: viewedTitle(facts), screenLock: facts.screenLock,
             enginePanel: enginePanel(facts),
             machines: machinesView(facts), pairing: { open: facts.pairingOpen, note: facts.pairingNote },
             bootError: facts.bootError };

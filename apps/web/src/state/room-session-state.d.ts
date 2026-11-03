@@ -32,6 +32,8 @@ export interface SessionFacts {
  /** What the room says of each conversation's figure, as one value: its mood, whether it is held still, and when something last
   *  happened with it (wall-clock). Relayed to the card, which acts out exactly that (conversation-avatars.ts). `restRelayed`: this store only receives it. */
  figures: Record<string, { mood: import('../features/avatar/avatar-spec').AvatarMood; still: boolean; restStart: number }>; restRelayed: boolean;
+ /** What the publisher keeps by the clock for a native call surface (call-surface.d.ts SurfaceLive); null until one asks. */
+ surfaceLive: import('./call-surface.js').SurfaceLive | null;
  /** The room's error above the stage, as people read it (error-message.ts). */
  bootError: import('../components/ui/ErrorText').ErrorMessage | null;
  /** The machines this device is paired with (never their tokens), and the clock they were read at. */
@@ -120,6 +122,8 @@ export interface SessionSnapshot {
  mic: {enabled: boolean; label: string; title: string; pressed: boolean; disabled: boolean; holding: boolean};
  call: {joined: boolean; busy: boolean; label: string}; title: string;
  callCard: CallCardView;
+ /** What a native call surface needs beyond `callCard` (call-surface.d.ts). */
+ callSurface: import('./call-surface.js').CallSurface;
  enginePanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
  screenLock: {state: string; note: string};
  bootError: import('../components/ui/ErrorText').ErrorMessage | null; machines: MachineView[]; pairing: PairingPromptView;

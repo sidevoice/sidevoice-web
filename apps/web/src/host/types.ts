@@ -361,6 +361,13 @@ export interface HostDebugBridge {
 export type MessageOverlay = Readonly<Record<string, string>>;
 /* A value of the host's table that is not a non-empty string is not a text: the translator skips it. */
 
+/** The app's native call surface (the phone's Lock Screen card, Dynamic Island, ongoing notification): it reads the room's
+ *  `callSurface` (state/call-surface.d.ts) from the store, and the page publishes what costs it work (the creatures'
+ *  stills, the spoken page) only while `active()`. An app without one offers none, and the page does none of that. */
+export interface CallSurfaceBridge {
+  active(): boolean;
+}
+
 export interface Host {
   identity: HostIdentity;
   /** The host's overlay for `language` (a tag: `es`, `zh-Hans`) exactly: nothing from its primary subtag or English, which
@@ -378,6 +385,7 @@ export interface Host {
   reset: ResetBridge | null;
   muteShortcut: MuteShortcutBridge | null;
   callControls: CallControlsBridge | null;
+  callSurface: CallSurfaceBridge | null;
   updater: AppUpdater | null;
   debug: HostDebugBridge | null;
 }
