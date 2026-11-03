@@ -6,6 +6,7 @@ import { createMicLevelChannel } from "./mic-level";
 import { playbackLevel } from "./playback-level";
 import { openSettings } from "../features/settings/open-settings";
 import { startCallSurface } from "./call-surface-publisher";
+import type { CallLayoutStore } from "./call-layout";
 
 export type RoomViewState = import('./room-session-state.js').SessionSnapshot;
 export type RoomStore = import('./room-session-state.js').SessionStore;
@@ -27,7 +28,7 @@ export function useRoomStore<T>(selector: (state: RoomViewState) => T): T {
 
 let stopSurface: (() => void) | null = null;
 
-export function installRoomBridge(store: RoomStore) {
+export function installRoomBridge(store: RoomStore, layout: CallLayoutStore | null = null) {
   playbackLevel.clear();
   // What a native call surface reads by the clock; it does nothing until the host has one.
   stopSurface?.();
@@ -40,5 +41,8 @@ export function installRoomBridge(store: RoomStore) {
     playbackLevel,
     // The desktop app opens Settings at a section from outside the page: its floating card's gear (Floating card).
     openSettings: (section) => openSettings({ section }, store),
+    // A phone app's call surface (its Lock Screen card, its notification) opens the app on its conversations: put them in
+    // front, as the header's own button does.
+    openConversations: () => layout?.getState().showConversations(),
   };
 }
