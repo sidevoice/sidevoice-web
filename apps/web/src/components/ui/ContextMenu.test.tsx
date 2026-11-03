@@ -6,13 +6,13 @@ afterEach(cleanup);
 
 test("the secondary click on the row opens its options, and choosing one runs it", async () => {
   const close = vi.fn();
-  render(<ContextMenu label="Options for Fix the bug" items={<ContextMenuItem danger onSelect={close}>Close conversation</ContextMenuItem>}>
+  render(<ContextMenu label="Options for Fix the bug" items={<ContextMenuItem danger onSelect={close}>Remove from this device</ContextMenuItem>}>
     <div data-testid="row">Fix the bug</div>
   </ContextMenu>);
   expect(screen.queryByRole("menu")).toBeNull();
   await act(async () => { fireEvent.contextMenu(screen.getByTestId("row")); });
   expect(screen.getByRole("menu", { name: "Options for Fix the bug" })).toBeInTheDocument();
-  const item = screen.getByRole("menuitem", { name: "Close conversation" });
+  const item = screen.getByRole("menuitem", { name: "Remove from this device" });
   expect(item).toHaveAttribute("data-danger");
   await act(async () => { fireEvent.click(item); });
   expect(close).toHaveBeenCalledOnce();

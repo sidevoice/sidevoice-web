@@ -6,7 +6,7 @@
 /** Whether the chevron shows when every conversation already fits in the row. On (the operator's decision, 2026-10-15,
  *  reversing 2026-10-12's off): always there, its "+N" only when some are behind it. Off, it shows only when some do not fit;
  *  and while it does not, a phone has no way to the conversations' sheet, which alone
- *  holds each conversation's ⋯ (Close conversation), its state in words, the connection statistics (#stats-open) and,
+ *  holds each conversation's ⋯ (Remove from this device), its state in words, the connection statistics (#stats-open) and,
  *  where the updates live in the sheet, the updates. On is the ux spec's recommendation: always there, its "+N" only
  *  when some are behind it. */
 export const CHEVRON_ALWAYS = true;

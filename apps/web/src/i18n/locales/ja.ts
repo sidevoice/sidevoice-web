@@ -34,7 +34,7 @@ export const messages: Messages = {
   "sidebar.empty": "まだ会話はありません。",
   "sidebar.unknownMachine": "不明なマシン",
   "sidebar.options": "{title}のオプション",
-  "sidebar.closeConversation": "会話を閉じる",
+  "sidebar.removeConversation": "このデバイスから削除",
   "sidebar.new": "新しい会話",
   "sidebar.newTitle": "エージェントを接続して話しかけましょう",
   "sidebar.newBody": "エージェントが接続すると、話しかけられるようになります。ここから会話を始めることはまだできません。エージェントのセッションで次のように伝えてください：",

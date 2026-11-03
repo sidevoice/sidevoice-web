@@ -33,7 +33,7 @@ export const messages: Messages = {
   "sidebar.empty": "Aucune conversation pour l’instant.",
   "sidebar.unknownMachine": "Machine inconnue",
   "sidebar.options": "Options de {title}",
-  "sidebar.closeConversation": "Fermer la conversation",
+  "sidebar.removeConversation": "Retirer de cet appareil",
   "sidebar.new": "Nouvelle conversation",
   "sidebar.newTitle": "Connectez votre agent pour lui parler",
   "sidebar.newBody": "Votre agent se connecte, puis vous pouvez lui parler. Impossible pour l’instant de démarrer une conversation d’ici. Dans la session de votre agent, dites :",

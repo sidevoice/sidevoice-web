@@ -170,12 +170,12 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
                   end={(row) => <>
                     {unread(row) && <span className="sidebar-unread" aria-hidden="true" />}
                   </>}
-                  // The same options on the secondary click anywhere on the row (operator, 2026-10-16): Close conversation, for now.
+                  // The same options on the secondary click anywhere on the row (operator, 2026-10-16): Remove from this device, for now.
                   wrap={(row, node) => <ContextMenu label={t("sidebar.options", { title: row.title })}
-                    items={<ContextMenuItem danger onSelect={() => void window.sidevoiceActions?.closeParticipant(row.threadId)}><CloseIcon />{t("sidebar.closeConversation")}</ContextMenuItem>}>{node}</ContextMenu>}
+                    items={<ContextMenuItem danger onSelect={() => void window.sidevoiceActions?.closeParticipant(row.threadId)}><CloseIcon />{t("sidebar.removeConversation")}</ContextMenuItem>}>{node}</ContextMenu>}
                   aside={(row) => (
                     <DropdownMenu label={t("sidebar.options", { title: row.title })} trigger={<Button variant="ghost" tone="neutral" size="icon-sm" className="participant-more" aria-label={t("sidebar.options", { title: row.title })}><MoreIcon /></Button>}>
-                      <DropdownMenuItem danger onSelect={() => void window.sidevoiceActions?.closeParticipant(row.threadId)}><CloseIcon />{t("sidebar.closeConversation")}</DropdownMenuItem>
+                      <DropdownMenuItem danger onSelect={() => void window.sidevoiceActions?.closeParticipant(row.threadId)}><CloseIcon />{t("sidebar.removeConversation")}</DropdownMenuItem>
                     </DropdownMenu>
                   )}
                 />

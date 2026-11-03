@@ -34,7 +34,7 @@ export const messages: Messages = {
   "sidebar.empty": "Non c’è ancora nessuna conversazione.",
   "sidebar.unknownMachine": "Macchina sconosciuta",
   "sidebar.options": "Opzioni di {title}",
-  "sidebar.closeConversation": "Chiudi conversazione",
+  "sidebar.removeConversation": "Rimuovi da questo dispositivo",
   "sidebar.new": "Nuova conversazione",
   "sidebar.newTitle": "Connetti il tuo agente per parlarci",
   "sidebar.newBody": "Il tuo agente si connette e poi puoi parlargli. Da qui non si può ancora iniziare una conversazione. Nella sessione del tuo agente, di’:",

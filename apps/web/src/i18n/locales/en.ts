@@ -34,7 +34,7 @@ export const messages = {
   "sidebar.empty": "No conversations yet.",
   "sidebar.unknownMachine": "Unknown machine",
   "sidebar.options": "Options for {title}",
-  "sidebar.closeConversation": "Close conversation",
+  "sidebar.removeConversation": "Remove from this device",
   "sidebar.new": "New conversation",
   "sidebar.newTitle": "Connect your agent to talk to it",
   "sidebar.newBody": "Your agent connects, and then you can talk to it. Starting a conversation from here isn't possible yet. In your agent's session, say:",

@@ -33,7 +33,7 @@ export const messages: Messages = {
   "sidebar.empty": "还没有对话。",
   "sidebar.unknownMachine": "未知计算机",
   "sidebar.options": "{title} 的选项",
-  "sidebar.closeConversation": "关闭对话",
+  "sidebar.removeConversation": "从此设备移除",
   "sidebar.new": "新对话",
   "sidebar.newTitle": "连接你的智能体，才能和它对话",
   "sidebar.newBody": "智能体连接后，你就能和它对话。暂时还不能从这里发起对话。请在你的智能体会话中说：",
