@@ -4403,7 +4403,7 @@ test('Removing is local first even when the machine is on: hidden and kept befor
  s.run('disconnect()');
 });
 test('A removal made in another tab is applied here: its queued text is cancelled and its row stays hidden when the machine omits it (web#375)',async()=>{
- const s=setup();
+ const s=setup();await settleSoon();
  s.run("queueText('fp-mac|a','must not send')");
  assert.equal(s.run('queuedTexts().length'),1);
  s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'a',taken:true}]);
@@ -4427,7 +4427,7 @@ test('A thread in the durable removal set cannot be picked or written to in any 
  s.run('disconnect()');
 });
 test('A tab that was suspended applies every change it missed, even one another tab already settled and deleted (web#375)',async()=>{
- const s=setup();s.run("queueText('fp-mac|a','must not send')");
+ const s=setup();await settleSoon();s.run("queueText('fp-mac|a','must not send')");
  const queued=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1'}]);
  const taken=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1',taken:true,ack:1}]);
  delete s.saved['sidevoice.pending-removals.v1'];
@@ -4435,7 +4435,7 @@ test('A tab that was suspended applies every change it missed, even one another 
  assert.equal(s.run('queuedTexts().length'),0,'the last event alone says enough');
 });
 test('An inventory that predates another tab\'s acknowledgement does not revive the removal, nor delete it (web#375)',async()=>{
- const s=setup();let release;
+ const s=setup();await settleSoon();let release;
  s.context.fetch=()=>new Promise(resolve=>{release=resolve});
  const poll=s.run("refreshPeople('fp-mac')");
  s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1',taken:true,ack:Date.now()+1000}]);
@@ -4444,12 +4444,11 @@ test('An inventory that predates another tab\'s acknowledgement does not revive 
  assert.equal(s.run("linkOf('fp-mac').people.length"),0);
  assert.equal(s.run('readRemovals().length'),1);
 });
-test('A removal made again since is not deleted by the settling of the earlier one (web#375)',async()=>{
- const s=setup();
- s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'new'}]);
- s.run("syncRemovals()");
- await s.run("changeRemovals(list=>list.filter(row=>!([{node:'fp-mac',thread_id:'a',id:'old'}]).some(done=>sameRemoval(done.node,done.thread_id,done.id)(row)&&row.taken)))");
- assert.equal(s.run('readRemovals().length'),1);
+test('A removal made again since is a removal of its own: acknowledging the earlier one leaves it (web#375)',async()=>{
+ const s=setup();await settleSoon();
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'old'},{node:'fp-mac',thread_id:'a',id:'new'}]);
+ await s.run("takeRemoval('fp-mac','a','old')");
+ assert.deepEqual(plain(s.run('readRemovals()')),[{node:'fp-mac',thread_id:'a',id:'old',taken:true},{node:'fp-mac',thread_id:'a',id:'new'}]);
 });
 test('Sends and picks go through the shared gate: the machine\'s round lock is entered when removals are open (web#375)',async()=>{
  const c=await callWithTwoMachines();const {s}=c,locks=[];
@@ -4460,8 +4459,16 @@ test('Sends and picks go through the shared gate: the machine\'s round lock is e
  assert.ok(locks.some(name=>name.includes('flush.fp-mac')),'the text waited at the gate');
  s.run('disconnect()');
 });
+test('A pick enters the shared gate of its machine when removals are open (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,locks=[];
+ s.context.navigator={locks:{request:async(name,a,b)=>{locks.push(name);const cb=b||a;return cb(a&&a.ifAvailable?{}:undefined)}}};
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-pc',thread_id:'gone',id:'r'}]);
+ void s.run("select('fp-pc|p')").catch(()=>{});await settleSoon();
+ assert.ok(locks.some(name=>name.includes('flush.fp-pc')),'the pick waited at the gate');
+ s.run('disconnect()');
+});
 test('A text typed while another tab is telling the machine its removals waits at the shared gate, then goes (web#375)',async()=>{
- const s=setup(),sent=[];s.context.crypto={randomUUID:()=> 'test-message'};
+ const s=setup(),sent=[];await settleSoon();s.context.crypto={randomUUID:()=> 'test-message'};
  let open;const held=new Promise(resolve=>{open=resolve});
  s.context.navigator={locks:{request:async(name,a,b)=>{const cb=b||a;if(name.includes('flush.'))await held;return cb(a&&a.ifAvailable?{}:undefined)}}};
  s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'z',id:'r'}]);
@@ -4474,7 +4481,7 @@ test('A text typed while another tab is telling the machine its removals waits a
  assert.equal(sent.length,1);assert.equal(sent[0].thread_id,'a');
 });
 test('A delayed event about a removal this tab applied, settled and saw revived, changes nothing (web#375)',async()=>{
- const s=setup();s.run("queueText('fp-mac|a','first')");
+ const s=setup();await settleSoon();s.run("queueText('fp-mac|a','first')");
  const queued=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1'}]);
  const taken=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1',taken:true}]);
  delete s.saved['sidevoice.pending-removals.v1'];
