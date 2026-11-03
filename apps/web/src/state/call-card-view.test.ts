@@ -63,7 +63,7 @@ test("FC4: the avatar acts out what the stage's would — listening while the tu
   expect(card({ harness: { "n|a": true }, workingSince: { "n|a": 0 }, now: WORKING_SHOWN_AFTER_MS }).mood).toBe("working");
   // Busy, but not yet for as long as Working waits: the avatar does not work yet.
   expect(card({ harness: { "n|a": true }, workingSince: { "n|a": 0 }, now: WORKING_SHOWN_AFTER_MS - 1 }).mood).toBe("idle");
-  expect(card({ botLive: true, ...turn, pendingPhase: "listening" }).mood).toBe("speaking"); // barge-in: speaking wins
+  expect(card({ botLive: true, ...turn, pendingPhase: "listening" }).mood).toBe("listening"); // barge-in: the person's turn wins (one precedence)
   expect(card({ people: [{ ...people[0], available: false, reach: { state: "offline" } }] }).mood).toBe("offline");
   // Cannot receive (#454): the card carries it as its own mood, not as resting; a working harness still shows as working.
   expect(card({ people: [{ ...people[0], reach: { state: "holding" } }] })).toMatchObject({ mood: "holding" });

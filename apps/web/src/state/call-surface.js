@@ -116,19 +116,30 @@ export function modelLabel(id) {
     return match && MODELS[match[1]] || id;
 }
 
+/** What a call is doing, resolved by ONE precedence (the stage's mood, the card's state line, the native call surface and
+ *  its Live Activity all read it, so web, iOS and Android agree): offline > the person's turn (listening, transcribing) >
+ *  speaking > working > holding > idle. Holding is a standing condition, so it takes idle's place; what is happening now
+ *  always wins. `turn` is the person's open turn ('listening', 'transcribing') or null. */
+export function callState({ offline, turn, speaking, working, holding }) {
+    if (offline)
+        return 'offline';
+    if (turn === 'listening' || turn === 'transcribing')
+        return turn;
+    if (speaking)
+        return 'speaking';
+    if (working)
+        return 'working';
+    return holding ? 'holding' : 'idle';
+}
 /** The line that says what the call is doing, in the page's words: the same words the stage, the card and the wave say
  *  for it (conversation-state.ts moodText, wave.transcribingTitle). */
-function stateKey(card, reach) {
-    if (card.busyReason === 'reconnecting' || card.mood === 'offline')
-        return 'state.offline';
-    if (reach === 'holding')
-        return 'state.holding';
-    if (card.turn === 'listening')
-        return 'state.listening';
-    if (card.turn === 'transcribing')
-        return 'wave.transcribingTitle';
-    return card.mood === 'speaking' ? 'state.speaking' : card.mood === 'working' ? 'state.working' : card.mood === 'listening' ? 'state.listening' : 'state.resting';
+function stateKey(card) {
+    const state = callState({ offline: card.busyReason === 'reconnecting' || card.mood === 'offline',
+        turn: card.turn ?? (card.mood === 'listening' ? 'listening' : null), speaking: card.mood === 'speaking', working: card.mood === 'working', holding: card.mood === 'holding' });
+    return STATE_KEYS[state];
 }
+const STATE_KEYS = { offline: 'state.offline', listening: 'state.listening', transcribing: 'wave.transcribingTitle', speaking: 'state.speaking',
+    working: 'state.working', holding: 'state.holding', idle: 'state.resting' };
 
 /** The words the surface draws, resolved in the page's language (the web catalogue under the app's overlay). A
  *  native catalogue never holds them. `offline` is always there, whatever the state: what a host cannot vouch for any
@@ -160,7 +171,7 @@ export function callSurfaceView(card, participants, live, say, call, previous) {
     const reach = row?.reach ?? null;
     const others = participants.filter(p => p.threadId !== card.conversation).slice(0, SURFACE_OTHERS);
     const keeping = card.busyReason === 'switching' && previous;
-    const key = stateKey(card, reach);
+    const key = stateKey(card);
     const line = keeping ? previous.words.state : say(key);
     return {
         pendingCancellable: !!call.pendingCancellable,

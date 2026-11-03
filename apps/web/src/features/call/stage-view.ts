@@ -1,6 +1,6 @@
 import { useRoomStore, type RoomViewState } from "../../state/room-store";
 import type { ParticipantView } from "../../state/room-types";
-import type { AvatarMood } from "../avatar/avatar-spec";
+import type { StageMood } from "../../state/room-session-state.js";
 import { canHear, stageMood } from "./conversation-state";
 
 /* The conversation on the stage: the one the person is looking at, which is the call's own unless they picked one
@@ -21,8 +21,8 @@ export interface StageConversation {
   canHear: boolean;
   speaking: boolean;
   working: boolean;
-  /** What its agent acts out (agentMood), before the stage holds it still under its balloon (conversation-avatars.ts). */
-  mood: AvatarMood;
+  /** What its agent is in (agentMood): the words and the notice read it as it is, "holding" included. The creature is handed avatarMood(mood), which draws holding as idle, after the stage holds it still under its balloon (conversation-avatars.ts). */
+  mood: StageMood;
 }
 
 /** What a conversation's agent's mood is made of. */
@@ -45,7 +45,7 @@ export const moodFacts = (state: RoomViewState): MoodFacts => ({
 /** The mood of a conversation's agent: the one the stage, its row and the header all act out, whichever conversation is
  *  on the stage (the room's projection, stageMood). It speaks and listens only as the call's own; it works whenever its
  *  harness says so. The preview (the playground's card) holds the one on the stage in a mood of its own. */
-export function agentMood({ participants, viewed, selected, inCall, botLive, turn, preview }: MoodFacts, threadId: string | null): AvatarMood {
+export function agentMood({ participants, viewed, selected, inCall, botLive, turn, preview }: MoodFacts, threadId: string | null): StageMood {
   if (preview && threadId === viewed) return preview.mood;
   const row = threadId ? participants.find((participant) => participant.threadId === threadId) ?? null : null;
   const isTarget = !!threadId && threadId === selected;

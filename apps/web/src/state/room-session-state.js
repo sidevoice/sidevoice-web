@@ -1,5 +1,5 @@
 // The session's facts and pure projections. No DOM, storage, audio engine or clock reads here.
-import { callSurfaceView } from './call-surface.js';
+import { callState, callSurfaceView } from './call-surface.js';
 export const PRESENCE_DELIVERED_DELAY_MS = 1500;
 /* How long a conversation works without a break before it shows as working (the operator, 2026-10-14): its words, its
  * light and its avatar's work wait for it, so a plain back-and-forth does not flash Working between turns. */
@@ -138,26 +138,26 @@ export function sessionStatus(s) {
 export function canHear(row) {
     return !!row.available && row.reach === 'listening';
 }
-/** The agent on the stage, by priority: offline (the room cannot reach it: the stage shows its wanted poster), then
- *  speaking, listening (the person is talking to it and it can hear them), working, and idle for everything else.
- *  A reply it is saying in the call plays to its end whatever happens to the link, so it speaks until then and only
- *  then shows the poster (#220). Short of offline it neither speaks nor listens whenever it cannot hear the person: out
- *  of the call, not the one the microphone talks to, or holding what it is sent — a conversation that is holding does
- *  not react to the person at all. Working is the conversation's own, whoever it talks to: then it works if its harness
- *  says so, and is idle otherwise. Every copy of a conversation's agent (the stage, its row, the header) acts out this
- *  one mood (#166). */
+/** The agent on the stage (its StageMood), by `callState`'s precedence. Offline is the room cannot reach it: the stage
+ *  shows its wanted poster; a reply it is saying in the call plays to its end whatever happens to the link, so it speaks
+ *  until then and only then shows the poster (#220). It listens and speaks only as the call's own, while it can take
+ *  them: in the call, the one the microphone talks to, and either able to hear the person or holding what it is sent (a
+ *  holding conversation still has the person's turn open and its reply sounding). Working is the conversation's own,
+ *  whoever it talks to. Holding (available, harness not working) is "can't receive"; the creature draws it as idle
+ *  (avatarMood). Every copy of a conversation's agent (the stage, its row, the header) acts out this one mood (#166). */
 export function stageMood(facts) {
     if (facts.reach === 'offline')
         return facts.inCall && facts.isTarget && facts.speaking ? 'speaking' : 'offline';
-    if (!facts.inCall || !facts.isTarget || !facts.canHear)
-        return facts.working ? 'working' : facts.reach === 'holding' && facts.available !== false ? 'holding' : 'idle';
-    if (facts.speaking)
-        return 'speaking';
-    if (facts.personSpeaking && (facts.reach === 'listening' || facts.reach === null))
-        return 'listening';
-    if (facts.working)
-        return 'working';
-    return 'idle';
+    const holding = facts.reach === 'holding';
+    const live = !!facts.inCall && !!facts.isTarget && (!!facts.canHear || holding);
+    const state = callState({ offline: false, turn: live && facts.personSpeaking ? 'listening' : null, speaking: live && !!facts.speaking,
+        working: !!facts.working, holding: holding && facts.available !== false });
+    return state === 'transcribing' ? 'listening' : state;
+}
+/** What the creature acts out for a stage mood: holding is at rest, exactly as idle (the words, the amber and the pause glyph
+ *  carry it; the creature engine never sees it). */
+export function avatarMood(mood) {
+    return mood === 'holding' ? 'idle' : mood;
 }
 /** The voice's devices as the card offers them (call-controls/host.ts AudioDevices): the system's default first, an
  *  option of its own (id ''); a device the system lists without a name said by its place; the speaker chosen only where

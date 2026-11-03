@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import type { ParticipantView } from "../../state/room-types";
 import { translator } from "../../i18n/translator";
-import { conversationState, machineGroups, moodText, personMood, stageMood, hasUnread, stateText } from "./conversation-state";
+import { avatarMood, callState, conversationState, machineGroups, moodText, personMood, stageMood, hasUnread, stateText } from "./conversation-state";
 
 const row = (threadId: string, extra: Partial<ParticipantView> = {}): ParticipantView => ({
   threadId, title: threadId, selected: false, available: true, switching: false, unread: 0, reach: "listening",
@@ -42,13 +42,14 @@ test("working is the conversation's own: it works whoever it talks to, in the ca
   expect(stageMood({ ...other, reach: "offline", canHear: false })).toBe("offline");
 });
 
-test("the stage's agent, by priority: offline, speaking, listening, working, idle", () => {
+test("the stage's agent, by priority: offline, the person's turn, speaking, working, idle", () => {
   const call = { inCall: true, isTarget: true, canHear: true, reach: "listening" as const, speaking: false, personSpeaking: false, working: false };
   expect(stageMood({ ...call, reach: "offline", canHear: false, personSpeaking: true, working: true })).toBe("offline");
   // A reply it is saying plays to its end whatever happens to the link: the poster waits for it (#220).
   expect(stageMood({ ...call, reach: "offline", canHear: false, speaking: true, personSpeaking: true, working: true })).toBe("speaking");
   expect(stageMood({ ...call, reach: "offline", canHear: false, isTarget: false, speaking: true })).toBe("offline");
-  expect(stageMood({ ...call, speaking: true, personSpeaking: true, working: true })).toBe("speaking");
+  expect(stageMood({ ...call, speaking: true, personSpeaking: true, working: true })).toBe("listening");
+  expect(stageMood({ ...call, speaking: true, working: true })).toBe("speaking");
   expect(stageMood({ ...call, personSpeaking: true, working: true })).toBe("listening");
   expect(stageMood({ ...call, working: true })).toBe("working");
   // What used to be "waiting for you" is idle now.
@@ -59,14 +60,19 @@ test("the stage's agent, by priority: offline, speaking, listening, working, idl
   expect(stageMood({ ...call, isTarget: false, speaking: true, personSpeaking: true })).toBe("idle");
 });
 
-test("it listens only while the person talks to it and it can hear them: holding, it does not react", () => {
+test("it listens only while the person talks to it and it can take it: hearing them, or holding what it is sent", () => {
   const call = { inCall: true, isTarget: true, canHear: true, reach: "listening" as const, speaking: false, personSpeaking: true, working: false };
   expect(stageMood(call)).toBe("listening");
-  expect(stageMood({ ...call, reach: "holding", canHear: false })).toBe("holding");
+  // Holding is a standing condition: what is happening now (the person's turn) wins over it, and it takes idle's place.
+  expect(stageMood({ ...call, reach: "holding", canHear: false })).toBe("listening");
+  expect(stageMood({ ...call, reach: "holding", canHear: false, personSpeaking: false })).toBe("holding");
+  expect(stageMood({ ...call, reach: "holding", canHear: false, personSpeaking: false, speaking: true })).toBe("speaking");
+  expect(stageMood({ ...call, isTarget: false, reach: "holding", canHear: false })).toBe("holding");
+  expect(stageMood({ ...call, inCall: false, reach: "holding", canHear: false })).toBe("holding");
   // Holding, but not listed as available, is offline's words, not this one.
-  expect(stageMood({ ...call, reach: "holding", canHear: false, available: false })).toBe("idle");
+  expect(stageMood({ ...call, reach: "holding", canHear: false, personSpeaking: false, available: false })).toBe("idle");
   // It does not react to the person, but its work goes on (#166).
-  expect(stageMood({ ...call, reach: "holding", canHear: false, working: true })).toBe("working");
+  expect(stageMood({ ...call, reach: "holding", canHear: false, personSpeaking: false, working: true })).toBe("working");
   // Bound to the call but not listed by the room yet, it hears the call.
   expect(stageMood({ ...call, reach: null })).toBe("listening");
   expect(stageMood({ ...call, personSpeaking: false })).toBe("idle");
@@ -109,4 +115,25 @@ test("conversations are grouped by the machine they run on — by its id, since 
     ["Laptop", ["a", "c"]], ["Server", ["b"]], ["Laptop", ["d"]], [null, ["e"]], [null, ["f"]], [null, ["g"]],
   ]);
   expect(new Set(groups.map((group) => group.key)).size).toBe(groups.length);
+});
+
+test("one precedence, every pair: offline > the person's turn > speaking > working > holding > idle", () => {
+  const none = { offline: false, turn: null, speaking: false, working: false, holding: false };
+  const order = [
+    ["offline", { offline: true }], ["listening", { turn: "listening" }], ["transcribing", { turn: "transcribing" }], ["speaking", { speaking: true }],
+    ["working", { working: true }], ["holding", { holding: true }],
+  ] as const;
+  for (const [state, on] of order) expect(callState({ ...none, ...on } as never)).toBe(state);
+  expect(callState(none)).toBe("idle");
+  for (let i = 0; i < order.length; i++)
+    for (let j = i + 1; j < order.length; j++) {
+      // A turn is one value: listening and transcribing are never both open.
+      if (order[i][0] === "listening" && order[j][0] === "transcribing") continue;
+      expect(callState({ ...none, ...order[i][1], ...order[j][1] } as never), order[i][0] + " over " + order[j][0]).toBe(order[i][0]);
+    }
+});
+
+test("the creature draws holding as idle; every other mood is its own", () => {
+  expect(avatarMood("holding")).toBe("idle");
+  for (const mood of ["offline", "speaking", "listening", "working", "idle", "present"] as const) expect(avatarMood(mood)).toBe(mood);
 });

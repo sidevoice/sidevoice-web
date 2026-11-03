@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { createRoomSessionStore, speakWith } from "./room-session-state.js";
+import { createRoomSessionStore, speakWith, WORKING_SHOWN_AFTER_MS } from "./room-session-state.js";
 import { spokenPage, modelLabel, stillId, SURFACE_PAGE_CHARS, STILL_PX, FACE_PX } from "./call-surface.js";
 import { startCallSurface, PAGE_SURFACE_MS, type SurfaceClock } from "./call-surface-publisher";
 import { readOn } from "../features/call/speech-chunks";
@@ -50,6 +50,21 @@ test("pendingCancellable is the open turn's, and the state line follows the turn
   expect(surface({ ...turn, pendingPhase: "listening" }).words.state).toBe("state.listening");
   expect(surface({ botLive: true }).words.state).toBe("state.speaking");
   expect(surface({ reconnectShown: true }).words.state).toBe("state.offline");
+});
+
+test("holding takes idle's place and nothing else's: the person's turn, speaking, working and offline all win over it", () => {
+  const hold = people.map((p) => p.thread_id === "a" ? { ...p, reach: { state: "holding" } } : p);
+  const turn = { userTurn: { id: "t", segment: "t", thread: "n|a" } };
+  const state = (facts: Record<string, unknown>) => createRoomSessionStore({ ...base, people: hold, ...facts } as never).getState().callSurface.words.state;
+  expect(state({})).toBe("state.holding");
+  expect(state({ ...turn, pendingPhase: "listening" })).toBe("state.listening");
+  expect(state({ ...turn, pendingPhase: "transcribing" })).toBe("wave.transcribingTitle");
+  expect(state({ botLive: true })).toBe("state.speaking");
+  expect(state({ harness: { "n|a": true }, workingSince: { "n|a": 0 }, now: WORKING_SHOWN_AFTER_MS })).toBe("state.working");
+  expect(state({ reconnectShown: true })).toBe("state.offline");
+  // The person's turn over speaking, speaking over working.
+  expect(state({ ...turn, pendingPhase: "listening", botLive: true })).toBe("state.listening");
+  expect(state({ botLive: true, harness: { "n|a": true }, workingSince: { "n|a": 0 }, now: WORKING_SHOWN_AFTER_MS })).toBe("state.speaking");
 });
 
 test("the spoken page: about 160 characters, cut after a whole word, an ellipsis where more follows", () => {
@@ -297,10 +312,10 @@ test("a model id the page does not know passes through, never a made-up name", (
   expect(modelLabel("claude-opus-5-5-20261101")).toBe("Opus 5.5");
 });
 
-test("workingSince is only sent in the working state: a busy conversation that is holding sends none", () => {
+test("workingSince is sent while the state shows as working: a busy conversation that cannot receive is still working", () => {
   const holding = people.map((p) => p.thread_id === "a" ? { ...p, reach: { state: "holding" } } : p);
   const store = createRoomSessionStore({ ...base, people: holding, harness: { "n|a": true }, workingSince: { "n|a": 1000 }, now: 1000 + 60_000 } as never);
-  expect(store.getState().callSurface).toMatchObject({ workingSince: null, words: { state: "state.holding" } });
+  expect(store.getState().callSurface).toMatchObject({ workingSince: 1000, words: { state: "state.working" } });
 });
 
 test("the estimated reading rounds down when asked: never a character ahead of the voice", () => {

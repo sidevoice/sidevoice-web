@@ -36,7 +36,7 @@ export function CallDetails({ stage, rows, t }: { stage: StageConversation; rows
         <h3>{t("titleDetail.agent")}</h3>
         <dl className="call-details-agent">{agent.map(([term, value]) => <div key={term}><dt>{term}</dt><dd translate="no">{value}</dd></div>)}</dl>
       </section>}
-      {stage.mood === "holding" && <section className="call-details-group call-details-holding">
+      {row?.reach === "holding" && row.available !== false && <section className="call-details-group call-details-holding">
         <h3>{t("state.holding")}</h3>
         {row?.detail && <p translate="no">{row.detail}</p>}
       </section>}
@@ -59,7 +59,6 @@ export function StageHeading({ stage, voice }: { stage: StageConversation; voice
         {voice.attention && <i className="stage-attention" aria-hidden="true" />}
         <ChevronIcon size={14} className="stage-heading-chevron" />
       </span>
-      {stage.mood === "holding" && <span className="stage-state" data-mood="holding"><i aria-hidden="true" />{t("state.holding")}</span>}
       {stage.row?.machine && <span className="stage-machine"><MachinesIcon size={12} /><span>{stage.row.machine}</span></span>}
       <span className="sr-only">{voice.attention ? ` · ${t("voiceModels.attention")}` : ""} · {t("titleDetail.open")}</span>
     </button>

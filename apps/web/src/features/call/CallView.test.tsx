@@ -460,15 +460,36 @@ test("the poster speaks Spanish on a device set to it", () => {
   expect(stageAgent()).toHaveAccessibleName("Plan the week · Desconectada");
 });
 
-test("a conversation that is holding does not react to the person talking", () => {
+test("a conversation that is holding shows the person's open turn first; the creature draws holding as idle", () => {
   room({
     people: [person("t-login", "Fix the slow login", { reach: { state: "holding" } })],
     userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening",
   });
-  expect(stageAgent()).toHaveAttribute("data-avatar-state", "holding");
-  expect(document.querySelector(".stage-holding")).toHaveTextContent("Can't receive");
-  expect(document.querySelector(".stage-state")).toHaveTextContent("Can't receive");
+  expect(stageAgent()).toHaveAttribute("data-avatar-state", "listening");
+  expect(document.querySelector(".stage-holding")).toBeNull();
+});
+
+test("holding stands in idle's place: the notice is in the title block, the creature is exactly at rest", () => {
+  room({ people: [person("t-login", "Fix the slow login", { reach: { state: "holding", detail: "The editor is closed. Open it." } })] });
+  expect(stageAgent()).toHaveAttribute("data-avatar-state", "idle");
+  expect(stageAgent()).toHaveAttribute("data-mood", "idle");
+  expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "idle");
+  const notice = document.querySelector(".stage-holding")!;
+  expect(notice).toHaveTextContent("Can't receive");
+  expect(notice).toHaveTextContent("The editor is closed. Open it.");
+  // Neither over the balloons nor the title: it is in the title block, not in the stage's top cell.
+  expect(notice.closest(".stage-top")).toBeNull();
+  expect(notice.closest(".stage-name, .stage-title")).not.toBeNull();
   expect(stageAgent()).toHaveAccessibleName("Fix the slow login · Can't receive");
+});
+
+test("working shows as working, and the reason and remedy stay in the title details", async () => {
+  room({ people: [person("t-login", "Fix the slow login", { reach: { state: "holding", detail: "The editor is closed. Open it." } })],
+    harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login") });
+  expect(stageAgent()).toHaveAttribute("data-avatar-state", "working");
+  expect(document.querySelector(".stage-holding")).toBeNull();
+  await act(async () => { fireEvent.click(document.querySelector(".stage-heading")!); });
+  expect(document.querySelector(".call-details-holding")).toHaveTextContent("The editor is closed. Open it.");
 });
 
 test("replies that arrived after leaving put the unread cue on that conversation's avatar, never the one in view", () => {

@@ -83,6 +83,7 @@ function StageName({ stage, className, tone, voice }: { stage: StageConversation
     // Its own tint: above the tile on a desktop, outside the tile that carries it.
     <Tag className={className} translate="no" style={avatarTone(tone) as CSSProperties}>
       <StageHeading stage={stage} voice={voice} />
+      {stage.mood === "holding" && <StageHolding stage={stage} t={translator()} />}
     </Tag>
   );
 }
@@ -104,7 +105,8 @@ function AgentBubbles({ reading, reply, sounding, messages, onUp }: { reading: R
 }
 
 /** The agent cannot receive what the person says: the words, and why and what to do when the core says (ParticipantView.detail
- *  carries the reason and its remedy). Not the resting look: an amber pause over the stage's top. */
+ *  carries the reason and its remedy). Not the resting look: an amber pause, laid in the title block under the name and
+ *  machine (StageName), so it never covers the name nor the balloons. */
 function StageHolding({ stage, t }: { stage: StageConversation; t: Translate }) {
   return <p className="stage-holding" role="status"><span className="stage-holding-line"><PauseIcon size={14} />{t("state.holding")}</span>
     {stage.row?.detail && <span className="stage-holding-why" translate="no">{stage.row.detail}</span>}</p>;
@@ -215,7 +217,6 @@ export function StageTile({ card = false }: { card?: boolean }) {
           {/* Working is said only to assistive tech here: the sidebar shows it. Not in the floating card (FLOATING-CARD-SPEC, "What
               the card leaves out"): its page has no .sr-only rule, so it would show over the creature; its figure label and state
               line carry it. */}
-          {stage.mood === "holding" && <StageHolding stage={stage} t={t} />}
           {!card && stage.mood === "working" && <p className="sr-only" role="status">{t("stage.working")}</p>}
         </div>
         {/* The agent's harness, model and effort, at the tile's foot (it gives the stage its touch: operator, 2026-10-15). */}

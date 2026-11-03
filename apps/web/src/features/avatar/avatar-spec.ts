@@ -7,9 +7,9 @@
  *  mascot. A seed is never read as a mascot's name. */
 export type AvatarSpec = { kind: "bicho"; seed: string } | { kind: "person"; hold?: "microphone" } | { kind: "mascot"; mascot: "sidevoice" };
 
-/** The state an avatar acts out. An agent's, by priority: offline > speaking > listening > working > holding (it cannot receive what the person says) > idle
+/** The state an avatar acts out. An agent's, by priority: offline > speaking > listening > working > idle
  *  (features/call/conversation-state.ts derives them). `present` is the person in a call, not speaking. */
-export type AvatarMood = "offline" | "speaking" | "listening" | "working" | "idle" | "present" | "holding";
+export type AvatarMood = "offline" | "speaking" | "listening" | "working" | "idle" | "present";
 
 /** The bicho of the agent behind `identity` (the conversation's thread id). */
 export function avatarFor(identity: string): AvatarSpec {
