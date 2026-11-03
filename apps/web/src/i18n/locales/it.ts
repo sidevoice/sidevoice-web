@@ -42,11 +42,11 @@ export const messages: Messages = {
   "sidebar.newCopy": "Copia il messaggio per il tuo agente",
   "connect.body": "Nella sessione del tuo agente, di’:",
   "connect.waiting.title": "In attesa del tuo agente",
-  "connect.waiting.body": "Si unisce dalla sua sessione, non da qui. Copia il messaggio e diglielo lì.",
+  "connect.waiting.body": "Si collega dalla propria sessione, non da qui. Copia il messaggio e diglielo lì.",
   "connect.copyCta": "Copia il messaggio",
   "connect.step.open": "Apri la sessione del tuo agente",
   "connect.step.say": "Digli questo",
-  "connect.step.talk": "Si unisce qui e puoi parlargli",
+  "connect.step.talk": "Si collegherà qui e potrai parlargli",
 
   "state.inCall": "In chiamata",
   "state.working": "Al lavoro",

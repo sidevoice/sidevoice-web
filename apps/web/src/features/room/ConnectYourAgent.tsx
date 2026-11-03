@@ -55,6 +55,7 @@ function Current({ why, Title, t }: { why: boolean; Title: Title; t: Words }) {
 function CreatureLed({ Title, t }: { Title: Title; t: Words }) {
   const phrase = useRef<HTMLParagraphElement>(null);
   const [feedback, copy] = useCopy(t("sidebar.newPhrase"), phrase);
+  const said = feedback === "copied" ? t("ui.copied") : feedback === "failed" ? t("ui.copyFailed") : "";
   const scene = useSceneScale();
   const tone = avatarColor(avatarFor("sidevoice-agent"));
   return <>
@@ -66,8 +67,9 @@ function CreatureLed({ Title, t }: { Title: Title; t: Words }) {
     <p className="connect-agent-body connect-centered">{t("connect.waiting.body")}</p>
     <Button variant="primary" block onClick={() => void copy()} aria-label={t("sidebar.newCopy")}>
       {feedback === "copied" ? <CheckIcon /> : feedback === "failed" ? <WarningIcon /> : <CopyIcon />}
-      {feedback === "copied" ? t("ui.copied") : feedback === "failed" ? t("ui.copyFailed") : t("connect.copyCta")}
+      {said || t("connect.copyCta")}
     </Button>
+    <span className="sr-only" role="status">{said}</span>
     <p ref={phrase} className="connect-caption"><Phrase text={t("sidebar.newPhrase")} /></p>
   </>;
 }
@@ -123,7 +125,7 @@ export function ConnectYourAgent({ why = false, titleAs: Title = "p", variant }:
   const picked = useVariant("connectAgent", CONNECT_VARIANTS);
   const shown = variant ?? picked;
   return (
-    <div className="connect-agent" data-variant={shown}>
+    <div className="connect-agent" data-variant={shown === "current" ? undefined : shown}>
       {shown === "creature" ? <CreatureLed Title={Title} t={t} />
         : shown === "chip" ? <ChipCard why={why} Title={Title} t={t} />
         : shown === "steps" ? <Steps Title={Title} t={t} />

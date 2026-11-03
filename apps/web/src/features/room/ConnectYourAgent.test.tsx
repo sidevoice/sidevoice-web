@@ -9,7 +9,7 @@ const PHRASE = "Connect to Sidevoice (use its voice_connect tool)";
 
 test("with nothing picked it is today's design", () => {
   render(<ConnectYourAgent why />);
-  expect(document.querySelector(".connect-agent")).toHaveAttribute("data-variant", "current");
+  expect(document.querySelector(".connect-agent")).not.toHaveAttribute("data-variant");
   expect(document.querySelector(".ui-quote blockquote")).toHaveTextContent(PHRASE);
 });
 
@@ -20,7 +20,7 @@ test("the stored choice picks a variant, and an unknown one is today's", () => {
   view.unmount();
   localStorage.setItem(VARIANTS_KEY, JSON.stringify({ connectAgent: "nope" }));
   render(<ConnectYourAgent />);
-  expect(document.querySelector(".connect-agent")).toHaveAttribute("data-variant", "current");
+  expect(document.querySelector(".connect-agent")).not.toHaveAttribute("data-variant");
 });
 
 test("every variant shows the whole phrase, names the tool, and copies it", async () => {
