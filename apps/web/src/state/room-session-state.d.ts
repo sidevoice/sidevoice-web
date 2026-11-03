@@ -165,7 +165,7 @@ export interface CallCardView {
  /** FC1: the first setup is finished, its wizard closed. */
  setupDone: boolean;
  /** FC4: what the conversation's avatar acts out, as the stage's would for it; and the person's turn to it, open. */
- mood: import('../features/avatar/avatar-spec').AvatarMood;
+ mood: StageMood;
  turn: 'listening' | 'transcribing' | null;
  /** FC6: the minute before the call ends itself for want of the person. */
  idleWarning: boolean;
@@ -194,6 +194,8 @@ export interface StageFacts {
  /** The conversation on the stage is the one the microphone talks to. */
  isTarget: boolean;
  canHear: boolean;
+ /** The room lists it as available (ParticipantView.available); absent counts as available. */
+ available?: boolean;
  /** How the room reaches it; null while the room has not listed it yet. */
  reach: ParticipantView['reach'] | null;
  /** Its reply is sounding. */
@@ -203,7 +205,11 @@ export interface StageFacts {
  /** Its harness says it is busy, and has been for a while (ParticipantView.working). */
  working: boolean;
 }
-export function stageMood(facts: StageFacts): import('../features/avatar/avatar-spec').AvatarMood;
+/** What a conversation's agent is in, for the words and the notice: the creature's moods and "holding" (can't receive), which the creature never gets (avatarMood). */
+export type StageMood = import('../features/avatar/avatar-spec').AvatarMood | 'holding';
+export function stageMood(facts: StageFacts): StageMood;
+/** The creature's mood for a stage mood: holding rests as idle. */
+export function avatarMood(mood: StageMood): import('../features/avatar/avatar-spec').AvatarMood;
 export interface SessionStore {
  facts: SessionFacts;
  getState(): SessionSnapshot; getInitialState(): SessionSnapshot;

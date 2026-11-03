@@ -8,6 +8,9 @@ export const STILL_PX: number;
 export const FACE_PX: number;
 export function stillId(threadId: string, px: number): string;
 export function wordBoundaries(text: string, locale?: string): number[];
+export type CallState = 'offline' | 'listening' | 'transcribing' | 'speaking' | 'working' | 'holding' | 'idle';
+/** The one precedence: offline > the person's turn > speaking > working > holding > idle. */
+export function callState(facts: { offline: boolean; turn: 'listening' | 'transcribing' | null; speaking: boolean; working: boolean; holding: boolean }): CallState;
 export function modelLabel(id: string | null | undefined): string | null;
 
 /** The page of the reply the voice is on: its text (an ellipsis ends it where more follows) and how many of its UTF-16

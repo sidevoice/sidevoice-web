@@ -1,6 +1,7 @@
 import type { ParticipantView } from "../../state/room-types";
 import { canHear } from "../../state/room-session-state.js";
 import type { AvatarMood } from "../avatar/avatar-spec";
+import type { StageMood } from "../../state/room-session-state.js";
 import type { Translate } from "../../i18n/translator";
 
 /* What the call view says about a conversation, derived in one place from the room's own row (participantsView)
@@ -12,8 +13,10 @@ export type { AvatarMood };
 /* Whether a conversation hears the person, and its agent's mood, are the room's own projections
  * (state/room-session-state.js): the stage and every thumbnail take the mood from them (stage-view.ts agentMood), and so
  * does the desktop card's snapshot, so none of them disagree (FLOATING-CARD-SPEC FC4). */
-export { canHear, stageMood } from "../../state/room-session-state.js";
-export type { StageFacts } from "../../state/room-session-state.js";
+export { avatarMood, canHear, stageMood } from "../../state/room-session-state.js";
+export type { StageFacts, StageMood } from "../../state/room-session-state.js";
+export { callState } from "../../state/call-surface.js";
+export type { CallState } from "../../state/call-surface.js";
 
 /** The state a conversation's dot and line show. */
 export type ConversationState = "in-call" | "working" | "waiting" | "idle";
@@ -56,11 +59,12 @@ export function stateText(row: ParticipantView, inCall: boolean, t: Translate): 
 }
 
 /** The words for what an agent's avatar is acting out: the stage says them with its name. */
-export function moodText(mood: AvatarMood, t: Translate): string {
+export function moodText(mood: StageMood, t: Translate): string {
   if (mood === "offline") return t("state.offline");
   if (mood === "speaking") return t("state.speaking");
   if (mood === "listening") return t("state.listening");
   if (mood === "working") return t("state.working");
+  if (mood === "holding") return t("state.holding");
   return t("state.resting");
 }
 

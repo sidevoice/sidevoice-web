@@ -3,7 +3,7 @@ import { motion, subscribeMotion } from "../../lib/motion";
 import { RoomStoreContext, type RoomStore, type RoomViewState } from "../../state/room-store";
 import { avatarFor } from "../avatar/avatar-spec";
 import { createAvatarStates, stillAvatar, type AvatarInputs, type AvatarState, type MouthLevel } from "../avatar/avatar-state";
-import { hasUnread } from "./conversation-state";
+import { avatarMood, hasUnread } from "./conversation-state";
 import { agentMood, moodFacts } from "./stage-view";
 
 /* A conversation's agent is one creature in one state, however many places draw it — the stage, its row in the sidebar
@@ -35,7 +35,7 @@ function agentInputs(state: RoomViewState, held: string | null, moving: Readonly
     // The card acts out what the room said of the figure; the room works it out.
     const said = state.facts.restRelayed ? state.facts.figures?.[thread] : undefined;
     const still = said ? said.still : thread === held;
-    const base = said ? said.mood : agentMood(facts, thread);
+    const base = said ? said.mood : avatarMood(agentMood(facts, thread));
     // Under its balloon it holds still (operator, 2026-10-15): work that starts meanwhile waits for it to go.
     const mood = said ? said.mood : still && base === "working" ? "speaking" : base;
     const onStage = thread === viewed;

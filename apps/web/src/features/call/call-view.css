@@ -503,3 +503,12 @@
 .voice-setup-card > p { max-width: 42ch; margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
 .voice-setup-card > .voice-models { justify-self: stretch; margin-top: var(--sv-space-3); text-align: start; }
 .voice-model-progress { grid-column: 1 / -1; width: 100%; height: 4px; accent-color: var(--sv-accent); }
+
+/* Can't receive (reach holding): its own look, amber like the warning, never the resting one. */
+/* Laid in the title block, under the name and its machine (the name's frame on a phone, the title band on a desktop), in
+ * flow: it covers neither the name nor the balloons. */
+.stage-holding { display: grid; justify-items: start; gap: .25em; justify-self: start; max-width: min(100%, 32em); margin: .3em 0 0; padding: .35em .7em; border-radius: var(--sv-radius-lg, 14px);
+  background: var(--sv-warning-soft); color: var(--sv-warning); font-size: .6em; line-height: 1.3333em; font-weight: var(--sv-weight-semibold); text-align: start; }
+.stage-holding-line { display: inline-flex; align-items: center; gap: .4em; }
+.stage-holding-why { font-size: 1em; font-weight: var(--sv-weight-normal, 400); color: var(--sv-text-muted); overflow-wrap: anywhere; }
+.call-details-holding h3 { color: var(--sv-warning); }

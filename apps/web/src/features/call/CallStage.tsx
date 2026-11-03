@@ -2,7 +2,7 @@ import { useCallback, useContext, useEffect, useRef, type CSSProperties, type Re
 import { Alert } from "../../components/ui/Alert";
 import { UpdateNotice } from "../updates/UpdateNotice";
 import { Button } from "../../components/ui/Button";
-import { CloseIcon, HarnessIcon, MachinesIcon } from "../../components/ui/Icons";
+import { CloseIcon, HarnessIcon, MachinesIcon, PauseIcon } from "../../components/ui/Icons";
 import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import type { ChatMessage } from "../../state/room-types";
@@ -83,6 +83,7 @@ function StageName({ stage, className, tone, voice }: { stage: StageConversation
     // Its own tint: above the tile on a desktop, outside the tile that carries it.
     <Tag className={className} translate="no" style={avatarTone(tone) as CSSProperties}>
       <StageHeading stage={stage} voice={voice} />
+      {stage.mood === "holding" && <StageHolding stage={stage} t={translator()} />}
     </Tag>
   );
 }
@@ -101,6 +102,14 @@ function AgentBubbles({ reading, reply, sounding, messages, onUp }: { reading: R
   useEffect(() => { onUp(up); }, [up, onUp]);
   useEffect(() => () => onUp(false), [onUp]);
   return <>{turns.map((turn) => <AgentBubble key={turn.key} turn={turn} />)}</>;
+}
+
+/** The agent cannot receive what the person says: the words, and why and what to do when the core says (ParticipantView.detail
+ *  carries the reason and its remedy). Not the resting look: an amber pause, laid in the title block under the name and
+ *  machine (StageName), so it never covers the name nor the balloons. */
+function StageHolding({ stage, t }: { stage: StageConversation; t: Translate }) {
+  return <p className="stage-holding" role="status"><span className="stage-holding-line"><PauseIcon size={14} />{t("state.holding")}</span>
+    {stage.row?.detail && <span className="stage-holding-why" translate="no">{stage.row.detail}</span>}</p>;
 }
 
 /** The room's errors (#error is the runtime's id), as people read them: what was raw about one is behind its Details.
