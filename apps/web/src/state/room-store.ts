@@ -5,6 +5,7 @@ import { useStore } from "zustand";
 import { createMicLevelChannel } from "./mic-level";
 import { playbackLevel } from "./playback-level";
 import { openSettings } from "../features/settings/open-settings";
+import { startCallSurface } from "./call-surface-publisher";
 
 export type RoomViewState = import('./room-session-state.js').SessionSnapshot;
 export type RoomStore = import('./room-session-state.js').SessionStore;
@@ -24,8 +25,13 @@ export function useRoomStore<T>(selector: (state: RoomViewState) => T): T {
   return useStore(store, selector);
 }
 
+let stopSurface: (() => void) | null = null;
+
 export function installRoomBridge(store: RoomStore) {
   playbackLevel.clear();
+  // What a native call surface reads by the clock; it does nothing until the host has one.
+  stopSurface?.();
+  stopSurface = startCallSurface(store);
   window.sidevoiceUI = {
     store,
     // A sentence already worded for people, or a failure as error-message.ts words it.

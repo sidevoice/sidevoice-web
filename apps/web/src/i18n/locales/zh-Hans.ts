@@ -1355,6 +1355,8 @@ export const messages: Messages = {
   "card.systemDefault": "系统默认",
   "card.skip": "跳过正在播放的内容",
   "card.hangUp": "挂断",
+  "liveActivity.skipShort": "跳过",
+  "liveActivity.routeName": "音频输出：{route}",
   "card.yourMicrophone": "你的麦克风",
   "card.reach.holding": "无法接收",
   "card.reach.offline": "离线",

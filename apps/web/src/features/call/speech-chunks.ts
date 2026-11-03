@@ -22,12 +22,12 @@ export interface Reading {
   position: number;
 }
 
-const paced = (milliseconds: number) => Math.round((milliseconds / 1000) * PACE);
+const paced = (milliseconds: number, round: (n: number) => number = Math.round) => round((milliseconds / 1000) * PACE);
 
 /** The reading after this moment: \`segment\` is the reply on the stage (null while there is none), \`sounding\` whether
  *  the voice is saying it, \`cue\` the part the voice says is sounding (null while it gives none). The same reply keeps
- *  its reading through a pause; a new reply, or this one heard again from the start (its cue goes back), starts over. */
-export function readOn(previous: Reading | null, segment: string | null, sounding: boolean, cue: KaraokeRange | null, now: number): Reading | null {
+ *  its reading through a pause (`round` is how the pace rounds to characters: a caption that must not run ahead passes Math.floor); a new reply, or this one heard again from the start (its cue goes back), starts over. */
+export function readOn(previous: Reading | null, segment: string | null, sounding: boolean, cue: KaraokeRange | null, now: number, round: (n: number) => number = Math.round): Reading | null {
   if (!segment) return previous?.since == null ? previous : { ...previous, elapsed: previous.elapsed + now - previous.since, since: null };
   const replayed = cue !== null && previous?.cue != null && cue.from < previous.cue.from;
   const reading: Reading = previous && previous.segment === segment && !replayed ? { ...previous }
@@ -36,7 +36,7 @@ export function readOn(previous: Reading | null, segment: string | null, soundin
   if (!sounding && reading.since !== null) { reading.elapsed += now - reading.since; reading.since = null; }
   const sounded = reading.elapsed + (reading.since === null ? 0 : now - reading.since);
   if (cue !== null && (reading.cue?.from !== cue.from || reading.cue?.to !== cue.to)) reading.cue = { from: cue.from, to: cue.to, at: sounded };
-  const reached = reading.cue ? Math.min(reading.cue.to, reading.cue.from + paced(sounded - reading.cue.at)) : paced(sounded);
+  const reached = reading.cue ? Math.min(reading.cue.to, reading.cue.from + paced(sounded - reading.cue.at, round)) : paced(sounded, round);
   reading.position = Math.max(reading.position, reached);
   return reading;
 }
