@@ -4352,7 +4352,7 @@ test('Removing a conversation of an away machine hides it at once, keeps the rem
  await s.run("window.sidevoiceActions.closeParticipant('fp-pc|p')");await settleSoon();
  assert.ok(!fetched.some(path=>path.includes('/presentation/remove')),'nothing asked of an away machine');
  assert.ok(!plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')).includes('fp-pc|p'),'the row leaves');
- assert.deepEqual(plain(s.run('readRemovals()')),[{node:'fp-pc',thread_id:'p'}],'the removal is kept');
+ assert.deepEqual(plain(s.run('readRemovals()')).map(({node,thread_id})=>({node,thread_id})),[{node:'fp-pc',thread_id:'p'}],'the removal is kept');
  assert.ok(s.saved['sidevoice.pending-removals.v1'].includes('"p"'),'in storage');
  assert.ok(s.run('queuedTexts().length')<=queued,'its queued texts are not sent later');
  assert.ok(s.run('state.ws'),'the call on the Mac goes on');
@@ -4424,6 +4424,40 @@ test('A thread in the durable removal set cannot be picked or written to in any 
  s.run("state.callNode='fp-mac'");await s.run('flushTexts()');
  assert.equal(s.run('queuedTexts().length'),0);
  assert.ok(!fetched.some(path=>path.includes('/presentation/text')),'nothing written');
+ s.run('disconnect()');
+});
+test('A tab that was suspended applies every change it missed, even one another tab already settled and deleted (web#375)',async()=>{
+ const s=setup();s.run("queueText('fp-mac|a','must not send')");
+ const queued=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1'}]);
+ const taken=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1',taken:true,ack:1}]);
+ delete s.saved['sidevoice.pending-removals.v1'];
+ s.handlers.storage({key:'sidevoice.pending-removals.v1',oldValue:taken,newValue:null});
+ assert.equal(s.run('queuedTexts().length'),0,'the last event alone says enough');
+});
+test('An inventory that predates another tab\'s acknowledgement does not revive the removal, nor delete it (web#375)',async()=>{
+ const s=setup();let release;
+ s.context.fetch=()=>new Promise(resolve=>{release=resolve});
+ const poll=s.run("refreshPeople('fp-mac')");
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1',taken:true,ack:Date.now()+1000}]);
+ release({ok:true,status:200,json:async()=>({participants:[{thread_id:'a',available:true}],closed_threads:[]})});
+ await poll;await settleSoon();
+ assert.equal(s.run("linkOf('fp-mac').people.length"),0);
+ assert.equal(s.run('readRemovals().length'),1);
+});
+test('A removal made again since is not deleted by the settling of the earlier one (web#375)',async()=>{
+ const s=setup();
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'new'}]);
+ s.run("syncRemovals()");
+ await s.run("changeRemovals(list=>list.filter(row=>!([{node:'fp-mac',thread_id:'a',id:'old'}]).some(done=>sameRemoval(done.node,done.thread_id,done.id)(row)&&row.taken)))");
+ assert.equal(s.run('readRemovals().length'),1);
+});
+test('Sends and picks go through the shared gate: the machine\'s round lock is entered when removals are open (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,locks=[];
+ s.context.navigator={locks:{request:async(name,a,b)=>{locks.push(name);const cb=b||a;return cb(a&&a.ifAvailable?{}:undefined)}}};
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'gone',id:'r'}]);
+ s.run("keepMessage('text','text',{thread:'a',text:'hi'})");
+ await s.run('flushTexts()');
+ assert.ok(locks.some(name=>name.includes('flush.fp-mac')),'the text waited at the gate');
  s.run('disconnect()');
 });
 test('Choosing a conversation of an away machine leaves the call where it is and shows no "No machine available"',async()=>{
