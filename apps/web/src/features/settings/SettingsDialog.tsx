@@ -7,6 +7,7 @@ import { Select } from "../../components/ui/Select";
 import { LanguagePicker } from "../../components/ui/LanguagePicker";
 import { Group, Row, Section } from "../../components/ui/Card";
 import { Segmented } from "../../components/ui/Tabs";
+import { MediaDuckRow } from "./MediaDuckRow";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { readThemePreference, setThemePreference, type ThemePreference } from "../../lib/theme";
 import { MachineList, MachineNav, machineName, ThisComputerSettings, useMachinesSummary } from "../room/MachineList";
@@ -135,6 +136,7 @@ function CallSettings({ t, microphone }: { t: Translate; microphone: MicrophoneS
           items={presence.map((option) => ({ value: option.value, label: t(option.label) }))} />
       </Row>
     </Group>
+    <MediaDuckRow t={t} />
     {/* The desktop app keeps its computer awake as any app does; holding the screen on is for a browser or a phone. */}
     {awake && host().identity.build === null && <Group title={t("settings.call.device")}>
       <Row label={t("settings.call.keepAwake")} description={awake.supported ? t("settings.call.keepAwakeHint") : t("settings.call.keepAwakeUnsupported")}>

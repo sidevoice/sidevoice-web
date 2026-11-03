@@ -18,6 +18,7 @@ export interface AppBuild {
   channel: "release" | "nightly" | "dev" | "unknown";
   version: string;
   commit?: string | null;
+  mediaDuck: MediaDuckBridge | null;
   date?: string | null;
 }
 
@@ -292,6 +293,20 @@ export interface MuteShortcutBridge {
   get(): Promise<MuteShortcut>;
   set(accelerator: string | null): Promise<MuteShortcut>;
   subscribe?(listener: (shortcut: MuteShortcut) => void): () => void;
+}
+
+/** What the app does to other apps' media while the microphone is open in a call (sidevoice-desktop `host.mediaDuck`): the
+ *  person's choice, and how far this system can carry it out. `lower`: `per-app`, `system` (the whole output volume, the app's
+ *  own voice with it) or `none`; `pause`: `media-controls`, `some-apps` or `none`. The app restores only what it took. */
+export type MediaDuckMode = "lower" | "pause" | "off";
+export interface MediaDuckStatus {
+  mode: MediaDuckMode;
+  lower: "per-app" | "system" | "none";
+  pause: "media-controls" | "some-apps" | "none";
+}
+export interface MediaDuckBridge {
+  get(): Promise<MediaDuckStatus>;
+  set(mode: MediaDuckMode): Promise<MediaDuckStatus>;
 }
 
 /** The app's floating card, as the app keeps it: whether it shows always or only while the app is minimised; and
