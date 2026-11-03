@@ -41,7 +41,7 @@ const named = (value: unknown) => typeof value === "string" && value.trim() ? va
 
 /** The members an app offers through the global it injects, `null` for the rest; the identity here is what the app says
  *  (its build, its computer's name, its shortcut modifier), the browser's to tell where it does not. */
-export type NativeHost = Omit<Host, "identity" | "microphone" | "presence" | "reach" | "storage" | "voice"> & {
+export type NativeHost = Omit<Host, "exclusive" | "identity" | "microphone" | "presence" | "reach" | "storage" | "voice"> & {
   identity: Omit<HostIdentity, "deviceName" | "shortcutModifier"> & { deviceName(): string | null; shortcutModifier: string | null };
   /** The app's permission bridge, and its help for a blocked one when it words it. */
   microphone: Partial<MicrophoneBridge> | null;

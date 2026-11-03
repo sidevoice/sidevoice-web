@@ -1329,6 +1329,8 @@ export const messages: Messages = {
   "room.failure.hostUnreachable": "マシンに接続できませんでした。",
   "room.failure.replay": "もう一度再生できませんでした。",
   "room.failure.textNotSent": "メッセージが送信されたか確認できませんでした。テキストは残してあります。",
+  "room.failure.removalsFull": "マシンの復帰を待っている削除が多すぎます。いくつかのマシンが戻ってから、もう一度お試しください。",
+  "room.failure.removalNotKept": "会話を削除できませんでした。このブラウザーが削除を保存できませんでした。",
   "room.failure.idle": "{minutes} 分間操作がなかったため、通話から退出しました。タップすると再び参加します。",
   "pairing.failed": "マシンがペアリングを受け付けませんでした。もう一度お試しください。",
   "app.panelFailed": "ページのこの部分でエラーが発生しました。",

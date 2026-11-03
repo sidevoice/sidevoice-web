@@ -1328,6 +1328,8 @@ export const messages: Messages = {
   "room.failure.hostUnreachable": "无法连接到计算机。",
   "room.failure.replay": "无法重新播放。",
   "room.failure.textNotSent": "无法确认消息已发送。你的文字已保留。",
+  "room.failure.removalsFull": "等待设备恢复的移除过多。请在部分设备恢复后重试。",
+  "room.failure.removalNotKept": "无法移除对话：此浏览器无法保存该移除。",
   "room.failure.idle": "你已退出通话：{minutes} 分钟没有检测到你的活动。点按即可重新加入。",
   "pairing.failed": "计算机未接受配对。请重试。",
   "app.panelFailed": "页面的这一部分出错了。",

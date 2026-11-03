@@ -1338,7 +1338,7 @@ test('A failed user close leaves the remembered card until Core accepts explicit
  s.run("const link=linkOf(__fp);link.base='http://127.0.0.1:8768';link.reach='ok';publishLinks()");
  const net=network({at:{'http://127.0.0.1:8768':node}});s.context.fetch=net.get;
  await s.run('refreshPeople(__fp)');
- s.context.fetch=(url,init)=>url.endsWith('/api/presentation/close')?Promise.resolve({ok:false,status:409,json:async()=>({detail:'No se encuentra'})}):net.get(url,init);
+ s.context.fetch=(url,init)=>url.endsWith('/api/presentation/remove')?Promise.resolve({ok:false,status:409,json:async()=>({detail:'No se encuentra'})}):net.get(url,init);
  await assert.rejects(s.run('window.sidevoiceActions.closeParticipant')(node.fp+'|old'));
  assert.deepEqual(plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')),[node.fp+'|old']);
  const restarted=setup({paired:false,siteData:s.saved});
@@ -3990,7 +3990,7 @@ test('A conversation closed is not gone back to by the refresh that follows the 
  const c=await callOnCoreRoom(room,{selected:'fp-mac|a'});
  c.s.context.fetch=async(path,options)=>{
   // Core's close: the binding goes, the call's focus with it, and A is among the closed conversations.
-  if(options?.method==='POST'&&path.includes('/presentation/close')){
+  if(options?.method==='POST'&&path.includes('/presentation/remove')){
    room.active.delete('a');room.live.delete('a');room.closed.add('a');room.targets.clear();
    return {ok:true,status:200,json:async()=>({status:'closed'})};
   }
@@ -4047,7 +4047,7 @@ test('A conversation closed while a select of it is on its way is not where the 
  let release;const gate=new Promise(resolve=>{release=resolve});
  c.s.context.fetch=async(path,options)=>{
   if(options?.method==='POST'&&path.includes('/presentation/select'))await gate;
-  if(options?.method==='POST'&&path.includes('/presentation/close')){
+  if(options?.method==='POST'&&path.includes('/presentation/remove')){
    room.active.delete('a');room.live.delete('a');room.closed.add('a');
    for(const [session,target]of room.targets)if(target?.thread_id==='a')room.targets.delete(session);
    return {ok:true,status:200,json:async()=>({status:'closed'})};
@@ -4113,7 +4113,7 @@ test('A leave of a closed conversation\'s late focus that lands after the person
  c.s.context.fetch=async(path,options)=>{
   if(options?.method==='POST'&&path.includes('/presentation/select')&&first){first=false;await selectGate}
   if(options?.method==='POST'&&path.includes('/presentation/leave')){leaveStarted=true;await leaveGate}
-  if(options?.method==='POST'&&path.includes('/presentation/close')){
+  if(options?.method==='POST'&&path.includes('/presentation/remove')){
    room.active.delete('a');room.live.delete('a');room.closed.add('a');
    for(const [sid,target]of room.targets)if(target?.thread_id==='a')room.targets.delete(sid);
    return {ok:true,status:200,json:async()=>({status:'closed'})};
@@ -4142,7 +4142,7 @@ test('A late select of a closed conversation leaves the call on the newer pick',
  let release,first=true;const gate=new Promise(resolve=>{release=resolve});
  c.s.context.fetch=async(path,options)=>{
   if(options?.method==='POST'&&path.includes('/presentation/select')&&first){first=false;await gate}
-  if(options?.method==='POST'&&path.includes('/presentation/close')){
+  if(options?.method==='POST'&&path.includes('/presentation/remove')){
    room.active.delete('a');room.live.delete('a');room.closed.add('a');
    for(const [sid,target]of room.targets)if(target?.thread_id==='a')room.targets.delete(sid);
    return {ok:true,status:200,json:async()=>({status:'closed'})};
@@ -4235,7 +4235,7 @@ test('A refused pick falls back to an open conversation, never to the closed foc
    if(thread==='b'){await newGate;return {ok:false,status:429,json:async()=>({detail:{key:'room.input_backlog_full',message:'full'}})}}
   }
   if(options?.method==='POST'&&path.includes('/presentation/leave'))leaves++;
-  if(options?.method==='POST'&&path.includes('/presentation/close')){
+  if(options?.method==='POST'&&path.includes('/presentation/remove')){
    room.active.delete('a');room.live.delete('a');room.closed.add('a');
    for(const [sid,target]of room.targets)if(target?.thread_id==='a')room.targets.delete(sid);
    return {ok:true,status:200,json:async()=>({status:'closed'})};
@@ -4338,19 +4338,48 @@ test('A leave that keeps failing is tried at most once a call beat, and a newer 
 // What the room shows as its top line, as the page sets it.
 function bannerOf(s){const seen=[];s.context.window.sidevoiceUI={...s.context.window.sidevoiceUI,setBootError:value=>seen.push(value)};return {now:()=>JSON.stringify(seen.at(-1)??null),all:()=>JSON.stringify(seen)}}
 const awayPc="{const link=linkOf('fp-pc');link.base=null;link.reach='away';link.via='';publishLinks()}";
-test('Closing a conversation of an away machine, the call on another, refuses by that machine\'s name and closes nothing',async()=>{
- const c=await callWithTwoMachines();const {s}=c,fetched=[],bn=bannerOf(c.s);
+test('Removing a conversation of an away machine hides it at once, keeps the removal, and cancels its queued texts (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,fetched=[];
  const room=s.context.fetch;s.context.fetch=async(path,options)=>{fetched.push(String(path));return room(path,options)};
  s.run(awayPc);s.run("viewedThread='fp-mac|a'");
- const before=plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')),pick=s.run('rememberedThread()');
+ s.run("keepMessage('text','text',{thread:'p',text:'hello'});state.callNode='fp-pc'");s.run("state.callNode='fp-mac'");
+ const queued=s.run("queuedTexts().length");
  await s.run("window.sidevoiceActions.closeParticipant('fp-pc|p')");await settleSoon();
- const banner=bn.all();
- assert.match(banner,/“pc” cannot be reached by any route/);
- assert.ok(!fetched.some(path=>path.includes('/presentation/close')),'nothing asked of any machine');
- assert.doesNotMatch(banner,/No machine available/);
- assert.deepEqual(plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')),before,'the row stays');
- assert.equal(s.run('rememberedThread()'),pick);
+ assert.ok(!fetched.some(path=>path.includes('/presentation/remove')),'nothing asked of an away machine');
+ assert.ok(!plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')).includes('fp-pc|p'),'the row leaves');
+ assert.deepEqual(plain(s.run('readRemovals()')),[{node:'fp-pc',thread_id:'p'}],'the removal is kept');
+ assert.ok(s.saved['sidevoice.pending-removals.v1'].includes('"p"'),'in storage');
+ assert.ok(s.run('queuedTexts().length')<=queued,'its queued texts are not sent later');
  assert.ok(s.run('state.ws'),'the call on the Mac goes on');
+ s.run('disconnect()');
+});
+test('A pending removal is sent when its machine answers again, retried with backoff on a healthy link, and dropped once taken (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,sent=[];let answer=503;
+ s.run(awayPc);
+ await s.run("window.sidevoiceActions.closeParticipant('fp-pc|p')");
+ const room=s.context.fetch;
+ s.context.fetch=async(path,options)=>{if(String(path).includes('/presentation/remove')){sent.push(options.body);return {ok:answer===200,status:answer,json:async()=>({detail:'x'})}}return room(path,options)};
+ s.run("{const link=linkOf('fp-pc');link.base='https://pc.example';link.reach='ok';link.via='node'}");
+ await s.run("flushRemovals('fp-pc')");
+ assert.equal(sent.length,1,'a retryable failure keeps it');
+ assert.equal(s.run('readRemovals().length'),1);
+ await s.run("flushRemovals('fp-pc')");
+ assert.equal(sent.length,1,'and waits out its backoff');
+ s.run("removalBackoff.clear()");answer=200;
+ await s.run("flushRemovals('fp-pc')");
+ assert.equal(sent.length,2);
+ assert.equal(s.run('readRemovals().length'),0,'taken: gone from the store');
+ s.run('disconnect()');
+});
+test('A removal is refused, and the row stays, when it cannot be kept: a full store never evicts an older one (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,bn=bannerOf(s);
+ s.run(awayPc);
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify(Array.from({length:256},(_,i)=>({node:'fp-pc',thread_id:'old'+i})));
+ await s.run("window.sidevoiceActions.closeParticipant('fp-pc|p')");
+ assert.equal(s.run('readRemovals().length'),256);
+ assert.ok(!s.run('readRemovals()').some(row=>row.thread_id==='p'));
+ assert.ok(plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')).includes('fp-pc|p'),'the row stays');
+ assert.match(bn.now(),/removals are waiting/);
  s.run('disconnect()');
 });
 test('Choosing a conversation of an away machine leaves the call where it is and shows no "No machine available"',async()=>{
@@ -4363,20 +4392,6 @@ test('Choosing a conversation of an away machine leaves the call where it is and
  assert.doesNotMatch(JSON.stringify(plain(s.run('roomStore.getState().joinView||null'))),/No machine available/);
  s.run('disconnect()');
 });
-test('A machine refusing the token on a close says it no longer recognises this device, even before the pairing is saved as revoked',async()=>{
- const c=await callWithTwoMachines();const {s}=c,bn=bannerOf(s);
- s.context.fetch=async url=>String(url).startsWith('https://pc.example')?{ok:false,status:401,json:async()=>({detail:'no'})}:{ok:true,status:200,json:async()=>({participants:[],messages:[]})};
- let release;const held=new Promise(resolve=>{release=resolve});
- s.context.__held=held;s.run("writePairingProjection=async()=>{await __held}");
- const closing=s.run("window.sidevoiceActions.closeParticipant('fp-pc|p')").catch(()=>{});
- await settleSoon();
- const banner=bn.now;
- assert.match(banner(),/“pc” no longer recognises this device/);
- release();await closing;await settleSoon();
- assert.match(banner(),/“pc” no longer recognises this device/,'and still once it is saved');
- s.run('disconnect()');
-});
-
 test('A conversation closed while on screen leaves the screen: the next one that listens, or none (sidevoice-web#351)',()=>{
  const s=setup();
  s.run("roomBinding=null;callNode='fp-mac';const link=linkOf('fp-mac');link.peopleAnswered=true;link.people=[{node:'fp-mac',thread_id:'a',title:'A',available:true,reach:{state:'listening'}},{node:'fp-mac',thread_id:'b',title:'B',available:true,reach:{state:'listening'}}];mergePeople();viewedThread='fp-mac|a'");

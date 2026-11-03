@@ -1369,6 +1369,8 @@ export const messages = {
   "room.failure.hostUnreachable": "The machine could not be reached.",
   "room.failure.replay": "Could not play it again.",
   "room.failure.textNotSent": "Could not confirm the message was sent. Your text is kept.",
+  "room.failure.removalsFull": "Too many removals are waiting for their machines. Try again once some machines are back.",
+  "room.failure.removalNotKept": "Could not remove the conversation: this browser could not keep the removal.",
   "room.failure.idle": "You left the call: {minutes} minutes without a sign from you. Tap to join again.",
   "pairing.failed": "The machine did not accept the pairing. Try again.",
   "app.panelFailed": "This part of the page failed.",

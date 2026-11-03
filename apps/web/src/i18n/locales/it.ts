@@ -1349,6 +1349,8 @@ export const messages: Messages = {
   "room.failure.hostUnreachable": "Impossibile contattare la macchina.",
   "room.failure.replay": "Impossibile riprodurre di nuovo.",
   "room.failure.textNotSent": "Impossibile confermare l’invio. Il testo è stato conservato.",
+  "room.failure.removalsFull": "Ci sono troppe rimozioni in attesa dei rispettivi computer. Riprova quando alcuni saranno di nuovo disponibili.",
+  "room.failure.removalNotKept": "Impossibile rimuovere la conversazione: questo browser non è riuscito a conservare la rimozione.",
   "room.failure.idle": "Hai lasciato la chiamata: {minutes} minuti senza segnali da te. Tocca per rientrare.",
   "pairing.failed": "La macchina non ha accettato l’associazione. Riprova.",
   "app.panelFailed": "Questa parte della pagina non ha funzionato.",

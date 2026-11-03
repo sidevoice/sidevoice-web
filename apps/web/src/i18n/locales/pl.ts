@@ -1349,6 +1349,8 @@ export const messages: Messages = {
   "room.failure.hostUnreachable": "Nie udało się połączyć z maszyną.",
   "room.failure.replay": "Nie udało się odtworzyć ponownie.",
   "room.failure.textNotSent": "Nie udało się potwierdzić wysłania wiadomości. Twój tekst został zachowany.",
+  "room.failure.removalsFull": "Zbyt wiele usunięć czeka na swoje komputery. Spróbuj ponownie, gdy część z nich wróci.",
+  "room.failure.removalNotKept": "Nie udało się usunąć rozmowy: ta przeglądarka nie mogła zachować usunięcia.",
   "room.failure.idle": "Rozłączono: {minutes} min bez żadnego sygnału od ciebie. Dotknij, aby dołączyć ponownie.",
   "pairing.failed": "Maszyna nie przyjęła parowania. Spróbuj ponownie.",
   "app.panelFailed": "Ta część strony przestała działać.",
