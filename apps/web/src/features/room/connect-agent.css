@@ -2,3 +2,43 @@
 .connect-agent { display: grid; gap: var(--sv-space-3); min-width: 0; }
 .connect-agent-title { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); line-height: 1.375rem; color: var(--sv-text); }
 .connect-agent-body { margin: 0; color: var(--sv-text-muted); }
+
+/* ----- the variants (VARIANTS `connectAgent`, sidevoice-web#463); `current` is the rules above and nothing else. */
+.connect-centered { text-align: center; }
+.connect-tool { padding: 1px 6px; border-radius: var(--sv-radius-sm); background: color-mix(in srgb, var(--sv-accent) 14%, transparent); color: var(--sv-accent-text); font: 600 .92em / 1.4 var(--sv-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); white-space: nowrap; }
+.connect-creature { display: inline-grid; place-items: center; }
+.connect-creature .sv-avatar { width: 100%; height: 100%; }
+
+/* A: the creature, waiting on the dark stage. */
+.connect-hero { position: relative; display: grid; place-items: end center; height: 148px; margin: calc(var(--sv-space-4) * -1) calc(var(--sv-space-4) * -1) 0; overflow: hidden; border-radius: var(--sv-radius-lg) var(--sv-radius-lg) 0 0;
+  background: radial-gradient(circle at 50% 70%, color-mix(in srgb, var(--cc-tone) 24%, transparent), transparent 62%), var(--sv-stage-bg); }
+.connect-hero .connect-creature { position: relative; width: 116px; height: 116px; margin-bottom: var(--sv-space-1); }
+.connect-caption { margin: 0; text-align: center; font-size: var(--sv-font-xs); color: var(--sv-text-subtle); overflow-wrap: anywhere; }
+
+/* B: the phrase as a chip. */
+.connect-chip { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); width: 100%; padding: var(--sv-space-2) var(--sv-space-2) var(--sv-space-2) var(--sv-space-4); border: 1px solid color-mix(in srgb, var(--sv-accent) 30%, var(--sv-border)); border-radius: var(--sv-radius-pill);
+  background: color-mix(in srgb, var(--sv-accent-soft) 60%, var(--sv-surface-raised)); color: var(--sv-text); font: inherit; font-weight: var(--sv-weight-semibold); text-align: start; cursor: pointer; }
+.connect-chip-text { min-width: 0; overflow-wrap: anywhere; line-height: 1.35; }
+.connect-chip-icon { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 50%; background: color-mix(in srgb, var(--sv-accent) 14%, transparent); color: var(--sv-accent-text); }
+@media (hover: hover) { .connect-chip:hover { border-color: var(--sv-accent); } .connect-chip:hover .connect-chip-icon { background: color-mix(in srgb, var(--sv-accent) 24%, transparent); } }
+.connect-chip:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.connect-chip[data-state="copied"] .connect-chip-icon { background: var(--sv-accent); color: var(--sv-on-accent); }
+.connect-chip[data-state="failed"] .connect-chip-icon { background: var(--sv-danger-soft); color: var(--sv-danger); }
+
+/* C: three steps, the creature waiting. */
+.connect-steps-head { display: flex; align-items: center; gap: var(--sv-space-3); }
+.connect-steps-head .connect-creature { width: 52px; height: 52px; border-radius: 50%; background: color-mix(in srgb, var(--cc-tone) 22%, var(--sv-surface)); }
+.connect-steps-title { display: grid; gap: 2px; min-width: 0; }
+.connect-waiting { display: flex; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-xs); color: var(--sv-text-subtle); }
+.connect-pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--sv-voice); animation: connect-pulse 1.6s ease-in-out infinite; }
+@keyframes connect-pulse { 50% { opacity: .25; transform: scale(.7); } }
+@media (prefers-reduced-motion: reduce) { .connect-pulse { animation: none; } }
+.connect-steps { display: grid; gap: var(--sv-space-3); margin: 0; padding: 0; list-style: none; }
+.connect-steps li { display: grid; grid-template-columns: 24px 1fr; gap: var(--sv-space-3); align-items: start; }
+.connect-step-n { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--sv-accent-soft); color: var(--sv-accent-text); font-size: var(--sv-font-xs); font-weight: var(--sv-weight-bold); }
+.connect-step-body { display: grid; gap: var(--sv-space-2); min-width: 0; padding-top: 2px; color: var(--sv-text); }
+
+/* D: a line and the phrase. */
+.connect-line { display: flex; align-items: center; gap: var(--sv-space-2); padding: var(--sv-space-1) var(--sv-space-1) var(--sv-space-1) var(--sv-space-3); border: 1px dashed var(--sv-border-strong); border-radius: var(--sv-radius-sm); }
+.connect-line .ui-copy-button { position: static; }
+.connect-line-text { flex: 1; min-width: 0; color: var(--sv-text); font-weight: var(--sv-weight-semibold); overflow-wrap: anywhere; }

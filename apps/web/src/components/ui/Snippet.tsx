@@ -54,7 +54,7 @@ type CopyProps = {
   feedback?: CopyFeedback;
 };
 
-function useCopy(text: string, target: React.RefObject<HTMLElement | null>) {
+export function useCopy(text: string, target: React.RefObject<HTMLElement | null>) {
   const [feedback, setFeedback] = useState<CopyFeedback | null>(null);
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
@@ -75,7 +75,7 @@ function useCopy(text: string, target: React.RefObject<HTMLElement | null>) {
 }
 
 /** The copy button, and what it says (politely) to a screen reader, hidden from sight. */
-function CopyButton({ text, label, feedback: pinned, target }: CopyProps & { target: React.RefObject<HTMLElement | null> }) {
+export function CopyButton({ text, label, feedback: pinned, target }: CopyProps & { target: React.RefObject<HTMLElement | null> }) {
   const t = translator();
   const [own, copy] = useCopy(text, target);
   const feedback = pinned ?? own;

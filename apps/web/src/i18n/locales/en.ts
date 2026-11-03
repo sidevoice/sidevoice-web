@@ -41,6 +41,12 @@ export const messages = {
   "sidebar.newPhrase": "Connect to Sidevoice (use its voice_connect tool)",
   "sidebar.newCopy": "Copy the message for your agent",
   "connect.body": "In your agent's session, say:",
+  "connect.waiting.title": "Waiting for your agent",
+  "connect.waiting.body": "It joins from its own session, not from here. Copy the message and say it there.",
+  "connect.copyCta": "Copy message",
+  "connect.step.open": "Open your agent's session",
+  "connect.step.say": "Say this to it",
+  "connect.step.talk": "It joins here, and you can talk to it",
 
   "state.inCall": "In call",
   "state.working": "Working",
