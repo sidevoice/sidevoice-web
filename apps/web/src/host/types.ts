@@ -371,6 +371,8 @@ export interface Host {
   voice: VoiceMember;
   presence: HostPresence;
   storage: HostStorage;
+  /** One tab at a time for a named piece of work across this site's tabs (the browser's Web Locks); see `exclusively`. */
+  exclusive<T>(name: string, run: () => T | Promise<T>, options?: { ifAvailable?: boolean }): Promise<T | undefined>;
   reach: ReachTransport;
   localHost: LocalHostBridge | null;
   reset: ResetBridge | null;

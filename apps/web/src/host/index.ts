@@ -4,7 +4,7 @@ import { browserMicrophoneHelp } from "./browser-microphone-help";
 import { browserRemote, browserScreenAwake } from "./browser-presence";
 import { beginBrowserAudioActivation, pageVoice } from "./browser-voice.js";
 import { browserReach, reachOfOrigin as reachOfPage } from "./browser-reach";
-import { browserStorage } from "./browser-storage";
+import { browserStorage, exclusively } from "./browser-storage";
 import { browserDeviceName, browserShortcutModifier } from "./identity";
 import { messageOverlay, nativeCardSeam, nativeHost } from "./native";
 import { setMessageOverlay } from "../i18n/translator";
@@ -56,6 +56,7 @@ export function host(): Host {
     ...app,
     // The app's when it keeps them; else this browser's own storage.
     storage: app.storage ?? browserStorage(),
+    exclusive: exclusively,
     identity: {
       build: app.identity.build,
       // The app's name for the computer; else what this browser is.

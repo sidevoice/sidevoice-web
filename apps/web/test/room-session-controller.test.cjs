@@ -2,13 +2,13 @@ const fs=require('node:fs'),vm=require('node:vm'),test=require('node:test'),{moc
 // This device's pairing, as the page keeps it, for every test that does not say otherwise: the machine proved itself
 // at the page's own origin a moment ago, so requests go where they always went and carry its token.
 const PAIRED={fp:'fp-mac',public_key:'pk',host:'macbook',urls:['http://127.0.0.1:8768'],device_id:'dev-1',token:'tok-1',paired_at:1};
-function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,siteData=null,localHost=null,nativeData=null,indexedDB=null,outboxScope=null,readingMode=false}={}){
+function setup({readThrows=null,strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,siteData=null,localHost=null,nativeData=null,indexedDB=null,outboxScope=null,readingMode=false}={}){
  const sourceRoot=__dirname+'/../src'; const uiSource=fs.readdirSync(sourceRoot,{recursive:true}).filter(file=>String(file).endsWith('.tsx')).map(file=>fs.readFileSync(sourceRoot+'/'+file,'utf8')).join('\n');
  class Element{constructor(id){this.id=id;this.children=[];this.dataset={};this.style={setProperty(){}};this.classList={add(){},remove(){}};this.parentElement=this;this.listeners={};this.attributes={}}addEventListener(name,fn){this.listeners[name]=fn}showModal(){this.open=true}close(){this.open=false;this.listeners.close?.()}contains(node){return node===this||this.children.includes(node)}removeAttribute(){}closest(){return null}querySelector(){return null}append(...children){this.children.push(...children)}replaceChildren(...children){this.children=[...children]}remove(){}setAttribute(name,value){this.attributes[name]=value}getAttribute(name){return this.attributes[name]}click(){this.onclick?.()}}
  const elements=new Map(),handlers={},documentHandlers={},observers=[];
  if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element(match[1]));for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','stats-recognition','stats-response'])elements.set(id,new Element(id))}
  const saved=siteData??(stored?{'sidevoice.pairings':JSON.stringify(stored)}:{});
- const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element(id))}return elements.get(id)},body:new Element('body'),createElement:()=>new Element(),addEventListener:(name,fn)=>(documentHandlers[name]??=[]).push(fn)},window:{addEventListener:(name,fn)=>handlers[name]=fn},MutationObserver:class{constructor(fn){observers.push(fn)}observe(){}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
+ const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>{if(readThrows&&key===readThrows)throw new Error('blocked');return saved[key]??null},setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element(id))}return elements.get(id)},body:new Element('body'),createElement:()=>new Element(),addEventListener:(name,fn)=>(documentHandlers[name]??=[]).push(fn)},window:{addEventListener:(name,fn)=>handlers[name]=fn},MutationObserver:class{constructor(fn){observers.push(fn)}observe(){}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
  if(localHost||nativeData)context.window.__sidevoiceHost={host:{...(localHost?{localHost}:{}),...(nativeData?{pairings:nativeData.pairings}:{})}};
  // The outbox's storage across reloads, and this tab's scope in it.
  if(indexedDB)context.indexedDB=indexedDB;
@@ -1332,17 +1332,22 @@ test('An explicit agent leave retires the card across restart; a new explicit jo
   [[node.fp+'|old','Rejoined']]);
 });
 
-test('A failed user close leaves the remembered card until Core accepts explicit leave',async()=>{
+test('A refused removal is not retried, and the next answer that still lists the conversation shows it again (web#375)',async()=>{
  const node=await fakeNode();node.tokens.add('tok-1');node.people=[{thread_id:'old',title:'Old conversation',available:true}];
  const s=setup({paired:false,stored:{pairings:[pairingOf(node,{})]}});s.context.__fp=node.fp;
  s.run("const link=linkOf(__fp);link.base='http://127.0.0.1:8768';link.reach='ok';publishLinks()");
  const net=network({at:{'http://127.0.0.1:8768':node}});s.context.fetch=net.get;
  await s.run('refreshPeople(__fp)');
- s.context.fetch=(url,init)=>url.endsWith('/api/presentation/close')?Promise.resolve({ok:false,status:409,json:async()=>({detail:'No se encuentra'})}):net.get(url,init);
- await assert.rejects(s.run('window.sidevoiceActions.closeParticipant')(node.fp+'|old'));
- assert.deepEqual(plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')),[node.fp+'|old']);
- const restarted=setup({paired:false,siteData:s.saved});
- assert.deepEqual(plain(restarted.run('roomStore.getState().participants.map(p=>p.threadId)')),[node.fp+'|old']);
+ let removals=0;
+ s.context.fetch=(url,init)=>url.endsWith('/api/presentation/remove')?(removals++,Promise.resolve({ok:false,status:409,json:async()=>({detail:'No se encuentra'})})):net.get(url,init);
+ const bn=bannerOf(s);
+ await s.run('window.sidevoiceActions.closeParticipant')(node.fp+'|old');
+ assert.equal(removals,1);assert.ok(bn.all().length>2,'the refusal is said');
+ assert.equal(removals,1,'sent once, not retried');
+ await s.run('refreshPeople(__fp)');
+ assert.equal(removals,1);
+ assert.deepEqual(plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')),[node.fp+'|old'],'the machine still lists it');
+ assert.equal(s.run('readRemovals().length'),0,'and the removal is let go of');
 });
 
 test('Olvidar forgets the machine here at once, and asks it to revoke this device only where it proves itself',async()=>{
@@ -3990,7 +3995,7 @@ test('A conversation closed is not gone back to by the refresh that follows the 
  const c=await callOnCoreRoom(room,{selected:'fp-mac|a'});
  c.s.context.fetch=async(path,options)=>{
   // Core's close: the binding goes, the call's focus with it, and A is among the closed conversations.
-  if(options?.method==='POST'&&path.includes('/presentation/close')){
+  if(options?.method==='POST'&&path.includes('/presentation/remove')){
    room.active.delete('a');room.live.delete('a');room.closed.add('a');room.targets.clear();
    return {ok:true,status:200,json:async()=>({status:'closed'})};
   }
@@ -4047,7 +4052,7 @@ test('A conversation closed while a select of it is on its way is not where the 
  let release;const gate=new Promise(resolve=>{release=resolve});
  c.s.context.fetch=async(path,options)=>{
   if(options?.method==='POST'&&path.includes('/presentation/select'))await gate;
-  if(options?.method==='POST'&&path.includes('/presentation/close')){
+  if(options?.method==='POST'&&path.includes('/presentation/remove')){
    room.active.delete('a');room.live.delete('a');room.closed.add('a');
    for(const [session,target]of room.targets)if(target?.thread_id==='a')room.targets.delete(session);
    return {ok:true,status:200,json:async()=>({status:'closed'})};
@@ -4113,7 +4118,7 @@ test('A leave of a closed conversation\'s late focus that lands after the person
  c.s.context.fetch=async(path,options)=>{
   if(options?.method==='POST'&&path.includes('/presentation/select')&&first){first=false;await selectGate}
   if(options?.method==='POST'&&path.includes('/presentation/leave')){leaveStarted=true;await leaveGate}
-  if(options?.method==='POST'&&path.includes('/presentation/close')){
+  if(options?.method==='POST'&&path.includes('/presentation/remove')){
    room.active.delete('a');room.live.delete('a');room.closed.add('a');
    for(const [sid,target]of room.targets)if(target?.thread_id==='a')room.targets.delete(sid);
    return {ok:true,status:200,json:async()=>({status:'closed'})};
@@ -4142,7 +4147,7 @@ test('A late select of a closed conversation leaves the call on the newer pick',
  let release,first=true;const gate=new Promise(resolve=>{release=resolve});
  c.s.context.fetch=async(path,options)=>{
   if(options?.method==='POST'&&path.includes('/presentation/select')&&first){first=false;await gate}
-  if(options?.method==='POST'&&path.includes('/presentation/close')){
+  if(options?.method==='POST'&&path.includes('/presentation/remove')){
    room.active.delete('a');room.live.delete('a');room.closed.add('a');
    for(const [sid,target]of room.targets)if(target?.thread_id==='a')room.targets.delete(sid);
    return {ok:true,status:200,json:async()=>({status:'closed'})};
@@ -4235,7 +4240,7 @@ test('A refused pick falls back to an open conversation, never to the closed foc
    if(thread==='b'){await newGate;return {ok:false,status:429,json:async()=>({detail:{key:'room.input_backlog_full',message:'full'}})}}
   }
   if(options?.method==='POST'&&path.includes('/presentation/leave'))leaves++;
-  if(options?.method==='POST'&&path.includes('/presentation/close')){
+  if(options?.method==='POST'&&path.includes('/presentation/remove')){
    room.active.delete('a');room.live.delete('a');room.closed.add('a');
    for(const [sid,target]of room.targets)if(target?.thread_id==='a')room.targets.delete(sid);
    return {ok:true,status:200,json:async()=>({status:'closed'})};
@@ -4338,20 +4343,175 @@ test('A leave that keeps failing is tried at most once a call beat, and a newer 
 // What the room shows as its top line, as the page sets it.
 function bannerOf(s){const seen=[];s.context.window.sidevoiceUI={...s.context.window.sidevoiceUI,setBootError:value=>seen.push(value)};return {now:()=>JSON.stringify(seen.at(-1)??null),all:()=>JSON.stringify(seen)}}
 const awayPc="{const link=linkOf('fp-pc');link.base=null;link.reach='away';link.via='';publishLinks()}";
-test('Closing a conversation of an away machine, the call on another, refuses by that machine\'s name and closes nothing',async()=>{
- const c=await callWithTwoMachines();const {s}=c,fetched=[],bn=bannerOf(c.s);
+test('Removing a conversation of an away machine hides it at once, keeps the removal, and cancels its queued texts (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,fetched=[];
  const room=s.context.fetch;s.context.fetch=async(path,options)=>{fetched.push(String(path));return room(path,options)};
  s.run(awayPc);s.run("viewedThread='fp-mac|a'");
- const before=plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')),pick=s.run('rememberedThread()');
+ s.run("keepMessage('text','text',{thread:'p',text:'hello'});state.callNode='fp-pc'");s.run("state.callNode='fp-mac'");
+ const queued=s.run("queuedTexts().length");
  await s.run("window.sidevoiceActions.closeParticipant('fp-pc|p')");await settleSoon();
- const banner=bn.all();
- assert.match(banner,/“pc” cannot be reached by any route/);
- assert.ok(!fetched.some(path=>path.includes('/presentation/close')),'nothing asked of any machine');
- assert.doesNotMatch(banner,/No machine available/);
- assert.deepEqual(plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')),before,'the row stays');
- assert.equal(s.run('rememberedThread()'),pick);
+ assert.ok(!fetched.some(path=>path.includes('/presentation/remove')),'nothing asked of an away machine');
+ assert.ok(!plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')).includes('fp-pc|p'),'the row leaves');
+ assert.deepEqual(plain(s.run('readRemovals()')).map(({node,thread_id})=>({node,thread_id})),[{node:'fp-pc',thread_id:'p'}],'the removal is kept');
+ assert.ok(s.saved['sidevoice.pending-removals.v1'].includes('"p"'),'in storage');
+ assert.ok(s.run('queuedTexts().length')<=queued,'its queued texts are not sent later');
  assert.ok(s.run('state.ws'),'the call on the Mac goes on');
  s.run('disconnect()');
+});
+test('A pending removal is sent when its machine answers again, retried with backoff on a healthy link, and dropped once taken (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,sent=[];let answer=503;
+ s.run(awayPc);
+ await s.run("window.sidevoiceActions.closeParticipant('fp-pc|p')");
+ const room=s.context.fetch;
+ s.context.fetch=async(path,options)=>{if(String(path).includes('/presentation/remove')){sent.push(options.body);return {ok:answer===200,status:answer,json:async()=>({detail:'x'})}}return room(path,options)};
+ s.run("{const link=linkOf('fp-pc');link.base='https://pc.example';link.reach='ok';link.via='node'}");
+ await s.run("flushRemovals('fp-pc')");
+ assert.equal(sent.length,1,'a retryable failure keeps it');
+ assert.equal(s.run('readRemovals().length'),1);
+ await s.run("flushRemovals('fp-pc')");
+ assert.equal(sent.length,1,'and waits out its backoff');
+ s.run("removalBackoff.clear()");answer=200;
+ await s.run("flushRemovals('fp-pc')");
+ assert.equal(sent.length,2);
+ assert.equal(s.run('readRemovals()[0].taken'),true,'taken: not sent again, kept until an answer settles it');
+ await s.run("refreshPeople('fp-pc')");
+ assert.equal(s.run('readRemovals().length'),0,'an answer asked after it lets it go');
+ s.run('disconnect()');
+});
+test('A removal is refused, and the row stays, when it cannot be kept: a full store never evicts an older one (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,bn=bannerOf(s);
+ s.run(awayPc);
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify(Array.from({length:256},(_,i)=>({node:'fp-pc',thread_id:'old'+i})));
+ await s.run("window.sidevoiceActions.closeParticipant('fp-pc|p')");
+ assert.equal(s.run('readRemovals().length'),256);
+ assert.ok(!s.run('readRemovals()').some(row=>row.thread_id==='p'));
+ assert.ok(plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')).includes('fp-pc|p'),'the row stays');
+ assert.match(bn.now(),/removals are waiting/);
+ s.run('disconnect()');
+});
+test('Removing is local first even when the machine is on: hidden and kept before the send answers, and the send has a timeout (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c;let signal=null;
+ const room=s.context.fetch;
+ s.context.fetch=(path,options)=>String(path).includes('/presentation/remove')?(signal=options.signal,new Promise(()=>{})):room(path,options);
+ s.run("{const link=linkOf('fp-pc');link.base='https://pc.example';link.reach='ok';link.via='node'}");
+ s.run("keepMessage('text','text',{thread:'p',text:'hello'});state.callNode;queuedTexts()[0].node='fp-pc'");
+ void s.run("window.sidevoiceActions.closeParticipant('fp-pc|p')");await settleSoon();
+ assert.ok(signal&&typeof signal.aborted==='boolean','the send can be abandoned');
+ assert.ok(!plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')).includes('fp-pc|p'),'hidden before the machine answered');
+ assert.equal(s.run('readRemovals().length'),1,'kept before it too');
+ assert.equal(s.run('queuedTexts().length'),0,'its queued texts are cancelled');
+ s.run('disconnect()');
+});
+test('A removal made in another tab is applied here: its queued text is cancelled and its row stays hidden when the machine omits it (web#375)',async()=>{
+ const s=setup();await settleSoon();
+ s.run("queueText('fp-mac|a','must not send')");
+ assert.equal(s.run('queuedTexts().length'),1);
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'a',taken:true}]);
+ s.handlers.storage({key:'sidevoice.pending-removals.v1'});
+ assert.equal(s.run('queuedTexts().length'),0);
+ s.run("linkOf('fp-mac').people=[{thread_id:'a',available:true}]");
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({participants:[],closed_threads:[]})});
+ await s.run("refreshPeople('fp-mac')");
+ assert.equal(s.run("linkOf('fp-mac').people.length"),0,'the omitted conversation does not linger as an offline row');
+});
+test('A thread in the durable removal set cannot be picked or written to in any tab, whatever the round is doing (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,fetched=[];
+ const room=s.context.fetch;s.context.fetch=async(path,options)=>{fetched.push(String(path));return room(path,options)};
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'p'}]);
+ s.run("keepMessage('text','text',{thread:'p',text:'late'})");
+ await s.run("select('fp-mac|p')");
+ assert.ok(!fetched.some(path=>path.includes('/presentation/select')),'no pick');
+ s.run("state.callNode='fp-mac'");await s.run('flushTexts()');
+ assert.equal(s.run('queuedTexts().length'),0);
+ assert.ok(!fetched.some(path=>path.includes('/presentation/text')),'nothing written');
+ s.run('disconnect()');
+});
+test('A tab that was suspended applies every change it missed, even one another tab already settled and deleted (web#375)',async()=>{
+ const s=setup();await settleSoon();s.run("queueText('fp-mac|a','must not send')");
+ const queued=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1'}]);
+ const taken=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1',taken:true,ack:1}]);
+ delete s.saved['sidevoice.pending-removals.v1'];
+ s.handlers.storage({key:'sidevoice.pending-removals.v1',oldValue:taken,newValue:null});
+ assert.equal(s.run('queuedTexts().length'),0,'the last event alone says enough');
+});
+test('An inventory that predates another tab\'s acknowledgement does not revive the removal, nor delete it (web#375)',async()=>{
+ const s=setup();await settleSoon();let release;
+ s.context.fetch=()=>new Promise(resolve=>{release=resolve});
+ const poll=s.run("refreshPeople('fp-mac')");
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1',taken:true,ack:Date.now()+1000}]);
+ release({ok:true,status:200,json:async()=>({participants:[{thread_id:'a',available:true}],closed_threads:[]})});
+ await poll;await settleSoon();
+ assert.equal(s.run("linkOf('fp-mac').people.length"),0);
+ assert.equal(s.run('readRemovals().length'),1);
+});
+test('A removal made again since is a removal of its own: acknowledging the earlier one leaves it (web#375)',async()=>{
+ const s=setup();await settleSoon();
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'old'},{node:'fp-mac',thread_id:'a',id:'new'}]);
+ await s.run("takeRemoval('fp-mac','a','old')");
+ assert.deepEqual(plain(s.run('readRemovals()')),[{node:'fp-mac',thread_id:'a',id:'old',taken:true},{node:'fp-mac',thread_id:'a',id:'new'}]);
+});
+test('Sends and picks go through the shared gate: the machine\'s round lock is entered when removals are open (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,locks=[];
+ s.context.navigator={locks:{request:async(name,a,b)=>{locks.push(name);const cb=b||a;return cb(a&&a.ifAvailable?{}:undefined)}}};
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'gone',id:'r'}]);
+ s.run("keepMessage('text','text',{thread:'a',text:'hi'})");
+ await s.run('flushTexts()');
+ assert.ok(locks.some(name=>name.includes('flush.fp-mac')),'the text waited at the gate');
+ s.run('disconnect()');
+});
+test('A pick enters the shared gate of its machine when removals are open (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,locks=[];
+ s.context.navigator={locks:{request:async(name,a,b)=>{locks.push(name);const cb=b||a;return cb(a&&a.ifAvailable?{}:undefined)}}};
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-pc',thread_id:'gone',id:'r'}]);
+ void s.run("select('fp-pc|p')").catch(()=>{});await settleSoon();
+ assert.ok(locks.some(name=>name.includes('flush.fp-pc')),'the pick waited at the gate');
+ s.run('disconnect()');
+});
+test('A text typed while another tab is telling the machine its removals waits at the shared gate, then goes (web#375)',async()=>{
+ const s=setup(),sent=[];await settleSoon();s.context.crypto={randomUUID:()=> 'test-message'};
+ let open;const held=new Promise(resolve=>{open=resolve});
+ s.context.navigator={locks:{request:async(name,a,b)=>{const cb=b||a;if(name.includes('flush.'))await held;return cb(a&&a.ifAvailable?{}:undefined)}}};
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'z',id:'r'}]);
+ s.run("ws={};$('text-message').value='hola';roomBinding.binding_id='binding-a'");
+ s.context.fetch=async(path,options)=>{if(options){sent.push(JSON.parse(options.body));return {ok:true,json:async()=>({accepted:true})}}return {ok:true,json:async()=>({messages:[]})}};
+ const sending=s.dispatch('submit',{target:s.run("$('text-composer')")});
+ await settleSoon();
+ assert.equal(sent.length,0,'nothing goes during the other tab\'s round');
+ open();await sending;
+ assert.equal(sent.length,1);assert.equal(sent[0].thread_id,'a');
+});
+test('A delayed event about a removal this tab applied, settled and saw revived, changes nothing (web#375)',async()=>{
+ const s=setup();await settleSoon();s.run("queueText('fp-mac|a','first')");
+ const queued=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1'}]);
+ const taken=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1',taken:true}]);
+ delete s.saved['sidevoice.pending-removals.v1'];
+ s.handlers.storage({key:'sidevoice.pending-removals.v1',oldValue:null,newValue:queued});
+ assert.equal(s.run('queuedTexts().length'),0);
+ s.run("queueText('fp-mac|a','after the revival')");
+ s.handlers.storage({key:'sidevoice.pending-removals.v1',oldValue:taken,newValue:null});
+ assert.equal(s.run('queuedTexts().length'),1,'the text written after is not cancelled by the old removal');
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r2'}]);
+ s.handlers.storage({key:'sidevoice.pending-removals.v1',oldValue:null,newValue:s.saved['sidevoice.pending-removals.v1']});
+ assert.equal(s.run('queuedTexts().length'),0,'a removal made again is another and applies');
+});
+test('A removal settled and revived here is applied for good: a delayed event about it cancels nothing written since (web#375)',async()=>{
+ const s=setup();await settleSoon();
+ const taken=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1',taken:true}]);
+ s.saved['sidevoice.pending-removals.v1']=taken;
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({participants:[{thread_id:'a',available:true}],closed_threads:[]})});
+ await s.run("refreshPeople('fp-mac')");await settleSoon();
+ assert.equal(s.run("linkOf('fp-mac').people.length"),1,'the machine lists it again');
+ s.run("queueText('fp-mac|a','written after the revival')");
+ s.handlers.storage({key:'sidevoice.pending-removals.v1',oldValue:taken,newValue:null});
+ assert.equal(s.run('queuedTexts().length'),1);
+});
+test('A store that cannot be read does not stop the page, and keeps no removal (web#375)',async()=>{
+ const s=setup({readThrows:'sidevoice.pending-removals.v1'});
+ assert.deepEqual(plain(s.run('readRemovals()')),[]);
+ const bn=bannerOf(s);
+ await s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");
+ assert.match(bn.now(),/could not be saved/);
+ assert.equal(s.run('pendingRemovals.length'),0,'and nothing is hidden for it');
 });
 test('Choosing a conversation of an away machine leaves the call where it is and shows no "No machine available"',async()=>{
  const c=await callWithTwoMachines();const {s}=c,bn=bannerOf(s);
@@ -4363,20 +4523,6 @@ test('Choosing a conversation of an away machine leaves the call where it is and
  assert.doesNotMatch(JSON.stringify(plain(s.run('roomStore.getState().joinView||null'))),/No machine available/);
  s.run('disconnect()');
 });
-test('A machine refusing the token on a close says it no longer recognises this device, even before the pairing is saved as revoked',async()=>{
- const c=await callWithTwoMachines();const {s}=c,bn=bannerOf(s);
- s.context.fetch=async url=>String(url).startsWith('https://pc.example')?{ok:false,status:401,json:async()=>({detail:'no'})}:{ok:true,status:200,json:async()=>({participants:[],messages:[]})};
- let release;const held=new Promise(resolve=>{release=resolve});
- s.context.__held=held;s.run("writePairingProjection=async()=>{await __held}");
- const closing=s.run("window.sidevoiceActions.closeParticipant('fp-pc|p')").catch(()=>{});
- await settleSoon();
- const banner=bn.now;
- assert.match(banner(),/“pc” no longer recognises this device/);
- release();await closing;await settleSoon();
- assert.match(banner(),/“pc” no longer recognises this device/,'and still once it is saved');
- s.run('disconnect()');
-});
-
 test('A conversation closed while on screen leaves the screen: the next one that listens, or none (sidevoice-web#351)',()=>{
  const s=setup();
  s.run("roomBinding=null;callNode='fp-mac';const link=linkOf('fp-mac');link.peopleAnswered=true;link.people=[{node:'fp-mac',thread_id:'a',title:'A',available:true,reach:{state:'listening'}},{node:'fp-mac',thread_id:'b',title:'B',available:true,reach:{state:'listening'}}];mergePeople();viewedThread='fp-mac|a'");
