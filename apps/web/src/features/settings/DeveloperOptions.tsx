@@ -15,20 +15,21 @@ export const DEVELOPER_OPTIONS_TITLE = "Developer options";
 
 /** The switches of the desktop app's `host.debug`, in the order shown, each with the words under it. The app says which
  *  of them its platform has (`available`); the others are not drawn. */
-const DEBUG_SWITCHES: { name: DebugSwitch; label: string; description: ReactNode }[] = [
-  { name: "inspectable", label: "Web Inspector", description: <>
+const DEBUG_SWITCHES: { name: DebugSwitch; label: string; description: ReactNode; group: "Rendering" | "Calls" }[] = [
+  { name: "inspectable", label: "Web Inspector", group: "Rendering", description: <>
     <span className="developer-howto">Safari → Settings → Advanced → “Show features for web developers”, then Develop → this Mac → Sidevoice → the room or the card.</span>
     <span className="developer-howto">In the inspector, Layers → compositing borders / paint flashing shows the CPU repaints.</span>
   </> },
-  { name: "compositingBorders", label: "Compositing borders", description: "Outlines each layer the GPU composites." },
-  { name: "repaintCounters", label: "Repaint counters", description: "Counts on each layer how often the CPU repainted it." },
+  { name: "compositingBorders", label: "Compositing borders", group: "Rendering", description: "Outlines each layer the GPU composites." },
+  { name: "repaintCounters", label: "Repaint counters", group: "Rendering", description: "Counts on each layer how often the CPU repainted it." },
+  { name: "systemCall", label: "Treat calls as system calls (CallKit / Telecom)", group: "Calls", description: "On: the call is a phone call of the system's own, with its lock screen card, in-call screen and headset or car buttons. Off: the app's own call, with its own notification. Takes effect on the next call." },
 ];
 
 /** One debugging switch. It moves at once, as the other switches do, and goes back with a line saying so if the app
  *  refuses; one that is still being changed ignores another click. */
 function DebugSwitchRow({ debug, name, label, description }: { debug: HostDebugBridge; name: DebugSwitch; label: string; description: ReactNode }) {
   // The app's word when the switch appeared; after that, what it took of the last change.
-  const [on, setOn] = useState(() => debug[name]);
+  const [on, setOn] = useState(() => debug[name] === true);
   const [failed, setFailed] = useState(false);
   const busy = useRef(false);
   async function change(next: boolean) {
@@ -36,7 +37,7 @@ function DebugSwitchRow({ debug, name, label, description }: { debug: HostDebugB
     busy.current = true;
     setFailed(false);
     setOn(next);
-    try { await debug.set(name, next); setOn(debug[name]); }
+    try { await debug.set(name, next); setOn(debug[name] === true); }
     catch { setOn(!next); setFailed(true); }
     finally { busy.current = false; }
   }
@@ -59,9 +60,12 @@ export function DeveloperOptions() {
         <Switch checked onChange={() => setDeveloperMode(false)} aria-label="Developer mode" />
       </Row>
     </Group>}
-    {debug && switches.length > 0 && <Group title="Rendering">
-      {switches.map((entry) => <DebugSwitchRow key={entry.name} debug={debug} {...entry} />)}
-    </Group>}
+    {debug && (["Rendering", "Calls"] as const).map((group) => {
+      const rows = switches.filter((entry) => entry.group === group);
+      return rows.length > 0 && <Group key={group} title={group}>
+        {rows.map(({ group: _, ...entry }) => <DebugSwitchRow key={entry.name} debug={debug} {...entry} />)}
+      </Group>;
+    })}
     {mode && <Group title="Conversations">
       <Row label="Animate conversation thumbnails" description="The thumbnails in the conversations list move as the creature on the stage does: drawn as GPU layers, with the mouth following the voice. Off: still, with the light. Kept on this device.">
         <Switch checked={animated} onChange={setAnimatedThumbnails} aria-label="Animate conversation thumbnails" />
