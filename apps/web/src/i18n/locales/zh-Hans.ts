@@ -1355,6 +1355,8 @@ export const messages: Messages = {
   "card.systemDefault": "系统默认",
   "card.skip": "跳过正在播放的内容",
   "card.hangUp": "挂断",
+  "liveActivity.skipShort": "跳过",
+  "liveActivity.routeName": "音频输出：{route}",
   "card.yourMicrophone": "你的麦克风",
   "card.reach.holding": "无法接收",
   "card.reach.offline": "离线",
@@ -1385,4 +1387,7 @@ export const messages: Messages = {
   "session.audio.reason.heard_elsewhere": "已在另一台设备上收听",
   "room.failure.replayUnavailable": "语音回复关闭或你正在说话时，无法播放。",
   "room.failure.inputBacklogFull": "待处理消息过多。请稍后重试。",
+  "settings.developer.systemCall": "将通话视为系统通话（CallKit / Telecom）",
+  "settings.developer.systemCall.hint": "开启：通话使用系统通话功能，带有锁屏卡片、通话界面以及耳机或车载按键。关闭：应用自己的通话，使用自己的通知。下次通话时生效。",
+  "settings.developer.group.calls": "通话",
 };

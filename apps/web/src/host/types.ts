@@ -341,17 +341,20 @@ export interface AppUpdater {
 }
 
 /** What the app's debugging seam can switch: Safari's Web Inspector on its web views, WebKit's compositing borders (each
- *  layer the GPU draws) and its repaint counters (how often the CPU repainted each layer). */
-export type DebugSwitch = "inspectable" | "compositingBorders" | "repaintCounters";
+ *  layer the GPU draws) and its repaint counters (how often the CPU repainted each layer) on the desktop; on a phone,
+ *  whether the call is a call of the system's (CallKit, Telecom: sidevoice-desktop #393). */
+export type DebugSwitch = "inspectable" | "compositingBorders" | "repaintCounters" | "systemCall";
 /** The app's debugging seam (`host.debug`, sidevoice-desktop #168), present only in a nightly or a development build.
  *  `available` is the switches this platform has (all three on macOS, none elsewhere): the page shows only those. Each
  *  switch is a live getter, so it is read when it is needed, and again once `set` resolves, for what took. A rejection
  *  means the app did not change it. */
 export interface HostDebugBridge {
   readonly available: readonly DebugSwitch[];
-  readonly inspectable: boolean;
-  readonly compositingBorders: boolean;
-  readonly repaintCounters: boolean;
+  /** Each switch is read only when `available` lists it: the desktop has the first three, a phone `systemCall`. */
+  readonly inspectable?: boolean;
+  readonly compositingBorders?: boolean;
+  readonly repaintCounters?: boolean;
+  readonly systemCall?: boolean;
   set(name: DebugSwitch, on: boolean): Promise<void>;
 }
 
@@ -360,6 +363,22 @@ export interface HostDebugBridge {
  *  (i18n/translator.ts); a key the catalogue no longer has is simply never read. */
 export type MessageOverlay = Readonly<Record<string, string>>;
 /* A value of the host's table that is not a non-empty string is not a text: the translator skips it. */
+
+/** A creature's PNG, handed to the host once per `id` (state/call-surface.d.ts SurfaceStillRef): `png` is base64 with no
+ *  prefix, `px` its width and height. */
+export interface CallSurfaceStill { id: string; png: string; px: number }
+
+/** The app's native call surface (the phone's Lock Screen card, Dynamic Island, ongoing notification): it reads the
+ *  room's `callSurface` (state/call-surface.d.ts) from the store, and the page publishes what costs it work only while
+ *  `active()`. The creatures' stills go by reference: the snapshot carries `{ id, k }`, and the bytes cross here, once per
+ *  id and always before the snapshot that names it; the host keeps them by id until `forget`. An app without a surface
+ *  offers none, and the page does none of that. */
+export interface CallSurfaceBridge {
+  active(): boolean;
+  still(still: CallSurfaceStill): void;
+  /** Ids the page no longer shows (a conversation removed, or left the faces) or every id when the surface closes. */
+  forget(ids: string[]): void;
+}
 
 export interface Host {
   identity: HostIdentity;
@@ -378,6 +397,7 @@ export interface Host {
   reset: ResetBridge | null;
   muteShortcut: MuteShortcutBridge | null;
   callControls: CallControlsBridge | null;
+  callSurface: CallSurfaceBridge | null;
   updater: AppUpdater | null;
   debug: HostDebugBridge | null;
 }
