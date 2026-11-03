@@ -4460,6 +4460,33 @@ test('Sends and picks go through the shared gate: the machine\'s round lock is e
  assert.ok(locks.some(name=>name.includes('flush.fp-mac')),'the text waited at the gate');
  s.run('disconnect()');
 });
+test('A text typed while another tab is telling the machine its removals waits at the shared gate, then goes (web#375)',async()=>{
+ const s=setup(),sent=[];s.context.crypto={randomUUID:()=> 'test-message'};
+ let open;const held=new Promise(resolve=>{open=resolve});
+ s.context.navigator={locks:{request:async(name,a,b)=>{const cb=b||a;if(name.includes('flush.'))await held;return cb(a&&a.ifAvailable?{}:undefined)}}};
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'z',id:'r'}]);
+ s.run("ws={};$('text-message').value='hola';roomBinding.binding_id='binding-a'");
+ s.context.fetch=async(path,options)=>{if(options){sent.push(JSON.parse(options.body));return {ok:true,json:async()=>({accepted:true})}}return {ok:true,json:async()=>({messages:[]})}};
+ const sending=s.dispatch('submit',{target:s.run("$('text-composer')")});
+ await settleSoon();
+ assert.equal(sent.length,0,'nothing goes during the other tab\'s round');
+ open();await sending;
+ assert.equal(sent.length,1);assert.equal(sent[0].thread_id,'a');
+});
+test('A delayed event about a removal this tab applied, settled and saw revived, changes nothing (web#375)',async()=>{
+ const s=setup();s.run("queueText('fp-mac|a','first')");
+ const queued=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1'}]);
+ const taken=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1',taken:true}]);
+ delete s.saved['sidevoice.pending-removals.v1'];
+ s.handlers.storage({key:'sidevoice.pending-removals.v1',oldValue:null,newValue:queued});
+ assert.equal(s.run('queuedTexts().length'),0);
+ s.run("queueText('fp-mac|a','after the revival')");
+ s.handlers.storage({key:'sidevoice.pending-removals.v1',oldValue:taken,newValue:null});
+ assert.equal(s.run('queuedTexts().length'),1,'the text written after is not cancelled by the old removal');
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r2'}]);
+ s.handlers.storage({key:'sidevoice.pending-removals.v1',oldValue:null,newValue:s.saved['sidevoice.pending-removals.v1']});
+ assert.equal(s.run('queuedTexts().length'),0,'a removal made again is another and applies');
+});
 test('Choosing a conversation of an away machine leaves the call where it is and shows no "No machine available"',async()=>{
  const c=await callWithTwoMachines();const {s}=c,bn=bannerOf(s);
  s.run(awayPc);s.run("viewedThread='fp-mac|a'");
