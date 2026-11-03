@@ -61,6 +61,7 @@ export function moodText(mood: AvatarMood, t: Translate): string {
   if (mood === "speaking") return t("state.speaking");
   if (mood === "listening") return t("state.listening");
   if (mood === "working") return t("state.working");
+  if (mood === "holding") return t("state.holding");
   return t("state.resting");
 }
 

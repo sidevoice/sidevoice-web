@@ -2,7 +2,7 @@ import { useCallback, useContext, useEffect, useRef, type CSSProperties, type Re
 import { Alert } from "../../components/ui/Alert";
 import { UpdateNotice } from "../updates/UpdateNotice";
 import { Button } from "../../components/ui/Button";
-import { CloseIcon, HarnessIcon, MachinesIcon } from "../../components/ui/Icons";
+import { CloseIcon, HarnessIcon, MachinesIcon, PauseIcon } from "../../components/ui/Icons";
 import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import type { ChatMessage } from "../../state/room-types";
@@ -101,6 +101,13 @@ function AgentBubbles({ reading, reply, sounding, messages, onUp }: { reading: R
   useEffect(() => { onUp(up); }, [up, onUp]);
   useEffect(() => () => onUp(false), [onUp]);
   return <>{turns.map((turn) => <AgentBubble key={turn.key} turn={turn} />)}</>;
+}
+
+/** The agent cannot receive what the person says: the words, and why and what to do when the core says (ParticipantView.detail
+ *  carries the reason and its remedy). Not the resting look: an amber pause over the stage's top. */
+function StageHolding({ stage, t }: { stage: StageConversation; t: Translate }) {
+  return <p className="stage-holding" role="status"><span className="stage-holding-line"><PauseIcon size={14} />{t("state.holding")}</span>
+    {stage.row?.detail && <span className="stage-holding-why" translate="no">{stage.row.detail}</span>}</p>;
 }
 
 /** The room's errors (#error is the runtime's id), as people read them: what was raw about one is behind its Details.
@@ -208,6 +215,7 @@ export function StageTile({ card = false }: { card?: boolean }) {
           {/* Working is said only to assistive tech here: the sidebar shows it. Not in the floating card (FLOATING-CARD-SPEC, "What
               the card leaves out"): its page has no .sr-only rule, so it would show over the creature; its figure label and state
               line carry it. */}
+          {stage.mood === "holding" && <StageHolding stage={stage} t={t} />}
           {!card && stage.mood === "working" && <p className="sr-only" role="status">{t("stage.working")}</p>}
         </div>
         {/* The agent's harness, model and effort, at the tile's foot (it gives the stage its touch: operator, 2026-10-15). */}

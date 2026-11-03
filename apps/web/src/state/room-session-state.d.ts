@@ -190,6 +190,8 @@ export interface StageFacts {
  /** The conversation on the stage is the one the microphone talks to. */
  isTarget: boolean;
  canHear: boolean;
+ /** The room lists it as available (ParticipantView.available); absent counts as available. */
+ available?: boolean;
  /** How the room reaches it; null while the room has not listed it yet. */
  reach: ParticipantView['reach'] | null;
  /** Its reply is sounding. */

@@ -51,7 +51,7 @@ export function agentMood({ participants, viewed, selected, inCall, botLive, tur
   const isTarget = !!threadId && threadId === selected;
   // A conversation the room has bound to the call but not listed yet hears the call: it was just chosen for it.
   const hears = row ? canHear(row) : isTarget;
-  return stageMood({ inCall, isTarget, canHear: hears, reach: row?.reach ?? null, speaking: isTarget && botLive, personSpeaking: isTarget && !!turn,
+  return stageMood({ inCall, isTarget, canHear: hears, available: row?.available, reach: row?.reach ?? null, speaking: isTarget && botLive, personSpeaking: isTarget && !!turn,
     working: !!row?.working });
 }
 

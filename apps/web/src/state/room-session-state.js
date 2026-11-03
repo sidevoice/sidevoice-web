@@ -147,7 +147,7 @@ export function stageMood(facts) {
     if (facts.reach === 'offline')
         return facts.inCall && facts.isTarget && facts.speaking ? 'speaking' : 'offline';
     if (!facts.inCall || !facts.isTarget || !facts.canHear)
-        return facts.working ? 'working' : 'idle';
+        return facts.working ? 'working' : facts.reach === 'holding' && facts.available !== false ? 'holding' : 'idle';
     if (facts.speaking)
         return 'speaking';
     if (facts.personSpeaking && (facts.reach === 'listening' || facts.reach === null))
@@ -205,7 +205,7 @@ export function callCardView(s, participants = participantsView(s)) {
     const turn = isTarget && s.userTurn?.thread === key && !s.cancelledInput && (s.pendingPhase === 'listening' || s.pendingPhase === 'transcribing') ? s.pendingPhase : null;
     const reach = row?.reach ?? null, hears = row ? canHear(row) : isTarget, speaking = isTarget && !!s.botLive;
     const mood = s.avatarPreview ? s.avatarPreview.mood
-        : stageMood({ inCall: inCall(s), isTarget, canHear: hears, reach, speaking, personSpeaking: !!turn, working: working(s) });
+        : stageMood({ inCall: inCall(s), isTarget, canHear: hears, available: row?.available, reach, speaking, personSpeaking: !!turn, working: working(s) });
     const mic = micView(s);
     const busyReason = s.reconnectShown ? 'reconnecting' : s.switching || s.movingTo ? 'switching' : null;
     const target = busyReason === 'switching' ? s.movingTo || (s.viewedThread && s.viewedThread !== selected ? s.viewedThread : selected) : null;

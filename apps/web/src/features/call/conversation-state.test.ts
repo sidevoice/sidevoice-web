@@ -62,7 +62,9 @@ test("the stage's agent, by priority: offline, speaking, listening, working, idl
 test("it listens only while the person talks to it and it can hear them: holding, it does not react", () => {
   const call = { inCall: true, isTarget: true, canHear: true, reach: "listening" as const, speaking: false, personSpeaking: true, working: false };
   expect(stageMood(call)).toBe("listening");
-  expect(stageMood({ ...call, reach: "holding", canHear: false })).toBe("idle");
+  expect(stageMood({ ...call, reach: "holding", canHear: false })).toBe("holding");
+  // Holding, but not listed as available, is offline's words, not this one.
+  expect(stageMood({ ...call, reach: "holding", canHear: false, available: false })).toBe("idle");
   // It does not react to the person, but its work goes on (#166).
   expect(stageMood({ ...call, reach: "holding", canHear: false, working: true })).toBe("working");
   // Bound to the call but not listed by the room yet, it hears the call.

@@ -503,3 +503,12 @@
 .voice-setup-card > p { max-width: 42ch; margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
 .voice-setup-card > .voice-models { justify-self: stretch; margin-top: var(--sv-space-3); text-align: start; }
 .voice-model-progress { grid-column: 1 / -1; width: 100%; height: 4px; accent-color: var(--sv-accent); }
+
+/* Can't receive (reach holding): its own look, amber like the warning, never the resting one. */
+.stage-state { display: inline-flex; align-items: center; gap: .4em; font-size: .6em; line-height: 1.3333em; font-weight: var(--sv-weight-semibold); color: var(--sv-warning); }
+.stage-state i { width: .6em; height: .6em; border-radius: 50%; background: var(--sv-warning); }
+.stage-holding { display: grid; justify-items: center; gap: .25em; max-width: min(90%, 28em); margin: 0; padding: .5em .9em; border-radius: var(--sv-radius-lg, 14px);
+  background: var(--sv-warning-soft); color: var(--sv-warning); font-size: .9em; font-weight: var(--sv-weight-semibold); text-align: center; }
+.stage-holding-line { display: inline-flex; align-items: center; gap: .4em; }
+.stage-holding-why { font-size: .85em; font-weight: var(--sv-weight-normal, 400); color: var(--sv-text-muted); overflow-wrap: anywhere; }
+.call-details-holding h3 { color: var(--sv-warning); }

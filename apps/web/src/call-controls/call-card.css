@@ -202,6 +202,8 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .card-state[data-mood=listening] i { background: var(--accent); }
 .card-state[data-mood=speaking] i { background: var(--sv-voice, #e0a82e); }
 .card-state[data-mood=working] i { background: #5bbf8a; animation: card-think 1.4s ease-in-out infinite; }
+.card-state[data-mood=holding] { color: var(--sv-warning); }
+.card-state[data-mood=holding] i { background: var(--sv-warning); }
 .card-state[data-mood=muted] i { background: var(--end); }
 @media (prefers-reduced-motion: reduce) { .card-state i { animation: none !important; } }
 .title-card .your-wave { align-self: center; }

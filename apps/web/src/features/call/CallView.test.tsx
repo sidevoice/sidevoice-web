@@ -465,7 +465,10 @@ test("a conversation that is holding does not react to the person talking", () =
     people: [person("t-login", "Fix the slow login", { reach: { state: "holding" } })],
     userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening",
   });
-  expect(stageAgent()).toHaveAttribute("data-avatar-state", "idle");
+  expect(stageAgent()).toHaveAttribute("data-avatar-state", "holding");
+  expect(document.querySelector(".stage-holding")).toHaveTextContent("Can't receive");
+  expect(document.querySelector(".stage-state")).toHaveTextContent("Can't receive");
+  expect(stageAgent()).toHaveAccessibleName("Fix the slow login · Can't receive");
 });
 
 test("replies that arrived after leaving put the unread cue on that conversation's avatar, never the one in view", () => {

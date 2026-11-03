@@ -26,7 +26,7 @@ export type EngineMood = "idle" | "speaking" | "listening" | "working";
 /** The engine's mood for an app state. Offline sleeps (the engine's idle with no step: the old sleep); present (the
  *  person in a call, a transcript's speaker) is idle and quiet, awake with nothing in hand. */
 export const ENGINE_MOOD: Record<AvatarMood, EngineMood> = {
-  offline: "idle", speaking: "speaking", listening: "listening", working: "working", idle: "idle", present: "idle",
+  offline: "idle", speaking: "speaking", listening: "listening", working: "working", idle: "idle", present: "idle", holding: "idle",
 };
 
 /** How long it rests, quiet, after anything happened (it spoke, listened, held still under its balloon) before a pastime
@@ -168,7 +168,7 @@ export function createAvatarStates(): AvatarStates {
       // During the entrance, what it had in hand stays on so it can drop away.
       work: working ?? (entry.enter === "working" ? entry.last.work : undefined),
       // Resting before it is bored (or held still) is quiet: awake, nothing in hand. Offline sleeps: no step.
-      idle: mood === "present" || (mood === "idle" && !bored) ? "quiet" : resting ?? (entry.enter === "idle" ? entry.last.idle : undefined),
+      idle: mood === "present" || mood === "holding" || (mood === "idle" && !bored) ? "quiet" : resting ?? (entry.enter === "idle" ? entry.last.idle : undefined),
       enter: entry.enter ?? undefined,
       unread: unread || undefined,
     };

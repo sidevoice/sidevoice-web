@@ -93,6 +93,7 @@ export const DownloadsIcon = mark(Download, 18);
 export const ListenAgainIcon = mark(Play, 14);
 /** A reply that never played, and the cut marker's pause bars (the landing draws the same). */
 export const UnplayedIcon = mark(VolumeX, 14);
+export const PauseIcon = mark(Pause, 16);
 export const CutIcon = mark(Pause, 12);
 export const CutMoreIcon = mark(ChevronRight, 12);
 /** A try's recording, played and paused (TryTake). */
