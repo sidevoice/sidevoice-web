@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { cloneElement, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactElement, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
-import { CheckIcon, ChevronIcon } from "../../components/ui/Icons";
+import { CheckIcon, ChevronIcon, ScanCodeIcon, TypeCodeIcon } from "../../components/ui/Icons";
 import { InfoTip } from "../../components/ui/InfoTip";
 import { Input, Textarea } from "../../components/ui/Input";
 import { host as hostOfPage } from "../../host";
@@ -15,6 +15,9 @@ import {
   type PairingCodePreview,
 } from "../../services/device-pairing.js";
 import { ConnectorSteps } from "./ConnectorSteps";
+import { ScanInCard, ScanOverlay } from "./ScanOverlay";
+import type { CodeScan, CodeScannerBridge } from "../../host";
+import { useVariant } from "../../lib/variants";
 import { CONNECTOR_PAIR_DEVICE } from "./connector-commands";
 import "./pairing.css";
 
@@ -69,6 +72,22 @@ const upperFirst = (text: string) => text.charAt(0).toUpperCase() + text.slice(1
 /** A phone or a tablet: the keyboard would cover the screen, so nothing takes the focus by itself. */
 const touchFirst = () => typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
 
+/* Where Scan sits is an open design decision (VARIANTS `pairingScan`; the design system's patterns page shows them side by
+ * side): `current` is a button under the code and a plain frame; the others draw the viewfinder in the app's own look
+ * (ScanOverlay `stage`) and put Scan — A `inField`: a camera inside the code's field, at its end, like a search field's;
+ * B `twoWays`: Scan and Type the code as two equal tiles, the field coming in with the second; C `scanFirst`: the
+ * viewfinder inside the card, typing the alternative under it; D `labelRow`: a quiet Scan at the end of the field's label
+ * row. What a scan does is the same in all of them. Once one is chosen, the others and this switch go. */
+export const SCAN_VARIANTS = ["current", "inField", "twoWays", "scanFirst", "labelRow"] as const;
+export type ScanVariant = (typeof SCAN_VARIANTS)[number];
+
+/** A: the code's field with Scan inside it, at its end. Field hands its id and description to this, and this to the field. */
+function CodeWithScan({ children, action, ...described }: {
+  children: ReactElement<{ id?: string }>; action: ReactNode; id?: string; "aria-describedby"?: string; "aria-invalid"?: boolean;
+}) {
+  return <div className="pairing-code-box">{cloneElement(children, described)}{action}</div>;
+}
+
 /** The command that prints a new code, copied from the alert that says the old one is spent. */
 function CopyCommand() {
   const t = translator();
@@ -83,8 +102,10 @@ function CopyCommand() {
  *  to get one. Its Connect sits at the end of the form, or, given `submitIn`, in the footer of whatever
  *  holds it (the dialog's, the setup's), still submitting it through its `form` attribute; `null` while that footer is
  *  not there. */
-export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, rows = 3, submitIn }: {
+export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, rows = 3, submitIn, scanVariant, codeScanner }: {
   idPrefix?: string; autoFocus?: boolean; rows?: number; submitIn?: HTMLElement | null;
+  /** The design system's specimens: a variant of Scan's place, and a scanner to draw it with, over the page's. */
+  scanVariant?: ScanVariant; codeScanner?: CodeScannerBridge | null;
 }) {
   const t = translator();
   const [code, setCode] = useState("");
@@ -103,6 +124,21 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
   const [heard, setHeard] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const [how, setHow] = useState(false);
+  // The camera that scans the code (the mobile app's): the viewfinder is open while a scan lasts; a camera that cannot be
+  // used is said under the code, with its way out.
+  const scanner = codeScanner === undefined ? hostOfPage().codeScanner : codeScanner;
+  const pickedLook = useVariant("pairingScan", SCAN_VARIANTS);
+  const look = scanVariant ?? pickedLook;
+  // B and C: typing is the other way, chosen; until then the field is not shown (unless it holds something, or is wrong).
+  const [typing, setTyping] = useState(false);
+  const focusCode = useRef(false);
+  // Type the code chosen while scanning: the scan ends cancelled, and the focus stays in the field.
+  const typedOverScan = useRef(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanNote, setScanNote] = useState<"denied" | "unavailable" | null>(null);
+  const scanButton = useRef<HTMLButtonElement>(null);
+  // Where the focus goes once the viewfinder is gone: it is modal, and the page behind is inert and hidden until it closes.
+  const refocusAfterScan = useRef<"scan" | "connect" | null>(null);
   // The address the code itself filled in, replaced when the code changes unless the person wrote their own.
   const prefilled = useRef("");
   const focusAddress = useRef(false);
@@ -129,6 +165,21 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
   useEffect(() => { if (alert) alertBox.current?.scrollIntoView?.({ block: "nearest" }); }, [alert]);
   // Asked to agree to no encryption, the person is taken to what it means, not to the button: the next Tab reaches it.
   useEffect(() => { if (alert?.kind === "httpPrivate" && !busy) warningTitle.current?.focus(); }, [alert, busy]);
+  // Leaving this screen during a scan (the page navigated, the dialog closed) lets the camera go: it is the app's, and would
+  // otherwise keep running under the page. The cleanup also runs when a scan ends, where cancelling is a no-op.
+  useEffect(() => {
+    if (!scanning) return;
+    return () => { void hostOfPage().codeScanner?.cancel().catch(() => undefined); };
+  }, [scanning]);
+  // The scan ended: the focus goes to Connect (a code was read) or back to Scan, once the viewfinder has closed and Scan is
+  // enabled again. Not before: a focus asked while the viewfinder is still open lands on nothing.
+  useEffect(() => {
+    if (scanning || !refocusAfterScan.current) return;
+    (refocusAfterScan.current === "connect" ? connectButton : scanButton).current?.focus();
+    refocusAfterScan.current = null;
+  }, [scanning]);
+  // Type the code chosen (B, C): its field, once drawn.
+  useEffect(() => { if (focusCode.current && typing) { focusCode.current = false; codeField.current?.focus(); } });
   // That button gone with what replaced the warning, the focus goes back to Connect.
   useEffect(() => { if (!busy && refocusConnect.current) { refocusConnect.current = false; connectButton.current?.focus(); } }, [busy]);
 
@@ -156,6 +207,33 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
     prefilled.current = plain;
     // What was said about the code, or about an address it needed or filled in, no longer stands.
     if (fieldError && (fieldError.field === "code" || fieldError.key === "pairing.addressNeeded" || fieldError.key === "pairing.addressUnreached" || replaced)) setFieldError(null);
+  }
+
+  /** Scans the code the machine shows. The camera is asked for first, outside the viewfinder, so that a denial is said on this
+   *  screen and not behind the camera; what is scanned goes where a pasted code goes. Typing stays as it was. */
+  async function scan() {
+    if (!scanner || scanning || busy) return;
+    setScanNote(null);
+    let permission: "granted" | "denied";
+    try { permission = await scanner.request(); } catch { permission = "denied"; }
+    if (permission !== "granted") { setScanNote("denied"); return; }
+    setScanning(true);
+    // A scan never rejects by contract; one that does is a camera that cannot be used.
+    const result: CodeScan = await scanner.scan().catch(() => ({ status: "unavailable" as const }));
+    setScanning(false);
+    switch (result.status) {
+      case "scanned": {
+        const text = result.text.trim();
+        changeCode(text);
+        // Not a Sidevoice code (any other QR): said at once under the field, where a pasted one would be said on Connect.
+        if (!readCode(text, Date.now())) { setFieldError({ field: "code", key: text ? "pairing.invalid" : "pairing.empty" }); return; }
+        refocusAfterScan.current = "connect";
+        return;
+      }
+      case "denied": setScanNote("denied"); return;
+      case "unavailable": setScanNote("unavailable"); return;
+      case "cancelled": refocusAfterScan.current = typedOverScan.current ? null : "scan"; typedOverScan.current = false; return;
+    }
   }
 
   function changeAddress(next: string) {
@@ -264,6 +342,11 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
     }
   }
 
+  const twoWays = !!scanner && (look === "twoWays" || look === "scanFirst");
+  const codeShown = !twoWays || typing || !!code || fieldError?.field === "code";
+  // Chosen while the camera is on (C's viewfinder is in the card): the scan ends, and the focus goes to the field.
+  const chooseTyping = () => { focusCode.current = true; setTyping(true); if (scanning) { typedOverScan.current = true; void scanner?.cancel(); } };
+  const scanBusy = !!busy || scanning;
   const formId = `${idPrefix}-form`, howId = `${idPrefix}-how`, addressBodyId = `${idPrefix}-address-body`;
   // Connect only ever tries https: no encryption is never the default, nor what Enter does.
   const connect = <Button ref={connectButton} type="submit" form={formId} variant="primary" loading={busy === "https"} disabled={busy === "insecure"}>{t("pairing.connect")}</Button>;
@@ -279,19 +362,48 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
         onChange={(event) => changeAddress(event.currentTarget.value)} />
     </Field>
   );
+  const codeId = `${idPrefix}-code`;
+  const codeInput = (
+    <Textarea ref={codeField} id={codeId} className="pairing-code" minRows={rows} maxRows={6} value={code} placeholder={t("pairing.codePlaceholder")}
+      readOnly={!!busy} spellCheck={false} autoComplete="off" autoCapitalize="off" autoCorrect="off"
+      onChange={(event) => changeCode(event.currentTarget.value)} onKeyDown={enterSubmits} />
+  );
   const form = (
     <form id={formId} className="pairing-form" onSubmit={submit} aria-busy={!!busy} noValidate>
       <p className="pairing-intro">{t("pairing.intro")}</p>
-      <Field label={t("pairing.code")} error={fieldError?.field === "code" ? t(fieldError.key) : undefined}
-        hint={preview ? <span className="pairing-recognised"><CheckIcon size={14} />{t("pairing.recognised", { host: named(preview.host, t), minutes: minutesLeft(preview, now) })}</span> : undefined}>
-        <Textarea ref={codeField} id={`${idPrefix}-code`} className="pairing-code" minRows={rows} maxRows={6} value={code} placeholder={t("pairing.codePlaceholder")}
-          readOnly={!!busy} spellCheck={false} autoComplete="off" autoCapitalize="off" autoCorrect="off"
-          onChange={(event) => changeCode(event.currentTarget.value)} onKeyDown={enterSubmits} />
-      </Field>
+      {scanner && look === "scanFirst" && <>
+        <ScanInCard scanning={scanning} onCancel={() => void scanner.cancel()}
+          start={<Button ref={scanButton} variant="primary" className="scan-card-action" disabled={scanBusy} onClick={() => void scan()}><ScanCodeIcon />{t("pairing.scan")}</Button>} />
+        {(!codeShown || scanning) && <Button variant="ghost" size="sm" className="pairing-type-link" aria-controls={codeId} onClick={chooseTyping}><TypeCodeIcon size={16} />{t("pairing.typeCode")}</Button>}
+      </>}
+      {scanner && look === "twoWays" && <div className="pairing-ways">
+        <button ref={scanButton} type="button" className="pairing-way" disabled={scanBusy} onClick={() => void scan()}>
+          <span className="pairing-way-icon"><ScanCodeIcon /></span>{t("pairing.scanShort")}
+        </button>
+        <button type="button" className="pairing-way" aria-pressed={codeShown} aria-controls={codeId} onClick={chooseTyping}>
+          <span className="pairing-way-icon"><TypeCodeIcon /></span>{t("pairing.typeCode")}
+        </button>
+      </div>}
+      <div className="pairing-code-field" hidden={!codeShown}>
+        <Field label={t("pairing.code")} error={fieldError?.field === "code" ? t(fieldError.key) : undefined}
+          aside={scanner && look === "labelRow" ? <button ref={scanButton} type="button" className="pairing-scan-link" disabled={scanBusy} onClick={() => void scan()}>
+            <ScanCodeIcon size={16} />{t("pairing.scan")}</button> : undefined}
+          hint={preview ? <span className="pairing-recognised"><CheckIcon size={14} />{t("pairing.recognised", { host: named(preview.host, t), minutes: minutesLeft(preview, now) })}</span> : undefined}>
+          {scanner && look === "inField"
+            ? <CodeWithScan id={codeId} action={<Button ref={scanButton} variant="ghost" tone="neutral" size="icon" className="pairing-code-scan" aria-label={t("pairing.scan")} title={t("pairing.scan")}
+                disabled={scanBusy} onClick={() => void scan()}><ScanCodeIcon /></Button>}>{codeInput}</CodeWithScan>
+            : codeInput}
+        </Field>
+      </div>
+      {scanner && look === "current" && <Button ref={scanButton} type="button" variant="secondary" className="pairing-scan" disabled={scanBusy} onClick={() => void scan()}>{t("pairing.scan")}</Button>}
+      {scanNote && <Alert tone="warning" live className="pairing-scan-note" title={t(scanNote === "denied" ? "pairing.scanDenied" : "pairing.scanUnavailable")}>
+        {scanNote === "denied" && <Button variant="secondary" onClick={() => void scanner?.openSettings().catch(() => undefined)}>{t("pairing.scanSettings")}</Button>}
+      </Alert>}
+      {scanning && scanner && look !== "scanFirst" && <ScanOverlay look={look === "current" ? "plain" : "stage"} onCancel={() => void scanner.cancel()} />}
       <p className="sr-only" role="status">{heard}</p>
       {/* The address, a quiet link under the code that opens its field and closes it again; open by itself, and needed,
           where the code carries no usable address or its addresses did not reach the machine. */}
-      <span className="pairing-address-head">
+      <span className="pairing-address-head" hidden={!codeShown && !addressOpen}>
         <button type="button" className="pairing-address-link" aria-expanded={addressOpen} aria-controls={addressBodyId}
           onClick={() => { addressOpenedByUser.current = !addressOpen; if (!addressOpen) focusAddress.current = true; setAddressOpen(!addressOpen); }}>
           <ChevronIcon size={14} />{t(addressRequired ? "pairing.addressToggleNeeded" : "pairing.addressToggle")}

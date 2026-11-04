@@ -11,6 +11,106 @@
 }
 .connector-steps > li > p { margin: 0; line-height: 1.5rem; color: var(--sv-text); }
 
+/* ----- scanning the pairing code (the mobile app's camera: PairMachine's Scan, ScanOverlay) */
+.pairing-scan { justify-self: start; }
+.pairing-scan-note .ui-alert-body { margin-top: var(--sv-space-3); }
+/* While the camera is on, the app draws it behind the page: the page is transparent and shows only the viewfinder. */
+html[data-scanning], html[data-scanning] body { background: transparent !important; }
+/* Whatever layer is open (a dialog, the setup's wizard, a page): not a list of classes that a new one would miss. */
+html[data-scanning=""] body > *:not(.scan-overlay), html[data-scanning=""] dialog:not(.scan-overlay) { visibility: hidden; }
+html[data-scanning] dialog::backdrop { background: transparent; }
+.scan-overlay {
+  position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: var(--sv-space-6) var(--sv-space-5);
+  border: 0; background: transparent; color: #fff; overflow: hidden;
+}
+.scan-overlay[open] { display: grid; grid-template-rows: auto 1fr auto; justify-items: center; align-items: center; gap: var(--sv-space-5); }
+.scan-hint { margin: 0; padding: var(--sv-space-2) var(--sv-space-4); border-radius: var(--sv-radius-lg); background: rgb(0 0 0 / 0.6); text-align: center; line-height: 1.5rem; }
+/* The frame to aim at: its corners drawn, the rest of the camera dimmed around it. */
+.scan-frame { width: min(70vw, 70vh, 320px); aspect-ratio: 1; border-radius: var(--sv-radius-lg); border: 3px solid rgb(255 255 255 / 0.9); box-shadow: 0 0 0 100vmax rgb(0 0 0 / 0.4); }
+.scan-cancel { min-height: 44px; min-width: 160px; }
+
+/* ----- where Scan sits and how the viewfinder looks: the open decision (VARIANTS `pairingScan`, PairMachine). `current` is
+ * the rules above; these are the others. */
+/* The frame's corners, in the accent (on the dark stage: these sit in a `data-theme="dark"` box whatever the page's theme). */
+.scan-corner { position: absolute; width: 36px; height: 36px; border: 0 solid var(--sv-accent); pointer-events: none; }
+.scan-corner[data-corner="tl"] { top: 0; left: 0; border-width: 4px 0 0 4px; border-top-left-radius: var(--sv-radius-2xl); }
+.scan-corner[data-corner="tr"] { top: 0; right: 0; border-width: 4px 4px 0 0; border-top-right-radius: var(--sv-radius-2xl); }
+.scan-corner[data-corner="bl"] { bottom: 0; left: 0; border-width: 0 0 4px 4px; border-bottom-left-radius: var(--sv-radius-2xl); }
+.scan-corner[data-corner="br"] { bottom: 0; right: 0; border-width: 0 4px 4px 0; border-bottom-right-radius: var(--sv-radius-2xl); }
+/* The mascot, perched on the frame's top edge, its tone glowing under it. */
+.scan-mascot { position: absolute; top: 0; left: 50%; display: grid; place-items: center; width: 64px; height: 64px; transform: translate(-50%, -78%);
+  border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--scan-tone) 34%, transparent) 0, transparent 70%); pointer-events: none; }
+.scan-mascot .sv-avatar { width: 52px; height: 52px; }
+
+/* The viewfinder in the app's look (A, B, D): the dark stage's tint around the frame instead of grey, the title and hint
+ * in the type of a dialog, Cancel the app's button. */
+.scan-overlay[data-look="stage"] { padding: calc(var(--sv-space-6) + env(safe-area-inset-top, 0px)) var(--sv-space-5) calc(var(--sv-space-6) + env(safe-area-inset-bottom, 0px)); color: var(--sv-text); }
+.scan-overlay[data-look="stage"][open] { grid-template-rows: auto 1fr auto; gap: var(--sv-space-6); }
+/* Above the tint, which the window (positioned) paints after them. */
+.scan-head, .scan-overlay[data-look="stage"] .scan-cancel { position: relative; z-index: 1; }
+.scan-head { display: grid; gap: var(--sv-space-1-5); max-width: 22rem; text-align: center; }
+.scan-title { margin: 0; font-size: var(--sv-font-lg); line-height: 1.5rem; font-weight: var(--sv-weight-bold); letter-spacing: -.01em; color: var(--sv-text); }
+.scan-lead { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.scan-window { position: relative; width: min(72vw, 52vh, 300px); aspect-ratio: 1; border-radius: var(--sv-radius-2xl);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.08), 0 0 0 100vmax color-mix(in srgb, var(--sv-bg) 72%, transparent); }
+/* The tint carries the stage's lilac glow, from the top as the stage's does. */
+.scan-overlay[data-look="stage"]::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(ellipse at 50% 0%, rgb(201 182 236 / 0.16) 0, transparent 55%); }
+.scan-overlay[data-look="stage"] .scan-cancel { min-width: 200px; border-radius: var(--sv-radius-pill); }
+
+/* A: Scan inside the code's field, at its end, like a search field's. */
+.pairing-code-box { position: relative; min-width: 0; }
+.pair-machine [hidden] { display: none !important; }
+.pairing-code-box > .ui-textarea { width: 100%; padding-inline-end: 52px; }
+.pairing-code-scan.ui-button { position: absolute; top: 4px; inset-inline-end: 4px; color: var(--sv-accent-text); }
+
+/* B: two equal ways, in the card's own style: Scan, and Type the code (which brings the field in). */
+.pairing-ways { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sv-space-3); }
+.pairing-way { display: grid; justify-items: center; align-content: center; gap: var(--sv-space-2); min-height: 112px; padding: var(--sv-space-4) var(--sv-space-3);
+  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-surface); color: var(--sv-text);
+  font: inherit; font-weight: var(--sv-weight-semibold); text-align: center; cursor: pointer;
+  transition: border-color var(--sv-dur-fast) var(--sv-ease), background-color var(--sv-dur-fast) var(--sv-ease); }
+[data-theme="dark"] .pairing-way { background: var(--sv-surface); }
+.pairing-way-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--sv-accent-soft); color: var(--sv-accent-text); }
+@media (hover: hover) { .pairing-way:not(:disabled):hover { border-color: var(--sv-accent); } }
+.pairing-way[aria-pressed="true"] { border-color: var(--sv-accent); background: color-mix(in srgb, var(--sv-accent-soft) 55%, var(--sv-surface)); }
+.pairing-way:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.pairing-way:disabled { opacity: .6; cursor: default; }
+
+/* C: the viewfinder inside the card, on the dark stage while it rests; Type the code under it. */
+.scan-card { position: relative; display: grid; justify-items: center; align-content: end; gap: var(--sv-space-3); height: clamp(220px, 70vw, 300px);
+  padding: var(--sv-space-4); border-radius: var(--sv-radius-2xl); color: var(--sv-text);
+  background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--sv-accent) 20%, transparent) 0, transparent 55%), var(--sv-stage-bg); }
+.scan-card .scan-corner { margin: var(--sv-space-3); width: 30px; height: 30px; }
+.scan-card .scan-mascot { top: 38%; transform: translate(-50%, -50%); width: 84px; height: 84px; }
+.scan-card .scan-mascot .sv-avatar { width: 64px; height: 64px; }
+.scan-card-hint { margin: 0; max-width: 18rem; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); text-align: center; }
+.scan-card-action { min-height: 44px; min-width: 200px; border-radius: var(--sv-radius-pill); }
+.scan-card-fill { display: none; }
+.pairing-type-link { justify-self: center; }
+/* Scanning in the card: the camera shows through the box. Its ancestors lose their background, and the box paints the
+ * colour they had all around itself (a shadow under everything else of its layer), so only the box is a window. */
+html[data-scanning="inline"], html[data-scanning="inline"] body { background: transparent !important; }
+html[data-scanning="inline"] :has(.scan-card[data-scanning]) { background: transparent !important; overflow: visible !important; }
+/* Only the layer that holds the card is seen: whatever is under it (the room, another dialog) is hidden, the card's own
+ * screen (the pairing dialog, the setup) stays as it was around the window. */
+html[data-scanning="inline"] body *:not(:has(.scan-card[data-scanning]), dialog:has(.scan-card[data-scanning]) *) { visibility: hidden; }
+.scan-card[data-scanning] { background: transparent; }
+.scan-card[data-scanning] .scan-card-fill { display: block; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.1), 0 0 0 200vmax var(--scan-fill, var(--sv-surface)); }
+.scan-card[data-scanning] .scan-mascot { top: 0; left: auto; right: var(--sv-space-6); transform: translateY(-62%); width: 56px; height: 56px; }
+.scan-card[data-scanning] .scan-mascot .sv-avatar { width: 46px; height: 46px; }
+/* The hint said it at rest; the camera has the whole window, Cancel at its foot. */
+.scan-card[data-scanning] .scan-card-hint { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* D: a quiet Scan at the end of the field's label row, in the accent, like a field's own action. */
+.pairing-scan-link { display: inline-flex; align-items: center; gap: var(--sv-space-1); margin-block: -8px; padding: 6px var(--sv-space-2); border: 0; border-radius: var(--sv-radius-pill);
+  background: var(--sv-accent-soft); color: var(--sv-accent-text); font: inherit; font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); cursor: pointer; }
+@media (hover: hover) { .pairing-scan-link:not(:disabled):hover { background: var(--sv-accent-soft-hover); } }
+.pairing-scan-link:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.pairing-scan-link:disabled { opacity: .6; cursor: default; }
+@media (pointer: coarse) { .pairing-scan-link { min-height: 36px; } .pairing-scan-link::after { content: ""; position: absolute; inset: -6px; } .pairing-scan-link { position: relative; } }
+
 /* ----- the install command to run on this computer, where the app does not install Sidevoice itself */
 .install-here { display: grid; gap: var(--sv-space-2); min-width: 0; }
 .install-here > p { margin: 0; line-height: 1.5rem; color: var(--sv-text); }
