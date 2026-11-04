@@ -21,7 +21,7 @@ export function playbackHearing(report, text, action = null, policy = HEARING_PO
   if (report?.status === 'heard' || action === 'user_skipped' && policy.skipCountsAsHeard)
     return { outcome: 'heard' };
   // These are app availability choices, even when a physical prefix happened to play before stopping.
-  if (['agents_muted', 'voice_off', 'connector_disconnected', 'focus_changed', 'call_ended', 'heard_elsewhere'].includes(action))
+  if (['agents_muted', 'voice_off', 'connector_disconnected', 'focus_changed', 'call_ended', 'heard_elsewhere', 'closed'].includes(action))
     return { outcome: 'not_heard' };
   const extent = extentOf(report, length);
   if (extent >= length && length > 0) return { outcome: 'heard' };
