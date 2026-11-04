@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { installHarness } from "./harness.mjs";
 
-/* What moves on the stage moves as GPU layers (web#278): with the GPU, the agent, its backdrop and its desk are drawn in
- * layers (features/avatar/layers.ts) and every animation they run is on an HTML element, none on an SVG one, which
- * WebKit would repaint every frame (desktop#149). The thumbnails hold still. Without the GPU nothing there moves. */
+/* What moves on the stage (web#278): the agent is its creature, one canvas its rig draws into (features/avatar/creature/).
+ * With the GPU it is drawn live, about thirty frames a second; without it, it holds still in its state's key pose and asks
+ * for no frame. Nothing it shows is a CSS animation, and nothing at all runs on an SVG element (which WebKit would repaint
+ * every frame, desktop#149). The thumbnails are still faces either way. */
 
 const conversation = (thread_id, title) => ({ thread_id, title, available: true, reach: { state: "listening" }, harness: "claude-code" });
 
@@ -22,24 +23,45 @@ const running = (page, selector) => page.evaluate((selector) => {
   return { all: all.length, svg: all.filter((a) => a.effect.target instanceof SVGElement).length };
 }, selector);
 
-test("with the GPU the stage's agent moves in layers, nothing on SVG; its thumbnails hold still", async ({ page }) => {
+/** What a canvas shows now, as a data URL; "" while it is blank. */
+const pixels = (locator) => locator.evaluate((canvas) => {
+  const blank = document.createElement("canvas");
+  blank.width = canvas.width; blank.height = canvas.height;
+  const now = canvas.toDataURL();
+  return now === blank.toDataURL() ? "" : now;
+});
+
+test("with the GPU the stage's agent is its creature, drawn live on one canvas; nothing runs on SVG; its thumbnails are still faces", async ({ page }) => {
   await stage(page, "gpu");
   await expect(page.locator("html")).toHaveAttribute("data-motion", "gpu");
-  await expect(page.locator(".stage-agent > [data-layers]")).toHaveCount(1);
-  await expect.poll(() => running(page, ".stage-agent")).toMatchObject({ svg: 0 });
-  expect((await running(page, ".stage-agent")).all).toBeGreaterThan(0);
-  // Its scene too (what of the backdrop and the desk moves).
-  expect((await running(page, ".stage-scene")).svg).toBe(0);
-  // A thumbnail is one still SVG.
-  const thumbnail = page.locator("#participants .sv-avatar").first();
-  await expect(thumbnail.locator("> svg")).toHaveCount(1);
+  const agent = page.locator(".stage-agent[data-style=creature] > canvas");
+  await expect(agent).toHaveCount(1);
+  // It is drawn, and it moves: what it shows changes from one moment to the next (its breathing, its blinks).
+  await expect.poll(() => pixels(agent), { timeout: 15_000 }).not.toBe("");
+  const before = await pixels(agent);
+  await expect.poll(() => pixels(agent), { timeout: 10_000 }).not.toBe(before);
+  expect(await running(page, ".stage-scene")).toMatchObject({ svg: 0 });
+  // A thumbnail is a still face: a canvas, drawn once.
+  const thumbnail = page.locator("#participants .sv-avatar[data-style=creature] > canvas").first();
+  await expect.poll(() => pixels(thumbnail), { timeout: 15_000 }).not.toBe("");
   expect(await running(page, "#participants")).toMatchObject({ svg: 0 });
 });
 
-test("without the GPU the stage's agent is one still SVG, as everywhere else", async ({ page }) => {
+test("without the GPU the stage's agent holds still in its key pose: drawn once, no frame asked for", async ({ page }) => {
   await stage(page, "still");
   await expect(page.locator("html")).toHaveAttribute("data-motion", "still");
-  await expect(page.locator(".stage-agent > svg")).toHaveCount(1);
-  await expect(page.locator("[data-layers]")).toHaveCount(0);
+  const agent = page.locator(".stage-agent[data-style=creature] > canvas");
+  await expect(agent).toHaveCount(1);
+  await expect.poll(() => pixels(agent), { timeout: 15_000 }).not.toBe("");
+  const still = await pixels(agent);
+  // Nothing runs: no CSS animation in the scene, and no animation frame asked for while nothing changes.
   expect(await running(page, ".stage-scene")).toMatchObject({ all: 0 });
+  const frames = await page.evaluate(() => new Promise((resolve) => {
+    let n = 0;
+    const raf = window.requestAnimationFrame.bind(window);
+    window.requestAnimationFrame = (callback) => { n += 1; return raf(callback); };
+    setTimeout(() => resolve(n), 1500);
+  }));
+  expect(frames).toBe(0);
+  expect(await pixels(agent)).toBe(still);
 });

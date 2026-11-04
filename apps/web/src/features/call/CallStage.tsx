@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useRef, type CSSProperties, type RefObject } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, type CSSProperties, type RefObject } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { UpdateNotice } from "../updates/UpdateNotice";
 import { Button } from "../../components/ui/Button";
@@ -9,7 +9,8 @@ import type { ChatMessage } from "../../state/room-types";
 import { avatarFor, avatarTone } from "../avatar/avatar-spec";
 import { avatarColor } from "../avatar/bicho-draw";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
-import { StageBackdrop, StageDesk, useSceneScale, WantedPoster, type PosterWords } from "../avatar/StageScene";
+import { StageBackdrop, useSceneScale, WantedPoster, type PosterWords } from "../avatar/StageScene";
+import type { MouthLevel } from "../avatar/avatar-state";
 import { uiLanguage, translator, type Translate } from "../../i18n/translator";
 import { moodText } from "./conversation-state";
 import { useAgentTurns, useReadingClock, useSpokenFrom, type AgentTurn } from "./speech-reading";
@@ -37,8 +38,9 @@ import "./call-view.css";
  * while they speak. One agent: the call talks to one conversation at a time. The whole transcript is a button away
  * (TranscriptPanel). Its look is call-view.css.
  *
- * The agent is the conversation's bicho, on the scene its seed rolls (features/avatar/StageScene.tsx): a backdrop, a
- * desk that slides in while it works, and a wanted poster in its place while the room cannot reach it. */
+ * The agent is the conversation's creature (features/avatar/creature/), on the scene its seed rolls (features/avatar/
+ * StageScene.tsx): a backdrop, and a wanted poster in its place while the room cannot reach it. The desk it used to work
+ * at is off, as the design reference has it (sidevoice-web#476). */
 
 /* The balloon, decided 2026-10-15: made of the agent's own skin (its colour, pale, its ink and its gloss), pushed left of
  * the agent with its tail out of its bottom-right corner toward it, three lines tall, a page at a time (the last page
@@ -192,6 +194,11 @@ export function StageTile({ card = false }: { card?: boolean }) {
   const captions = useCaptions();
   // The room's stage, for the desktop app's floating card (stage-visibility.ts): not the card's own picture of it.
   const stageRef = useStageRef<HTMLDivElement>(!card);
+  // The voice it hears while it listens: the person's microphone, as the room measures it (0–100).
+  const hearLevel = useMemo<MouthLevel | undefined>(() => {
+    const mic = typeof window === "undefined" ? undefined : window.sidevoiceUI?.micLevel;
+    return mic ? (paint) => mic.subscribe((value) => paint(value / 100)) : undefined;
+  }, []);
   if (!stage.threadId) return null;
   const spec = avatarFor(stage.threadId);
   const tone = avatarColor(spec);
@@ -205,9 +212,8 @@ export function StageTile({ card = false }: { card?: boolean }) {
           <div className="stage-scene">
             <StageBackdrop seed={stage.threadId} tone={tone} live />
             {avatar.mood === "offline" && <WantedPoster spec={spec} seed={stage.threadId} words={posterWords(t)} language={uiLanguage()} />}
-            <CharacterAvatar className="stage-agent" spec={spec} state={avatar} size="stage" desk={avatar.mood === "working"} live
-              mouth="playback" mouthLevel={avatars.mouth(stage.threadId)} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
-            <StageDesk seed={stage.threadId} live />
+            <CharacterAvatar className="stage-agent" spec={spec} state={avatar} size="stage" scene live
+              mouth="playback" mouthLevel={avatars.mouth(stage.threadId)} hearLevel={hearLevel} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
           </div>
         </div>
         {!card && <StageName stage={stage} className="stage-name" tone={tone} voice={voice} />}

@@ -3,10 +3,21 @@ import { cn } from "../../lib/cn";
 import { useMotion } from "../../lib/motion";
 import { avatarKey, avatarTone, type AvatarSpec } from "./avatar-spec";
 import { ENGINE_MOOD, toTimeline, type AvatarState, type MouthLevel } from "./avatar-state";
-import { drawAvatar, engineSize, type AvatarSize } from "./bicho-draw";
+import { avatarColor, drawAvatar, engineSize, type AvatarSize, type DrawnSpec } from "./bicho-draw";
 import { useLayers } from "./layers";
+import { ATTENTION_EXPR, STILL_EXPR } from "./creature/faces";
+import type { LiveCreature } from "./creature/host";
 
-/* An avatar is a drawing and a state. The drawing is the bichos engine's SVG, made once per figure and size; the state
+/** The creature host (three.js and the rig), loaded the first time a creature is drawn: the room does not wait for it. */
+let creatureHost: Promise<typeof import("./creature/host")> | null = null;
+const loadCreatureHost = () => (creatureHost ??= import("./creature/host"));
+
+/* A conversation's agent is its creature (creature/: a real-time 3D rig, CreatureAvatar below): one canvas, drawn by the
+ * page's creature stages: on the stage's scene, live (moving where the GPU moves the drawings, else in its state's key
+ * pose); everywhere else, a still face in its state's expression. The person and the Sidevoice mascot are still the
+ * bichos engine's drawings (the rest of this comment).
+ *
+ * An avatar is a drawing and a state. The drawing is the bichos engine's SVG, made once per figure and size; the state
  * (avatar-state.ts) is a handful of attributes on its root that CSS keys on (src/styles/bichos.css, the engine's;
  * styles/call.css, the app's), so React touches it once per state and never per frame. This component only draws: the
  * state is one object per figure, worked out and moved on in avatar-state.ts, so every copy of a figure (the stage, a
@@ -44,6 +55,11 @@ export interface CharacterAvatarProps {
   desk?: boolean;
   /** It moves, where the GPU moves it (the stage's agent, the card's creature); every other copy holds still. */
   live?: boolean;
+  /** Drawn on the stage's scene (a creature): the canvas is the whole tile, the creature standing on its ground, its eyes
+   *  following the pointer over the tile. */
+  scene?: boolean;
+  /** A creature listening: the level of the voice it hears (the person's microphone), 0..1. */
+  hearLevel?: MouthLevel;
   /** Said for the avatar; without one it is decoration. */
   label?: string;
   className?: string;
@@ -61,7 +77,96 @@ function useBeat(key: string | number | undefined): "a" | "b" | undefined {
   return key === undefined ? undefined : beat;
 }
 
-export function CharacterAvatar({ spec, state, size, mouth: asked = "voice", mouthKey, mouthLevel, desk, live, label, className, ref }: CharacterAvatarProps) {
+export function CharacterAvatar(props: CharacterAvatarProps) {
+  return props.spec.kind === "bicho" ? <CreatureAvatar {...props} seed={props.spec.seed} /> : <DrawnAvatar {...props} spec={props.spec} />;
+}
+
+/** The stage's figure box (styles/call.css .stage-agent, call-view.css --stage-head-y): its feet at 106 and the top of
+ *  its head at 20 of its 120. The creature stands in it, so what is laid out round the figure (the balloons, the
+ *  person's lift on a phone) stays where it was. */
+const FIGURE = { feet: 106 / 120, crown: 20 / 120 };
+
+/** A conversation's creature (creature/host.ts): live on the stage's scene, a still face elsewhere. */
+function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, hearLevel, live, scene, label, className, ref }: CharacterAvatarProps & { seed: string }) {
+  const root = useRef<HTMLSpanElement | null>(null);
+  const canvas = useRef<HTMLCanvasElement | null>(null);
+  const creature = useRef<LiveCreature | null>(null);
+  const motion = useMotion();
+  const moving = motion === "gpu" && !!live;
+  // The stage's creature is drawn live, moving or not (held still: its key pose, drawn again on each change). Every other
+  // copy is a still face in its state's expression, even one asked to move (the floating card, the animated thumbnails):
+  // the reference animates no small face, and a page drawing a few creatures thirty times a second on a GPU-less machine
+  // stalls. The rig can draw a live face (host.ts, framing "face") for whichever surface decides it should move.
+  const drawn = !!scene;
+  const framing = scene ? "scene" : "face";
+  const voice = useRef(0), heard = useRef(0);
+  useEffect(() => {
+    if (!moving || mouth !== "playback" || !mouthLevel) { voice.current = 0; return; }
+    // The rig reads the level each frame; the root says whether a voice is heard (data-mouth-active), as a drawing's does.
+    let active = false;
+    const stop = mouthLevel((level) => {
+      voice.current = level;
+      if ((level > 0) === active) return;
+      active = level > 0;
+      root.current?.toggleAttribute("data-mouth-active", active);
+    });
+    return () => { stop(); voice.current = 0; root.current?.removeAttribute("data-mouth-active"); };
+  }, [moving, mouth, mouthLevel]);
+  useEffect(() => {
+    if (!moving || !hearLevel) { heard.current = 0; return; }
+    return hearLevel((level) => { heard.current = level; });
+  }, [moving, hearLevel]);
+  const mood = state.mood;
+  // What it shows when its host has loaded, whatever changed in the meantime.
+  const now = useRef({ mood, moving });
+  now.current = { mood, moving };
+  useEffect(() => {
+    const element = canvas.current;
+    if (!drawn || !element) return;
+    let live: LiveCreature | null = null, gone = false;
+    void loadCreatureHost().then(({ mountCreature }) => {
+      if (gone) return;
+      live = mountCreature({ seed, canvas: element, framing, mood: now.current.mood, moving: now.current.moving, scene: () => {
+        // its feet on the figure's, the top of its body at the figure's crown, in the scene's own pixels
+        const figure = root.current, sceneBox = figure?.parentElement;
+        if (!figure || !sceneBox?.offsetHeight || !figure.offsetHeight) return null;
+        const H = sceneBox.offsetHeight, top = figure.offsetTop, size = figure.offsetHeight;
+        return { ground: (top + size * FIGURE.feet) / H, crown: (top + size * FIGURE.crown) / H };
+      },
+        gazeFrom: scene ? element.closest<HTMLElement>(".stage-tile") ?? element : null,
+        level: (acting) => (acting === "speaking" ? voice.current : heard.current) });
+      creature.current = live;
+    });
+    return () => { gone = true; live?.dispose(); creature.current = null; };
+    // Its mood and whether it moves are applied below without building the creature again.
+  }, [drawn, seed, framing, scene]);
+  useEffect(() => { creature.current?.setMood(mood); }, [mood, drawn, seed, framing]);
+  useEffect(() => { creature.current?.setMoving(moving); }, [moving, drawn, seed, framing]);
+  // A still face: its state's expression (the card's states row, T34), surprised while it has something unread.
+  const expr = state.unread ? ATTENTION_EXPR : STILL_EXPR[mood];
+  useEffect(() => {
+    const element = canvas.current;
+    if (drawn || !element) return;
+    let cancel = () => {}, gone = false;
+    void loadCreatureHost().then(({ drawFace }) => { if (!gone) cancel = drawFace(element, seed, expr); });
+    return () => { gone = true; cancel(); };
+  }, [drawn, seed, expr]);
+  // The state as the root says it, the same words as the engine's drawings (what it acts out, what it has in hand, its
+  // entrance): the creature's own acts key on them as they come over from the design reference.
+  const idle = moving || state.idle === undefined ? state.idle : "quiet";
+  return (
+    <span ref={(element) => { root.current = element; if (typeof ref === "function") ref(element); else if (ref) ref.current = element; }} className={cn("sv-avatar", className)}
+      data-style="creature" data-framing={framing} data-avatar-state={mood} data-mood={ENGINE_MOOD[mood]} data-size={engineSize(size)}
+      data-mouth={mouth === "playback" && motion === "still" ? "still" : mouth} data-work={state.work} data-idle={idle} data-enter={state.enter}
+      data-unread={state.unread || undefined} data-offline={mood === "offline" || undefined} style={avatarTone(avatarColor(spec)) as CSSProperties}
+      role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true}>
+      <canvas ref={canvas} />
+    </span>
+  );
+}
+
+/** The person, the mascot: the bichos engine's drawing. */
+function DrawnAvatar({ spec, state, size, mouth: asked = "voice", mouthKey, mouthLevel, desk, live, label, className, ref }: CharacterAvatarProps & { spec: DrawnSpec }) {
   const avatar = useRef<HTMLSpanElement | null>(null);
   const motion = useMotion();
   // Held still means still (operator, 2026-10-21): where the drawings do not move as GPU layers, the mouth does not follow the

@@ -1,14 +1,15 @@
 import type { Size } from "./engine/core";
-import { idlesFor, type Idle } from "./engine/bichos/idle";
+import { IDLE_STYLES, type Idle } from "./engine/bichos/idle";
 import type { Spec } from "./engine/bichos/kit";
 import { renderSpec } from "./engine/bichos/render";
-import { specFromSeed } from "./engine/bichos/generate";
 import { normalizeSpec } from "./engine/bichos/spec";
-import { worksFor, type Work } from "./engine/bichos/work";
+import { WORKS, type Work } from "./engine/bichos/work";
+import { creatureFromSeed } from "./creature/catalogue";
 import { renderMascot } from "./engine/styles/bichos";
 import { avatarKey, type AvatarSpec } from "./avatar-spec";
 
-/* The one door to the bichos engine. A drawing is SVG markup the engine builds from a spec and a size; React puts it
+/* The one door to the bichos engine, which draws the person and the Sidevoice mascot; a conversation's agent is its
+ * creature (creature/, CharacterAvatar), and only its tone and repertoire are answered here. A drawing is SVG markup the engine builds from a spec and a size; React puts it
  * in once and CSS animates it (src/styles/bichos.css), keyed on the root's data-* attributes. Drawings are cached by
  * figure and size — the sidebar, the header and the transcript draw the same conversation many times — and every
  * copy handed out gets ids of its own: two copies sharing a gradient's id would paint from whichever came first, and
@@ -30,14 +31,6 @@ export interface Drawing {
   /** The idle steps it can take (idle.ts: quiet and the pastimes that suit it); none for the person or the mascot,
    *  who keep the old sleep. */
   idles: readonly Idle[];
-}
-
-const specs = new Map<string, Spec>();
-/** The bicho a conversation's seed rolls (the engine's generator: archetype, body, parts, palette). */
-export function bichoSpec(seed: string): Spec {
-  let spec = specs.get(seed);
-  if (!spec) specs.set(seed, (spec = specFromSeed(seed)));
-  return spec;
 }
 
 const people = new Map<string, Spec>();
@@ -62,23 +55,20 @@ export function personSpec(hold?: "microphone"): Spec {
 const CACHE_LIMIT = 400;
 const drawings = new Map<string, Drawing>();
 
-function drawFresh(spec: AvatarSpec, size: AvatarSize): Drawing {
+/** The drawings the engine makes: the person's and the mascot's. */
+export type DrawnSpec = Exclude<AvatarSpec, { kind: "bicho" }>;
+
+function drawFresh(spec: DrawnSpec, size: AvatarSize): Drawing {
   if (spec.kind === "mascot") {
     const drawn = renderMascot(spec.mascot, engineSize(size));
     return { html: drawn.html, tone: drawn.tone, works: [], idles: [] };
   }
-  const figure = spec.kind === "person" ? personSpec(spec.hold) : bichoSpec(spec.seed);
-  const drawn = renderSpec(figure, engineSize(size));
-  return {
-    html: drawn.html,
-    tone: drawn.tone,
-    works: spec.kind === "person" ? [] : worksFor(figure),
-    idles: spec.kind === "bicho" ? idlesFor(figure) : [],
-  };
+  const drawn = renderSpec(personSpec(spec.hold), engineSize(size));
+  return { html: drawn.html, tone: drawn.tone, works: [], idles: [] };
 }
 
 /** The drawing of `spec` at `size`, shared: never put in the page as it is (drawAvatar gives out copies). */
-function cached(spec: AvatarSpec, size: AvatarSize): Drawing {
+function cached(spec: DrawnSpec, size: AvatarSize): Drawing {
   const key = avatarKey(spec) + "\u0000" + size;
   let drawing = drawings.get(key);
   if (!drawing) {
@@ -88,11 +78,14 @@ function cached(spec: AvatarSpec, size: AvatarSize): Drawing {
   return drawing;
 }
 
-/** The main colour of `spec`'s figure (the same at every size). */
-export const avatarColor = (spec: AvatarSpec): string => cached(spec, "small").tone;
+/** The main colour of `spec`'s figure (the same at every size): a creature's body colour. */
+export const avatarColor = (spec: AvatarSpec): string => (spec.kind === "bicho" ? creatureFromSeed(spec.seed).color : cached(spec, "small").tone);
 
-/** The working styles and idle steps `spec`'s figure can take (the same at every size). */
+/** The working styles and idle steps `spec`'s figure can take (the same at every size). A creature takes every one (every
+ *  act works on every body); what it draws for each comes with its acts (the moods, working styles and pastimes still to
+ *  come over from the design reference), and until then the state's own motion stands for all of them. */
 export function avatarRepertoire(spec: AvatarSpec): Pick<Drawing, "works" | "idles"> {
+  if (spec.kind === "bicho") return { works: WORKS, idles: IDLE_STYLES };
   const { works, idles } = cached(spec, "small");
   return { works, idles };
 }
@@ -104,8 +97,8 @@ export function withOwnIds(html: string): string {
   return html.replace(/(\bid="|url\(#|href="#)/g, `$1${salt}`);
 }
 
-/** A copy of the drawing of `spec` at `size`, with ids of its own. */
-export function drawAvatar(spec: AvatarSpec, size: AvatarSize): Drawing {
+/** A copy of the drawing of `spec` (the person or the mascot) at `size`, with ids of its own. */
+export function drawAvatar(spec: DrawnSpec, size: AvatarSize): Drawing {
   const drawing = cached(spec, size);
   return { ...drawing, html: withOwnIds(drawing.html) };
 }
