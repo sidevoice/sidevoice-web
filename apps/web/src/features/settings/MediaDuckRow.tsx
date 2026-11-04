@@ -21,6 +21,7 @@ export function MediaDuckRow({ t }: { t: Translate }) {
     void bridge.set(mode).then(setStatus).catch(() => setStatus(before));
   };
   const hint = status.mode === "lower" && status.lower === "system" ? t("settings.call.mediaHint.system")
+    : status.mode === "pause" && status.access === "denied" ? t("settings.call.mediaHint.denied")
     : status.mode === "pause" && status.pause === "some-apps" ? t("settings.call.mediaHint.someApps")
     : t("settings.call.mediaHint");
   return <Group><Row label={t("settings.call.media")} description={hint}>

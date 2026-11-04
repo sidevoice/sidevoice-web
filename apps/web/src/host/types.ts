@@ -18,7 +18,6 @@ export interface AppBuild {
   channel: "release" | "nightly" | "dev" | "unknown";
   version: string;
   commit?: string | null;
-  mediaDuck: MediaDuckBridge | null;
   date?: string | null;
 }
 
@@ -296,13 +295,15 @@ export interface MuteShortcutBridge {
 }
 
 /** What the app does to other apps' media while the microphone is open in a call (sidevoice-desktop `host.mediaDuck`): the
- *  person's choice, and how far this system can carry it out. `lower`: `per-app`, `system` (the whole output volume, the app's
- *  own voice with it) or `none`; `pause`: `media-controls`, `some-apps` or `none`. The app restores only what it took. */
+ *  person's choice, and how far this system can carry it out. `lower`: `per-app`, `system` (the whole output volume, and only while an app the system can ask is playing; the app's
+ *  own voice goes down with it) or `none`; `pause`: `media-controls`, `some-apps` or `none`. The app restores only what it took. */
 export type MediaDuckMode = "lower" | "pause" | "off";
 export interface MediaDuckStatus {
   mode: MediaDuckMode;
   lower: "per-app" | "system" | "none";
   pause: "media-controls" | "some-apps" | "none";
+  /** Whether the system lets the app control the apps it pauses (macOS Automation); `denied` is the person's no. */
+  access: "granted" | "denied" | "undetermined";
 }
 export interface MediaDuckBridge {
   get(): Promise<MediaDuckStatus>;
@@ -411,6 +412,7 @@ export interface Host {
   localHost: LocalHostBridge | null;
   reset: ResetBridge | null;
   muteShortcut: MuteShortcutBridge | null;
+  mediaDuck: MediaDuckBridge | null;
   callControls: CallControlsBridge | null;
   callSurface: CallSurfaceBridge | null;
   updater: AppUpdater | null;
