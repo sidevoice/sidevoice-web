@@ -177,6 +177,25 @@ test("the page is sent at most every two seconds, and follows the voice", () => 
   expect(store.getState().callSurface.page!.lit).toBeGreaterThan(0);
 });
 
+test("while the person's words show, the native surface says working at once, with its timer: not after the 3 s the stage waits", () => {
+  const time = clock();
+  const store = room({ botLive: false, karaokeState: null, history: [], userTurn: { id: "t", segment: "t", thread: "n|a" }, pendingPhase: "listening",
+    harness: { "n|a": true }, workingSince: { "n|a": 1000 }, now: 1500 });
+  startCallSurface(store, options(host(), time));
+  store.patch({ pendingPhase: "", userTurn: null, history: [userMessage("Run the tests")] });
+  // Busy for half a second: the stage and the card do not say working yet, the native surface's line and timer do.
+  expect(store.getState().callCard.mood).not.toBe("working");
+  expect(store.getState().callSurface).toMatchObject({ said: "Run the tests", words: { state: "state.working" }, workingSince: 1000 });
+  // Nothing busy: no time is made up, and the line is the real one.
+  const idle = room({ botLive: false, karaokeState: null, history: [], userTurn: { id: "t", segment: "t", thread: "n|a" }, pendingPhase: "listening" });
+  startCallSurface(idle, options(host(), clock()));
+  idle.patch({ pendingPhase: "", userTurn: null, history: [userMessage("Run the tests")] });
+  expect(idle.getState().callSurface).toMatchObject({ said: "Run the tests", words: { state: "state.working" }, workingSince: null });
+  // Without the said text, idle is idle.
+  time.advance(PAGE_MS + 1);
+  expect(store.getState().callSurface.words.state).not.toBe("state.working");
+});
+
 test("browsing another conversation, the call's own surface goes on: its captions, its Cancel Send, its said text", () => {
   const time = clock();
   const store = room({ viewedThread: "n|b", botLive: true });

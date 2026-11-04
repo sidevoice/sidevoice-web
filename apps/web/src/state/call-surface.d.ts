@@ -60,4 +60,4 @@ export interface CallSurface {
   words: SurfaceWords;
 }
 
-export function callSurfaceView(card: CallCardView, participants: ParticipantView[], live: SurfaceLive | null | undefined, say: (key: string, params?: Record<string, unknown>) => string, call: { pendingCancellable: boolean; workingSince?: number | null }, previous?: CallSurface | null): CallSurface;
+export function callSurfaceView(card: CallCardView, participants: ParticipantView[], live: SurfaceLive | null | undefined, say: (key: string, params?: Record<string, unknown>) => string, call: { pendingCancellable: boolean; workingSince?: number | null; busySince?: number | null }, previous?: CallSurface | null): CallSurface;
