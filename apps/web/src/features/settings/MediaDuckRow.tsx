@@ -10,10 +10,17 @@ import type { Translate } from "../../i18n/translator";
 export function MediaDuckRow({ t }: { t: Translate }) {
   const bridge = host().mediaDuck;
   const [status, setStatus] = useState<MediaDuckStatus | null>(null);
+  const [asking, setAsking] = useState(false);
+  // Read when the row shows, and again whenever the person comes back to this window: they may have answered the system's
+  // question, or opened Music, in between.
   useEffect(() => {
     let gone = false;
-    void bridge?.get().then((value) => { if (!gone) setStatus(value); }).catch(() => undefined);
-    return () => { gone = true; };
+    const read = () => { void bridge?.get().then((value) => { if (!gone) setStatus(value); }).catch(() => undefined); };
+    const visible = () => { if (document.visibilityState === "visible") read(); };
+    read();
+    window.addEventListener("focus", read);
+    document.addEventListener("visibilitychange", visible);
+    return () => { gone = true; window.removeEventListener("focus", read); document.removeEventListener("visibilitychange", visible); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (!bridge || !status) return null;
   const choose = (mode: MediaDuckMode) => {
@@ -34,6 +41,7 @@ export function MediaDuckRow({ t }: { t: Translate }) {
       { value: "off", label: t("settings.call.media.off") },
     ]} />
     {needsAccess && status.access === "undetermined" && bridge.allow &&
-      <Button variant="secondary" size="sm" onClick={() => { void bridge.allow!().then(setStatus).catch(() => undefined); }}>{t("settings.call.media.allow")}</Button>}
+      <Button variant="secondary" size="sm" disabled={asking}
+        onClick={() => { setAsking(true); void bridge.allow!().then(setStatus).catch(() => undefined).finally(() => setAsking(false)); }}>{t("settings.call.media.allow")}</Button>}
   </Row></Group>;
 }

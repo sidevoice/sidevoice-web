@@ -932,7 +932,7 @@ export const messages: Messages = {
   "settings.call.media.off": "何もしない",
   "settings.call.mediaHint": "通話中、マイクがオンの間だけ動作します。Sidevoice は自分で下げた音量や一時停止したものだけを元に戻します。",
   "settings.call.mediaHint.system": "この Mac で音量を下げられるのは「ミュージック」または Spotify が再生中のときだけで、出力音量全体が下がるため Sidevoice の声も小さくなります。",
-  "settings.call.mediaHint.someApps": "一時停止できるのは「ミュージック」と Spotify のみです。システムから確認されたら、Sidevoice による操作を許可してください。",
+  "settings.call.mediaHint.someApps": "一時停止できるのは「ミュージック」と Spotify のみです。",
   "settings.call.media.allow": "許可",
   "settings.call.mediaHint.needsAccess": "「ミュージック」や Spotify が再生中かどうかを知るには、Sidevoice にそれらを操作する許可が必要です。どちらかを開いてから「許可」を選んでください。",
   "settings.call.mediaHint.denied": "Sidevoice は「ミュージック」と Spotify の操作を許可されていないため、音量を下げたり一時停止したりできません。システム設定の「プライバシーとセキュリティ」の「オートメーション」で許可してください。",

@@ -302,8 +302,8 @@ export interface MediaDuckStatus {
   mode: MediaDuckMode;
   lower: "per-app" | "system" | "none";
   pause: "media-controls" | "some-apps" | "none";
-  /** Whether the system lets the app control the apps it pauses (macOS Automation); `denied` is the person's no. */
-  access: "granted" | "denied" | "undetermined";
+  /** Whether the system lets the app control the apps it pauses (macOS Automation); `denied` is the person's no; `unknown`: the system answers only with one of the apps open, and none is. */
+  access: "granted" | "denied" | "undetermined" | "unknown";
 }
 export interface MediaDuckBridge {
   get(): Promise<MediaDuckStatus>;

@@ -931,7 +931,7 @@ export const messages: Messages = {
   "settings.call.media.off": "不处理",
   "settings.call.mediaHint": "仅在通话中麦克风开启期间生效。Sidevoice 只会恢复它自己降低或暂停的内容。",
   "settings.call.mediaHint.system": "在这台 Mac 上，只有“音乐”或 Spotify 正在播放时才会降低音量，并且会降低整个输出音量，包括 Sidevoice 的声音。",
-  "settings.call.mediaHint.someApps": "只能暂停“音乐”和 Spotify。系统询问时，请允许 Sidevoice 控制它们。",
+  "settings.call.mediaHint.someApps": "只能暂停“音乐”和 Spotify。",
   "settings.call.media.allow": "允许",
   "settings.call.mediaHint.needsAccess": "Sidevoice 需要获准控制“音乐”和 Spotify，才能知道它们是否在播放。请先打开其中一个，然后选择“允许”。",
   "settings.call.mediaHint.denied": "Sidevoice 未获准控制“音乐”和 Spotify，因此无法降低音量或暂停它们。请在“系统设置”的“隐私与安全性”中的“自动化”里允许。",

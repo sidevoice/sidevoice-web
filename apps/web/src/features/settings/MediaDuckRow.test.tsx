@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MediaDuckRow } from "./MediaDuckRow";
 import { translator } from "../../i18n/translator";
 import type { MediaDuckMode, MediaDuckStatus } from "../../host";
@@ -55,7 +55,7 @@ test("what the system cannot do is disabled, and the hint says how the rest work
   view.unmount();
   inApp({ mediaDuck: bridge(status({ mode: "pause", pause: "some-apps", access: "denied" })) });
   const denied = render(<MediaDuckRow t={en} />);
-  expect(await screen.findByText(/isn’t allowed to control Music and Spotify/)).toBeInTheDocument();
+  expect(await screen.findByText(/can’t lower or pause Music and Spotify/)).toBeInTheDocument();
   denied.unmount();
   inApp({ mediaDuck: bridge(status({ lower: "system" })) });
   render(<MediaDuckRow t={en} />);
@@ -87,6 +87,18 @@ test("nothing to allow elsewhere, or when the choice is to do nothing, or once t
   off.unmount();
   inApp({ mediaDuck: bridge(status({ lower: "system", pause: "some-apps", access: "denied" })) });
   render(<MediaDuckRow t={en} />);
-  expect(await screen.findByText(/isn’t allowed to control Music and Spotify/)).toBeInTheDocument();
+  expect(await screen.findByText(/can’t lower or pause Music and Spotify/)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
+});
+
+test("neither Music nor Spotify open: the hint says to open one first and there is nothing to press yet; coming back to the window reads again", async () => {
+  const states = [status({ lower: "system", pause: "some-apps", access: "unknown" }), status({ lower: "system", pause: "some-apps", access: "undetermined" })];
+  const media = bridge(states[0]);
+  media.get.mockImplementation(async () => states.shift() ?? status({ lower: "system", pause: "some-apps", access: "undetermined" }));
+  inApp({ mediaDuck: media });
+  render(<MediaDuckRow t={en} />);
+  expect(await screen.findByText(/Open one of them, then choose Allow/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
+  act(() => { window.dispatchEvent(new Event("focus")); });
+  expect(await screen.findByRole("button", { name: "Allow" })).toBeEnabled();
 });
