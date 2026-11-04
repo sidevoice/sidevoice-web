@@ -732,23 +732,37 @@ function reportHearing(said,data){
 let LEAVE_GRACE_MS=5000;
 const pendingReplies=thread=>[...replies.values()].filter(said=>said.reply.thread_id===thread&&!said.terminal);
 const isLeaving=thread=>!!thread&&!!links.get(state.callNode)?.leaving?.has(thread);
-function startLeaving(fp,link,thread){
+// The longest a closed conversation is kept for its replies: one held behind an open turn would keep it for ever.
+let LEAVE_HOLD_MAX_MS=60000;
+function startLeaving(fp,link,thread,{early=false}={}){
  if(link.closed?.has(thread)||link.graced?.has(thread)||fp!==state.callNode||!state.ws||speechOutput!=='on')return false;
  if(!conversationCalls.has(conversationKey(fp,thread))||!pendingReplies(thread).length)return false;
- link.leaving.set(thread,{timer:null});
+ const leave={timer:null,cap:null,early};
+ leave.cap=setTimeout(()=>endLeaving(fp,link,thread,leave),LEAVE_HOLD_MAX_MS);
+ (link.leaving||(link.leaving=new Map())).set(thread,leave);
  // What was written to it and never left this device never will.
  failTexts(entry=>entry.node===fp&&entry.payload.data.thread===thread);
  updateComposer();
  return true;
 }
+// The grace is over (or the hold ran out): the conversation closes as any other, by the participants' next answer.
+function endLeaving(fp,link,thread,leave){
+ if(link.leaving?.get(thread)!==leave)return;
+ clearTimeout(leave.timer);clearTimeout(leave.cap);
+ link.leaving.delete(thread);(link.graced||(link.graced=new Set())).add(thread);
+ void refreshPeople(fp).then(updateComposer);
+}
+function holdsClosed(thread){
+ const fp=state.callNode,link=links.get(fp);
+ if(!link||!thread)return false;
+ if(!link.leaving?.has(thread)&&!startLeaving(fp,link,thread,{early:true}))return false;
+ void refreshPeople(fp);
+ return true;
+}
 function graceLeaving(thread){
  const fp=state.callNode,link=links.get(fp),leave=link?.leaving?.get(thread);
  if(!leave||leave.timer||pendingReplies(thread).length)return;
- leave.timer=setTimeout(()=>{
-  if(link.leaving.get(thread)!==leave)return;
-  link.leaving.delete(thread);link.graced.add(thread);
-  void refreshPeople(fp).then(updateComposer);
- },LEAVE_GRACE_MS);
+ leave.timer=setTimeout(()=>endLeaving(fp,link,thread,leave),LEAVE_GRACE_MS);
 }
 function finishReply(said,data){
  if(replies.get(said.reply.utterance_id)!==said)return;
@@ -801,7 +815,11 @@ function skipReply(){for(const said of replies.values())if(said.playing){said.ac
 // The room took back replies it sent and this call has not finished: each is cancelled, and its end says why.
 function withdrawReplies(d){
  if(d.session_id!==state.sessionId)return;
- for(const id of d.utterance_ids||[]){const said=replies.get(id);if(!said)continue;said.withdrawn=d.reason;if(said.saying)said.saying.cancel();else finishReply(said,{status:'unplayed',reason:d.reason})}
+ for(const id of d.utterance_ids||[]){const said=replies.get(id);if(!said)continue;
+  // The room closed this conversation (its agent left, or no device shows it): a reply this call is already on is heard to
+  // its end, and the conversation is closed on screen after it (`startLeaving`). Everywhere else it is withdrawn as ever.
+  if(d.reason==='closed'&&holdsClosed(said.reply.thread_id))continue;
+  said.withdrawn=d.reason;if(said.saying)said.saying.cancel();else finishReply(said,{status:'unplayed',reason:d.reason})}
 }
 function markHistorySeen() {
     const id = historyThreadId(), seen = Math.max(state.roomSeen[id] || 0, ...state.history.filter(r => r.thread === id).map(r => r.seq || 0));
@@ -1206,7 +1224,7 @@ async function refreshPeople(fp=state.callNode){
   // A conversation whose agent left while its last reply sounds (or waits to) is closed on screen only after it has
   // been heard and kept a moment more (`startLeaving`); until then it is not among the closed ones, and shows as gone.
   const leaving=link.leaving||(link.leaving=new Map()),graced=link.graced||(link.graced=new Set());
-  for(const thread of [...leaving.keys()])if(!reported.has(thread)){clearTimeout(leaving.get(thread).timer);leaving.delete(thread)}
+  for(const [thread,leave] of [...leaving])if(!reported.has(thread)&&!leave.early){clearTimeout(leave.timer);clearTimeout(leave.cap);leaving.delete(thread)}
   for(const thread of [...graced])if(!reported.has(thread))graced.delete(thread);
   const closed=new Set([...reported].filter(thread=>!leaving.has(thread)&&!startLeaving(fp,link,thread)));
   for(const thread of closed)forgetCard(fp,thread);

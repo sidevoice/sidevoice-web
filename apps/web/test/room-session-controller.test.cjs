@@ -4633,3 +4633,46 @@ test('Nothing can be sent to a conversation in its leave grace',async()=>{
  assert.equal(c.s.run('composerFor()'),null,'no text box for it');
  c.s.run('disconnect()');
 });
+const withdrawn=(c,reason,ids=['last'])=>c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:ids,reason}});
+test('The room closing the conversation (withdrawn: closed) does not cut the reply: it is heard, then the grace runs',async()=>{
+ const c=await callOnRoom();
+ c.s.run('LEAVE_GRACE_MS=40');
+ reply(c,'last');c.voice.said[0].step({type:'playing'});
+ withdrawn(c,'closed');
+ assert.equal(c.voice.said[0].cancelled,false);
+ agentLeaves(c);
+ await c.s.run('refresh()');await settleSoon();await c.s.run('refreshPeople()');await settleSoon();
+ assert.equal(c.voice.said[0].cancelled,false);
+ assert.equal(c.s.run('composerFor()'),null);
+ c.voice.said[0].step({type:'done',outcome:{status:'heard'}});
+ await settleSoon();
+ assert.deepEqual(peopleOf(c),[['a',false]]);
+ await new Promise(resolve=>setTimeout(resolve,80));await settleSoon();
+ assert.deepEqual(peopleOf(c),[]);
+ c.s.run('disconnect()');
+});
+test('A closed withdrawal for a conversation the person is not in withdraws as ever; focus_changed too',async()=>{
+ const c=await callOnRoom();
+ reply(c,'last');c.voice.said[0].step({type:'playing'});
+ withdrawn(c,'focus_changed');
+ assert.equal(c.voice.said[0].cancelled,true,'focus_changed cancels');
+ c.s.run('disconnect()');
+ const d=await callOnRoom();
+ reply(d,'other');d.voice.said[0].step({type:'playing'});
+ d.s.run("conversationCalls.clear()");
+ withdrawn(d,'closed',['other']);
+ assert.equal(d.voice.said[0].cancelled,true,'no call on it: nothing to wait for');
+ d.s.run('disconnect()');
+});
+test('A conversation whose replies are still pending 60 s after the close is closed anyway',async()=>{
+ const c=await callOnRoom();
+ c.s.run('LEAVE_GRACE_MS=40;LEAVE_HOLD_MAX_MS=60');
+ reply(c,'last');c.voice.said[0].step({type:'playing'});
+ withdrawn(c,'closed');
+ agentLeaves(c);
+ await c.s.run('refresh()');await settleSoon();await c.s.run('refreshPeople()');await settleSoon();
+ assert.deepEqual(peopleOf(c),[['a',false]]);
+ await new Promise(resolve=>setTimeout(resolve,120));await settleSoon();
+ assert.deepEqual(peopleOf(c),[],'the reply never ended, the conversation goes');
+ c.s.run('disconnect()');
+});
