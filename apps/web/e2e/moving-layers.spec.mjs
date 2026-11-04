@@ -23,6 +23,10 @@ const running = (page, selector) => page.evaluate((selector) => {
   return { all: all.length, svg: all.filter((a) => a.effect.target instanceof SVGElement).length };
 }, selector);
 
+/** Whether this browser gives the page WebGL at all (the creature needs it; without it its canvas stays empty). */
+const webgl = (page) => page.evaluate(() => !!document.createElement("canvas").getContext("webgl"));
+const noWebgl = (page) => test.info().annotations.push({ type: "skip-pixels", description: "this browser gives no WebGL: the creature's canvas stays empty" });
+
 /** What a canvas shows now, as a data URL; "" while it is blank. */
 const pixels = (locator) => locator.evaluate((canvas) => {
   const blank = document.createElement("canvas");
@@ -36,11 +40,12 @@ test("with the GPU the stage's agent is its creature, drawn live on one canvas; 
   await expect(page.locator("html")).toHaveAttribute("data-motion", "gpu");
   const agent = page.locator(".stage-agent[data-style=creature] > canvas");
   await expect(agent).toHaveCount(1);
+  expect(await running(page, ".stage-scene")).toMatchObject({ svg: 0 });
+  if (!await webgl(page)) return noWebgl(page);
   // It is drawn, and it moves: what it shows changes from one moment to the next (its breathing, its blinks).
   await expect.poll(() => pixels(agent), { timeout: 15_000 }).not.toBe("");
   const before = await pixels(agent);
   await expect.poll(() => pixels(agent), { timeout: 10_000 }).not.toBe(before);
-  expect(await running(page, ".stage-scene")).toMatchObject({ svg: 0 });
   // A thumbnail is a still face: a canvas, drawn once.
   const thumbnail = page.locator("#participants .sv-avatar[data-style=creature] > canvas").first();
   await expect.poll(() => pixels(thumbnail), { timeout: 15_000 }).not.toBe("");
@@ -52,7 +57,9 @@ test("without the GPU the stage's agent holds still in its key pose: drawn once,
   await expect(page.locator("html")).toHaveAttribute("data-motion", "still");
   const agent = page.locator(".stage-agent[data-style=creature] > canvas");
   await expect(agent).toHaveCount(1);
-  await expect.poll(() => pixels(agent), { timeout: 15_000 }).not.toBe("");
+  const drawn = await webgl(page);
+  if (drawn) await expect.poll(() => pixels(agent), { timeout: 15_000 }).not.toBe("");
+  else noWebgl(page);
   const still = await pixels(agent);
   // Nothing runs: no CSS animation in the scene, and no animation frame asked for while nothing changes.
   expect(await running(page, ".stage-scene")).toMatchObject({ all: 0 });
