@@ -157,7 +157,8 @@ function hammer(rig: Rig, shade: (c: string) => string, o: Out) {
 }
 
 /** Read: a big open book held low in front, pages towards us; the arms reach in behind its edges. One page (a copy of
- * the right one) turns over now and then, about the spine. */
+ * the right one, as the arm on that side turns it) turns over now and then, about the spine, onto the left: the eyes read the
+ * left page, then the right, then the right page turns over to the left. */
 function read(rig: Rig, shade: (c: string) => string, o: Out) {
   const bw = clamp(rig.half - 8, 17, 28), H = 15, yT = Math.min(rig.mouthY + 7, rig.at.ground.y - H - 4), x0 = 60 - bw, s = yT + 2.5, b = yT + H;
   const lift = deskLift(o, b + 3);
@@ -169,7 +170,7 @@ function read(rig: Rig, shade: (c: string) => string, o: Out) {
       <path d="${lines}" fill="none" stroke="#cbc3d9" stroke-width="1.2" stroke-linecap="round"/>`;
   };
   const cover = `<path fill="${shade("#4f6bed")}" ${ink(2.2)} d="M${n(x0 - 2.5)} ${n(yT + 2)}L${n(x0 - 2.5)} ${n(b + 1.8)}Q${n(60 - bw * 0.5)} ${n(b + 0.8)} 60 ${n(b + 4.4)}Q${n(60 + bw * 0.5)} ${n(b + 0.8)} ${n(120 - x0 + 2.5)} ${n(b + 1.8)}L${n(120 - x0 + 2.5)} ${n(yT + 2)}Z"/>`;
-  const turning = !o.fine ? "" : `<g class="wk-page" style="transform-box:view-box;transform-origin:60px ${n(yT + H / 2)}px">${page(1)}</g>`;
+  const turning = !o.fine ? "" : `<g class="wk-page" style="transform-box:view-box;transform-origin:60px ${n(yT + H / 2)}px">${page(-1)}</g>`;
   o.front += prop("read", `${cover}${page(-1)}${page(1)}${turning}<path d="M60 ${n(s)}V${n(b + 1.8)}" stroke="${INK}" stroke-width="1.6"/>`, "keep-small", lift);
   if (!o.fine) return;
   // Finished pages fly up from behind the head, over its left shoulder, and land on a little pile behind it on the floor
