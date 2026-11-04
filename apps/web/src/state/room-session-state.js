@@ -528,6 +528,8 @@ export function createRoomSessionStore(seed = {}) {
         const surface = callSurfaceView(callCard, participants, facts.surfaceLive, say, {
             pendingCancellable: !!selected && facts.userTurn?.thread === selected && !facts.cancelledInput,
             workingSince: selected && working(facts, selected) ? facts.workingSince?.[selected] : null,
+            // Since when it has been busy, shown as working yet or not: the person's words just sent say "working" at once.
+            busySince: selected && busy(facts, selected) ? facts.workingSince?.[selected] ?? null : null,
         }, snapshot?.callSurface);
         const next = { facts, session: sessionStatus(facts), conversation: conversationView(facts), participants,
             join: joinView(facts),

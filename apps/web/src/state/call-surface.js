@@ -146,7 +146,7 @@ const ref = (live, threadId, px) => (threadId && live?.stills?.[stillId(threadId
 /** `callSurface`: of the CALL's conversation (never the one being browsed): pendingCancellable, its reach, model and
  *  machine, the working phase's start; and the others (up to SURFACE_OTHERS faces) with the count of all conversations,
  *  the spoken page, the said text, the words, and the stills by reference.
- *  `call` is what only the facts know: `{ pendingCancellable, workingSince }`; `previous` the last snapshot
+ *  `call` is what only the facts know: `{ pendingCancellable, workingSince, busySince }`; `previous` the last snapshot
  *  of this projection, whose state line is kept while the call switches conversation (until the new one lands).
  *  `live` is the publisher's: `{ page, said, stills }`, none of it until a host that draws a surface asks. */
 export function callSurfaceView(card, participants, live, say, call, previous) {
@@ -155,18 +155,29 @@ export function callSurfaceView(card, participants, live, say, call, previous) {
     const others = participants.filter(p => p.threadId !== card.conversation).slice(0, SURFACE_OTHERS);
     const keeping = card.busyReason === 'switching' && previous;
     const key = stateKey(card);
-    const line = keeping ? previous.words.state : say(key);
+    // The person's words just sent (their said text is up) are not a state: while nothing else is happening the call is
+    // working on them, and a native surface says so at once, not after the 3 s the stage waits before it shows Working
+    // (D-LA-SAID-STATE). It goes on saying so, as long as the same conversation stays busy, until the stage's Working
+    // takes over (the said text lasts 3 s from the message and the stage's wait 3 s from the work's start: between them the
+    // line would drop to Resting and back). Only the native surface's snapshot: the stage and the card keep their own wait.
+    const thread = card.conversation ?? null;
+    const saying = key === 'state.resting' && !!thread
+        && (!!live?.said || (previous?.saying === thread && call.busySince != null));
+    const line = keeping ? previous.words.state : say(saying ? 'state.working' : key);
     return {
         pendingCancellable: !!call.pendingCancellable,
         reach,
         model: row?.model ?? null, effort: row?.effort ?? null, machine: row?.machine ?? null,
         // Since when the call's conversation has been busy without a break, while it shows as working; absent when the room does not know.
-        workingSince: keeping ? previous.workingSince ?? null : key === 'state.working' && call.workingSince != null ? call.workingSince : null,
+        workingSince: keeping ? previous.workingSince ?? null : key === 'state.working' && call.workingSince != null ? call.workingSince
+            : saying && call.busySince != null ? call.busySince : null,
         conversationCount: participants.length,
         others: others.map(p => ({ threadId: p.threadId, title: p.title, reach: p.reach, unread: p.unread, still: ref(live, p.threadId, FACE_PX) })),
         still: ref(live, card.conversation, STILL_PX),
         page: live?.page ?? null,
         said: live?.said ?? null,
+        // The conversation whose said text the Working line is carried for (see `saying`); null otherwise.
+        saying: keeping ? previous.saying ?? null : saying ? thread : null,
         words: surfaceWords(line, say, participants.length),
     };
 }

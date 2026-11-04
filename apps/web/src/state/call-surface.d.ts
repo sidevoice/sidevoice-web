@@ -57,7 +57,9 @@ export interface CallSurface {
   still: SurfaceStillRef | null;
   page: SpokenPage | null;
   said: string | null;
+  /** The conversation (thread) whose said text the Working line is being carried for, until the stage's Working takes over. */
+  saying: string | null;
   words: SurfaceWords;
 }
 
-export function callSurfaceView(card: CallCardView, participants: ParticipantView[], live: SurfaceLive | null | undefined, say: (key: string, params?: Record<string, unknown>) => string, call: { pendingCancellable: boolean; workingSince?: number | null }, previous?: CallSurface | null): CallSurface;
+export function callSurfaceView(card: CallCardView, participants: ParticipantView[], live: SurfaceLive | null | undefined, say: (key: string, params?: Record<string, unknown>) => string, call: { pendingCancellable: boolean; workingSince?: number | null; busySince?: number | null }, previous?: CallSurface | null): CallSurface;
