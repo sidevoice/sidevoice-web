@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { createRoomSessionStore, speakWith, WORKING_SHOWN_AFTER_MS } from "./room-session-state.js";
-import { spokenPage, modelLabel, stillId, SURFACE_PAGE_CHARS, STILL_PX, FACE_PX } from "./call-surface.js";
+import { spokenPage, stillId, SURFACE_PAGE_CHARS, STILL_PX, FACE_PX } from "./call-surface.js";
 import { startCallSurface, PAGE_SURFACE_MS, type SurfaceClock } from "./call-surface-publisher";
 import { readOn } from "../features/call/speech-chunks";
 import { PAGE_MS } from "../features/call/PagedText";
@@ -25,23 +25,14 @@ test("the projection's shape and defaults: nothing live, nothing pending, the wo
   expect(view.words.route).toBe('liveActivity.routeName {"route":"{route}"}');
 });
 
-test("model as people say it, effort in the data; the others as up to three faces; the count is of all conversations", () => {
+test("model as the connector reports it, effort in the data; the others as up to three faces; the count is of all conversations", () => {
   const view = surface({ pairings: [] });
-  expect(view.model).toBe("Opus 5.5");
+  expect(view.model).toBe("claude-opus-5-5");
   expect(view.effort).toBe("high");
   expect(view.conversationCount).toBe(5);
   expect(view.others.map((item) => item.threadId)).toEqual(["n|b", "n|c", "n|d"]);
   expect(view.words.conversations).toBe('card.conversationsCount {"n":5}');
   expect(view.words.offline).toBe("state.offline");
-});
-
-test("the page names a model in one place: known ids formatted, anything else unchanged", () => {
-  expect(modelLabel("claude-opus-5-5")).toBe("Opus 5.5");
-  expect(modelLabel("claude-sonnet-4-5-20250929")).toBe("Sonnet 4.5");
-  expect(modelLabel("claude-opus-5")).toBe("claude-opus-5");
-  expect(modelLabel("gpt-6-astra")).toBe("gpt-6-astra");
-  expect(modelLabel("claude-fable-9")).toBe("claude-fable-9");
-  expect(modelLabel(null)).toBeNull();
 });
 
 test("pendingCancellable is the open turn's, and the state line follows the turn, the reach and the mood", () => {
@@ -304,12 +295,6 @@ test("workingSince is the call's conversation's busy start while it shows as wor
   expect(store.getState().callSurface).toMatchObject({ workingSince: 1000, words: { state: "state.working" } });
   const idle = createRoomSessionStore({ ...base } as never);
   expect(idle.getState().callSurface.workingSince).toBeNull();
-});
-
-test("a model id the page does not know passes through, never a made-up name", () => {
-  expect(modelLabel("claude-opus-999-42")).toBe("claude-opus-999-42");
-  expect(modelLabel("claude-opus-5-9")).toBe("claude-opus-5-9");
-  expect(modelLabel("claude-opus-5-5-20261101")).toBe("Opus 5.5");
 });
 
 test("workingSince is sent while the state shows as working: a busy conversation that cannot receive is still working", () => {
