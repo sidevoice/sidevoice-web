@@ -518,3 +518,11 @@ test("no microphone to ask, but the app reports a media permission: Permissions 
   await act(async () => {});
   expect(store.getState().facts.settingsSection).toBe("permissions");
 });
+
+test("no microphone to ask and the media status cannot be read: Permissions opens General, never a blank page", async () => {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { mediaDuck: { get: async () => { throw new Error("no"); }, set: async () => { throw new Error("no"); } } } } });
+  onTestFinished(() => { delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; });
+  const store = open("whisper-base");
+  act(() => store.patch({ settingsSection: "permissions" }));
+  await waitFor(() => expect(store.getState().facts.settingsSection).toBe("general"));
+});

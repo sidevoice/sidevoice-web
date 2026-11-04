@@ -71,6 +71,8 @@ export function PermissionsList({ microphone, openSettings, onRequest, t, action
       <MediaPermissionRows t={t} onSay={setMediaSaid} />
     </Group>
     {/* Each change said once, as it happens. */}
-    <p className="sr-only" role="status" aria-live="polite">{microphone && view ? announcement(microphone, t) : ""}{mediaSaid && <span> {mediaSaid}</span>}</p>
+    <p className="sr-only" role="status" aria-live="polite">{microphone && view ? announcement(microphone, t) : ""}</p>
+    {/* The media rows' answers in a region of their own, so one changing does not have the other read again. */}
+    <p className="sr-only" role="status" aria-live="polite">{mediaSaid}</p>
   </div>;
 }

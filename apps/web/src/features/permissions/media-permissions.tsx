@@ -12,17 +12,22 @@ import type { MessageKey, Translate } from "../../i18n/translator";
 
 /** `host().mediaDuck`'s status, read as the screen shows and again whenever the person comes back to this window: they may
  *  have answered the system's question, or opened Music, in between. Only the answer to the latest request is kept (one
- *  that comes late, after the system's question took a while, is not). `run` sends a request, and settles once answered. Null status where the app does not offer it (a browser), and until the first answer. */
+ *  that comes late, after the system's question took a while, is not), per lane: the status (reads and the choice) and each
+ *  permission's Allow, so two questions answered in any order are both kept. `run` sends a request, and settles once
+ *  answered. Null status where the app does not offer it (a browser), and until the first answer; `known` once there is an
+ *  answer, a read that failed, or nothing to read. */
 export function useMediaDuck() {
   const bridge = host().mediaDuck;
   const [status, setStatus] = useState<MediaDuckStatus | null>(null);
-  const latest = useRef(0);
+  const latest = useRef<Record<string, number>>({});
+  const next = (lane: string) => (latest.current[lane] = (latest.current[lane] ?? 0) + 1);
+  const [unread, setUnread] = useState(false);
   useEffect(() => {
     if (!bridge) return;
     let gone = false;
     const read = () => {
-      const id = ++latest.current;
-      void bridge.get().then((value) => { if (!gone && id === latest.current) setStatus(value); }).catch(() => undefined);
+      const id = next("status");
+      void bridge.get().then((value) => { if (!gone && id === latest.current.status) setStatus(value); }, () => { if (!gone) setUnread(true); });
     };
     const visible = () => { if (document.visibilityState === "visible") read(); };
     read();
@@ -30,12 +35,13 @@ export function useMediaDuck() {
     document.addEventListener("visibilitychange", visible);
     return () => { gone = true; window.removeEventListener("focus", read); document.removeEventListener("visibilitychange", visible); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  /** Sends `request`; its answer is shown if no later request was made, `failed` (if given) when it fails. */
-  const run = (request: () => Promise<MediaDuckStatus>, failed?: MediaDuckStatus) => {
-    const id = ++latest.current;
-    return request().then((value) => { if (id === latest.current) setStatus(value); }, () => { if (failed && id === latest.current) setStatus(failed); });
+  /** Sends `request` in `lane`; its answer is shown if no later request was made in that lane, `failed` (if given) when it
+   *  fails. */
+  const run = (request: () => Promise<MediaDuckStatus>, failed?: MediaDuckStatus, lane = "status") => {
+    const id = next(lane);
+    return request().then((value) => { if (id === latest.current[lane]) setStatus(value); }, () => { if (failed && id === latest.current[lane]) setStatus(failed); });
   };
-  return { bridge, status, setStatus, run };
+  return { bridge, status, setStatus, run, known: !bridge || status !== null || unread };
 }
 
 /** Whether a permission is missing in a way the person can change: not asked yet, or refused. */
@@ -57,6 +63,8 @@ function MediaPermissionRow({ permission, access, asking, onAllow, onSettings, o
 }) {
   const Icon = ICON[permission];
   const control = useRef<HTMLSpanElement>(null);
+  const why: MessageKey = access === "denied" ? `perm.${permission}.denied`
+    : permission === "automation" && access === "unknown" ? "perm.automation.openApp" : `perm.${permission}.why`;
   // Allow pressed: once answered, focus moves to what replaced the button (the Allowed badge, Open System Settings, or the
   // row's control itself), never to the page; and the live region says the answer.
   const pressed = useRef(false);
@@ -65,10 +73,8 @@ function MediaPermissionRow({ permission, access, asking, onAllow, onSettings, o
     pressed.current = false;
     const target = control.current?.querySelector<HTMLElement>("button, [tabindex]") ?? control.current;
     target?.focus();
-    onSay(t(access === "granted" ? `perm.${permission}.allowedNow` : access === "denied" ? `perm.${permission}.denied` : `perm.${permission}.why`));
+    onSay(t(access === "granted" ? `perm.${permission}.allowedNow` : why));
   }, [access]); // eslint-disable-line react-hooks/exhaustive-deps
-  const why: MessageKey = access === "denied" ? `perm.${permission}.denied`
-    : permission === "automation" && access === "unknown" ? "perm.automation.openApp" : `perm.${permission}.why`;
   return <Row className="perm-settings-row perm-step-row" label={<span className="perm-label"><span className="perm-plain-icon" aria-hidden><Icon size={18} /></span>{t(`perm.${permission}.label`)}</span>}
     description={t(why)}>
     <span ref={control} tabIndex={-1} className="perm-settings-control">
@@ -98,7 +104,7 @@ export function MediaPermissionRows({ t, onSay }: { t: Translate; onSay(text: st
     .filter((row): row is readonly [MediaDuckPermission, MediaDuckAccess] => row[1] !== undefined);
   const allow = (permission: MediaDuckPermission) => {
     setAsking((now) => ({ ...now, [permission]: true }));
-    void run(() => bridge.allow!(permission)).finally(() => setAsking((now) => ({ ...now, [permission]: false })));
+    void run(() => bridge.allow!(permission), undefined, permission).finally(() => setAsking((now) => ({ ...now, [permission]: false })));
   };
   return <>{rows.map(([permission, access]) =>
     <MediaPermissionRow key={permission} permission={permission} access={access} asking={!!asking[permission]} t={t} onSay={onSay}

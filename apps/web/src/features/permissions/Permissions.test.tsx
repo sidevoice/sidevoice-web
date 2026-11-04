@@ -340,7 +340,7 @@ test("the setup lists System Audio Recording and Music and Spotify; Allow asks f
   fireEvent.click(capture);
   expect(media.allow).toHaveBeenCalledWith("capture");
   await waitFor(() => expect(screen.getAllByRole("button", { name: "Allow" })).toHaveLength(1));
-  expect(document.activeElement?.textContent).toBe("Allowed");
+  await waitFor(() => expect(document.activeElement?.textContent).toBe("Allowed"));
 });
 
 test("Settings › Permissions: refused, the line says where and Open System Settings opens that permission's page; Music and Spotify closed, the line says to open one", async () => {
@@ -384,6 +384,23 @@ test("each row's Allow waits for its own question only; refused, focus moves to 
   expect(automation).not.toHaveAttribute("data-loading");
   await act(async () => { answer({ mode: "lower", lower: "some-apps", pause: "some-apps", capture: "denied", access: "undetermined" }); });
   const settings = await screen.findByRole("button", { name: "Open System Settings" });
-  expect(document.activeElement).toBe(settings);
-  expect(screen.getByRole("status")).toHaveTextContent(/Screen & System Audio Recording/);
+  await waitFor(() => expect(document.activeElement).toBe(settings));
+  const [mic, media2] = screen.getAllByRole("status");
+  expect(media2).toHaveTextContent(/Screen & System Audio Recording/);
+  expect(mic).not.toHaveTextContent(/Screen/);
+});
+
+test("two Allows answered in any order are both kept", async () => {
+  const answers: ((value: unknown) => void)[] = [];
+  const base = { mode: "lower", lower: "some-apps", pause: "some-apps" };
+  const media = mediaApp({ capture: "undetermined", access: "undetermined" });
+  media.allow.mockImplementation(() => new Promise((resolve) => { answers.push(resolve); }) as never);
+  render(<PermissionsStep microphone={snapshot("granted")} openSettings={null} t={t} />);
+  await screen.findByText("System Audio Recording");
+  const [capture, automation] = screen.getAllByRole("button", { name: "Allow" });
+  fireEvent.click(capture);
+  fireEvent.click(automation);
+  await act(async () => { answers[1]({ ...base, capture: "undetermined", access: "granted" }); });
+  await act(async () => { answers[0]({ ...base, lower: "per-app", capture: "granted", access: "granted" }); });
+  expect(screen.getAllByText("Allowed")).toHaveLength(3);
 });

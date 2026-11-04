@@ -323,7 +323,7 @@ export function SettingsDialog() {
   const mediaListed = listsMediaPermissions(media.status);
   const permissionsShown = mic.microphone?.state !== "none" || mediaListed;
   // Left only once it is known there is nothing to show: the media permissions are read after the dialog opens.
-  const mediaKnown = !media.bridge || media.status !== null;
+  const mediaKnown = media.known;
   const floatingCardShown = useFloatingCardSection();
   // Developer options: developer mode on (a nightly), or the turn-tuning flag a browser or a playground sets by hand.
   const developerMode = useDeveloperMode();

@@ -1194,7 +1194,7 @@ export const messages: Messages = {
   "perm.automation.denied": "Activez-la dans Réglages Système › Confidentialité et sécurité › Automatisation",
   "perm.automation.openApp": "Ouvrez Musique ou Spotify, puis revenez ici pour l’autoriser",
   "perm.capture.allowedNow": "Enregistrement de l’audio du système autorisé.",
-  "perm.automation.allowedNow": "Contrôle de Musique et Spotify autorisé.",
+  "perm.automation.allowedNow": "Contrôle de Musique et de Spotify autorisé.",
   "wizard.turnIntro": "Comment Sidevoice sait que vous avez fini de parler. Vous pouvez le modifier dans Réglages → Appel.",
   "voice.endOfTurn.smartHint": "Un petit modèle entend quand vous avez fini : une pause pour réfléchir ne vous coupe pas.",
   "voice.endOfTurn.silenceHint": "Votre tour se termine après une pause ; Patience en fixe la durée.",
