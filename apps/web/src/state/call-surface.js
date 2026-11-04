@@ -157,8 +157,12 @@ export function callSurfaceView(card, participants, live, say, call, previous) {
     const key = stateKey(card);
     // The person's words just sent (their said text is up) are not a state: while nothing else is happening the call is
     // working on them, and a native surface says so at once, not after the 3 s the stage waits before it shows Working
-    // (D-LA-SAID-STATE). Only the native surface's snapshot: the stage and the card keep their own wait.
-    const saying = key === 'state.resting' && !!live?.said;
+    // (D-LA-SAID-STATE). It goes on saying so, as long as the same conversation stays busy, until the stage's Working
+    // takes over (the said text lasts 3 s from the message and the stage's wait 3 s from the work's start: between them the
+    // line would drop to Resting and back). Only the native surface's snapshot: the stage and the card keep their own wait.
+    const thread = card.conversation ?? null;
+    const saying = key === 'state.resting' && !!thread
+        && (!!live?.said || (previous?.saying === thread && call.busySince != null));
     const line = keeping ? previous.words.state : say(saying ? 'state.working' : key);
     return {
         pendingCancellable: !!call.pendingCancellable,
@@ -172,6 +176,8 @@ export function callSurfaceView(card, participants, live, say, call, previous) {
         still: ref(live, card.conversation, STILL_PX),
         page: live?.page ?? null,
         said: live?.said ?? null,
+        // The conversation whose said text the Working line is carried for (see `saying`); null otherwise.
+        saying: keeping ? previous.saying ?? null : saying ? thread : null,
         words: surfaceWords(line, say, participants.length),
     };
 }

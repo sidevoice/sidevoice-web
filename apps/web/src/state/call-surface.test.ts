@@ -177,23 +177,83 @@ test("the page is sent at most every two seconds, and follows the voice", () => 
   expect(store.getState().callSurface.page!.lit).toBeGreaterThan(0);
 });
 
-test("while the person's words show, the native surface says working at once, with its timer: not after the 3 s the stage waits", () => {
+/** A call whose person has just sent "Run the tests" (the said text is up), the conversation busy since `busy`. */
+function sent(facts: Record<string, unknown> = {}, busy = 1000) {
   const time = clock();
   const store = room({ botLive: false, karaokeState: null, history: [], userTurn: { id: "t", segment: "t", thread: "n|a" }, pendingPhase: "listening",
-    harness: { "n|a": true }, workingSince: { "n|a": 1000 }, now: 1500 });
+    harness: { "n|a": true }, workingSince: { "n|a": busy }, now: busy + 500, ...facts });
   startCallSurface(store, options(host(), time));
   store.patch({ pendingPhase: "", userTurn: null, history: [userMessage("Run the tests")] });
+  return { store, time, view: () => store.getState().callSurface };
+}
+
+test("while the person's words show, the native surface says working at once, with its timer: not after the 3 s the stage waits", () => {
+  const { store, view } = sent();
   // Busy for half a second: the stage and the card do not say working yet, the native surface's line and timer do.
   expect(store.getState().callCard.mood).not.toBe("working");
-  expect(store.getState().callSurface).toMatchObject({ said: "Run the tests", words: { state: "state.working" }, workingSince: 1000 });
-  // Nothing busy: no time is made up, and the line is the real one.
-  const idle = room({ botLive: false, karaokeState: null, history: [], userTurn: { id: "t", segment: "t", thread: "n|a" }, pendingPhase: "listening" });
-  startCallSurface(idle, options(host(), clock()));
-  idle.patch({ pendingPhase: "", userTurn: null, history: [userMessage("Run the tests")] });
-  expect(idle.getState().callSurface).toMatchObject({ said: "Run the tests", words: { state: "state.working" }, workingSince: null });
-  // Without the said text, idle is idle.
+  expect(view()).toMatchObject({ said: "Run the tests", words: { state: "state.working" }, workingSince: 1000 });
+  // Nothing busy: no time is made up.
+  const idle = sent({ harness: {}, workingSince: {} });
+  expect(idle.view()).toMatchObject({ said: "Run the tests", words: { state: "state.working" }, workingSince: null });
+});
+
+test("the working line is carried past the said text until the stage's Working takes over, with the same timer", () => {
+  const { store, time, view } = sent();
   time.advance(PAGE_MS + 1);
-  expect(store.getState().callSurface.words.state).not.toBe("state.working");
+  expect(view().said).toBeNull();
+  // Busy for 2.5 s: said is over, the stage's Working is not due yet. The line and the timer do not drop.
+  store.patch({ now: 3500 });
+  expect(view()).toMatchObject({ said: null, words: { state: "state.working" }, workingSince: 1000 });
+  store.patch({ now: 1000 + WORKING_SHOWN_AFTER_MS });
+  expect(store.getState().callCard.mood).toBe("working");
+  expect(view()).toMatchObject({ words: { state: "state.working" }, workingSince: 1000 });
+  // The work ends: resting, and no timer.
+  store.patch({ harness: { "n|a": false }, workingSince: {} });
+  expect(view()).toMatchObject({ words: { state: "state.resting" }, workingSince: null });
+});
+
+test("the carried working line ends with the work, and is not made from nothing", () => {
+  const { store, time, view } = sent();
+  time.advance(PAGE_MS + 1);
+  store.patch({ harness: { "n|a": false }, workingSince: {} });
+  expect(view()).toMatchObject({ said: null, words: { state: "state.resting" }, workingSince: null });
+  // Busy with no said text before: the stage's wait, as ever.
+  const quiet = room({ botLive: false, karaokeState: null, history: [], harness: { "n|a": true }, workingSince: { "n|a": 1000 }, now: 1500 });
+  startCallSurface(quiet, options(host(), clock()));
+  quiet.patch({ now: 2000 });
+  expect(quiet.getState().callSurface).toMatchObject({ words: { state: "state.resting" }, workingSince: null });
+});
+
+test("what is happening wins over the said text's working line, and over its carry", () => {
+  const lines = (facts: Record<string, unknown>) => sent(facts).view().words.state;
+  const turn = { userTurn: { id: "u", segment: "u", thread: "n|a" } };
+  // The said text is up, and then the person speaks again, the agent speaks, the call drops, or the conversation holds.
+  const again = sent();
+  again.store.patch({ ...turn, pendingPhase: "listening" });
+  expect(again.view().words.state).toBe("state.listening");
+  again.store.patch({ pendingPhase: "transcribing" });
+  expect(again.view().words.state).toBe("wave.transcribingTitle");
+  again.store.patch({ pendingPhase: "", userTurn: null, botLive: true });
+  expect(again.view().words.state).toBe("state.speaking");
+  again.store.patch({ botLive: false, reconnectShown: true });
+  expect(again.view().words.state).toBe("state.offline");
+  const hold = people.map((p) => p.thread_id === "a" ? { ...p, reach: { state: "holding" } } : p);
+  expect(lines({ people: hold })).toBe("state.holding");
+  // Carried: the same, once the said text is over.
+  const carried = sent();
+  carried.time.advance(PAGE_MS + 1);
+  carried.store.patch({ botLive: true });
+  expect(carried.view().words.state).toBe("state.speaking");
+  carried.store.patch({ botLive: false, ...turn, pendingPhase: "listening" });
+  expect(carried.view().words.state).toBe("state.listening");
+});
+
+test("another conversation does not inherit the carried working line", () => {
+  const { store, time, view } = sent({ harness: { "n|a": true, "n|b": true }, workingSince: { "n|a": 1000, "n|b": 1200 } });
+  time.advance(PAGE_MS + 1);
+  expect(view().words.state).toBe("state.working");
+  store.patch({ roomBinding: { thread_id: "b", title: "B" } });
+  expect(view()).toMatchObject({ said: null, words: { state: "state.resting" }, workingSince: null });
 });
 
 test("browsing another conversation, the call's own surface goes on: its captions, its Cancel Send, its said text", () => {

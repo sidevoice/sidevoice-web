@@ -57,6 +57,8 @@ export interface CallSurface {
   still: SurfaceStillRef | null;
   page: SpokenPage | null;
   said: string | null;
+  /** The conversation (thread) whose said text the Working line is being carried for, until the stage's Working takes over. */
+  saying: string | null;
   words: SurfaceWords;
 }
 
