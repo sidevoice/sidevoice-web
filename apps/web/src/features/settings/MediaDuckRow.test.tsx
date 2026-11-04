@@ -16,6 +16,7 @@ const status = (changes: Partial<MediaDuckStatus> = {}): MediaDuckStatus => ({ m
 
 function bridge(now: MediaDuckStatus, fail = false) {
   return {
+    allow: vi.fn(async () => ({ ...now, access: "granted" as const })),
     get: vi.fn(async () => now),
     set: vi.fn(async (mode: MediaDuckMode) => { if (fail) throw new Error("nope"); return { ...now, mode }; }),
   };
@@ -59,4 +60,33 @@ test("what the system cannot do is disabled, and the hint says how the rest work
   inApp({ mediaDuck: bridge(status({ lower: "system" })) });
   render(<MediaDuckRow t={en} />);
   expect(await screen.findByText(/whole output volume, Sidevoice’s voice included/)).toBeInTheDocument();
+});
+
+test("on a Mac where the app has not been allowed, Lower says it needs it and Allow asks, once, when pressed", async () => {
+  const media = bridge(status({ lower: "system", pause: "some-apps", access: "undetermined" }));
+  inApp({ mediaDuck: media });
+  render(<MediaDuckRow t={en} />);
+  expect(await screen.findByText(/needs permission to control them/)).toBeInTheDocument();
+  expect(media.allow).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Allow" }));
+  expect(media.allow).toHaveBeenCalledTimes(1);
+  expect(await screen.findByText(/whole output volume, Sidevoice’s voice included/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
+});
+
+test("nothing to allow elsewhere, or when the choice is to do nothing, or once the system has said no", async () => {
+  inApp({ mediaDuck: bridge(status()) });
+  const view = render(<MediaDuckRow t={en} />);
+  await screen.findByRole("radio", { name: "Lower volume" });
+  expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
+  view.unmount();
+  inApp({ mediaDuck: bridge(status({ mode: "off", lower: "system", pause: "some-apps", access: "undetermined" })) });
+  const off = render(<MediaDuckRow t={en} />);
+  await screen.findByRole("radio", { name: "Do nothing" });
+  expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
+  off.unmount();
+  inApp({ mediaDuck: bridge(status({ lower: "system", pause: "some-apps", access: "denied" })) });
+  render(<MediaDuckRow t={en} />);
+  expect(await screen.findByText(/isn’t allowed to control Music and Spotify/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
 });

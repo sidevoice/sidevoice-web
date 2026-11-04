@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Button } from "../../components/ui/Button";
 import { Group, Row } from "../../components/ui/Card";
 import { Segmented } from "../../components/ui/Tabs";
 import { host, type MediaDuckMode, type MediaDuckStatus } from "../../host";
@@ -20,8 +21,10 @@ export function MediaDuckRow({ t }: { t: Translate }) {
     setStatus({ ...status, mode });
     void bridge.set(mode).then(setStatus).catch(() => setStatus(before));
   };
-  const hint = status.mode === "lower" && status.lower === "system" ? t("settings.call.mediaHint.system")
-    : status.mode === "pause" && status.access === "denied" ? t("settings.call.mediaHint.denied")
+  // Seeing that Music or Spotify play, and pausing them, needs the system's permission to control them (macOS).
+  const needsAccess = status.mode !== "off" && status.access !== "granted" && (status.lower === "system" || status.pause === "some-apps");
+  const hint = needsAccess ? t(status.access === "denied" ? "settings.call.mediaHint.denied" : "settings.call.mediaHint.needsAccess")
+    : status.mode === "lower" && status.lower === "system" ? t("settings.call.mediaHint.system")
     : status.mode === "pause" && status.pause === "some-apps" ? t("settings.call.mediaHint.someApps")
     : t("settings.call.mediaHint");
   return <Group><Row label={t("settings.call.media")} description={hint}>
@@ -30,5 +33,7 @@ export function MediaDuckRow({ t }: { t: Translate }) {
       { value: "pause", label: t("settings.call.media.pause"), disabled: status.pause === "none" },
       { value: "off", label: t("settings.call.media.off") },
     ]} />
+    {needsAccess && status.access === "undetermined" && bridge.allow &&
+      <Button variant="secondary" size="sm" onClick={() => { void bridge.allow!().then(setStatus).catch(() => undefined); }}>{t("settings.call.media.allow")}</Button>}
   </Row></Group>;
 }

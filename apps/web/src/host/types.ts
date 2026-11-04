@@ -307,6 +307,9 @@ export interface MediaDuckStatus {
 }
 export interface MediaDuckBridge {
   get(): Promise<MediaDuckStatus>;
+  /** The person's own request to let the app control the apps it needs to see or pause (macOS Automation): the system may
+   *  ask now. Never called by the page on its own. */
+  allow?(): Promise<MediaDuckStatus>;
   set(mode: MediaDuckMode): Promise<MediaDuckStatus>;
 }
 
