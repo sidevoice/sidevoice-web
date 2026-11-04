@@ -28,9 +28,13 @@ export function stillMarkup(threadId: string, px: number): string {
   const tone = Object.entries(avatarTone(drawing.tone)).map(([name, value]) => `${name}:${value}`).join(";");
   const css = `${bichosStylesheet()}\n${pageAvatarRules()}\n.sv-avatar{background:none!important;display:block}*{animation:none!important;transition:none!important}`;
   // The root is the avatar's own, so the rules written for `.sv-avatar svg` reach the drawing; no foreignObject, which taints the canvas in WebKit.
+  // The CSS goes in as CDATA: a nesting `&` or a `<` in a value is not XML, and one anywhere would leave every still undrawable.
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${px}" height="${px}" class="sv-avatar" data-style="bichos" data-size="sidebar" data-mood="idle" data-avatar-state="idle" data-mouth="still" style="${tone}">`
-    + `<style>${css}</style>${drawing.html.replace(/<svg\b/, `<svg width="${px}" height="${px}"`)}</svg>`;
+    + `<style><![CDATA[${css.replaceAll("]]>", "]]]]><![CDATA[>")}]]></style>${drawing.html.replace(/<svg\b/, `<svg width="${px}" height="${px}"`)}</svg>`;
 }
+
+/** The failures already told, so one that repeats does not fill the log. */
+const warned = new Set<string>();
 
 /** The still as PNG (base64, no prefix), or null where the page cannot draw one (no canvas). */
 export async function renderStill(threadId: string, px: number): Promise<RenderedStill | null> {
@@ -38,19 +42,28 @@ export async function renderStill(threadId: string, px: number): Promise<Rendere
     const url = URL.createObjectURL(new Blob([stillMarkup(threadId, px)], { type: "image/svg+xml" }));
     try {
       const image = new Image(px, px);
-      image.src = url;
-      await image.decode();
+      // Its load, not decode(), which not every WebKit has been seen to keep for an SVG.
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error("the SVG did not load as an image"));
+        image.src = url;
+      });
       const canvas = document.createElement("canvas");
       canvas.width = canvas.height = px;
       const context = canvas.getContext("2d");
-      if (!context) return null;
+      if (!context) throw new Error("no 2d canvas context");
       context.drawImage(image, 0, 0, px, px);
       const png = canvas.toDataURL("image/png").split(",")[1];
-      return png ? { png, px, k: STILL_K } : null;
+      if (!png) throw new Error("the canvas gave no PNG");
+      return { png, px, k: STILL_K };
     } finally {
       URL.revokeObjectURL(url);
     }
-  } catch {
+  } catch (error) {
+    // The host shows its own mark instead, and the reason goes to the console, once per still and reason. Only the mobile
+    // app draws stills, and it does not forward the page's console yet (desktop row S5b): until it does, no device log has it.
+    const told = `${threadId}#${px}:${String(error)}`;
+    if (!warned.has(told)) { warned.add(told); console.warn(`[sidevoice] call surface: no still for ${threadId} at ${px}px:`, error); }
     return null;
   }
 }
