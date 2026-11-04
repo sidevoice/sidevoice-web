@@ -712,7 +712,7 @@ let stoppingReplies=false;
 // Only the conversation in focus sounds, connected or not: with the window shown the one on screen, minimised the one
 // selected on the call card (`focusedThread`). The call's voice is its conversation's, so it sounds only while the
 // call is on the one in focus; the focus leaving it, by a pick or by the window going away, stops what it says at once.
-function callInFocus(){const focused=focusedThread(state,document.hidden);return focused===targetId()||isLeaving(conversationOf(focused)?.thread)}
+function callInFocus(){const focused=focusedThread(state,document.hidden);return focused===targetId()||!targetId()&&isLeaving(conversationOf(focused)?.thread)}
 let inFocus=true;
 function followFocus(){const now=callInFocus(),lost=inFocus&&!now;inFocus=now;if(lost)stopReplies('focus_changed')}
 function reportPlayback(said,data){
@@ -734,10 +734,10 @@ const pendingReplies=thread=>[...replies.values()].filter(said=>said.reply.threa
 const isLeaving=thread=>!!thread&&!!links.get(state.callNode)?.leaving?.has(thread);
 // The longest a closed conversation is kept for its replies: one held behind an open turn would keep it for ever.
 let LEAVE_HOLD_MAX_MS=60000;
-function startLeaving(fp,link,thread,{early=false}={}){
+function startLeaving(fp,link,thread){
  if(link.closed?.has(thread)||link.graced?.has(thread)||fp!==state.callNode||!state.ws||speechOutput!=='on')return false;
  if(!conversationCalls.has(conversationKey(fp,thread))||!pendingReplies(thread).length)return false;
- const leave={timer:null,cap:null,early};
+ const leave={timer:null,cap:null};
  leave.cap=setTimeout(()=>endLeaving(fp,link,thread,leave),LEAVE_HOLD_MAX_MS);
  (link.leaving||(link.leaving=new Map())).set(thread,leave);
  // What was written to it and never left this device never will.
@@ -752,12 +752,12 @@ function endLeaving(fp,link,thread,leave){
  link.leaving.delete(thread);(link.graced||(link.graced=new Set())).add(thread);
  void refreshPeople(fp).then(updateComposer);
 }
-function holdsClosed(thread){
- const fp=state.callNode,link=links.get(fp);
- if(!link||!thread)return false;
- if(!link.leaving?.has(thread)&&!startLeaving(fp,link,thread,{early:true}))return false;
- void refreshPeople(fp);
- return true;
+// A hang-up or a left session ends every hold: nothing of a conversation gone is kept for a call that is over.
+function clearLeaving(){
+ for(const link of links.values()){
+  for(const leave of link.leaving?.values()||[]){clearTimeout(leave.timer);clearTimeout(leave.cap)}
+  link.leaving?.clear();
+ }
 }
 function graceLeaving(thread){
  const fp=state.callNode,link=links.get(fp),leave=link?.leaving?.get(thread);
@@ -815,11 +815,7 @@ function skipReply(){for(const said of replies.values())if(said.playing){said.ac
 // The room took back replies it sent and this call has not finished: each is cancelled, and its end says why.
 function withdrawReplies(d){
  if(d.session_id!==state.sessionId)return;
- for(const id of d.utterance_ids||[]){const said=replies.get(id);if(!said)continue;
-  // The room closed this conversation (its agent left, or no device shows it): a reply this call is already on is heard to
-  // its end, and the conversation is closed on screen after it (`startLeaving`). Everywhere else it is withdrawn as ever.
-  if(d.reason==='closed'&&holdsClosed(said.reply.thread_id))continue;
-  said.withdrawn=d.reason;if(said.saying)said.saying.cancel();else finishReply(said,{status:'unplayed',reason:d.reason})}
+ for(const id of d.utterance_ids||[]){const said=replies.get(id);if(!said)continue;said.withdrawn=d.reason;if(said.saying)said.saying.cancel();else finishReply(said,{status:'unplayed',reason:d.reason})}
 }
 function markHistorySeen() {
     const id = historyThreadId(), seen = Math.max(state.roomSeen[id] || 0, ...state.history.filter(r => r.thread === id).map(r => r.seq || 0));
@@ -1221,10 +1217,10 @@ async function refreshPeople(fp=state.callNode){
   // Only an explicit leave reported by the paired Core retires a remembered card. Missing rows alone are not a
   // closure: the connector may still be registering after Core restart, or the response may be partial.
   const reported=new Set((Array.isArray(data.closed_threads)?data.closed_threads:[]).filter(thread=>typeof thread==='string'));
-  // A conversation whose agent left while its last reply sounds (or waits to) is closed on screen only after it has
-  // been heard and kept a moment more (`startLeaving`); until then it is not among the closed ones, and shows as gone.
+  // A conversation the room reports closed (an agent that left or was archived registers its thread there) while its last
+  // reply sounds or waits to is closed on screen only after it has been heard and kept a moment more (`startLeaving`); until then it is not among the closed ones, and shows as gone.
   const leaving=link.leaving||(link.leaving=new Map()),graced=link.graced||(link.graced=new Set());
-  for(const [thread,leave] of [...leaving])if(!reported.has(thread)&&!leave.early){clearTimeout(leave.timer);clearTimeout(leave.cap);leaving.delete(thread)}
+  for(const [thread,leave] of [...leaving])if(!reported.has(thread)){clearTimeout(leave.timer);clearTimeout(leave.cap);leaving.delete(thread)}
   for(const thread of [...graced])if(!reported.has(thread))graced.delete(thread);
   const closed=new Set([...reported].filter(thread=>!leaving.has(thread)&&!startLeaving(fp,link,thread)));
   for(const thread of closed)forgetCard(fp,thread);
@@ -2147,6 +2143,7 @@ function openSession(socket,hello={},fp=state.callNode,token=null){return new Pr
  socket.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type!=='voice-session'){if(m.type==='error'){refusal=m.data?refusalError(m.data):refusal;refused=m.data?.reason||refused}message(e.data,socket);return}state.roomInfo=m.data?.room||state.roomInfo;clearTimeout(timer);resolve(m.data)}})}
 function disconnect() {
     audioLog.callEnded();
+    clearLeaving();
     // A deliberate hang-up is this app's not-heard choice for replies still pending. Offer the
     // semantic frames on the live socket before closing it; a lost frame remains unconfirmed.
     for(const said of replies.values())if(!said.terminal){if(said.action!=='user_skipped')said.action='call_ended';reportHearing(said,{status:'unplayed'})}
@@ -2506,6 +2503,7 @@ async function drainOutbox(node,ms,mine){
 }
 // The call's session ends, its voice does not: the socket is closed as a hang-up, and nothing of that session stays.
 function leaveSession(){
+ clearLeaving();
  // A select on its way is the session left's: the move owns `switching` now.
  pick.op=null;
  clearTurnLifecycle();
