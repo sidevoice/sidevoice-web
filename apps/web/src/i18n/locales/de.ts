@@ -940,7 +940,7 @@ export const messages: Messages = {
   "settings.call.mediaHint.lowerSomeApps": "Auf diesem Mac lassen sich nur Musik und Spotify leiser stellen.",
   "settings.call.mediaHint.pauseOthersLowered": "Musik und Spotify werden pausiert. Andere Apps werden stattdessen leiser gestellt, da macOS sie nicht pausieren kann.",
   "settings.call.mediaHint.needsCapture": "Damit nur die anderen Apps leiser werden, fragt macOS nach der Erlaubnis zur Systemaudioaufnahme. Sidevoice nutzt sie, um deren Ton leiser zu stellen, nie, um ihn aufzunehmen.",
-  "settings.call.mediaHint.captureDenied": "Ohne Systemaudioaufnahme werden nur Musik und Spotify leiser gestellt. Um jede App leiser zu stellen, erlaube es in Systemeinstellungen > Datenschutz & Sicherheit > Bildschirm- & Systemaudioaufnahme.",
+  "settings.call.mediaHint.captureDenied": "Ohne Erlaubnis zur Systemaudioaufnahme werden nur Musik und Spotify leiser gestellt. Um jede App leiser zu stellen, aktiviere sie in Systemeinstellungen > Datenschutz & Sicherheit > Bildschirm- & Systemaudioaufnahme.",
   "settings.call.media.openSettings": "Systemeinstellungen öffnen",
   "settings.call.device": "Dieses Gerät",
   "settings.desktop.muteShortcut": "Kürzel zum Stummschalten",

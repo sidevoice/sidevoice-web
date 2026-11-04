@@ -937,7 +937,7 @@ export const messages: Messages = {
   "settings.call.mediaHint.lowerSomeApps": "Sur ce Mac, seul le volume de Musique et de Spotify peut être baissé.",
   "settings.call.mediaHint.pauseOthersLowered": "Musique et Spotify sont mis en pause. Le volume des autres apps est baissé à la place, car macOS ne permet pas de les mettre en pause.",
   "settings.call.mediaHint.needsCapture": "Pour ne baisser que les autres apps, macOS demande l’autorisation d’enregistrer l’audio du système. Sidevoice s’en sert pour baisser leur son, jamais pour l’enregistrer.",
-  "settings.call.mediaHint.captureDenied": "Sans l’enregistrement de l’audio du système, seul le volume de Musique et de Spotify est baissé. Pour baisser n’importe quelle app, activez-le dans Réglages Système > Confidentialité et sécurité > Enregistrement de l’écran et de l’audio du système.",
+  "settings.call.mediaHint.captureDenied": "Sans l’autorisation d’enregistrer l’audio du système, seul le volume de Musique et de Spotify est baissé. Pour baisser le volume de n’importe quelle app, activez-la dans Réglages Système > Confidentialité et sécurité > Enregistrement de l’écran et de l’audio du système.",
   "settings.call.media.openSettings": "Ouvrir Réglages Système",
   "settings.call.device": "Cet appareil",
   "settings.desktop.muteShortcut": "Raccourci pour couper le micro",
