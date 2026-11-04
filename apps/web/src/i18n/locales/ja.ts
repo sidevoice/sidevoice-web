@@ -1194,6 +1194,8 @@ export const messages: Messages = {
   "perm.automation.why": "通話中に「ミュージック」と Spotify を一時停止したり音量を下げたりするために必要です",
   "perm.automation.denied": "システム設定の「プライバシーとセキュリティ」の「オートメーション」で許可してください",
   "perm.automation.openApp": "「ミュージック」か Spotify を開いてから、ここに戻って許可してください",
+  "perm.capture.allowedNow": "「システムオーディオ録音」を許可しました。",
+  "perm.automation.allowedNow": "「ミュージック」と Spotify の操作を許可しました。",
   "wizard.turnIntro": "Sidevoice があなたが話し終えたと判断する方法です。「設定 → 通話」で変更できます。",
   "voice.endOfTurn.smartHint": "小さなモデルが話し終えたことを聞き分けるので、考えるための間で途切れません。",
   "voice.endOfTurn.silenceHint": "間が空くとターンが終わります。長さは「待ち時間」で設定します。",

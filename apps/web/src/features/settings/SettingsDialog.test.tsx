@@ -504,3 +504,17 @@ test("a section shown again reads the app's switches as it holds them now, not a
   fireEvent.click(document.getElementById("settings-developer")!);
   expect(screen.getByRole("switch", { name: "Compositing borders" })).toHaveAttribute("aria-checked", "true");
 });
+
+test("no microphone to ask, but the app reports a media permission: Permissions shows it, and Call's Open Permissions lands there", async () => {
+  const status = { mode: "lower", lower: "some-apps", pause: "some-apps", capture: "undetermined", access: "granted" };
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { mediaDuck: { get: async () => status, set: async () => status } } } });
+  onTestFinished(() => { delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; });
+  const store = open("whisper-base");
+  act(() => store.patch({ settingsSection: "call" }));
+  fireEvent.click(await within(document.getElementById("pane-call")!).findByRole("button", { name: "Open Permissions" }));
+  expect(store.getState().facts.settingsSection).toBe("permissions");
+  expect(navLabels()).toContain("Permissions");
+  expect(await within(document.getElementById("pane-permissions")!).findByText("System Audio Recording")).toBeInTheDocument();
+  await act(async () => {});
+  expect(store.getState().facts.settingsSection).toBe("permissions");
+});

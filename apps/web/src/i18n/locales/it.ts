@@ -1211,6 +1211,8 @@ export const messages: Messages = {
   "perm.automation.why": "Necessario per mettere in pausa Musica e Spotify o abbassarne il volume durante una chiamata",
   "perm.automation.denied": "Attivalo in Impostazioni di Sistema › Privacy e sicurezza › Automazione",
   "perm.automation.openApp": "Apri Musica o Spotify, poi torna qui per consentirlo",
+  "perm.capture.allowedNow": "Registrazione dell’audio di sistema consentita.",
+  "perm.automation.allowedNow": "Controllo di Musica e Spotify consentito.",
   "wizard.turnIntro": "Come Sidevoice capisce che hai finito di parlare. Puoi cambiarlo in Impostazioni → Chiamata.",
   "voice.endOfTurn.smartHint": "Un piccolo modello sente quando hai finito, e una pausa per pensare non ti interrompe.",
   "voice.endOfTurn.silenceHint": "Il tuo turno finisce dopo una pausa; la Pazienza dice quanto dura.",

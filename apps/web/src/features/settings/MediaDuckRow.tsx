@@ -15,7 +15,7 @@ export function MediaDuckRow({ t, openPermissions }: { t: Translate; openPermiss
   const choose = (mode: MediaDuckMode) => {
     const before = status;
     setStatus({ ...status, mode });
-    run(() => bridge.set(mode), before);
+    void run(() => bridge.set(mode), before);
   };
   const { mode, lower, pause, access, capture } = status;
   // Going through Music and Spotify needs the permission to control them (macOS Automation).

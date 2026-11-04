@@ -23,6 +23,7 @@ import { FloatingCardSettings, useFloatingCardSection } from "./FloatingCardSett
 import { host } from "../../host";
 import { PermissionsSettings } from "./PermissionsSettings";
 import { useMicrophoneAccess } from "../permissions/permission-view";
+import { listsMediaPermissions, useMediaDuck } from "../permissions/media-permissions";
 import type { MicrophoneAccess, MicrophoneSnapshot } from "../../services/microphone-access";
 import { ShortcutsSettings, useShortcutsSection } from "./ShortcutsSettings";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
@@ -315,9 +316,14 @@ export function SettingsDialog() {
   // Shortcuts: in the desktop app, or wherever there is a keyboard; never on a phone.
   const shortcutsShown = useShortcutsSection();
   // The microphone's reader, one for Permissions and Call's link to it. Permissions is drawn only where there is
-  // something to ask (not in an app that asks for itself when its call opens, nor a page with no microphone).
+  // something to ask: the microphone (not in an app that asks for itself when its call opens, nor a page with no
+  // microphone), or a permission the app's media handling needs (Call's row links there too).
   const mic = useMicrophoneAccess();
-  const permissionsShown = mic.microphone?.state !== "none";
+  const media = useMediaDuck();
+  const mediaListed = listsMediaPermissions(media.status);
+  const permissionsShown = mic.microphone?.state !== "none" || mediaListed;
+  // Left only once it is known there is nothing to show: the media permissions are read after the dialog opens.
+  const mediaKnown = !media.bridge || media.status !== null;
   const floatingCardShown = useFloatingCardSection();
   // Developer options: developer mode on (a nightly), or the turn-tuning flag a browser or a playground sets by hand.
   const developerMode = useDeveloperMode();
@@ -328,8 +334,8 @@ export function SettingsDialog() {
   // Updates shown as the last machine behind is updated (a browser, a phone), or Shortcuts as the mouse or trackpad
   // goes (a tablet's keyboard taken off): General.
   useEffect(() => {
-    if ((current === "updates" && !updatesShown) || (current === "shortcuts" && !shortcutsShown) || (current === "permissions" && !permissionsShown)) show("general");
-  }, [current, updatesShown, shortcutsShown, permissionsShown]); // eslint-disable-line react-hooks/exhaustive-deps
+    if ((current === "updates" && !updatesShown) || (current === "shortcuts" && !shortcutsShown) || (current === "permissions" && !permissionsShown && mediaKnown)) show("general");
+  }, [current, updatesShown, shortcutsShown, permissionsShown, mediaKnown]); // eslint-disable-line react-hooks/exhaustive-deps
   // Developer mode turned off from its own page: General, with the focus on its entry rather than lost with the page.
   useEffect(() => {
     if (current !== "developer" || developerShown) return;

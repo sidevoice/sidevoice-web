@@ -17,9 +17,10 @@ import type { Translate } from "../../i18n/translator";
  * link to this section. */
 export function PermissionsSettings({ t, access, microphone }: { t: Translate; access: MicrophoneAccess | null; microphone: MicrophoneSnapshot | null }) {
   // The same list as the setup's permissions step (PermissionsList, operator 2026-10-16): the person's bicho, then a row per
-  // permission with its action at the right; it follows the platform by itself, so no Refresh.
+  // permission with its action at the right; it follows the platform by itself, so no Refresh. With no microphone to ask, the
+  // media permissions alone.
   return <Section id="permissions" title={t("settings.section.permissions")}>
-    {microphone && <PermissionsList microphone={microphone} openSettings={access?.openSettings ?? null} onRequest={() => void access?.request()} t={t}
-      actionId="permissions-mic-action" helpId="settings-mic-help" />}
+    <PermissionsList microphone={microphone} openSettings={access?.openSettings ?? null} onRequest={() => void access?.request()} t={t}
+      actionId="permissions-mic-action" helpId="settings-mic-help" />
   </Section>;
 }

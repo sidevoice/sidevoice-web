@@ -1223,6 +1223,8 @@ export const messages = {
   "perm.automation.why": "Needed to pause or lower Music and Spotify during a call",
   "perm.automation.denied": "Turn it on in System Settings › Privacy & Security › Automation",
   "perm.automation.openApp": "Open Music or Spotify, then come back here to allow it",
+  "perm.capture.allowedNow": "System Audio Recording allowed.",
+  "perm.automation.allowedNow": "Control of Music and Spotify allowed.",
   "wizard.turnIntro": "How Sidevoice knows you have finished speaking. You can change it in Settings → Call.",
   "voice.endOfTurn.smartHint": "A small model hears when you have finished, so a pause to think does not cut you off.",
   "voice.endOfTurn.silenceHint": "Your turn ends after a pause; Patience sets how long.",

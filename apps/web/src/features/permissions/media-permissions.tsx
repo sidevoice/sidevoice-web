@@ -12,12 +12,10 @@ import type { MessageKey, Translate } from "../../i18n/translator";
 
 /** `host().mediaDuck`'s status, read as the screen shows and again whenever the person comes back to this window: they may
  *  have answered the system's question, or opened Music, in between. Only the answer to the latest request is kept (one
- *  that comes late, after the system's question took a while, is not). `run` sends a request; `pending` counts the ones in
- *  flight. Null status where the app does not offer it (a browser), and until the first answer. */
+ *  that comes late, after the system's question took a while, is not). `run` sends a request, and settles once answered. Null status where the app does not offer it (a browser), and until the first answer. */
 export function useMediaDuck() {
   const bridge = host().mediaDuck;
   const [status, setStatus] = useState<MediaDuckStatus | null>(null);
-  const [pending, setPending] = useState(0);
   const latest = useRef(0);
   useEffect(() => {
     if (!bridge) return;
@@ -35,12 +33,9 @@ export function useMediaDuck() {
   /** Sends `request`; its answer is shown if no later request was made, `failed` (if given) when it fails. */
   const run = (request: () => Promise<MediaDuckStatus>, failed?: MediaDuckStatus) => {
     const id = ++latest.current;
-    setPending((n) => n + 1);
-    void request()
-      .then((value) => { if (id === latest.current) setStatus(value); }, () => { if (failed && id === latest.current) setStatus(failed); })
-      .finally(() => setPending((n) => n - 1));
+    return request().then((value) => { if (id === latest.current) setStatus(value); }, () => { if (failed && id === latest.current) setStatus(failed); });
   };
-  return { bridge, status, setStatus, pending, run };
+  return { bridge, status, setStatus, run };
 }
 
 /** Whether a permission is missing in a way the person can change: not asked yet, or refused. */
@@ -48,26 +43,37 @@ export function missing(access: MediaDuckAccess | undefined) {
   return access === "undetermined" || access === "denied";
 }
 
+/** Whether the app reports any permission its media handling needs here: then the list of permissions is shown for them,
+ *  microphone or not (Settings › Permissions, the setup's permissions step). */
+export function listsMediaPermissions(status: MediaDuckStatus | null) {
+  return !!status && (status.capture !== undefined || status.access !== undefined);
+}
+
 const ICON: Record<MediaDuckPermission, typeof SpeakerIcon> = { capture: SpeakerIcon, automation: PauseIcon };
 
-function MediaPermissionRow({ permission, access, asking, onAllow, onSettings, t }: {
-  permission: MediaDuckPermission; access: MediaDuckAccess; asking: boolean; onAllow: (() => void) | null; onSettings: (() => void) | null; t: Translate;
+function MediaPermissionRow({ permission, access, asking, onAllow, onSettings, onSay, t }: {
+  permission: MediaDuckPermission; access: MediaDuckAccess; asking: boolean; onAllow: (() => void) | null; onSettings: (() => void) | null;
+  onSay(text: string): void; t: Translate;
 }) {
   const Icon = ICON[permission];
-  const badge = useRef<HTMLSpanElement>(null);
-  // Allow pressed: once allowed, focus moves to the badge that replaces the button, never to the page.
+  const control = useRef<HTMLSpanElement>(null);
+  // Allow pressed: once answered, focus moves to what replaced the button (the Allowed badge, Open System Settings, or the
+  // row's control itself), never to the page; and the live region says the answer.
   const pressed = useRef(false);
   useEffect(() => {
-    if (access === "granted" && pressed.current) badge.current?.focus();
-    if (access !== "undetermined") pressed.current = false;
-  }, [access]);
+    if (!pressed.current || access === "undetermined") return;
+    pressed.current = false;
+    const target = control.current?.querySelector<HTMLElement>("button, [tabindex]") ?? control.current;
+    target?.focus();
+    onSay(t(access === "granted" ? `perm.${permission}.allowedNow` : access === "denied" ? `perm.${permission}.denied` : `perm.${permission}.why`));
+  }, [access]); // eslint-disable-line react-hooks/exhaustive-deps
   const why: MessageKey = access === "denied" ? `perm.${permission}.denied`
     : permission === "automation" && access === "unknown" ? "perm.automation.openApp" : `perm.${permission}.why`;
   return <Row className="perm-settings-row perm-step-row" label={<span className="perm-label"><span className="perm-plain-icon" aria-hidden><Icon size={18} /></span>{t(`perm.${permission}.label`)}</span>}
     description={t(why)}>
-    <span className="perm-settings-control">
+    <span ref={control} tabIndex={-1} className="perm-settings-control">
       {access === "granted"
-        ? <span ref={badge} tabIndex={-1} className="perm-badge-focus"><Badge tone="positive" className="perm-badge"><CheckIcon size={12} />{t("wizard.mic.state.granted")}</Badge></span>
+        ? <span tabIndex={-1} className="perm-badge-focus"><Badge tone="positive" className="perm-badge"><CheckIcon size={12} />{t("wizard.mic.state.granted")}</Badge></span>
         : access === "undetermined" && onAllow
           ? <Button size="sm" variant="primary" loading={asking} onClick={() => { pressed.current = true; onAllow(); }}>{t("perm.allow")}</Button>
           // Refused, or (System Audio Recording) not readable: the system's own page. Music and Spotify, neither open: the
@@ -81,14 +87,21 @@ function MediaPermissionRow({ permission, access, asking, onAllow, onSettings, t
 
 /** The permissions the app's media handling needs on this system, one row each in the list of permissions (macOS: System
  *  Audio Recording, and controlling Music and Spotify): nothing where the app reports none, or does not offer it. Allow
- *  is the person's own request, so the system may ask then; nothing here asks by itself. */
-export function MediaPermissionRows({ t }: { t: Translate }) {
-  const { bridge, status, pending, run } = useMediaDuck();
+ *  is the person's own request, so the system may ask then; nothing here asks by itself. `onSay`: what an Allow came to,
+ *  for the list's live region. */
+export function MediaPermissionRows({ t, onSay }: { t: Translate; onSay(text: string): void }) {
+  const { bridge, status, run } = useMediaDuck();
+  // Each row's own question in flight: one being asked does not hold the other.
+  const [asking, setAsking] = useState<Partial<Record<MediaDuckPermission, boolean>>>({});
   if (!bridge || !status) return null;
   const rows = ([["capture", status.capture], ["automation", status.access]] as const)
     .filter((row): row is readonly [MediaDuckPermission, MediaDuckAccess] => row[1] !== undefined);
+  const allow = (permission: MediaDuckPermission) => {
+    setAsking((now) => ({ ...now, [permission]: true }));
+    void run(() => bridge.allow!(permission)).finally(() => setAsking((now) => ({ ...now, [permission]: false })));
+  };
   return <>{rows.map(([permission, access]) =>
-    <MediaPermissionRow key={permission} permission={permission} access={access} asking={pending > 0} t={t}
-      onAllow={bridge.allow ? () => run(() => bridge.allow!(permission)) : null}
+    <MediaPermissionRow key={permission} permission={permission} access={access} asking={!!asking[permission]} t={t} onSay={onSay}
+      onAllow={bridge.allow ? () => allow(permission) : null}
       onSettings={bridge.openSettings ? () => { void bridge.openSettings!(permission).catch(() => undefined); } : null} />)}</>;
 }

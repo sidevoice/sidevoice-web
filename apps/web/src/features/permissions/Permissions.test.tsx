@@ -359,3 +359,31 @@ test("Settings › Permissions: refused, the line says where and Open System Set
   expect(refused.openSettings).toHaveBeenCalledWith("automation");
   expect(screen.getByText(/Privacy & Security › Automation/)).toBeInTheDocument();
 });
+
+test("no microphone to ask (none, or not read yet): Settings › Permissions still lists the media permissions", async () => {
+  mediaApp({ capture: "undetermined", access: "granted" });
+  for (const microphone of [null, snapshot("none")]) {
+    render(<PermissionsSettings t={t} access={null} microphone={microphone} />);
+    expect(await screen.findByText("System Audio Recording")).toBeInTheDocument();
+    expect(screen.queryByText("Microphone")).toBeNull();
+    expect(screen.queryByText("Nothing to allow here")).toBeNull();
+    cleanup();
+  }
+});
+
+test("each row's Allow waits for its own question only; refused, focus moves to Open System Settings and the live region says so", async () => {
+  let answer: (value: unknown) => void = () => undefined;
+  const media = mediaApp({ capture: "undetermined", access: "undetermined" }, {});
+  media.allow.mockImplementationOnce(() => new Promise((resolve) => { answer = resolve; }) as never);
+  render(<PermissionsStep microphone={snapshot("granted")} openSettings={null} t={t} />);
+  await screen.findByText("System Audio Recording");
+  const [capture, automation] = screen.getAllByRole("button", { name: "Allow" });
+  capture.focus();
+  fireEvent.click(capture);
+  await waitFor(() => expect(capture).toHaveAttribute("data-loading"));
+  expect(automation).not.toHaveAttribute("data-loading");
+  await act(async () => { answer({ mode: "lower", lower: "some-apps", pause: "some-apps", capture: "denied", access: "undetermined" }); });
+  const settings = await screen.findByRole("button", { name: "Open System Settings" });
+  expect(document.activeElement).toBe(settings);
+  expect(screen.getByRole("status")).toHaveTextContent(/Screen & System Audio Recording/);
+});

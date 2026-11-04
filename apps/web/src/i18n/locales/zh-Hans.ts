@@ -1193,6 +1193,8 @@ export const messages: Messages = {
   "perm.automation.why": "用于在通话中暂停“音乐”和 Spotify 或降低其音量",
   "perm.automation.denied": "请在“系统设置”的“隐私与安全性”中的“自动化”里允许",
   "perm.automation.openApp": "请先打开“音乐”或 Spotify，然后回到这里允许",
+  "perm.capture.allowedNow": "已允许“系统录音”。",
+  "perm.automation.allowedNow": "已允许控制“音乐”和 Spotify。",
   "wizard.turnIntro": "Sidevoice 如何判断你已说完。你可以在“设置 → 通话”中更改。",
   "voice.endOfTurn.smartHint": "一个小模型能听出你何时说完，停下来思考时不会被打断。",
   "voice.endOfTurn.silenceHint": "停顿一段时间后结束你的发言；时长由“耐心”决定。",
