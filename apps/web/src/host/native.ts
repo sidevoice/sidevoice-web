@@ -97,7 +97,7 @@ export function nativeHost(): NativeHost {
     muteShortcut: member<MuteShortcutBridge>(app, "muteShortcut", ["get", "set"]),
     callControls: member<CallControlsBridge>(app, "callControls", ["settings", "setAlwaysShown"]),
     callSurface: member<CallSurfaceBridge>(app, "callSurface", ["active", "still", "forget"]),
-    codeScanner: member<CodeScannerBridge>(app, "codeScanner", ["request", "scan", "cancel", "openSettings"]),
+    codeScanner: member<CodeScannerBridge>(app, "codeScanner", ["permission", "request", "scan", "cancel", "openSettings"]),
     updater: updater && typeof updater.status === "function" ? updater : null,
     debug: debug && Array.isArray(debug.available) && typeof debug.set === "function" ? debug as HostDebugBridge : null,
   };

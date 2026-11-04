@@ -82,7 +82,7 @@ test("Cancel ends the scan and leaves the field as it was; the focus goes back t
   open();
   await tapScan();
   await act(async () => { fireEvent.click(within(viewfinder()!).getByRole("button", { name: "Cancel" })); });
-  expect(bridge.cancel).toHaveBeenCalledTimes(1);
+  expect(bridge.cancel).toHaveBeenCalled();
   expect(viewfinder()).toBeNull();
   expect(code().value).toBe("");
   expect(document.activeElement).toBe(scanButton());
@@ -96,8 +96,8 @@ test("a camera that is not allowed is said, with the way to the settings, and ty
   await tapScan();
   expect(bridge.scan).not.toHaveBeenCalled();
   expect(viewfinder()).toBeNull();
-  expect(screen.getByText("Sidevoice can't use the camera. Allow it in Settings, or type the code instead.")).toBeInTheDocument();
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Open Settings" })); });
+  expect(screen.getByText("Sidevoice can't use the camera. Allow it in the system settings, or type the code instead.")).toBeInTheDocument();
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Open system settings" })); });
   expect(bridge.openSettings).toHaveBeenCalledTimes(1);
   const typed = pairingCode();
   fireEvent.change(code(), { target: { value: typed } });
@@ -128,4 +128,22 @@ test("a QR that is not a Sidevoice code is said under the field, as a pasted one
   expect(code()).toHaveAccessibleDescription("That's not a Sidevoice code. Codes start with SV1.");
   expect(code()).toHaveAttribute("aria-invalid", "true");
   expect(code()).toHaveFocus();
+});
+
+test("leaving the screen during a scan lets the camera go; a request that fails is a camera not allowed", async () => {
+  const { bridge } = camera();
+  installApp({ codeScanner: bridge });
+  open();
+  await tapScan();
+  expect(bridge.cancel).not.toHaveBeenCalled();
+  cleanup();
+  expect(bridge.cancel).toHaveBeenCalledTimes(1);
+  expect(document.documentElement).not.toHaveAttribute("data-scanning");
+  const broken = camera();
+  broken.bridge.request.mockRejectedValue(new Error("not allowed"));
+  installApp({ codeScanner: broken.bridge });
+  open();
+  await tapScan();
+  expect(broken.bridge.scan).not.toHaveBeenCalled();
+  expect(screen.getByText(/^Sidevoice can't use the camera\./)).toBeInTheDocument();
 });

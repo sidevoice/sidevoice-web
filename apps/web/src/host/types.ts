@@ -400,7 +400,7 @@ export interface CodeScannerBridge {
   scan(): Promise<CodeScan>;
   /** Ends the scan in progress: it resolves `cancelled`. */
   cancel(): Promise<void>;
-  /** The app's page of the system's settings, where a denied camera is allowed again. */
+  /** The app's page of the system's settings, where a denied camera is allowed again. May reject (the page catches it). */
   openSettings(): Promise<void>;
 }
 

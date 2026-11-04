@@ -5,8 +5,10 @@ import { translator } from "../../i18n/translator";
 
 /* The viewfinder of a pairing-code scan (`host.codeScanner`): the app draws the camera behind the page and the page shows it
  * through. While this is open the page is transparent (`data-scanning` on the root, pairing.css) and everything but this is
- * hidden, so what is seen is the camera, a frame to aim at and a Cancel. A modal dialog of its own, so that Escape and the
- * system's back gesture end the scan, the focus stays on Cancel and the page behind is inert. */
+ * hidden, so what is seen is the camera, a frame to aim at and a Cancel. A modal dialog of its own, so that Escape ends the
+ * scan, the focus stays on Cancel and the page behind is inert. The phone's back gesture is not a dialog `cancel` (the app
+ * navigates the web view back or sends itself to the background): leaving the screen is PairMachine's to handle, by
+ * cancelling the scan when it unmounts. */
 export function ScanOverlay({ onCancel }: { onCancel: () => void }) {
   const t = translator();
   const dialog = useRef<HTMLDialogElement>(null);

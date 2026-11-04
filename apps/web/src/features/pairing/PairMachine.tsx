@@ -16,6 +16,7 @@ import {
 } from "../../services/device-pairing.js";
 import { ConnectorSteps } from "./ConnectorSteps";
 import { ScanOverlay } from "./ScanOverlay";
+import type { CodeScan } from "../../host";
 import { CONNECTOR_PAIR_DEVICE } from "./connector-commands";
 import "./pairing.css";
 
@@ -137,6 +138,12 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
   useEffect(() => { if (alert) alertBox.current?.scrollIntoView?.({ block: "nearest" }); }, [alert]);
   // Asked to agree to no encryption, the person is taken to what it means, not to the button: the next Tab reaches it.
   useEffect(() => { if (alert?.kind === "httpPrivate" && !busy) warningTitle.current?.focus(); }, [alert, busy]);
+  // Leaving this screen during a scan (the page navigated, the dialog closed) lets the camera go: it is the app's, and would
+  // otherwise keep running under the page. The cleanup also runs when a scan ends, where cancelling is a no-op.
+  useEffect(() => {
+    if (!scanning) return;
+    return () => { void hostOfPage().codeScanner?.cancel().catch(() => undefined); };
+  }, [scanning]);
   // The scan ended without a code: the focus goes back to Scan, once it is enabled again.
   useEffect(() => { if (!scanning && refocusScan.current) { refocusScan.current = false; scanButton.current?.focus(); } }, [scanning]);
   // That button gone with what replaced the warning, the focus goes back to Connect.
@@ -173,9 +180,12 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
   async function scan() {
     if (!scanner || scanning || busy) return;
     setScanNote(null);
-    if (await scanner.request() !== "granted") { setScanNote("denied"); return; }
+    let permission: "granted" | "denied";
+    try { permission = await scanner.request(); } catch { permission = "denied"; }
+    if (permission !== "granted") { setScanNote("denied"); return; }
     setScanning(true);
-    const result = await scanner.scan();
+    // A scan never rejects by contract; one that does is a camera that cannot be used.
+    const result: CodeScan = await scanner.scan().catch(() => ({ status: "unavailable" as const }));
     setScanning(false);
     switch (result.status) {
       case "scanned": {
