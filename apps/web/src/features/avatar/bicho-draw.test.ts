@@ -96,3 +96,13 @@ test("nothing of the lab's third-party mascots or its Beyond batch is in the app
   const stylesheet = readFileSync(resolve(process.cwd(), "src/styles/bichos.css"), "utf8");
   expect(stylesheet).not.toMatch(/\.pg-(?:rays|star|wheel)\b|\.pg-(?:gk|pi|oc|cl|cp|cu|km|ol|lm|ds|mi|qw|ws)-/);
 });
+
+test("reading: the page that turns is the right-hand one, and it turns over onto the left", () => {
+  const html = drawAvatar(avatarFor("7f3c2a91-thread"), "stage").html;
+  const turning = html.match(/<g class="wk-page"[^>]*>\s*<path[^>]*\sd="M60 [\d.]+Q([\d.]+)/);
+  expect(turning).not.toBeNull();
+  // Its outer curve is on the right of the spine (x = 60); the flip (wk-flip) mirrors it about the spine, onto the left.
+  expect(Number(turning![1])).toBeGreaterThan(60);
+  const css = readFileSync(resolve(process.cwd(), "src/styles/bichos.css"), "utf8");
+  expect(css).toMatch(/@keyframes wk-flip \{ 0%,78% \{ transform: scaleX\(1\) \} 88% \{[^}]*\} 97%,100% \{ transform: scaleX\(-1\) \} \}/);
+});
