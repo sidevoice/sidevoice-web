@@ -57,20 +57,24 @@ test("what the system cannot do is disabled, and the hint says how the rest work
   const denied = render(<MediaDuckRow t={en} />);
   expect(await screen.findByText(/can’t lower or pause Music and Spotify/)).toBeInTheDocument();
   denied.unmount();
-  inApp({ mediaDuck: bridge(status({ lower: "system" })) });
+  inApp({ mediaDuck: bridge(status({ lower: "some-apps" })) });
+  const some = render(<MediaDuckRow t={en} />);
+  expect(await screen.findByText(/only Music and Spotify can be lowered/)).toBeInTheDocument();
+  some.unmount();
+  inApp({ mediaDuck: bridge(status()) });
   render(<MediaDuckRow t={en} />);
-  expect(await screen.findByText(/whole output volume, Sidevoice’s voice included/)).toBeInTheDocument();
+  expect(await screen.findByText(/and while the agent is speaking/)).toBeInTheDocument();
 });
 
 test("on a Mac where the app has not been allowed, Lower says it needs it and Allow asks, once, when pressed", async () => {
-  const media = bridge(status({ lower: "system", pause: "some-apps", access: "undetermined" }));
+  const media = bridge(status({ lower: "some-apps", pause: "some-apps", access: "undetermined" }));
   inApp({ mediaDuck: media });
   render(<MediaDuckRow t={en} />);
   expect(await screen.findByText(/needs permission to control them/)).toBeInTheDocument();
   expect(media.allow).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Allow" }));
   expect(media.allow).toHaveBeenCalledTimes(1);
-  expect(await screen.findByText(/whole output volume, Sidevoice’s voice included/)).toBeInTheDocument();
+  expect(await screen.findByText(/only Music and Spotify can be lowered/)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
 });
 
@@ -80,25 +84,56 @@ test("nothing to allow elsewhere, or when the choice is to do nothing, or once t
   await screen.findByRole("radio", { name: "Lower volume" });
   expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
   view.unmount();
-  inApp({ mediaDuck: bridge(status({ mode: "off", lower: "system", pause: "some-apps", access: "undetermined" })) });
+  inApp({ mediaDuck: bridge(status({ mode: "off", lower: "some-apps", pause: "some-apps", access: "undetermined", capture: "undetermined" })) });
   const off = render(<MediaDuckRow t={en} />);
   await screen.findByRole("radio", { name: "Do nothing" });
   expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
   off.unmount();
-  inApp({ mediaDuck: bridge(status({ lower: "system", pause: "some-apps", access: "denied" })) });
+  inApp({ mediaDuck: bridge(status({ lower: "some-apps", pause: "some-apps", access: "denied" })) });
   render(<MediaDuckRow t={en} />);
   expect(await screen.findByText(/can’t lower or pause Music and Spotify/)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
 });
 
 test("neither Music nor Spotify open: the hint says to open one first and there is nothing to press yet; coming back to the window reads again", async () => {
-  const states = [status({ lower: "system", pause: "some-apps", access: "unknown" }), status({ lower: "system", pause: "some-apps", access: "undetermined" })];
+  const states = [status({ lower: "some-apps", pause: "some-apps", access: "unknown" }), status({ lower: "some-apps", pause: "some-apps", access: "undetermined" })];
   const media = bridge(states[0]);
-  media.get.mockImplementation(async () => states.shift() ?? status({ lower: "system", pause: "some-apps", access: "undetermined" }));
+  media.get.mockImplementation(async () => states.shift() ?? status({ lower: "some-apps", pause: "some-apps", access: "undetermined" }));
   inApp({ mediaDuck: media });
   render(<MediaDuckRow t={en} />);
   expect(await screen.findByText(/Open one of them, then choose Allow/)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
   act(() => { window.dispatchEvent(new Event("focus")); });
   expect(await screen.findByRole("button", { name: "Allow" })).toBeEnabled();
+});
+
+test("System Audio Recording not asked yet: Lower explains it and Allow asks; once given, any app is lowered", async () => {
+  const media = bridge(status({ lower: "some-apps", pause: "some-apps", access: "granted", capture: "undetermined" }));
+  media.allow.mockImplementation(async () => status({ lower: "per-app", pause: "some-apps", access: "granted", capture: "granted" }));
+  inApp({ mediaDuck: media });
+  render(<MediaDuckRow t={en} />);
+  expect(await screen.findByText(/macOS asks for System Audio Recording/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Allow" }));
+  expect(media.allow).toHaveBeenCalledTimes(1);
+  expect(await screen.findByText(/and while the agent is speaking/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
+});
+
+test("System Audio Recording refused: only Music and Spotify, and a way to System Settings; Pause says the others are lowered", async () => {
+  const media = { ...bridge(status({ lower: "some-apps", pause: "some-apps", access: "granted", capture: "denied" })), openSettings: vi.fn(async () => status()) };
+  inApp({ mediaDuck: media });
+  const view = render(<MediaDuckRow t={en} />);
+  expect(await screen.findByText(/Without System Audio Recording, only Music and Spotify/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Open System Settings" }));
+  expect(media.openSettings).toHaveBeenCalledTimes(1);
+  view.unmount();
+  // Music and Spotify cannot be seen yet: that comes first, as without it nothing is lowered at all.
+  inApp({ mediaDuck: bridge(status({ lower: "some-apps", pause: "some-apps", access: "undetermined", capture: "denied" })) });
+  const both = render(<MediaDuckRow t={en} />);
+  expect(await screen.findByText(/needs permission to control them/)).toBeInTheDocument();
+  both.unmount();
+  inApp({ mediaDuck: bridge(status({ mode: "pause", lower: "per-app", pause: "some-apps", capture: "granted" })) });
+  render(<MediaDuckRow t={en} />);
+  expect(await screen.findByText(/Other apps are lowered instead/)).toBeInTheDocument();
 });

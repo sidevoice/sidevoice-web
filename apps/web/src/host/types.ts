@@ -118,7 +118,11 @@ export interface MicrophoneHelp {
 /** The app's native microphone permission (sidevoice-desktop `host.microphone`, macOS: the system's own prompt and its
  *  answer; Windows offers only `openSettings`). `missing`: not denied, and the system lists no audio input device. */
 export interface MicrophoneBridge {
-  state(): Promise<"prompt" | "granted" | "denied" | "missing">;
+  state(): Promise<"prompt" | "granted" |  access: MediaDuckAccess;
+  /** Whether the system lets the app lower any app on its own (macOS 14.4 and later: System Audio Recording); absent where
+   *  there is no such permission. `unknown`: the app could not ask. */
+  capture?: MediaDuckAccess;
+}| "missing">;
   request(): Promise<"granted" | "denied" | "missing">;
   /** Where the app can open the system's microphone settings. */
   openSettings?(): Promise<void>;
@@ -172,7 +176,7 @@ export type LocalHostStatusName = "absent" | "installing" | "not-installed" | "s
 
 export interface LocalHostStatus {
   state: LocalHostStatusName;
-  service?: "launchd" | "systemd" | "none";
+  service?: "launchd" | "systemd" |  lower: "per-app" | "some-apps" | "none";
   installed?: boolean;
   core?: { pid?: number; version?: string; api?: number; launch_id?: string } | null;
   /** The installed Sidevoice's version — the `sidevoice` package, which bundles the core — as the person knows it.
@@ -294,22 +298,29 @@ export interface MuteShortcutBridge {
   subscribe?(listener: (shortcut: MuteShortcut) => void): () => void;
 }
 
-/** What the app does to other apps' media while the microphone is open in a call (sidevoice-desktop `host.mediaDuck`): the
- *  person's choice, and how far this system can carry it out. `lower`: `per-app`, `system` (the whole output volume, and only while an app the system can ask is playing; the app's
- *  own voice goes down with it) or `none`; `pause`: `media-controls`, `some-apps` or `none`. The app restores only what it took. */
+/** What the app does to other apps' media while the microphone is open or the agent is speaking in a call (sidevoice-desktop
+ *  `host.mediaDuck`): the person's choice, and how far this system can carry it out. `lower`: `per-app` (any app, one by
+ *  one), `some-apps` (only named apps: Music and Spotify on a Mac without System Audio Recording) or `none`; `pause`:
+ *  `media-controls`, `some-apps` or `none`. The app restores only what it took. */
 export type MediaDuckMode = "lower" | "pause" | "off";
+export type MediaDuckAccess = "granted" | "denied" | "undetermined" | "unknown";
 export interface MediaDuckStatus {
   mode: MediaDuckMode;
-  lower: "per-app" | "system" | "none";
+  lower: "per-app" | "some-apps" | "none";
   pause: "media-controls" | "some-apps" | "none";
-  /** Whether the system lets the app control the apps it pauses (macOS Automation); `denied` is the person's no; `unknown`: the system answers only with one of the apps open, and none is. */
-  access: "granted" | "denied" | "undetermined" | "unknown";
+  /** Whether the system lets the app control the named apps it lowers or pauses (macOS Automation); `denied` is the person's no; `unknown`: the system answers only with one of the apps open, and none is. */
+  access: MediaDuckAccess;
+  /** Whether the system lets the app lower any app on its own (macOS 14.4 and later: System Audio Recording); absent where
+   *  there is no such permission. `unknown`: the app could not ask. */
+  capture?: MediaDuckAccess;
 }
 export interface MediaDuckBridge {
   get(): Promise<MediaDuckStatus>;
-  /** The person's own request to let the app control the apps it needs to see or pause (macOS Automation): the system may
-   *  ask now. Never called by the page on its own. */
+  /** The person's own request to let the app do what the choice needs (macOS: System Audio Recording, Automation of Music
+   *  and Spotify): the system may ask now. Never called by the page on its own. */
   allow?(): Promise<MediaDuckStatus>;
+  /** The system's page where the person turns System Audio Recording back on (macOS). */
+  openSettings?(): Promise<MediaDuckStatus>;
   set(mode: MediaDuckMode): Promise<MediaDuckStatus>;
 }
 

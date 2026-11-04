@@ -3,9 +3,9 @@ import { Button } from "../../components/ui/Button";
 import { Group, Row } from "../../components/ui/Card";
 import { Segmented } from "../../components/ui/Tabs";
 import { host, type MediaDuckMode, type MediaDuckStatus } from "../../host";
-import type { Translate } from "../../i18n/translator";
+import type { MessageKey, Translate } from "../../i18n/translator";
 
-/* What the desktop app does to other apps' media while the microphone is open in a call: lower it (the default), pause it,
+/* What the desktop app does to other apps' media while the microphone is open or the agent is speaking in a call: lower it (the default), pause it,
  * or nothing. A row of Call, only where the app offers it (`host().mediaDuck`): a browser cannot touch other apps' media. */
 export function MediaDuckRow({ t }: { t: Translate }) {
   const bridge = host().mediaDuck;
@@ -28,20 +28,31 @@ export function MediaDuckRow({ t }: { t: Translate }) {
     setStatus({ ...status, mode });
     void bridge.set(mode).then(setStatus).catch(() => setStatus(before));
   };
-  // Seeing that Music or Spotify play, and pausing them, needs the system's permission to control them (macOS).
-  const needsAccess = status.mode !== "off" && status.access !== "granted" && (status.lower === "system" || status.pause === "some-apps");
-  const hint = needsAccess ? t(status.access === "denied" ? "settings.call.mediaHint.denied" : "settings.call.mediaHint.needsAccess")
-    : status.mode === "lower" && status.lower === "system" ? t("settings.call.mediaHint.system")
-    : status.mode === "pause" && status.pause === "some-apps" ? t("settings.call.mediaHint.someApps")
-    : t("settings.call.mediaHint");
-  return <Group><Row label={t("settings.call.media")} description={hint}>
-    <Segmented size="sm" label={t("settings.call.media")} value={status.mode} onChange={choose} items={[
-      { value: "lower", label: t("settings.call.media.lower"), disabled: status.lower === "none" },
-      { value: "pause", label: t("settings.call.media.pause"), disabled: status.pause === "none" },
+  const ask = () => { setAsking(true); void bridge.allow!().then(setStatus).catch(() => undefined).finally(() => setAsking(false)); };
+  const { mode, lower, pause, access, capture } = status;
+  // Lowering any app by itself needs its own permission where the system has one (macOS System Audio Recording)...
+  const needsCapture = mode !== "off" && capture !== undefined && capture !== "granted" && capture !== "unknown";
+  // ...and going through Music and Spotify needs the permission to control them (macOS Automation).
+  const throughNamed = (mode === "lower" && lower === "some-apps") || (mode === "pause" && pause === "some-apps");
+  const needsAccess = throughNamed && access !== "granted";
+  // What to say first: the question not asked yet, then what the named apps need to work at all, then what was refused.
+  const [hint, action]: [MessageKey, "allow" | "settings" | null] =
+    needsCapture && capture === "undetermined" ? ["settings.call.mediaHint.needsCapture", "allow"]
+    : needsAccess && access === "denied" ? ["settings.call.mediaHint.denied", null]
+    : needsAccess ? ["settings.call.mediaHint.needsAccess", access === "undetermined" ? "allow" : null]
+    : needsCapture && capture === "denied" ? ["settings.call.mediaHint.captureDenied", "settings"]
+    : mode === "lower" && lower === "some-apps" ? ["settings.call.mediaHint.lowerSomeApps", null]
+    : mode === "pause" && pause === "some-apps" ? [capture === "granted" ? "settings.call.mediaHint.pauseOthersLowered" : "settings.call.mediaHint.someApps", null]
+    : ["settings.call.mediaHint", null];
+  return <Group><Row label={t("settings.call.media")} description={t(hint)}>
+    <Segmented size="sm" label={t("settings.call.media")} value={mode} onChange={choose} items={[
+      { value: "lower", label: t("settings.call.media.lower"), disabled: lower === "none" },
+      { value: "pause", label: t("settings.call.media.pause"), disabled: pause === "none" },
       { value: "off", label: t("settings.call.media.off") },
     ]} />
-    {needsAccess && status.access === "undetermined" && bridge.allow &&
-      <Button variant="secondary" size="sm" disabled={asking}
-        onClick={() => { setAsking(true); void bridge.allow!().then(setStatus).catch(() => undefined).finally(() => setAsking(false)); }}>{t("settings.call.media.allow")}</Button>}
+    {action === "allow" && bridge.allow &&
+      <Button variant="secondary" size="sm" disabled={asking} onClick={ask}>{t("settings.call.media.allow")}</Button>}
+    {action === "settings" && bridge.openSettings &&
+      <Button variant="secondary" size="sm" onClick={() => { void bridge.openSettings!().catch(() => undefined); }}>{t("settings.call.media.openSettings")}</Button>}
   </Row></Group>;
 }
