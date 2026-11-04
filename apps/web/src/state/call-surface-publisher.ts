@@ -41,6 +41,8 @@ export function startCallSurface(store: RoomStore, options: SurfaceOptions = {})
   let seen = "", sentKey: string | null = null, spoke = false, baselined = false, callThread: string | null | undefined;
   let engaged = false, stopped = false;
   const drawing = new Set<string>();
+  /** The stills that could not be drawn. An id is its inputs (the thread and the size): drawn again, it fails again. */
+  const failed = new Set<string>();
   let shown = new Map<string, { thread: string; px: number }>();
 
   /** The host the stills were handed to: a new instance (the app reloaded) holds none of them. */
@@ -143,11 +145,12 @@ export function startCallSurface(store: RoomStore, options: SurfaceOptions = {})
       host_?.forget(stale);
     }
     for (const [id, { thread, px }] of shown) {
-      if (live.stills[id] || drawing.has(id)) continue;
+      if (live.stills[id] || drawing.has(id) || failed.has(id)) continue;
       drawing.add(id);
       const target = host_;
       void draw(thread, px).then((still) => {
         drawing.delete(id);
+        if (!still) failed.add(id);
         if (stopped || !engaged || !still || !shown.has(id)) return;
         if (bridge() !== target) { wantStills(); return; } // The host changed while it drew: its own copy goes to the new one.
         // The bytes first, so a snapshot never names a still the host does not hold.

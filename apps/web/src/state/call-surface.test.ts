@@ -347,6 +347,20 @@ test("stills go by reference: the bytes cross once per id, before the snapshot t
   expect(api.still).toHaveBeenCalledTimes(4);
 });
 
+test("a still that cannot be drawn is not drawn again with every word", async () => {
+  const store = room();
+  const api = host();
+  const draw = vi.fn(async (id: string, px: number) => (id === "n|b" ? null : { png: "png-" + id, px, k: 1 }));
+  startCallSurface(store, options(api, clock(), draw));
+  await vi.waitFor(() => expect(api.still).toHaveBeenCalledTimes(3));
+  for (const to of [1, 2, 3]) {
+    store.patch({ karaokeState: { segment: "s1", from: 0, to } });
+    await new Promise((resolve) => setTimeout(resolve, 0)); // the draws of this word settle
+  }
+  expect(draw).toHaveBeenCalledTimes(4);
+  expect(Object.keys(store.getState().facts.surfaceLive!.stills)).not.toContain(stillId("n|b", FACE_PX));
+});
+
 test("stills of a removed conversation are given back and no longer kept", async () => {
   const store = room();
   const api = host();
