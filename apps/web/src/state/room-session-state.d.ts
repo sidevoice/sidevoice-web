@@ -84,7 +84,7 @@ export interface SessionFacts {
  voiceCatalogue: {state: 'idle' | 'loading' | 'ready' | 'failed'; catalogs: import('../services/model-catalogs.js').CatalogView[]; error: string; details?: string};
  /** Whether this device's engine can take a model off it (`uninstallVoiceModel`). */
  modelsRemovable: boolean;
- /** How long a downloaded model not used is kept, in days; null: forever (model-housekeeping.js). */
+ /** How long a downloaded model not used is kept, in days; null: never; 7 until chosen (model-housekeeping.js). */
  deleteUnusedDays: number | null;
  /** This device's name as the person set it (General, the setup), for its own row in machines' lists; null until set. */
  deviceName: string | null;
