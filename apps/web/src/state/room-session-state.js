@@ -296,9 +296,9 @@ export function viewedTitle(s) {
 export function enginePanel(s) {
     const rows = [];
     const engine = s.people?.find(person => personKey(person) === selectedThread(s))?.engine;
-    if (engine?.model)
+    if (engine?.label || engine?.model)
         rows.push({ id: 'agent', label: 'LLM',
-            value: [engine.model, engine.effort].filter(Boolean).join(' · '),
+            value: [engine.label || engine.model, engine.effort].filter(Boolean).join(' · '),
             state: 'ok', note: '' });
     return rows;
 }
@@ -403,7 +403,7 @@ export function participantsView(s) {
         return { threadId: key, title: displayTitle(p.title, p), selected: key === selected, available: !!p.available, switching: s.switching,
             unread, unheard: p.unheard?.count ?? 0, reach, working: busy,
             machine: machineName(s, p.node) || p.machine?.host || null, machineId: p.node || p.machine?.id || null, harness: p.harness || null, route: routeLabel(p),
-            model: p.engine?.model || null, effort: p.engine?.effort || null,
+            model: p.engine?.label || p.engine?.model || null, effort: p.engine?.effort || null,
             activityNote: [experimentalNote(p), workingCapabilityNote(p)].filter(Boolean).join(' ') || null, detail: p.reach?.detail ? (p.reach.detail + (p.reach.remedy ? '\n\n' + p.reach.remedy : '')) : undefined };
     });
 }

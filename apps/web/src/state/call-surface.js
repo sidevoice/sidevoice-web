@@ -99,23 +99,6 @@ export function spokenPage(text, spoken, max = SURFACE_PAGE_CHARS, locale) {
     }
 }
 
-/** The model ids the page names, by their base id (a trailing `-YYYYMMDD` date is ignored). Only these: a new id is
- *  added here when it is known, never derived from a pattern. */
-const MODELS = {
-    'claude-opus-5-5': 'Opus 5.5', 'claude-sonnet-5-5': 'Sonnet 5.5',
-    'claude-opus-4-5': 'Opus 4.5', 'claude-opus-4-1': 'Opus 4.1', 'claude-opus-4': 'Opus 4',
-    'claude-sonnet-4-5': 'Sonnet 4.5', 'claude-sonnet-4': 'Sonnet 4', 'claude-haiku-4-5': 'Haiku 4.5',
-};
-
-/** A harness's model id as people say it, in this one place: `claude-opus-5-5` is "Opus 5.5". An id it does not know
- *  passes through unchanged; no name is made up for it. */
-export function modelLabel(id) {
-    if (typeof id !== 'string' || !id)
-        return null;
-    const match = /^(claude-(?:opus|sonnet|haiku)-\d+(?:-\d)?)(?:-\d{8})?$/.exec(id);
-    return match && MODELS[match[1]] || id;
-}
-
 /** What a call is doing, resolved by ONE precedence (the stage's mood, the card's state line, the native call surface and
  *  its Live Activity all read it, so web, iOS and Android agree): offline > the person's turn (listening, transcribing) >
  *  speaking > working > holding > idle. Holding is a standing condition, so it takes idle's place; what is happening now
@@ -176,7 +159,7 @@ export function callSurfaceView(card, participants, live, say, call, previous) {
     return {
         pendingCancellable: !!call.pendingCancellable,
         reach,
-        model: modelLabel(row?.model), effort: row?.effort ?? null, machine: row?.machine ?? null,
+        model: row?.model ?? null, effort: row?.effort ?? null, machine: row?.machine ?? null,
         // Since when the call's conversation has been busy without a break, while it shows as working; absent when the room does not know.
         workingSince: keeping ? previous.workingSince ?? null : key === 'state.working' && call.workingSince != null ? call.workingSince : null,
         conversationCount: participants.length,
