@@ -949,7 +949,7 @@ export const messages: Messages = {
   "settings.call.mediaHint.needsAccess": "Per sapere quando Musica o Spotify sono in riproduzione, Sidevoice ha bisogno del permesso di controllarle. Apri una delle due app, poi scegli Consenti.",
   "settings.call.mediaHint.denied": "Sidevoice non può abbassare il volume né mettere in pausa Musica e Spotify senza il permesso di controllarle. Attivalo in Impostazioni di Sistema › Privacy e sicurezza › Automazione.",
   "settings.call.mediaHint.lowerSomeApps": "Su questo Mac si può abbassare il volume solo di Musica e Spotify.",
-  "settings.call.mediaHint.lowerNone": "Abbassare il volume delle altre app non è disponibile su questo computer. Scegli invece Metti in pausa.",
+  "settings.call.mediaHint.lowerNone": "Su questo computer non è possibile abbassare il volume delle altre app. Scegli invece Metti in pausa.",
   "settings.call.mediaHint.pauseOthersLowered": "Musica e Spotify vengono messe in pausa. Alle altre app viene invece abbassato il volume, perché macOS non permette di metterle in pausa.",
   "settings.call.mediaHint.needsCapture": "Per abbassare il volume solo delle altre app, macOS chiede il permesso di registrazione dell’audio di sistema. Sidevoice lo usa per abbassarne il volume, mai per registrarlo.",
   "settings.call.mediaHint.captureDenied": "Senza il permesso di registrazione dell’audio di sistema, Sidevoice può agire solo su Musica e Spotify. Per abbassare il volume anche di qualsiasi altra app, attivalo in Impostazioni di Sistema › Privacy e sicurezza › Registrazione schermo e audio di sistema.",

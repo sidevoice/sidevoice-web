@@ -949,7 +949,7 @@ export const messages: Messages = {
   "settings.call.mediaHint.needsAccess": "Para saber cuándo suenan Música o Spotify, Sidevoice necesita permiso para controlarlas. Abre una de las dos y elige Permitir.",
   "settings.call.mediaHint.denied": "Sidevoice no puede bajar ni pausar Música y Spotify sin permiso para controlarlas. Actívalo en Ajustes del Sistema › Privacidad y seguridad › Automatización.",
   "settings.call.mediaHint.lowerSomeApps": "En este Mac solo se puede bajar el volumen de Música y Spotify.",
-  "settings.call.mediaHint.lowerNone": "Bajar el volumen de otras aplicaciones no está disponible en este ordenador. Elige Pausar.",
+  "settings.call.mediaHint.lowerNone": "En este ordenador no se puede bajar el volumen de otras aplicaciones. Elige Pausar en su lugar.",
   "settings.call.mediaHint.pauseOthersLowered": "Música y Spotify se pausan. A las demás aplicaciones se les baja el volumen, porque macOS no permite pausarlas.",
   "settings.call.mediaHint.needsCapture": "Para bajar el volumen solo de las demás aplicaciones, macOS pide permiso de grabación de audio del sistema. Sidevoice lo usa para bajar su volumen, nunca para grabarlo.",
   "settings.call.mediaHint.captureDenied": "Sin permiso de grabación de audio del sistema, Sidevoice solo llega a Música y Spotify. Para bajar también el volumen de cualquier otra aplicación, actívalo en Ajustes del Sistema › Privacidad y seguridad › Grabación de pantalla y audio del sistema.",
