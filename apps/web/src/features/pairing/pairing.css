@@ -16,7 +16,8 @@
 .pairing-scan-note .ui-alert-body { margin-top: var(--sv-space-3); }
 /* While the camera is on, the app draws it behind the page: the page is transparent and shows only the viewfinder. */
 html[data-scanning], html[data-scanning] body { background: transparent !important; }
-html[data-scanning] body > *:not(.scan-overlay), html[data-scanning] dialog.ui-dialog { visibility: hidden; }
+/* Whatever layer is open (a dialog, the setup's wizard, a page): not a list of classes that a new one would miss. */
+html[data-scanning] body > *:not(.scan-overlay), html[data-scanning] dialog:not(.scan-overlay) { visibility: hidden; }
 html[data-scanning] dialog::backdrop { background: transparent; }
 .scan-overlay {
   position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: var(--sv-space-6) var(--sv-space-5);

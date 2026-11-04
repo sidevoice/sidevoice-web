@@ -147,3 +147,26 @@ test("leaving the screen during a scan lets the camera go; a request that fails 
   expect(broken.bridge.scan).not.toHaveBeenCalled();
   expect(screen.getByText(/^Sidevoice can't use the camera\./)).toBeInTheDocument();
 });
+
+test("Connect is focused only after the viewfinder is gone: while it is open the page is inert and hidden", async () => {
+  const { bridge, finish } = camera();
+  installApp({ codeScanner: bridge });
+  open();
+  await tapScan();
+  const seen: { overlayOpen: boolean; scanning: boolean }[] = [];
+  const focus = HTMLElement.prototype.focus;
+  const spy = vi.spyOn(HTMLElement.prototype, "focus").mockImplementation(function (this: HTMLElement, ...args) {
+    if (this.matches("button[type=submit][form]")) seen.push({ overlayOpen: !!viewfinder(), scanning: document.documentElement.hasAttribute("data-scanning") });
+    focus.apply(this, args);
+  });
+  try { await finish({ status: "scanned", text: pairingCode() }); } finally { spy.mockRestore(); }
+  expect(seen).toEqual([{ overlayOpen: false, scanning: false }]);
+});
+
+test("the page is hidden while scanning whatever layer is open: any dialog, not a list of classes", async () => {
+  const { readFileSync } = await import("node:fs");
+  const css = readFileSync("src/features/pairing/pairing.css", "utf8");
+  expect(css).toMatch(/html\[data-scanning\] dialog:not\(\.scan-overlay\)\s*\{\s*visibility: hidden/);
+  expect(css).toMatch(/html\[data-scanning\] body > \*:not\(\.scan-overlay\)/);
+  expect(css).not.toMatch(/html\[data-scanning\] dialog\.ui-dialog/);
+});

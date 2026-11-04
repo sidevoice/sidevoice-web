@@ -111,7 +111,8 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
   const [scanning, setScanning] = useState(false);
   const [scanNote, setScanNote] = useState<"denied" | "unavailable" | null>(null);
   const scanButton = useRef<HTMLButtonElement>(null);
-  const refocusScan = useRef(false);
+  // Where the focus goes once the viewfinder is gone: it is modal, and the page behind is inert and hidden until it closes.
+  const refocusAfterScan = useRef<"scan" | "connect" | null>(null);
   // The address the code itself filled in, replaced when the code changes unless the person wrote their own.
   const prefilled = useRef("");
   const focusAddress = useRef(false);
@@ -144,8 +145,13 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
     if (!scanning) return;
     return () => { void hostOfPage().codeScanner?.cancel().catch(() => undefined); };
   }, [scanning]);
-  // The scan ended without a code: the focus goes back to Scan, once it is enabled again.
-  useEffect(() => { if (!scanning && refocusScan.current) { refocusScan.current = false; scanButton.current?.focus(); } }, [scanning]);
+  // The scan ended: the focus goes to Connect (a code was read) or back to Scan, once the viewfinder has closed and Scan is
+  // enabled again. Not before: a focus asked while the viewfinder is still open lands on nothing.
+  useEffect(() => {
+    if (scanning || !refocusAfterScan.current) return;
+    (refocusAfterScan.current === "connect" ? connectButton : scanButton).current?.focus();
+    refocusAfterScan.current = null;
+  }, [scanning]);
   // That button gone with what replaced the warning, the focus goes back to Connect.
   useEffect(() => { if (!busy && refocusConnect.current) { refocusConnect.current = false; connectButton.current?.focus(); } }, [busy]);
 
@@ -193,12 +199,12 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
         changeCode(text);
         // Not a Sidevoice code (any other QR): said at once under the field, where a pasted one would be said on Connect.
         if (!readCode(text, Date.now())) { setFieldError({ field: "code", key: text ? "pairing.invalid" : "pairing.empty" }); return; }
-        connectButton.current?.focus();
+        refocusAfterScan.current = "connect";
         return;
       }
       case "denied": setScanNote("denied"); return;
       case "unavailable": setScanNote("unavailable"); return;
-      case "cancelled": refocusScan.current = true; return;
+      case "cancelled": refocusAfterScan.current = "scan"; return;
     }
   }
 
