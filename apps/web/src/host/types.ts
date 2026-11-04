@@ -118,11 +118,7 @@ export interface MicrophoneHelp {
 /** The app's native microphone permission (sidevoice-desktop `host.microphone`, macOS: the system's own prompt and its
  *  answer; Windows offers only `openSettings`). `missing`: not denied, and the system lists no audio input device. */
 export interface MicrophoneBridge {
-  state(): Promise<"prompt" | "granted" |  access: MediaDuckAccess;
-  /** Whether the system lets the app lower any app on its own (macOS 14.4 and later: System Audio Recording); absent where
-   *  there is no such permission. `unknown`: the app could not ask. */
-  capture?: MediaDuckAccess;
-}| "missing">;
+  state(): Promise<"prompt" | "granted" | "denied" | "missing">;
   request(): Promise<"granted" | "denied" | "missing">;
   /** Where the app can open the system's microphone settings. */
   openSettings?(): Promise<void>;
@@ -176,7 +172,7 @@ export type LocalHostStatusName = "absent" | "installing" | "not-installed" | "s
 
 export interface LocalHostStatus {
   state: LocalHostStatusName;
-  service?: "launchd" | "systemd" |  lower: "per-app" | "some-apps" | "none";
+  service?: "launchd" | "systemd" | "none";
   installed?: boolean;
   core?: { pid?: number; version?: string; api?: number; launch_id?: string } | null;
   /** The installed Sidevoice's version — the `sidevoice` package, which bundles the core — as the person knows it.

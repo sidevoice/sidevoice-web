@@ -16,7 +16,7 @@ const status = (changes: Partial<MediaDuckStatus> = {}): MediaDuckStatus => ({ m
 
 function bridge(now: MediaDuckStatus, fail = false) {
   return {
-    allow: vi.fn(async () => ({ ...now, access: "granted" as const })),
+    allow: vi.fn(async (): Promise<MediaDuckStatus> => ({ ...now, access: "granted" })),
     get: vi.fn(async () => now),
     set: vi.fn(async (mode: MediaDuckMode) => { if (fail) throw new Error("nope"); return { ...now, mode }; }),
   };
