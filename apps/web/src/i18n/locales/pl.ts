@@ -493,6 +493,8 @@ export const messages: Messages = {
   "pairing.scanDenied": "Sidevoice nie może używać aparatu. Zezwól na dostęp do aparatu w ustawieniach systemu albo wpisz kod.",
   "pairing.scanSettings": "Otwórz ustawienia systemu",
   "pairing.scanUnavailable": "To urządzenie nie ma aparatu do skanowania. Wpisz kod.",
+  "pairing.scanShort": "Skanuj",
+  "pairing.typeCode": "Wpisz kod",
   "pairing.expired": "Ten kod wygasł lub został już użyty. Uruchom ponownie pair-device.",
   "pairing.copyCommand": "Kopiuj polecenie",
   "pairing.unreachable": "Nie udało się nawiązać połączenia — {host}. Sprawdź, czy maszyna działa i jest w twojej sieci, albo wpisz jej adres.",

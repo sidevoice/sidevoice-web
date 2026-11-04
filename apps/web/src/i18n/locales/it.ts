@@ -493,6 +493,8 @@ export const messages: Messages = {
   "pairing.scanDenied": "Sidevoice non può usare la fotocamera. Concedi il permesso nelle impostazioni di sistema oppure scrivi il codice.",
   "pairing.scanSettings": "Apri le impostazioni di sistema",
   "pairing.scanUnavailable": "Questo dispositivo non ha una fotocamera per scansionare. Scrivi il codice.",
+  "pairing.scanShort": "Scansiona",
+  "pairing.typeCode": "Scrivi il codice",
   "pairing.expired": "Questo codice è scaduto o è già stato usato. Esegui di nuovo pair-device.",
   "pairing.copyCommand": "Copia comando",
   "pairing.unreachable": "Impossibile raggiungere {host}. Verifica che sia in esecuzione e nella tua rete, oppure scrivi il suo indirizzo.",

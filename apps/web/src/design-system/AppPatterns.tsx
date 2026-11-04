@@ -27,6 +27,9 @@ import type { MachineView } from "../state/room-types";
 import type { LocalHostStatus } from "../host";
 import { NewConversation } from "../features/room/NewConversation";
 import { CONNECTOR_INSTALL, CONNECTOR_PAIR_DEVICE } from "../features/pairing/connector-commands";
+import { PairMachine, SCAN_VARIANTS, type ScanVariant } from "../features/pairing/PairMachine";
+import { Viewfinder } from "../features/pairing/ScanOverlay";
+import type { CodeScannerBridge } from "../host";
 
 /* The app's whole vocabulary drawn with the design system: every surface of the room, the call, the transcript, the
  * first-run setup, pairing and Settings, as the system would draw it. These are pictures, not the app: they take no
@@ -333,6 +336,45 @@ function WizardPair() {
   );
 }
 
+/** Scanning the pairing QR code, as each variant draws it (an open decision; VARIANTS `pairingScan`). The scanner is a
+ *  picture's: a scan here ends at once, cancelled. */
+const SPECIMEN_SCANNER: CodeScannerBridge = {
+  permission: async () => "granted", request: async () => "granted", scan: async () => ({ status: "cancelled" }),
+  cancel: async () => {}, openSettings: async () => {},
+};
+const SCAN_NOTES: Record<ScanVariant, string> = {
+  current: "Today's: a Scan QR code button under the field, and a plain white frame over the camera.",
+  inField: "A · In the field: a camera at the field's end, like a search field's; the viewfinder in the app's look.",
+  twoWays: "B · Two ways: Scan and Type the code as two equal tiles; the field comes in with the second, or with a scan.",
+  scanFirst: "C · Scan first: the viewfinder lives in the card, on the dark stage; the camera opens inside it, Type the code under it.",
+  labelRow: "D · Label row: a quiet Scan QR code pill at the end of the field's label, the field still the first thing.",
+};
+
+function ScanVariants() {
+  const t = translator();
+  return (
+    <div className="pt-scan-variants" data-testid="scan-variants">
+      {SCAN_VARIANTS.map((variant) => (
+        <figure className="pt-scan-variant" key={variant} data-variant={variant}>
+          <div className="pt-phone-screen pt-scan-phone">
+            <DialogSurface titleId={`pt-scan-${variant}-title`} title={t("noMachine.connect")} onClose={() => {}}
+              footer={<><Button variant="ghost" tone="neutral">{t("hosts.cancel")}</Button><Button variant="primary">{t("pairing.connect")}</Button></>}>
+              <PairMachine idPrefix={`pt-scan-${variant}`} rows={2} submitIn={null} scanVariant={variant} codeScanner={SPECIMEN_SCANNER} />
+            </DialogSurface>
+          </div>
+          <figcaption>{SCAN_NOTES[variant]}</figcaption>
+        </figure>
+      ))}
+      <figure className="pt-scan-variant">
+        <div className="pt-phone-screen scan-overlay pt-scan-picture" data-look="stage" data-theme="dark">
+          <Viewfinder look="stage" cancel={<Button variant="secondary" className="scan-cancel">{t("pairing.scanCancel")}</Button>} />
+        </div>
+        <figcaption>The viewfinder of A, B and D, over the camera: the stage's tint and lilac glow, the corners in the accent, the mascot on the frame, a dialog's title. Today's is the plain frame.</figcaption>
+      </figure>
+    </div>
+  );
+}
+
 function WizardTranscription() {
   const t = translator();
   return (
@@ -589,6 +631,9 @@ export function AppPatterns() {
             <PairingForm error />
           </DialogSurface>
         </Frame>
+      </Pattern>
+      <Pattern title="Pairing · scanning the QR code (open decision)" note="Where Scan sits on the pairing screen of the mobile app (the only host with a camera) and how the viewfinder looks. What a scan does is the same in all: it fills the code like a paste and Connect takes the focus. The app shows today's until one is picked (VARIANTS pairingScan).">
+        <ScanVariants />
       </Pattern>
       <Pattern title="Settings · machines" note="The machines, with adding one always in sight; then a machine's own page: its state and actions (stop asks first), its paired devices, and a code to pair another. The A/B layouts are switchable in the app (VARIANTS).">
         <MachinesList />

@@ -273,3 +273,15 @@
 /* The microphone and the speaker's bar (the call's AudioDevices). */
 .pt-devices { display: grid; gap: var(--sv-space-3); width: min(18rem, 100%); padding: var(--sv-space-3) var(--sv-space-4) var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-surface-raised); box-shadow: var(--sv-shadow-md); }
 .pt-devices-lost { display: flex; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); }
+
+/* ----- Pairing · scanning the QR code: the variants side by side (VARIANTS `pairingScan`), each in a phone's screen */
+.pt-scan-variants { display: grid; grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr)); gap: var(--sv-space-5); align-items: start; }
+.pt-scan-variant { display: grid; gap: var(--sv-space-2); margin: 0; }
+.pt-scan-variant figcaption { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+.pt-scan-phone { height: 640px; display: flex; }
+.pt-scan-phone .ui-dialog-surface { flex: 1; }
+/* The viewfinder's picture: the overlay laid out in the screen instead of over the page, a stand-in camera behind. */
+.pt-scan-picture.scan-overlay { position: relative; inset: auto; width: auto; height: 640px; display: grid; grid-template-rows: auto 1fr auto; justify-items: center; align-items: center; gap: var(--sv-space-6);
+  padding: var(--sv-space-6) var(--sv-space-5); background: linear-gradient(160deg, #6a6f75, #3b3e42 55%, #8b9098); }
+.pt-scan-picture.scan-overlay::before { position: absolute; }
+.pt-scan-picture .scan-window { width: min(72%, 260px); }

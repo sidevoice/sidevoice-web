@@ -483,6 +483,8 @@ export const messages: Messages = {
   "pairing.scanDenied": "Sidevoice 无法使用相机。请在系统设置中允许，或改为输入代码。",
   "pairing.scanSettings": "打开系统设置",
   "pairing.scanUnavailable": "此设备没有可用于扫描的相机。请改为输入代码。",
+  "pairing.scanShort": "扫描",
+  "pairing.typeCode": "输入代码",
   "pairing.expired": "此代码已失效或已被使用。请重新运行 pair-device。",
   "pairing.copyCommand": "复制命令",
   "pairing.unreachable": "无法连接到 {host}。请检查它是否正在运行并位于你的网络中，或输入它的地址。",

@@ -5,6 +5,7 @@ import { PairingDialog } from "./PairingDialog";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import { installApp, removeApp } from "../../host/testing";
+import { VARIANTS_KEY } from "../../lib/variants";
 import type { CodeScan, CodeScannerBridge } from "../../host";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
@@ -13,7 +14,7 @@ vi.mock("../../services/room-session-controller.js", () => ({}));
  * as it prints it, so what is scanned goes where a pasted code goes. Typing stays: a camera not allowed, or none, is said and
  * the field is still there. */
 
-afterEach(() => { removeApp(); cleanup(); });
+afterEach(() => { removeApp(); cleanup(); localStorage.removeItem(VARIANTS_KEY); });
 
 function pairingCode(extra: Record<string, unknown> = {}) {
   const payload = { v: 1, fp: "A".repeat(43), host: "nuc", urls: ["http://127.0.0.1:8768", "https://nuc.example:8768"], secret: "s3cret",
@@ -166,7 +167,71 @@ test("Connect is focused only after the viewfinder is gone: while it is open the
 test("the page is hidden while scanning whatever layer is open: any dialog, not a list of classes", async () => {
   const { readFileSync } = await import("node:fs");
   const css = readFileSync("src/features/pairing/pairing.css", "utf8");
-  expect(css).toMatch(/html\[data-scanning\] dialog:not\(\.scan-overlay\)\s*\{\s*visibility: hidden/);
-  expect(css).toMatch(/html\[data-scanning\] body > \*:not\(\.scan-overlay\)/);
+  expect(css).toMatch(/html\[data-scanning=""\] dialog:not\(\.scan-overlay\)\s*\{\s*visibility: hidden/);
+  expect(css).toMatch(/html\[data-scanning=""\] body > \*:not\(\.scan-overlay\)/);
   expect(css).not.toMatch(/html\[data-scanning\] dialog\.ui-dialog/);
+});
+
+/* Where Scan sits is an open decision (VARIANTS `pairingScan`): each variant scans the same way, from its own place. */
+const variant = (value: string) => localStorage.setItem(VARIANTS_KEY, JSON.stringify({ pairingScan: value }));
+const connectButton = () => document.querySelector("#device-pairing button[type=submit][form]") as HTMLButtonElement;
+
+for (const [value, name] of [["inField", "Scan QR code"], ["twoWays", "Scan"], ["scanFirst", "Scan QR code"], ["labelRow", "Scan QR code"]] as const) {
+  test(`${value}: its Scan fills the field like a paste, and Connect takes the focus`, async () => {
+    variant(value);
+    const { bridge, finish } = camera();
+    installApp({ codeScanner: bridge });
+    open();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name })); });
+    expect(bridge.scan).toHaveBeenCalledTimes(1);
+    expect(document.documentElement.getAttribute("data-scanning")).toBe(value === "scanFirst" ? "inline" : "");
+    const scanned = pairingCode();
+    await finish({ status: "scanned", text: scanned });
+    expect(document.documentElement).not.toHaveAttribute("data-scanning");
+    expect(code().value).toBe(scanned);
+    expect(code()).toBeVisible();
+    expect(document.activeElement).toBe(connectButton());
+  });
+}
+
+test("twoWays and scanFirst: the field comes in with Type the code, and takes the focus", async () => {
+  for (const value of ["twoWays", "scanFirst"]) {
+    variant(value);
+    installApp({ codeScanner: camera().bridge });
+    open();
+    expect(document.querySelector("#device-pairing-code")!.closest(".pairing-code-field")).toHaveAttribute("hidden");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Type the code" })); });
+    expect(code().closest(".pairing-code-field")).not.toHaveAttribute("hidden");
+    expect(code()).toHaveFocus();
+    cleanup();
+    removeApp();
+  }
+});
+
+test("scanFirst: the camera opens inside the card; Escape ends it, and Type the code during it goes to the field", async () => {
+  variant("scanFirst");
+  const { bridge } = camera();
+  installApp({ codeScanner: bridge });
+  open();
+  const start = () => screen.getByRole("button", { name: "Scan QR code" });
+  await act(async () => { fireEvent.click(start()); });
+  expect(viewfinder()).toBeNull();
+  expect(screen.getByRole("region", { name: "Scan the pairing code" })).toBeInTheDocument();
+  await act(async () => { fireEvent.keyDown(document.body, { key: "Escape" }); });
+  expect(bridge.cancel).toHaveBeenCalled();
+  expect(document.documentElement).not.toHaveAttribute("data-scanning");
+  expect(document.activeElement).toBe(start());
+  bridge.cancel.mockClear();
+  await act(async () => { fireEvent.click(start()); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Type the code" })); });
+  expect(bridge.cancel).toHaveBeenCalled();
+  expect(document.documentElement).not.toHaveAttribute("data-scanning");
+  expect(code()).toHaveFocus();
+});
+
+test("an unknown variant is today's: the button under the field", () => {
+  variant("nope");
+  installApp({ codeScanner: camera().bridge });
+  open();
+  expect(scanButton()).toHaveClass("pairing-scan");
 });

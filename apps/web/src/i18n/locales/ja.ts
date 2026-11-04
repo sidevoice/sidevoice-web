@@ -484,6 +484,8 @@ export const messages: Messages = {
   "pairing.scanDenied": "Sidevoice はカメラを使用できません。システム設定で許可するか、代わりにコードを入力してください。",
   "pairing.scanSettings": "システム設定を開く",
   "pairing.scanUnavailable": "このデバイスにはスキャンに使えるカメラがありません。代わりにコードを入力してください。",
+  "pairing.scanShort": "スキャン",
+  "pairing.typeCode": "コードを入力",
   "pairing.expired": "このコードは期限切れか、すでに使用されています。もう一度 pair-device を実行してください。",
   "pairing.copyCommand": "コマンドをコピー",
   "pairing.unreachable": "{host} に接続できませんでした。起動していて同じネットワーク上にあるか確認するか、アドレスを入力してください。",

@@ -483,6 +483,8 @@ export const messages: Messages = {
   "pairing.scanDenied": "Sidevoice ne peut pas utiliser l’appareil photo. Autorisez-le dans les réglages du système ou saisissez le code à la place.",
   "pairing.scanSettings": "Ouvrir les réglages du système",
   "pairing.scanUnavailable": "Cet appareil n’a pas d’appareil photo pour scanner. Saisissez le code à la place.",
+  "pairing.scanShort": "Scanner",
+  "pairing.typeCode": "Saisir le code",
   "pairing.expired": "Ce code a expiré ou a déjà été utilisé. Relancez pair-device.",
   "pairing.copyCommand": "Copier la commande",
   "pairing.unreachable": "Impossible de joindre {host}. Vérifiez qu’elle est en marche et sur votre réseau, ou saisissez son adresse.",
