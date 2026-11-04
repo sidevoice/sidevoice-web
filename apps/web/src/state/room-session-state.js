@@ -56,7 +56,7 @@ export function initialSessionFacts() {
         voiceInstall: null,
         // The voice settings this device keeps (`VoiceSettings`), the ones the open settings pane is editing, the engine's
         // catalogues for its choices, and whether this device keeps a key for each remote provider (never the key).
-        voiceSettings: null, voiceDraft: null, voiceCatalogue: { state: 'idle', catalogs: [], error: '' }, modelsRemovable: false, deleteUnusedDays: null, deviceName: null, providerKeys: {},
+        voiceSettings: null, voiceDraft: null, voiceCatalogue: { state: 'idle', catalogs: [], error: '' }, modelsRemovable: false, deleteUnusedDays: 7, deviceName: null, providerKeys: {},
         // The conversation a move to another machine is taking the call to.
         movingTo: null,
         // The floating call card (briefs/FLOATING-CARD-SPEC.md): whether the first setup is finished with its wizard

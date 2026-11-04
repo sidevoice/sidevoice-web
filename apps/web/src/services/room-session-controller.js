@@ -2736,7 +2736,7 @@ function cancelVoiceInstall(){voiceInstall?.abort()}
 // none the engine says nothing about; the catalogues read again once one went.
 async function deleteUnusedModels(models,catalogs){
  if(typeof models.uninstall!=='function')return;
- const stale=staleModels(catalogs,state.voiceSettings,state.deleteUnusedDays,Date.now());if(!stale.length)return;
+ const stale=staleModels(catalogs,state.voiceSettings,state.deleteUnusedDays,Date.now(),state.voiceDraft);if(!stale.length)return;
  for(const model of stale)await models.uninstall(model).catch(()=>undefined);
  await loadVoiceCatalogue();
 }
