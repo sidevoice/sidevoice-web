@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { Group, Row } from "../../components/ui/Card";
 import { Segmented } from "../../components/ui/Tabs";
@@ -10,12 +10,19 @@ import type { MessageKey, Translate } from "../../i18n/translator";
 export function MediaDuckRow({ t }: { t: Translate }) {
   const bridge = host().mediaDuck;
   const [status, setStatus] = useState<MediaDuckStatus | null>(null);
-  const [asking, setAsking] = useState(false);
+  // Requests in flight that may make the system ask (set can, for Lower): Allow waits for them.
+  const [asking, setAsking] = useState(0);
+  // Only the answer to the latest request is shown: one that comes late (the system's question took a while) is not.
+  const latest = useRef(0);
+  const answer = (id: number) => (value: MediaDuckStatus) => { if (id === latest.current) setStatus(value); };
   // Read when the row shows, and again whenever the person comes back to this window: they may have answered the system's
   // question, or opened Music, in between.
   useEffect(() => {
     let gone = false;
-    const read = () => { void bridge?.get().then((value) => { if (!gone) setStatus(value); }).catch(() => undefined); };
+    const read = () => {
+      const id = ++latest.current;
+      void bridge?.get().then((value) => { if (!gone) answer(id)(value); }).catch(() => undefined);
+    };
     const visible = () => { if (document.visibilityState === "visible") read(); };
     read();
     window.addEventListener("focus", read);
@@ -23,12 +30,17 @@ export function MediaDuckRow({ t }: { t: Translate }) {
     return () => { gone = true; window.removeEventListener("focus", read); document.removeEventListener("visibilitychange", visible); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (!bridge || !status) return null;
+  const track = (request: (id: number) => Promise<unknown>) => {
+    const id = ++latest.current;
+    setAsking((n) => n + 1);
+    void request(id).finally(() => setAsking((n) => n - 1));
+  };
   const choose = (mode: MediaDuckMode) => {
     const before = status;
     setStatus({ ...status, mode });
-    void bridge.set(mode).then(setStatus).catch(() => setStatus(before));
+    track((id) => bridge.set(mode).then(answer(id)).catch(() => answer(id)(before)));
   };
-  const ask = () => { setAsking(true); void bridge.allow!().then(setStatus).catch(() => undefined).finally(() => setAsking(false)); };
+  const ask = () => track((id) => bridge.allow!().then(answer(id)).catch(() => undefined));
   const { mode, lower, pause, access, capture } = status;
   // Lowering any app by itself needs its own permission where the system has one (macOS System Audio Recording)...
   const needsCapture = mode !== "off" && capture !== undefined && capture !== "granted" && capture !== "unknown";
@@ -42,6 +54,7 @@ export function MediaDuckRow({ t }: { t: Translate }) {
     : needsAccess ? ["settings.call.mediaHint.needsAccess", access === "undetermined" ? "allow" : null]
     : needsCapture && capture === "denied" ? ["settings.call.mediaHint.captureDenied", "settings"]
     : mode === "lower" && lower === "some-apps" ? ["settings.call.mediaHint.lowerSomeApps", null]
+    : mode === "lower" && lower === "none" && pause !== "none" ? ["settings.call.mediaHint.lowerNone", null]
     : mode === "pause" && pause === "some-apps" ? [capture === "granted" ? "settings.call.mediaHint.pauseOthersLowered" : "settings.call.mediaHint.someApps", null]
     : ["settings.call.mediaHint", null];
   return <Group><Row label={t("settings.call.media")} description={t(hint)}>
@@ -51,7 +64,7 @@ export function MediaDuckRow({ t }: { t: Translate }) {
       { value: "off", label: t("settings.call.media.off") },
     ]} />
     {action === "allow" && bridge.allow &&
-      <Button variant="secondary" size="sm" disabled={asking} onClick={ask}>{t("settings.call.media.allow")}</Button>}
+      <Button variant="secondary" size="sm" disabled={asking > 0} onClick={ask}>{t("settings.call.media.allow")}</Button>}
     {action === "settings" && bridge.openSettings &&
       <Button variant="secondary" size="sm" onClick={() => { void bridge.openSettings!().catch(() => undefined); }}>{t("settings.call.media.openSettings")}</Button>}
   </Row></Group>;

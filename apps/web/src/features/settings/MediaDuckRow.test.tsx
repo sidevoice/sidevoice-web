@@ -123,7 +123,7 @@ test("System Audio Recording refused: only Music and Spotify, and a way to Syste
   const media = { ...bridge(status({ lower: "some-apps", pause: "some-apps", access: "granted", capture: "denied" })), openSettings: vi.fn(async () => status()) };
   inApp({ mediaDuck: media });
   const view = render(<MediaDuckRow t={en} />);
-  expect(await screen.findByText(/Without System Audio Recording, only Music and Spotify/)).toBeInTheDocument();
+  expect(await screen.findByText(/Without System Audio Recording, Sidevoice can only reach Music and Spotify/)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Open System Settings" }));
   expect(media.openSettings).toHaveBeenCalledTimes(1);
@@ -136,4 +136,30 @@ test("System Audio Recording refused: only Music and Spotify, and a way to Syste
   inApp({ mediaDuck: bridge(status({ mode: "pause", lower: "per-app", pause: "some-apps", capture: "granted" })) });
   render(<MediaDuckRow t={en} />);
   expect(await screen.findByText(/Other apps are lowered instead/)).toBeInTheDocument();
+});
+
+test("Pause with System Audio Recording refused says what is reached, not that Music and Spotify are lowered", async () => {
+  inApp({ mediaDuck: bridge(status({ mode: "pause", lower: "some-apps", pause: "some-apps", access: "granted", capture: "denied" })) });
+  render(<MediaDuckRow t={en} />);
+  expect(await screen.findByText(/Sidevoice can only reach Music and Spotify/)).toBeInTheDocument();
+});
+
+test("Lower where this computer cannot lower says to choose Pause", async () => {
+  inApp({ mediaDuck: bridge(status({ lower: "none", pause: "media-controls" })) });
+  render(<MediaDuckRow t={en} />);
+  expect(await screen.findByText(/Choose Pause instead/)).toBeInTheDocument();
+});
+
+test("a late answer (the system's question took a while) does not overwrite a newer choice, and Allow waits for it", async () => {
+  let release: (value: MediaDuckStatus) => void = () => undefined;
+  const media = bridge(status({ mode: "off", lower: "some-apps", pause: "some-apps", access: "undetermined", capture: "undetermined" }));
+  media.set.mockImplementationOnce(() => new Promise<MediaDuckStatus>((resolve) => { release = resolve; }));
+  inApp({ mediaDuck: media });
+  render(<MediaDuckRow t={en} />);
+  fireEvent.click(await screen.findByRole("radio", { name: "Lower volume" }));
+  expect(await screen.findByRole("button", { name: "Allow" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("radio", { name: "Do nothing" }));
+  expect(await screen.findByRole("radio", { name: "Do nothing" })).toHaveAttribute("aria-checked", "true");
+  await act(async () => { release(status({ mode: "lower", lower: "per-app", capture: "granted" })); });
+  expect(screen.getByRole("radio", { name: "Do nothing" })).toHaveAttribute("aria-checked", "true");
 });
