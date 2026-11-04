@@ -43,14 +43,17 @@ export async function renderStill(threadId: string, px: number): Promise<Rendere
       const canvas = document.createElement("canvas");
       canvas.width = canvas.height = px;
       const context = canvas.getContext("2d");
-      if (!context) return null;
+      if (!context) throw new Error("no 2d canvas context");
       context.drawImage(image, 0, 0, px, px);
       const png = canvas.toDataURL("image/png").split(",")[1];
-      return png ? { png, px, k: STILL_K } : null;
+      if (!png) throw new Error("the canvas gave no PNG");
+      return { png, px, k: STILL_K };
     } finally {
       URL.revokeObjectURL(url);
     }
-  } catch {
+  } catch (error) {
+    // The host shows its own mark instead; the reason goes to the console, which the desktop app writes to its log.
+    console.warn(`[sidevoice] call surface: no still for ${threadId} at ${px}px:`, error);
     return null;
   }
 }
