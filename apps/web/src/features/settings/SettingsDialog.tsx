@@ -136,7 +136,7 @@ function CallSettings({ t, microphone }: { t: Translate; microphone: MicrophoneS
           items={presence.map((option) => ({ value: option.value, label: t(option.label) }))} />
       </Row>
     </Group>
-    <MediaDuckRow t={t} />
+    <MediaDuckRow t={t} openPermissions={() => store?.patch({ settingsSection: "permissions", settingsLevel: "page" })} />
     {/* The desktop app keeps its computer awake as any app does; holding the screen on is for a browser or a phone. */}
     {awake && host().identity.build === null && <Group title={t("settings.call.device")}>
       <Row label={t("settings.call.keepAwake")} description={awake.supported ? t("settings.call.keepAwakeHint") : t("settings.call.keepAwakeUnsupported")}>

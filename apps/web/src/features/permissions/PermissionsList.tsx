@@ -8,6 +8,7 @@ import { CharacterAvatar } from "../avatar/CharacterAvatar";
 import { announcement, MicrophoneBadge, MicrophoneHowTo, microphoneAction, MIC_HELP_ID, microphoneView, type MicrophoneView } from "./permission-view";
 import type { MicrophoneSnapshot } from "../../services/microphone-access";
 import type { Translate } from "../../i18n/translator";
+import { MediaPermissionRows } from "./media-permissions";
 
 /* What Sidevoice needs allowed, one look wherever it is asked (operator, 2026-10-16): the setup's permissions step and
  * Settings › Permissions. The person's bicho on top — the microphone in its hand once allowed — and under it a list, each
@@ -61,6 +62,8 @@ export function PermissionsList({ microphone, openSettings, onRequest, t, action
     <span className="perm-hero-figure" data-state={view.state} aria-hidden><CharacterAvatar spec={view.state === "granted" ? PERSON_WITH_MIC : PERSON_AVATAR} state={stillAvatar("present")} size="pip" /></span>
     <Group>
       <MicrophoneRow microphone={microphone} view={view} onRequest={onRequest} openSettings={openSettings} t={t} actionId={actionId} helpId={helpId} />
+      {/* Where the app lowers or pauses other apps' media in a call, the permissions that needs (macOS). */}
+      <MediaPermissionRows t={t} />
     </Group>
     {/* Each change said once, as it happens. */}
     <p className="sr-only" role="status" aria-live="polite">{announcement(microphone, t)}</p>

@@ -299,24 +299,29 @@ export interface MuteShortcutBridge {
  *  one), `some-apps` (only named apps: Music and Spotify on a Mac without System Audio Recording) or `none`; `pause`:
  *  `media-controls`, `some-apps` or `none`. The app restores only what it took. */
 export type MediaDuckMode = "lower" | "pause" | "off";
+/** The permissions the status reports, as the page asks for one: `capture` (macOS System Audio Recording, lowering any
+ *  app) and `automation` (macOS Automation, controlling Music and Spotify). */
+export type MediaDuckPermission = "capture" | "automation";
 export type MediaDuckAccess = "granted" | "denied" | "undetermined" | "unknown";
 export interface MediaDuckStatus {
   mode: MediaDuckMode;
   lower: "per-app" | "some-apps" | "none";
   pause: "media-controls" | "some-apps" | "none";
-  /** Whether the system lets the app control the named apps it lowers or pauses (macOS Automation); `denied` is the person's no; `unknown`: the system answers only with one of the apps open, and none is. */
-  access: MediaDuckAccess;
+  /** Whether the system lets the app control the named apps it lowers or pauses (macOS Automation of Music and Spotify);
+   *  absent where nothing has to be allowed for that. `denied` is the person's no; `unknown`: the system answers only with
+   *  one of the apps open, and none is. */
+  access?: MediaDuckAccess;
   /** Whether the system lets the app lower any app on its own (macOS 14.4 and later: System Audio Recording); absent where
    *  there is no such permission. `unknown`: the app could not ask. */
   capture?: MediaDuckAccess;
 }
 export interface MediaDuckBridge {
   get(): Promise<MediaDuckStatus>;
-  /** The person's own request to let the app do what the choice needs (macOS: System Audio Recording, Automation of Music
-   *  and Spotify): the system may ask now. Never called by the page on its own. */
-  allow?(): Promise<MediaDuckStatus>;
-  /** The system's page where the person turns System Audio Recording back on (macOS). */
-  openSettings?(): Promise<MediaDuckStatus>;
+  /** The person's own request, from the list of permissions, to let the app do what `permission` names: the system may
+   *  ask now. Never called by the page on its own. */
+  allow?(permission: MediaDuckPermission): Promise<MediaDuckStatus>;
+  /** The system's page where the person turns `permission` back on (macOS). */
+  openSettings?(permission: MediaDuckPermission): Promise<MediaDuckStatus>;
   set(mode: MediaDuckMode): Promise<MediaDuckStatus>;
 }
 
