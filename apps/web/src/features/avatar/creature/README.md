@@ -51,7 +51,8 @@ the rate (30, 20, 15 fps, even on a 60 Hz screen) until the frames hold, and bac
 is expected to hold with room to spare (a frame's cost goes with its pixels, so a steady 4 ms on the second rung is about
 5.5 ms on the first, under 6; a step down needs the whole 8), doubling the wait each time a step up failed. A stage on its last rung that still costs more than a sixth of the thread spaces its frames
 out (to 500 ms), as the page's no-GPU case always did. Only frames of motion are judged (a creature held still, or its
-first frames, which compile programs, are not), so a stage that asks for few frames is never redrawn at another size. `creatureQuality.pin(n)` fixes a rung (diagnostics, tests).
+first frames, which compile programs, are not), so a stage that asks for few frames is never redrawn at another size, and a step
+resizes only the creatures in motion (one held still keeps the size it was drawn at until something draws it). `creatureQuality.pin(n)` fixes a rung (diagnostics, tests).
 
 ## Drawing one
 

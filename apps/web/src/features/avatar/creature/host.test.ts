@@ -294,7 +294,7 @@ test("when the governor steps down, the canvas takes fewer pixels in the very ta
   webgl();
   vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(3);
   const element = tile(364, 655);
-  const live = mount({ ...onStage, canvas: element })!;
+  const live = mount({ ...onStage, canvas: element, moving: true })!; // (the governor steps on frames of motion)
   const scene = stageFor("scene"), seen: Array<[number, number]> = [], draw = scene.draw.bind(scene);
   scene.draw = (...args: Parameters<typeof draw>) => { seen.push([element.width, element.height]); draw(...args); };
   expect(live.tick(0)).toBe(true);
@@ -307,6 +307,38 @@ test("when the governor steps down, the canvas takes fewer pixels in the very ta
   host.creatureQuality.pin(null);
   expect(live.tick(2)).toBe(true);
   expect(seen.at(-1)).toEqual([533, 960]);
+});
+
+test("a retier resizes and redraws only the creatures in motion: one held still is left as it was until something draws it", () => {
+  webgl();
+  vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(3);
+  const heldCanvas = tile(364, 655), movingCanvas = tile(364, 655);
+  const held = mount({ ...onStage, canvas: heldCanvas, moving: false })!;
+  const moving = mount({ ...onStage, canvas: movingCanvas, moving: true })!;
+  const scene = stageFor("scene"), drawnInto: HTMLCanvasElement[] = [], draw = scene.draw.bind(scene);
+  scene.draw = (...args: Parameters<typeof draw>) => { drawnInto.push((args[0] as unknown as { canvas: HTMLCanvasElement }).canvas); draw(...args); };
+  expect(held.tick(0)).toBe(true);
+  expect(moving.tick(0)).toBe(true);
+  drawnInto.length = 0;
+  // Another creature's frames stepped the governor down (a pin is the same retier).
+  host.creatureQuality.pin(3); // 0.6 of the full size
+  expect(moving.wantsFrames()).toBe(true);
+  expect(held.wantsFrames()).toBe(false); // not woken: nothing of it changed
+  expect(held.tick(1)).toBe(false);
+  expect([heldCanvas.width, heldCanvas.height]).toEqual([533, 960]); // not resized, so not cleared either
+  expect(moving.tick(1)).toBe(true);
+  expect([movingCanvas.width, movingCanvas.height]).toEqual([320, 576]);
+  expect(drawnInto).toEqual([movingCanvas]); // the one drawing, and only it
+  // Letting go of the pin is a retier too: still not woken.
+  host.creatureQuality.pin(null);
+  expect(held.wantsFrames()).toBe(false);
+  expect([heldCanvas.width, heldCanvas.height]).toEqual([533, 960]);
+  // Drawn for another reason (a change, the pointer), it takes the rung the governor is on then.
+  host.creatureQuality.pin(3);
+  held.redraw();
+  expect(held.tick(2)).toBe(true);
+  expect([heldCanvas.width, heldCanvas.height]).toEqual([320, 576]);
+  expect(drawnInto).toEqual([movingCanvas, heldCanvas]);
 });
 
 test("only a creature that moves is judged by the governor: held still, or the poster, its frames are not motion", () => {

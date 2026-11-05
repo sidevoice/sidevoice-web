@@ -562,9 +562,11 @@ export class LiveCreature {
   /** Moving, or holding still in its key pose (reduced motion, no GPU). */
   setMoving(moving: boolean) { if (moving !== this.moving) { this.moving = moving; this.framer?.hold(!moving); this.poke(); } }
 
-  /** The governor moved to another rung: this canvas is sized to it by its next frame (in the task that draws it, so it is never
-   *  shown cleared), and drawn then. */
-  requality() { if (this.slot === "scene" && this.scaled !== governor.scale) this.poke(); }
+  /** The governor moved to another rung: a creature in motion has this canvas sized to it by its next frame (in the task that
+   *  draws it, so it is never shown cleared), and drawn then. One held still (reduced motion, a key pose) is left as it is: it
+   *  was not what the governor judged, and resizing it would clear and redraw a picture nothing changed; it takes the rung
+   *  the governor is on when it is next drawn (tick). */
+  requality() { if (this.slot === "scene" && this.animates() && this.scaled !== governor.scale) this.poke(); }
 
   /** Drawn again at once (a framing or a level source changed). */
   redraw() { this.poke(); }
