@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.23.0](https://github.com/sidevoice/sidevoice-web/compare/v0.22.1...v0.23.0) (2026-11-05)
+
+
+### Features
+
+* **card:** the floating card's voice text in the new style ([#497](https://github.com/sidevoice/sidevoice-web/issues/497)) ([531febf](https://github.com/sidevoice/sidevoice-web/commit/531febf11f81a51ba9660078f073e25f180441a6))
+* **conversations:** the creature pops out of its card; state colours, menu and icons ([#490](https://github.com/sidevoice/sidevoice-web/issues/490)) ([3acf8eb](https://github.com/sidevoice/sidevoice-web/commit/3acf8eb2a370693d8a884a8ee0ba6bf81cde7a16))
+* **media:** choose what happens to other apps' media while the microphone is open ([#468](https://github.com/sidevoice/sidevoice-web/issues/468)) ([07c76f4](https://github.com/sidevoice/sidevoice-web/commit/07c76f496ec1d8ac959afec9874f4b227a50a27b))
+
+
+### Bug Fixes
+
+* **call-surface:** your words win over the state line, and the reply goes as one page ([#485](https://github.com/sidevoice/sidevoice-web/issues/485)) ([b2354e3](https://github.com/sidevoice/sidevoice-web/commit/b2354e34c22f67c189cddfc8d25f279def1489cd))
+* **ui:** drop the not-in-call subtitle, unselectable creatures ([#495](https://github.com/sidevoice/sidevoice-web/issues/495)) ([a78a88a](https://github.com/sidevoice/sidevoice-web/commit/a78a88ae8ff5a0826044442d67af21341ee216dd))
+
+
+### Performance Improvements
+
+* **avatar:** the creature runs smoothly on phones ([#491](https://github.com/sidevoice/sidevoice-web/issues/491)) ([7a0b278](https://github.com/sidevoice/sidevoice-web/commit/7a0b27883edccb8c77f66f30dd763f2f5ed92ae7))
+
 ## [0.22.1](https://github.com/sidevoice/sidevoice-web/compare/v0.22.0...v0.22.1) (2026-11-05)
 
 
