@@ -86,3 +86,36 @@ test("a context the browser takes away and gives back: the creature is drawn aga
   await page.setViewportSize(size);
   await expect.poll(() => pixels(agent), { timeout: 10_000 }).toBe(before);
 });
+
+test("only the faces' context taken away and not given back: the thumbnails show the fallback, the stage's creature stays", async ({ page }) => {
+  await page.addInitScript(() => {
+    const getContext = HTMLCanvasElement.prototype.getContext;
+    window.__contexts = [];
+    HTMLCanvasElement.prototype.getContext = function (kind, ...rest) {
+      const context = getContext.call(this, kind, ...rest);
+      if (context && /webgl/.test(kind) && !window.__contexts.includes(context)) window.__contexts.push(context);
+      return context;
+    };
+  });
+  await stage(page);
+  test.skip(!await page.evaluate(() => window.__contexts.length), "this browser gives no WebGL");
+  const agent = page.locator(".stage-agent[data-style=creature]");
+  const thumbnail = page.locator("#participants .sv-avatar[data-style=creature]").first();
+  await expect.poll(() => pixels(agent.locator("> canvas")), { timeout: 15_000 }).not.toBe("");
+  await expect.poll(() => pixels(thumbnail.locator("> canvas")), { timeout: 15_000 }).not.toBe("");
+  // The faces' stage renders 256 px squares; the stage's, 1152 × 768.
+  const losing = await page.evaluate(() => {
+    const faces = window.__contexts.find((gl) => gl.drawingBufferWidth === 256 && gl.drawingBufferHeight === 256);
+    window.__lose = faces?.getExtension("WEBGL_lose_context") ?? null;
+    window.__lose?.loseContext();
+    return !!window.__lose;
+  });
+  test.skip(!losing, "this browser cannot take a context away on request");
+  await expect(thumbnail).toHaveAttribute("data-fallback", { timeout: 10_000 });
+  await expect(agent).not.toHaveAttribute("data-fallback");
+  expect(await pixels(agent.locator("> canvas"))).not.toBe("");
+  // Given back: the thumbnails are faces again.
+  await page.evaluate(() => window.__lose.restoreContext());
+  await expect(thumbnail).not.toHaveAttribute("data-fallback", { timeout: 10_000 });
+  await expect.poll(() => pixels(thumbnail.locator("> canvas")), { timeout: 15_000 }).not.toBe("");
+});

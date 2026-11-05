@@ -43,7 +43,14 @@ export function loadCreatureHost(): Promise<CreatureHost> {
   }));
 }
 
-const watch = (watcher: () => void) => { watchers.add(watcher); return () => { watchers.delete(watcher); }; };
+const watch = (watcher: () => void) => {
+  watchers.add(watcher);
+  return () => {
+    watchers.delete(watcher);
+    // No creature waits for it any more: no retry is kept running. The next one mounted asks again.
+    if (!watchers.size && retry !== undefined) { clearTimeout(retry); retry = undefined; }
+  };
+};
 const now = () => state;
 
 /** The creature host once it has loaded (null until then) and whether its last load failed. A component that mounts asks

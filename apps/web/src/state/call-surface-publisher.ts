@@ -16,6 +16,9 @@ import type { RoomStore } from "./room-store";
 
 /** The spoken page goes out at most this often: a Live Activity is rate limited and a caption needs no more. */
 export const PAGE_SURFACE_MS = 2000;
+/** A still that could not be drawn (the creature's code did not load, most likely for a moment) is asked for again after
+ *  this, doubling up to STILL_RETRY_LAST_MS while none can be drawn: an idle call brings no change to ask again on. */
+export const STILL_RETRY_FIRST_MS = 1000, STILL_RETRY_LAST_MS = 30_000;
 
 export interface SurfaceClock {
   now(): number;
@@ -41,6 +44,7 @@ export function startCallSurface(store: RoomStore, options: SurfaceOptions = {})
   let seen = "", sentKey: string | null = null, spoke = false, baselined = false, callThread: string | null | undefined;
   let engaged = false, stopped = false;
   const drawing = new Set<string>();
+  let stillTimer: unknown = null, stillWait = STILL_RETRY_FIRST_MS;
   let shown = new Map<string, { thread: string; px: number }>();
 
   /** The host the stills were handed to: a new instance (the app reloaded) holds none of them. */
@@ -57,9 +61,24 @@ export function startCallSurface(store: RoomStore, options: SurfaceOptions = {})
     pageTimer = saidTimer = null;
   }
 
+  function clearStillRetry() {
+    if (stillTimer !== null) clock.clearTimeout(stillTimer);
+    stillTimer = null;
+    stillWait = STILL_RETRY_FIRST_MS;
+  }
+
+  /** The stills not drawn yet are asked for again in a while (wantStills draws every one still missing). */
+  function retryStills() {
+    if (stillTimer !== null) return;
+    const wait = stillWait;
+    stillWait = Math.min(STILL_RETRY_LAST_MS, stillWait * 2);
+    stillTimer = clock.setTimeout(() => { stillTimer = null; if (!stopped && engaged && active()) wantStills(); }, wait);
+  }
+
   /** The surface closed: nothing of it is kept, in the page or in the host. */
   function disengage() {
     clearTimers();
+    clearStillRetry();
     const ids = Object.keys(live.stills);
     live = { page: null, said: null, stills: {} };
     reading = null; pageAt = -Infinity; seen = ""; baselined = false; callThread = undefined; shown = new Map();
@@ -148,7 +167,9 @@ export function startCallSurface(store: RoomStore, options: SurfaceOptions = {})
       const target = host_;
       void draw(thread, px).then((still) => {
         drawing.delete(id);
-        if (stopped || !engaged || !still || !shown.has(id)) return;
+        if (stopped || !engaged || !shown.has(id)) return;
+        if (!still) { retryStills(); return; }
+        stillWait = STILL_RETRY_FIRST_MS;
         if (bridge() !== target) { wantStills(); return; } // The host changed while it drew: its own copy goes to the new one.
         // The bytes first, so a snapshot never names a still the host does not hold.
         target?.still({ id, png: still.png, px: still.px });
@@ -187,6 +208,7 @@ export function startCallSurface(store: RoomStore, options: SurfaceOptions = {})
     stopped = true;
     stop();
     clearTimers();
+    clearStillRetry();
     if (engaged) { const ids = Object.keys(live.stills); live = { page: null, said: null, stills: {} }; store.patch({ surfaceLive: null }); if (ids.length) host_?.forget(ids); }
   };
 }

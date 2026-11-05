@@ -13,6 +13,8 @@ const host = vi.hoisted(() => ({
   failLoads: 0,
   loads: 0,
   drawable: true,
+  /** The stages that are down while the other draws ("scene", "face"). */
+  down: new Set<string>(),
   watchers: new Set<() => void>(),
   lives: [] as { opts: Record<string, unknown>; disposed: boolean }[],
   faces: [] as { seed: string; expr: string }[],
@@ -22,16 +24,16 @@ const loadHost = vi.hoisted(() => () => {
   host.loads += 1;
   if (host.failLoads > 0) { host.failLoads -= 1; throw new Error("Failed to fetch dynamically imported module"); }
   return {
-    creaturesDrawable: () => host.drawable,
+    creaturesDrawable: (framing: string) => host.drawable && !host.down.has(framing),
     onCreaturesChange: (watcher: () => void) => { host.watchers.add(watcher); return () => { host.watchers.delete(watcher); }; },
     mountCreature: (opts: Record<string, unknown>) => {
-      if (!host.drawable) return null;
+      if (!host.drawable || host.down.has(opts.framing as string)) return null;
       const live = { opts, disposed: false };
       host.lives.push(live);
       return { setMood() {}, setMoving() {}, dispose: () => { live.disposed = true; } };
     },
     drawFace: (_canvas: HTMLCanvasElement, seed: string, expr: string) => {
-      if (host.drawable) host.faces.push({ seed, expr });
+      if (host.drawable && !host.down.has("face")) host.faces.push({ seed, expr });
       return () => {};
     },
   };
@@ -46,6 +48,7 @@ beforeEach(async () => {
   vi.doMock("./creature/host", loadHost);
   Object.assign(host, { failLoads: 0, loads: 0, drawable: true });
   host.watchers.clear();
+  host.down.clear();
   host.lives.length = 0;
   host.faces.length = 0;
   vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -131,4 +134,34 @@ test("a context lost and not given back shows the fallback; given back, the crea
   expect(avatar).not.toHaveAttribute("data-fallback");
   expect(host.lives).toHaveLength(2);
   expect(host.lives[1].disposed).toBe(false);
+});
+
+test("only the copies whose stage is down show the fallback: the faces' renderer down leaves the stage's creature", async () => {
+  const scene = render(stage());
+  const face = render(<CharacterAvatar spec={spec} state={idle} size="small" mouth="still" label="Agent, idle" />);
+  await until(() => host.lives.length > 0 && host.faces.length > 0);
+  host.down.add("face");
+  tell();
+  expect(scene.container.querySelector(".sv-avatar")).not.toHaveAttribute("data-fallback");
+  expect(host.lives[0].disposed).toBe(false);
+  expectFallback(face.container.firstElementChild!, "Agent, idle");
+  // The faces' renderer back: the still face is drawn again; the stage's creature was never built again.
+  host.down.delete("face");
+  tell();
+  expect(face.container.firstElementChild).not.toHaveAttribute("data-fallback");
+  expect(host.faces).toHaveLength(2);
+  expect(host.lives).toHaveLength(1);
+});
+
+test("the load's retry is let go of with the last creature: nothing keeps running for a page that shows none", async () => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  try {
+    host.failLoads = 1;
+    const view = render(stage());
+    for (let i = 0; i < 200 && !view.container.querySelector("[data-fallback]"); i++) await act(async () => { await new Promise((resolve) => setImmediate(resolve)); });
+    expect(view.container.querySelector(".sv-avatar")).toHaveAttribute("data-fallback");
+    expect(vi.getTimerCount()).toBe(1);
+    view.unmount();
+    expect(vi.getTimerCount()).toBe(0);
+  } finally { vi.useRealTimers(); }
 });

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 const rig = vi.hoisted(() => ({
   refuse: false,
-  made: [] as Array<{ renderer: FakeRenderer; draws: number }>,
+  made: [] as Array<{ renderer: FakeRenderer; draws: number; kind: "scene" | "face" }>,
   /** What each draw was asked to show: its state (a pose) and its expression. */
   drawn: [] as Array<{ state?: string; expr?: string; still: boolean }>,
 }));
@@ -20,14 +20,16 @@ vi.mock("./rig.js", () => {
   };
   class Stage {
     renderer: FakeRenderer;
+    kind: "scene" | "face";
     w = 256;
     h = 256;
     draws = 0;
     items: unknown[] = [];
     scene = { remove() {} };
     camera = { aspect: 1, updateProjectionMatrix() {} };
-    constructor() {
+    constructor(_look: string, _px: number, mode?: string) {
       if (rig.refuse) throw new Error("THREE.WebGLRenderer: Error creating WebGL context.");
+      this.kind = mode === "wide" ? "scene" : "face";
       this.renderer = renderer();
       rig.made.push(this);
     }
@@ -80,35 +82,42 @@ const lose = (stage: (typeof rig.made)[number]) => {
   return event;
 };
 const giveBack = (stage: (typeof rig.made)[number]) => stage.renderer.domElement.dispatchEvent(new Event("webglcontextrestored"));
+/** The page's stage for `kind`: the first made (a new renderer later is moved into it). */
+const stageFor = (kind: "scene" | "face") => rig.made.find((stage) => stage.kind === kind)!;
+/** The stage's creature, framed by hand (the test's DOM lays nothing out to place it by). */
+const onStage = { seed: "t1", framing: "scene" as const, scene: { zoom: 1, lookY: 0 }, moving: false };
 
 test("without WebGL nothing is drawn and the page is told so; a mount a while later tries again", async () => {
   const told = vi.fn();
   host.onCreaturesChange(told);
-  expect(host.creaturesDrawable()).toBe(true); // not tried yet
+  expect(host.creaturesDrawable("face")).toBe(true); // not tried yet
   expect(mount({ seed: "t1", canvas: canvas(), framing: "face" })).toBeNull();
-  expect(host.creaturesDrawable()).toBe(false);
+  expect(host.creaturesDrawable("face")).toBe(false);
   expect(told).toHaveBeenCalledTimes(1);
   expect(await host.faceImage("t1", "neutral")).toBeNull();
   // WebGL can be had now (a context refused for a moment): not tried again at once...
   webgl();
-  expect(host.canDrawCreatures()).toBe(false);
+  expect(host.canDrawCreatures("face")).toBe(false);
   expect(rig.made).toHaveLength(0);
   // ...but by a mount a while later.
   clock += 10_000;
   expect(mount({ seed: "t1", canvas: canvas(), framing: "face" })).not.toBeNull();
-  expect(host.creaturesDrawable()).toBe(true);
+  expect(host.creaturesDrawable("face")).toBe(true);
   expect(told).toHaveBeenCalledTimes(2);
 });
 
 test("a context refused is not drawn into: the page is told, and both stages are tried again later", () => {
   webgl();
   rig.refuse = true;
-  expect(host.canDrawCreatures()).toBe(false);
-  expect(host.creaturesDrawable()).toBe(false);
+  expect(host.canDrawCreatures("scene")).toBe(false);
+  expect(host.canDrawCreatures("face")).toBe(false);
+  expect(host.creaturesDrawable("scene")).toBe(false);
+  expect(host.creaturesDrawable("face")).toBe(false);
   rig.refuse = false;
   clock += 10_000;
-  expect(host.canDrawCreatures()).toBe(true);
-  expect(rig.made).toHaveLength(2);
+  expect(host.canDrawCreatures("scene")).toBe(true);
+  expect(host.canDrawCreatures("face")).toBe(true);
+  expect(rig.made.map((stage) => stage.kind)).toEqual(["scene", "face"]);
 });
 
 test("a lost context draws nothing; when it is back the stage gets a new renderer and the creature is drawn again", () => {
@@ -116,7 +125,7 @@ test("a lost context draws nothing; when it is back the stage gets a new rendere
   const told = vi.fn();
   host.onCreaturesChange(told);
   const live = mount({ seed: "t1", canvas: canvas(), framing: "face", moving: false })!;
-  const face = rig.made[1];
+  const face = stageFor("face");
   expect(live.tick(0)).toBe(true);
   expect(face.draws).toBe(1);
   // Lost: asked back (default prevented), and nothing is drawn meanwhile; the canvas keeps its last frame.
@@ -128,15 +137,15 @@ test("a lost context draws nothing; when it is back the stage gets a new rendere
   // Back: a new renderer (made as the stage made its own) takes the lost one's place, and the creature is drawn again.
   const old = face.renderer;
   giveBack(face);
-  expect(rig.made).toHaveLength(3);
-  expect(face.renderer).toBe(rig.made[2].renderer);
+  expect(rig.made).toHaveLength(2);
+  expect(face.renderer).toBe(rig.made[1].renderer);
   expect(old.disposed).toBe(true);
   expect(live.wantsFrames()).toBe(true);
   expect(live.tick(2)).toBe(true);
   expect(face.draws).toBe(2);
   // A brief loss never told the page it could not draw.
   expect(told).not.toHaveBeenCalled();
-  expect(host.creaturesDrawable()).toBe(true);
+  expect(host.creaturesDrawable("face")).toBe(true);
   // The new renderer is watched in turn.
   expect(lose(face).defaultPrevented).toBe(true);
 });
@@ -146,17 +155,17 @@ test("a context not given back in time counts as missing: waiting faces get none
   webgl();
   const told = vi.fn();
   host.onCreaturesChange(told);
-  expect(host.canDrawCreatures()).toBe(true);
-  const face = rig.made[1];
+  expect(host.canDrawCreatures("face")).toBe(true);
+  const face = stageFor("face");
   lose(face);
   const still = host.faceImage("t1", "neutral");
   vi.advanceTimersByTime(3000);
-  expect(host.creaturesDrawable()).toBe(false);
+  expect(host.creaturesDrawable("face")).toBe(false);
   expect(told).toHaveBeenCalledTimes(1);
   await expect(still).resolves.toBeNull();
   expect(mount({ seed: "t1", canvas: canvas(), framing: "face" })).toBeNull();
   giveBack(face);
-  expect(host.creaturesDrawable()).toBe(true);
+  expect(host.creaturesDrawable("face")).toBe(true);
   expect(told).toHaveBeenCalledTimes(2);
   expect(mount({ seed: "t1", canvas: canvas(), framing: "face" })).not.toBeNull();
 });
@@ -169,4 +178,37 @@ test("a still face is the idle key pose with its state's expression, as the refe
     { state: "idle", expr: "happy", still: true },
     { state: "idle", expr: "surprised", still: true },
   ]);
+});
+
+test("each stage answers for itself: the faces' renderer down leaves the stage's creature drawn, and the other way round", async () => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  webgl();
+  const told = vi.fn();
+  host.onCreaturesChange(told);
+  const live = mount({ ...onStage, canvas: canvas() })!;
+  expect(host.canDrawCreatures("face")).toBe(true);
+  const scene = stageFor("scene"), face = stageFor("face");
+  expect(live.tick(0)).toBe(true);
+  // The faces' context is lost and not given back.
+  lose(face);
+  vi.advanceTimersByTime(3000);
+  expect(told).toHaveBeenCalledTimes(1);
+  expect(host.creaturesDrawable("face")).toBe(false);
+  expect(await host.faceImage("t1", "neutral")).toBeNull();
+  expect(mount({ seed: "t1", canvas: canvas(), framing: "face" })).toBeNull();
+  // The stage's creature is still drawn, and another can be mounted there.
+  expect(host.creaturesDrawable("scene")).toBe(true);
+  live.redraw();
+  expect(live.wantsFrames()).toBe(true);
+  expect(live.tick(1)).toBe(true);
+  expect(scene.draws).toBe(2);
+  expect(mount({ ...onStage, canvas: canvas() })).not.toBeNull();
+  // The faces' renderer back, and the stage's lost for good: the faces are drawn, the stage's creature is not.
+  giveBack(face);
+  lose(scene);
+  vi.advanceTimersByTime(3000);
+  expect(host.creaturesDrawable("face")).toBe(true);
+  expect(host.creaturesDrawable("scene")).toBe(false);
+  expect(await host.faceImage("t1", "neutral")).not.toBeNull();
+  expect(live.tick(2)).toBe(false);
 });

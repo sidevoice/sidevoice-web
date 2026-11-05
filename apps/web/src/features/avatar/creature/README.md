@@ -22,18 +22,21 @@ the Sidevoice mascot are still the bichos engine's drawings (`../engine/`).
 
 ## Where it cannot be drawn
 
-An agent is never an empty box. Where no creature can be drawn, `fallback.ts` stands in, with the creature's label:
+An agent is never an empty box. Where no creature can be drawn, `fallback.ts` stands in, with the creature's label.
+Each of the two stages answers for itself: one stage draws the stage's creature, the other the still faces. When one is
+down, only the creatures it draws show the fallback.
 
 - **Its code did not load** (a dropped chunk): the load is not kept as failed. The next creature mounted loads it again,
   and the ones on the page try again after 1 s, doubling up to 30 s.
-- **No WebGL, or a context refused**: the page is told (`creaturesDrawable`, `onCreaturesChange`), and a creature mounted
-  10 s later tries again.
+- **No WebGL, or a context refused**: the page is told (`creaturesDrawable(framing)`, `onCreaturesChange`). A creature
+  mounted on that stage 10 s later tries again.
 - **A context lost**: nothing is drawn, and each canvas keeps its last frame. When the browser gives the context back,
-  the stage gets a new renderer (same scene, camera and creatures) and everything is drawn again. If it is not back
-  within 3 s, the fallback stands in until it is.
+  the stage gets a new renderer (same scene, camera and creatures) and its creatures are drawn again. If it is not back
+  within 3 s, the fallback stands in for that stage's creatures until it is.
 - **A native call surface's still** is the fallback too where creatures cannot be drawn
-  (`../../../state/call-surface-still.ts`). Where the code did not load it gives no still yet, and the publisher asks
-  again with the next change.
+  (`../../../state/call-surface-still.ts`), drawn by the faces' stage. Where the code did not load it gives no still
+  yet, and the publisher asks again by itself, after 1 s, doubling up to 30 s
+  (`../../../state/call-surface-publisher.ts`).
 
 ## Drawing one
 

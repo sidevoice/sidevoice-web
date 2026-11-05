@@ -21,8 +21,8 @@ export async function renderStill(threadId: string, px: number): Promise<Rendere
     face = await faceImage(threadId, STILL_EXPR.idle);
   } catch {
     // Its code did not load, most likely for a moment: no still yet, and the snapshot names none until there is one. The
-    // publisher asks again with the next change. A fallback here would stay for the whole call, since a still handed
-    // over is not drawn again.
+    // publisher asks again by itself (call-surface-publisher.ts retryStills), even on a call where nothing changes. A
+    // fallback here would stay for the whole call, since a still handed over is not drawn again.
     return null;
   }
   try {

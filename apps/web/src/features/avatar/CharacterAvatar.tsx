@@ -11,11 +11,11 @@ import type { LiveCreature } from "./creature/host";
 import { useCreatureHost, type CreatureHost } from "./creature-loader";
 
 const noWatch = () => () => {};
-const drawable = () => true;
-/** Whether the page can draw creatures now (creature/host.ts). It is read again each time that changes: a context lost
- *  and not given back, or given back. */
-function useDrawable(host: CreatureHost | null): boolean {
-  return useSyncExternalStore(host?.onCreaturesChange ?? noWatch, host?.creaturesDrawable ?? drawable);
+/** Whether the page can draw creatures now on the stage for `framing` (creature/host.ts: the stage's creature and the
+ *  still faces have a renderer each). It is read again each time that changes: a context lost and not given back, or
+ *  given back. */
+function useDrawable(host: CreatureHost | null, framing: "scene" | "face"): boolean {
+  return useSyncExternalStore(host?.onCreaturesChange ?? noWatch, () => host?.creaturesDrawable(framing) ?? true);
 }
 
 /* A conversation's agent is its creature (creature/: a real-time 3D rig, CreatureAvatar below): one canvas, drawn by the
@@ -127,7 +127,7 @@ function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, 
   const mood = state.mood;
   // The host (three.js and the rig) loads the first time a creature is drawn; the room does not wait for it.
   const { host, failed } = useCreatureHost();
-  const canDraw = useDrawable(host);
+  const canDraw = useDrawable(host, framing);
   // Nothing to draw it with: the fallback stands in. While the host is loading for the first time, nothing does yet.
   const fallback = host ? !canDraw : failed;
   // What it shows when its host has loaded, whatever changed in the meantime.
