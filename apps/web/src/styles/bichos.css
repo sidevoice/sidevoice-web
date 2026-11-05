@@ -1,6 +1,6 @@
 /* Built from the bichos engine (src/features/avatar/engine) by features/avatar/engine-stylesheet.ts: do not edit by
    hand, run `npx vitest run -u src/features/avatar/engine-css.test.ts`. The figures' moods, sizes and shared groups
-   under .sv-avatar[data-style=bichos], then the stage backdrops. */
+   under .sv-avatar[data-style=bichos]. */
 
 .sv-avatar[data-style=bichos] .ground { fill: rgb(0 0 0 / .16) }
 .sv-avatar[data-style=bichos] .shine { fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; opacity: .7 }
@@ -826,47 +826,3 @@
 @keyframes idl-yawn-rest { 0%,30% { opacity: 1 } 34%,47% { opacity: 0 } 50%,100% { opacity: 1 } }
 @keyframes idl-look { 0%,30%,52%,72%,100% { transform: translate(0,0) } 36%,46% { transform: translate(-2.4px,.4px) } 78%,88% { transform: translate(2.2px,-1px) } }
 @keyframes idl-snooze { 0%,100% { transform: scale(1.04,.95) } 50% { transform: scale(1.06,.935) } }
-
-/* the stage backdrops (engine/backdrop.ts) */
-.backdrop { position: absolute; inset: 0; display: block; width: 100%; height: 100%; pointer-events: none; overflow: hidden }
-.backdrop .bd-mount { display: none }
-.backdrop :is(.bd-drift, .bd-tw, .bd-sway, .bd-wave, .bd-rise, .bd-glow, .bd-band, .bd-swim, .bd-float, .bd-spin) { transform-box: fill-box; transform-origin: 50% 50% }
-.backdrop .bd-drift { animation: bd-drift 38s ease-in-out infinite alternate }
-.backdrop .bd-drift.slow { animation-duration: 56s; animation-delay: -20s }
-.backdrop .bd-drift.b { animation-direction: alternate-reverse }
-.backdrop .bd-tw { animation: bd-tw 3.4s ease-in-out infinite }
-.backdrop .bd-tw.b { animation-duration: 4.7s; animation-delay: -1.6s }
-.backdrop .bd-tw.c { animation-duration: 2.7s; animation-delay: -.8s }
-.backdrop .bd-sway { transform-origin: 50% 100%; animation: bd-sway 5s ease-in-out infinite alternate }
-.backdrop .bd-sway.b { animation-duration: 6.2s; animation-delay: -2s }
-.backdrop .bd-sway.c { animation-duration: 4.4s; animation-delay: -1s }
-.backdrop .bd-sway.slow { animation: bd-sway-slow 9s ease-in-out infinite alternate }
-.backdrop .bd-sway.slow.b { animation-delay: -4s }
-.backdrop .bd-sway.palm { transform-origin: 50% 30% }
-.backdrop .bd-wave { animation: bd-wave 6s ease-in-out infinite alternate }
-.backdrop .bd-wave.b { animation-duration: 7.5s; animation-direction: alternate-reverse }
-.backdrop .bd-rise { animation: bd-rise 10.4s linear infinite }
-.backdrop .bd-glow { animation: bd-glow 7s ease-in-out infinite alternate }
-.backdrop .bd-glow.b { animation-delay: -3s }
-.backdrop .bd-glow.c { animation-delay: -5s }
-.backdrop .bd-band { animation: bd-band 14s ease-in-out infinite alternate }
-.backdrop .bd-band.b { animation-duration: 18s; animation-direction: alternate-reverse }
-.backdrop .bd-band.c { animation-duration: 11s; animation-delay: -4s }
-.backdrop .bd-swim { animation: bd-swim 26s ease-in-out infinite alternate }
-.backdrop .bd-swim.b { animation-duration: 34s; animation-direction: alternate-reverse }
-.backdrop .bd-float { animation: bd-float 9s ease-in-out infinite alternate }
-.backdrop .bd-float.b { animation-duration: 7s; animation-delay: -3s }
-.backdrop .bd-spin { animation: bd-spin 30s linear infinite }
-.backdrop .bd-spin.b { animation-direction: reverse }
-@keyframes bd-drift { from { transform: translateX(-22px) } to { transform: translateX(22px) } }
-@keyframes bd-tw { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
-@keyframes bd-sway { from { transform: rotate(-3deg) } to { transform: rotate(3deg) } }
-@keyframes bd-sway-slow { from { transform: rotate(-1.2deg) } to { transform: rotate(1.2deg) } }
-@keyframes bd-wave { from { transform: translateX(-10px) } to { transform: translateX(10px) } }
-@keyframes bd-rise { 0% { transform: translateY(0); opacity: 0 } 10% { opacity: 1 } 85% { opacity: 1 } 100% { transform: translateY(-260px); opacity: 0 } }
-@keyframes bd-glow { from { opacity: .55 } to { opacity: 1 } }
-@keyframes bd-band { from { transform: translateX(-30px) skewX(-4deg); opacity: .75 } to { transform: translateX(30px) skewX(4deg); opacity: 1 } }
-@keyframes bd-swim { from { transform: translateX(-40px) } to { transform: translateX(40px) } }
-@keyframes bd-float { from { transform: translateY(-4px) } to { transform: translateY(4px) } }
-@keyframes bd-spin { to { transform: rotate(360deg) } }
-@media (prefers-reduced-motion: reduce) { .backdrop * { animation: none !important } }

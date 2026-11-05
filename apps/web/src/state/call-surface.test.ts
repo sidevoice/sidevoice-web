@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { createRoomSessionStore, speakWith, WORKING_SHOWN_AFTER_MS } from "./room-session-state.js";
-import { spokenPage, modelLabel, stillId, SURFACE_PAGE_CHARS, STILL_PX, FACE_PX } from "./call-surface.js";
-import { startCallSurface, PAGE_SURFACE_MS, type SurfaceClock } from "./call-surface-publisher";
+import { spokenPage, stillId, SURFACE_PAGE_CHARS, STILL_PX, FACE_PX } from "./call-surface.js";
+import { startCallSurface, PAGE_SURFACE_MS, STILL_RETRY_FIRST_MS, STILL_RETRY_LAST_MS, type SurfaceClock } from "./call-surface-publisher";
 import { readOn } from "../features/call/speech-chunks";
 import { PAGE_MS } from "../features/call/PagedText";
 
@@ -25,23 +25,14 @@ test("the projection's shape and defaults: nothing live, nothing pending, the wo
   expect(view.words.route).toBe('liveActivity.routeName {"route":"{route}"}');
 });
 
-test("model as people say it, effort in the data; the others as up to three faces; the count is of all conversations", () => {
+test("model as the connector reports it, effort in the data; the others as up to three faces; the count is of all conversations", () => {
   const view = surface({ pairings: [] });
-  expect(view.model).toBe("Opus 5.5");
+  expect(view.model).toBe("claude-opus-5-5");
   expect(view.effort).toBe("high");
   expect(view.conversationCount).toBe(5);
   expect(view.others.map((item) => item.threadId)).toEqual(["n|b", "n|c", "n|d"]);
   expect(view.words.conversations).toBe('card.conversationsCount {"n":5}');
   expect(view.words.offline).toBe("state.offline");
-});
-
-test("the page names a model in one place: known ids formatted, anything else unchanged", () => {
-  expect(modelLabel("claude-opus-5-5")).toBe("Opus 5.5");
-  expect(modelLabel("claude-sonnet-4-5-20250929")).toBe("Sonnet 4.5");
-  expect(modelLabel("claude-opus-5")).toBe("claude-opus-5");
-  expect(modelLabel("gpt-6-astra")).toBe("gpt-6-astra");
-  expect(modelLabel("claude-fable-9")).toBe("claude-fable-9");
-  expect(modelLabel(null)).toBeNull();
 });
 
 test("pendingCancellable is the open turn's, and the state line follows the turn, the reach and the mood", () => {
@@ -186,6 +177,85 @@ test("the page is sent at most every two seconds, and follows the voice", () => 
   expect(store.getState().callSurface.page!.lit).toBeGreaterThan(0);
 });
 
+/** A call whose person has just sent "Run the tests" (the said text is up), the conversation busy since `busy`. */
+function sent(facts: Record<string, unknown> = {}, busy = 1000) {
+  const time = clock();
+  const store = room({ botLive: false, karaokeState: null, history: [], userTurn: { id: "t", segment: "t", thread: "n|a" }, pendingPhase: "listening",
+    harness: { "n|a": true }, workingSince: { "n|a": busy }, now: busy + 500, ...facts });
+  startCallSurface(store, options(host(), time));
+  store.patch({ pendingPhase: "", userTurn: null, history: [userMessage("Run the tests")] });
+  return { store, time, view: () => store.getState().callSurface };
+}
+
+test("while the person's words show, the native surface says working at once, with its timer: not after the 3 s the stage waits", () => {
+  const { store, view } = sent();
+  // Busy for half a second: the stage and the card do not say working yet, the native surface's line and timer do.
+  expect(store.getState().callCard.mood).not.toBe("working");
+  expect(view()).toMatchObject({ said: "Run the tests", words: { state: "state.working" }, workingSince: 1000 });
+  // Nothing busy: no time is made up.
+  const idle = sent({ harness: {}, workingSince: {} });
+  expect(idle.view()).toMatchObject({ said: "Run the tests", words: { state: "state.working" }, workingSince: null });
+});
+
+test("the working line is carried past the said text until the stage's Working takes over, with the same timer", () => {
+  const { store, time, view } = sent();
+  time.advance(PAGE_MS + 1);
+  expect(view().said).toBeNull();
+  // Busy for 2.5 s: said is over, the stage's Working is not due yet. The line and the timer do not drop.
+  store.patch({ now: 3500 });
+  expect(view()).toMatchObject({ said: null, words: { state: "state.working" }, workingSince: 1000 });
+  store.patch({ now: 1000 + WORKING_SHOWN_AFTER_MS });
+  expect(store.getState().callCard.mood).toBe("working");
+  expect(view()).toMatchObject({ words: { state: "state.working" }, workingSince: 1000 });
+  // The work ends: resting, and no timer.
+  store.patch({ harness: { "n|a": false }, workingSince: {} });
+  expect(view()).toMatchObject({ words: { state: "state.resting" }, workingSince: null });
+});
+
+test("the carried working line ends with the work, and is not made from nothing", () => {
+  const { store, time, view } = sent();
+  time.advance(PAGE_MS + 1);
+  store.patch({ harness: { "n|a": false }, workingSince: {} });
+  expect(view()).toMatchObject({ said: null, words: { state: "state.resting" }, workingSince: null });
+  // Busy with no said text before: the stage's wait, as ever.
+  const quiet = room({ botLive: false, karaokeState: null, history: [], harness: { "n|a": true }, workingSince: { "n|a": 1000 }, now: 1500 });
+  startCallSurface(quiet, options(host(), clock()));
+  quiet.patch({ now: 2000 });
+  expect(quiet.getState().callSurface).toMatchObject({ words: { state: "state.resting" }, workingSince: null });
+});
+
+test("what is happening wins over the said text's working line, and over its carry", () => {
+  const lines = (facts: Record<string, unknown>) => sent(facts).view().words.state;
+  const turn = { userTurn: { id: "u", segment: "u", thread: "n|a" } };
+  // The said text is up, and then the person speaks again, the agent speaks, the call drops, or the conversation holds.
+  const again = sent();
+  again.store.patch({ ...turn, pendingPhase: "listening" });
+  expect(again.view().words.state).toBe("state.listening");
+  again.store.patch({ pendingPhase: "transcribing" });
+  expect(again.view().words.state).toBe("wave.transcribingTitle");
+  again.store.patch({ pendingPhase: "", userTurn: null, botLive: true });
+  expect(again.view().words.state).toBe("state.speaking");
+  again.store.patch({ botLive: false, reconnectShown: true });
+  expect(again.view().words.state).toBe("state.offline");
+  const hold = people.map((p) => p.thread_id === "a" ? { ...p, reach: { state: "holding" } } : p);
+  expect(lines({ people: hold })).toBe("state.holding");
+  // Carried: the same, once the said text is over.
+  const carried = sent();
+  carried.time.advance(PAGE_MS + 1);
+  carried.store.patch({ botLive: true });
+  expect(carried.view().words.state).toBe("state.speaking");
+  carried.store.patch({ botLive: false, ...turn, pendingPhase: "listening" });
+  expect(carried.view().words.state).toBe("state.listening");
+});
+
+test("another conversation does not inherit the carried working line", () => {
+  const { store, time, view } = sent({ harness: { "n|a": true, "n|b": true }, workingSince: { "n|a": 1000, "n|b": 1200 } });
+  time.advance(PAGE_MS + 1);
+  expect(view().words.state).toBe("state.working");
+  store.patch({ roomBinding: { thread_id: "b", title: "B" } });
+  expect(view()).toMatchObject({ said: null, words: { state: "state.resting" }, workingSince: null });
+});
+
 test("browsing another conversation, the call's own surface goes on: its captions, its Cancel Send, its said text", () => {
   const time = clock();
   const store = room({ viewedThread: "n|b", botLive: true });
@@ -277,6 +347,20 @@ test("stills go by reference: the bytes cross once per id, before the snapshot t
   expect(api.still).toHaveBeenCalledTimes(4);
 });
 
+test("a still that cannot be drawn is not drawn again with every word", async () => {
+  const store = room();
+  const api = host();
+  const draw = vi.fn(async (id: string, px: number) => (id === "n|b" ? null : { png: "png-" + id, px, k: 1 }));
+  startCallSurface(store, options(api, clock(), draw));
+  await vi.waitFor(() => expect(api.still).toHaveBeenCalledTimes(3));
+  for (const to of [1, 2, 3]) {
+    store.patch({ karaokeState: { segment: "s1", from: 0, to } });
+    await new Promise((resolve) => setTimeout(resolve, 0)); // the draws of this word settle
+  }
+  expect(draw).toHaveBeenCalledTimes(4);
+  expect(Object.keys(store.getState().facts.surfaceLive!.stills)).not.toContain(stillId("n|b", FACE_PX));
+});
+
 test("stills of a removed conversation are given back and no longer kept", async () => {
   const store = room();
   const api = host();
@@ -304,12 +388,6 @@ test("workingSince is the call's conversation's busy start while it shows as wor
   expect(store.getState().callSurface).toMatchObject({ workingSince: 1000, words: { state: "state.working" } });
   const idle = createRoomSessionStore({ ...base } as never);
   expect(idle.getState().callSurface.workingSince).toBeNull();
-});
-
-test("a model id the page does not know passes through, never a made-up name", () => {
-  expect(modelLabel("claude-opus-999-42")).toBe("claude-opus-999-42");
-  expect(modelLabel("claude-opus-5-9")).toBe("claude-opus-5-9");
-  expect(modelLabel("claude-opus-5-5-20261101")).toBe("Opus 5.5");
 });
 
 test("workingSince is sent while the state shows as working: a busy conversation that cannot receive is still working", () => {
@@ -355,4 +433,67 @@ test("a still is let go of only after the snapshot stops naming it: on removal, 
   expect(store.getState().facts.surfaceLive).toBeNull();
   expect(api.forget).toHaveBeenCalledTimes(2);
   expect(forgotten).toEqual([[], []]);
+});
+
+test("a still that could not be drawn is asked for again by itself, on an idle call: after 1 s, then doubling", async () => {
+  const time = clock();
+  const store = room();
+  const api = host();
+  // The creature's code fails to load twice (renderStill gives null), then loads.
+  let failures = 2;
+  const draw = vi.fn(async (id: string, px: number) => (failures > 0 ? null : { png: "png-" + id, px, k: 1 }));
+  startCallSurface(store, options(api, time, draw));
+  await vi.waitFor(() => expect(draw).toHaveBeenCalledTimes(4));
+  await Promise.resolve();
+  failures -= 1;
+  expect(api.still).not.toHaveBeenCalled();
+  // Nothing in the room changes: the publisher asks again on its own.
+  time.advance(STILL_RETRY_FIRST_MS - 1);
+  expect(draw).toHaveBeenCalledTimes(4);
+  time.advance(1);
+  await vi.waitFor(() => expect(draw).toHaveBeenCalledTimes(8));
+  await Promise.resolve();
+  failures -= 1;
+  // The next wait is twice as long.
+  time.advance(STILL_RETRY_FIRST_MS * 2 - 1);
+  expect(draw).toHaveBeenCalledTimes(8);
+  time.advance(1);
+  await vi.waitFor(() => expect(api.still).toHaveBeenCalledTimes(4));
+  expect(store.getState().callSurface.still).toEqual({ id: stillId("n|a", STILL_PX), k: 1 });
+  // Drawn: nothing more is asked.
+  time.advance(STILL_RETRY_LAST_MS * 2);
+  expect(draw).toHaveBeenCalledTimes(12);
+});
+
+test("a still retry ends with the surface: none is asked for after it closes or stops", async () => {
+  const time = clock();
+  const store = room();
+  const api = host();
+  const draw = vi.fn(async () => null);
+  const stop = startCallSurface(store, options(api, time, draw));
+  await vi.waitFor(() => expect(draw).toHaveBeenCalledTimes(4));
+  await Promise.resolve();
+  stop();
+  time.advance(STILL_RETRY_LAST_MS * 4);
+  expect(draw).toHaveBeenCalledTimes(4);
+});
+
+test("a failed still is tried again by its own clock, not by the words: none with each word, one after the wait", async () => {
+  const time = clock();
+  const store = room();
+  const api = host();
+  let fails = true;
+  const draw = vi.fn(async (id: string, px: number) => (id === "n|b" && fails ? null : { png: "png-" + id, px, k: 1 }));
+  startCallSurface(store, options(api, time, draw));
+  await vi.waitFor(() => expect(api.still).toHaveBeenCalledTimes(3));
+  for (const to of [1, 2, 3]) {
+    store.patch({ karaokeState: { segment: "s1", from: 0, to } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  expect(draw).toHaveBeenCalledTimes(4);
+  fails = false;
+  time.advance(STILL_RETRY_FIRST_MS);
+  await vi.waitFor(() => expect(api.still).toHaveBeenCalledTimes(4));
+  expect(draw).toHaveBeenCalledTimes(5);
+  expect(store.getState().callSurface.others.map((o) => o.still?.id)).toContain(stillId("n|b", FACE_PX));
 });

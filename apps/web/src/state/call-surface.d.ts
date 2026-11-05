@@ -11,7 +11,6 @@ export function wordBoundaries(text: string, locale?: string): number[];
 export type CallState = 'offline' | 'listening' | 'transcribing' | 'speaking' | 'working' | 'holding' | 'idle';
 /** The one precedence: offline > the person's turn > speaking > working > holding > idle. */
 export function callState(facts: { offline: boolean; turn: 'listening' | 'transcribing' | null; speaking: boolean; working: boolean; holding: boolean }): CallState;
-export function modelLabel(id: string | null | undefined): string | null;
 
 /** The page of the reply the voice is on: its text (an ellipsis ends it where more follows) and how many of its UTF-16
  *  code units are lit, rounded down to the start of a word (never ahead of the voice). */
@@ -46,7 +45,7 @@ export interface CallSurface {
   pendingCancellable: boolean;
   /** The call's conversation's reach; null with none. */
   reach: ParticipantView['reach'] | null;
-  /** The model as people say it ("Opus 5.5"; an id the page does not know, unchanged); effort as reported, not shown. */
+  /** The model exactly as the connector reports it; effort as reported, not shown. */
   model: string | null; effort: string | null; machine: string | null;
   /** Epoch ms the working phase began (the room's busy clock), while the call shows as working; null otherwise or when unknown. */
   workingSince: number | null;
@@ -58,7 +57,9 @@ export interface CallSurface {
   still: SurfaceStillRef | null;
   page: SpokenPage | null;
   said: string | null;
+  /** The conversation (thread) whose said text the Working line is being carried for, until the stage's Working takes over. */
+  saying: string | null;
   words: SurfaceWords;
 }
 
-export function callSurfaceView(card: CallCardView, participants: ParticipantView[], live: SurfaceLive | null | undefined, say: (key: string, params?: Record<string, unknown>) => string, call: { pendingCancellable: boolean; workingSince?: number | null }, previous?: CallSurface | null): CallSurface;
+export function callSurfaceView(card: CallCardView, participants: ParticipantView[], live: SurfaceLive | null | undefined, say: (key: string, params?: Record<string, unknown>) => string, call: { pendingCancellable: boolean; workingSince?: number | null; busySince?: number | null }, previous?: CallSurface | null): CallSurface;

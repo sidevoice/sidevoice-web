@@ -216,6 +216,11 @@ export const messages = {
   "messages.thinking": "The conversation is working on your message",
   "messages.new": "New messages",
   "messages.toLatest": "Go to the end of the conversation",
+  // The transcript: a long message folded to six lines, and its live rows (their ellipsis is drawn after the word).
+  "messages.seeMore": "See more",
+  "messages.seeLess": "See less",
+  "messages.working": "Working",
+  "messages.transcribing": "Transcribing",
 
   "wave.listening": "Listening",
   "wave.listeningTitle": "Listening…",

@@ -1,166 +1,288 @@
 /* The transcript (TranscriptPanel): docked at the call's right on a desktop, over the call from the right on a compact
  * desktop window, a sheet from the bottom on a phone (state/call-layout.ts NARROW_QUERY and COMPACT_QUERY say which
- * is which); its runs of messages drawn as a chat app draws them, and the text box
- * always under them. Its look is the design system's "Transcript" pattern (design-system/app-patterns.css).
+ * is which); its runs of messages, and the text box always under them.
+ *
+ * Its look is the creature redesign's closed transcript (research creature-void-design-2026-11-01, frozen reference
+ * 2026-11-04: creator.js, the transcript's styles; DESIGN.md T33–T59), built to it pixel for pixel: the stage cards'
+ * colours and type in a chat bubble's shape (T40), the agent's whole creature floating over its run's foot (T37, T41),
+ * every message's time inside it (T42), an interrupted reply's rest quiet with its tag (T48), a reply never played folded
+ * in a grey bubble (T57), "Working…" in place of the dots (T52), a head that says only "Transcript" (T58, T59). Its
+ * colours are its own (below, both themes), as the reference has them: the room's palette is aligned with them later,
+ * in a pass of its own. Where the reference's own cascade drew a colour other than the one its rule names (the head's
+ * icon, an opened reply's words), the colour it drew is the one here: that is what was seen and closed.
  * The shared components' rules load after this file, so a rule here that reshapes one of them names it as well. */
 
-/* ----- the panel: a fixed column beside the call, gone while closed */
+.transcript {
+  --tr-panel: #fbf9f6; --tr-ink: #1b1d24; --tr-edge: #c5b9d5; --tr-line: #e6dff0;
+  --tr-panel-shadow: 0 3px 8px rgb(42 26 64 / 8%), 0 18px 40px -22px rgb(74 47 107 / 40%);
+  --tr-icon-bg: #f3eefa; --tr-icon-ink: #686b7a; --tr-hover: #0000000d; --tr-scroll: #d6cce4; --tr-grab: #c5b9d5;
+  --tr-bubble: #fff; --tr-bubble-ink: #1b1d24; --tr-bubble-edge: #ddd3e8;
+  --tr-bubble-shadow: 0 1px 2px rgb(42 26 64 / 8%), 0 4px 10px rgb(42 26 64 / 8%), 0 16px 30px -14px rgb(74 47 107 / 42%);
+  --tr-time: #8b8696; --tr-accent: #6b4fd8; --tr-play-bg: #f3eefa; --tr-play-ink: #4a2f6b;
+  --tr-tag-bg: #efe9f6; --tr-tag-ink: #8a7fa0; --tr-day-edge: #e6dff0;
+  --tr-never-bg: #f1edf6; --tr-never-edge: #e3dcec; --tr-never-ink: #9a93a6; --tr-never-hover: #686b7a;
+  --tr-opened-bg: #f6f3fa; --tr-opened-edge: #e6e0ee; --tr-opened-shadow: 0 1px 2px rgb(42 26 64 / 6%); --tr-opened-ink: #686b7a;
+  --tr-cancel-bg: rgb(27 20 40 / 7%);
+  --tr-jump-bg: rgb(255 255 255 / 14%); --tr-jump-edge: rgb(197 185 213 / 38%); --tr-jump-ink: rgb(74 47 107 / 55%);
+  --tr-jump-hover-bg: rgb(255 255 255 / 92%); --tr-jump-hover-edge: #c5b9d5; --tr-jump-hover-ink: #4a2f6b; --tr-jump-dot: #6b4fd8;
+  --tr-field: #fff; --tr-field-edge: #c5b9d5; --tr-field-ink: #8b8696; --tr-send-bg: #ebe6f2; --tr-send-ink: #4a2f6b;
+  --tr-scrim: rgb(20 14 30 / 38%);
+}
+[data-theme="dark"] .transcript, .transcript[data-theme="dark"] {
+  --tr-panel: #19181d; --tr-ink: #f2f1f5; --tr-edge: #3d3946; --tr-line: #2e2b35;
+  --tr-icon-bg: #2a2633; --tr-icon-ink: #93939c; --tr-scroll: #3d3946;
+  --tr-bubble: #212125; --tr-bubble-ink: #fafafa; --tr-bubble-edge: #4b4756; --tr-bubble-shadow: 0 6px 18px rgb(0 0 0 / 35%);
+  --tr-accent: #b8a3ef; --tr-play-bg: #2a2633; --tr-play-ink: #c9b6ec;
+  --tr-tag-bg: #2a2633; --tr-tag-ink: #a99fc0; --tr-day-edge: #3a3644;
+  --tr-never-bg: #26242c; --tr-never-edge: #34313d;
+  --tr-opened-bg: #222028; --tr-opened-edge: #34313d; --tr-opened-ink: #c9c4d4;
+  --tr-cancel-bg: rgb(255 255 255 / 14%);
+  --tr-jump-bg: rgb(33 33 37 / 14%); --tr-jump-edge: #4b4756; --tr-jump-ink: #c9b6ec;
+  --tr-jump-hover-bg: rgb(36 35 42 / 92%); --tr-jump-hover-edge: #4b4756; --tr-jump-hover-ink: #e6def5; --tr-jump-dot: #b8a3ef;
+  --tr-field: #24232a; --tr-field-edge: #4b4756; --tr-send-bg: #2f2a3b; --tr-send-ink: #c9b6ec;
+}
+
+/* ----- the panel: a card at the call's right, 320px wide, 12px off its edges; gone while closed */
 .call-layout > .transcript {
-  flex: none; display: flex; flex-direction: column; width: 380px; min-width: 0; min-height: 0; overflow: hidden;
-  border-left: 1px solid var(--sv-border); background: var(--sv-bg);
+  flex: none; display: flex; flex-direction: column; position: relative; width: 320px; min-width: 0; min-height: 0; margin: 12px 12px 12px 0; overflow: hidden;
+  border: 1px solid var(--tr-edge); border-radius: 22px; background: var(--tr-panel); color: var(--tr-ink); box-shadow: var(--tr-panel-shadow);
 }
 .call-layout > .transcript:not([data-open]) { display: none; }
+.transcript { font: 14.5px/1.42 var(--sv-font-sans); letter-spacing: -.005em; }
 .transcript-grab, .transcript-scrim { display: none; }
 
-.transcript-head {
-  display: flex; flex: none; align-items: center; gap: var(--sv-space-3); min-width: 0;
-  padding: var(--sv-space-3) var(--sv-space-3) var(--sv-space-3) var(--sv-space-5); border-bottom: 1px solid var(--sv-border);
+/* The head (T58, T59): the transcript's three lines in a soft square, "Transcript", and the ×. */
+.transcript-head { display: flex; flex: none; align-items: center; gap: 8px; min-width: 0; padding: 10px 10px 9px 16px; border-bottom: 1px solid var(--tr-line); }
+.transcript-heading { display: grid; flex: 1; min-width: 0; margin: 0; font-size: inherit; font-weight: inherit; line-height: 1.2; }
+.transcript-title { display: inline-flex; align-items: center; gap: 9px; min-width: 0; font-size: 16px; font-weight: 650; }
+.transcript-icon { display: grid; flex: none; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: var(--tr-icon-bg); color: var(--tr-icon-ink); }
+.transcript-close {
+  appearance: none; position: relative; display: grid; flex: none; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%;
+  background: transparent; color: inherit; cursor: pointer;
 }
-.transcript-heading { display: grid; flex: 1; min-width: 0; }
-.transcript-heading strong { font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); line-height: 1.375rem; }
-#transcript-title { overflow: hidden; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); white-space: nowrap; text-overflow: ellipsis; }
-.transcript-close { flex: none; }
+@media (hover: hover) { .transcript-close:hover { background: var(--tr-hover); } }
+.transcript-close:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+/* Small to the eye, not to a finger: its tap area is 44px. */
+.transcript-close::after { content: ""; position: absolute; inset: -7px; }
 
-/* ----- the messages: one column that never grows wider than the panel; a long word breaks rather than push it */
+/* ----- the messages: one column scrolling under the head, the newest at its foot (the first block takes the slack) */
 .message-viewport-wrap { position: relative; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 #messages {
-  display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--sv-space-3);
-  height: 100%; padding: var(--sv-space-4); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scroll-behavior: smooth;
+  display: flex; flex-direction: column; height: 100%; padding: 12px 12px 6px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: var(--tr-scroll) transparent;
 }
+.messages-content { display: flex; flex-direction: column; gap: 14px; min-width: 0; margin-top: auto; }
 .message-day {
-  justify-self: center; margin: 0; padding: 2px var(--sv-space-2); border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken);
-  font-size: var(--sv-font-xs); font-weight: 600; line-height: 1rem; color: var(--sv-text-muted);
+  align-self: center; margin: 0; padding: 2px 10px; border: 1px solid var(--tr-day-edge); border-radius: 999px; background: transparent;
+  font-size: 11.5px; font-weight: 600; letter-spacing: .01em; color: var(--tr-tag-ink);
 }
-[data-theme="dark"] .message-day { background: var(--sv-surface-raised); }
-.message-group { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sv-space-1); min-width: 0; }
-/* The agent's face sits at the foot of its run, level with the last bubble's bottom. */
-.chat-message-row { display: flex; align-items: flex-end; gap: var(--sv-space-2); min-width: 0; }
+/* A run: the agent's at the left, its creature floating over the foot of its last message and taking no room (T41); the
+ * person's at the right. */
+.message-group { display: grid; grid-template-columns: minmax(0, 1fr); gap: 5px; min-width: 0; }
+/* The agent's run holds its face; the person's lies in the flow, under the agent's shadows, as the reference stacks them. */
+.message-group[data-role="assistant"] { position: relative; }
+.message-group[data-role="user"] { justify-items: end; }
+.chat-message-row { display: flex; align-items: flex-end; width: 100%; min-width: 0; }
+.message-group[data-role="assistant"] .chat-message-row { padding-left: 18px; }
 .message-group[data-role="user"] .chat-message-row { justify-content: flex-end; }
-.chat-avatar-spacer { flex: none; width: 32px; }
+.chat-face { position: absolute; z-index: 2; left: -12px; bottom: -14px; width: 44px; height: 44px; }
+.chat-face > .sv-avatar { display: block; width: 100%; height: 100%; background: none; }
+.chat-face > .sv-avatar > :is(canvas, .creature-fallback) { filter: drop-shadow(0 2px 2px rgb(42 26 64 / 22%)); }
+/* A run from no known conversation keeps its initials, where the face would be. */
+.chat-face > .ui-avatar { display: grid; place-items: center; width: 32px; height: 32px; margin: 6px; border-radius: 50%; background: var(--tr-icon-bg); color: var(--tr-play-ink); font-size: 12px; font-weight: 700; }
 
-/* A small face on its circle: in the light theme the circle is the figure's colour over the surface, since the
- * avatars' own backgrounds are dark ones. */
-.transcript .ui-avatar {
-  display: inline-grid; place-items: center; flex: none; width: 32px; height: 32px; overflow: hidden; border-radius: 50%;
-  background: var(--sv-accent-soft); color: var(--sv-accent-text); font-size: var(--sv-font-xs); font-weight: var(--sv-weight-bold);
-}
-.transcript .chat-character .sv-avatar { background: color-mix(in srgb, var(--av-color) 22%, var(--sv-surface)); }
-[data-theme="dark"] .transcript .chat-character .sv-avatar { background: var(--av-bg); }
-
-/* ----- a bubble: the agent's at the left, the person's at the right, each in the chat's colours (theme.css --sv-chat-*:
- * a fill, its text, its quieter text, which what the bubble holds reads as the theme's); the corner at a run's foot,
- * beside the face, is the tight one. Soft cards (decided 2026-10-14), as on the stage: round, lifted by a low shadow,
- * the agent's parted from the panel by an edge. */
+/* ----- a message (T40): the stage cards' face, colours and edge in a chat bubble's shape; the run's last tucked toward
+ * its speaker. */
 .chat-bubble {
-  --sv-text: var(--sv-chat-agent-fg); --sv-text-subtle: var(--sv-chat-agent-subtle);
-  position: relative; min-width: 0; max-width: min(86%, 34rem); padding: var(--sv-space-3) var(--sv-space-4) var(--sv-space-2);
-  border-radius: var(--sv-radius-2xl); background: var(--sv-chat-agent-bg); color: var(--sv-text); box-shadow: var(--sv-bubble-shadow);
-  font-size: 1rem; line-height: 1.5rem; white-space: pre-wrap; overflow-wrap: anywhere;
+  min-width: 0; max-width: 82%; padding: 9px 14px 10px; border: 1px solid var(--tr-bubble-edge); border-radius: 20px;
+  background: var(--tr-bubble); color: var(--tr-bubble-ink); box-shadow: var(--tr-bubble-shadow);
+  font: 450 15.5px/22px var(--sv-font-sans); letter-spacing: -.01em; text-wrap: pretty; white-space: pre-wrap; overflow-wrap: anywhere;
 }
-.chat-bubble[data-role="assistant"] { border: 1px solid var(--sv-bubble-edge); }
-/* Without a meta line (a draft has no time yet) the text sits in the middle. */
-.chat-bubble:not(:has(> .chat-meta)) { padding-bottom: var(--sv-space-3); }
-/* The person's, here and on the call's stage (call-view.css .person-bubble): one rule, so the two never differ. */
-.chat-bubble[data-role="user"], .person-bubble {
-  --sv-text: var(--sv-chat-person-fg); --sv-text-subtle: var(--sv-chat-person-subtle); background: var(--sv-chat-person-bg); color: var(--sv-text);
-}
-/* A person's bubble, filled in the deep colour, is an island of light inks: the time, the marks, the waveform, a
- * draft's edge, the cancel button and its hover and focus ring all take them. */
-:is(.chat-bubble[data-role="user"], .person-bubble) {
-  --sv-text-muted: var(--sv-chat-person-subtle); --sv-border-strong: var(--sv-chat-person-subtle); --sv-border: var(--sv-chat-person-bg);
-  --sv-accent: var(--sv-chat-person-mark); --sv-accent-text: var(--sv-chat-person-mark); --sv-focus: var(--sv-chat-person-mark);
-  --sv-danger: var(--sv-chat-person-danger); --sv-disabled-text: var(--sv-chat-person-quiet);
-  --sv-hover: var(--sv-chat-person-wash-hover); --sv-pressed: var(--sv-chat-person-wash-pressed); --sv-accent-soft: var(--sv-chat-person-wash); --sv-danger-soft: var(--sv-chat-person-wash);
-}
-.chat-bubble[data-role="assistant"]:is([data-position="last"], [data-position="only"]) { border-bottom-left-radius: var(--sv-radius-sm); }
-.chat-bubble[data-role="user"]:is([data-position="last"], [data-position="only"]) { border-bottom-right-radius: var(--sv-radius-sm); }
+/* The agent's messages, once said, are laid over what follows them (their shadows over the next run's top), as the
+ * reference stacks them; the person's and the live rows lie in the flow. */
+.message-group[data-role="assistant"] .chat-bubble:not(.working):not([data-saying]) { position: relative; }
+.message-group[data-role="assistant"] .chat-bubble:is([data-position="last"], [data-position="only"]) { border-bottom-left-radius: 6px; }
+.message-group[data-role="user"] .chat-bubble:is([data-position="last"], [data-position="only"]):not(.turn-pill) { border-bottom-right-radius: 6px; }
 /* Not sent yet: what is being said, still open, has a dashed edge and quieter text. */
-.chat-bubble[data-draft]:not([data-live]) { color: var(--sv-text-muted); outline: 1px dashed var(--sv-border-strong); outline-offset: -1px; }
+.chat-bubble[data-draft] { color: var(--tr-time); border-style: dashed; }
 
-/* Time, listen again and the delivery mark share the bubble's last line, at its end. */
+/* Its time inside it, at its foot right after the words (T42), as a chat app has it: the agent's with the replay, the
+ * person's with the ticks. */
 .chat-meta {
-  display: flex; align-items: center; justify-content: flex-end; gap: var(--sv-space-1); min-height: 20px; margin-top: 2px;
-  font-size: var(--sv-font-xs); line-height: 1rem; color: var(--sv-text-subtle); white-space: nowrap;
+  float: right; display: inline-flex; align-items: center; gap: 5px; margin: 7px -5px -5px 12px;
+  font-size: 11.5px; line-height: 1; color: var(--tr-time); white-space: nowrap;
 }
-.chat-meta time { font-variant-numeric: tabular-nums; }
-.chat-meta .ui-button.listen-again { width: 22px; height: 22px; border-radius: 50%; color: var(--sv-text-subtle); }
-.chat-meta .ui-button.listen-again svg { width: 12px; height: 12px; }
+.chat-receipt { display: inline-flex; color: var(--tr-time); }
+.chat-receipt[data-state="read"] { color: var(--tr-accent); }
+.chat-receipt[data-state="unconfirmed"] { color: var(--sv-disabled-text); }
+.chat-receipt:is([data-state="uncertain"], [data-state="not_sent"]) { color: var(--sv-danger); }
+.listen-again {
+  appearance: none; position: relative; display: grid; flex: none; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%;
+  background: var(--tr-play-bg); color: var(--tr-play-ink); cursor: pointer;
+}
+.listen-again:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
 /* Small to the eye, not to a finger: its tap area reaches past what it draws. */
-.chat-meta .ui-button.listen-again::after { content: ""; position: absolute; inset: -11px; }
-.chat-meta .receipt { display: inline-flex; color: var(--sv-text-subtle); }
-.chat-meta .receipt[data-state="read"] { color: var(--sv-accent-text); }
-/* Written but never acknowledged: a quieter grey than delivered, still 3:1 on the bubble (an opacity fell under it). */
-.chat-meta .receipt[data-state="unconfirmed"] { color: var(--sv-disabled-text); }
-.chat-meta .receipt:is([data-state="uncertain"], [data-state="not_sent"]) { color: var(--sv-danger); }
-.chat-audio-note { display: block; margin-top: var(--sv-space-1); font-size: var(--sv-font-xs); line-height: 1rem; color: var(--sv-text-muted); white-space: normal; }
+.listen-again::after { content: ""; position: absolute; inset: -11px; }
+.chat-audio-note { display: block; clear: both; padding-top: 4px; font-size: 12px; line-height: 16px; color: var(--tr-time); white-space: normal; }
 
-/* Cancelling belongs to the bubble, not beside it: its own line, at the end, in the danger colour and without a frame. */
-.chat-bubble .ui-button.cancel-input { display: flex; width: max-content; height: 28px; margin: var(--sv-space-1) calc(-1 * var(--sv-space-2)) 0 auto; padding: 0 var(--sv-space-2); }
-/* Small to the eye, not to a finger, here and on the stage. */
-:is(.person-bubble, .chat-bubble) .cancel-input::after { content: ""; position: absolute; inset: -6px; }
+/* Taking a written draft back: the person's round ×, its own line, at the end. */
+.chat-bubble[data-draft] > .turn-cancel { float: right; margin: 0 -6px 0 9px; }
 
-/* The open turn is the microphone's own waveform, on the person's balloon: the stage's (LiveVoiceBalloon, call-view.css),
- * which sizes and colours it. */
-
-/* The conversation is working on your turn: three dots in the agent's bubble. */
-.chat-bubble.thinking { display: inline-flex; align-items: center; height: 36px; padding: 0 var(--sv-space-4); color: var(--sv-text-muted); }
-
-/* Away from the end, a way back to it, a down arrow with no text (its name is the label): centred above the text box, where it covers least. It floats over the
- * messages, so the secondary's tint (see-through in the dark theme) lies over an opaque surface. */
-.message-viewport-wrap .ui-button.latest-jump {
-  position: absolute; z-index: 2; left: 0; right: 0; bottom: var(--sv-space-3); width: max-content; margin-inline: auto; box-shadow: var(--sv-shadow-md);
-  background-color: var(--sv-surface-raised); background-image: linear-gradient(var(--sv-button-secondary-bg), var(--sv-button-secondary-bg));
+/* A long message (T31): six lines, then "See more" in the accent; "See less" once open. */
+.chat-text[data-fold] { display: block; }
+.chat-text[data-fold="folded"] { white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+.see-more {
+  appearance: none; display: inline-block; margin: 5px 0 0; padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 600; letter-spacing: inherit; color: var(--tr-accent);
 }
+.see-more:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: 4px; }
+
+/* ----- the agent's reply while it is said: lit as it goes, the rest quiet (production's KaraokeText) */
+.karaoke-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.karaoke-text:is([data-playback="pending"], [data-playback="playing"]:not([data-progress])) { opacity: .38; }
+.karaoke-text[data-progress] .karaoke-upcoming { opacity: .38; }
+
+/* ----- a reply the person cut ('tag', T44–T48): what was said, the rest quiet and gaining on hover, a 2px accent mark at
+ * the cut on hover, and the "Interrupted" tag. Where it was cut is production's (UnheardReply hearingOf). */
+.cut-point { display: inline-block; width: 2px; height: 1.05em; margin: 0 1px 0 3px; vertical-align: -3px; border-radius: 1px; background: var(--tr-accent); opacity: 0; transition: opacity .2s; }
+.cut-rest { opacity: .38; transition: opacity .2s; }
 @media (hover: hover) {
-  .message-viewport-wrap .ui-button.latest-jump:hover {
-    background-color: var(--sv-surface-raised); background-image: linear-gradient(var(--sv-button-secondary-hover), var(--sv-button-secondary-hover));
-  }
+  .chat-bubble:hover .cut-point { opacity: 1; }
+  .chat-bubble:hover .cut-rest { opacity: .85; }
+}
+.cut-tag {
+  display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 999px; vertical-align: 1px;
+  font-size: 11.5px; font-weight: 600; line-height: 18px; color: var(--tr-tag-ink); background: var(--tr-tag-bg); white-space: nowrap;
 }
 
-/* ----- the text box, always there, as a call app's chat has it: a rounded field pinned at the panel's foot, set apart
- * from the messages by space rather than a line, Send an icon inside its end, waiting for something to send. */
-.text-composer { flex: none; min-width: 0; padding: var(--sv-space-2) var(--sv-space-4) var(--sv-space-4); background: var(--sv-bg); }
-/* The field's edge is an input's own (ui.css), 3:1 on the panel: its fill alone hardly parts from it in either theme. */
-.composer-field {
-  display: flex; align-items: flex-end; gap: var(--sv-space-1); min-width: 0; padding: var(--sv-space-1) var(--sv-space-1) var(--sv-space-1) var(--sv-space-4);
-  border: 1px solid var(--sv-border-strong); border-radius: 22px; background: var(--sv-bg-sunken); transition: border-color var(--sv-dur-fast) var(--sv-ease);
+/* ----- a reply that never played ('bubble-badge', T49–T57): folded, a grey bubble with the struck circle and its first
+ * line, nothing else; on hover the circle turns into the arrow (production's morph); opened, a muted bubble of its own,
+ * "Not played" over the words, its time and replay at the foot, the arrow down. */
+.chat-bubble.unheard {
+  display: flex; align-items: center; gap: 8px; width: 82%; padding: 7px 12px;
+  border-color: var(--tr-never-edge); background: var(--tr-never-bg); box-shadow: none;
 }
-[data-theme="dark"] .composer-field { background: var(--sv-surface-raised); }
+.chat-bubble.unheard[data-open] { display: block; border-color: var(--tr-opened-edge); background: var(--tr-opened-bg); box-shadow: var(--tr-opened-shadow); }
+.unheard-mark {
+  display: grid; flex: 1; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 1px 8px; min-width: 0;
+  color: var(--tr-never-ink); cursor: pointer;
+}
+.unheard[data-open] .unheard-mark { align-items: start; }
+@media (hover: hover) { .chat-bubble.unheard:hover .unheard-mark { color: var(--tr-never-hover); } }
+.unheard-toggle {
+  appearance: none; position: relative; grid-row: 1; width: 15px; height: 15px; padding: 0; border: 0; background: none; color: inherit; cursor: pointer;
+}
+.unheard[data-open] .unheard-toggle { margin-top: 1px; }
+.unheard-toggle:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: 4px; }
+/* Small to the eye, not to a finger. */
+.unheard-toggle::after { content: ""; position: absolute; inset: -8px; }
+.unheard-toggle svg { position: absolute; inset: 0; width: 15px; height: 15px; transition: opacity 140ms, transform 140ms; }
+.unheard-chevron { opacity: 0; transform: rotate(-45deg) scale(.7); }
+.unheard-toggle:focus-visible .unheard-blocked, .unheard[data-open] .unheard-blocked { opacity: 0; transform: rotate(45deg) scale(.7); }
+.unheard-toggle:focus-visible .unheard-chevron, .unheard[data-open] .unheard-chevron { opacity: 1; transform: none; }
+@media (hover: hover) {
+  .chat-bubble.unheard:hover .unheard-blocked { opacity: 0; transform: rotate(45deg) scale(.7); }
+  .chat-bubble.unheard:hover .unheard-chevron { opacity: 1; transform: none; }
+}
+/* Opened, down, hovered or not. */
+.chat-bubble.unheard[data-open] .unheard-chevron { transform: rotate(90deg); }
+.unheard-badge {
+  grid-column: 2; justify-self: start; padding: 0 7px; border-radius: 999px; font-size: 11.5px; font-weight: 650; line-height: 18px; letter-spacing: .01em;
+  color: var(--tr-tag-ink); background: var(--tr-tag-bg); white-space: nowrap;
+}
+.unheard-snippet { grid-column: 2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unheard[data-open] .unheard-snippet { overflow: visible; white-space: pre-wrap; color: var(--tr-opened-ink); }
+.unheard[data-open] .chat-meta { float: none; display: flex; justify-content: flex-end; margin: 3px -5px -4px 0; }
+
+/* ----- the conversation working on the person's turn ('label', T51): a quiet row, its dot in the creature's accent */
+.chat-bubble.working { display: flex; align-items: center; gap: 8px; width: 82%; border-color: transparent; background: none; box-shadow: none; }
+.working-label { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--tr-tag-ink); }
+.working-label > i { width: 8px; height: 8px; border-radius: 50%; background: var(--creature-accent, var(--tr-accent)); animation: transcript-blink 1.2s ease-in-out infinite; }
+@keyframes transcript-blink { 50% { opacity: .3; } }
+/* A running ellipsis after a live row's word. */
+.transcript-ell i { font-style: normal; animation: transcript-ell 1.2s ease-in-out infinite; }
+.transcript-ell i:nth-child(2) { animation-delay: .2s; }
+.transcript-ell i:nth-child(3) { animation-delay: .4s; }
+@keyframes transcript-ell { 0%, 100% { opacity: .2; } 40% { opacity: 1; } }
+
+/* ----- the person's open turn, without STT streaming (today): a pill with the microphone and its bars, then
+ * "Transcribing…", and the round × that takes it back, until it is sent. */
+.chat-bubble.turn-pill { display: flex; align-items: center; border-radius: 999px; padding: 5px 6px 5px 13px; white-space: nowrap; }
+.turn-lead { display: inline-flex; align-items: center; gap: 6px; }
+.turn-bars { display: inline-flex; align-items: center; gap: 2px; height: 14px; }
+.turn-bars i { display: block; width: 3px; height: 5px; border-radius: 2px; background: currentColor; animation: turn-bar .9s ease-in-out infinite; }
+.turn-bars i:nth-child(2) { height: 11px; animation-delay: -.3s; }
+.turn-bars i:nth-child(3) { height: 8px; animation-delay: -.6s; }
+.turn-bars i:nth-child(4) { height: 13px; animation-delay: -.15s; }
+.turn-bars i:nth-child(5) { animation-delay: -.45s; }
+@keyframes turn-bar { 50% { transform: scaleY(.35); } }
+.turn-label { font-size: 13px; font-weight: 550; }
+.turn-cancel {
+  appearance: none; position: relative; display: inline-flex; flex: none; align-items: center; justify-content: center; width: 24px; height: 24px; margin-left: 9px;
+  padding: 0; border: 0; border-radius: 50%; background: var(--tr-cancel-bg); color: inherit; cursor: pointer;
+}
+.turn-cancel:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.turn-cancel::after { content: ""; position: absolute; inset: -6px; }
+
+/* ----- back to the latest (T38): barely there over what it floats on, filling in on hover; a dot when something new came */
+.latest-jump {
+  appearance: none; position: absolute; z-index: 2; left: 50%; bottom: 14px; display: grid; place-items: center; width: 36px; height: 36px; padding: 0;
+  border: 1px solid var(--tr-jump-edge); border-radius: 50%; background: var(--tr-jump-bg); color: var(--tr-jump-ink); cursor: pointer;
+  opacity: 0; transform: translate(-50%, 8px) scale(.9); pointer-events: none; transition: opacity .2s, transform .2s;
+}
+.latest-jump[data-show] { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+@media (hover: hover) {
+  .latest-jump:hover { background: var(--tr-jump-hover-bg); border-color: var(--tr-jump-hover-edge); color: var(--tr-jump-hover-ink); box-shadow: 0 3px 10px rgb(42 26 64 / 14%); }
+}
+.latest-jump:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.latest-jump[data-new]::after { content: ""; position: absolute; top: 1px; right: 1px; width: 9px; height: 9px; border-radius: 50%; background: var(--tr-jump-dot); box-shadow: 0 0 0 2px var(--tr-panel); }
+
+/* ----- the text box, always there, under the messages: a rounded white field, Send an icon inside its end, waiting for
+ * something to send. The runtime owns its value and its disabled state (Composer). */
+.text-composer { flex: none; min-width: 0; padding: 6px 10px 10px; }
+.composer-field {
+  display: flex; align-items: center; gap: 6px; min-width: 0; padding: 5px 5px 5px 14px; border: 1px solid var(--tr-field-edge); border-radius: 16px;
+  background: var(--tr-field); box-shadow: 0 2px 6px rgb(42 26 64 / 6%); transition: border-color var(--sv-dur-fast) var(--sv-ease);
+}
 .composer-field:focus-within { border-color: var(--sv-focus); }
 .text-composer .composer-field .ui-textarea {
-  flex: 1; min-width: 0; padding: 7px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; line-height: 1.375rem;
+  flex: 1; min-width: 0; padding: 5.35px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none;
+  font-size: 15px; line-height: 1.42; letter-spacing: inherit; color: var(--tr-ink);
 }
+.text-composer .composer-field .ui-textarea::placeholder { color: var(--tr-field-ink); }
+/* A touch screen keeps the field's text at 16px (ui.css), or Safari zooms the page in as it is focused: the field stays
+ * 44px tall all the same. */
+@media (pointer: coarse) { .text-composer .composer-field .ui-textarea { padding-block: 4.64px; font-size: 16px; } }
 .text-composer .composer-field .ui-textarea:focus, .text-composer .composer-field .ui-textarea:focus-visible { outline: none; }
 .text-composer .composer-field .ui-textarea:disabled { background: transparent; }
-.text-composer .composer-send { flex: none; border-radius: 50%; background: var(--sv-accent); color: var(--sv-on-accent); }
+.text-composer .composer-send { flex: none; align-self: flex-end; width: 32px; height: 32px; border-radius: 50%; background: var(--sv-accent); color: var(--sv-on-accent); }
 @media (hover: hover) { .text-composer .composer-send:hover { background: var(--sv-accent-hover); } }
 .text-composer .composer-send:disabled { background: var(--sv-disabled-bg); border-color: transparent; color: var(--sv-disabled-text); pointer-events: none; }
-/* Waiting for something to write, Send is still the box's one action: the accent's soft fill, never the greyed one of a box that cannot take text. */
-.text-composer .composer-send[data-empty]:not(:disabled) { background: var(--sv-accent-soft); border-color: transparent; color: var(--sv-accent-text); pointer-events: none; }
+/* Waiting for something to write, Send is still the box's one action: the soft fill, never the greyed one of a box that cannot take text. */
+.text-composer .composer-send[data-empty]:not(:disabled) { background: var(--tr-send-bg); border-color: transparent; color: var(--tr-send-ink); pointer-events: none; }
 
 /* ----- a phone: the transcript rises from the bottom as a sheet over the dimmed call */
 @media (max-width: 559px), (max-width: 899px) and (pointer: coarse) {
   .transcript-scrim {
-    display: block; position: fixed; inset: 0; z-index: 30; background: var(--sv-scrim);
+    display: block; position: fixed; inset: 0; z-index: 30; background: var(--tr-scrim);
     opacity: 0; pointer-events: none; transition: opacity var(--sv-dur-base) var(--sv-ease);
   }
   .transcript-scrim[data-open] { opacity: 1; pointer-events: auto; }
   .call-layout > .transcript, .call-layout > .transcript:not([data-open]) {
-    display: flex; position: fixed; z-index: 31; left: var(--sv-inset-left); right: var(--sv-inset-right); bottom: 0; width: auto; height: 82dvh;
-    border: 1px solid var(--sv-border); border-bottom: 0; border-radius: var(--sv-radius-2xl) var(--sv-radius-2xl) 0 0; box-shadow: var(--sv-shadow-lg);
+    display: flex; position: fixed; z-index: 31; left: var(--sv-inset-left); right: var(--sv-inset-right); bottom: 0; width: auto; height: 76dvh; margin: 0;
+    border-width: 1px 0 0; border-radius: 26px 26px 0 0; box-shadow: var(--tr-panel-shadow);
     transform: translateY(105%); visibility: hidden; transition: transform .25s ease, visibility 0s linear .25s;
   }
   .call-layout > .transcript[data-open] { transform: none; visibility: visible; transition: transform .25s ease; }
-  /* Closed, the sheet waits off screen: what pulses in it (the thinking dots, a turn being transcribed) does not run until it is opened. */
+  /* Closed, the sheet waits off screen: what pulses in it (a live row) does not run until it is opened. */
   .call-layout > .transcript:not([data-open]) * { animation: none !important; }
   /* The grabber and the title row drag the sheet down (lib/use-sheet-drag.ts): the engine claims no pan from them, and
-     the grabber's strip is the sheet's whole width, a finger's height, its bar drawn in its middle. */
-  .transcript-grab { display: block; position: relative; flex: none; height: var(--sv-space-5); }
-  .transcript-grab::before { content: ""; position: absolute; top: var(--sv-space-2); left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: var(--sv-border-strong); }
+     the grabber's strip is the sheet's whole width, its bar drawn in its middle. */
+  .transcript-grab { display: block; position: relative; flex: none; height: 13px; }
+  .transcript-grab::before { content: ""; position: absolute; top: 8px; left: 50%; width: 40px; height: 5px; margin-left: -20px; border-radius: 3px; background: var(--tr-grab); }
   .transcript-grab, .transcript-head { touch-action: none; user-select: none; -webkit-user-select: none; }
-  .transcript-head { padding-top: 0; }
-  #messages { padding-inline: var(--sv-space-3); }
-  .text-composer { padding: var(--sv-space-2) var(--sv-space-3) max(var(--sv-space-3), var(--sv-inset-bottom)); }
+  .latest-jump { bottom: 24px; }
+  .text-composer { padding: 6px 10px max(22px, var(--sv-inset-bottom)); }
 }
 
 /* ----- a compact desktop window (560–899px, a fine pointer: COMPACT_QUERY): no room to dock it beside the rail and a
@@ -168,20 +290,37 @@
  * as wide as it docks; the call does not move under it */
 @media (min-width: 560px) and (max-width: 899px) and (pointer: fine) {
   .transcript-scrim {
-    display: block; position: fixed; inset: 0; z-index: 30; background: var(--sv-scrim);
+    display: block; position: fixed; inset: 0; z-index: 30; background: var(--tr-scrim);
     opacity: 0; pointer-events: none; transition: opacity var(--sv-dur-base) var(--sv-ease);
   }
   .transcript-scrim[data-open] { opacity: 1; pointer-events: auto; }
   .call-layout > .transcript, .call-layout > .transcript:not([data-open]) {
-    display: flex; position: absolute; z-index: 31; top: 0; right: 0; bottom: 0; box-shadow: var(--sv-shadow-lg);
-    transform: translateX(105%); visibility: hidden; transition: transform .25s ease, visibility 0s linear .25s;
+    display: flex; position: absolute; z-index: 31; top: 0; right: 0; bottom: 0;
+    transform: translateX(calc(100% + 24px)); visibility: hidden; transition: transform .25s ease, visibility 0s linear .25s;
   }
   .call-layout > .transcript[data-open] { transform: none; visibility: visible; transition: transform .25s ease; }
   .call-layout > .transcript:not([data-open]) * { animation: none !important; }
 }
 
-/* ----- the conversation's pieces, wherever they show (the call's stage shows the first two, at its own size and
- * colour): the open turn's waveform, the karaoke of a reply, the thinking dots */
+@media (prefers-reduced-motion: reduce) {
+  .working-label > i, .transcript-ell i, .turn-bars i { animation: none; }
+  .transcript-ell i { opacity: 1; }
+}
+
+/* ----- the conversation's pieces the call's stage shows too, at its own size and colour */
+/* The person's balloon on the call's stage (call-view.css .person-bubble, PersonTurn): the chat's person colours, and an
+ * island of light inks on that deep fill — the time, the marks, the waveform, the cancel button and its hover and focus
+ * ring all take them. The transcript's own person messages are white (T40) and no longer share it. */
+.person-bubble {
+  --sv-text: var(--sv-chat-person-fg); --sv-text-subtle: var(--sv-chat-person-subtle); background: var(--sv-chat-person-bg); color: var(--sv-text);
+  --sv-text-muted: var(--sv-chat-person-subtle); --sv-border-strong: var(--sv-chat-person-subtle); --sv-border: var(--sv-chat-person-bg);
+  --sv-accent: var(--sv-chat-person-mark); --sv-accent-text: var(--sv-chat-person-mark); --sv-focus: var(--sv-chat-person-mark);
+  --sv-danger: var(--sv-chat-person-danger); --sv-disabled-text: var(--sv-chat-person-quiet);
+  --sv-hover: var(--sv-chat-person-wash-hover); --sv-pressed: var(--sv-chat-person-wash-pressed); --sv-accent-soft: var(--sv-chat-person-wash); --sv-danger-soft: var(--sv-chat-person-wash);
+}
+/* Small to the eye, not to a finger. */
+.person-bubble .cancel-input::after { content: ""; position: absolute; inset: -6px; }
+/* The open turn's waveform */
 .voice-wave { position: relative; display: block; width: min(13rem, 44vw); height: 2.15rem; }
 /* The bars (VoiceWaveform): per column, a fully rounded bar made of two round ends (<i>) and a middle (<u>), all anchored at
  * the wave's right edge and each on a layer of its own. VoiceWaveform writes their transforms (barTransforms) and nothing
@@ -201,89 +340,12 @@
 .voice-bars { display: inline-flex; align-items: center; gap: 3px; height: 20px; padding: 0 2px; }
 .voice-bars i { display: block; width: 3px; height: 12px; border-radius: 2px; background: currentColor; }
 .voice-bars[data-phase="transcribing"] i { opacity: .8; }
-
-/* The part already spoken in the text's colour, the rest quieter; all of it quiet before the voice says where it is. */
-.karaoke-text { white-space: pre-wrap; overflow-wrap: anywhere; }
-.karaoke-text:is([data-playback="pending"], [data-playback="playing"]:not([data-progress])) { color: var(--sv-text-subtle); }
-.karaoke-text[data-progress] .karaoke-upcoming { color: var(--sv-text-subtle); }
-
-/* One beat each, at the pace of the presence pulse. Between beats a dot rests at .7, the least that keeps it 3:1 on the
- * agent's bubble in the light theme: fainter, the dots that say it is working all but vanish. */
-.thinking-dots { display: inline-flex; align-items: center; gap: 5px; }
-.thinking-dots i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .7; animation: thinking-dot 1.2s infinite ease-in-out; }
-.thinking-dots i:nth-child(2) { animation-delay: .16s; }
-.thinking-dots i:nth-child(3) { animation-delay: .32s; }
-@keyframes thinking-dot { 0%, 60%, 100% { opacity: .7; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
-
 @media (prefers-reduced-motion: reduce) {
   .voice-wave[data-phase="transcribing"] .voice-wave-bars { animation: none; opacity: .8; }
-  .thinking-dots i { animation: none; opacity: .7; }
 }
 
 /* Nothing said yet: the panel says so instead of standing empty. */
-.messages-empty { display: grid; justify-items: center; align-content: center; gap: var(--sv-space-3); min-height: 60%; padding: var(--sv-space-8) var(--sv-space-6); text-align: center; color: var(--sv-text-muted); }
-.messages-empty svg { color: var(--sv-text-subtle); }
-.messages-empty p { max-width: 28ch; margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
-
-/* ----- how a reply settles once played (UnheardReply.tsx, UnheardMark.tsx): cut part-way, or never played. */
-.cut-heard { white-space: pre-wrap; }
-.cut-rest { color: var(--sv-text-muted); }
-/* The landing's interrupted pill (site.css .voice-cut), built like the never-played row: the pause bars are the icon, which
- * becomes the arrow in its place on hover or focus (down once the rest is open). The icon variant shows its word only then. */
-.cut-marker {
-  appearance: none; display: inline-flex; align-items: center; gap: 4px; padding: 2px 5px; border-radius: 4px; vertical-align: middle; cursor: pointer; font: inherit;
-  border: 1px solid color-mix(in srgb, var(--sv-accent) 25%, var(--sv-surface)); background: var(--sv-accent-soft); color: var(--sv-accent-text);
-  font-size: 0.64rem; font-weight: 650; line-height: 1.3; white-space: nowrap;
-}
-.cut-marker:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
-.cut-marker:active { background-image: linear-gradient(var(--sv-pressed), var(--sv-pressed)); }
-.cut-icon { position: relative; flex: none; width: 10px; height: 10px; }
-.cut-icon svg { position: absolute; inset: 0; width: 10px; height: 10px; transition: opacity 140ms, transform 140ms; }
-.cut-chevron { opacity: 0; transform: rotate(-45deg) scale(.7); }
-.cut-marker:focus-visible .cut-pause, .cut-marker[aria-expanded="true"] .cut-pause { opacity: 0; transform: rotate(45deg) scale(.7); }
-@media (hover: hover) { .cut-marker:hover .cut-pause { opacity: 0; transform: rotate(45deg) scale(.7); } }
-.cut-marker:focus-visible .cut-chevron, .cut-marker[aria-expanded="true"] .cut-chevron { opacity: 1; transform: none; }
-@media (hover: hover) { .cut-marker:hover .cut-chevron { opacity: 1; transform: none; } }
-/* The rest continues in the same balloon: the arrow points right (more after), and left once open (back). */
-.cut-marker[aria-expanded="true"] .cut-chevron { transform: rotate(180deg); }
-.cut-marker .cut-label { overflow: hidden; transition: max-width 160ms, opacity 160ms; }
-/* What was not heard continues the same balloon, quieter. */
-.cut-rest { color: var(--sv-text-subtle); }
-.cut-heard { white-space: pre-wrap; }
-
-/* A reply that never played: one quiet row, at the message size in a light grey, from one fixed left edge. */
-/* Never wider than an agent's balloon, whose width it takes. */
-.unheard { min-width: 0; flex: 1; display: grid; gap: var(--sv-space-1); max-width: min(86%, 34rem); }
-.unheard-mark {
-  appearance: none; display: flex; align-items: center; gap: var(--sv-space-2); width: 100%; min-height: 24px; padding: var(--sv-space-2) 0; border: 0; background: none;
-  font: inherit; font-size: 1rem; line-height: 1.5rem; text-align: left; color: var(--sv-text-subtle); cursor: pointer; position: relative; min-width: 0;
-}
-/* Small to the eye, not to a finger. */
-.unheard-mark::after { content: ""; position: absolute; inset: -4px 0; }
-.unheard-mark:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: var(--sv-radius-sm); }
-.unheard-mark:active { color: var(--sv-text-muted); }
-.unheard-icon { position: relative; flex: none; width: 16px; height: 16px; }
-.unheard-icon svg { position: absolute; inset: 0; transition: opacity 140ms, transform 140ms; }
-.unheard-chevron { opacity: 0; transform: rotate(-45deg) scale(.7); }
-/* The icon morphs into the arrow: right while folded, down once the reply is open. */
-.unheard-mark:focus-visible .unheard-blocked, .unheard-mark[aria-expanded="true"] .unheard-blocked { opacity: 0; transform: rotate(45deg) scale(.7); }
-@media (hover: hover) { .unheard-mark:hover .unheard-blocked { opacity: 0; transform: rotate(45deg) scale(.7); } }
-.unheard-mark:focus-visible .unheard-chevron, .unheard-mark[aria-expanded="true"] .unheard-chevron { opacity: 1; transform: none; }
-@media (hover: hover) { .unheard-mark:hover .unheard-chevron { opacity: 1; transform: none; } }
-.unheard-mark[aria-expanded="true"] .unheard-chevron { transform: rotate(90deg); }
-.unheard-snippet { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.unheard-label { flex: none; max-width: 0; overflow: hidden; opacity: 0; white-space: nowrap; font-size: var(--sv-font-xs); transition: max-width 160ms, opacity 160ms; }
-/* A little presence: darker, a touch heavier, and what it is. */
-.unheard-mark:focus-visible { color: var(--sv-text-muted); font-weight: 500; }
-@media (hover: hover) { .unheard-mark:hover { color: var(--sv-text-muted); font-weight: 500; } }
-.unheard-mark:focus-visible .unheard-label { max-width: 8rem; opacity: 1; }
-@media (hover: hover) { .unheard-mark:hover .unheard-label { max-width: 8rem; opacity: 1; } }
-
-/* Opened, the reply is a balloon like any other, its first line the row's title, the arrow pointing down. */
-.unheard-header { margin-bottom: var(--sv-space-1); }
-.unheard-header .unheard-mark { padding-block: 0; min-height: 24px; color: var(--sv-text-subtle); }
-.unheard-header .unheard-label { max-width: none; opacity: 1; font-size: var(--sv-font-sm); font-weight: 600; }
-.unheard-header .unheard-mark::after { inset: -4px -8px; }
-/* The balloon is the row's own width cap already: it sizes to its text like any other, never past it. */
-.unheard[data-open] { justify-items: start; }
-.unheard[data-open] .chat-bubble { max-width: 100%; }
+.messages-content:has(> .messages-empty) { flex: 1; }
+.messages-empty { display: grid; justify-items: center; align-content: center; gap: 12px; margin: auto 0; padding: 32px 24px; text-align: center; color: var(--tr-time); }
+.messages-empty svg { color: var(--tr-tag-ink); }
+.messages-empty p { max-width: 28ch; margin: 0; font-size: 13px; line-height: 20px; }

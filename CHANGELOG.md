@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.21.0](https://github.com/sidevoice/sidevoice-web/compare/v0.20.0...v0.21.0) (2026-11-05)
+
+
+### Features
+
+* **avatar:** the agent is a 3D creature, ported from the design reference ([#479](https://github.com/sidevoice/sidevoice-web/issues/479)) ([a7f9ceb](https://github.com/sidevoice/sidevoice-web/commit/a7f9ceb7eb28562ac3a9594494c191ad75e7e194))
+
+## [0.20.0](https://github.com/sidevoice/sidevoice-web/compare/v0.19.0...v0.20.0) (2026-11-04)
+
+
+### Features
+
+* **models:** delete unused models after 7 days by default ([#473](https://github.com/sidevoice/sidevoice-web/issues/473)) ([de98f0d](https://github.com/sidevoice/sidevoice-web/commit/de98f0d2a60f543dc23a90984faf8e4a25b0822f))
+
+
+### Bug Fixes
+
+* **call-surface:** say why a creature still fails, and test it in WebKit ([#478](https://github.com/sidevoice/sidevoice-web/issues/478)) ([2a559c8](https://github.com/sidevoice/sidevoice-web/commit/2a559c83dbefca0a0ad0b13b879dad17d085ee42))
+* **conversations:** finish the leaving agent's reply before the conversation goes ([#465](https://github.com/sidevoice/sidevoice-web/issues/465)) ([d93c3b6](https://github.com/sidevoice/sidevoice-web/commit/d93c3b6a8052b013d2e5b1043d25d21673205072))
+* **mobile:** the native call surface says working, with its timer, while the person's words show ([#474](https://github.com/sidevoice/sidevoice-web/issues/474)) ([bf6c56c](https://github.com/sidevoice/sidevoice-web/commit/bf6c56cee7f8c42100f34ddee86f740abad0e4a4))
+
 ## [0.19.0](https://github.com/sidevoice/sidevoice-web/compare/v0.18.0...v0.19.0) (2026-11-03)
 
 

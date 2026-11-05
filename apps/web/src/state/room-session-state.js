@@ -56,7 +56,7 @@ export function initialSessionFacts() {
         voiceInstall: null,
         // The voice settings this device keeps (`VoiceSettings`), the ones the open settings pane is editing, the engine's
         // catalogues for its choices, and whether this device keeps a key for each remote provider (never the key).
-        voiceSettings: null, voiceDraft: null, voiceCatalogue: { state: 'idle', catalogs: [], error: '' }, modelsRemovable: false, deleteUnusedDays: null, deviceName: null, providerKeys: {},
+        voiceSettings: null, voiceDraft: null, voiceCatalogue: { state: 'idle', catalogs: [], error: '' }, modelsRemovable: false, deleteUnusedDays: 7, deviceName: null, providerKeys: {},
         // The conversation a move to another machine is taking the call to.
         movingTo: null,
         // The floating call card (briefs/FLOATING-CARD-SPEC.md): whether the first setup is finished with its wizard
@@ -296,9 +296,9 @@ export function viewedTitle(s) {
 export function enginePanel(s) {
     const rows = [];
     const engine = s.people?.find(person => personKey(person) === selectedThread(s))?.engine;
-    if (engine?.model)
+    if (engine?.label || engine?.model)
         rows.push({ id: 'agent', label: 'LLM',
-            value: [engine.model, engine.effort].filter(Boolean).join(' · '),
+            value: [engine.label || engine.model, engine.effort].filter(Boolean).join(' · '),
             state: 'ok', note: '' });
     return rows;
 }
@@ -403,7 +403,7 @@ export function participantsView(s) {
         return { threadId: key, title: displayTitle(p.title, p), selected: key === selected, available: !!p.available, switching: s.switching,
             unread, unheard: p.unheard?.count ?? 0, reach, working: busy,
             machine: machineName(s, p.node) || p.machine?.host || null, machineId: p.node || p.machine?.id || null, harness: p.harness || null, route: routeLabel(p),
-            model: p.engine?.model || null, effort: p.engine?.effort || null,
+            model: p.engine?.label || p.engine?.model || null, effort: p.engine?.effort || null,
             activityNote: [experimentalNote(p), workingCapabilityNote(p)].filter(Boolean).join(' ') || null, detail: p.reach?.detail ? (p.reach.detail + (p.reach.remedy ? '\n\n' + p.reach.remedy : '')) : undefined };
     });
 }
@@ -528,6 +528,8 @@ export function createRoomSessionStore(seed = {}) {
         const surface = callSurfaceView(callCard, participants, facts.surfaceLive, say, {
             pendingCancellable: !!selected && facts.userTurn?.thread === selected && !facts.cancelledInput,
             workingSince: selected && working(facts, selected) ? facts.workingSince?.[selected] : null,
+            // Since when it has been busy, shown as working yet or not: the person's words just sent say "working" at once.
+            busySince: selected && busy(facts, selected) ? facts.workingSince?.[selected] ?? null : null,
         }, snapshot?.callSurface);
         const next = { facts, session: sessionStatus(facts), conversation: conversationView(facts), participants,
             join: joinView(facts),

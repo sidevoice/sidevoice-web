@@ -34,7 +34,6 @@ test("styles/bichos.css is the engine's, as engine-stylesheet.ts builds it from 
   expect(file).not.toContain("&");
   expect(file).toContain(`${BICHOS_SCOPE}[data-mood=listening] .fig`);
   expect(file).toContain(`${BICHOS_SCOPE}[data-unread] .bang`);
-  expect(file).toContain(".backdrop .bd-mount { display: none }");
 });
 
 test("the stylesheet loads after the app's own avatar rules, and nothing of an avatar moves under reduced motion", () => {

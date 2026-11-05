@@ -2,7 +2,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { expect, test } from "vitest";
 import { avatarFor, PERSON_AVATAR, SIDEVOICE_MASCOT } from "./avatar-spec";
-import { avatarColor, bichoSpec, drawAvatar, engineSize, withOwnIds } from "./bicho-draw";
+import { avatarColor, avatarRepertoire, drawAvatar, engineSize, withOwnIds } from "./bicho-draw";
+import { creatureFromSeed } from "./creature/catalogue";
 import type { Spec } from "./engine/bichos/kit";
 import { renderSpec } from "./engine/bichos/render";
 import { normalizeSpec } from "./engine/bichos/spec";
@@ -12,7 +13,7 @@ const ids = (html: string) => [...html.matchAll(/\bid="([^"]+)"/g)].map((match) 
 const refs = (html: string) => [...html.matchAll(/url\(#([^)]+)\)/g)].map((match) => match[1]);
 
 test("every copy of a drawing has ids of its own, and refers only to its own", () => {
-  const a = drawAvatar(avatarFor("t-login"), "small"), b = drawAvatar(avatarFor("t-login"), "small");
+  const a = drawAvatar(PERSON_AVATAR, "small"), b = drawAvatar(PERSON_AVATAR, "small");
   expect(ids(a.html).length).toBeGreaterThan(0);
   expect(ids(a.html).filter((id) => ids(b.html).includes(id))).toEqual([]);
   for (const copy of [a, b]) expect(refs(copy.html).every((ref) => ids(copy.html).includes(ref))).toBe(true);
@@ -22,16 +23,13 @@ test("every copy of a drawing has ids of its own, and refers only to its own", (
   expect(withOwnIds('<path id="x" fill="url(#x)"/><use href="#x"/>')).toMatch(/^<path id="(c[0-9a-z]+-)x" fill="url\(#\1x\)"\/><use href="#\1x"\/>$/);
 });
 
-test("a conversation's bicho is the same drawing on every device; its tone tints what is behind it", () => {
-  const drawing = drawAvatar(avatarFor("7f3c2a91-thread"), "stage");
-  expect(drawing.html.startsWith("<svg viewBox=\"0 0 120 120\"")).toBe(true);
-  expect(drawing.html).toContain(`data-kind="${bichoSpec("7f3c2a91-thread").body}"`);
-  expect(drawing.tone).toBe(avatarColor(avatarFor("7f3c2a91-thread")));
-  expect(drawing.tone).toMatch(/^#[0-9a-f]{6}$/);
-  // A bicho with free hands can take any working style; a small one draws only each style's big cue.
-  expect(drawing.works).toEqual(expect.arrayContaining(["crank", "read", "type"]));
-  // Resting, it goes in idle steps: quiet, and the pastimes that suit it.
-  expect(drawing.idles).toEqual(expect.arrayContaining(["quiet", "bubbles", "music", "stretch", "nap"]));
+test("a conversation's agent is its creature: its tone is the creature's body colour, and it takes every act", () => {
+  expect(avatarColor(avatarFor("7f3c2a91-thread"))).toBe(creatureFromSeed("7f3c2a91-thread").color);
+  expect(avatarColor(avatarFor("7f3c2a91-thread"))).toMatch(/^#[0-9a-f]{6}$/);
+  // Every act works on every creature: every working style, and quiet and every pastime when it rests (creature/schedule.ts).
+  const { works, idles } = avatarRepertoire(avatarFor("7f3c2a91-thread"));
+  expect(works).toEqual(["crank", "hammer", "files", "type", "think"]);
+  expect(idles).toEqual(["quiet", "stretch", "water", "juggle", "soup", "fish", "bubbles", "music", "read", "nap"]);
   expect(engineSize("stage")).toBe("stage");
   expect(engineSize("small")).toBe("sidebar");
   expect(engineSize("pip")).toBe("sidebar");
@@ -68,18 +66,15 @@ test("the person is a bicho too, and keeps the old sleep: no working style, no p
   expect(drawing.idles).toEqual([]);
 });
 
-test("only the Sidevoice mascot ships, and only by name: a seed that spells a harness is a bicho", () => {
+test("only the Sidevoice mascot ships, and only by name: a seed that spells a harness is a conversation's creature", () => {
   expect([...HARNESSES]).toEqual(["sidevoice"]);
   expect(() => mascot("claude" as never, "x")).toThrow();
   const sidevoice = drawAvatar(SIDEVOICE_MASCOT, "stage");
   expect(sidevoice.html).toContain('data-kind="sidevoice"');
   expect(sidevoice.html).toContain("data-logo");
   expect(sidevoice.works).toEqual([]);
-  for (const seed of ["sidevoice", "claude", "clawd", "openclaw", "codex", "gemini", "copilot", "cursor", "cline", "ollama", "harness:claude", "Claude"]) {
-    const drawing = drawAvatar(avatarFor(seed), "small");
-    expect(drawing.html, seed).not.toContain("data-logo");
-    expect(drawing.html, seed).not.toContain(`data-kind="${seed}"`);
-  }
+  for (const seed of ["sidevoice", "claude", "clawd", "openclaw", "codex", "gemini", "copilot", "cursor", "cline", "ollama", "harness:claude", "Claude"])
+    expect(avatarFor(seed), seed).toEqual({ kind: "bicho", seed });
 });
 
 test("nothing of the lab's third-party mascots or its Beyond batch is in the app", () => {

@@ -2,19 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { Group, Row } from "../../components/ui/Card";
 import { MicrophoneIcon, MicrophoneOffIcon } from "../../components/ui/Icons";
-import { PERSON_AVATAR, type AvatarSpec } from "../avatar/avatar-spec";
-import { stillAvatar } from "../avatar/avatar-state";
-import { CharacterAvatar } from "../avatar/CharacterAvatar";
+import { MicrophoneHero } from "../avatar/MicrophoneHero";
+import type { MicState } from "../avatar/creature/mic-hero-spec";
 import { announcement, MicrophoneBadge, MicrophoneHowTo, microphoneAction, MIC_HELP_ID, microphoneView, type MicrophoneView } from "./permission-view";
 import type { MicrophoneSnapshot } from "../../services/microphone-access";
 import type { Translate } from "../../i18n/translator";
 import { MediaPermissionRows } from "./media-permissions";
 
 /* What Sidevoice needs allowed, one look wherever it is asked (operator, 2026-10-16): the setup's permissions step and
- * Settings › Permissions. The person's bicho on top — the microphone in its hand once allowed — and under it a list, each
- * permission a row: its icon, its name, why it is needed in a few words, and at the right its action, Allow, that becomes
- * the green Allowed badge (focus moves to the badge, never to the page); blocked, Check again and, under the row, how to
- * allow it. It follows the platform by itself. Another permission is one more row. */
+ * Settings › Permissions. The microphone hero on top (T23: a creature of its own, a microphone floating by its mouth once
+ * allowed) and under it a list, each permission a row: its icon, its name, why it is needed in a few words, and at the
+ * right its action, Allow, that becomes the green Allowed badge (focus moves to the badge, never to the page); blocked,
+ * Check again and, under the row, how to allow it. It follows the platform by itself. Another permission is one more row. */
 function MicrophoneRow({ microphone, view, onRequest, openSettings, t, actionId, helpId }: {
   microphone: MicrophoneSnapshot; view: MicrophoneView; onRequest(): void; openSettings: (() => Promise<void>) | null; t: Translate; actionId: string; helpId: string;
 }) {
@@ -51,8 +50,10 @@ function MicrophoneRow({ microphone, view, onRequest, openSettings, t, actionId,
   </>;
 }
 
-/** The person's bicho with the microphone in its hand, once it is allowed. */
-const PERSON_WITH_MIC: AvatarSpec = { kind: "person", hold: "microphone" };
+/** The microphone's state as the hero acts it out: checking, and nothing to allow here, are the calm of not asked yet. */
+export function heroState(state: MicrophoneView["state"]): MicState {
+  return state === "granted" || state === "requesting" || state === "denied" || state === "missing" ? state : "prompt";
+}
 
 /** `microphone` null, or with nothing to ask (`none`): no microphone row; the list still shows for the media permissions the
  *  app reports, if any. */
@@ -64,7 +65,7 @@ export function PermissionsList({ microphone, openSettings, onRequest, t, action
   // What a media row's Allow came to, said in the same live region as the microphone's changes.
   const [mediaSaid, setMediaSaid] = useState("");
   return <div className="wizard-perm perm-list" data-state={state}>
-    <span className="perm-hero-figure" data-state={state} aria-hidden><CharacterAvatar spec={state === "granted" ? PERSON_WITH_MIC : PERSON_AVATAR} state={stillAvatar("present")} size="pip" /></span>
+    <MicrophoneHero className="perm-hero-figure" state={heroState(view?.state ?? "prompt")} />
     <Group>
       {microphone && view && <MicrophoneRow microphone={microphone} view={view} onRequest={onRequest} openSettings={openSettings} t={t} actionId={actionId} helpId={helpId} />}
       {/* Where the app lowers or pauses other apps' media in a call, the permissions that needs (macOS). */}

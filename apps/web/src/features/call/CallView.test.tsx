@@ -121,16 +121,17 @@ test("the stage plays what the agent says as a karaoke bubble, the whole reply i
   // Under its balloon the agent holds still and shows as speaking: the work waits for the balloon to go.
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "speaking");
   expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "speaking");
-  expect(document.querySelector(".stage-desk svg.desk")).toBeInTheDocument();
-  // The balloon gone, it works at the desk that slid in, a tool in hand, the cogs turning.
+  // No desk: the design reference has it off (sidevoice-web#476).
+  expect(document.querySelector(".stage-desk")).toBeNull();
+  // The balloon gone, it works, a tool in hand, the cogs turning (drawn by its rig: creature/acts.js).
   tick(AGENT_LINGER_MS + SENT_LEAVING_MS);
   expect(document.querySelector(".stage-bubble")).toBeNull();
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "working");
   expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "working");
-  expect(document.querySelector(".stage-desk svg.desk")).toBeInTheDocument();
-  expect(stageAgent()).toHaveAttribute("data-desk");
-  expect(stageAgent().getAttribute("data-work")).toMatch(/^(crank|hammer|read|type)$/);
-  expect(stageAgent().querySelector(".cogs")).toBeInTheDocument();
+  expect(document.querySelector(".stage-desk")).toBeNull();
+  expect(stageAgent()).not.toHaveAttribute("data-desk");
+  expect(stageAgent().getAttribute("data-work")).toMatch(/^(crank|hammer|files|type|think)$/);
+  expect(stageAgent()).toHaveAttribute("data-mood", "working");
   expect(stageAgent()).not.toHaveAttribute("data-idle");
 
   // With nothing to do and its turn over, it rests: waiting for you is idle now.
@@ -395,7 +396,7 @@ test("the stage's agent and its thumbnails are one creature in one state: rest a
   expect(inStep(login)).toContain("data-enter=null");
   // It works: the same tool in every hand, swapped in every hand.
   patch(store, { userLive: false, userTurn: null, pendingPhase: "", harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login") } as Partial<SessionFacts>);
-  expect(attr("data-work")).toMatch(/^(crank|hammer|read|type)$/);
+  expect(attr("data-work")).toMatch(/^(crank|hammer|files|type|think)$/);
   inStep(login);
   tick(31_000);
   inStep(login);
@@ -439,17 +440,22 @@ test("an offline conversation on the stage is a wanted poster, in the interface'
   expect(stageAgent()).toHaveAttribute("data-mood", "idle");
   expect(stageAgent()).toHaveAccessibleName("Plan the week · Offline");
   const poster = document.querySelector(".wanted")!;
-  expect(poster).toHaveAttribute("aria-hidden", "true");
+  // Decoration: the stage's agent says its state.
+  expect(poster.closest("[aria-hidden=true]")).not.toBeNull();
   expect(poster).toHaveTextContent("WANTED");
   expect(poster).toHaveTextContent("ONLINE OR PAUSED");
   expect(poster).toHaveTextContent("IF SEEN, PLEASE TELL ITS HUMAN.");
   expect(poster.querySelector(".w-bounty")?.textContent).toMatch(/^\d{3},000,000-$/);
-  // Its portrait is the same bicho, laughing.
-  expect(poster.querySelector(".w-photo .sv-avatar")).toHaveAttribute("data-mood", "speaking");
-  expect(document.querySelector(".stage-desk")).toBeInTheDocument();
+  // It is drawn on the scene's canvas (those words are its fallback content), from what the backdrop has to hang it from.
+  const scene = document.querySelector(".stage-backdrop")!;
+  expect(scene).toHaveAttribute("data-poster");
+  expect(poster.closest("canvas")).toBe(scene.querySelector("canvas"));
+  expect(["mount", "pin", "nail", "float"]).toContain(scene.getAttribute("data-hang"));
+  expect(document.querySelector(".stage-desk")).toBeNull();
   // Back within reach, the poster goes.
   patch(store, { viewedThread: "fp-1|t-login" });
   expect(document.querySelector(".wanted")).toBeNull();
+  expect(document.querySelector(".stage-backdrop")).not.toHaveAttribute("data-poster");
 });
 
 test("the poster speaks Spanish on a device set to it", () => {
@@ -938,8 +944,8 @@ test("the Working… line over the agent is an sr-only status, with no visible b
   expect(workingLine()!.querySelector(".ui-spinner")).toBeNull();
   expect(screen.getAllByRole("status")).toContain(workingLine());
   expect(document.querySelector(".stage-activity")).toBeNull();
-  // The desk waits for the balloon to go (the first test follows it out).
-  expect(document.querySelector(".stage-desk svg.desk")).toBeInTheDocument();
+  // No desk comes in (sidevoice-web#476).
+  expect(document.querySelector(".stage-desk")).toBeNull();
   // The work over, the line goes.
   patch(store, { harness: { "fp-1|t-login": false } });
   expect(workingLine()).toBeNull();

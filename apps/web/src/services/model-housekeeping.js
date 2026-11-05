@@ -1,8 +1,8 @@
 /* What this device's downloaded models are for, and how long one not used is kept. A model is in use when the settings
  * name it (transcription, voice, the end of turn) or every call needs it (the voice activity detector); the others can
  * be deleted, and — when the person asks for it — are, once not used for that long. When a model was last used is the
- * engine's to say (`CatalogModel.lastUsedAt`); one it says nothing about is never deleted on its own. Downloads are
- * costly: the default is never. */
+ * engine's to say (`CatalogModel.lastUsedAt`); one it says nothing about is never deleted on its own. Switching models
+ * would otherwise leave the old one (about a gigabyte) for good: the default is a week. */
 
 import { LOCAL_CATALOG } from './model-catalogs.js';
 import { endOfTurnModel, vadModel } from './voice-settings.js';
@@ -12,22 +12,26 @@ import { endOfTurnModel, vadModel } from './voice-settings.js';
 /** @typedef {'transcription' | 'voice' | 'end-of-turn' | 'every-call'} ModelPurpose */
 
 export const DELETE_UNUSED_KEY = 'sidevoice.delete-unused-models';
-/** How long a model not used is kept, in days, as Settings offers it; null is forever (the default). */
-export const DELETE_UNUSED_DAYS = [null, 30, 90];
+/** How long a model not used is kept, in days, as Settings offers it; null is forever. */
+export const DELETE_UNUSED_DAYS = [7, 30, 90, null];
+/** What a device that never chose keeps for. */
+export const DEFAULT_DELETE_UNUSED_DAYS = 7;
+const NEVER = 'never';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** @param {Storage | null | undefined} storage @returns {number | null} */
+/** The days chosen on this device, null for never; the default when nothing valid is kept. @param {Storage | null | undefined} storage @returns {number | null} */
 export function readDeleteUnused(storage) {
   try {
-    const days = Number(storage?.getItem(DELETE_UNUSED_KEY));
-    return DELETE_UNUSED_DAYS.includes(days) ? days : null;
-  } catch { return null; }
+    const kept = storage?.getItem(DELETE_UNUSED_KEY);
+    if (kept === NEVER) return null;
+    const days = Number(kept);
+    return kept != null && DELETE_UNUSED_DAYS.includes(days) ? days : DEFAULT_DELETE_UNUSED_DAYS;
+  } catch { return DEFAULT_DELETE_UNUSED_DAYS; }
 }
 
-/** @param {Storage | null | undefined} storage @param {number | null} days */
+/** Never is kept as such: an absent value is the default, not never. @param {Storage | null | undefined} storage @param {number | null} days */
 export function writeDeleteUnused(storage, days) {
-  if (days == null) storage?.removeItem(DELETE_UNUSED_KEY);
-  else storage?.setItem(DELETE_UNUSED_KEY, String(days));
+  storage?.setItem(DELETE_UNUSED_KEY, days == null ? NEVER : String(days));
 }
 
 /**
@@ -48,16 +52,19 @@ export function modelPurposes(catalogs, settings) {
 }
 
 /**
- * The downloaded models to delete now: not in use, and last used (as the engine says) more than `days` ago.
+ * The downloaded models to delete now: not in use, and last used (as the engine says) more than `days` ago. A model
+ * the saved settings or the ones being edited (`editing`) name is in use; with no settings known, none is deleted.
  * @param {CatalogView[]} catalogs
  * @param {DeviceVoiceSettings | null | undefined} settings
  * @param {number | null} days
  * @param {number} now
+ * @param {DeviceVoiceSettings | null | undefined} [editing]
  * @returns {string[]}
  */
-export function staleModels(catalogs, settings, days, now) {
-  if (days == null) return [];
-  const purposes = modelPurposes(catalogs, settings);
+export function staleModels(catalogs, settings, days, now, editing) {
+  if (days == null || !settings) return [];
+  const saved = modelPurposes(catalogs, settings), drafted = modelPurposes(catalogs, editing);
+  const purposes = (/** @type {string} */ model) => [...saved(model), ...drafted(model)];
   const local = catalogs.find((catalog) => catalog.id === LOCAL_CATALOG);
   return (local?.models ?? []).filter((model) => (model.builds ?? []).some((build) => build.installed)
     && !purposes(model.id).length && typeof model.lastUsedAt === 'number' && now - model.lastUsedAt > days * DAY_MS).map((model) => model.id);
