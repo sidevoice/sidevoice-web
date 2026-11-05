@@ -17,6 +17,8 @@ const DESKTOP_ZOOM = 1.32;
 /** The phone's framing until measured, and its side margin and centre (creator.js PHONE). */
 const PHONE = { side: 0.05, mid: 0.5, zoom: 2.6 };
 
+/** How long a step of a solve waits, at most, for the page to be idle. */
+const SOLVE_WAIT_MS = 500;
 /** How long the creature waits, at most, for its first framing before it is drawn. */
 const FIRST_WAIT_MS = 4000;
 
@@ -165,7 +167,7 @@ export class StageFramer {
     return !this.to;
   }
 
-  dispose() { clearTimeout(this.deadline); clearTimeout(this.running); this.jobs = []; this.off(); if (this.measuring) { this.measuring.gen.return(undefined as unknown as Footprint); this.measuring = null; } this.frame.feet(null); }
+  dispose() { clearTimeout(this.deadline); clearTimeout(this.running); this.cancelIdle?.(); this.jobs = []; this.off(); if (this.measuring) { this.measuring.gen.return(undefined as unknown as Footprint); this.measuring = null; } this.frame.feet(null); }
 
   /** Held still (reduced motion, no GPU): a new framing is taken at once instead of eased into (the reference under
    *  reduced motion). */
@@ -316,20 +318,27 @@ export class StageFramer {
     return reach > to.low ? { ...to, reach } : to;
   }
 
-  /** Steps the solves a trial render a task, while the creature can be drawn. */
+  /** Steps the solves a trial render at a time, in the page's idle time (its layout, input and frames come first; a
+   *  step waits SOLVE_WAIT_MS at most), while the creature can be drawn. */
   private run() {
     if (this.running !== undefined) return;
+    const later = (fn: () => void, ms: number) => { this.running = setTimeout(fn, ms); };
+    const idle = (fn: () => void) => {
+      if (typeof requestIdleCallback === "function") { const id = requestIdleCallback(fn, { timeout: SOLVE_WAIT_MS }); this.running = id as unknown as ReturnType<typeof setTimeout>; this.cancelIdle = () => cancelIdleCallback(id); }
+      else later(fn, 16);
+    };
     const tick = () => {
-      this.running = undefined;
+      this.running = undefined; this.cancelIdle = null;
       const job = this.jobs[0];
       if (!job) return;
-      if (!this.ready()) { this.running = setTimeout(tick, 250); return; }
+      if (!this.ready()) { later(tick, 250); return; }
       const r = job.steps.next();
       if (r.done) { this.jobs.shift(); job.done(r.value); }
-      if (this.jobs.length) this.running = setTimeout(tick, 0);
+      if (this.jobs.length) idle(tick);
     };
-    this.running = setTimeout(tick, 0);
+    idle(tick);
   }
+  private cancelIdle: (() => void) | null = null;
 
   private prefetch(ask: FrameAsk, rest: boolean) {
     const todo: Array<[boolean, string]> = rest ? [[false, "listening"], [false, "speaking"]] : ask.phone ? [] : [[true, "speaking"]];
