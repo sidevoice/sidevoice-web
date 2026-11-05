@@ -216,20 +216,19 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .call-card .card-captions:hover { background: var(--btn); }
 .call-card .card-captions[aria-pressed=true] { color: var(--accent); }
 
-/* Its captions: lines as a transcript reads, a speaker's name over each. */
-.card-captions-lines { display: grid; gap: 8px; width: var(--card-w); padding: 10px 14px; pointer-events: auto; }
-.caption-line { display: grid; gap: 2px; margin: 0; font-size: 13.5px; line-height: 1.45; }
-.floating-card[data-size=l] .caption-line { font-size: 14.5px; }
-.caption-line b { font-size: 11px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.caption-line[data-role=assistant] b { color: var(--accent); }
-.caption-line[data-role=user] b { color: var(--mu); }
-.caption-line .lit-base { color: var(--mu); }
-.caption-line .lit-words { color: var(--fg); }
-.caption-line .receipt { display: inline-flex; margin-left: 4px; color: var(--mu); vertical-align: -1px; }
-.caption-live { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.caption-live .voice-wave { display: block; flex: 1 1 auto; min-width: 0; height: 22px; color: var(--accent); }
-.caption-live .voice-wave[data-phase=transcribing] .voice-wave-bars { animation: card-fade 1.6s ease-in-out infinite; }
-.caption-live .cancel-input { flex: none; }
+/* Its captions: the stage's voice text, docked (stage-voice.css .docked-voice) in a column the card's width, over or under it
+ * (toward the screen's middle: the column comes after the card in the flow, and first when the card opens up). The reply's card
+ * is the whole column wide, as the design reference has it; the person's is as wide as its words, toward the card's side. */
+.card-voice { width: var(--card-w); }
+.floating-card[data-side=left] .card-voice { justify-items: start; }
+.docked-voice.card-voice > .vcap.agent { width: 100%; }
+
+/* What is said docks with a shadow that fits the window's margin, the card's own (the stage's reaches 50px: cut by the window's edge
+ * into a hard line, sidevoice-desktop#159; card-shadow.test.ts). */
+.docked-voice > .vcap.card { box-shadow: 0 2px 8px rgb(42 26 64 / 28%); }
+:root[data-theme=dark] .docked-voice > .vcap.card { box-shadow: 0 2px 8px rgb(0 0 0 / 50%); }
+/* Opening up, the cards grow away from the card: their pop and their lift come from its side. */
+.floating-card[data-open=up] .docked-voice > .vcap { transform-origin: 50% 100%; }
 
 /* ---------- B1: the picture-in-picture ---------- */
 /* One box, as the room's screen: the room's title block, its stage tile at 16:9, its call bar. */
@@ -241,15 +240,10 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .picture-stage { position: relative; aspect-ratio: 16 / 9; min-width: 0; min-height: 0; }
 .picture-card[data-sized] .picture-stage { aspect-ratio: auto; }
 .picture-stage .stage-slot { position: absolute; inset: 0; }
-/* The room's tile, at the desktop's 16:9 whatever the window's width (the room's phone rules key on the viewport), its
- * words never under readable floors; no frame of its own inside the card's. */
+/* The room's tile, at the desktop's 16:9 whatever the window's width (the room's phone rules key on the viewport); no frame of
+ * its own inside the card's. */
 .floating-card .stage-tile[data-mood][data-card] { --stage-ratio: 16 / 9; --stage-ref: 600; --stage-inset: calc(16 * var(--u));
-  --bubble-fs: clamp(12.5px, calc(25.6 * var(--u) * 1.6), 34px); --bubble-lh: 1.375; --bubble-pad: 24; --peek: 20; --tail-w: calc(72 * var(--u)); --tail-h: calc(40 * var(--u));
-  --person-fs: clamp(12px, calc(22.4 * var(--u) * 1.6), 28px); --person-lh: 1.4286; --person-pad-b: 12; --person-pad-i: 20; --person-live-w: 272;
   border: 0; box-shadow: none; border-radius: var(--sv-radius-xl, 14px); }
-.floating-card .stage-tile[data-card] .stage-bubble { --push: clamp(0px, calc(50% - 112 * var(--u) * 1.6), 40%); width: auto; margin-inline-end: var(--push); max-width: calc(100% - var(--push)); }
-.floating-card .stage-tile[data-card] .person-turns { max-width: calc(100% - 2 * var(--stage-inset)); --live-w: min(calc(var(--person-live-w) * var(--u) * 1.6), 70cqi); }
-.floating-card .stage-tile[data-card] .person-turns .person-bubble { max-width: 100%; }
 /* The room's title block: the title and the conversations control, the machine on the line under it; × at the right. */
 .card-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; align-items: start; padding: 0 0 0 4px; }
 .card-heading-name { display: flex; align-items: center; gap: 4px; min-width: 0; height: 28px; }
@@ -276,51 +270,43 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .card-grip[data-edge=nw] { left: 2px; top: 2px; transform: scale(-1, -1); }
 
 /* ---------- C1: just the avatar ---------- */
-/* The creature on nothing; its balloons toward the screen's middle (above or below it); under both, the compact card. A grid in
- * one column, so the window holds whatever shows and the creature never moves. */
-.floating-card { --balloon-zone: 150px; }
-.floating-card[data-size=s] { --balloon-zone: 130px; }
-.floating-card[data-size=l] { --balloon-zone: 180px; }
+/* The creature on nothing; its voice text toward the screen's middle (above or below it); under both, the compact card. A grid in
+ * one column, so the window holds whatever shows and the creature never moves. The voice text is the stage's cards, docked: as wide
+ * as their words, up to the compact card's width (--avatar-col), toward the card's side. */
+.floating-card { --voice-zone: 112px; --avatar-col: 300px; }
+.floating-card[data-size=s] { --avatar-col: 264px; }
+.floating-card[data-size=l] { --avatar-col: 344px; }
 .avatar-card { position: relative; display: grid; grid-template-columns: auto; justify-items: center; align-items: center; }
-.floating-card[data-open=down] .avatar-card { grid-template-areas: "figure" "balloons" "compact"; }
-.floating-card[data-open=up] .avatar-card { grid-template-areas: "balloons" "figure" "compact"; }
+.floating-card[data-open=down] .avatar-card { grid-template-areas: "figure" "voice" "compact"; }
+.floating-card[data-open=up] .avatar-card { grid-template-areas: "voice" "figure" "compact"; }
 .avatar-figure { grid-area: figure; width: var(--card-w); height: var(--card-w); }
 .avatar-figure .sv-avatar { display: block; width: 100%; height: 100%; }
-/* Its balloons: the room's, the creature's width, their tails toward it (.balloon--tail-up when they open below). */
-.avatar-balloons { grid-area: balloons; display: grid; gap: 6px; width: var(--card-w); container-type: inline-size; pointer-events: auto;
-  --k: .5; --u: calc(var(--k) * 440px / 600); --stage-inset: 0px; --bubble-fs: 14px; --person-fs: 13px; --bubble-lh: 1.375; --bubble-pad: 24; --peek: 20;
-  --tail-w: calc(72 * var(--u)); --tail-h: calc(40 * var(--u)); --person-lh: 1.4286; --person-pad-b: 12; --person-pad-i: 20; --person-live-w: 272; }
-.floating-card[data-size=s] .avatar-balloons { --k: .45; --bubble-fs: 13px; --person-fs: 12px; }
-.floating-card[data-size=l] .avatar-balloons { --k: .66; --bubble-fs: 17px; --person-fs: 15px; }
-.avatar-balloons .stage-top { position: static; display: grid; pointer-events: auto; }
-.avatar-balloons .person-turns { position: static; align-items: stretch; --live-w: 100%; }
-.avatar-balloons .speech-bubble { width: 100%; max-width: 100%; margin: 0; }
-.floating-card[data-open=up] .avatar-balloons .speech-bubble { margin-bottom: var(--tail-h); }
-.floating-card[data-open=down] .avatar-balloons .speech-bubble { margin-top: var(--tail-h); }
+.avatar-voice { grid-area: voice; width: max-content; max-width: var(--avatar-col); }
+.floating-card[data-side=left] .avatar-voice { justify-self: start; justify-items: start; }
+.floating-card[data-side=right] .avatar-voice { justify-self: end; }
 /* Close to the creature: its box has room under its feet for its shadow, and over its head for its antics. */
-.floating-card[data-open=down] .avatar-balloons { margin-top: calc(var(--card-w) * -.1); }
-.floating-card[data-open=down] .avatar-balloons { align-self: start; }
-.floating-card[data-open=up] .avatar-balloons { margin-bottom: calc(var(--card-w) * -.04); }
+.floating-card[data-open=down] .avatar-voice { align-self: start; margin-top: 2px; }
+.floating-card[data-open=up] .avatar-voice { margin-bottom: 2px; }
 
 /* ---------- C1: its controls, the compact card (operator, 2026-10-20; briefs/UX-DECISIONS-2026-10-20.md "App spec") ----------
  * .floating-card carries data-expanded (the card shows: the pointer on the creature or the card, or the keyboard's focus in it),
  * data-flow (its box is in the window's flow: shown, fading out, or kept while the creature is dragged) and data-dragging.
  * Folded it is still there for Tab (not display: none, not inert), clipped inside the creature's box and out of the flow; shown
- * it is a row under the creature, centred on its column, 6px from it or from the balloons. The window is only as big as what
- * shows, so the creature stays where it rests and the app moves the window in just by what does not fit. Where the balloons open
- * below, the window counts their whole room (--balloon-zone) while the card is out, and the card goes just past the balloon
- * showing (--balloon-reach, set by the card), gliding as a balloon grows or goes: a balloon never moves the creature. */
+ * it is a row under the creature, centred on its column, 6px from it or from the voice text. The window is only as big as what
+ * shows, so the creature stays where it rests and the app moves the window in just by what does not fit. Where the voice text opens
+ * below, the window counts its whole room (--voice-zone) while the card is out, and the card goes just past the card showing
+ * (--voice-reach, set by the card), gliding as one grows or goes: a voice card never moves the creature. */
 .avatar-compact { grid-area: compact; position: absolute; inset: 0; overflow: clip; opacity: 0; pointer-events: none; transition: opacity .15s linear; }
 .floating-card[data-flow] .avatar-compact { position: relative; inset: auto; overflow: visible; margin-top: 6px; }
-.floating-card[data-flow][data-open=down] .avatar-card { grid-template-rows: auto minmax(var(--balloon-zone), auto) auto; }
-.floating-card[data-flow][data-open=down] .avatar-compact { translate: 0 min(0px, calc(var(--balloon-reach, 0px) - var(--balloon-zone))); transition: opacity .15s linear, translate .2s ease; }
+.floating-card[data-flow][data-open=down] .avatar-card { grid-template-rows: auto minmax(var(--voice-zone), auto) auto; }
+.floating-card[data-flow][data-open=down] .avatar-compact { translate: 0 min(0px, calc(var(--voice-reach, 0px) - var(--voice-zone))); transition: opacity .15s linear, translate .2s ease; }
 .floating-card[data-expanded] .avatar-compact, .avatar-compact:has(:focus-visible) { opacity: 1; pointer-events: auto; }
 .floating-card[data-dragging] .avatar-compact { opacity: 0; pointer-events: none; transition: none; }
 @media (prefers-reduced-motion: reduce) { .avatar-compact { transition: none !important; } }
 
 /* Cursors (operator, 2026-10-20): buttons show the hand, "Cancel sending" too; C1's creature is what you drag:
  * the open hand over it, the closed hand while it is pressed or dragged. A1 and B1 keep the plain pointer (their whole card
- * drags); balloons stay plain (a press on one moves nothing). */
+ * drags); the voice text stays plain (a press on it moves nothing). */
 .cancel-input:not(:disabled) { cursor: pointer; }
 .avatar-figure, .avatar-figure * { cursor: grab; }
 .avatar-figure:active, .avatar-figure:active * { cursor: grabbing; }
@@ -357,9 +343,7 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
  * B1's and C1's headings keep the 8px. */
 
 /* ---------- The avatar's compact card: A1's first row and its controls row, narrower and tighter ---------- */
-.compact-card { --card-w: 300px; --tl-column-end: 13px; padding-bottom: 8px; }
-.floating-card[data-size=s] .compact-card { --card-w: 264px; }
-.floating-card[data-size=l] .compact-card { --card-w: 344px; }
+.compact-card { --card-w: var(--avatar-col); --tl-column-end: 13px; padding-bottom: 8px; }
 .compact-card .card-row { padding-left: 6px; }       /* the title starts where the mic does */
 .compact-card .card-who { padding-right: 0; }          /* no wave column: the title's column ends at the padding */
 .compact-card .card-controls { margin-top: 8px; }

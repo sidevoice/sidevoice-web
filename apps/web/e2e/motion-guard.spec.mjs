@@ -53,7 +53,7 @@ const PAINT_BUDGET = 1;
 
 /** The desktop app's card, by format: the states that move it. */
 const CARDS = {
-  card: ["working", "person-speaking"],
+  card: ["working", "person-speaking", "agent-speaking"],
   pip: ["working", "person-speaking", "agent-speaking", "reconnecting"],
   avatar: ["person-speaking", "agent-speaking"],
 };

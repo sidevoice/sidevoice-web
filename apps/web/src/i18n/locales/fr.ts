@@ -1403,7 +1403,6 @@ export const messages: Messages = {
   "card.conversationsCountUnread": "Conversations ({n}), dont {unread} avec des réponses non lues",
   "card.settings": "Réglages de la carte flottante",
   "card.hide": "Masquer pendant cet appel",
-  "card.you": "Vous",
   "messages.audio.notPlayed": "Audio non lu",
   "messages.audio.unknown": "Audio interrompu · Partie écoutée inconnue",
   "messages.audio.skipped": "Ignoré",

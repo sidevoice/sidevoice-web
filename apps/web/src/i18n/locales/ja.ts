@@ -1404,7 +1404,6 @@ export const messages: Messages = {
   "card.conversationsCountUnread": "会話（{n}）、未読の返信がある会話：{unread}",
   "card.settings": "フローティングカードの設定",
   "card.hide": "この通話中は非表示",
-  "card.you": "あなた",
   "messages.audio.notPlayed": "再生されませんでした",
   "messages.audio.unknown": "音声停止 · 再生範囲は不明",
   "messages.audio.skipped": "スキップしました",

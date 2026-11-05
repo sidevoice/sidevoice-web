@@ -5,7 +5,7 @@ import { Button } from "../../components/ui/Button";
 import { CloseIcon, HarnessIcon, MachinesIcon, PauseIcon } from "../../components/ui/Icons";
 import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
-import type { ChatMessage } from "../../state/room-types";
+import type { ChatMessage, ConversationView } from "../../state/room-types";
 import { avatarFor, avatarTone } from "../avatar/avatar-spec";
 import { avatarColor } from "../avatar/bicho-draw";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
@@ -49,7 +49,8 @@ import "./call-view.css";
 
 /* The stage's look (decided 2026-11-04, the design reference's `.vcap.card`, T24–T36): the reply in a white card under
  * the creature, never over it (StageVoice places it), always three lines tall, a page at a time, lit as the voice says it.
- * The balloon stays where the stage is not a tile (the desktop card's avatar format: StageBalloons). */
+ * Where the stage is not a tile (the desktop card's title card and avatar) the same cards dock over or under the card
+ * (DockedVoice). */
 export type AgentLook = "balloon" | "card";
 
 /** One reply on the stage, in a speech balloon whose tail points down at the agent (call-view.css), or the stage's card:
@@ -118,6 +119,20 @@ function AgentBubbles({ reading, reply, sounding, messages, onUp, look, cut }: {
   useEffect(() => { onUp(up); }, [up, onUp]);
   useEffect(() => () => onUp(false), [onUp]);
   return <>{turns.map((turn) => <AgentBubble key={turn.key} turn={turn} look={look} cut={cut} />)}</>;
+}
+
+/** What is said, as the stage's cards: the agent's reply and the person's turn (the pill where their words will come, then
+ *  what was sent), one turn's card at a time: the person's turn coming in lifts the agent's reply away, and a reply
+ *  starting lifts away what was sent. The stage lays them under the creature (StageVoice); the desktop card docks them
+ *  (DockedVoice). `reading`: the reply's clock, kept by the caller; `onUp`: told whether a reply's card is up. */
+function VoiceCards({ stage, conversation, reply, reading, onUp, t }: { stage: StageConversation; conversation: ConversationView; reply: ChatMessage | null;
+  reading: RefObject<Reading | null>; onUp: (up: boolean) => void; t: Translate }) {
+  const pending = !!conversation.pendingText || !!conversation.pendingPhase;
+  return <>
+    <AgentBubbles key={stage.threadId} reading={reading} reply={reply} sounding={stage.speaking} messages={conversation.messages} onUp={onUp}
+      look="card" cut={pending} />
+    <PersonTurn conversation={conversation} t={t} look="card" cut={!!reply && stage.speaking} />
+  </>;
 }
 
 /** The agent cannot receive what the person says: the words, and why and what to do when the core says (ParticipantView.detail
@@ -221,7 +236,6 @@ export function StageTile({ card = false }: { card?: boolean }) {
   if (!stage.threadId) return null;
   const spec = avatarFor(stage.threadId);
   const tone = avatarColor(spec);
-  const pending = !!conversation.pendingText || !!conversation.pendingPhase;
   return (
       /* The tile keeps its form factor's shape, as a slide does: as large as the room allows, centred, the app's own
           background around it (useSceneScale fits it in its slot; call-view.css names the shapes). What the tile says —
@@ -245,9 +259,7 @@ export function StageTile({ card = false }: { card?: boolean }) {
         {/* What is said, under the creature: one turn's card at a time there, the newer sending the older away. Its own
             conversation's: another one on the stage starts with none of the replies before it. */}
         <StageVoice frame={frame} turn={avatar.mood === "speaking" || avatar.mood === "listening" ? avatar.mood : null} phone={narrow && !card} onGround={onGround}>
-          {captions && <AgentBubbles key={stage.threadId} reading={reading} reply={reply} sounding={stage.speaking} messages={conversation.messages} onUp={holdStill}
-            look="card" cut={pending} />}
-          {captions && <PersonTurn conversation={conversation} t={t} look="card" cut={!!reply && stage.speaking} />}
+          {captions && <VoiceCards stage={stage} conversation={conversation} reply={reply} reading={reading} onUp={holdStill} t={t} />}
         </StageVoice>
         {narrow && !card && <TranscriptEntry />}
       </div>
@@ -255,10 +267,11 @@ export function StageTile({ card = false }: { card?: boolean }) {
   );
 }
 
-/** The call's conversation's balloons, the stage's own, apart from a tile: the desktop card's avatar format lays them
- *  above or below the creature. The agent's (the reply sounding, followed as it is heard) and the person's (the voice's
- *  bars and the room's Cancel sending, then what was sent). */
-export function StageBalloons() {
+/** The call's conversation's voice text, apart from a tile: the stage's own cards (the agent's reply, the person's pill and
+ *  what was sent) docked in a column over or under the desktop card's title card and avatar, as the design reference docks
+ *  them (T23), where the stage lays them under a creature by its framing. Nothing is measured or placed here: the caller's
+ *  column is their place (call-card.css). */
+export function DockedVoice() {
   const t = translator();
   const stage = useStageConversation();
   const avatars = useConversationAvatars();
@@ -268,8 +281,5 @@ export function StageBalloons() {
   const reading = useRef<Reading | null>(null);
   useReadingClock(reading, reply, stage.speaking, conversation.messages);
   if (!stage.threadId) return null;
-  return <>
-    <div className="stage-top"><AgentBubbles key={stage.threadId} reading={reading} reply={reply} sounding={stage.speaking} messages={conversation.messages} onUp={holdStill} /></div>
-    <PersonTurn conversation={conversation} t={t} />
-  </>;
+  return <VoiceCards stage={stage} conversation={conversation} reply={reply} reading={reading} onUp={holdStill} t={t} />;
 }

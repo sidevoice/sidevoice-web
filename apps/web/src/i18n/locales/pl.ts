@@ -1424,7 +1424,6 @@ export const messages: Messages = {
   "card.conversationsCountUnread": "Rozmowy ({n}), z nieprzeczytanymi odpowiedziami: {unread}",
   "card.settings": "Ustawienia pływającej karty",
   "card.hide": "Ukryj na czas tego połączenia",
-  "card.you": "Ty",
   "messages.audio.notPlayed": "Nie odtworzono",
   "messages.audio.unknown": "Dźwięk przerwany · Nie wiadomo, ile odtworzono",
   "messages.audio.skipped": "Pominięto",

@@ -1406,7 +1406,6 @@ export const messages: Messages = {
   "card.conversationsCountUnread": "Unterhaltungen ({n}), {unread} mit ungelesenen Antworten",
   "card.settings": "Einstellungen der schwebenden Karte",
   "card.hide": "Für diesen Anruf ausblenden",
-  "card.you": "Du",
   "messages.audio.notPlayed": "Nicht abgespielt",
   "messages.audio.unknown": "Audio gestoppt · Abspielumfang unbekannt",
   "messages.audio.skipped": "Übersprungen",
