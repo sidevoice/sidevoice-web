@@ -39,7 +39,7 @@ test("working blinks; where motion is reduced it holds still, with a halo that s
 });
 
 test("a card's creature stands out of its square; the card is ringed in mustard when it needs the person", () => {
-  assert.match(find(outside, ".conversation-avatar[data-pop]").body, /width: 56px; height: 56px; overflow: visible/);
+  assert.match(find(outside, ".conversation-avatar[data-pop]").body, /width: 34px; height: 34px; margin-top: 7px; overflow: visible/);
   assert.match(find(outside, ".conversation-avatar[data-pop] .sv-avatar").body, /border-radius: 30%/);
   assert.match(find(outside, ".conversation-avatar[data-pop] .sv-avatar").body, /radial-gradient\(circle at 50% 70%, color-mix\(in srgb, var\(--av-color\) 34%, transparent\), var\(--sv-accent-soft\) 72%\)/);
   assert.match(find(outside, ".sidebar-rows .participant-row:has(.conversation-avatar[data-attention])").body, /border-color: var\(--sv-state-attention\)/);
