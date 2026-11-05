@@ -8,7 +8,15 @@ import { useLayers } from "./layers";
 import { ATTENTION_EXPR, STILL_EXPR } from "./creature/faces";
 import { FALLBACK_PATH } from "./creature/fallback";
 import type { LiveCreature } from "./creature/host";
-import { useCreatureHost, type CreatureHost } from "./creature-loader";
+import { creatureHostNow, loadCreatureHost, watchCreatureHost, type CreatureHost, type CreatureHostLoading } from "./creature-loader";
+
+/** The creature host once it has loaded (null until then) and whether its last load failed (creature-loader.ts). A
+ *  component that mounts asks for it, and asks again if the last load failed. */
+function useCreatureHost(): CreatureHostLoading {
+  const loading = useSyncExternalStore(watchCreatureHost, creatureHostNow);
+  useEffect(() => { if (!creatureHostNow().host) loadCreatureHost().catch(() => {}); }, []);
+  return loading;
+}
 
 const noWatch = () => () => {};
 /** Whether the page can draw creatures now on the stage for `framing` (creature/host.ts: the stage's creature and the

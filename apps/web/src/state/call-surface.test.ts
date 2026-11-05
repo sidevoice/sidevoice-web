@@ -347,6 +347,20 @@ test("stills go by reference: the bytes cross once per id, before the snapshot t
   expect(api.still).toHaveBeenCalledTimes(4);
 });
 
+test("a still that cannot be drawn is not drawn again with every word", async () => {
+  const store = room();
+  const api = host();
+  const draw = vi.fn(async (id: string, px: number) => (id === "n|b" ? null : { png: "png-" + id, px, k: 1 }));
+  startCallSurface(store, options(api, clock(), draw));
+  await vi.waitFor(() => expect(api.still).toHaveBeenCalledTimes(3));
+  for (const to of [1, 2, 3]) {
+    store.patch({ karaokeState: { segment: "s1", from: 0, to } });
+    await new Promise((resolve) => setTimeout(resolve, 0)); // the draws of this word settle
+  }
+  expect(draw).toHaveBeenCalledTimes(4);
+  expect(Object.keys(store.getState().facts.surfaceLive!.stills)).not.toContain(stillId("n|b", FACE_PX));
+});
+
 test("stills of a removed conversation are given back and no longer kept", async () => {
   const store = room();
   const api = host();
@@ -462,4 +476,24 @@ test("a still retry ends with the surface: none is asked for after it closes or 
   stop();
   time.advance(STILL_RETRY_LAST_MS * 4);
   expect(draw).toHaveBeenCalledTimes(4);
+});
+
+test("a failed still is tried again by its own clock, not by the words: none with each word, one after the wait", async () => {
+  const time = clock();
+  const store = room();
+  const api = host();
+  let fails = true;
+  const draw = vi.fn(async (id: string, px: number) => (id === "n|b" && fails ? null : { png: "png-" + id, px, k: 1 }));
+  startCallSurface(store, options(api, time, draw));
+  await vi.waitFor(() => expect(api.still).toHaveBeenCalledTimes(3));
+  for (const to of [1, 2, 3]) {
+    store.patch({ karaokeState: { segment: "s1", from: 0, to } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  expect(draw).toHaveBeenCalledTimes(4);
+  fails = false;
+  time.advance(STILL_RETRY_FIRST_MS);
+  await vi.waitFor(() => expect(api.still).toHaveBeenCalledTimes(4));
+  expect(draw).toHaveBeenCalledTimes(5);
+  expect(store.getState().callSurface.others.map((o) => o.still?.id)).toContain(stillId("n|b", FACE_PX));
 });

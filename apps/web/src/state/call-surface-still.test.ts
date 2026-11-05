@@ -52,3 +52,23 @@ test("a host that did not load gives no still yet, and the next ask loads it", a
   host.face = document.createElement("canvas");
   expect(await renderStill("t-login", 240)).toEqual({ png: "UE5H", px: 240, k: 1 });
 });
+
+test("a still that cannot be drawn says why, once per still and reason", async () => {
+  const { renderStill } = await import("./call-surface-still");
+  // The creature's code does not load: told, once.
+  host.fail = true;
+  expect(await renderStill("t1", 108)).toBeNull();
+  expect(await renderStill("t1", 108)).toBeNull();
+  expect(console.warn).toHaveBeenCalledWith("[sidevoice] call surface: no still for t1 at 108px:", expect.any(Error));
+  const told = vi.mocked(console.warn).mock.calls.filter(([said]) => String(said).startsWith("[sidevoice] call surface")).length;
+  expect(told).toBe(1);
+  // It loads, but the canvas gives no PNG: another reason, told once too.
+  host.fail = false;
+  host.face = document.createElement("canvas");
+  vi.mocked(HTMLCanvasElement.prototype.toDataURL).mockImplementation(() => "data:,");
+  expect(await renderStill("t1", 108)).toBeNull();
+  expect(await renderStill("t1", 108)).toBeNull();
+  const reasons = vi.mocked(console.warn).mock.calls.filter(([said]) => String(said).startsWith("[sidevoice] call surface"));
+  expect(reasons).toHaveLength(2);
+  expect(String(reasons[1][1])).toContain("the canvas gave no PNG");
+});
