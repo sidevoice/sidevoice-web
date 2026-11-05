@@ -22,14 +22,14 @@ function fakeStage() {
     },
     act: (layer: string) => layers[layer]?.name ?? null,
   };
-  const draws: Array<{ t: number; still: boolean; k?: Record<string, number | null> }> = [];
+  const draws: Array<{ t: number; still: boolean; k?: Record<string, number | null>; extra?: Record<string, unknown> }> = [];
   const stage = {
     camera: { aspect: 1.5, updateProjectionMatrix() {} },
     renderer: {},
     items: [],
     add: (spec: object, canvas: HTMLCanvasElement) => ({ c, canvas, spec, opts: {}, off: 0 }),
-    draw: (_item: unknown, t: number, _lvl: number, still: boolean) => {
-      draws.push({ t, still, k: Object.fromEntries(Object.entries(layers).map(([name, L]) => [name, L.t0 == null ? null : Math.round((t - L.t0) * 1e6) / 1e6])) });
+    draw: (item: { opts: { extra?: Record<string, unknown> } }, t: number, _lvl: number, still: boolean) => {
+      draws.push({ t, still, extra: { ...item.opts.extra }, k: Object.fromEntries(Object.entries(layers).map(([name, L]) => [name, L.t0 == null ? null : Math.round((t - L.t0) * 1e6) / 1e6])) });
     },
     scene: { remove() {} },
   };
@@ -46,7 +46,7 @@ const make = (opts: Partial<ConstructorParameters<typeof LiveCreature>[1]> = {})
 const base = () => rig.calls.filter((x) => x.layer === "base");
 
 beforeEach(() => { vi.useFakeTimers({ now: 1_800_000_000_000 }); rig = fakeStage(); });
-afterEach(() => { live?.dispose(); vi.useRealTimers(); });
+afterEach(() => { live?.dispose(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 test("the acts are registered: twelve moods, five working styles, nine pastimes and the cogs", () => {
   const names = Object.keys(ACTS);
@@ -97,6 +97,8 @@ test("resting: a pastime runs for its spell and half a second more (the rotation
 });
 
 test("only working shows a style and only idle a pastime: listening, speaking and present have no base act; offline clears every act", () => {
+  // Entering listening, the reference drops the base act and the cogs at once (creator.js applyMode: setCogs, setBase(null)),
+  // even while the state keeps what it had for its entrance (avatar-state.ts `enter`): the startle is the transition.
   const since = Date.now();
   make({ mood: "listening", step: { work: "crank", idle: "juggle", since } });
   expect(rig.layers.base).toBeUndefined();
@@ -175,4 +177,69 @@ test("a renderer whose first acts are drawn still (reduced motion) compiles them
   live.frameAt(0.5, true);
   live.frameAt(2);
   expect(rig.draws.map((d) => d.still)).toEqual([true, false]);
+});
+
+/** performance.now (the host's clock: frames, the startle) held where the test puts it. */
+function holdClock() {
+  let ms = 1_000_000;
+  vi.spyOn(performance, "now").mockImplementation(() => ms);
+  return (by: number) => { ms += by; vi.advanceTimersByTime(by); };
+}
+/** What the last frame was given over the state's own pose: the startle's expression and hop. */
+const lastExtra = () => rig.draws.at(-1)?.extra ?? {};
+
+test("entering listening from working, the style and the cogs go at once and it startles as the creator does: surprised, a hop, 0.55 s", () => {
+  const tick = holdClock();
+  make({ mood: "working", step: { work: "hammer", since: Date.now() } });
+  expect(Object.keys(rig.layers).sort()).toEqual(["base", "cogs"]);
+  // the room stamped the entrance now; the state keeps the hammer for its entrance (enter: working)
+  live.setMood("listening", { step: { work: "hammer", since: Date.now(), enter: "working" } });
+  expect(rig.layers).toEqual({});
+  tick(225);
+  live.frameAt(0);
+  expect(lastExtra().expr).toBe("surprised");
+  // the creator's hop: -sin(min(1, k / 0.45) π) · 9 · 1.1, at its top half-way through
+  expect(lastExtra().dy).toBeCloseTo(-9 * 1.1, 6);
+  tick(300);
+  live.frameAt(0);
+  expect(lastExtra().expr).toBe("surprised");
+  expect(lastExtra().dy).toBeCloseTo(0, 6);
+  tick(50);
+  live.frameAt(0);
+  expect(lastExtra()).toEqual({});
+});
+
+test("a window that hears of the entrance late startles at its moment, and not at all once it is over", () => {
+  holdClock();
+  make({ mood: "idle", step: { idle: "fish", since: Date.now() - 60_000, until: Date.now() + 1000 } });
+  live.setMood("listening", { step: { since: Date.now() - 300, enter: "idle" } });
+  live.frameAt(0);
+  expect(lastExtra().expr).toBe("surprised");
+  expect(lastExtra().dy).toBeCloseTo(-Math.sin((0.3 / 0.45) * Math.PI) * 9 * 1.1, 6);
+  // another one, mounted while that entrance is going on, startles in step with it
+  const other = new LiveCreature(rig.stage, { seed: "t-login", canvas: document.createElement("canvas"), framing: "scene", scene: { zoom: 1.32, lookY: 0.3 }, mood: "listening", step: { since: Date.now() - 300, enter: "idle" } });
+  other.frameAt(0);
+  expect(lastExtra().dy).toBeCloseTo(-Math.sin((0.3 / 0.45) * Math.PI) * 9 * 1.1, 6);
+  other.dispose();
+  // heard of 600 ms after it began: over (0.55 s), no startle
+  make({ mood: "idle", step: {} });
+  live.setMood("listening", { step: { since: Date.now() - 600, enter: "idle" } });
+  live.frameAt(0);
+  expect(lastExtra()).toEqual({});
+});
+
+test("no entrance, no startle: listening after speaking (production makes none), or the same entrance told again", () => {
+  const tick = holdClock();
+  make({ mood: "speaking", step: {} });
+  live.setMood("listening", { step: { since: Date.now() } });
+  live.frameAt(0);
+  expect(lastExtra()).toEqual({});
+  make({ mood: "working", step: { work: "type", since: Date.now() } });
+  const since = Date.now();
+  live.setMood("listening", { step: { since, enter: "working" } });
+  tick(600);
+  live.setMood("listening", { step: { since, enter: "working" } });
+  live.setStep({ since, enter: "working" });
+  live.frameAt(0);
+  expect(lastExtra()).toEqual({});
 });

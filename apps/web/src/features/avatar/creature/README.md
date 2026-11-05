@@ -66,6 +66,10 @@ On the rig's act layers, as the creator plays them:
   step to the host (`work`, `idle`, `since`, `until`): the act's clock starts at `since` and a pastime runs for its
   spell (`until - since`) and half a second more, as the creator's `idleStep` does.
 - **`cogs`**: the busy cue over the head in every working style.
+- **Entering listening**, whatever it had going goes at once, as the creator's `applyMode` drops the base act and the
+  cogs, and it startles as the creator does (surprised, a hop of 1.1, 0.55 s). The state says when (`enter`: into
+  listening from idle or working, the same moment in every window, `since`); the reference says how it looks, so the
+  startle is its 0.55 s, not the 2D figure's 420 ms entrance.
 - **`mood`**: a reaction over all of it (`LiveCreature.playMood(name, { dur, hold })`), which keeps the mouth while it
   speaks. Nothing in the product plays one yet: they are meant to be picked from the conversation.
 

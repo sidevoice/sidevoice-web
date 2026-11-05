@@ -53,7 +53,13 @@ export interface CreatureStep {
   since?: number;
   /** When it is due to end, wall-clock: a pastime runs for its spell (the creator's dur, secs + 0.5). None: its own. */
   until?: number;
+  /** It is making an entrance into listening (avatar-state.ts `enter`: from idle or working), which began at `since`. */
+  enter?: "idle" | "working";
 }
+
+/** The startle on entering listening, as the creator plays it on a change of mode (creator.js react): surprised, a hop of
+ *  1.1 over its first 0.45 s, 0.55 s in all. */
+const STARTLE = { expr: "surprised", hop: 1.1, secs: 0.55 } as const;
 
 /** The reference's desktop stage distance (creator.js VIEWS.desktop). */
 export const SCENE_ZOOM = 1.32;
@@ -262,7 +268,7 @@ export interface LiveOptions {
   gazeFrom?: HTMLElement | null;
   /** The voice's level now, 0..1: the agent's while it speaks, the person's while it listens. */
   level?: (mood: AvatarMood) => number;
-  /** The state it starts in (no startle for it), and what it has on the go. */
+  /** The state it starts in, and what it has on the go (a startle only if the step says an entrance is under way). */
   mood?: AvatarMood;
   step?: CreatureStep;
   /** Moving (default), or holding still in its key pose. */
@@ -289,6 +295,8 @@ export class LiveCreature {
   /** The base act built for the step (its name and start), so the same step is not built again. */
   private baseKey: string | null = null;
   private moodTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The start of the last entrance it was startled for (wall-clock). */
+  private startledAt: number | null = null;
 
   constructor(stage: RigStage, private opts: LiveOptions) {
     this.stage = stage;
@@ -296,7 +304,7 @@ export class LiveCreature {
     this.item = stage.add(rigSpec(opts.choice ?? creatureFromSeed(opts.seed)), opts.canvas, face ? { ...FACE, off: 0 } : { turn: 0, off: 0 });
     this.fit();
     this.moving = opts.moving ?? true;
-    this.setMood(opts.mood ?? "idle", { step: opts.step, startle: false });
+    this.setMood(opts.mood ?? "idle", { step: opts.step });
     const box = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => { this.fit(); this.hidden = false; this.poke(); });
     box?.observe(opts.canvas);
     this.off.push(() => box?.disconnect());
@@ -366,10 +374,9 @@ export class LiveCreature {
 
   private poke() { this.needDraw = true; wake(); }
 
-  /** What it acts out: the product's state, and what it has on the go (`step`: kept from before when not given). Starting
-   *  to listen, it is startled for a moment (the creator's mode change). */
-  setMood(mood: AvatarMood, { step, startle = true }: { step?: CreatureStep; startle?: boolean } = {}) {
-    const was = this.mood;
+  /** What it acts out: the product's state, and what it has on the go (`step`: kept from before when not given). Making
+   *  an entrance into listening, it is startled for a moment (syncStartle). */
+  setMood(mood: AvatarMood, { step }: { step?: CreatureStep } = {}) {
     this.mood = mood;
     if (step) this.step = step;
     const c = this.item.c, M = MODES[mood];
@@ -377,13 +384,31 @@ export class LiveCreature {
     const cogs = mood === "working" ? "cogs" : null;
     if (c.act("cogs") !== cogs) c.setAct("cogs", cogs);
     if (M.poster && c.act("mood")) this.playMood(null);
+    // Entering listening, whatever it had going goes at once, as the creator's applyMode drops the base act and the cogs
+    // (the 2D figure's props fell away over its entrance instead): the startle is the whole transition.
     this.syncBase();
-    if (M.enter && startle && was !== mood) this.react = { expr: "surprised", hop: 1.1, t0: nowS(), until: nowS() + 0.55 };
+    this.syncStartle();
     this.poke();
   }
 
   /** What it has on the go, its state unchanged. */
-  setStep(step: CreatureStep) { this.step = step; if (this.syncBase()) this.poke(); }
+  setStep(step: CreatureStep) { this.step = step; const startled = this.syncStartle(); if (this.syncBase() || startled) this.poke(); }
+
+  /** The creator's startle (STARTLE) when the state says it is making an entrance into listening: production decides when
+   *  (avatar-state.ts `enter`: into listening from idle or working, from the moment the room stamped, the same in every
+   *  window), the reference how it looks. Its clock starts at the entrance's start (`since`), so a window that hears of it
+   *  late startles at the same moment, or not at all once it is over. It lasts the reference's 0.55 s, not the 2D
+   *  figure's 420 ms entrance (ENTER_MS). Each entrance startles once. Whether it started one. */
+  private syncStartle(): boolean {
+    const s = this.step;
+    if (!MODES[this.mood].enter || !s.enter || s.since == null || s.since === this.startledAt) return false;
+    this.startledAt = s.since;
+    const k = Math.max(0, Date.now() - s.since) / 1000;
+    if (k >= STARTLE.secs) return false;
+    const t0 = nowS() - k;
+    this.react = { expr: STARTLE.expr, hop: STARTLE.hop, t0, until: t0 + STARTLE.secs };
+    return true;
+  }
 
   /** The act its state and step ask for on the base layer: the working style while it works, the pastime while it rests. */
   private baseAct(): string | null {

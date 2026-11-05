@@ -85,7 +85,7 @@ function render() {
     const show = () => {
       const s: AvatarState | undefined = states.get("lab");
       if (!s) return;
-      creature.setMood(s.mood, { step: { work: s.work, idle: s.idle, since: s.since, until: s.until } });
+      creature.setMood(s.mood, { step: { work: s.work, idle: s.idle, since: s.since, until: s.until, enter: s.enter } });
       const base = creature.acting().base;
       log.push({ t: (Date.now() - born) / 1000, mood: s.mood, work: s.work, idle: s.idle, spell: s.until != null && s.since != null ? (s.until - s.since) / 1000 : undefined, act: base?.name ?? null, actDur: base?.dur });
     };
