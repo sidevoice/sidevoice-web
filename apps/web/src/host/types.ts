@@ -299,12 +299,16 @@ export interface MuteShortcutBridge {
  *  one), `some-apps` (only named apps: Music and Spotify on a Mac without System Audio Recording) or `none`; `pause`:
  *  `media-controls`, `some-apps` or `none`. The app restores only what it took. */
 export type MediaDuckMode = "lower" | "pause" | "off";
+/** How far Lower goes: `half` (50 % of the app's volume), `quarter` (25 %, the default) or `mute` (silent). */
+export type MediaDuckLevel = "half" | "quarter" | "mute";
 /** The permissions the status reports, as the page asks for one: `capture` (macOS System Audio Recording, lowering any
  *  app) and `automation` (macOS Automation, controlling Music and Spotify). */
 export type MediaDuckPermission = "capture" | "automation";
 export type MediaDuckAccess = "granted" | "denied" | "undetermined" | "unknown";
 export interface MediaDuckStatus {
   mode: MediaDuckMode;
+  /** How far Lower goes; absent from an app that has no level to choose. */
+  level?: MediaDuckLevel;
   lower: "per-app" | "some-apps" | "none";
   pause: "media-controls" | "some-apps" | "none";
   /** Whether the system lets the app control the named apps it lowers or pauses (macOS Automation of Music and Spotify);
@@ -323,6 +327,8 @@ export interface MediaDuckBridge {
   /** The system's page where the person turns `permission` back on (macOS). */
   openSettings?(permission: MediaDuckPermission): Promise<MediaDuckStatus>;
   set(mode: MediaDuckMode): Promise<MediaDuckStatus>;
+  /** How far Lower goes; applied at once while lowered. Absent from an app that has no level to choose. */
+  setLevel?(level: MediaDuckLevel): Promise<MediaDuckStatus>;
 }
 
 /** The app's floating card, as the app keeps it: whether it shows always or only while the app is minimised; and

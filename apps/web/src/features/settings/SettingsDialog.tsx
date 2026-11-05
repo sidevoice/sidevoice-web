@@ -23,7 +23,7 @@ import { FloatingCardSettings, useFloatingCardSection } from "./FloatingCardSett
 import { host } from "../../host";
 import { PermissionsSettings } from "./PermissionsSettings";
 import { useMicrophoneAccess } from "../permissions/permission-view";
-import { listsMediaPermissions, useMediaDuck } from "../permissions/media-permissions";
+import { listsMediaPermissions, neededPermission, useMediaDuck } from "../permissions/media-permissions";
 import type { MicrophoneAccess, MicrophoneSnapshot } from "../../services/microphone-access";
 import { ShortcutsSettings, useShortcutsSection } from "./ShortcutsSettings";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
@@ -355,10 +355,13 @@ export function SettingsDialog() {
   // The app's update, unseen: its mark is the Updates entry's, said in words to assistive tech.
   const updated = (id: string) => id === "updates" && updateMark;
   // What needs attention wears the one warning dot the app uses (the stage's title has it too; operator, 2026-10-16):
-  // a model chosen but not ready, or the microphone not allowed; said in words on hover and to assistive tech.
+  // a model chosen but not ready, the microphone not allowed, or a permission the media choice needs not allowed (not one
+  // the system can't say: operator, 2026-11-05); said in words on hover and to assistive tech.
   const micBlocked = ["prompt", "requesting", "denied", "missing"].includes(mic.microphone?.state ?? "");
+  const mediaBlocked = neededPermission(media.status) !== null;
   const attention = (id: string): MessageKey | null => (id === "transcription" && waits.stt) || (id === "voice" && waits.tts) || (id === "call" && waits.turn)
-    ? "settings.section.waiting" : id === "permissions" && micBlocked ? "settings.call.micNotAllowed" : null;
+    ? "settings.section.waiting" : id === "permissions" && micBlocked ? "settings.call.micNotAllowed"
+      : id === "permissions" && mediaBlocked ? "settings.call.mediaPermissionMissing" : null;
   const badge = (id: string) => { const why = attention(id); return why && <Tooltip content={t(why)}><span className="ui-nav-badge settings-attention" role="img" aria-label={t(why)} /></Tooltip>; };
   // A phone's header says where the person is: Settings on the list, the section on its page, the machine on its own.
   const shownMachine = useRoomStore((state) => state.machines.find((entry) => entry.id === machine) ?? null);

@@ -2,7 +2,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MediaDuckRow } from "./MediaDuckRow";
 import { translator } from "../../i18n/translator";
-import type { MediaDuckMode, MediaDuckStatus } from "../../host";
+import type { MediaDuckLevel, MediaDuckMode, MediaDuckStatus } from "../../host";
 
 const en = translator("en");
 
@@ -126,4 +126,41 @@ test("a late answer does not overwrite a newer choice; coming back to the window
   const reads = media.get.mock.calls.length;
   act(() => { window.dispatchEvent(new Event("focus")); });
   expect(media.get).toHaveBeenCalledTimes(reads + 1);
+});
+
+test("how far to lower is a row for Lower only, sent to the app, and the default is A lot", async () => {
+  const media = { ...bridge(status({ level: "quarter" })), setLevel: vi.fn(async (level: MediaDuckLevel) => status({ level })) };
+  inApp({ mediaDuck: media });
+  render(<MediaDuckRow t={en} openPermissions={() => undefined} />);
+  expect(await screen.findByText("How much to lower")).toBeInTheDocument();
+  expect(screen.getByText("Leaves other apps at 50% of their volume (A little), at 25% (A lot) or silent (Mute).")).toBeInTheDocument();
+  expect(screen.getByRole("radio", { name: "A lot" })).toHaveAttribute("aria-checked", "true");
+  fireEvent.click(screen.getByRole("radio", { name: "Mute" }));
+  expect(media.setLevel).toHaveBeenCalledWith("mute");
+  expect(await screen.findByRole("radio", { name: "Mute" })).toHaveAttribute("aria-checked", "true");
+  fireEvent.click(screen.getByRole("radio", { name: "Pause" }));
+  expect(await screen.findByRole("radio", { name: "Pause" })).toHaveAttribute("aria-checked", "true");
+  expect(screen.queryByText("How much to lower")).toBeNull();
+});
+
+test("a level the app refuses goes back; no level row where the app has none to choose or cannot lower", async () => {
+  const media = { ...bridge(status({ level: "half" })), setLevel: vi.fn(async (): Promise<MediaDuckStatus> => { throw new Error("nope"); }) };
+  inApp({ mediaDuck: media });
+  const view = render(<MediaDuckRow t={en} openPermissions={() => undefined} />);
+  fireEvent.click(await screen.findByRole("radio", { name: "Mute" }));
+  expect(await screen.findByRole("radio", { name: "A little" })).toHaveAttribute("aria-checked", "true");
+  view.unmount();
+  for (const [now, setLevel] of [[status({ level: "quarter" }), false], [status(), true], [status({ level: "quarter", lower: "none" }), true]] as const) {
+    inApp({ mediaDuck: { ...bridge(now), ...(setLevel ? { setLevel: vi.fn() } : {}) } });
+    const other = render(<MediaDuckRow t={en} openPermissions={() => undefined} />);
+    await screen.findAllByRole("radio");
+    expect(screen.queryByText("How much to lower")).toBeNull();
+    other.unmount();
+  }
+});
+
+test("Pause through the system's media controls says only players shown there can be paused", async () => {
+  inApp({ mediaDuck: bridge(status({ mode: "pause", pause: "media-controls" })) });
+  render(<MediaDuckRow t={en} openPermissions={() => undefined} />);
+  expect(await screen.findByText("Only players that show in the system’s media controls can be paused.")).toBeInTheDocument();
 });

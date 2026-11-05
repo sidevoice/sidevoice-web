@@ -10,15 +10,21 @@ import type { MessageKey, Translate } from "../../i18n/translator";
  * Settings › Call's row, and the permissions it needs in the list of permissions (operator, 2026-11-04: asked in the
  * setup and listed in Settings › Permissions; the Call row only links there). */
 
+/** What every screen showing the status is told, so they all show the same one. */
+const shown = new Set<(value: MediaDuckStatus) => void>();
+
 /** `host().mediaDuck`'s status, read as the screen shows and again whenever the person comes back to this window: they may
  *  have answered the system's question, or opened Music, in between. Only the answer to the latest request is kept (one
  *  that comes late, after the system's question took a while, is not), per lane: the status (reads and the choice) and each
  *  permission's Allow, so two questions answered in any order are both kept. `run` sends a request, and settles once
  *  answered. Null status where the app does not offer it (a browser), and until the first answer; `known` once there is an
- *  answer, a read that failed, or nothing to read. */
+ *  answer, a read that failed, or nothing to read. Every screen showing it at once shares each answer and choice (the
+ *  Settings nav's warning dot follows the mode the Call row just chose). */
 export function useMediaDuck() {
   const bridge = host().mediaDuck;
-  const [status, setStatus] = useState<MediaDuckStatus | null>(null);
+  const [status, own] = useState<MediaDuckStatus | null>(null);
+  useEffect(() => { shown.add(own); return () => { shown.delete(own); }; }, []);
+  const setStatus = (value: MediaDuckStatus) => { for (const show of shown) show(value); };
   const latest = useRef<Record<string, number>>({});
   const next = (lane: string) => (latest.current[lane] = (latest.current[lane] ?? 0) + 1);
   const [unread, setUnread] = useState(false);
@@ -47,6 +53,16 @@ export function useMediaDuck() {
 /** Whether a permission is missing in a way the person can change: not asked yet, or refused. */
 export function missing(access: MediaDuckAccess | undefined) {
   return access === "undetermined" || access === "denied";
+}
+
+/** The permission the current choice needs and lacks, if any (`unknown` is not taken for missing): lowering any app
+ *  (System Audio Recording) for Lower, else controlling Music and Spotify where the choice goes through them (Pause on a
+ *  Mac, or Lower without System Audio Recording). */
+export function neededPermission(status: MediaDuckStatus | null): MediaDuckPermission | null {
+  if (!status) return null;
+  const { mode, lower, pause, access, capture } = status;
+  const throughNamed = (mode === "lower" && lower === "some-apps") || (mode === "pause" && pause === "some-apps");
+  return mode === "lower" && missing(capture) ? "capture" : throughNamed && missing(access) ? "automation" : null;
 }
 
 /** Whether the app reports any permission its media handling needs here: then the list of permissions is shown for them,
