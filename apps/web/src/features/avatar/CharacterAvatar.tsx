@@ -7,7 +7,7 @@ import { avatarColor, drawAvatar, engineSize, type AvatarSize, type DrawnSpec } 
 import { useLayers } from "./layers";
 import { ATTENTION_EXPR, STILL_EXPR } from "./creature/faces";
 import { FALLBACK_PATH } from "./creature/fallback";
-import type { LiveCreature } from "./creature/host";
+import type { CreatureStep, LiveCreature } from "./creature/host";
 import { creatureHostNow, loadCreatureHost, watchCreatureHost, type CreatureHost, type CreatureHostLoading } from "./creature-loader";
 
 /** The creature host once it has loaded (null until then) and whether its last load failed (creature-loader.ts). A
@@ -138,14 +138,19 @@ function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, 
   const canDraw = useDrawable(host, framing);
   // Nothing to draw it with: the fallback stands in. While the host is loading for the first time, nothing does yet.
   const fallback = host ? !canDraw : failed;
+  // What it has on the go (its working style or pastime: creature/host.ts plays it as the rig's base act). A copy that holds
+  // still shows it at rest, quiet, never a pastime frozen mid-way; a working style it shows in its key pose (the creator
+  // under reduced motion).
+  const idle = moving || state.idle === undefined ? state.idle : "quiet";
+  const step = useMemo<CreatureStep>(() => ({ work: state.work, idle, since: state.since, until: state.until, entered: state.enteredAt }), [state.work, idle, state.since, state.until, state.enteredAt]);
   // What it shows when its host has loaded, whatever changed in the meantime.
-  const now = useRef({ mood, moving });
-  now.current = { mood, moving };
+  const now = useRef({ mood, moving, step });
+  now.current = { mood, moving, step };
   useEffect(() => {
     const element = canvas.current;
     if (!drawn || !element || !host) return;
     // Mounted even where the page last found it could not draw: a mount is what tries again (null until it can).
-    const live = host.mountCreature({ seed, canvas: element, framing, mood: now.current.mood, moving: now.current.moving, scene: () => {
+    const live = host.mountCreature({ seed, canvas: element, framing, mood: now.current.mood, step: now.current.step, moving: now.current.moving, scene: () => {
       // its feet on the figure's, the top of its body at the figure's crown, in the scene's own pixels
       const figure = root.current, sceneBox = figure?.parentElement;
       if (!figure || !sceneBox?.offsetHeight || !figure.offsetHeight) return null;
@@ -156,10 +161,10 @@ function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, 
       level: (acting) => (acting === "speaking" ? voice.current : heard.current) });
     creature.current = live;
     return () => { live?.dispose(); creature.current = null; };
-    // Its mood and whether it moves are applied below without building the creature again. It is built again when the
-    // page can draw creatures again (canDraw).
+    // Its mood, what it has on the go and whether it moves are applied below without building the creature again. It is
+    // built again when the page can draw creatures again (canDraw).
   }, [drawn, seed, framing, scene, host, canDraw]);
-  useEffect(() => { creature.current?.setMood(mood); }, [mood, drawn, seed, framing]);
+  useEffect(() => { creature.current?.setMood(mood, { step }); }, [mood, step, drawn, seed, framing]);
   useEffect(() => { creature.current?.setMoving(moving); }, [moving, drawn, seed, framing]);
   // A still face: its state's expression (the card's states row, T34), surprised while it has something unread.
   const expr = state.unread ? ATTENTION_EXPR : STILL_EXPR[mood];
@@ -168,9 +173,8 @@ function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, 
     if (drawn || !element || !host) return;
     return host.drawFace(element, seed, expr);
   }, [drawn, seed, expr, host, canDraw]);
-  // The state as the root says it, the same words as the engine's drawings (what it acts out, what it has in hand, its
-  // entrance): the creature's own acts key on them as they come over from the design reference.
-  const idle = moving || state.idle === undefined ? state.idle : "quiet";
+  // The state as the root says it, the same words as the engine's drawings (what it acts out, what it has on the go, its
+  // entrance).
   return (
     <span ref={(element) => { root.current = element; if (typeof ref === "function") ref(element); else if (ref) ref.current = element; }} className={cn("sv-avatar", className)}
       data-style="creature" data-framing={framing} data-avatar-state={mood} data-mood={ENGINE_MOOD[mood]} data-size={engineSize(size)}

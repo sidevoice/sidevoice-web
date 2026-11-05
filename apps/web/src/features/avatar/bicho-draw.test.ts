@@ -26,10 +26,10 @@ test("every copy of a drawing has ids of its own, and refers only to its own", (
 test("a conversation's agent is its creature: its tone is the creature's body colour, and it takes every act", () => {
   expect(avatarColor(avatarFor("7f3c2a91-thread"))).toBe(creatureFromSeed("7f3c2a91-thread").color);
   expect(avatarColor(avatarFor("7f3c2a91-thread"))).toMatch(/^#[0-9a-f]{6}$/);
-  // Every act works on every creature: every working style, and quiet and every pastime when it rests.
+  // Every act works on every creature: every working style, and quiet and every pastime when it rests (creature/schedule.ts).
   const { works, idles } = avatarRepertoire(avatarFor("7f3c2a91-thread"));
-  expect(works).toEqual(expect.arrayContaining(["crank", "read", "type"]));
-  expect(idles).toEqual(expect.arrayContaining(["quiet", "bubbles", "music", "stretch", "nap"]));
+  expect(works).toEqual(["crank", "hammer", "files", "type", "think"]);
+  expect(idles).toEqual(["quiet", "stretch", "water", "juggle", "soup", "fish", "bubbles", "music", "read", "nap"]);
   expect(engineSize("stage")).toBe("stage");
   expect(engineSize("small")).toBe("sidebar");
   expect(engineSize("pip")).toBe("sidebar");

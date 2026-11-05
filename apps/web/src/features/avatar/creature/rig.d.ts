@@ -27,6 +27,18 @@ export interface RigCamera {
   clone(): RigCamera;
 }
 
+/** An act playing on one of a creature's layers (Creature3D.setAct). */
+export interface ActLayer {
+  name: string;
+  /** Its clock's start, on the clock its stage is drawn with (seconds); set by its first frame when null. */
+  t0: number | null;
+  /** Its seconds, ended by the rig past them unless held; null loops. */
+  dur: number | null;
+  hold: boolean;
+  /** Drawn still: the moment of it shown (default: the act's key). */
+  keyAt?: number;
+}
+
 /** A creature: its meshes under `root`, its acts in `layers` (base, mood, cogs…). */
 export class Creature3D {
   constructor(spec: object, look: string);
@@ -36,8 +48,8 @@ export class Creature3D {
   body: { geometry: { boundingBox: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } } } };
   /** The layers that ended in the last frame. */
   ended: string[];
-  layers: Record<string, unknown>;
-  setAct(layer: string, name: string | null, opts?: object): unknown;
+  layers: Record<string, ActLayer>;
+  setAct(layer: string, name: string | null, opts?: { dur?: number; hold?: boolean } & Record<string, unknown>): ActLayer | null;
   act(layer: string): string | null;
 }
 

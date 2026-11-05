@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { playbackLevel } from "../../state/playback-level";
 import { avatarFor } from "./avatar-spec";
-import { BORED_AFTER_MS, createAvatarStates, toTimeline, type AvatarInputs, type AvatarStates } from "./avatar-state";
+import { BORED_AFTER_MS, createAvatarStates, toTimeline, type AvatarInputs, type AvatarState, type AvatarStates } from "./avatar-state";
+import { IDLE_DEFS, PASTIMES, WORKS, WORK_DURATION } from "./creature/schedule";
 import { avatarRepertoire } from "./bicho-draw";
 import { ENTER_MS } from "./engine/styles/bichos";
 
@@ -43,6 +44,64 @@ test("resting, it is quiet for BORED_AFTER_MS, then goes in steps on its one clo
   expect(states.get("a")!.idle).toBe("quiet");
   // The first quiet lasts 4–10 s, then a pastime comes up (and ends in its turn).
   expect(pastimeWithin(40)).toBe(true);
+});
+
+/** Every state the figure shows over `ms` from now, on the fake clock, as its timers move it on. */
+function shown(id: string, ms: number): AvatarState[] {
+  const seen = [{ ...states.get(id)! }];
+  const stop = states.subscribe(() => seen.push({ ...states.get(id)! }));
+  vi.advanceTimersByTime(ms);
+  stop();
+  return seen;
+}
+
+test("at work, a creature takes the design reference's styles in turn, each for its spell (until - since), never twice running", () => {
+  const start = Date.now();
+  states.set("a", inputs({ mood: "working", restStart: start }));
+  const steps = shown("a", 600_000);
+  expect(steps[0]).toMatchObject({ mood: "working", since: start });
+  expect(steps.length).toBeGreaterThan(20);
+  steps.forEach((step, i) => {
+    expect(WORKS).toContain(step.work);
+    const [lo, hi] = WORK_DURATION[step.work as keyof typeof WORK_DURATION];
+    const spell = (step.until! - step.since!) / 1000;
+    expect(spell).toBeGreaterThanOrEqual(lo - 0.001);
+    expect(spell).toBeLessThanOrEqual(hi + 0.001);
+    // each style ends exactly when the next begins, and the next is another
+    if (i) { expect(step.since).toBe(steps[i - 1].until); expect(step.work).not.toBe(steps[i - 1].work); }
+  });
+});
+
+test("resting, after BORED_AFTER_MS a creature's quiet and its pastimes take turns, each pastime for its spell, never the last one again", () => {
+  const start = Date.now();
+  states.set("a", inputs({ restStart: start }));
+  const steps = shown("a", 900_000);
+  // quiet with nothing due until bored; the first change is at BORED_AFTER_MS + the first quiet spell
+  expect(steps[0]).toMatchObject({ idle: "quiet", until: undefined });
+  const pastimes = steps.filter((step) => step.idle !== "quiet");
+  expect(pastimes.length).toBeGreaterThan(12);
+  expect(pastimes[0].since! - start).toBeGreaterThanOrEqual(BORED_AFTER_MS + IDLE_DEFS.quiet[0] * 1000 - 1);
+  expect(pastimes[0].since! - start).toBeLessThanOrEqual(BORED_AFTER_MS + IDLE_DEFS.quiet[1] * 1000 + 1);
+  pastimes.forEach((step, i) => {
+    expect(PASTIMES).toContain(step.idle);
+    const [lo, hi] = IDLE_DEFS[step.idle as keyof typeof IDLE_DEFS];
+    const spell = (step.until! - step.since!) / 1000;
+    expect(spell).toBeGreaterThanOrEqual(lo - 0.001);
+    expect(spell).toBeLessThanOrEqual(hi + 0.001);
+    if (i) expect(step.idle).not.toBe(pastimes[i - 1].idle);
+  });
+  // between two pastimes, quiet (4–10 s), with nothing of its own due
+  steps.forEach((step, i) => {
+    if (i && step.idle !== "quiet") expect(steps[i - 1].idle).toBe("quiet");
+    if (step.idle === "quiet") expect(step.until).toBeUndefined();
+  });
+});
+
+test("present it is awake and quiet, nothing on the go however long; offline nothing at all", () => {
+  states.set("a", inputs({ mood: "present" }));
+  expect(shown("a", 120_000).every((step) => step.idle === "quiet" && step.work === undefined && step.until === undefined)).toBe(true);
+  states.set("a", inputs({ mood: "offline" }));
+  expect(shown("a", 120_000).every((step) => step.idle === undefined && step.work === undefined)).toBe(true);
 });
 
 test("a figure no copy draws moving rests quiet however long; drawn moving, it goes by the time since its rest began", () => {
@@ -88,6 +147,42 @@ test("startled into listening, what it had in hand stays on for the entrance, th
   // A first mood makes no entrance.
   states.set("b", inputs({ mood: "listening" }));
   expect(states.get("b")!.enter).toBeUndefined();
+});
+
+test("coming into listening from any mood, a barge-in on its speech included, it says when (the room's stamp), for as long as it listens", () => {
+  for (const from of ["working", "idle", "speaking", "present"] as const) {
+    const id = "e-" + from;
+    states.set(id, inputs({ mood: from, restStart: Date.now() - 10_000 }));
+    const came = Date.now();
+    states.set(id, inputs({ mood: "listening", restStart: came }));
+    expect(states.get(id)!.enteredAt, from).toBe(came);
+  }
+  // the 2D figure's entrance marker goes at ENTER_MS (420 ms); the creature's startle (0.55 s) still has its start at 480 ms
+  vi.advanceTimersByTime(480);
+  expect(states.get("e-working")).toMatchObject({ enter: undefined, enteredAt: Date.now() - 480 });
+  // and a barge-in never had the 2D marker (enterFrom: from idle or working), but has its start
+  expect(states.get("e-speaking")).toMatchObject({ enter: undefined, enteredAt: Date.now() - 480 });
+  // it lasts as long as the listening does, and goes with it
+  vi.advanceTimersByTime(60_000);
+  expect(states.get("e-idle")!.enteredAt).toBe(Date.now() - 60_480);
+  states.set("e-idle", inputs({ mood: "working", restStart: Date.now() }));
+  expect(states.get("e-idle")!.enteredAt).toBeUndefined();
+});
+
+test("a first mood makes no entrance; two windows given the same change say the same moment", () => {
+  states.set("first", inputs({ mood: "listening", restStart: Date.now() }));
+  expect(states.get("first")!.enteredAt).toBeUndefined();
+  const room = createAvatarStates(), card = createAvatarStates();
+  const restStart = Date.now() - 5_000;
+  for (const set of [room, card]) set.set("a", inputs({ mood: "speaking", restStart }));
+  const came = Date.now();
+  room.set("a", inputs({ mood: "listening", restStart: came }));
+  vi.advanceTimersByTime(470);
+  card.set("a", inputs({ mood: "listening", restStart: came }));
+  expect(card.get("a")!.enteredAt).toBe(came);
+  expect(room.get("a")!.enteredAt).toBe(came);
+  room.clear();
+  card.clear();
 });
 
 test("offline it sleeps: no step, and none starts however long it lasts", () => {

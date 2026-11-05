@@ -10,7 +10,7 @@ import { creatureFromSeed } from "./creature/catalogue";
  * its state's expression. */
 
 const host = vi.hoisted(() => {
-  const lives: { opts: Record<string, unknown>; moods: string[]; moving: boolean[]; disposed: boolean }[] = [];
+  const lives: { opts: Record<string, unknown>; moods: string[]; steps: unknown[]; moving: boolean[]; disposed: boolean }[] = [];
   const faces: { seed: string; expr: string; cancelled: boolean }[] = [];
   return { lives, faces };
 });
@@ -19,9 +19,12 @@ vi.mock("./creature/host", () => {
     creaturesDrawable: () => true,
     onCreaturesChange: () => () => {},
     mountCreature: (opts: Record<string, unknown>) => {
-      const live = { opts, moods: [] as string[], moving: [] as boolean[], disposed: false };
+      const live = { opts, moods: [] as string[], steps: [] as unknown[], moving: [] as boolean[], disposed: false };
       host.lives.push(live);
-      return { setMood: (m: string) => live.moods.push(m), setMoving: (m: boolean) => live.moving.push(m), dispose: () => { live.disposed = true; } };
+      return {
+        setMood: (m: string, o: { step?: unknown } = {}) => { live.moods.push(m); live.steps.push(o.step); },
+        setMoving: (m: boolean) => live.moving.push(m), dispose: () => { live.disposed = true; },
+      };
     },
     drawFace: (_canvas: HTMLCanvasElement, seed: string, expr: string) => {
       const face = { seed, expr, cancelled: false };
@@ -64,6 +67,35 @@ test("on the stage's scene it is a live creature in the tile, tinted with its bo
   expect(live.moods.at(-1)).toBe("listening");
   view.unmount();
   expect(live.disposed).toBe(true);
+});
+
+test("what its state has on the go reaches the creature with its state: the working style or the pastime, and when it began and ends", async () => {
+  const since = 1_800_000_000_000, until = since + 12_000;
+  const view = render(<div className="stage-tile"><CharacterAvatar spec={spec} state={state("working", { work: "hammer", since, until })} size="stage" scene live /></div>);
+  await settle();
+  const [live] = host.lives;
+  expect(live.opts).toMatchObject({ mood: "working", step: { work: "hammer", since, until } });
+  expect(view.container.querySelector(".sv-avatar")).toHaveAttribute("data-work", "hammer");
+  // the next style: the same creature, told the new step with its state
+  view.rerender(<div className="stage-tile"><CharacterAvatar spec={spec} state={state("working", { work: "think", since: until, until: until + 9_000 })} size="stage" scene live /></div>);
+  expect(host.lives).toHaveLength(1);
+  expect(live.moods.at(-1)).toBe("working");
+  expect(live.steps.at(-1)).toEqual({ work: "think", idle: undefined, since: until, until: until + 9_000 });
+  // resting at a pastime
+  view.rerender(<div className="stage-tile"><CharacterAvatar spec={spec} state={state("idle", { idle: "fish", since: until, until: until + 40_000 })} size="stage" scene live /></div>);
+  expect(live.moods.at(-1)).toBe("idle");
+  expect(live.steps.at(-1)).toEqual({ work: undefined, idle: "fish", since: until, until: until + 40_000 });
+  view.unmount();
+});
+
+test("held still, the stage's creature shows a rest quiet, never a pastime frozen mid-way; a working style in its key pose", async () => {
+  motion("still");
+  const view = render(<CharacterAvatar spec={spec} state={state("idle", { idle: "juggle", since: 1, until: 2 })} size="stage" scene live />);
+  await settle();
+  expect(host.lives[0].opts).toMatchObject({ mood: "idle", moving: false, step: { idle: "quiet" } });
+  expect(view.container.firstElementChild).toHaveAttribute("data-idle", "quiet");
+  view.rerender(<CharacterAvatar spec={spec} state={state("working", { work: "crank", since: 1, until: 2 })} size="stage" scene live />);
+  expect(host.lives[0].steps.at(-1)).toMatchObject({ work: "crank" });
 });
 
 test("held still (no GPU, reduced motion), the stage's creature is still drawn, in its key pose", async () => {
