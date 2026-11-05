@@ -197,8 +197,9 @@
 /* ----- the conversation working on the person's turn ('label', T51): a quiet row, its dot in the creature's accent */
 .chat-bubble.working { display: flex; align-items: center; gap: 8px; width: 82%; border-color: transparent; background: none; box-shadow: none; }
 .working-label { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--tr-tag-ink); }
-.working-label > i { width: 8px; height: 8px; border-radius: 50%; background: var(--creature-accent, var(--tr-accent)); animation: transcript-blink 1.2s ease-in-out infinite; }
-@keyframes transcript-blink { 50% { opacity: .3; } }
+/* The working glyph: three dots in the working state's colour (tokens.css), blinking as the conversations' dot does (room.css). */
+.working-label > svg { flex: none; width: 16px; height: 16px; color: var(--sv-state-working); animation: transcript-blink 1.2s ease-in-out infinite; }
+@keyframes transcript-blink { 50% { opacity: .25; } }
 /* A running ellipsis after a live row's word. */
 .transcript-ell i { font-style: normal; animation: transcript-ell 1.2s ease-in-out infinite; }
 .transcript-ell i:nth-child(2) { animation-delay: .2s; }
@@ -303,7 +304,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .working-label > i, .transcript-ell i, .turn-bars i { animation: none; }
+  .working-label > svg, .transcript-ell i, .turn-bars i { animation: none; }
   .transcript-ell i { opacity: 1; }
 }
 

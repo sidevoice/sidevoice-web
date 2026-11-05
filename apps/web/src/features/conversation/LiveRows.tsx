@@ -1,5 +1,4 @@
-import type { CSSProperties } from "react";
-import { TurnMicIcon } from "../../components/ui/Icons";
+import { TurnMicIcon, WorkingIcon } from "../../components/ui/Icons";
 import { translator } from "../../i18n/translator";
 import { CancelTurn, type BubblePosition } from "./MessageBubble";
 
@@ -8,13 +7,14 @@ function Ellipsis() {
   return <span className="transcript-ell" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span>;
 }
 
-/** The conversation working on the person's turn ('label', T51, T52): a quiet row in the agent's run, "Working…", its dot
- *  in the creature's accent blinking (1.2 s), in place of the thinking dots. */
-export function WorkingRow({ position, accent }: { position: BubblePosition; accent?: string }) {
+/** The conversation working on the person's turn ('label', T51, T52): a quiet row in the agent's run, "Working…", led by the
+ *  working glyph (three dots, in the working state's colour, blinking 1.2 s: as the conversations' dot says it everywhere
+ *  else), in place of the thinking dots. */
+export function WorkingRow({ position }: { position: BubblePosition }) {
   const t = translator();
   return <div className="chat-bubble working" data-role="assistant" data-position={position} role="status" aria-label={t("messages.thinking")}>
-    <span className="working-label" aria-hidden="true" style={accent ? { "--creature-accent": accent } as CSSProperties : undefined}>
-      <i /><span>{t("messages.working")}<Ellipsis /></span>
+    <span className="working-label" aria-hidden="true">
+      <WorkingIcon /><span>{t("messages.working")}<Ellipsis /></span>
     </span>
   </div>;
 }

@@ -14,9 +14,10 @@ import { selectInCall } from "./stage-view";
  *  developer option "Animate conversation thumbnails" is on: then it moves as the stage's does, in layers, lip-syncing.
  *
  *  `pop`, a conversation's card in the sidebar and its rail: the creature stands in a rounded square and comes out of it
- *  (features/avatar/fit-pop.ts). Nothing sits on it but the state's colour as a dot at the square's foot while its agent
- *  works, and, while it needs the person (`attention`: it said something they have not seen), the burst with its "!" at
- *  the square's top-right. The state is otherwise said by the card's words and the avatar's own face. */
+ *  (features/avatar/fit-pop.ts). Nothing sits on it but the dot at the square's foot-right and, while it needs the person
+ *  (`attention`: it said something they have not seen), the burst with its "!" at the top-right. The dot is the connected
+ *  green while the agent is reachable, blinks in the working colour while it works, and is not there when it is offline;
+ *  the rest of the state is said by the card's words and the avatar's own face. */
 export function ConversationAvatar({ row, pop = false, attention = false }: { row: ParticipantView; pop?: boolean; attention?: boolean }) {
   const inCall = useRoomStore(selectInCall);
   const avatar = useConversationAvatar(row.threadId);
@@ -31,7 +32,7 @@ export function ConversationAvatar({ row, pop = false, attention = false }: { ro
       {animated
         ? <CharacterAvatar spec={avatarFor(row.threadId)} state={avatar} size="small" mouth="playback" mouthLevel={avatars.mouth(row.threadId)} live />
         : <CharacterAvatar spec={avatarFor(row.threadId)} state={avatar} size="small" mouth="still" pop={pop} />}
-      {(!pop || state === "working") && <span className="state-dot" data-state={state} data-kind={kind} aria-hidden="true" />}
+      {(!pop || kind !== "offline") && <span className="state-dot" data-state={state} data-kind={kind} aria-hidden="true" />}
       {pop && attention && <AttentionBurstIcon className="attention-burst" />}
     </span>
   );

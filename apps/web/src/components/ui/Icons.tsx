@@ -10,7 +10,7 @@ import {
   MessagesSquare, Monitor, MoreVertical, Plus, Info, PanelLeftClose,
   PanelLeftOpen, Pause, Phone, PhoneOff, Play, Plug, RefreshCw, SkipForward, SlidersHorizontal, Wrench, X,
   Box, AudioWaveform, ArrowLeft, ArrowRight, RefreshCcwDot, Pencil, Laptop, Server,
-  Timer, ScrollText, Link, Unlink, Search, ChevronLeft, ChevronRight, Eye, EyeOff, Square, Sparkle, ShieldCheck, Captions, CaptionsOff, PictureInPicture2, Terminal,
+  Timer, Link, Unlink, Search, ChevronLeft, ChevronRight, Eye, EyeOff, Square, Sparkle, ShieldCheck, Captions, CaptionsOff, PictureInPicture2, Terminal,
 } from "lucide-react";
 import type { ComponentType } from "react";
 // Other products' own marks, from their brand kits (assets/logos/README.md: where each comes from and its rules).
@@ -39,9 +39,7 @@ function mark(Drawing: LucideLike, fallbackSize: number) {
 const HAND = {
   mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
   micOff: '<path d="M15 9.3V6a3 3 0 0 0-5.7-1.3M9 9v2a3 3 0 0 0 5.1 2.1M5 11a7 7 0 0 0 11.6 5.3M19 11a7 7 0 0 1-.6 2.8M12 18v3M3 3l18 18"/>',
-  ear: '<path d="M6 8.5a6 6 0 0 1 12 0c0 3.5-3 4.5-3 7.5a3.5 3.5 0 0 1-7 0"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-1.5 2-1.5 3.5"/>',
   speaker: '<path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>',
-  hourglass: '<path d="M6 3h12M6 21h12M7 3c0 5 10 5 10 9s-10 4-10 9M17 3c0 5-10 5-10 9s10 4 10 9"/>',
   cog: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
   dots: '<path d="M6 12h.01M12 12h.01M18 12h.01" stroke-width="3.4"/>',
 };
@@ -101,10 +99,9 @@ export const OpenPageIcon = mark(ChevronRight, 16);
 /** Searching a list. */
 export const SearchIcon = mark(Search, 16);
 export const SpeakerIcon = drawn(HAND.speaker, "0 0 24 24", 20, false, STROKE);
-/** What an agent that hears you is told by, and one that works (the state-colours demo's alternatives to the microphone; the
- *  conversations' states are said by colour and words for now, so nothing draws these yet). */
-export const EarIcon = drawn(HAND.ear, "0 0 24 24", 16, false, STROKE);
-export const HourglassIcon = drawn(HAND.hourglass, "0 0 24 24", 16, false, STROKE);
+/** An agent at work, wherever a state is shown as an icon: three dots (the operator's choice, 2026-11-05: not a cog, not an
+ *  hourglass). The conversations' states are said by colour and words for now, so nothing draws it yet. */
+export const WorkingIcon = drawn(HAND.dots, "0 0 24 24", 16, false, STROKE);
 export const CallIcon = mark(Phone, 22);
 export const HangupIcon = mark(PhoneOff, 22);
 export const SkipIcon = mark(SkipForward, 22);
@@ -115,8 +112,6 @@ export const PauseIcon = mark(Pause, 16);
 export const PlayRecordingIcon = mark(Play, 16);
 export const PauseRecordingIcon = mark(Pause, 16);
 export const KeyboardIcon = mark(Keyboard, 20);
-/** The record of what was said: unlike the conversations' bubbles, a scroll of text. */
-export const TranscriptIcon = mark(ScrollText, 22);
 /** What is said, shown on the stage as it is said: on, or turned off. */
 export const CaptionsIcon = mark(Captions, 22);
 export const CaptionsOffIcon = mark(CaptionsOff, 22);
@@ -189,7 +184,7 @@ function drawn(paths: string, viewBox: string, fallbackSize: number | [number, n
       strokeWidth={fill ? undefined : stroke} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" dangerouslySetInnerHTML={{ __html: paths }} />;
   };
 }
-/** The transcript, by its three lines (its head, T59: the stage's transcript button's). */
+/** The transcript, by its three lines (its head, T59: the stage's transcript button's, the empty transcript's). */
 export const TranscriptLinesIcon = drawn('<path d="M4 6h16M4 12h16M4 18h10"/>', "0 0 24 24", 16, false, 2.2);
 /** Puts the transcript away (its head's ×). */
 export const TranscriptCloseIcon = drawn('<path d="M6 6l12 12M18 6L6 18"/>', "0 0 24 24", 15, false, 2.4);

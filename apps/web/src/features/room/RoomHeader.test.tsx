@@ -65,7 +65,7 @@ test("a row says its state in words, and what is unread as the one burst on its 
   act(() => store.patch({ history: [reply("r-1", 1), reply("r-2", 2)], roomSeen: {} }));
   const row = [...document.querySelectorAll(".conversation-sidebar .person")].find((button) => button.textContent?.includes("Review the nightly backups"))!;
   expect(row.querySelector(".conversation-avatar")).toHaveAttribute("data-state", "waiting");
-  expect(row.querySelector(".state-dot")).toBeNull();
+  expect(row.querySelector(".state-dot")).toHaveAttribute("data-state", "waiting");
   expect(row.querySelector(".sidebar-state-text")).toHaveTextContent(/^Waiting for you$/);
   expect(row.querySelectorAll(".attention-burst")).toHaveLength(1);
   expect(row.querySelector(".conversation-avatar")).toHaveAttribute("data-attention");

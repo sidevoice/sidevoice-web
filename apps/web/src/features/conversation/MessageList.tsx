@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ToLatestArrowIcon, TranscriptIcon } from "../../components/ui/Icons";
+import { ToLatestArrowIcon, TranscriptLinesIcon } from "../../components/ui/Icons";
 import type { ChatMessage, ConversationView } from "../../state/room-types";
 import { translator, uiLanguage } from "../../i18n/translator";
 import { TextLayoutContext } from "./FoldedText";
@@ -122,7 +122,7 @@ export function MessageList({ conversation: view, visible = true, inCall = true 
       <div id="messages" ref={viewport} role="log" aria-live="polite" onScroll={readScroll}>
         <TextLayoutContext.Provider value={width ? width + fonts / 1000 : 0}>
           <div className="messages-content" ref={content}>
-            {empty && <div className="messages-empty"><TranscriptIcon size={28} /><p>{t("messages.empty")}</p></div>}
+            {empty && <div className="messages-empty"><TranscriptLinesIcon size={28} /><p>{t("messages.empty")}</p></div>}
             {blocks.map((block) => block.kind === "day"
               ? <p className="message-day" key={block.key}>{block.label}</p>
               : <MessageGroup key={block.key} run={block.run} sig={block.sig} />)}

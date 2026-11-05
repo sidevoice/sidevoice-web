@@ -54,6 +54,9 @@ test("working is a quiet row starting the agent's next run, wearing its face, in
   const working = container.querySelector(".chat-bubble.working")!;
   expect(working).toHaveAccessibleName("The conversation is working on your message");
   expect(working.textContent).toBe("Working...");
+  // Led by the working glyph (three dots), as the conversations' state says it, not by a dot of the creature's accent.
+  expect(working.querySelector(".working-label > svg")).not.toBeNull();
+  expect(working.querySelector(".working-label > i")).toBeNull();
   const run = working.closest(".message-group")!;
   expect(run).toHaveAttribute("data-role", "assistant");
   expect(run.querySelector(":scope > .chat-face")).not.toBeNull();

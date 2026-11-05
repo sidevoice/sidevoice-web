@@ -2,7 +2,7 @@ import { useContext, useEffect, useLayoutEffect, useRef } from "react";
 import { Button } from "../../components/ui/Button";
 import { DropdownMenu, DropdownMenuItem } from "../../components/ui/DropdownMenu";
 import { ContextMenu, ContextMenuItem } from "../../components/ui/ContextMenu";
-import { CloseIcon, CloseUpIcon, ConversationsIcon, HarnessIcon, MoreIcon, OtherMachineIcon, SidebarCollapseIcon, SidebarExpandIcon, SettingsIcon, SidevoiceMark, ThisComputerIcon } from "../../components/ui/Icons";
+import { CloseIcon, CloseUpIcon, ConversationsIcon, HarnessIcon, MoreIcon, OtherMachineIcon, SidebarCollapseIcon, SettingsIcon, SidevoiceMark, ThisComputerIcon } from "../../components/ui/Icons";
 import { useSurface } from "../../lib/use-surface";
 import { useSheetDrag } from "../../lib/use-sheet-drag";
 import { COMPACT_QUERY, isNarrow, NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
@@ -132,12 +132,13 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
         <div className="sidebar-head">
           {/* Icon and count are one face, as the call card's switcher wears them (call-card.css .card-conversations-button);
               no chevron: the list is already open here. */}
-          <h2>{blocked ? <ConversationsIcon /> : <span className="conversations-chip" aria-hidden="true"><ConversationsIcon size={14} /><span className="conversations-count">{participants.length}</span></span>}<span className="sidebar-title">{t("sidebar.title")}</span></h2>
+          <h2>{blocked ? <ConversationsIcon /> : <span className="conversations-chip" aria-hidden="true"><ConversationsIcon size={14} /><span className="conversations-count">{participants.length}</span></span>}{t("sidebar.title")}</h2>
           <Tooltip action content={rail ? t("sidebar.expand") : t("sidebar.collapse")}>
             <Button variant="ghost" tone="neutral" size="icon-sm" className="sidebar-collapse" aria-controls="conversations" aria-expanded={!rail}
               aria-label={rail ? t("sidebar.expand") : t("sidebar.collapse")}
               onClick={toggle}>
-              {rail ? <SidebarExpandIcon /> : <SidebarCollapseIcon />}
+              {/* The rail has no second button: the conversations' icon is the one that expands it, with their number as its badge. */}
+              {rail ? <><ConversationsIcon size={20} />{!blocked && participants.length > 0 && <span className="sidebar-count-badge" aria-hidden="true">{participants.length}</span>}</> : <SidebarCollapseIcon />}
             </Button>
           </Tooltip>
           <Button variant="ghost" tone="neutral" size="icon-sm" className="sidebar-close" aria-label={t("sidebar.close")} title={t("sidebar.close")} onClick={close}>

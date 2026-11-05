@@ -337,11 +337,13 @@ test("state dots and small avatars follow each conversation's state, grouped by 
   expect([...document.querySelectorAll(".sidebar-group-label")].map((label) => label.textContent)).toEqual(["Laptop", "Home server"]);
   expect(rowOf("Migrate the payments API")).toHaveTextContent("Working");
   expect(rowOf("Plan the week")).toHaveTextContent("Offline");
-  // A card's creature wears nothing but the dot of its state's colour at its foot while its agent works, blinking (room.css); the
-  // rest is said by its words and its face. A dot carries no mark of its own.
+  // A card's creature wears nothing but the dot at its foot (room.css): the connected green while its agent is reachable, blinking
+  // in the working colour while it works, none while it is offline; the rest is said by its words and its face. A dot carries no
+  // mark of its own.
   const cardDots = [...document.querySelectorAll(".sidebar-rows .state-dot")];
-  expect(cardDots.map((d) => [d.getAttribute("data-state"), d.getAttribute("data-kind")])).toEqual([["working", "working"]]);
+  expect(cardDots.map((d) => [d.getAttribute("data-state"), d.getAttribute("data-kind")])).toEqual([["in-call", "idle"], ["working", "working"], ["waiting", "idle"]]);
   expect(cardDots.every((d) => d.childElementCount === 0)).toBe(true);
+  expect(rowOf("Plan the week").querySelector(".state-dot")).toBeNull();
   expect(document.querySelector(".sidebar-rows .attention-burst")).toBeNull();
   // The call's own conversation at work says Working, on its line and its light (desktop trial, item 11).
   // At work for a minute: past any wait before Working shows (#112).
