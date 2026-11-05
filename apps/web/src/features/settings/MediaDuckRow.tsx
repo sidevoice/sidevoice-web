@@ -32,7 +32,8 @@ export function MediaDuckRow({ t, openPermissions }: { t: Translate; openPermiss
   // What to say first: a permission the choice needs (lowering any app, then controlling the named apps), then how far the
   // system goes.
   const hint: MessageKey =
-    needed === "capture" ? "settings.call.mediaHint.needsCapture"
+    needed === "capture" && status.capture === "restart" ? "settings.call.mediaHint.restartCapture"
+    : needed === "capture" ? "settings.call.mediaHint.needsCapture"
     : needed === "automation" ? "settings.call.mediaHint.needsAccess"
     : mode === "lower" && lower === "some-apps" ? "settings.call.mediaHint.lowerSomeApps"
     : mode === "lower" && lower === "none" && pause !== "none" ? "settings.call.mediaHint.lowerNone"

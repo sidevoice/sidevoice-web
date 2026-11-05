@@ -77,6 +77,8 @@ test("a permission the choice needs is said with a link to Permissions; the row 
     [{ lower: "some-apps", pause: "some-apps", access: "undetermined", capture: "denied" }, /Without System Audio Recording/],
     [{ lower: "some-apps", pause: "some-apps", access: "denied" }, /needs permission to control Music and Spotify/],
     [{ mode: "pause", lower: "per-app", pause: "some-apps", access: "undetermined", capture: "granted" }, /needs permission to control Music and Spotify/],
+    // Allowed, waiting for a restart: still pointing to Permissions, with its own words (Restart is there).
+    [{ lower: "some-apps", pause: "some-apps", access: "granted", capture: "restart" }, /allowed, but Sidevoice has to restart before it can lower any app/],
   ];
   for (const [changes, hint] of cases) {
     const media = bridge(status(changes));
