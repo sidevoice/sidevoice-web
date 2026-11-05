@@ -362,6 +362,38 @@ test("Permissions wears the warning dot while the microphone is not allowed, sai
   expect(document.querySelector("#settings-permissions .settings-attention")).toBeNull();
 });
 
+test("Permissions wears the warning dot for a media permission the current choice needs, not for one the system can't say", async () => {
+  const cases: [Record<string, string>, boolean][] = [
+    [{ mode: "lower", lower: "some-apps", pause: "some-apps", capture: "denied", access: "granted" }, true],
+    [{ mode: "pause", lower: "per-app", pause: "some-apps", capture: "granted", access: "undetermined" }, true],
+    [{ mode: "lower", lower: "per-app", pause: "some-apps", capture: "granted", access: "denied" }, false],
+    [{ mode: "off", lower: "some-apps", pause: "some-apps", capture: "denied", access: "denied" }, false],
+    [{ mode: "pause", lower: "some-apps", pause: "some-apps", capture: "unknown", access: "unknown" }, false],
+  ];
+  onTestFinished(() => { delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; });
+  // No microphone to ask: the dot is the media permission's alone.
+  for (const [status, lit] of cases) {
+    Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { mediaDuck: { get: async () => status, set: async () => status } } } });
+    open("whisper-base");
+    await waitFor(() => expect(document.getElementById("settings-permissions")).not.toBeNull());
+    await act(async () => {});
+    const dot = document.querySelector("#settings-permissions .settings-attention");
+    if (lit) expect(dot?.getAttribute("aria-label"), JSON.stringify(status)).toBe("A permission needed for Other apps’ media isn’t allowed yet.");
+    else expect(dot, JSON.stringify(status)).toBeNull();
+    cleanup();
+  }
+});
+
+test("the warning dot follows the choice made in Call at once", async () => {
+  const status = { mode: "off", lower: "some-apps", pause: "some-apps", capture: "denied", access: "granted" };
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { mediaDuck: { get: async () => status, set: async (mode: string) => ({ ...status, mode }) } } } });
+  onTestFinished(() => { delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; });
+  const store = open("whisper-base");
+  act(() => store.patch({ settingsSection: "call" }));
+  fireEvent.click(await within(document.getElementById("pane-call")!).findByRole("radio", { name: "Lower volume" }));
+  await waitFor(() => expect(document.querySelector("#settings-permissions .settings-attention")).not.toBeNull());
+});
+
 /* Developer options (operator, 2026-10-21): a section below Advanced, English only, for a nightly desktop build with
  * developer mode on (turned on from the build in Advanced: developer-mode.test.tsx, and below) — or, for a browser or
  * a playground, with the turn-tuning flag set by hand. It holds the turn tuning panel, no longer Advanced's, and the
@@ -503,4 +535,26 @@ test("a section shown again reads the app's switches as it holds them now, not a
   act(() => { setDeveloperMode(true); });
   fireEvent.click(document.getElementById("settings-developer")!);
   expect(screen.getByRole("switch", { name: "Compositing borders" })).toHaveAttribute("aria-checked", "true");
+});
+
+test("no microphone to ask, but the app reports a media permission: Permissions shows it, and Call's Open Permissions lands there", async () => {
+  const status = { mode: "lower", lower: "some-apps", pause: "some-apps", capture: "undetermined", access: "granted" };
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { mediaDuck: { get: async () => status, set: async () => status } } } });
+  onTestFinished(() => { delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; });
+  const store = open("whisper-base");
+  act(() => store.patch({ settingsSection: "call" }));
+  fireEvent.click(await within(document.getElementById("pane-call")!).findByRole("button", { name: "Open Permissions" }));
+  expect(store.getState().facts.settingsSection).toBe("permissions");
+  expect(navLabels()).toContain("Permissions");
+  expect(await within(document.getElementById("pane-permissions")!).findByText("System Audio Recording")).toBeInTheDocument();
+  await act(async () => {});
+  expect(store.getState().facts.settingsSection).toBe("permissions");
+});
+
+test("no microphone to ask and the media status cannot be read: Permissions opens General, never a blank page", async () => {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { mediaDuck: { get: async () => { throw new Error("no"); }, set: async () => { throw new Error("no"); } } } } });
+  onTestFinished(() => { delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; });
+  const store = open("whisper-base");
+  act(() => store.patch({ settingsSection: "permissions" }));
+  await waitFor(() => expect(store.getState().facts.settingsSection).toBe("general"));
 });

@@ -7,7 +7,7 @@ import type { MicrophoneSnapshot } from "../../services/microphone-access";
 import type { Translate } from "../../i18n/translator";
 
 /* The setup's permissions step (W4m; web#129, moved early on 2026-10-16): right after the basics, before this computer
- * is prepared or a machine paired, everything Sidevoice needs allowed on this device — today the microphone alone
+ * is prepared or a machine paired, everything Sidevoice needs allowed on this device — the microphone, and on a Mac what lowering or pausing other apps needs
  * (briefs/plans/permissions-screen.md: Accessibility is not needed). The person's own bicho, with the microphone on its
  * badge (decided 2026-10-16), says where it stands — not allowed yet (who will ask: the browser, or the computer),
  * waiting for the answer, allowed, blocked, none connected — and, blocked, how to allow it where this page runs (the

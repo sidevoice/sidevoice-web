@@ -7,6 +7,7 @@ import { Select } from "../../components/ui/Select";
 import { LanguagePicker } from "../../components/ui/LanguagePicker";
 import { Group, Row, Section } from "../../components/ui/Card";
 import { Segmented } from "../../components/ui/Tabs";
+import { MediaDuckRow } from "./MediaDuckRow";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { readThemePreference, setThemePreference, type ThemePreference } from "../../lib/theme";
 import { MachineList, MachineNav, machineName, ThisComputerSettings, useMachinesSummary } from "../room/MachineList";
@@ -22,6 +23,7 @@ import { FloatingCardSettings, useFloatingCardSection } from "./FloatingCardSett
 import { host } from "../../host";
 import { PermissionsSettings } from "./PermissionsSettings";
 import { useMicrophoneAccess } from "../permissions/permission-view";
+import { listsMediaPermissions, neededPermission, useMediaDuck } from "../permissions/media-permissions";
 import type { MicrophoneAccess, MicrophoneSnapshot } from "../../services/microphone-access";
 import { ShortcutsSettings, useShortcutsSection } from "./ShortcutsSettings";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
@@ -135,6 +137,7 @@ function CallSettings({ t, microphone }: { t: Translate; microphone: MicrophoneS
           items={presence.map((option) => ({ value: option.value, label: t(option.label) }))} />
       </Row>
     </Group>
+    <MediaDuckRow t={t} openPermissions={() => store?.patch({ settingsSection: "permissions", settingsLevel: "page" })} />
     {/* The desktop app keeps its computer awake as any app does; holding the screen on is for a browser or a phone. */}
     {awake && host().identity.build === null && <Group title={t("settings.call.device")}>
       <Row label={t("settings.call.keepAwake")} description={awake.supported ? t("settings.call.keepAwakeHint") : t("settings.call.keepAwakeUnsupported")}>
@@ -313,9 +316,14 @@ export function SettingsDialog() {
   // Shortcuts: in the desktop app, or wherever there is a keyboard; never on a phone.
   const shortcutsShown = useShortcutsSection();
   // The microphone's reader, one for Permissions and Call's link to it. Permissions is drawn only where there is
-  // something to ask (not in an app that asks for itself when its call opens, nor a page with no microphone).
+  // something to ask: the microphone (not in an app that asks for itself when its call opens, nor a page with no
+  // microphone), or a permission the app's media handling needs (Call's row links there too).
   const mic = useMicrophoneAccess();
-  const permissionsShown = mic.microphone?.state !== "none";
+  const media = useMediaDuck();
+  const mediaListed = listsMediaPermissions(media.status);
+  const permissionsShown = mic.microphone?.state !== "none" || mediaListed;
+  // Left only once it is known there is nothing to show: the media permissions are read after the dialog opens.
+  const mediaKnown = media.known;
   const floatingCardShown = useFloatingCardSection();
   // Developer options: developer mode on (a nightly), or the turn-tuning flag a browser or a playground sets by hand.
   const developerMode = useDeveloperMode();
@@ -326,8 +334,8 @@ export function SettingsDialog() {
   // Updates shown as the last machine behind is updated (a browser, a phone), or Shortcuts as the mouse or trackpad
   // goes (a tablet's keyboard taken off): General.
   useEffect(() => {
-    if ((current === "updates" && !updatesShown) || (current === "shortcuts" && !shortcutsShown) || (current === "permissions" && !permissionsShown)) show("general");
-  }, [current, updatesShown, shortcutsShown, permissionsShown]); // eslint-disable-line react-hooks/exhaustive-deps
+    if ((current === "updates" && !updatesShown) || (current === "shortcuts" && !shortcutsShown) || (current === "permissions" && !permissionsShown && mediaKnown)) show("general");
+  }, [current, updatesShown, shortcutsShown, permissionsShown, mediaKnown]); // eslint-disable-line react-hooks/exhaustive-deps
   // Developer mode turned off from its own page: General, with the focus on its entry rather than lost with the page.
   useEffect(() => {
     if (current !== "developer" || developerShown) return;
@@ -347,10 +355,13 @@ export function SettingsDialog() {
   // The app's update, unseen: its mark is the Updates entry's, said in words to assistive tech.
   const updated = (id: string) => id === "updates" && updateMark;
   // What needs attention wears the one warning dot the app uses (the stage's title has it too; operator, 2026-10-16):
-  // a model chosen but not ready, or the microphone not allowed; said in words on hover and to assistive tech.
+  // a model chosen but not ready, the microphone not allowed, or a permission the media choice needs not allowed (not one
+  // the system can't say: operator, 2026-11-05); said in words on hover and to assistive tech.
   const micBlocked = ["prompt", "requesting", "denied", "missing"].includes(mic.microphone?.state ?? "");
+  const mediaBlocked = neededPermission(media.status) !== null;
   const attention = (id: string): MessageKey | null => (id === "transcription" && waits.stt) || (id === "voice" && waits.tts) || (id === "call" && waits.turn)
-    ? "settings.section.waiting" : id === "permissions" && micBlocked ? "settings.call.micNotAllowed" : null;
+    ? "settings.section.waiting" : id === "permissions" && micBlocked ? "settings.call.micNotAllowed"
+      : id === "permissions" && mediaBlocked ? "settings.call.mediaPermissionMissing" : null;
   const badge = (id: string) => { const why = attention(id); return why && <Tooltip content={t(why)}><span className="ui-nav-badge settings-attention" role="img" aria-label={t(why)} /></Tooltip>; };
   // A phone's header says where the person is: Settings on the list, the section on its page, the machine on its own.
   const shownMachine = useRoomStore((state) => state.machines.find((entry) => entry.id === machine) ?? null);

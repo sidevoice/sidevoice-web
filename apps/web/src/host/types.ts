@@ -294,6 +294,43 @@ export interface MuteShortcutBridge {
   subscribe?(listener: (shortcut: MuteShortcut) => void): () => void;
 }
 
+/** What the app does to other apps' media while the microphone is open or the agent is speaking in a call (sidevoice-desktop
+ *  `host.mediaDuck`): the person's choice, and how far this system can carry it out. `lower`: `per-app` (any app, one by
+ *  one), `some-apps` (only named apps: Music and Spotify on a Mac without System Audio Recording) or `none`; `pause`:
+ *  `media-controls`, `some-apps` or `none`. The app restores only what it took. */
+export type MediaDuckMode = "lower" | "pause" | "off";
+/** How far Lower goes: `half` (50 % of the app's volume), `quarter` (25 %, the default) or `mute` (silent). */
+export type MediaDuckLevel = "half" | "quarter" | "mute";
+/** The permissions the status reports, as the page asks for one: `capture` (macOS System Audio Recording, lowering any
+ *  app) and `automation` (macOS Automation, controlling Music and Spotify). */
+export type MediaDuckPermission = "capture" | "automation";
+export type MediaDuckAccess = "granted" | "denied" | "undetermined" | "unknown";
+export interface MediaDuckStatus {
+  mode: MediaDuckMode;
+  /** How far Lower goes; absent from an app that has no level to choose. */
+  level?: MediaDuckLevel;
+  lower: "per-app" | "some-apps" | "none";
+  pause: "media-controls" | "some-apps" | "none";
+  /** Whether the system lets the app control the named apps it lowers or pauses (macOS Automation of Music and Spotify);
+   *  absent where nothing has to be allowed for that. `denied` is the person's no; `unknown`: the system answers only with
+   *  one of the apps open, and none is. */
+  access?: MediaDuckAccess;
+  /** Whether the system lets the app lower any app on its own (macOS 14.4 and later: System Audio Recording); absent where
+   *  there is no such permission. `unknown`: the app could not ask. */
+  capture?: MediaDuckAccess;
+}
+export interface MediaDuckBridge {
+  get(): Promise<MediaDuckStatus>;
+  /** The person's own request, from the list of permissions, to let the app do what `permission` names: the system may
+   *  ask now. Never called by the page on its own. */
+  allow?(permission: MediaDuckPermission): Promise<MediaDuckStatus>;
+  /** The system's page where the person turns `permission` back on (macOS). */
+  openSettings?(permission: MediaDuckPermission): Promise<MediaDuckStatus>;
+  set(mode: MediaDuckMode): Promise<MediaDuckStatus>;
+  /** How far Lower goes; applied at once while lowered. Absent from an app that has no level to choose. */
+  setLevel?(level: MediaDuckLevel): Promise<MediaDuckStatus>;
+}
+
 /** The app's floating card, as the app keeps it: whether it shows always or only while the app is minimised; and
  *  (where the app offers them) the corner a card first appears in, whether the person has moved or resized it
  *  (`moved`), forgetting that, and showing the card a moment after a change in Settings. Its format and starting size
@@ -396,6 +433,7 @@ export interface Host {
   localHost: LocalHostBridge | null;
   reset: ResetBridge | null;
   muteShortcut: MuteShortcutBridge | null;
+  mediaDuck: MediaDuckBridge | null;
   callControls: CallControlsBridge | null;
   callSurface: CallSurfaceBridge | null;
   updater: AppUpdater | null;

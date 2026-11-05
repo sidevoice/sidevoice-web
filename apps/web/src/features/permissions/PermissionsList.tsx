@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { Group, Row } from "../../components/ui/Card";
 import { MicrophoneIcon, MicrophoneOffIcon } from "../../components/ui/Icons";
@@ -7,6 +7,7 @@ import type { MicState } from "../avatar/creature/mic-hero-spec";
 import { announcement, MicrophoneBadge, MicrophoneHowTo, microphoneAction, MIC_HELP_ID, microphoneView, type MicrophoneView } from "./permission-view";
 import type { MicrophoneSnapshot } from "../../services/microphone-access";
 import type { Translate } from "../../i18n/translator";
+import { MediaPermissionRows } from "./media-permissions";
 
 /* What Sidevoice needs allowed, one look wherever it is asked (operator, 2026-10-16): the setup's permissions step and
  * Settings › Permissions. The microphone hero on top (T23: a creature of its own, a microphone floating by its mouth once
@@ -54,16 +55,25 @@ export function heroState(state: MicrophoneView["state"]): MicState {
   return state === "granted" || state === "requesting" || state === "denied" || state === "missing" ? state : "prompt";
 }
 
+/** `microphone` null, or with nothing to ask (`none`): no microphone row; the list still shows for the media permissions the
+ *  app reports, if any. */
 export function PermissionsList({ microphone, openSettings, onRequest, t, actionId = "wizard-mic-action", helpId = MIC_HELP_ID }: {
-  microphone: MicrophoneSnapshot; openSettings: (() => Promise<void>) | null; onRequest(): void; t: Translate; actionId?: string; helpId?: string;
+  microphone: MicrophoneSnapshot | null; openSettings: (() => Promise<void>) | null; onRequest(): void; t: Translate; actionId?: string; helpId?: string;
 }) {
-  const view = microphoneView(microphone);
-  return <div className="wizard-perm perm-list" data-state={view.state}>
-    <MicrophoneHero className="perm-hero-figure" state={heroState(view.state)} />
+  const view = microphone && microphone.state !== "none" ? microphoneView(microphone) : null;
+  const state = view?.state ?? "none";
+  // What a media row's Allow came to, said in the same live region as the microphone's changes.
+  const [mediaSaid, setMediaSaid] = useState("");
+  return <div className="wizard-perm perm-list" data-state={state}>
+    <MicrophoneHero className="perm-hero-figure" state={heroState(view?.state ?? "prompt")} />
     <Group>
-      <MicrophoneRow microphone={microphone} view={view} onRequest={onRequest} openSettings={openSettings} t={t} actionId={actionId} helpId={helpId} />
+      {microphone && view && <MicrophoneRow microphone={microphone} view={view} onRequest={onRequest} openSettings={openSettings} t={t} actionId={actionId} helpId={helpId} />}
+      {/* Where the app lowers or pauses other apps' media in a call, the permissions that needs (macOS). */}
+      <MediaPermissionRows t={t} onSay={setMediaSaid} />
     </Group>
     {/* Each change said once, as it happens. */}
-    <p className="sr-only" role="status" aria-live="polite">{announcement(microphone, t)}</p>
+    <p className="sr-only" role="status" aria-live="polite">{microphone && view ? announcement(microphone, t) : ""}</p>
+    {/* The media rows' answers in a region of their own, so one changing does not have the other read again. */}
+    <p className="sr-only" role="status" aria-live="polite">{mediaSaid}</p>
   </div>;
 }

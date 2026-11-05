@@ -309,3 +309,104 @@ test("not blocked, the host is not asked", () => {
   render(<PermissionsStep microphone={snapshot("granted")} openSettings={null} t={t} />);
   expect(help).not.toHaveBeenCalled();
 });
+
+/* Other apps' media (sidevoice-desktop `host.mediaDuck`): the permissions it needs, one row each, in the setup and in
+ * Settings › Permissions alike (operator, 2026-11-04). */
+const mediaApp = (status: Record<string, unknown>, extra: Record<string, unknown> = {}) => {
+  const media = {
+    get: vi.fn(async () => ({ mode: "lower", lower: "some-apps", pause: "some-apps", ...status })),
+    set: vi.fn(),
+    allow: vi.fn(async (permission: string) => ({ mode: "lower", lower: "per-app", pause: "some-apps", ...status, [permission === "capture" ? "capture" : "access"]: "granted" })),
+    openSettings: vi.fn(async () => ({ mode: "lower", lower: "some-apps", pause: "some-apps", ...status })),
+    ...extra,
+  };
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel: "release", version: "0.3.0" }, microphone: { help: () => WINDOWS_APP_HELP }, mediaDuck: media } } });
+  return media;
+};
+
+test("a browser, or an app that reports no media permission, lists the microphone alone", async () => {
+  render(<PermissionsStep microphone={snapshot("granted")} openSettings={null} t={t} />);
+  expect(screen.queryByText("System Audio Recording")).toBeNull();
+  cleanup();
+  const media = mediaApp({ lower: "per-app", pause: "media-controls" });
+  render(<PermissionsStep microphone={snapshot("granted")} openSettings={null} t={t} />);
+  await waitFor(() => expect(media.get).toHaveBeenCalled());
+  await act(async () => {});
+  expect(screen.queryByText("System Audio Recording")).toBeNull();
+  expect(screen.queryByText("Control Music and Spotify")).toBeNull();
+});
+
+test("the setup lists System Audio Recording and Music and Spotify; Allow asks for that one only, and the badge follows", async () => {
+  const media = mediaApp({ capture: "undetermined", access: "undetermined" });
+  render(<PermissionsStep microphone={snapshot("granted")} openSettings={null} t={t} />);
+  expect(await screen.findByText("System Audio Recording")).toBeInTheDocument();
+  expect(screen.getByText("Control Music and Spotify")).toBeInTheDocument();
+  expect(media.allow).not.toHaveBeenCalled();
+  const [capture] = screen.getAllByRole("button", { name: "Allow" });
+  fireEvent.click(capture);
+  expect(media.allow).toHaveBeenCalledWith("capture");
+  await waitFor(() => expect(screen.getAllByRole("button", { name: "Allow" })).toHaveLength(1));
+  await waitFor(() => expect(document.activeElement?.textContent).toBe("Allowed"));
+});
+
+test("Settings › Permissions: refused, the line says where and Open System Settings opens that permission's page; Music and Spotify closed, the line says to open one", async () => {
+  const media = mediaApp({ capture: "denied", access: "unknown" });
+  render(<PermissionsSettings t={t} access={null} microphone={snapshot("granted")} />);
+  expect(await screen.findByText(/Screen & System Audio Recording/)).toBeInTheDocument();
+  expect(screen.getByText(/Open Music or Spotify, then come back here/)).toBeInTheDocument();
+  const buttons = screen.getAllByRole("button", { name: "Open System Settings" });
+  expect(buttons).toHaveLength(1);
+  fireEvent.click(buttons[0]);
+  expect(media.openSettings).toHaveBeenCalledWith("capture");
+  cleanup();
+  const refused = mediaApp({ capture: "granted", access: "denied" });
+  render(<PermissionsSettings t={t} access={null} microphone={snapshot("granted")} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Open System Settings" }));
+  expect(refused.openSettings).toHaveBeenCalledWith("automation");
+  expect(screen.getByText(/Privacy & Security › Automation/)).toBeInTheDocument();
+});
+
+test("no microphone to ask (none, or not read yet): Settings › Permissions still lists the media permissions", async () => {
+  mediaApp({ capture: "undetermined", access: "granted" });
+  for (const microphone of [null, snapshot("none")]) {
+    render(<PermissionsSettings t={t} access={null} microphone={microphone} />);
+    expect(await screen.findByText("System Audio Recording")).toBeInTheDocument();
+    expect(screen.queryByText("Microphone")).toBeNull();
+    expect(screen.queryByText("Nothing to allow here")).toBeNull();
+    cleanup();
+  }
+});
+
+test("each row's Allow waits for its own question only; refused, focus moves to Open System Settings and the live region says so", async () => {
+  let answer: (value: unknown) => void = () => undefined;
+  const media = mediaApp({ capture: "undetermined", access: "undetermined" }, {});
+  media.allow.mockImplementationOnce(() => new Promise((resolve) => { answer = resolve; }) as never);
+  render(<PermissionsStep microphone={snapshot("granted")} openSettings={null} t={t} />);
+  await screen.findByText("System Audio Recording");
+  const [capture, automation] = screen.getAllByRole("button", { name: "Allow" });
+  capture.focus();
+  fireEvent.click(capture);
+  await waitFor(() => expect(capture).toHaveAttribute("data-loading"));
+  expect(automation).not.toHaveAttribute("data-loading");
+  await act(async () => { answer({ mode: "lower", lower: "some-apps", pause: "some-apps", capture: "denied", access: "undetermined" }); });
+  const settings = await screen.findByRole("button", { name: "Open System Settings" });
+  await waitFor(() => expect(document.activeElement).toBe(settings));
+  const [mic, media2] = screen.getAllByRole("status");
+  expect(media2).toHaveTextContent(/Screen & System Audio Recording/);
+  expect(mic).not.toHaveTextContent(/Screen/);
+});
+
+test("two Allows answered in any order are both kept", async () => {
+  const answers: ((value: unknown) => void)[] = [];
+  const base = { mode: "lower", lower: "some-apps", pause: "some-apps" };
+  const media = mediaApp({ capture: "undetermined", access: "undetermined" });
+  media.allow.mockImplementation(() => new Promise((resolve) => { answers.push(resolve); }) as never);
+  render(<PermissionsStep microphone={snapshot("granted")} openSettings={null} t={t} />);
+  await screen.findByText("System Audio Recording");
+  const [capture, automation] = screen.getAllByRole("button", { name: "Allow" });
+  fireEvent.click(capture);
+  fireEvent.click(automation);
+  await act(async () => { answers[1]({ ...base, capture: "undetermined", access: "granted" }); });
+  await act(async () => { answers[0]({ ...base, lower: "per-app", capture: "granted", access: "granted" }); });
+  expect(screen.getAllByText("Allowed")).toHaveLength(3);
+});
