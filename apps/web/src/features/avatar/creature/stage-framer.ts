@@ -20,7 +20,7 @@ const PHONE = { side: 0.05, mid: 0.5, zoom: 2.6 };
 /** How long a step of a solve waits, at most, for the page to be idle. */
 const SOLVE_WAIT_MS = 500;
 /** How long the creature waits, at most, for its first framing before it is drawn. */
-const FIRST_WAIT_MS = 4000;
+const FIRST_WAIT_MS = 8000;
 
 /** The poses the creature can take while a turn's card shows: the turn's own, and resting or working after it. */
 const TURN_POSES = ["speaking", "listening", "idle", "working"];
