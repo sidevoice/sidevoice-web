@@ -3,8 +3,9 @@ import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { installHarness } from "./harness.mjs";
 
-/* On a phone the stage is a small square: the agent's face, and the balloons laid on the tile (the agent's reply, the
- * person's bars with Cancel sending, its transcribing, the page after it is sent), must never cover the face, and each
+/* On a phone the stage fills the screen in portrait: what is said on it (the agent's reply, the person's pill with Cancel
+ * sending, its transcribing, what was sent), laid under the creature by the stage's framing, must never cover the
+ * creature (a gap from its lowest drawn row, its shadow included: max(14px, 3.5% of the tile's height)), and each card
  * stays inside the tile. The tooltips of the call bar and the header open beside their trigger, inside the viewport and
  * the safe areas. Measured in real browsers at the phone sizes (440 × 956, 390 × 844), light and dark; the desktop's
  * layout is left as it was (SCREENSHOTS=<dir> also writes the stage as a picture, for a review). */
@@ -36,7 +37,23 @@ const STATES = {
   "working-sent": [working, listening, sent],
 };
 
-async function onStage(page, theme, state) {
+/** The stage's framing settled: solved (the layer says so where the browser draws the creature) and no card's layer still
+ *  easing down to stay clear of the creature (its animation over, the cards' boxes unchanged a moment). */
+async function settled(page) {
+  await page.locator(".stage-tile .stage-voice[data-framed]").waitFor({ timeout: 60_000 }).catch(() => {});
+  let last = null;
+  for (let i = 0, same = 0; i < 80 && same < 3; i++) {
+    const now = await page.evaluate(() => {
+      const layer = document.querySelector(".stage-tile .stage-voice");
+      const easing = layer ? layer.getAnimations().filter((a) => a.effect?.target === layer).length : 0;
+      return easing + "|" + [...(layer?.querySelectorAll(":scope > .vcap:not(.meas)") ?? [])].map((c) => { const r = c.getBoundingClientRect(); return Math.round(r.top) + "," + Math.round(r.left); }).join(";");
+    });
+    same = now === last ? same + 1 : 0; last = now;
+    await page.waitForTimeout(300);
+  }
+}
+
+async function onStage(page, theme, state, { held = false } = {}) {
   await installHarness(page, { participants: { first: [conversation] } });
   // The call below is the page's own state, not a room's: the room would answer its binding poll (/api/presentation,
   // on the beat and after the pick) with no binding, and the page would take the call as ended by it and clear the
@@ -61,28 +78,82 @@ async function onStage(page, theme, state) {
   await page.evaluate((insets) => {
     for (const [side, px] of Object.entries(insets)) document.documentElement.style.setProperty(`--sv-inset-${side}`, `calc(${px}px + 0px)`);
   }, INSETS);
-  for (const facts of STATES[state]) {
+  for (const [i, facts] of STATES[state].entries()) {
+    if (state.endsWith("sent") && i === STATES[state].length - 1) await settled(page);
     await page.evaluate((facts) => window.sidevoiceUI.store.patch(facts), facts(key));
     // The turns' hooks read each step as they render it (a sent turn is shown only after the bars were).
     await page.waitForTimeout(250);
   }
   // Where a state has one, its balloon is up before it is measured (a slow runner takes its time), and it pops in over
   // 460ms: measure it where it stands.
-  if (state !== "idle" && state !== "working") await page.locator(".stage-tile .stage-bubble, .stage-tile .person-bubble").first().waitFor({ timeout: 10_000 });
-  await page.waitForTimeout(900);
+  if (state !== "idle" && state !== "working") await page.locator(".stage-tile .stage-voice > .vcap:not(.meas)").first().waitFor({ timeout: 10_000, state: held ? "attached" : "visible" });
+  // What was sent shows PAGE_MS: measured as it lands, the framing having settled while the person spoke (above).
+  if (state.endsWith("sent")) await page.waitForTimeout(300);
+  else { await page.waitForTimeout(900); await settled(page); }
 }
 
-/** The boxes on the stage, in the page's own pixels. */
+/** The boxes on the stage, in the page's own pixels, and the creature as drawn under them: its canvas's drawn pixels inside
+ *  each card, and the gap from a card's top to the lowest drawn row above it (none where the browser gives no WebGL). */
+/** The gap a card keeps to the creature: max(14 px, 3.5% of the tile), a px and a half of rounding. What the person sent
+ *  lands where their pill was (it pops out of it, as the design reference has it) while the agent may rest or work by then,
+ *  a pose that can reach a few px lower than the one the turn was fitted on: never touching, 14 px at least (the gap's
+ *  floor; recorded for the human). */
+const need = (state, tileHeight) => state.endsWith("sent") ? 14 - 0.5 : Math.max(14, tileHeight * 0.035) - 1.5;
+
+/** Whether this browser gives the page WebGL (the creature needs it; without it its fallback stands in). */
+const webgl = (page) => page.evaluate(() => !!document.createElement("canvas").getContext("webgl"));
+
+/** Every animation frame for `ms` after `facts` are patched in: each card seen (its pop-in transform included; one held
+ *  unseen is skipped), whether the creature's canvas has anything drawn, the creature's drawn pixels under the card, the
+ *  gap from its top to the lowest drawn row above it, and whether it is inside the tile. */
+const sampleTransition = (page, facts, ms) => page.evaluate(([facts, ms]) => new Promise((done) => {
+  const out = [], t0 = performance.now();
+  window.sidevoiceUI.store.patch(facts);
+  const sample = () => {
+    const t = performance.now() - t0, cv = document.querySelector(".stage-agent canvas"), g = cv?.width ? cv.getContext("2d") : null;
+    const tile = document.querySelector(".stage-tile"), tr = tile.getBoundingClientRect(), inner = { top: tr.top + tile.clientTop, bottom: tr.top + tile.clientTop + tile.clientHeight };
+    if (g) {
+      const vr = cv.getBoundingClientRect(), k = cv.width / vr.width, W = cv.width, H = cv.height, d = g.getImageData(0, 0, W, H).data;
+      let drawn = false; for (let i = 3; i < d.length; i += 4 * 7) if (d[i] > 16) { drawn = true; break; }
+      for (const card of document.querySelectorAll(".stage-tile .stage-voice > .vcap:not(.meas)")) {
+        const er = card.getBoundingClientRect(), style = getComputedStyle(card);
+        if (!er.width || style.visibility === "hidden" || +style.opacity < 0.05) continue;
+        const x0 = Math.max(0, Math.floor((er.left - vr.left) * k)), x1 = Math.min(W, Math.ceil((er.right - vr.left) * k)), y0 = Math.max(0, Math.floor((er.top - vr.top) * k)), y1 = Math.min(H, Math.ceil((er.bottom - vr.top) * k));
+        let over = 0, low = -1;
+        for (let y = 0; y < y1; y++) for (let x = x0; x < x1; x++) if (d[(y * W + x) * 4 + 3] > 16) { if (y >= y0) over++; else if (y > low) low = y; }
+        out.push({ t: Math.round(t), drawn, over, gap: low < 0 ? null : (y0 - low) / k, inside: er.top >= inner.top - 0.5 && er.bottom <= inner.bottom + 0.5 });
+      }
+    }
+    if (t < ms) requestAnimationFrame(sample); else done(out);
+  };
+  requestAnimationFrame(sample);
+}), [facts, ms]);
+
 const measure = (page) => page.evaluate(() => {
   const box = (node) => { if (!node) return null; const { left, top, right, bottom, width, height } = node.getBoundingClientRect(); return width && height ? { left, top, right, bottom, width, height } : null; };
-  const agent = box(document.querySelector(".stage-agent"));
-  // The face: the head of the figure, its middle half across and from its crown to under its chin (the figure's box is
-  // 120 tall with its crown at ~20 and its chin at ~85, call-view.css --stage-head-y).
-  const face = agent && { left: agent.left + agent.width * .25, right: agent.right - agent.width * .25, top: agent.top + agent.height * (30 / 120), bottom: agent.top + agent.height * (85 / 120) };
-  return { viewport: { width: innerWidth, height: innerHeight }, tile: box(document.querySelector(".stage-tile")), face,
-    balloons: [...document.querySelectorAll(".stage-tile .stage-bubble, .stage-tile .person-turns .person-bubble")].map((node) => ({ kind: node.className.split(" ")[1] ?? node.className, ...box(node) })).filter((b) => b.width) };
+  const tile = document.querySelector(".stage-tile"), canvas = document.querySelector(".stage-agent canvas");
+  const cards = [...document.querySelectorAll(".stage-tile .stage-voice > .vcap:not(.meas)")].map((node) => ({ kind: node.className, ...box(node) })).filter((b) => b.width);
+  let drawn = null;
+  const g = canvas?.width ? canvas.getContext("2d") : null;
+  if (g) {
+    const r = canvas.getBoundingClientRect(), k = canvas.width / r.width, d = g.getImageData(0, 0, canvas.width, canvas.height).data, W = canvas.width;
+    let any = 0; for (let i = 3; i < d.length; i += 64) if (d[i] > 16) { any = 1; break; }
+    if (any) drawn = cards.map((c) => {
+      const x0 = Math.max(0, Math.floor((c.left - r.left) * k)), x1 = Math.min(W, Math.ceil((c.right - r.left) * k)), y0 = Math.max(0, Math.floor((c.top - r.top) * k)), y1 = Math.min(canvas.height, Math.ceil((c.bottom - r.top) * k));
+      let over = 0, low = -1;
+      for (let y = 0; y < y1; y++) for (let x = x0; x < x1; x++) if (d[(y * W + x) * 4 + 3] > 16) { if (y >= y0) over++; else if (y > low) low = y; }
+      return { over, gap: low < 0 ? null : (y0 - low) / k };
+    });
+  }
+  let creature = null;
+  if (g) {
+    const r = canvas.getBoundingClientRect(), k = canvas.width / r.width, W = canvas.width, H = canvas.height, d = g.getImageData(0, 0, W, H).data;
+    let y0 = H, y1 = -1;
+    for (let y = 0; y < H; y += 2) for (let x = 0; x < W; x += 2) if (d[(y * W + x) * 4 + 3] > 16) { if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (y1 >= 0) creature = { top: r.top + y0 / k, bottom: r.top + y1 / k };
+  }
+  return { viewport: { width: innerWidth, height: innerHeight }, tile: box(tile), tileHeight: tile.clientHeight, balloons: cards, drawn, creature };
 });
-const overlaps = (a, b) => a.left < b.right - 0.5 && a.right > b.left + 0.5 && a.top < b.bottom - 0.5 && a.bottom > b.top + 0.5;
 
 for (const [name, viewport] of [["440x956", { width: 440, height: 956 }], ["390x844", { width: 390, height: 844 }]]) {
   for (const theme of ["light", "dark"]) {
@@ -94,11 +165,15 @@ for (const [name, viewport] of [["440x956", { width: 440, height: 956 }], ["390x
           await onStage(page, theme, state);
           if (SHOTS) { mkdirSync(SHOTS, { recursive: true }); await page.screenshot({ path: path.join(SHOTS, `${name}-${theme}-${state}.png`) }); }
           const m = await measure(page);
-          expect(m.face, "the agent is on the stage").not.toBeNull();
-          if (state !== "idle" && state !== "working") expect(m.balloons.length, "a balloon is up").toBeGreaterThan(0);
-          if (state.endsWith("sent")) expect(await page.locator(".stage-tile .person-bubble[data-sent]").count(), "what was sent is on the stage").toBe(1);
+          if (state !== "idle" && state !== "working") expect(m.balloons.length, "a card is up").toBeGreaterThan(0);
+          if (state.endsWith("sent")) expect(await page.locator(".stage-tile .stage-voice > .vcap.sent:not(.meas)").count(), "what was sent is on the stage").toBe(1);
+          // The creature as drawn: none of it under a card, and a gap over each (where the browser gives WebGL, it is drawn).
+          if (await webgl(page) && m.balloons.length) expect(m.drawn, "the creature is drawn under the cards").not.toBeNull();
+          for (const [i, drawn] of (m.drawn ?? []).entries()) {
+            expect(drawn.over, `${m.balloons[i].kind}: the creature's pixels under it`).toBe(0);
+            if (drawn.gap != null) expect(drawn.gap, `${m.balloons[i].kind}: the gap to the creature`).toBeGreaterThanOrEqual(need(state, m.tileHeight));
+          }
           for (const balloon of m.balloons) {
-            expect(overlaps(balloon, m.face), `${balloon.kind} ${JSON.stringify(balloon)} over the face ${JSON.stringify(m.face)}`).toBe(false);
             expect(balloon.left, "inside the tile, left").toBeGreaterThanOrEqual(m.tile.left - 0.5);
             expect(balloon.right, "inside the tile, right").toBeLessThanOrEqual(m.tile.right + 0.5);
             expect(balloon.top, "inside the tile, top").toBeGreaterThanOrEqual(m.tile.top - 0.5);
@@ -138,26 +213,65 @@ for (const [name, viewport] of [["440x956", { width: 440, height: 956 }], ["390x
   }
 }
 
+/* A phone on its side (844 × 390: a tile far wider than tall). The design reference has no landscape phone: the tile takes
+ * the desktop's framing and card rules (StageVoice), so the creature stays on the stage, smaller, the cards clear of it. */
+test.describe("844x390 landscape", () => {
+  test.use({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
+  for (const state of ["idle", "speaking", "listening"]) {
+    test(`${state}: the creature stays on the stage and no card covers it`, async ({ page }) => {
+      // a card that cannot fit under the creature in so short a tile waits unseen: never over it, never out of the tile
+      await onStage(page, "light", state, { held: true });
+      const m = await measure(page);
+      if (await webgl(page)) {
+        expect(m.creature, "the creature is drawn").not.toBeNull();
+        expect(m.creature.top, "its top on the stage").toBeGreaterThanOrEqual(m.tile.top - 0.5);
+        expect(m.creature.bottom, "its foot on the stage").toBeLessThanOrEqual(m.tile.bottom + 0.5);
+      }
+      for (const [i, drawn] of (m.drawn ?? []).entries()) expect(drawn.over, `${m.balloons[i].kind}: the creature's pixels under it`).toBe(0);
+      for (const balloon of m.balloons) expect(balloon.bottom, "inside the tile").toBeLessThanOrEqual(m.tile.bottom + 0.5);
+    });
+  }
+});
+
 test.describe("desktop", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
   for (const state of ["listening", "transcribing", "sent", "working-listening"]) {
-    test(`${state}: the stage is not laid out for a phone: the balloon stays in the tile's corner and the agent does not move`, async ({ page }) => {
+    test(`${state}: the person's card is centred under the creature and clear of it, and the agent's box does not move`, async ({ page }) => {
       await onStage(page, "light", state);
       if (SHOTS) { mkdirSync(SHOTS, { recursive: true }); await page.screenshot({ path: path.join(SHOTS, `1280x800-light-${state}.png`) }); }
       const m = await measure(page);
       expect(m.balloons.length).toBe(1);
-      const [balloon] = m.balloons;
-      // At the tile's foot, on its right (beside the transcript's button, which a desktop keeps at the call bar's right):
-      // the stage's inset (16 of a 600px-tall slide, scaled by the tile) from its edges.
-      const inset = m.tile.height / 600 * 440 / 440 * 16;
-      expect(Math.abs(m.tile.right - balloon.right - inset), `right ${JSON.stringify({ balloon, tile: m.tile })}`).toBeLessThanOrEqual(2);
-      expect(Math.abs(m.tile.bottom - balloon.bottom - inset), "bottom").toBeLessThanOrEqual(2);
-      // The tile's own size for it (--person-live-w: 272 of the slide), as it always was.
-      expect(Math.abs(balloon.width - 272 * m.tile.height / 600), "width").toBeLessThanOrEqual(2);
-      // No lift: the agent keeps its place.
-      const lift = await page.evaluate(() => ({ agent: getComputedStyle(document.querySelector(".stage-agent")).translate, lift: getComputedStyle(document.querySelector(".stage-tile")).getPropertyValue("--person-lift").trim() }));
-      expect(["none", "0px", "0px 0px"], JSON.stringify(lift)).toContain(lift.agent);
-      expect(lift.lift).toBe("0px");
+      const [card] = m.balloons;
+      // Centred on the tile, under the creature (the design reference's 'place': both turns below it).
+      expect(Math.abs((card.left + card.right) / 2 - (m.tile.left + m.tile.right) / 2), JSON.stringify({ card, tile: m.tile })).toBeLessThanOrEqual(1.5);
+      expect(card.bottom, "inside the tile").toBeLessThanOrEqual(m.tile.bottom + 0.5);
+      for (const drawn of m.drawn ?? []) {
+        expect(drawn.over, "the creature's pixels under the card").toBe(0);
+        if (drawn.gap != null) expect(drawn.gap, "the gap to the creature").toBeGreaterThanOrEqual(need(state, m.tileHeight));
+      }
+      // The stage's framing moves the creature by its camera: its box never moves.
+      const agent = await page.evaluate(() => getComputedStyle(document.querySelector(".stage-agent")).translate);
+      expect(["none", "0px", "0px 0px"]).toContain(agent);
+    });
+  }
+
+  // At rest a desktop's creature stands closer; the first card after it comes in while it steps back: never over it, the
+  // gap kept, from the card's first visible frame to the framing settled.
+  for (const state of ["speaking", "listening"]) {
+    test(`the first card after rest (${state}) keeps clear of the creature while it steps back for it`, async ({ page }) => {
+      await onStage(page, "light", "idle");
+      await settled(page);
+      const key = await page.evaluate(() => { const person = window.sidevoiceUI.store.getState().facts.people.find((p) => p.thread_id === "t1"); return `${person.node}|t1`; });
+      const samples = await sampleTransition(page, STATES[state].at(-1)(key), 2500);
+      const tileHeight = await page.evaluate(() => document.querySelector(".stage-tile").clientHeight);
+      const drawn = await webgl(page);
+      if (drawn) expect(samples.length, "the card seen over the creature's canvas").toBeGreaterThan(0);
+      for (const s of samples) {
+        if (drawn) expect(s.drawn, `${s.t} ms: the creature is drawn`).toBe(true);
+        expect(s.inside, `${s.t} ms: the card inside the tile`).toBe(true);
+        expect(s.over, `${s.t} ms: the creature's pixels under the card`).toBe(0);
+        if (s.gap != null) expect(s.gap, `${s.t} ms: the gap to the creature`).toBeGreaterThanOrEqual(Math.max(14, tileHeight * 0.035) - 1.5);
+      }
     });
   }
 });

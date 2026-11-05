@@ -29,6 +29,13 @@ function parseRatio(value: string): number {
   return Number(over) / Number(under);
 }
 
+/** The scene scaled to the tile's inner box (inside its border), where the stage's framing and its voice text measure:
+ *  `--k` its height over the lab's 440, `--kw` its width over 440. */
+function inner(tile: HTMLElement) {
+  tile.style.setProperty("--k", String(tile.clientHeight / SCENE_HEIGHT));
+  tile.style.setProperty("--kw", String(tile.clientWidth / SCENE_HEIGHT));
+}
+
 /** A ref for the stage's tile: it keeps `--k`, the scene's height over the lab's, on the tile, as it resizes. Where the
  *  tile holds a canvas (`.stage-canvas`) and says its shape (`--stage-ratio`, the form factor's: call-view.css), the
  *  canvas is fitted to the tile at that shape and the scene scaled to the canvas; else the scene fills the tile. */
@@ -49,7 +56,13 @@ export function useSceneScale() {
           const fitted = fitCanvas(width, height, shape);
           tile.style.width = fitted.width + "px";
           tile.style.height = fitted.height + "px";
-          tile.style.setProperty("--k", String(fitted.height / SCENE_HEIGHT));
+          inner(tile);
+          return;
+        }
+        // "fill" (the phone's portrait tile): the tile takes the whole slot.
+        if (getComputedStyle(tile).getPropertyValue("--stage-ratio").trim() === "fill") {
+          tile.style.width = tile.style.height = "";
+          inner(tile);
           return;
         }
       }

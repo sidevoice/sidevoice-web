@@ -9,6 +9,7 @@ import { ATTENTION_EXPR, STILL_EXPR } from "./creature/faces";
 import { FALLBACK_PATH } from "./creature/fallback";
 import type { CreatureStep, LiveCreature } from "./creature/host";
 import { creatureHostNow, loadCreatureHost, watchCreatureHost, type CreatureHost, type CreatureHostLoading } from "./creature-loader";
+import type { StageFrame } from "./creature/stage-frame";
 
 /** The creature host once it has loaded (null until then) and whether its last load failed (creature-loader.ts). A
  *  component that mounts asks for it, and asks again if the last load failed. */
@@ -80,6 +81,8 @@ export interface CharacterAvatarProps {
    *  fallback outline stands in until its canvas is painted (while the creature's code loads too). Once painted, it keeps
    *  its image until the next one is drawn over it. */
   immediate?: boolean;
+  /** The stage's framing (creature/stage-frame.ts): the creature on the scene stands where the stage's voice text needs it. */
+  frame?: StageFrame;
   /** Said for the avatar; without one it is decoration. */
   label?: string;
   className?: string;
@@ -107,7 +110,7 @@ export function CharacterAvatar(props: CharacterAvatarProps) {
 const FIGURE = { feet: 106 / 120, crown: 20 / 120 };
 
 /** A conversation's creature (creature/host.ts): live on the stage's scene, a still face elsewhere. */
-function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, hearLevel, live, scene, immediate = false, label, className, ref }: CharacterAvatarProps & { seed: string }) {
+function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, hearLevel, live, scene, frame, immediate = false, label, className, ref }: CharacterAvatarProps & { seed: string }) {
   const root = useRef<HTMLSpanElement | null>(null);
   const canvas = useRef<HTMLCanvasElement | null>(null);
   const creature = useRef<LiveCreature | null>(null);
@@ -165,13 +168,13 @@ function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, 
       const H = sceneBox.offsetHeight, top = figure.offsetTop, size = figure.offsetHeight;
       return { ground: (top + size * FIGURE.feet) / H, crown: (top + size * FIGURE.crown) / H };
     },
-      gazeFrom: scene ? element.closest<HTMLElement>(".stage-tile") ?? element : null,
+      gazeFrom: scene ? element.closest<HTMLElement>(".stage-tile") ?? element : null, frame: scene ? frame : undefined,
       level: (acting) => (acting === "speaking" ? voice.current : heard.current) });
     creature.current = live;
     return () => { live?.dispose(); creature.current = null; };
     // Its mood, what it has on the go and whether it moves are applied below without building the creature again. It is
     // built again when the page can draw creatures again (canDraw).
-  }, [drawn, seed, framing, scene, host, canDraw]);
+  }, [drawn, seed, framing, scene, host, canDraw, frame]);
   useEffect(() => { creature.current?.setMood(mood, { step }); }, [mood, step, drawn, seed, framing]);
   useEffect(() => { creature.current?.setMoving(moving); }, [moving, drawn, seed, framing]);
   // A still face: its state's expression (the card's states row, T34), surprised while it has something unread.

@@ -36,7 +36,7 @@ function tile(extra: Partial<SessionFacts> = {}) {
   render(<RoomStoreContext.Provider value={store}><StageTile /></RoomStoreContext.Provider>);
   return store;
 }
-const lit = () => litPart(document.querySelector(".stage-bubble")!).played ?? "";
+const lit = () => litPart(document.querySelector(".stage-voice .vcap.agent:not(.meas)")!).played ?? "";
 
 test("the balloon's words go on and the tile around it is not drawn again", () => {
   tile();
@@ -53,7 +53,7 @@ test("with captions off nothing ticks, and turned on mid-reply they find the wor
   localStorage.setItem(CAPTIONS_KEY, "off");
   tile();
   act(() => { vi.advanceTimersByTime(3000); });
-  expect(document.querySelector(".stage-bubble")).toBeNull();
+  expect(document.querySelector(".stage-voice .vcap.agent:not(.meas)")).toBeNull();
   // Nothing is drawn, nothing keeps time: no interval for the words.
   expect(vi.getTimerCount()).toBe(0);
   act(() => setCaptions(true));

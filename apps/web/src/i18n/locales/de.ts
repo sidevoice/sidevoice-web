@@ -57,6 +57,7 @@ export const messages: Messages = {
   "stage.empty": "Wähle eine Unterhaltung zum Sprechen.",
   "stage.chooseConversation": "Unterhaltung wählen",
   "stage.cancelTurn": "Senden abbrechen",
+  "stage.transcribing": "Wird transkribiert",
   "stage.sent": "Gesendet",
   "stage.poster.title": "GESUCHT",
   "stage.poster.status": "LEBENDIG ODER PAUSIERT",

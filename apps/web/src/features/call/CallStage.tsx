@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, type CSSProperties, type RefObject } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { UpdateNotice } from "../updates/UpdateNotice";
 import { Button } from "../../components/ui/Button";
@@ -20,6 +20,7 @@ import { PagedText } from "./PagedText";
 import { useStageConversation, type StageConversation } from "./stage-view";
 import { BalloonTail } from "./BalloonTail";
 import { PersonTurn } from "./PersonTurn";
+import { StageVoice, useStageFrame } from "./StageVoice";
 import { TranscriptEntry } from "./TranscriptEntry";
 import { useVoiceModels } from "./VoiceModels";
 import { harnessName, StageHeading } from "./CallDetails";
@@ -46,9 +47,22 @@ import "./call-view.css";
  * the agent with its tail out of its bottom-right corner toward it, three lines tall, a page at a time (the last page
  * turning only as far as its last line: PagedText fixed). */
 
-/** One reply on the stage, in a speech balloon whose tail points down at the agent (call-view.css): a few lines at a
- *  time (PagedText), lit as the voice says them, moving on with the words heard. */
-function AgentBubble({ turn }: { turn: AgentTurn }) {
+/* The stage's look (decided 2026-11-04, the design reference's `.vcap.card`, T24–T36): the reply in a white card under
+ * the creature, never over it (StageVoice places it), always three lines tall, a page at a time, lit as the voice says it.
+ * The balloon stays where the stage is not a tile (the desktop card's avatar format: StageBalloons). */
+export type AgentLook = "balloon" | "card";
+
+/** One reply on the stage, in a speech balloon whose tail points down at the agent (call-view.css), or the stage's card:
+ *  a few lines at a time (PagedText), lit as the voice says them, moving on with the words heard. `cut`: the person's
+ *  turn took its place under the creature, so it lifts away. */
+function AgentBubble({ turn, look = "balloon", cut = false }: { turn: AgentTurn; look?: AgentLook; cut?: boolean }) {
+  if (look === "card") return (
+    <div className="vcap card agent" data-leaving={turn.leaving || cut || undefined} aria-hidden="true" translate="no">
+      <PagedText measure={turn.text} follow=".lit-heard" lines={3} turn="page" fixed>
+        <LitText text={turn.text} spoken={turn.spoken} />
+      </PagedText>
+    </div>
+  );
   return (
     <div className="speech-bubble stage-bubble" data-visible="" data-leaving={turn.leaving || undefined} aria-hidden="true" translate="no">
       <PagedText measure={turn.text} follow=".lit-heard" lines={3} turn="page" fixed>
@@ -95,15 +109,15 @@ function StageName({ stage, className, tone, voice }: { stage: StageConversation
  *
  *  The words go on five times a second while the voice says them: that draws the balloons and nothing around them, so the
  *  clock is here and not in the tile (its caller keeps `reading`, so captions turned on mid-reply pick it up where it is). */
-function AgentBubbles({ reading, reply, sounding, messages, onUp }: { reading: RefObject<Reading | null>; reply: ChatMessage | null;
-  sounding: boolean; messages: ChatMessage[]; onUp: (up: boolean) => void }) {
+function AgentBubbles({ reading, reply, sounding, messages, onUp, look, cut }: { reading: RefObject<Reading | null>; reply: ChatMessage | null;
+  sounding: boolean; messages: ChatMessage[]; onUp: (up: boolean) => void; look?: AgentLook; cut?: boolean }) {
   const spokenTo = useSpokenFrom(reading, reply, sounding, messages);
   const turns = useAgentTurns(reply, spokenTo);
   // Whether a balloon is on the stage, for the agent to hold still under it (no idle pastime until it has gone).
   const up = turns.length > 0;
   useEffect(() => { onUp(up); }, [up, onUp]);
   useEffect(() => () => onUp(false), [onUp]);
-  return <>{turns.map((turn) => <AgentBubble key={turn.key} turn={turn} />)}</>;
+  return <>{turns.map((turn) => <AgentBubble key={turn.key} turn={turn} look={look} cut={cut} />)}</>;
 }
 
 /** The agent cannot receive what the person says: the words, and why and what to do when the core says (ParticipantView.detail
@@ -199,9 +213,15 @@ export function StageTile({ card = false }: { card?: boolean }) {
     const mic = typeof window === "undefined" ? undefined : window.sidevoiceUI?.micLevel;
     return mic ? (paint) => mic.subscribe((value) => paint(value / 100)) : undefined;
   }, []);
+  // The stage's framing: the voice text asks for room under the creature, the creature drawn there answers (StageVoice).
+  const frame = useStageFrame();
+  // Where its feet stand (a share of the scene's height) once the framing settles: the backdrop's ground line is painted there.
+  const [ground, setGround] = useState<number | undefined>();
+  const onGround = useCallback((share: number | null) => setGround(share ?? undefined), []);
   if (!stage.threadId) return null;
   const spec = avatarFor(stage.threadId);
   const tone = avatarColor(spec);
+  const pending = !!conversation.pendingText || !!conversation.pendingPhase;
   return (
       /* The tile keeps its form factor's shape, as a slide does: as large as the room allows, centred, the app's own
           background around it (useSceneScale fits it in its slot; call-view.css names the shapes). What the tile says —
@@ -210,23 +230,25 @@ export function StageTile({ card = false }: { card?: boolean }) {
       <div ref={stageRef} className="stage-tile" data-mood={avatar.mood} data-app={host().identity.build ? "" : undefined} data-card={card || undefined} style={avatarTone(tone) as CSSProperties}>
         <div className="stage-canvas">
           <div className="stage-scene">
-            <StageBackdrop seed={stage.threadId} tone={tone} live poster={avatar.mood === "offline" ? { words: posterWords(t), language: uiLanguage() } : undefined} />
-            <CharacterAvatar className="stage-agent" spec={spec} state={avatar} size="stage" scene live
+            <StageBackdrop seed={stage.threadId} tone={tone} live feet={avatar.mood === "offline" ? undefined : ground} poster={avatar.mood === "offline" ? { words: posterWords(t), language: uiLanguage() } : undefined} />
+            <CharacterAvatar className="stage-agent" spec={spec} state={avatar} size="stage" scene live frame={frame}
               mouth="playback" mouthLevel={avatars.mouth(stage.threadId)} hearLevel={hearLevel} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
           </div>
         </div>
         {!card && <StageName stage={stage} className="stage-name" tone={tone} voice={voice} />}
-        <div className="stage-top">
-          {/* Its own conversation's: another one on the stage starts with none of the replies before it. */}
-          {captions && <AgentBubbles key={stage.threadId} reading={reading} reply={reply} sounding={stage.speaking} messages={conversation.messages} onUp={holdStill} />}
-          {/* Working is said only to assistive tech here: the sidebar shows it. Not in the floating card (FLOATING-CARD-SPEC, "What
-              the card leaves out"): its page has no .sr-only rule, so it would show over the creature; its figure label and state
-              line carry it. */}
-          {!card && stage.mood === "working" && <p className="sr-only" role="status">{t("stage.working")}</p>}
-        </div>
+        {/* Working is said only to assistive tech here: the sidebar shows it. Not in the floating card (FLOATING-CARD-SPEC, "What
+            the card leaves out"): its page has no .sr-only rule, so it would show over the creature; its figure label and state
+            line carry it. */}
+        {!card && stage.mood === "working" && <p className="sr-only" role="status">{t("stage.working")}</p>}
         {/* The agent's harness, model and effort, at the tile's foot (it gives the stage its touch: operator, 2026-10-15). */}
         <div className="stage-tags"><AgentBadge stage={stage} /></div>
-        {captions && <PersonTurn conversation={conversation} t={t} />}
+        {/* What is said, under the creature: one turn's card at a time there, the newer sending the older away. Its own
+            conversation's: another one on the stage starts with none of the replies before it. */}
+        <StageVoice frame={frame} turn={avatar.mood === "speaking" || avatar.mood === "listening" ? avatar.mood : null} phone={narrow && !card} onGround={onGround}>
+          {captions && <AgentBubbles key={stage.threadId} reading={reading} reply={reply} sounding={stage.speaking} messages={conversation.messages} onUp={holdStill}
+            look="card" cut={pending} />}
+          {captions && <PersonTurn conversation={conversation} t={t} look="card" cut={!!reply && stage.speaking} />}
+        </StageVoice>
         {narrow && !card && <TranscriptEntry />}
       </div>
       </div>

@@ -22,9 +22,12 @@ const CELL = 5; // column pitch in CSS pixels
 const BAR = 3;
 const FLOOR = 2; // a silent column is still a line, never a gap
 
-/** The person's balloon on the stage draws long rows of fine bars, as a voice note (2026-10-15); the transcript's open
- *  turn wider, rounder bars on its pill (the soft cards, 2026-10-14); a settings try the fine ones its row is sized for. */
+/** The person's pill on the stage draws five fine bars (the design reference's, 2026-11-04); the person's balloon long rows
+ *  of them, as a voice note (2026-10-15); the transcript's open turn wider, rounder bars on its pill (the soft cards,
+ *  2026-10-14); a settings try the fine ones its row is sized for. */
 export function waveformBrush(node: HTMLElement): { pitch: number; width: number } {
+  // The stage's icon pill (call/stage-voice.css): the design reference's five bars, 3 px on a 5 px pitch.
+  if (node.closest(".vcap")) return { pitch: CELL, width: BAR };
   if (node.closest(".person-turns")) return { pitch: 6, width: 3 };
   return node.closest(".call-layout") ? { pitch: 8, width: 5 } : { pitch: CELL, width: BAR };
 }
