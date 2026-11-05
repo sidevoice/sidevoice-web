@@ -145,6 +145,27 @@ test("a small copy is a still face even where it is asked to move (the card, the
   expect(host.faces.at(-1)).toMatchObject({ seed: "t-login", expr: "happy" });
 });
 
+test("the floating card's creature (liveFace) is a live, sharp face on the card stage: it moves with its state, still in its key pose when held", async () => {
+  const view = render(<CharacterAvatar spec={spec} state={state("working", { work: "hammer", since: 1, until: 2 })} size="small" live liveFace mouth="playback" />);
+  await settle();
+  expect(host.faces).toHaveLength(0);
+  expect(host.lives).toHaveLength(1);
+  const [live] = host.lives;
+  expect(live.opts).toMatchObject({ seed: "t-login", framing: "face", sharp: true, mood: "working", moving: true, step: { work: "hammer" } });
+  expect(view.container.firstElementChild).toHaveAttribute("data-framing", "face");
+  view.rerender(<CharacterAvatar spec={spec} state={state("speaking")} size="small" live liveFace mouth="playback" />);
+  await settle();
+  expect(live.moods.at(-1)).toBe("speaking");
+  expect(host.lives).toHaveLength(1);
+  // Held still (reduced motion, no GPU): still the host's creature, in its key pose, not a 144 px face.
+  motion("still");
+  await settle();
+  expect(live.moving.at(-1)).toBe(false);
+  expect(host.faces).toHaveLength(0);
+  view.unmount();
+  expect(live.disposed).toBe(true);
+});
+
 test("the person and the mascot are still the engine's drawings", async () => {
   const { PERSON_AVATAR, SIDEVOICE_MASCOT } = await import("./avatar-spec");
   for (const figure of [PERSON_AVATAR, SIDEVOICE_MASCOT]) {

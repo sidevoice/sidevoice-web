@@ -11,7 +11,7 @@ const rig = vi.hoisted(() => ({
   /** What each draw was asked to show: its state (a pose) and its expression. */
   drawn: [] as Array<{ state?: string; expr?: string; still: boolean }>,
 }));
-interface FakeRenderer { domElement: HTMLCanvasElement; setSize: () => void; getContext: () => { isContextLost: () => boolean }; forceContextLoss: () => void; dispose: () => void; disposed: boolean }
+interface FakeRenderer { domElement: HTMLCanvasElement; setSize: (width?: number, height?: number) => void; getContext: () => { isContextLost: () => boolean }; forceContextLoss: () => void; dispose: () => void; disposed: boolean }
 
 vi.mock("./rig.js", () => {
   const renderer = (): FakeRenderer => {
@@ -118,6 +118,32 @@ test("a context refused is not drawn into: the page is told, and both stages are
   expect(host.canDrawCreatures("scene")).toBe(true);
   expect(host.canDrawCreatures("face")).toBe(true);
   expect(rig.made.map((stage) => stage.kind)).toEqual(["scene", "face"]);
+});
+
+test("a sharp live face is drawn on a stage of its own, its canvas and renderer as many device pixels as its box (capped)", () => {
+  webgl();
+  const dpr = vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(2);
+  const box = (px: number) => { const element = canvas(); element.getBoundingClientRect = () => new DOMRect(0, 0, px, px); return element; };
+  const sizes: Array<[number, number]> = [];
+  const small = box(100);
+  const live = mount({ seed: "t1", canvas: small, framing: "face", sharp: true })!;
+  const card = rig.made.find((stage) => stage.kind === "face")!;
+  card.renderer.setSize = (w = 0, h = 0) => { sizes.push([w, h]); };
+  expect(rig.made).toHaveLength(1); // the card's stage, not the still faces'
+  expect([small.width, small.height]).toEqual([200, 200]);
+  expect(live.tick(0)).toBe(true);
+  expect(sizes).toEqual([[200, 200]]);
+  // A second screen's pixel ratio, and a box beyond the cap.
+  dpr.mockReturnValue(3);
+  const large = box(400);
+  const second = mount({ seed: "t2", canvas: large, framing: "face", sharp: true })!;
+  expect([large.width, large.height]).toEqual([512, 512]);
+  second.tick(0);
+  expect(sizes.at(-1)).toEqual([512, 512]);
+  // A still face is unchanged: 144 px, on the faces' stage.
+  const still = mount({ seed: "t3", canvas: box(40), framing: "face" })!;
+  expect(still.drawnBy(card as never)).toBe(false);
+  expect(rig.made).toHaveLength(2);
 });
 
 test("a lost context draws nothing; when it is back the stage gets a new renderer and the creature is drawn again", () => {

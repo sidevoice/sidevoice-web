@@ -155,7 +155,7 @@ function CardFigure({ state, size, label }: { state: CallControlsState; size: "s
   const avatars = useConversationAvatars();
   const avatar = useConversationAvatar(agent.threadId);
   useMovingCopy(agent.threadId);
-  return <CharacterAvatar spec={agent.spec} state={avatar} size={size} mouth="playback" label={label} live
+  return <CharacterAvatar spec={agent.spec} state={avatar} size={size} mouth="playback" label={label} live liveFace
     mouthLevel={agent.threadId ? avatars.mouth(agent.threadId) : undefined} />;
 }
 
