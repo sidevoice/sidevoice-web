@@ -1,4 +1,4 @@
-import { installHarness } from "./harness.mjs";
+import { installHarness, stageFramed } from "./harness.mjs";
 import { probe } from "./motion-audit.mjs";
 
 /* The states the room and its floating card can be put in, for the motion guard (motion-guard.spec.mjs) and the animation
@@ -127,7 +127,14 @@ export async function openRoom(page, { people = MIXED, state = "not-in-call", mo
     // The transcription's try keeps the microphone's level in view: a waveform that is flat until it listens.
     if (section === "transcription") await page.locator(".model-try-wave").first().scrollIntoViewIfNeeded();
   }
+  // The stage's framing is solved on the pixels, a frame at a time, for as long as a software GL takes: what the room does
+  // then (frames asked for, the cards' place written) is that solve, not the state, which is what is watched. Not where the
+  // poster stands in for the creature: there is nothing to solve.
+  if (!POSTER.has(state)) await stageFramed(page, 20_000);
 }
+
+/** The states in which no creature is drawn: the agent's poster stands in for it (its machine, or its own conversation, is offline). */
+const POSTER = new Set(["offline-machine", "own-offline"]);
 
 /** The desktop app's floating card (call-controls.html) in `state`, in `format` (card | pip | avatar) at `size`: the room's
  *  own projection of the call (its `callCard` snapshot) handed to the card through a host of its own, as the app hands it.

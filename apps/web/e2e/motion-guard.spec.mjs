@@ -58,6 +58,10 @@ const CARDS = {
   avatar: ["person-speaking", "agent-speaking"],
 };
 
+/** The room is let settle before it is watched (openRoom waits for the stage's framing, a trial render a frame, which a software GL
+ *  takes seconds over, the live creature's own frames among them), then watched for the better part of five seconds. */
+test.describe.configure({ timeout: 60_000 });
+
 /** A settled page watched for two and a half seconds: enough to tell a loop from a one-off (the CI runs both browsers). */
 const watch = (page) => observe(page, { settle: 1000, duration: 2500, samples: 3 });
 /** The findings as readable lines, or an empty list. */
