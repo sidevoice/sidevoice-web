@@ -1,9 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { installHarness } from "./harness.mjs";
 
-/* The stage is a slide: the tile keeps its form factor's shape, whatever room its slot has — 16:9 on a web page — as
- * large as the slot allows and centred in it with the app's own ground around it; on a phone it fills its slot in
- * portrait (the design reference's phone stage). The canvas fills the tile (call-view.css --stage-ratio, useSceneScale). */
+/* The stage is a slide: on a web page the tile takes its slot's shape, kept between a phone's portrait (9:16) and 21:9
+ * (operator, 2026-11-05), as large as the slot allows and centred in it with the app's own ground around it; on a phone
+ * it fills its slot in portrait (the design reference's phone stage). The canvas fills the tile (call-view.css
+ * --stage-ratio, useSceneScale). */
+const NARROWEST = 9 / 16, WIDEST = 21 / 9;
 
 const conversation = (thread_id, title) => ({ thread_id, title, available: true, reach: { state: "listening" }, harness: "claude-code" });
 
@@ -17,16 +19,15 @@ async function canvasOnStage(page, phone) {
   const canvas = tileLocator.locator("> .stage-canvas");
   await expect(canvas).toBeVisible();
   // Until it is fitted, the tile fills the slot: wait for it to take its shape (a phone's keeps filling it: its scene is scaled).
-  if (phone) await expect.poll(() => tileLocator.evaluate((t) => !!t.style.getPropertyValue("--kw"))).toBe(true);
-  else await expect.poll(async () => { const t = await tileLocator.boundingBox(), r = await slot.boundingBox(); return t.width < r.width - 2 || t.height < r.height - 2; }).toBe(true);
+  await expect.poll(() => tileLocator.evaluate((t) => !!t.style.getPropertyValue("--kw"))).toBe(true);
   return { slot: await slot.boundingBox(), tile: await tileLocator.boundingBox(), canvas: await canvas.boundingBox() };
 }
 
-for (const [label, viewport, ratio] of [["a web page, 16:9", { width: 1280, height: 800 }, 16 / 9], ["a short, wide window, still 16:9", { width: 1600, height: 640 }, 16 / 9], ["a phone, filling its slot in portrait", { width: 390, height: 844 }, null]]) {
+for (const [label, viewport, ranged] of [["a web page, the slot's own shape", { width: 1280, height: 800 }, true], ["a short, wide window, held at 21:9", { width: 1600, height: 560 }, true], ["a tall window, held at 9:16", { width: 920, height: 1500 }, true], ["a phone, filling its slot in portrait", { width: 390, height: 844 }, false]]) {
   test(`on ${label}: the tile keeps its shape, centred in its slot`, async ({ page }) => {
     await page.setViewportSize(viewport);
     const { slot, tile, canvas } = await canvasOnStage(page, viewport.width < 900);
-    if (ratio) expect(Math.abs(tile.width / tile.height - ratio)).toBeLessThan(0.02);
+    if (ranged) expect(Math.abs(tile.width / tile.height - Math.min(WIDEST, Math.max(NARROWEST, slot.width / slot.height)))).toBeLessThan(0.02);
     else { expect(Math.abs(tile.width - slot.width)).toBeLessThanOrEqual(3); expect(Math.abs(tile.height - slot.height)).toBeLessThanOrEqual(3); expect(tile.height).toBeGreaterThan(tile.width); }
     // As large as fits: one side meets the slot's.
     expect(Math.min(slot.width - tile.width, slot.height - tile.height)).toBeLessThanOrEqual(3);
