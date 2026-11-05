@@ -11,20 +11,23 @@
 export const SCENE_MAX_H = 960;
 /** The canvas's area at most (px): what the stage's own 1152 × 768 render held, so no tile is drawn at more fill than before. */
 export const SCENE_MAX_AREA = 900_000;
-/** The canvas's height at least (px): below this the creature's outline and face would smear. */
+/** The canvas's height at least (px): below this the creature's outline and face would smear. SCENE_MAX_AREA wins over it, for
+ *  a tile so wide and short (past about 11:1) that its area cap is lower still. */
 export const SCENE_MIN_H = 288;
 /** The pixel ratio the stage draws for at most: past 2 the eye cannot tell, and the fill triples. */
 export const MAX_DPR = 2;
 
 /** The canvas's size for a tile `cssW` × `cssH` (css px) on a screen of pixel ratio `dpr`, at `scale` of its full resolution
- *  (the governor's): as many device pixels as the tile shows, within SCENE_MAX_H, SCENE_MAX_AREA and SCENE_MIN_H. A tile with
- *  no box yet is 3:2. */
+ *  (the governor's): as many device pixels as the tile shows, within SCENE_MAX_H and SCENE_MIN_H, and never over SCENE_MAX_AREA
+ *  (that ceiling is the fill the stage was sized for: the minimum height gives way to it). A tile with no box yet is 3:2. */
 export function sceneSize(cssW: number, cssH: number, dpr: number, scale = 1): { width: number; height: number } {
   const ar = cssW > 0 && cssH > 0 ? cssW / cssH : 1.5;
+  const fits = Math.max(1, Math.floor(Math.sqrt(SCENE_MAX_AREA / ar))); // the tallest this shape may be within the area
   let h = cssH > 0 ? cssH * Math.min(Math.max(dpr, 1), MAX_DPR) : 768;
-  h = Math.min(SCENE_MAX_H, h, Math.sqrt(SCENE_MAX_AREA / ar));
-  h = Math.max(SCENE_MIN_H, Math.round(h * scale));
-  return { width: Math.max(1, Math.round(h * ar)), height: h };
+  h = Math.min(SCENE_MAX_H, h, fits);
+  h = Math.min(fits, Math.max(SCENE_MIN_H, Math.round(h * scale)));
+  // (whole pixels: the width is rounded down where rounding it to the shape would pass the ceiling by a few)
+  return { width: Math.max(1, Math.min(Math.round(h * ar), Math.floor(SCENE_MAX_AREA / h))), height: h };
 }
 
 /** A rung of the ladder: the share of the full resolution the creature is drawn at, and the frames a second it is drawn at. */

@@ -12,8 +12,29 @@ describe("sceneSize: as many pixels as the tile shows", () => {
     for (const [w, h, dpr] of [[1118, 628, 2], [1600, 900, 3], [700, 700, 2], [364, 655, 3], [2000, 400, 2]] as const) {
       const s = sceneSize(w, h, dpr);
       expect(s.height).toBeLessThanOrEqual(SCENE_MAX_H);
-      expect(s.width * s.height).toBeLessThanOrEqual(SCENE_MAX_AREA * 1.005) // (rounded to whole pixels);
+      expect(s.width * s.height).toBeLessThanOrEqual(SCENE_MAX_AREA);
     }
+  });
+  it("the area ceiling holds for any tile and scale: the minimum height gives way to it, not it to the minimum", () => {
+    // 2000 × 100 css px is 20:1: its area-limited height is about 212 px, under SCENE_MIN_H.
+    const wide = sceneSize(2000, 100, 1);
+    expect(wide.width * wide.height).toBeLessThanOrEqual(SCENE_MAX_AREA);
+    expect(wide.height).toBeLessThan(SCENE_MIN_H);
+    expect(wide.width / wide.height).toBeCloseTo(20, 1); // still the tile's shape
+    for (const [w, h] of [[2000, 100], [4000, 100], [1600, 120], [900, 80], [1118, 628], [364, 655], [100, 100], [120, 1400], [0, 0], [1, 1]] as const) {
+      for (const dpr of [0.5, 1, 1.5, 2, 3]) {
+        for (const scale of [1, 0.85, 0.72, 0.6, 0.5, 0.1]) {
+          const s = sceneSize(w, h, dpr, scale);
+          expect(s.width * s.height, `${w}x${h} @${dpr} x${scale}`).toBeLessThanOrEqual(SCENE_MAX_AREA);
+          expect(s.width).toBeGreaterThanOrEqual(1);
+          expect(s.height).toBeGreaterThanOrEqual(1);
+        }
+      }
+    }
+  });
+  it("a shape that fits keeps its minimum height", () => {
+    // 3:1 at 100 css px tall is 100 device px: raised to SCENE_MIN_H (288 × 3 is far under the ceiling).
+    expect(sceneSize(300, 100, 1).height).toBe(SCENE_MIN_H);
   });
   it("keeps the tile's shape whatever the scale", () => {
     for (const scale of [1, 0.85, 0.72, 0.6, 0.5]) {
