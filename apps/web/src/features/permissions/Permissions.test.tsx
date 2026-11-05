@@ -67,15 +67,21 @@ test("no Refresh status in the setup; blocked, the footer's action is described 
   expect(screen.queryByRole("button", { name: /Continue without/ })).toBeNull();
 });
 
-test("the bicho is calm in every state and its wrapper follows the permission state", () => {
-  const cases: [MicrophoneSnapshot, string][] = [
-    [snapshot("prompt"), "prompt"], [snapshot("requesting", { from: "prompt" }), "requesting"], [snapshot("granted"), "granted"],
-    [snapshot("denied"), "denied"], [snapshot("requesting", { from: "denied" }), "denied"], [snapshot("missing"), "missing"],
+test("the microphone hero acts out the permission state, greyed a little while blocked or none found", () => {
+  // checking, and nothing to allow here, are the calm of not asked yet (the act's prompt)
+  const cases: [MicrophoneSnapshot, string, string][] = [
+    [snapshot("prompt"), "prompt", "prompt"], [snapshot("requesting", { from: "prompt" }), "requesting", "requesting"], [snapshot("granted"), "granted", "granted"],
+    [snapshot("denied"), "denied", "denied"], [snapshot("requesting", { from: "denied" }), "denied", "denied"], [snapshot("missing"), "missing", "missing"],
+    [snapshot("checking"), "checking", "prompt"], [snapshot("none"), "none", "prompt"],
   ];
-  for (const [microphone, state] of cases) {
+  for (const [microphone, state, acted] of cases) {
     render(<PermissionsStep microphone={microphone} openSettings={null} t={t} />);
-    expect(document.querySelector(".perm-hero-figure .sv-avatar")).toHaveAttribute("data-avatar-state", "present");
-    expect(document.querySelector(".perm-hero-figure")).toHaveAttribute("data-state", state);
+    const hero = document.querySelector(".perm-hero-figure.mic-hero")!;
+    expect(hero).toHaveAttribute("data-state", acted);
+    expect(hero).toHaveAttribute("aria-hidden", "true");
+    expect(hero.hasAttribute("data-greyed")).toBe(acted === "denied" || acted === "missing");
+    // it is its own creature, not the person's drawing
+    expect(hero.querySelector(".sv-avatar")).toBeNull();
     expect(list()).toHaveAttribute("data-state", state);
     cleanup();
   }

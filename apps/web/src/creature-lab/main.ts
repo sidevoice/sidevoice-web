@@ -4,6 +4,7 @@ import { ATTENTION_EXPR, drawFace, mountCreature, STILL_EXPR, type Framing, type
 import { MOODS as ACT_MOODS, PASTIMES, WORKS, fishing } from "../features/avatar/creature/schedule";
 import { avatarFor, type AvatarMood } from "../features/avatar/avatar-spec";
 import { createAvatarStates, type AvatarState } from "../features/avatar/avatar-state";
+import { disposeScene, micLab, sceneLab } from "./scene";
 
 /* The creature lab (creature-lab.html, served by the dev server only): one conversation's creature as the product draws
  * it (features/avatar/creature/host.ts), on its own, for review and for the pixel comparison against the design
@@ -24,6 +25,8 @@ import { createAvatarStates, type AvatarState } from "../features/avatar/avatar-
  *   still=1                          held still in its key pose (as under reduced motion); default: moving
  *   w= h=                            the tile's size in CSS px (default 900 × 600, the desktop's 3:2)
  *   zoom= lookY=                     an exact camera (the creator's item.opts); default: the stage's scene framing
+ *
+ *   backdrop= dark= feet= mic=       the scene behind it, the offline poster, the microphone hero (scene.ts)
  *
  * Under the tile: the still faces (the transcript's, the sidebar's) in every state. A developer page, not the product:
  * its few words are not translated. */
@@ -55,6 +58,7 @@ let stopAuto: (() => void) | null = null;
 function render() {
   live?.dispose(); live = null;
   stopAuto?.(); stopAuto = null;
+  disposeScene();
   root.textContent = "";
   const h = readHash();
   const seed = h.seed ?? "creature-lab";
@@ -65,11 +69,13 @@ function render() {
   const work = (WORKS as readonly string[]).includes(h.work) ? h.work : undefined;
   const rest = (PASTIMES as readonly string[]).includes(h.rest) ? h.rest : undefined;
   const mood: AvatarMood = work ? "working" : rest ? "idle" : (MOODS as string[]).includes(h.mode) ? (h.mode as AvatarMood) : "idle";
+  if (micLab(root, h)) return;
   const fixed = h.t != null ? Number(h.t) : h.at != null ? Number(h.at) : null;
   const w = Number(h.w) || 900, ht = Number(h.h) || 600;
   const tile = document.createElement("div");
   tile.className = "tile stage-tile";
   tile.style.width = w + "px"; tile.style.height = ht + "px";
+  const scene = sceneLab(tile, { h, choice, seed, byHand, mood });
   const canvas = document.createElement("canvas");
   tile.appendChild(canvas);
   root.appendChild(tile);
@@ -108,12 +114,12 @@ function render() {
   root.appendChild(faces);
   const about = document.createElement("pre");
   const link = "#" + CHOICE_KEYS.map((k) => `${k}=${encodeURIComponent(choice[k])}`).join("&") + `&mode=${mood}`;
-  about.textContent = `${byHand ? "by hand" : `seed ${seed}`}\n${JSON.stringify(choice)}\ncreator hash: ${link}`;
+  about.textContent = `${byHand ? "by hand" : `seed ${seed}`}\n${JSON.stringify(choice)}\ncreator hash: ${link}${scene.about}`;
   root.appendChild(about);
   const it = live;
   if (it && fixed != null) it.frameAt(fixed, h.at != null);
   (window as unknown as { __lab: unknown }).__lab = {
-    canvas, live, choice, mood, log, ready: true,
+    canvas, live, choice, mood, log, ready: true, ...scene.lab,
     /** The frame `t` seconds into everything it acts out (still: its key pose, the acts at `t`). */
     frameAt: (t: number, still = false) => it?.frameAt(t, still),
     /** An exact camera from now on (the reference's, which makes room for the act playing). */

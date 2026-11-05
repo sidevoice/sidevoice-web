@@ -440,17 +440,22 @@ test("an offline conversation on the stage is a wanted poster, in the interface'
   expect(stageAgent()).toHaveAttribute("data-mood", "idle");
   expect(stageAgent()).toHaveAccessibleName("Plan the week · Offline");
   const poster = document.querySelector(".wanted")!;
-  expect(poster).toHaveAttribute("aria-hidden", "true");
+  // Decoration: the stage's agent says its state.
+  expect(poster.closest("[aria-hidden=true]")).not.toBeNull();
   expect(poster).toHaveTextContent("WANTED");
   expect(poster).toHaveTextContent("ONLINE OR PAUSED");
   expect(poster).toHaveTextContent("IF SEEN, PLEASE TELL ITS HUMAN.");
   expect(poster.querySelector(".w-bounty")?.textContent).toMatch(/^\d{3},000,000-$/);
-  // Its portrait is the same creature, smiling.
-  expect(poster.querySelector(".w-photo .sv-avatar")).toHaveAttribute("data-mood", "speaking");
+  // It is drawn on the scene's canvas (those words are its fallback content), from what the backdrop has to hang it from.
+  const scene = document.querySelector(".stage-backdrop")!;
+  expect(scene).toHaveAttribute("data-poster");
+  expect(poster.closest("canvas")).toBe(scene.querySelector("canvas"));
+  expect(["mount", "pin", "nail", "float"]).toContain(scene.getAttribute("data-hang"));
   expect(document.querySelector(".stage-desk")).toBeNull();
   // Back within reach, the poster goes.
   patch(store, { viewedThread: "fp-1|t-login" });
   expect(document.querySelector(".wanted")).toBeNull();
+  expect(document.querySelector(".stage-backdrop")).not.toHaveAttribute("data-poster");
 });
 
 test("the poster speaks Spanish on a device set to it", () => {
