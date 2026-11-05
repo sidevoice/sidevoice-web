@@ -113,10 +113,13 @@ export function StageVoice({ frame, turn, phone, onGround, children }: { frame: 
   }, [frame, size, phone, rest, cards, turn]);
 
   const { solved, pending } = useSyncExternalStore(frame.subscribe, frame.snapshot);
-  // Under the creature, a gap below its lowest drawn row; never past the tile's foot (the largest card kept inside it).
+  // Under the creature, a gap below its lowest drawn row, and nowhere else: a card that cannot be there and inside the tile
+  // too (the largest in a tile as short as a phone on its side) is held, unseen (data-hold below), never moved up onto the
+  // creature to fit. (Clamped to the largest card, the shared place of the agent's card and the person's pill rose onto the
+  // creature as soon as the three-line agent's card could not fit, though the pill itself would.)
   // Until the creature is drawn and framed (its host loading, or a browser that cannot draw it), at the cards' floor.
   const floor = size && cards ? size.h - (phone ? 58 : 10) - cards.below : null;
-  const top = size && cards ? Math.max(0, Math.min(solved ? solved.below : floor!, size.h - cards.below - 2)) : null;
+  const top = size && cards ? Math.max(0, solved ? solved.below : floor!) : null;
   const topAny = size && cards ? Math.max(0, Math.min(solved ? solved.belowAny : floor!, size.h - cards.sent - 2)) : null;
   // No card over the creature while it eases back for one (or before its framing is solved), nor out of the tile. Each
   // framing change is said once, as it starts, with how the creature's lowest row will move (FrameMotion): the cards'
@@ -124,10 +127,10 @@ export function StageVoice({ frame, turn, phone, onGround, children }: { frame: 
   // that cannot be both under it and inside the tile yet (a reply's three lines while the creature still stands close, at
   // rest) is held, unseen and its pop-in not started, until it can (data-hold, released on a timer). Nothing is written
   // per frame; the backdrop's ground line is told where the feet end (onGround).
-  const place = useRef({ top: 0, h: 0, heights: { agent: 0, pill: 0, sent: 0 } });
+  const place = useRef({ h: 0, heights: { agent: 0, pill: 0, sent: 0 } });
   const ground = useRef(onGround);
   ground.current = onGround;
-  place.current = { top: top ?? 0, h: size?.h ?? 0, heights: { agent: cards?.agent ?? 0, pill: cards?.pill ?? 0, sent: cards?.sent ?? 0 } };
+  place.current = { h: size?.h ?? 0, heights: { agent: cards?.agent ?? 0, pill: cards?.pill ?? 0, sent: cards?.sent ?? 0 } };
   useEffect(() => {
     const node = layer.current;
     if (!node) return;
@@ -137,7 +140,9 @@ export function StageVoice({ frame, turn, phone, onGround, children }: { frame: 
     const off = frame.watchMotion((m) => {
       stop();
       if (!m) { node.removeAttribute("data-hold"); ground.current?.(null); return; }
-      const { top, h, heights } = place.current, sh = size?.sh || h, dy = size?.dy ?? 0;
+      // The cards rest where the change settles (its last floor, which the answer then gives as the layer's top: the render that
+      // writes it comes after this, so the render's own value is the last change's, never the one this plays).
+      const { h, heights } = place.current, top = Math.max(0, m.floor[m.floor.length - 1]), sh = size?.sh || h, dy = size?.dy ?? 0;
       // the backdrop's ground line where the feet will stand (its canvas is painted once, there: the ground reaches the
       // tile's foot, as the reference's backdrops do with the feet it is given)
       ground.current?.(Math.round(((m.feet[m.feet.length - 1] - dy) / sh) * 1e4) / 1e4);
