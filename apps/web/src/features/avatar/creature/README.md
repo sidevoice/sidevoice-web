@@ -49,7 +49,8 @@ proportion so the soft edge keeps its size), no preserved drawing buffer, and a 
 feeds with each frame's cost and lateness: it steps the resolution down (`TIERS`: 1, .85, .72, .6 of the full size), then
 the rate (30, 20, 15 fps, even on a 60 Hz screen) until the frames hold, and back up after a calm spell (doubling the wait
 each time a step up failed). A stage on its last rung that still costs more than a sixth of the thread spaces its frames
-out (to 500 ms), as the page's no-GPU case always did. `creatureQuality.pin(n)` fixes a rung (diagnostics, tests).
+out (to 500 ms), as the page's no-GPU case always did. Only frames of motion are judged (a creature held still, or its
+first frames, which compile programs, are not), so a stage that asks for few frames is never redrawn at another size. `creatureQuality.pin(n)` fixes a rung (diagnostics, tests).
 
 ## Drawing one
 

@@ -249,7 +249,8 @@ export function placeFigure(stage: RigStage, c: Creature3D, aspect: number, { gr
 // holds the drawings still there).
 const lives = new Set<LiveCreature>();
 const governor = new Governor();
-governor.start(0, performance.now());
+/** Whether the governor has been started (on the first frame of motion: the first frames, which compile programs, are not judged). */
+let judging = false;
 /** For diagnostics and tests: the creature's quality rung now, or fixed at one (null: judged again). */
 export const creatureQuality = {
   tier: () => governor.tier,
@@ -268,9 +269,14 @@ function frame(ms: number) {
   if (gap >= governor.every - SLACK_MS) {
     last = ms;
     const t0 = performance.now();
-    let drew = false;
-    for (const live of lives) drew = live.tick(ms / 1000) || drew;
-    if (drew && governor.observe(ms, performance.now() - t0, gap)) retier();
+    // Only motion is judged: a creature held still (reduced motion, a key pose drawn on a change) asks for few frames, and
+    // drawing it at fewer pixels would only change what it shows.
+    let animated = false;
+    for (const live of lives) if (live.tick(ms / 1000) && live.animates()) animated = true;
+    if (animated) {
+      if (!judging) { judging = true; governor.start(0, ms); }
+      else if (governor.observe(ms, performance.now() - t0, gap)) retier();
+    }
   }
   // (not when a creature woke the loop while it drew: that one is already asked for)
   if (!frameId && wanted()) frameId = requestAnimationFrame(frame);
@@ -552,6 +558,9 @@ export class LiveCreature {
     const M = MODES[this.mood];
     return !M.poster && (!!this.ix.gaze || this.ix.w > 0 || !!this.react || this.moving || this.easing);
   }
+
+  /** Its frames are motion (it moves, and is not the poster), so the governor judges what they cost. */
+  animates(): boolean { return this.moving && !MODES[this.mood].poster; }
 
   /** It has a frame to draw: a change not drawn yet, or motion (its own, the pointer's gaze, a startle). */
   wantsFrames(): boolean { return !this.hidden && !seats[this.slot].lost && (this.needDraw || this.active()); }

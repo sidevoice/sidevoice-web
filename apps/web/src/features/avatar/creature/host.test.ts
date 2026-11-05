@@ -308,3 +308,15 @@ test("when the governor steps down, the canvas takes fewer pixels in the very ta
   expect(live.tick(2)).toBe(true);
   expect(seen.at(-1)).toEqual([533, 960]);
 });
+
+test("only a creature that moves is judged by the governor: held still, or the poster, its frames are not motion", () => {
+  webgl();
+  expect(mount({ ...onStage, canvas: tile(364, 655), moving: false })!.animates()).toBe(false);
+  const live = mount({ ...onStage, canvas: tile(364, 655), moving: true })!;
+  expect(live.animates()).toBe(true);
+  live.setMoving(false);
+  expect(live.animates()).toBe(false);
+  live.setMood("offline");
+  live.setMoving(true);
+  expect(live.animates()).toBe(false); // the poster stands in for it
+});
