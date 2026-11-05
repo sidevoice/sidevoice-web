@@ -66,7 +66,8 @@ function expectDrawn(stills, px, said) {
 }
 
 test("the app's stylesheets with avatar rules are the ones the spec loads", () => {
-  expect(sheets.length).toBeGreaterThanOrEqual(8);
+  // seven: the permissions screens' hero is a creature of its own now (features/avatar/MicrophoneHero.tsx), not an avatar
+  expect(sheets.length).toBeGreaterThanOrEqual(7);
 });
 
 for (const px of [240, 108]) {
