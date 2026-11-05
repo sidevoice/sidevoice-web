@@ -35,8 +35,9 @@ export function loadCreatureHost(): Promise<CreatureHost> {
   }, (error: unknown) => {
     pending = null;
     console.warn("[creature] cannot load the creatures:", error instanceof Error ? error.message : error);
-    // The creatures on the page wait for it: tried again in a while, for as long as any is there.
-    if (retry === undefined) retry = setTimeout(() => { retry = undefined; if (watchers.size) void loadCreatureHost().catch(() => {}); }, wait);
+    // The creatures on the page wait for it: tried again in a while, for as long as any is there. None left (all gone
+    // while it loaded): no retry; the next one mounted asks again.
+    if (retry === undefined && watchers.size) retry = setTimeout(() => { retry = undefined; if (watchers.size) void loadCreatureHost().catch(() => {}); }, wait);
     wait = Math.min(LAST_RETRY_MS, wait * 2);
     if (!state.failed) set({ host: null, failed: true });
     throw error;

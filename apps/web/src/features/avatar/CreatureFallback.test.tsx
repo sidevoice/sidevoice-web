@@ -165,3 +165,17 @@ test("the load's retry is let go of with the last creature: nothing keeps runnin
     expect(vi.getTimerCount()).toBe(0);
   } finally { vi.useRealTimers(); }
 });
+
+test("a load that fails after the last creature is gone schedules no retry", async () => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  try {
+    host.failLoads = 1;
+    const warn = vi.mocked(console.warn);
+    // Unmounted while the load is still on its way; it fails afterwards.
+    render(stage()).unmount();
+    for (let i = 0; i < 200 && !warn.mock.calls.some(([said]) => String(said).includes("cannot load the creatures")); i++) await act(async () => { await new Promise((resolve) => setImmediate(resolve)); });
+    expect(host.loads).toBe(1);
+    expect(warn).toHaveBeenCalledWith("[creature] cannot load the creatures:", expect.any(String));
+    expect(vi.getTimerCount()).toBe(0);
+  } finally { vi.useRealTimers(); }
+});
