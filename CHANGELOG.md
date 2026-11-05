@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.0](https://github.com/sidevoice/sidevoice-web/compare/v0.20.0...v0.21.0) (2026-11-05)
+
+
+### Features
+
+* **avatar:** the agent is a 3D creature, ported from the design reference ([#479](https://github.com/sidevoice/sidevoice-web/issues/479)) ([a7f9ceb](https://github.com/sidevoice/sidevoice-web/commit/a7f9ceb7eb28562ac3a9594494c191ad75e7e194))
+
 ## [0.20.0](https://github.com/sidevoice/sidevoice-web/compare/v0.19.0...v0.20.0) (2026-11-04)
 
 
