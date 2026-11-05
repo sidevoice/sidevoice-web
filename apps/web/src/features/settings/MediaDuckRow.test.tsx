@@ -70,27 +70,55 @@ test("Pause on a Mac says only Music and Spotify are paused, not YouTube, browse
   expect(screen.queryByRole("button")).toBeNull();
 });
 
-test("a permission the choice needs is said with a link to Permissions; the row itself never asks", async () => {
+test("a permission the choice needs is a note under the row: Allow where it can be asked, else a link to Permissions; the row keeps its neutral hint", async () => {
   const openPermissions = vi.fn();
-  const cases: [Partial<MediaDuckStatus>, RegExp][] = [
-    [{ lower: "some-apps", pause: "some-apps", access: "granted", capture: "undetermined" }, /Without System Audio Recording, only Music and Spotify can be lowered/],
-    [{ lower: "some-apps", pause: "some-apps", access: "undetermined", capture: "denied" }, /Without System Audio Recording/],
-    [{ lower: "some-apps", pause: "some-apps", access: "denied" }, /needs permission to control Music and Spotify/],
-    [{ mode: "pause", lower: "per-app", pause: "some-apps", access: "undetermined", capture: "granted" }, /needs permission to control Music and Spotify/],
-    // Allowed, waiting for a restart: still pointing to Permissions, with its own words (Restart is there).
-    [{ lower: "some-apps", pause: "some-apps", access: "granted", capture: "restart" }, /allowed, but Sidevoice has to restart before it can lower any app/],
+  const cases: [Partial<MediaDuckStatus>, RegExp, "Allow" | null][] = [
+    [{ lower: "some-apps", pause: "some-apps", access: "granted", capture: "undetermined" }, /Lowering needs System Audio Recording\./, "Allow"],
+    [{ lower: "some-apps", pause: "some-apps", access: "undetermined", capture: "denied" }, /Lowering needs System Audio Recording\./, null],
+    [{ lower: "some-apps", pause: "some-apps", access: "denied" }, /Controlling Music and Spotify needs access\./, null],
+    [{ mode: "pause", lower: "per-app", pause: "some-apps", access: "undetermined", capture: "granted" }, /Controlling Music and Spotify needs access\./, null],
   ];
-  for (const [changes, hint] of cases) {
+  for (const [changes, note, allow] of cases) {
     const media = bridge(status(changes));
     inApp({ mediaDuck: media });
     const view = render(<MediaDuckRow t={en} openPermissions={openPermissions} />);
-    expect(await screen.findByText(hint)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Open Permissions" }));
-    expect(media.allow).not.toHaveBeenCalled();
+    expect(await screen.findByText(note)).toBeInTheDocument();
+    // The row's own line is the neutral one, and the Segmented control stands alone in it.
+    expect(screen.queryByText(/Allow it in Permissions/)).toBeNull();
+    expect(screen.getByRole("radiogroup").closest(".ui-row")!.querySelector("button:not([role=radio])")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Allow" }) !== null).toBe(allow === "Allow");
+    if (!allow) fireEvent.click(screen.getByRole("button", { name: "Open Permissions ›" }));
     view.unmount();
   }
-  expect(openPermissions).toHaveBeenCalledTimes(cases.length);
+  expect(openPermissions).toHaveBeenCalledTimes(3);
+});
+
+test("Allow in the note asks the app for capture and the note follows the answer", async () => {
+  const media = bridge(status({ lower: "some-apps", pause: "some-apps", capture: "undetermined" }));
+  media.allow = vi.fn(async () => status({ lower: "some-apps", pause: "some-apps", capture: "restart" })) as never;
+  const restart = vi.fn(async () => status());
+  inApp({ mediaDuck: { ...media, restart } });
+  render(<MediaDuckRow t={en} openPermissions={() => undefined} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Allow" }));
+  expect(media.allow).toHaveBeenCalledWith("capture");
+  expect(await screen.findByText("Allowed. Restart Sidevoice to apply it.")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Restart now" }));
+  expect(restart).toHaveBeenCalledTimes(1);
+});
+
+test("allowed and waiting for a restart: the note offers Restart now, or a link to Permissions where the app cannot restart", async () => {
+  const waiting = status({ lower: "some-apps", pause: "some-apps", capture: "restart" });
+  const restart = vi.fn(async () => waiting);
+  inApp({ mediaDuck: { ...bridge(waiting), restart } });
+  const view = render(<MediaDuckRow t={en} openPermissions={() => undefined} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Restart now" }));
+  expect(restart).toHaveBeenCalledTimes(1);
+  view.unmount();
+  inApp({ mediaDuck: bridge(waiting) });
+  render(<MediaDuckRow t={en} openPermissions={() => undefined} />);
+  expect(await screen.findByText("Allowed. Restart Sidevoice to apply it.")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Restart now" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Open Permissions ›" })).toBeInTheDocument();
 });
 
 test("no link when nothing is missing: elsewhere, doing nothing, allowed, or Music and Spotify not open to tell", async () => {

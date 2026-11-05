@@ -86,25 +86,50 @@ function useInCall() {
   );
 }
 
-const ICON: Record<MediaDuckPermission, typeof SpeakerIcon> = { capture: SpeakerIcon, automation: PauseIcon };
+type MediaBridge = NonNullable<ReturnType<typeof host>["mediaDuck"]>;
 
-function MediaPermissionRow({ permission, access, asking, inCall, onAllow, onSettings, onRestart, onSay, t }: {
-  permission: MediaDuckPermission; access: MediaDuckAccess; asking: boolean; inCall: boolean; onAllow: (() => void) | null;
-  onSettings: (() => void) | null; onRestart: (() => Promise<void>) | null; onSay(text: string): void; t: Translate;
-}) {
-  // What a Restart now that did not go ahead came to (the app refuses during a call).
+/** What pressing Allow and Restart now does, shared by the list of permissions and Call's note, so both ask the app the same
+ *  way: Allow is the person's own request (the system may ask then), shown while it is in flight; Restart now asks the app
+ *  to restart, and what it came to is kept (`refused`: the app refuses during a call, or it failed). `onSay`: the
+ *  refusal, for a live region. `restart` is null where the app cannot (an older one). */
+export function useMediaActions(bridge: MediaBridge | null, run: ReturnType<typeof useMediaDuck>["run"], t: Translate, onSay: (text: string) => void = () => undefined) {
+  const inCall = useInCall();
+  // Each permission's own question in flight: one being asked does not hold the other.
+  const [asking, setAsking] = useState<Partial<Record<MediaDuckPermission, boolean>>>({});
   const [refused, setRefused] = useState<MessageKey | null>(null);
   const [restarting, setRestarting] = useState(false);
-  const restart = () => {
-    if (!onRestart) return;
+  const allow = bridge?.allow ? (permission: MediaDuckPermission) => {
+    setAsking((now) => ({ ...now, [permission]: true }));
+    void run(() => bridge.allow!(permission), undefined, permission).finally(() => setAsking((now) => ({ ...now, [permission]: false })));
+  } : null;
+  const restart = bridge?.restart ? () => {
     setRefused(null);
     setRestarting(true);
-    onRestart().catch((error: unknown) => {
+    bridge.restart!().catch((error: unknown) => {
       const key: MessageKey = (error as { key?: unknown } | null)?.key === "media_duck.restart-in-call" ? "perm.capture.restartInCall" : "perm.capture.restartFailed";
       setRefused(key);
       onSay(t(key));
     }).finally(() => setRestarting(false));
-  };
+  } : null;
+  return { inCall, asking, allow, restart, restarting, refused };
+}
+
+/** The Allow of a permission, the same wherever it is. */
+export function AllowButton({ asking, onClick, t }: { asking: boolean; onClick(): void; t: Translate }) {
+  return <Button size="sm" variant="primary" loading={asking} onClick={onClick}>{t("perm.allow")}</Button>;
+}
+
+/** Restart now, the same wherever it is: waits (disabled) while a call is joined. */
+export function RestartButton({ restarting, inCall, onClick, t }: { restarting: boolean; inCall: boolean; onClick(): void; t: Translate }) {
+  return <Button size="sm" variant="primary" loading={restarting} disabled={inCall} onClick={onClick}>{t("perm.capture.restartNow")}</Button>;
+}
+
+const ICON: Record<MediaDuckPermission, typeof SpeakerIcon> = { capture: SpeakerIcon, automation: PauseIcon };
+
+function MediaPermissionRow({ permission, access, asking, inCall, restarting, refused, onAllow, onSettings, onRestart, onSay, t }: {
+  permission: MediaDuckPermission; access: MediaDuckAccess; asking: boolean; inCall: boolean; restarting: boolean; refused: MessageKey | null;
+  onAllow: (() => void) | null; onSettings: (() => void) | null; onRestart: (() => void) | null; onSay(text: string): void; t: Translate;
+}) {
   const Icon = ICON[permission];
   const control = useRef<HTMLSpanElement>(null);
   const why: MessageKey = access === "denied" ? `perm.${permission}.denied`
@@ -130,10 +155,10 @@ function MediaPermissionRow({ permission, access, asking, inCall, onAllow, onSet
           // Allowed, and only a new process sees it: Restart now (a call is never dropped for it: the button waits, and says
           // so). An app that cannot restart itself: its own page, where the person can see the permission, and the line.
           ? onRestart
-            ? <Button size="sm" variant="primary" loading={restarting} disabled={inCall} onClick={restart}>{t("perm.capture.restartNow")}</Button>
+            ? <RestartButton restarting={restarting} inCall={inCall} onClick={onRestart} t={t} />
             : onSettings ? <Button size="sm" variant="secondary" onClick={onSettings}>{t("perm.openSettings")}</Button> : null
         : access === "undetermined" && onAllow
-          ? <Button size="sm" variant="primary" loading={asking} onClick={() => { pressed.current = true; onAllow(); }}>{t("perm.allow")}</Button>
+          ? <AllowButton asking={asking} onClick={() => { pressed.current = true; onAllow(); }} t={t} />
           // Refused, or (System Audio Recording) not readable: the system's own page. Music and Spotify, neither open: the
           // line says to open one, as the system can only ask about an app that is open.
           : (access === "denied" || permission === "capture") && onSettings
@@ -149,19 +174,14 @@ function MediaPermissionRow({ permission, access, asking, inCall, onAllow, onSet
  *  for the list's live region. */
 export function MediaPermissionRows({ t, onSay }: { t: Translate; onSay(text: string): void }) {
   const { bridge, status, run } = useMediaDuck();
-  const inCall = useInCall();
-  // Each row's own question in flight: one being asked does not hold the other.
-  const [asking, setAsking] = useState<Partial<Record<MediaDuckPermission, boolean>>>({});
+  const { inCall, asking, allow, restart, restarting, refused } = useMediaActions(bridge, run, t, onSay);
   if (!bridge || !status) return null;
   const rows = ([["capture", status.capture], ["automation", status.access]] as const)
     .filter((row): row is readonly [MediaDuckPermission, MediaDuckAccess] => row[1] !== undefined);
-  const allow = (permission: MediaDuckPermission) => {
-    setAsking((now) => ({ ...now, [permission]: true }));
-    void run(() => bridge.allow!(permission), undefined, permission).finally(() => setAsking((now) => ({ ...now, [permission]: false })));
-  };
   return <>{rows.map(([permission, access]) =>
     <MediaPermissionRow key={permission} permission={permission} access={access} asking={!!asking[permission]} inCall={inCall} t={t} onSay={onSay}
-      onRestart={permission === "capture" && bridge.restart ? () => bridge.restart!().then(() => undefined) : null}
-      onAllow={bridge.allow ? () => allow(permission) : null}
+      restarting={restarting} refused={permission === "capture" ? refused : null}
+      onRestart={permission === "capture" ? restart : null}
+      onAllow={allow ? () => allow(permission) : null}
       onSettings={bridge.openSettings ? () => { void bridge.openSettings!(permission).catch(() => undefined); } : null} />)}</>;
 }
