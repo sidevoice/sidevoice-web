@@ -1447,7 +1447,6 @@ export const messages = {
   "card.conversationsCountUnread": "Conversations ({n}), {unread} with unread replies",
   "card.settings": "Floating card settings",
   "card.hide": "Hide for this call",
-  "card.you": "You",
   "messages.audio.notPlayed": "Not played",
   "messages.audio.unknown": "Audio stopped · Played amount unknown",
   "messages.audio.skipped": "Skipped",

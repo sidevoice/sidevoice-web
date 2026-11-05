@@ -1,4 +1,4 @@
-import { act, createEvent, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, createEvent, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { CallCard, CLICK_GUARD_MS } from "./CallCard";
 import { createCardRoom } from "./card-room";
@@ -10,6 +10,8 @@ import { FLOATING_CARD_KEY } from "../state/floating-card";
 import { CARD_MARGIN } from "./card-shell";
 import { translator } from "../i18n/translator";
 import { litPart } from "../features/call/lit-part";
+import { PAGE_MS } from "../features/call/PagedText";
+import { SENT_LEAVING_MS } from "../features/call/speech-reading";
 
 vi.mock("../services/room-session-controller.js", () => ({}));
 
@@ -30,13 +32,19 @@ function page(format: string, extra: Partial<CallControlsState> = {}, roomExtra:
   localStorage.setItem(FLOATING_CARD_KEY, JSON.stringify({ format, size: "m" }));
   const room = createRoomStore();
   act(() => room.patch({ ...ROOM, ...roomExtra }));
-  const state: CallControlsState = { call: { ...room.getState().callCard, version: 2, since: 1 }, level: 0, pointerInside: null, alwaysExpanded: false,
+  let state: CallControlsState = { call: { ...room.getState().callCard, version: 2, since: 1 }, level: 0, pointerInside: null, alwaysExpanded: false,
     muteShortcut: "", ...extra };
-  const host: CallControlsHost = { subscribe: (listener) => { listener(state); return () => undefined; }, run: vi.fn(), layout: vi.fn(), drag: vi.fn(), ...hostExtra };
+  let push: ((next: CallControlsState) => void) | null = null;
+  const host: CallControlsHost = { subscribe: (listener) => { push = listener; listener(state); return () => undefined; }, run: vi.fn(), layout: vi.fn(), drag: vi.fn(), ...hostExtra };
   const card = createCardRoom((command) => host.run(command));
   const wrapped: CallControlsHost = { ...host, subscribe: (listener) => host.subscribe((next) => { card.apply(next); listener(next); }) };
   render(<RoomProvider store={card.store} runtime={false}><CallCard host={wrapped} t={translator("en")} /></RoomProvider>);
-  return host;
+  // What the room says next (the call going on): the facts patched, the app relaying the new snapshot to the card.
+  return Object.assign(host, { say(next: Record<string, unknown>) {
+    act(() => room.patch(next));
+    state = { ...state, call: { ...room.getState().callCard, version: 2, since: 1 } };
+    act(() => push?.(state));
+  } });
 }
 
 afterEach(() => { localStorage.removeItem(FLOATING_CARD_KEY); vi.useRealTimers(); });
@@ -55,18 +63,128 @@ test("the picture is the room's own stage tile and call bar, on the facts the ro
   expect(host.run).toHaveBeenCalledWith({ command: "skip-reply" });
 });
 
-test("just the avatar: its balloons below it in the screen's upper half point their tails up at it, above it in the lower half down", () => {
+test("just the avatar: its voice text is the stage's white card, docked under it in the screen's upper half, over it in the lower half", () => {
+  vi.useFakeTimers();
   page("avatar");
-  expect(document.querySelector(".avatar-balloons")).toHaveClass("balloon--tail-up");
-  expect(document.querySelector(".avatar-balloons .stage-bubble")).not.toBeNull();
+  expect(document.querySelector(".floating-card")).toHaveAttribute("data-open", "down");
+  const card = document.querySelector(".avatar-card > .avatar-voice.docked-voice > .vcap.card.agent")!;
+  expect(card).not.toBeNull();
+  expect(litPart(card as HTMLElement).played).toBe("Okay. I'll start with");
+  expect(document.querySelector(".avatar-card")).toHaveAttribute("data-voice");
+  // No balloon: no bubble, no tail, no gloss.
+  expect(document.querySelector(".speech-bubble, .balloon-tail, .balloon-shine")).toBeNull();
   // Its controls come out of a handle, shown by the pointer on the creature only.
   expect(document.querySelector(".avatar-dock")).toBeNull();
-});
-
-test("just the avatar in the lower half: balloons above, tails down", () => {
+  cleanup();
   page("avatar", { place: { vertical: "lower", horizontal: "left" } });
   expect(document.querySelector(".floating-card")).toHaveAttribute("data-open", "up");
-  expect(document.querySelector(".avatar-balloons")).not.toHaveClass("balloon--tail-up");
+  expect(document.querySelector(".avatar-voice .vcap.card.agent")).not.toBeNull();
+});
+
+test("the title card: its captions are the stage's voice text, docked after it: the reply lit as it is heard, never plain lines", () => {
+  vi.useFakeTimers();
+  page("card");
+  const column = document.querySelector(".floating-card > .docked-voice.card-voice")!;
+  expect(column).not.toBeNull();
+  expect(column.previousElementSibling).toHaveClass("title-card");
+  const card = column.querySelector<HTMLElement>(":scope > .vcap.card.agent")!;
+  expect(litPart(card).played).toBe("Okay. I'll start with");
+  // The stage's reading: three lines a page, the words said in the ink and the rest quiet.
+  expect(card.querySelector(".paged-text[data-turn=page] .lit-text")).not.toBeNull();
+  expect(document.querySelector(".caption-line, .card-captions-lines, .speech-bubble")).toBeNull();
+  // It is the card's own look, in the window's margin: the stage's own would be cut by the window's edge (card-shadow.test.ts).
+  expect(card).toHaveAttribute("translate", "no");
+});
+
+test("with captions off, neither the title card nor the avatar docks any voice text; the stage's tile keeps the room's own switch", () => {
+  localStorage.setItem("sidevoice.captions", "off");
+  try {
+    page("card");
+    expect(document.querySelector(".docked-voice")).toBeNull();
+    cleanup();
+    page("avatar");
+    expect(document.querySelector(".docked-voice")).toBeNull();
+    expect(document.querySelector(".avatar-card")).not.toHaveAttribute("data-voice");
+  } finally { localStorage.removeItem("sidevoice.captions"); }
+});
+
+test("nothing said, nothing docked: the column is empty (and out of the flow) between turns", () => {
+  page("card", {}, { botLive: false, karaokeState: null, history: [] });
+  const column = document.querySelector(".docked-voice")!;
+  expect(column).toBeEmptyDOMElement();
+  cleanup();
+  page("avatar", {}, { botLive: false, karaokeState: null, history: [] });
+  expect(document.querySelector(".avatar-voice")).toBeEmptyDOMElement();
+  expect(document.querySelector(".avatar-card")).not.toHaveAttribute("data-voice");
+});
+
+/** The person's turn, as the room's facts say it at each step (stage-phone-balloon's states). */
+const KEY = LOGIN;
+const draft = { segment: "u", thread: KEY, role: "user", text: "", name: "", time: 5, session: "s1", seq: 5, draft: true };
+const speaks = { botLive: false, karaokeState: null, userLive: true, userTurn: { id: "u", segment: "u", thread: KEY }, pendingPhase: "listening", history: [draft] };
+const transcribes = { ...speaks, userLive: false, pendingPhase: "transcribing" };
+const sends = { userLive: false, userTurn: null, pendingPhase: "", pendingText: "",
+  history: [{ ...draft, segment: "u-sent", text: "Run the tests and tell me what fails.", draft: false, delivery: "delivered" }] };
+
+test.each(["card", "avatar"])("%s: the person's turn is the stage's pill, then \"Transcribing\", then what was sent; the reply it cuts in on lifts away", (format) => {
+  vi.useFakeTimers();
+  const host = page(format);
+  const column = () => document.querySelector(".docked-voice")!;
+  const reply = () => column().querySelector(".vcap.card.agent")!;
+  expect(reply()).not.toHaveAttribute("data-leaving");
+  // They speak: the pill (the microphone and the voice's bars) in the reply's place, which lifts away.
+  host.say(speaks);
+  const pill = column().querySelector(".vcap.card.person.pill")!;
+  expect(pill).toHaveAttribute("data-phase", "listening");
+  expect(pill.querySelector(".voice-bars, .voice-wave")).not.toBeNull();
+  expect(reply()).toHaveAttribute("data-leaving");
+  // Cancel sending: the card's command, from the pill's ×.
+  fireEvent.click(screen.getByRole("button", { name: "Cancel sending" }));
+  expect(host.run).toHaveBeenCalledWith({ command: "cancel-input" });
+});
+
+test("just the avatar: a press on its voice text moves nothing, a press on the creature drags", () => {
+  vi.useFakeTimers();
+  const host = page("avatar");
+  const voice = document.querySelector(".avatar-voice")!;
+  fireEvent.pointerDown(voice, { button: 0, pointerId: 1, screenX: 100, screenY: 100 });
+  fireEvent.pointerMove(voice, { pointerId: 1, screenX: 140, screenY: 110 });
+  expect(host.drag).not.toHaveBeenCalled();
+  fireEvent.pointerUp(voice, { pointerId: 1, screenX: 140, screenY: 110 });
+  const figure = document.querySelector(".avatar-figure")!;
+  fireEvent.pointerDown(figure, { button: 0, pointerId: 2, screenX: 100, screenY: 100 });
+  fireEvent.pointerMove(figure, { pointerId: 2, screenX: 140, screenY: 110 });
+  expect(host.drag).toHaveBeenCalledWith("start");
+});
+
+test("the title card: a press on its voice text drags the card, as a press anywhere on it does", () => {
+  vi.useFakeTimers();
+  const host = page("card");
+  const reply = document.querySelector(".docked-voice")!;
+  fireEvent.pointerDown(reply, { button: 0, pointerId: 1, screenX: 100, screenY: 100 });
+  fireEvent.pointerMove(reply, { pointerId: 1, screenX: 140, screenY: 110 });
+  expect(host.drag).toHaveBeenCalledWith("start");
+});
+
+test.each(["card", "avatar"])("%s: transcribing says so in the pill, and what was sent pops out of it as a white card for 3s, then leaves", (format) => {
+  vi.useFakeTimers();
+  const host = page(format, {}, { botLive: false, karaokeState: null, history: [] });
+  host.say(speaks);
+  host.say(transcribes);
+  const pill = document.querySelector(".docked-voice .vcap.card.person.pill")!;
+  expect(pill).toHaveAttribute("data-phase", "transcribing");
+  expect(pill.querySelector(".tlabel")).toHaveTextContent("Transcribing");
+  host.say(sends);
+  expect(document.querySelector(".docked-voice .vcap.pill")).toBeNull();
+  const sent = document.querySelector<HTMLElement>(".docked-voice .vcap.card.person.sent")!;
+  expect(sent).toHaveTextContent("Run the tests and tell me what fails.");
+  act(() => { vi.advanceTimersByTime(PAGE_MS - 1); });
+  expect(sent).not.toHaveAttribute("data-leaving");
+  act(() => { vi.advanceTimersByTime(1); });
+  expect(sent).toHaveAttribute("data-leaving");
+  act(() => { vi.advanceTimersByTime(SENT_LEAVING_MS); });
+  expect(document.querySelector(".docked-voice .vcap")).toBeNull();
+  expect(document.querySelector(".docked-voice")).toBeEmptyDOMElement();
 });
 
 test("the facts relayed are plain data: the socket as whether there is one, nothing browsed, only the call's history and others' unseen replies", () => {
@@ -111,10 +229,10 @@ test("just the avatar: no handle; the compact card is there for Tab, with A1's f
   expect([...card.querySelectorAll(".card-controls > *")].map((node) => node.className)).toEqual(["card-mic", "card-captions", "card-skip", "card-hangup"]);
 });
 
-test("just the avatar: the pointer on the creature opens the card after 120ms, away it folds after 500ms; a balloon is not the creature", () => {
+test("just the avatar: the pointer on the creature opens the card after 120ms, away it folds after 500ms; its voice text is not the creature", () => {
   vi.useFakeTimers();
   page("avatar");
-  fireEvent.pointerOver(document.querySelector(".avatar-balloons")!);
+  fireEvent.pointerOver(document.querySelector(".avatar-voice")!);
   act(() => { vi.advanceTimersByTime(700); });
   expect(expanded()).toBe(false);
   fireEvent.pointerOver(document.querySelector(".avatar-figure")!);
@@ -222,11 +340,11 @@ test("just the avatar: once open, the card holds while the pointer is within 16p
     return this.classList.contains("compact-card") ? rect(100, 400, 150, 230) : this.classList.contains("avatar-figure") ? rect(180, 320, 0, 140) : rect(0, 0, 0, 0);
   });
   // Between them, and within the hull's 16px of the card: still on the card, so it holds.
-  overAt(document.querySelector(".avatar-balloons")!, 90, 200);
+  overAt(document.querySelector(".avatar-voice")!, 90, 200);
   act(() => { vi.advanceTimersByTime(700); });
   expect(expanded()).toBe(true);
   // Beyond it: it folds after the usual delay.
-  overAt(document.querySelector(".avatar-balloons")!, 60, 200);
+  overAt(document.querySelector(".avatar-voice")!, 60, 200);
   act(() => { vi.advanceTimersByTime(520); });
   expect(expanded()).toBe(false);
   vi.restoreAllMocks();

@@ -237,8 +237,8 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState, r
       // A press anywhere in the card but in an open panel or on what opens it closes the panel.
       if (panel && !target.closest(".card-panel, .card-title, .card-devices, .card-conversations-button")) setPanel(null);
       // Dragging from anywhere but a button (the title counts as card): past the threshold it moves the window.
-      // The avatar's balloons are inert, as the room's are: a press on one moves nothing (its button acts).
-      if (event.button > 0 || target.closest("button:not(.card-title), .card-panel, .card-grip, .ui-popover, .avatar-balloons .speech-bubble")) return;
+      // The avatar's voice text is inert, as the room's are: a press on it moves nothing (its button acts).
+      if (event.button > 0 || target.closest("button:not(.card-title), .card-panel, .card-grip, .ui-popover, .avatar-voice")) return;
       drag.current = { x: event.screenX, y: event.screenY, moving: false, id: event.pointerId };
     },
     onPointerMove(event) {
@@ -262,9 +262,9 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState, r
     onPointerCancel: (event) => endDrag(event),
     onClickCapture(event) {
       keyboardClick.current = event.detail === 0;
-      // After "Cancel sending" (its balloon goes with it) nothing of the card keeps focus, which would hold the controls out; from the
+      // After "Cancel sending" (its pill goes with it) nothing of the card keeps focus, which would hold the controls out; from the
       // keyboard, focus goes to the microphone, the call's nearest control.
-      if ((event.target as Element).closest(".cancel-input")) {
+      if ((event.target as Element).closest(".cancel-input, .vcap .cancel")) {
         const keyboard = event.detail === 0;
         setTimeout(() => { if (keyboard) card.current?.querySelector<HTMLElement>(".card-mute")?.focus(); else (document.activeElement as HTMLElement | null)?.blur(); });
       }

@@ -87,3 +87,15 @@
 
 /* The harness's badge at the tile's foot steps aside while something is said on the stage. */
 .stage-tile:has(.stage-voice .vcap:not(.meas)) .stage-tags { display: none; }
+
+/* Docked (the desktop card's title card and avatar: DockedVoice, laid by call-card.css): the same cards, not under a creature by
+ * a framing but in the flow of a column over or under the card, as the design reference docks them (`.vcap.docked`, T23). One
+ * turn's card at a time: they share one cell, so a card lifting away and the one coming in stand in the same place, as they do
+ * on the stage, and the column is as tall as the tallest there. A card is as wide as its words, up to the column's width (the
+ * one track is the column's: a card's own width never widens it). The type stays at the stage's floor (18 and 16px: a tile
+ * this small is always at it), and the pop and the lift go by a small tile's unit. */
+.docked-voice { --vu: .6px; display: grid; grid-template-columns: minmax(0, 1fr); justify-items: end; pointer-events: auto; }
+.docked-voice:empty { display: none; }
+.docked-voice > .vcap { position: static; grid-area: 1 / 1; max-width: 100%; transform: none; transform-origin: 50% 0; }
+.docked-voice > .vcap.card, .docked-voice > .vcap.card.person { width: auto; max-width: 100%; }
+.docked-voice > .vcap.card.person { width: max-content; }

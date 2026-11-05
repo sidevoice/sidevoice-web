@@ -1424,7 +1424,6 @@ export const messages: Messages = {
   "card.conversationsCountUnread": "Conversazioni ({n}), {unread} con risposte da leggere",
   "card.settings": "Impostazioni della scheda mobile",
   "card.hide": "Nascondi per questa chiamata",
-  "card.you": "Tu",
   "messages.audio.notPlayed": "Non riprodotto",
   "messages.audio.unknown": "Audio interrotto · Parte riprodotta sconosciuta",
   "messages.audio.skipped": "Saltato",

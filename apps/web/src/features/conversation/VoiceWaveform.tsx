@@ -122,7 +122,7 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
       if (longest !== middle) { middle = longest; node.style.setProperty("--mid", String(middle)); drawn.fill(NaN); }
       while (slots.length > capacity) { slots.pop()!.forEach((part) => part.remove()); drawn.pop(); }
       while (slots.length < capacity) {
-        // The ends are <i>, the middle a <u>: never a <b>, which the card's captions colour (call-card.css .caption-line b).
+        // The ends are <i>, the middle a <u>.
         const parts = [document.createElement("i"), document.createElement("i"), document.createElement("u")];
         node.append(...parts);
         slots.push(parts);

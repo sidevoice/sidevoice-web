@@ -38,8 +38,8 @@
   --person-fs: clamp(16px, calc(22.4 * var(--u)), 28px); --person-lh: 1.4286; --person-pad-b: 12; --person-pad-i: 20; --person-live-w: 272;
   --fig-px: min(calc(var(--stage-avatar-share, .56) * 440px * var(--k, 1)), var(--stage-avatar-max, 420px)); }
 /* The person's balloon's height: three of its whole-pixel lines, its margins and padding. Where the balloons are laid (the
- * tile; the desktop card's avatar balloons, call-card.css), from that place's own sizes. */
-:is(.stage-tile, .avatar-balloons) { --person-live-h: calc(3 * round(nearest, calc(var(--person-fs) * var(--person-lh)), 1px) + 16 * var(--u) + 2 * var(--person-pad-b) * var(--u)); }
+ * tile), from that place's own sizes. */
+.stage-tile { --person-live-h: calc(3 * round(nearest, calc(var(--person-fs) * var(--person-lh)), 1px) + 16 * var(--u) + 2 * var(--person-pad-b) * var(--u)); }
 /* No conversation: the tile fills the stage rather than keeping a shape; its words keep the interface's size. */
 .stage-tile.stage-empty { --u: 1px; }
 /* The canvas the agent is drawn on keeps one shape per form factor (--stage-ratio, width over height), never whatever
@@ -133,10 +133,6 @@
   overflow: visible; pointer-events: none; }
 .balloon-tail .tail-fill { fill: var(--balloon-fill); }
 .balloon-tail .tail-ink { fill: none; stroke: var(--balloon-ink); stroke-width: var(--balloon-line); stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-/* A balloon drawn under whoever speaks (the desktop card's avatar, its balloons opening below it): its tail leaves the
- * top edge and points up at them, the same tail turned over (sidevoice-web#240). On the balloon or on what holds it. */
-.balloon--tail-up .balloon-tail { top: auto; bottom: calc(100% - var(--balloon-line) - 1px); transform: scaleY(-1); }
-.balloon--tail-up .stage-bubble .balloon-tail, .stage-bubble.balloon--tail-up .balloon-tail { transform: scale(-1, -1); }
 .balloon-shine { position: absolute; z-index: -1; left: calc(14 * var(--u)); top: calc(8 * var(--u)); width: calc(40 * var(--u)); height: calc(20 * var(--u)); overflow: visible; pointer-events: none; }
 .balloon-shine path { fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; opacity: .75; }
 

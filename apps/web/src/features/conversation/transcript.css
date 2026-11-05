@@ -327,9 +327,7 @@
  * the wave's right edge and each on a layer of its own. VoiceWaveform writes their transforms (barTransforms) and nothing
  * else changes, so a new height is composited: nothing is laid out or repainted. `--w` is the bar's width and `--mid` the
  * middle's length at its tallest (px, bare numbers, set once). No transition: the bars follow the voice as it is read. The
- * ink is the wave's own colour, so a theme switch needs no code. The middle is a <u>, never a <b>: the card's captions
- * colour every <b> in a line (call-card.css .caption-line b, the speaker's name), and the bars take their ink from their
- * own colour. */
+ * ink is the wave's own colour, so a theme switch needs no code. The bars take their ink from their own colour. */
 .voice-wave-bars { position: absolute; inset: 0; }
 .voice-wave-bars :is(i, u) { position: absolute; right: 0; top: 50%; width: calc(var(--w) * 1px); background: currentColor; will-change: transform; }
 .voice-wave-bars i { height: calc(var(--w) * 1px); margin-top: calc(var(--w) * -.5px); border-radius: 50%; }

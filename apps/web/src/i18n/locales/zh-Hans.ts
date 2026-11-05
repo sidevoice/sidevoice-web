@@ -1403,7 +1403,6 @@ export const messages: Messages = {
   "card.conversationsCountUnread": "对话（{n}），其中 {unread} 个有未读回复",
   "card.settings": "浮动卡片设置",
   "card.hide": "本次通话中隐藏",
-  "card.you": "你",
   "messages.audio.notPlayed": "未播放",
   "messages.audio.unknown": "音频已停止 · 已播放长度未知",
   "messages.audio.skipped": "已跳过",
