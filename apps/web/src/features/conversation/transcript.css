@@ -197,9 +197,8 @@
 /* ----- the conversation working on the person's turn ('label', T51): a quiet row, its dot in the creature's accent */
 .chat-bubble.working { display: flex; align-items: center; gap: 8px; width: 82%; border-color: transparent; background: none; box-shadow: none; }
 .working-label { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--tr-tag-ink); }
-/* The working glyph: three dots in the working state's colour (tokens.css), blinking as the conversations' dot does (room.css). */
-.working-label > svg { flex: none; width: 16px; height: 16px; color: var(--sv-state-working); animation: transcript-blink 1.2s ease-in-out infinite; }
-@keyframes transcript-blink { 50% { opacity: .25; } }
+/* The working glyph (StateGlyph): three dots in the working state's colour, blinking as the conversations' dot does (ui.css). */
+.working-label > svg { width: 16px; height: 16px; }
 /* A running ellipsis after a live row's word. */
 .transcript-ell i { font-style: normal; animation: transcript-ell 1.2s ease-in-out infinite; }
 .transcript-ell i:nth-child(2) { animation-delay: .2s; }
@@ -210,7 +209,7 @@
  * "Transcribing…", and the round × that takes it back, until it is sent. */
 .chat-bubble.turn-pill { display: flex; align-items: center; border-radius: 999px; padding: 5px 6px 5px 13px; white-space: nowrap; }
 .turn-lead { display: inline-flex; align-items: center; gap: 6px; }
-.turn-bars { display: inline-flex; align-items: center; gap: 2px; height: 14px; }
+.turn-bars { display: inline-flex; align-items: center; gap: 2px; height: 14px; color: var(--sv-state-listening); }
 .turn-bars i { display: block; width: 3px; height: 5px; border-radius: 2px; background: currentColor; animation: turn-bar .9s ease-in-out infinite; }
 .turn-bars i:nth-child(2) { height: 11px; animation-delay: -.3s; }
 .turn-bars i:nth-child(3) { height: 8px; animation-delay: -.6s; }
@@ -304,7 +303,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .working-label > svg, .transcript-ell i, .turn-bars i { animation: none; }
+  .transcript-ell i, .turn-bars i { animation: none; }
   .transcript-ell i { opacity: 1; }
 }
 

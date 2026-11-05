@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import type { ParticipantView } from "../../state/room-types";
 import { translator } from "../../i18n/translator";
-import { avatarMood, callState, conversationState, machineGroups, moodText, personMood, stageMood, hasUnread, stateText } from "./conversation-state";
+import { avatarMood, callState, conversationState, isHolding, machineGroups, moodText, personMood, stageMood, hasUnread, stateKind, stateText } from "./conversation-state";
 
 const row = (threadId: string, extra: Partial<ParticipantView> = {}): ParticipantView => ({
   threadId, title: threadId, selected: false, available: true, switching: false, unread: 0, reach: "listening",
@@ -136,4 +136,23 @@ test("one precedence, every pair: offline > the person's turn > speaking > worki
 test("the creature draws holding as idle; every other mood is its own", () => {
   expect(avatarMood("holding")).toBe("idle");
   for (const mood of ["offline", "speaking", "listening", "working", "idle", "present"] as const) expect(avatarMood(mood)).toBe(mood);
+});
+
+test("can't receive is an agent that is there and cannot take what is said: not offline, not unreachable", () => {
+  expect(isHolding(row("a", { reach: "holding" }))).toBe(true);
+  expect(isHolding(row("a", { reach: "holding", available: false }))).toBe(false);
+  expect(isHolding(row("a", { reach: "offline", available: false }))).toBe(false);
+  expect(isHolding(row("a"))).toBe(false);
+});
+
+test("a conversation's colour kind: working first, then can't receive, then what its creature acts out; resting and present are one", () => {
+  expect(stateKind("working", "idle", true)).toBe("working");
+  // The creature rests while the agent cannot receive (avatarMood draws holding as idle): the kind is still the mustard one.
+  expect(stateKind("idle", "idle", true)).toBe("holding");
+  expect(stateKind("in-call", "listening")).toBe("listening");
+  expect(stateKind("in-call", "speaking")).toBe("speaking");
+  expect(stateKind("waiting", "working")).toBe("working");
+  expect(stateKind("idle", "offline")).toBe("offline");
+  expect(stateKind("waiting", "idle")).toBe("idle");
+  expect(stateKind("waiting", "present")).toBe("idle");
 });

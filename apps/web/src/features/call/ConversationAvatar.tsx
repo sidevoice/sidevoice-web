@@ -5,7 +5,7 @@ import { CharacterAvatar } from "../avatar/CharacterAvatar";
 import { AttentionBurstIcon } from "../../components/ui/Icons";
 import { useAnimatedThumbnails } from "../../lib/animated-thumbnails";
 import { useConversationAvatar, useConversationAvatars } from "./conversation-avatars";
-import { conversationState, stateKind } from "./conversation-state";
+import { conversationState, isHolding, stateKind } from "./conversation-state";
 import { selectInCall } from "./stage-view";
 
 /** A conversation's agent, small, with the dot that says its state: the sidebar, its rail, a phone's header and its
@@ -24,7 +24,7 @@ export function ConversationAvatar({ row, pop = false, attention = false }: { ro
   const avatars = useConversationAvatars();
   const moves = useAnimatedThumbnails();
   const state = conversationState(row, inCall);
-  const kind = stateKind(state, avatar.mood);
+  const kind = stateKind(state, avatar.mood, isHolding(row));
   // A popping creature is always the still face: the animated thumbnails are a circle's (their canvas is the whole box).
   const animated = moves && !pop;
   return (

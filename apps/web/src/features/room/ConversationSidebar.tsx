@@ -2,7 +2,7 @@ import { useContext, useEffect, useLayoutEffect, useRef } from "react";
 import { Button } from "../../components/ui/Button";
 import { DropdownMenu, DropdownMenuItem } from "../../components/ui/DropdownMenu";
 import { ContextMenu, ContextMenuItem } from "../../components/ui/ContextMenu";
-import { CloseIcon, CloseUpIcon, ConversationsIcon, HarnessIcon, MoreIcon, OtherMachineIcon, SidebarCollapseIcon, SettingsIcon, SidevoiceMark, ThisComputerIcon } from "../../components/ui/Icons";
+import { CloseIcon, CloseUpIcon, ConversationsIcon, HarnessIcon, MoreIcon, OtherMachineIcon, SidebarCollapseIcon, SettingsIcon, SidevoiceMark, StateGlyph, ThisComputerIcon } from "../../components/ui/Icons";
 import { useSurface } from "../../lib/use-surface";
 import { useSheetDrag } from "../../lib/use-sheet-drag";
 import { COMPACT_QUERY, isNarrow, NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
@@ -15,7 +15,7 @@ import { StateOnIcon, machineEntryName, machineEntryTitle } from "../settings/Ma
 import type { ParticipantView } from "../../state/room-types";
 import { translator } from "../../i18n/translator";
 import { ConversationAvatar } from "../call/ConversationAvatar";
-import { conversationState, hasUnread, machineGroups, stateText } from "../call/conversation-state";
+import { conversationState, hasUnread, isHolding, machineGroups, stateText } from "../call/conversation-state";
 import { selectInCall, useStageConversation } from "../call/stage-view";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { ConversationRows } from "./ConversationRows";
@@ -165,6 +165,7 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
                   sub={(row) => (
                     <span className="sidebar-state" data-state={conversationState(row, inCall)}>
                       {row.harness && <HarnessIcon harness={row.harness} size={12} />}
+                      {isHolding(row) && <StateGlyph kind="holding" size={14} />}
                       <span className="sidebar-state-text">{stateText(row, inCall, t)}</span>
                     </span>
                   )}

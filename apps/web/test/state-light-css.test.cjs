@@ -18,6 +18,8 @@ test("a conversation's light is the fixed colour of its state, from the tokens i
   for (const kind of ["listening", "speaking", "working", "offline"])
     assert.match(find(outside, `.state-dot[data-kind="${kind}"]`).body, new RegExp(`background: var\\(--sv-state-${kind}\\)`), kind);
   assert.match(find(outside, ".state-dot").body, /background: var\(--sv-state-idle\)/, "resting and present are the plain dot");
+  // Can't receive is the mustard of "needs you", on the light that is not a card's (a card's dot says connected).
+  assert.match(find(outside, '.state-dot[data-kind="holding"]').body, /background: var\(--sv-state-attention\)/, "can't receive");
   // The dark theme lightens the chromatic ones, in the same file; the greys stay.
   const dark = tokens.slice(tokens.indexOf('[data-theme="dark"]'));
   for (const state of ["listening", "speaking", "working", "attention", "muted"]) assert.match(dark, new RegExp(`--sv-state-${state}: #[0-9a-f]{6};`), state);
@@ -58,9 +60,14 @@ test("a working card has no light along its foot, and its type is the Live Activ
   assert.ok(outside.some((rule) => rule.selector === ".sidebar-rows .person" && /font-family: var\(--sv-font-sans\)/.test(rule.body)), "DM Sans on the card's button");
 });
 
-test("the transcript's Working row wears the working colour and blinks like the conversations' dot", () => {
+test("the transcript's Working row wears the working colour and blinks like the conversations' dot: its glyph is the state's, from one place", () => {
+  // The three dots are StateGlyph's working icon: its colour and its 1.2 s blink are the state glyph's (components/ui/ui.css), the
+  // same wherever a state is shown as an icon, and held still where motion is reduced.
+  const ui = read("components/ui/ui.css");
+  assert.match(ui, /\.state-glyph-working \{ color: var\(--sv-state-working\); animation: state-glyph-blink 1\.2s ease-in-out infinite; \}/);
+  assert.match(ui, /@keyframes state-glyph-blink \{ 50% \{ opacity: \.25; \} \}/);
+  assert.match(ui, /prefers-reduced-motion: reduce\) \{ \.state-glyph-working \{ animation: none; \} \}/);
   const transcript = read("features/conversation/transcript.css");
-  assert.match(transcript, /\.working-label > svg \{[^}]*color: var\(--sv-state-working\); animation: transcript-blink 1\.2s ease-in-out infinite;/);
-  assert.match(transcript, /@keyframes transcript-blink \{ 50% \{ opacity: \.25; \} \}/);
-  assert.match(transcript, /prefers-reduced-motion: reduce\) \{ \.working-label > svg[^}]*animation: none/);
+  assert.doesNotMatch(transcript, /\.working-label > svg \{[^}]*(color|animation):/, "the row adds nothing of its own to the glyph's colour or blink");
+  assert.match(fs.readFileSync(__dirname + "/../src/features/conversation/LiveRows.tsx", "utf8"), /<StateGlyph kind="working" \/>/);
 });

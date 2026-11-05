@@ -16,11 +16,13 @@
 .conversation-avatar, .conversation-avatar * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
 .state-dot { position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border: 2px solid var(--dot-ring, var(--sv-surface)); border-radius: 50%; background: var(--sv-state-idle); }
 /* The light is the colour of what its agent is doing (styles/tokens.css --sv-state-*, fixed in light and dark): listening,
-   speaking, working (blinking), resting or just present (the one idle colour), or unreachable. Where motion is reduced it
-   holds still, and working wears a halo of its colour instead, so it still differs from the rest. */
+   speaking, working (blinking), can't receive (the mustard of "needs you"), resting or just present (the one idle colour), or
+   unreachable. Where motion is reduced it holds still, and working wears a halo of its colour instead, so it still differs from
+   the rest. */
 .state-dot[data-kind="listening"] { background: var(--sv-state-listening); }
 .state-dot[data-kind="speaking"] { background: var(--sv-state-speaking); }
 .state-dot[data-kind="working"] { background: var(--sv-state-working); animation: state-dot-blink 1.2s ease-in-out infinite; }
+.state-dot[data-kind="holding"] { background: var(--sv-state-attention); }
 .state-dot[data-kind="offline"] { background: var(--sv-state-offline); }
 @keyframes state-dot-blink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) {
@@ -30,7 +32,8 @@
 /* A conversation's card in the sidebar and its rail (ConversationAvatar `pop`): the creature stands in a rounded square
    and comes out of it, feet on its foot, head and hat over its edge (features/avatar/fit-pop.ts sets the canvas). The
    square's own tint is the creature's colour over the soft accent. Only two things sit on it: the dot at its foot-right (the
-   connected green while the agent is reachable, blinking in the working colour while it works, none while it is offline)
+   connected green while the agent is reachable, blinking in the working colour while it works, none while it is offline: an
+   agent that cannot receive is still connected, its slashed tray is in its state line)
    and, when the agent needs the person, the burst with its "!" at its top-right. */
 .conversation-avatar[data-pop] { width: 56px; height: 56px; overflow: visible; }
 .conversation-avatar[data-pop] .sv-avatar { position: absolute; inset: 0; width: auto; height: auto; overflow: visible; border-radius: 30%;
