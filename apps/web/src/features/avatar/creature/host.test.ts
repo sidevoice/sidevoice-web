@@ -34,7 +34,7 @@ vi.mock("./rig.js", () => {
       rig.made.push(this);
     }
     add(spec: object, canvas: HTMLCanvasElement, opts: object) {
-      const item = { c: { root: { traverse() {} }, act: () => null, setAct() {} }, canvas, spec, opts, off: 0 };
+      const item = { c: { root: { traverse() {} }, layers: {}, act: () => null, setAct() {} }, canvas, spec, opts, off: 0 };
       this.items.push(item);
       return item;
     }

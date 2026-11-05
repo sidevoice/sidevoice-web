@@ -227,6 +227,8 @@ export function placeFigure(stage: RigStage, c: Creature3D, aspect: number, { gr
 // GPU, which the page only meets when the motion is forced on: lib/motion.ts holds the drawings still there), so the
 // creature never takes more than an eighth of the page's thread.
 const lives = new Set<LiveCreature>();
+/** Renderers that have drawn acts: their act outline shader is compiled (LiveCreature.draw). */
+const warmed = new WeakSet<object>();
 let frameId = 0, last = 0, every = 33, cost = 0;
 const wanted = () => { for (const live of lives) if (live.wantsFrames()) return true; return false; };
 function frame(ms: number) {
@@ -511,7 +513,25 @@ export class LiveCreature {
     item.opts.extra = extra;
     if (view) { item.opts.zoom = view.zoom; item.opts.lookY = view.lookY; }
     const lvl = M.voice && this.opts.level ? this.opts.level(this.mood) : 0;
+    this.warm(t, lvl, still);
     this.stage.draw(item, t, lvl, still);
+  }
+
+  /** product: the first time a renderer draws acts, it first draws the reference's first two frames of them (k = 0, then
+   *  a frame later), so its act outlines compile in the reference's order. An outline's thickness is baked into its shader
+   *  (rig.js addOutline) and three.js reuses the first such program it compiles for every later one, so the first act
+   *  outline drawn sets every act outline's thickness: with a working style on, the props' (0.038), never the cogs' puff's
+   *  (0.030), as in the reference, whose acts always start at k = 0 on their first frame. Here a step's clock starts where
+   *  the step began (a creature drawn mid-way is at that moment), so a first frame could show the puff before the props.
+   *  Drawn and drawn over in this same task: never seen. A first frame drawn still is the reference's too (reduced motion). */
+  private warm(t: number, lvl: number, still: boolean) {
+    const layers = Object.values(this.item.c.layers), renderer = this.stage.renderer;
+    if (!layers.length || warmed.has(renderer)) return;
+    warmed.add(renderer);
+    if (still) return;
+    const keep = layers.map((L) => [L, L.t0] as const);
+    for (const k of [0, 1 / 30]) { for (const L of layers) L.t0 = t - k; this.stage.draw(this.item, t, lvl, false); }
+    for (const [L, t0] of keep) L.t0 = t0;
   }
 
   dispose() {

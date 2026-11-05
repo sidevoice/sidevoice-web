@@ -22,12 +22,15 @@ function fakeStage() {
     },
     act: (layer: string) => layers[layer]?.name ?? null,
   };
-  const draws: Array<{ t: number; still: boolean }> = [];
+  const draws: Array<{ t: number; still: boolean; k?: Record<string, number | null> }> = [];
   const stage = {
     camera: { aspect: 1.5, updateProjectionMatrix() {} },
+    renderer: {},
     items: [],
     add: (spec: object, canvas: HTMLCanvasElement) => ({ c, canvas, spec, opts: {}, off: 0 }),
-    draw: (_item: unknown, t: number, _lvl: number, still: boolean) => { draws.push({ t, still }); },
+    draw: (_item: unknown, t: number, _lvl: number, still: boolean) => {
+      draws.push({ t, still, k: Object.fromEntries(Object.entries(layers).map(([name, L]) => [name, L.t0 == null ? null : Math.round((t - L.t0) * 1e6) / 1e6])) });
+    },
     scene: { remove() {} },
   };
   return { stage: stage as unknown as Stage, c, calls, layers, draws };
@@ -146,8 +149,30 @@ test("frameAt draws a fixed moment of everything it acts out: moving at t, or it
   live.frameAt(2.5);
   expect(rig.layers.base.t0).toBe(0);
   expect(rig.layers.cogs.t0).toBe(0);
-  expect(rig.draws.at(-1)).toEqual({ t: 2.5, still: false });
+  expect(rig.draws.at(-1)).toMatchObject({ t: 2.5, still: false, k: { cogs: 2.5, base: 2.5 } });
   live.frameAt(0.98, true);
   expect(rig.layers.base.keyAt).toBe(0.98);
-  expect(rig.draws.at(-1)).toEqual({ t: 0, still: true });
+  expect(rig.draws.at(-1)).toMatchObject({ t: 0, still: true });
+});
+
+test("the first acts a renderer draws are drawn first at the reference's first two frames of them, so act outlines compile in its order", () => {
+  // a creature drawn mid-way through a working style: its first frame is 7.3 s in, the cogs' puff showing
+  const since = Date.now() - 7_300;
+  make({ mood: "working", step: { work: "hammer", since, until: since + 12_000 } });
+  live.frameAt(7.3);
+  // k = 0 and a frame later for every act (as the creator's first frames, where the props show before the puff), then the
+  // frame asked for: the three drawn in one task, the last one kept
+  expect(rig.draws.map((d) => d.k)).toEqual([{ cogs: 0, base: 0 }, { cogs: 0.033333, base: 0.033333 }, { cogs: 7.3, base: 7.3 }]);
+  expect(rig.layers.base.t0).toBe(0);
+  // once per renderer: the next style is drawn straight away
+  live.setStep({ work: "think", since: Date.now(), until: Date.now() + 9_000 });
+  live.frameAt(1.5);
+  expect(rig.draws.slice(3).map((d) => d.k)).toEqual([{ cogs: 1.5, base: 1.5 }]);
+});
+
+test("a renderer whose first acts are drawn still (reduced motion) compiles them in the key pose, as the reference's does", () => {
+  make({ mood: "working", step: { work: "crank", since: Date.now() } });
+  live.frameAt(0.5, true);
+  live.frameAt(2);
+  expect(rig.draws.map((d) => d.still)).toEqual([true, false]);
 });
