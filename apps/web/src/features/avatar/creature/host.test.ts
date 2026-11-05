@@ -7,7 +7,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 const rig = vi.hoisted(() => ({
   refuse: false,
-  made: [] as Array<{ renderer: FakeRenderer; draws: number; kind: "scene" | "face" }>,
+  made: [] as Array<{ renderer: FakeRenderer; draws: number; kind: "scene" | "face"; w: number; h: number; draw: (item: { spec: { state?: string; expr?: string } }, t: number, level: number, still: boolean) => void }>,
   /** What each draw was asked to show: its state (a pose) and its expression. */
   drawn: [] as Array<{ state?: string; expr?: string; still: boolean }>,
 }));
@@ -27,7 +27,9 @@ vi.mock("./rig.js", () => {
     items: unknown[] = [];
     scene = { remove() {} };
     camera = { aspect: 1, updateProjectionMatrix() {} };
-    constructor(_look: string, _px: number, mode?: string) {
+    /** As the real stage's: the renderer takes the size (and says so). */
+    setRenderSize(w: number, h: number) { if (this.w === w && this.h === h) return; this.w = w; this.h = h; this.renderer.setSize(w, h); }
+    constructor(_look: string, _px: number, mode?: string, _opts?: object) {
       if (rig.refuse) throw new Error("THREE.WebGLRenderer: Error creating WebGL context.");
       this.kind = mode === "wide" ? "scene" : "face";
       this.renderer = renderer();
@@ -260,4 +262,49 @@ test("a face asked for at once is rendered before drawFace returns, kept, and pa
   expect(rig.drawn).toHaveLength(1);
   expect(thirdCalls).toEqual([]);
   expect(later).not.toHaveBeenCalled();
+});
+
+/** A stage canvas in the page whose box is `w` × `h` css px. */
+function tile(w: number, h: number) {
+  const element = canvas();
+  element.getBoundingClientRect = () => new DOMRect(0, 0, w, h);
+  element.getContext = (() => null) as never; // (a dispose clears it)
+  return element;
+}
+
+test("the stage's canvas holds the pixels its tile shows (the pixel ratio to 2, to 960 px tall), and its renderer is sized to it", () => {
+  webgl();
+  const dpr = vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(3);
+  const phone = tile(364, 655);
+  const live = mount({ ...onStage, canvas: phone })!;
+  expect([phone.width, phone.height]).toEqual([533, 960]);
+  expect(live.tick(0)).toBe(true);
+  const scene = stageFor("scene");
+  expect([scene.w, scene.h]).toEqual([533, 960]);
+  // A desktop at pixel ratio 1 draws what it shows, not 960 px.
+  dpr.mockReturnValue(1);
+  const desk = tile(1118, 628);
+  const second = mount({ ...onStage, canvas: desk })!;
+  expect([desk.width, desk.height]).toEqual([1118, 628]);
+  expect(second.tick(0)).toBe(true);
+  expect([scene.w, scene.h]).toEqual([1118, 628]);
+});
+
+test("when the governor steps down, the canvas takes fewer pixels in the very task that draws it, so it is never shown cleared", () => {
+  webgl();
+  vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(3);
+  const element = tile(364, 655);
+  const live = mount({ ...onStage, canvas: element })!;
+  const scene = stageFor("scene"), seen: Array<[number, number]> = [], draw = scene.draw.bind(scene);
+  scene.draw = (...args: Parameters<typeof draw>) => { seen.push([element.width, element.height]); draw(...args); };
+  expect(live.tick(0)).toBe(true);
+  host.creatureQuality.pin(3); // 0.6 of the full size
+  expect(live.wantsFrames()).toBe(true); // asked for a frame, to size the canvas in the task that draws it
+  expect([element.width, element.height]).toEqual([533, 960]); // not yet: nothing is shown cleared in between
+  expect(live.tick(1)).toBe(true);
+  expect(seen).toEqual([[533, 960], [320, 576]]); // what the frame drew into
+  expect([scene.w, scene.h]).toEqual([320, 576]);
+  host.creatureQuality.pin(null);
+  expect(live.tick(2)).toBe(true);
+  expect(seen.at(-1)).toEqual([533, 960]);
 });

@@ -40,10 +40,23 @@ down, only the creatures it draws show the fallback.
   yet, and the publisher asks again by itself, after 1 s, doubling up to 30 s
   (`../../../state/call-surface-publisher.ts`).
 
+## What a frame costs
+
+A phone's fill rate, not the JavaScript, is what the creature's frame spends (the profile of a speaking frame at 4× CPU
+throttle is under 1 ms of script and 3–6 ms of three.js submit; the rest is the GPU's work and the copy into the canvas).
+So `quality.ts` holds the knobs: the canvas's size (`sceneSize`), the key light's shadow map (512², its filter radius in
+proportion so the soft edge keeps its size), no preserved drawing buffer, and a `Governor` the frame loop (`host.ts`)
+feeds with each frame's cost and lateness: it steps the resolution down (`TIERS`: 1, .85, .72, .6 of the full size), then
+the rate (30, 20, 15 fps, even on a 60 Hz screen) until the frames hold, and back up after a calm spell (doubling the wait
+each time a step up failed). A stage on its last rung that still costs more than a sixth of the thread spaces its frames
+out (to 500 ms), as the page's no-GPU case always did. `creatureQuality.pin(n)` fixes a rung (diagnostics, tests).
+
 ## Drawing one
 
-- **The stage** (`<CharacterAvatar scene live …>`, `framing: "scene"`): one canvas over the whole tile, 960 px tall as
-  the creator's preview, rendered at the stage's 1152 × 768 and resampled into it (the creator's `viewCam`). The camera
+- **The stage** (`<CharacterAvatar scene live …>`, `framing: "scene"`): one canvas over the whole tile, as many pixels
+  as the tile shows (CSS size × the pixel ratio, at most 2), up to the creator's 960 px tall and 900 k px (`quality.ts`
+  `sceneSize`), and the renderer is sized to that canvas, so a frame is drawn at the pixels it is shown in (the reference
+  rendered 1152 × 768 and resampled it, the creator's `viewCam`). The camera
   stands where the stage puts it: by default the reference's desktop distance (`SCENE_ZOOM`, 1.32) with the feet on the
   scene's ground line; a framing `{ zoom, lookY }` (the creator's `item.opts`) replaces it — this is where the stage's
   own framing (`fitFrame`, `capCentre`) plugs in.

@@ -234,11 +234,14 @@ export class StageFramer {
     // In the tile's px: the canvas's rows moved by where it sits in the tile; the cards' columns moved back onto it.
     const rows = (lift: number, zk: number, xa: number, xb: number): Rows => {
       xa -= dx; xb -= dx;
-      const cam = this.camera(v, { lift, zk }), shown = host.canvas, W = shown.width, H = shown.height;
+      // A trial is read at one pixel to the css px at most (rows are wanted to a px of the tile, and the readback and the
+      // scans over it cost by area): the frame is rendered as the stage renders it and resampled into the smaller canvas.
+      const cam = this.camera(v, { lift, zk }), shown = host.canvas, cssW = this.box().w, shrink = Math.min(1, cssW / shown.width) || 1;
+      const W = Math.max(1, Math.round(shown.width * shrink)), H = Math.max(1, Math.round(shown.height * shrink));
       const cv = (this.trial ??= document.createElement("canvas"));
       if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
       host.render(cam.zoom, cam.lookY, state, cv);
-      const k = W / this.box().w;
+      const k = W / cssW;
       const x0 = Math.max(0, Math.floor(xa * k)), x1 = Math.min(W, Math.ceil(xb * k));
       const d = cv.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, W, H).data;
       let low = -1, top = H, lowAny = -1;
