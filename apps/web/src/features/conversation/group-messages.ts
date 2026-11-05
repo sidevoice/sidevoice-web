@@ -13,7 +13,8 @@ export interface MessageGroupView {
   messages: ChatMessage[];
 }
 
-const GROUP_WINDOW_MS = 5 * 60 * 1000;
+/** How far apart two messages of one side may be and still be one run. */
+export const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
 function sameCalendarDay(left: number, right: number) {
   const a = new Date(left);

@@ -1,120 +1,131 @@
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Tooltip } from "../../components/ui/Tooltip";
-import { Button } from "../../components/ui/Button";
-import { ToLatestIcon, TranscriptIcon } from "../../components/ui/Icons";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ToLatestArrowIcon, TranscriptIcon } from "../../components/ui/Icons";
 import type { ChatMessage, ConversationView } from "../../state/room-types";
-import { translator, type Translate } from "../../i18n/translator";
-import { groupMessages } from "./group-messages";
-import { MessageGroup, Speaker } from "./MessageGroup";
-import { speakerName } from "./group-messages";
-import { LiveVoiceBalloon } from "../call/LiveVoiceBalloon";
-import { uiLocale } from "../../i18n/locale";
+import { translator, uiLanguage } from "../../i18n/translator";
+import { TextLayoutContext } from "./FoldedText";
+import { MessageGroup } from "./MessageGroup";
+import { transcriptBlocks } from "./transcript-blocks";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+export { dayLabel } from "./transcript-blocks";
 
-/** Today and yesterday by name, any other day by its date — with its year only when it is not this one. */
-export function dayLabel(time: number, t: Translate, now = Date.now()) {
-  const day = new Date(time).toDateString();
-  if (day === new Date(now).toDateString()) return t("messages.today");
-  if (day === new Date(now - DAY_MS).toDateString()) return t("messages.yesterday");
-  const sameYear = new Date(time).getFullYear() === new Date(now).getFullYear();
-  return new Date(time).toLocaleDateString(uiLocale(), { weekday: "long", day: "numeric", month: "long", year: sameYear ? undefined : "numeric" });
-}
+/** At the foot: within this of the list's end (the reference's 24px). There it follows the newest; above it, it keeps
+ *  its place and the way back shows. */
+export const FOOT_PX = 24;
+/** Jumping to the latest pins the list to its very foot this long, while the live turn may still grow it (T38). */
+export const PIN_MS = 900;
+/** When the smooth jump is taken to have arrived, and is set exactly at the foot. */
+export const JUMP_SETTLE_MS = 650;
 
 /** The messages with no word lit: a transcript nobody sees. */
 const unlit = (messages: ChatMessage[]) => messages.map((message) => message.karaoke ? { ...message, karaoke: null } : message);
 
+const reducedMotion = () => !!globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
 /** `visible`: the list is on screen. Hidden, it cannot scroll, so it lands on the latest message when it shows.
- *  `inCall`: the person is in the call; out of it the transcript is not shown, so neither is the working bubble. */
+ *  `inCall`: the person is in the call; out of it the transcript is not shown, so neither is the working row.
+ *
+ *  It follows the newest only while at its foot; scrolled up, it keeps its place and the way back to the latest shows,
+ *  with a dot once something new has come (T31, T38). The way back reaches the very foot and stays pinned there for
+ *  PIN_MS while the live turn grows. Each block (a day, a run) is drawn again only when what it shows changed (T40). */
 export function MessageList({ conversation: view, visible = true, inCall = true }: { conversation: ConversationView; visible?: boolean; inCall?: boolean }) {
   const t = translator();
+  const language = uiLanguage();
   const conversation = useMemo(() => inCall || !view.working ? view : { ...view, working: false }, [view, inCall]);
   // Closed, it does not follow the voice word by word: nobody sees the words light, and every step would write the text of a
   // box that has no layout. It lights them as it opens.
-  const groups = useMemo(() => groupMessages(visible ? conversation.messages : unlit(conversation.messages)), [conversation.messages, visible]);
+  const messages = useMemo(() => visible ? conversation.messages : unlit(conversation.messages), [conversation.messages, visible]);
+  const blocks = transcriptBlocks(conversation, messages, t, language);
   const viewport = useRef<HTMLDivElement>(null);
-  const nearBottom = useRef(true);
+  const content = useRef<HTMLDivElement>(null);
+  const atFoot = useRef(true);
+  const pinnedUntil = useRef(0);
   const [away, setAway] = useState(false);
+  const [fresh, setFresh] = useState(false);
+  const [width, setWidth] = useState(0);
+  const [fonts, setFonts] = useState(0);
   const lastId = conversation.messages.at(-1)?.segment || null;
-  // The dots are the agent's next run starting, so they wear its face like any run's foot.
-  const agent = conversation.working ? [...conversation.messages].reverse().find((message) => message.role === "assistant") : undefined;
-  const agentThread = agent?.thread ?? conversation.messages.at(-1)?.thread ?? null;
 
-  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+  const following = () => atFoot.current || performance.now() < pinnedUntil.current;
+  const toFoot = (behavior: ScrollBehavior = "instant") => {
+    const node = viewport.current;
+    if (node) node.scrollTo({ top: node.scrollHeight, behavior });
+  };
+  const readScroll = () => {
     const node = viewport.current;
     if (!node) return;
-    node.scrollTo({ top: node.scrollHeight, behavior });
-    nearBottom.current = true;
-    setAway(false);
+    const foot = node.scrollHeight - node.scrollTop - node.clientHeight < FOOT_PX;
+    atFoot.current = foot;
+    setAway(!foot);
+    if (foot) setFresh(false);
   };
 
-  // Anything that changes the height of the log counts, the thinking bubble included: it appeared after
-  // this ran and left the view a sliver short of the bottom, which is exactly where the dots live.
+  // Something new: at the foot (or pinned there), it is followed before it is painted; above it, the place is kept and
+  // the way back gets its dot. The live words lighting up are not new: they change no height.
   useLayoutEffect(() => {
-    if (nearBottom.current) scrollToBottom("auto");
-  }, [lastId, conversation.pendingText, conversation.pendingPhase, conversation.working, conversation.messages.length]);
+    if (following()) { toFoot(); atFoot.current = true; }
+    else setFresh(true);
+  }, [lastId, conversation.messages.length, conversation.pendingText, conversation.pendingPhase, conversation.working]);
 
   // Opening lands on the latest at once: "auto" would take the list's smooth scrolling and pass for being away.
   useLayoutEffect(() => {
-    if (visible) scrollToBottom("instant");
+    if (!visible) return;
+    toFoot("instant");
+    atFoot.current = true;
+    setAway(false);
+    setFresh(false);
   }, [visible]);
 
-  // The text box growing as it is written in takes its height from the list: whoever was at the end stays there,
-  // the latest message just above the box, as a chat keeps it.
+  // Whatever changes the height of the list or of what it holds — the text box growing as it is written in, a message
+  // opened, a reply's words wrapping as it is said — keeps whoever was at the foot there, as a chat keeps it. Its width is
+  // what each long message counts its lines at.
   useEffect(() => {
-    const node = viewport.current;
+    const node = viewport.current, inner = content.current;
     if (!node) return;
-    const observer = new ResizeObserver(() => { if (nearBottom.current) node.scrollTo({ top: node.scrollHeight, behavior: "instant" }); });
+    setWidth(node.clientWidth);
+    const observer = new ResizeObserver(() => {
+      setWidth(node.clientWidth);
+      if (following()) toFoot();
+    });
     observer.observe(node);
+    if (inner) observer.observe(inner);
     return () => observer.disconnect();
   }, []);
 
-  const cancel = <Tooltip action content={t("messages.cancel")}>
-    <Button variant="ghost" tone="danger" size="sm" className="cancel-input" onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("messages.cancel")}</Button>
-  </Tooltip>;
-  // In the person's balloon it is as quiet as on the stage: its ink, not the danger colour of a draft's.
-  const cancelInBalloon = <Tooltip action content={t("messages.cancel")}>
-    <Button variant="ghost" tone="neutral" size="sm" className="cancel-input" onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("messages.cancel")}</Button>
-  </Tooltip>;
+  // The face loads lazily: once it has, the lines are counted again.
+  useEffect(() => {
+    const faces = globalThis.document?.fonts;
+    if (!faces?.addEventListener) return;
+    const loaded = () => setFonts((n) => n + 1);
+    faces.addEventListener("loadingdone", loaded);
+    return () => faces.removeEventListener("loadingdone", loaded);
+  }, []);
+
+  const jump = () => {
+    pinnedUntil.current = performance.now() + PIN_MS;
+    atFoot.current = true;
+    setAway(false);
+    setFresh(false);
+    toFoot(reducedMotion() ? "instant" : "smooth");
+    window.setTimeout(() => { toFoot(); readScroll(); }, JUMP_SETTLE_MS);
+  };
+
+  const empty = !blocks.length;
   return (
     <div className="message-viewport-wrap">
-      <div id="messages" ref={viewport} role="log" aria-live="polite" onScroll={(event) => {
-        const node = event.currentTarget;
-        nearBottom.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80;
-        setAway(!nearBottom.current);
-      }}>
-        {!groups.length && !conversation.pendingText && !conversation.pendingPhase && !conversation.working &&
-          <div className="messages-empty"><TranscriptIcon size={28} /><p>{t("messages.empty")}</p></div>}
-        {groups.map((group, index) => {
-          // A run never spans two days (groupMessages), so a day's first run is where its name goes.
-          const day = new Date(group.messages[0].time).toDateString();
-          const newDay = index === 0 || day !== new Date(groups[index - 1].messages[0].time).toDateString();
-          return (
-            <Fragment key={group.id}>
-              {newDay && <p className="message-day">{dayLabel(group.messages[0].time, t)}</p>}
-              <MessageGroup group={group} />
-            </Fragment>
-          );
-        })}
-        {conversation.pendingText && <div className="message-group live-draft" data-role="user"><div className="chat-message-row">
-          <article className="chat-bubble" data-role="user" data-position="only" data-draft="true">
-            <span>{conversation.pendingText}</span>
-            {conversation.pendingCancellable && cancel}
-          </article>
-        </div></div>}
-        {!conversation.pendingText && conversation.pendingPhase && <div className="message-group live-draft" data-role="user">
-          <div className="person-turns" data-inline="">
-            <LiveVoiceBalloon phase={conversation.pendingPhase === "transcribing" ? "transcribing" : "listening"}>{conversation.pendingCancellable && cancelInBalloon}</LiveVoiceBalloon>
+      <div id="messages" ref={viewport} role="log" aria-live="polite" onScroll={readScroll}>
+        <TextLayoutContext.Provider value={width ? width + fonts / 1000 : 0}>
+          <div className="messages-content" ref={content}>
+            {empty && <div className="messages-empty"><TranscriptIcon size={28} /><p>{t("messages.empty")}</p></div>}
+            {blocks.map((block) => block.kind === "day"
+              ? <p className="message-day" key={block.key}>{block.label}</p>
+              : <MessageGroup key={block.key} run={block.run} sig={block.sig} />)}
           </div>
-        </div>}
-        {conversation.working && <div className="message-group live-draft" data-role="assistant"><div className="chat-message-row">
-          <Speaker name={agent ? speakerName(agent, t) : ""} thread={agentThread} />
-          <article className="chat-bubble thinking" data-role="assistant" data-position="only" aria-label={t("messages.thinking")}><span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span></article>
-        </div></div>}
+        </TextLayoutContext.Provider>
       </div>
-      {away && <Button variant="secondary" size="icon-sm" className="latest-jump" aria-label={t("messages.toLatest")} title={t("messages.toLatest")} onClick={() => scrollToBottom()}>
-        <ToLatestIcon />
-      </Button>}
+      <button type="button" className="latest-jump" data-show={away || undefined} data-new={away && fresh || undefined}
+        aria-hidden={!away || undefined} tabIndex={away ? undefined : -1} aria-label={t("messages.toLatest")} title={t("messages.toLatest")} onClick={jump}>
+        <ToLatestArrowIcon />
+      </button>
     </div>
   );
 }

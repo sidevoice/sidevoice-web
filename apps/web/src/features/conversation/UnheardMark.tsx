@@ -1,26 +1,33 @@
-import { useState, type ReactNode } from "react";
-import { CutMoreIcon, UnplayedIcon } from "../../components/ui/Icons";
+import { useState } from "react";
+import { NotPlayedIcon, UnfoldIcon } from "../../components/ui/Icons";
 import { translator } from "../../i18n/translator";
 import type { ChatMessage } from "../../state/room-types";
-import { MessageBubble } from "./MessageBubble";
+import { speakerName } from "./group-messages";
+import { ListenAgain } from "./ListenAgain";
+import { MessageTime, type BubblePosition } from "./MessageBubble";
 
-/** A reply that never played: one quiet row in the run in place of its balloon. At rest the blocked-speaker icon and the
- *  first words; on hover or focus the icon becomes an arrow and the row says what it is. Opened, the reply is a balloon
- *  like any other under the row, and the arrow points down. */
-export function UnheardMark({ message }: { message: ChatMessage }) {
+/** A reply that never played ('bubble-badge', T49–T57). Folded, a grey bubble with the struck circle and its first line,
+ *  and nothing else; on hover or focus the circle turns into the arrow (production's morph). A click opens it into a muted
+ *  bubble of its own, "Not played" over its words and its time and replay at its foot; the arrow, turned down, folds it
+ *  again. The whole mark takes the click, as the reference's does; its toggle is the arrow's button, which says what it
+ *  does. */
+export function UnheardMark({ message, position }: { message: ChatMessage; position: BubblePosition }) {
   const t = translator();
   const [open, setOpen] = useState(false);
   const label = t("messages.audio.notPlayed");
   const action = t(open ? "messages.unheard.hide" : "messages.unheard.show");
-  const icon = <span className="unheard-icon" aria-hidden="true"><UnplayedIcon className="unheard-blocked" size={16} /><CutMoreIcon className="unheard-chevron" size={16} /></span>;
-  const toggle = (children: ReactNode) => <button type="button" className="unheard-mark" aria-expanded={open} aria-label={`${label} · ${action}`} onClick={() => setOpen(!open)}>
-    {icon}{children}
-  </button>;
-  // Opened, the reply is a balloon exactly like the others, with the row's title as its header line.
-  if (open) return <div className="unheard" data-open data-segment={message.segment || undefined}>
-    <MessageBubble message={{ ...message, hearing: "heard" }} position="first" header={<div className="unheard-header">{toggle(<span className="unheard-label" aria-hidden="true">{label}</span>)}</div>} />
-  </div>;
-  return <div className="unheard" data-segment={message.segment || undefined}>
-    {toggle(<><span className="unheard-snippet">{message.text}</span><span className="unheard-label" aria-hidden="true">{label}</span></>)}
-  </div>;
+  const replay = message.replayable && message.playback !== "playing" && message.playback !== "pending";
+  return <article className="chat-bubble unheard" data-role="assistant" data-position={position} data-open={open || undefined} data-segment={message.segment || undefined}
+    aria-label={t("messages.message", { name: speakerName(message, t), text: message.text })}>
+    <div className="unheard-mark" onClick={() => setOpen(!open)}>
+      <button type="button" className="unheard-toggle" aria-expanded={open} aria-label={`${label} · ${action}`}>
+        <NotPlayedIcon className="unheard-blocked" /><UnfoldIcon className="unheard-chevron" />
+      </button>
+      {open && <span className="unheard-badge" aria-hidden="true">{label}</span>}
+      <span className="unheard-snippet">{message.text}</span>
+    </div>
+    {open && <span className="chat-meta"><MessageTime time={message.time} />{replay && <ListenAgain message={message} />}</span>}
+    {open && message.deliveryNote && <span className="chat-audio-note">{message.deliveryNote}</span>}
+    {open && message.audioNote && <span className="chat-audio-note">{message.audioNote}</span>}
+  </article>;
 }

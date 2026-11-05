@@ -168,7 +168,9 @@ function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, 
   useEffect(() => { creature.current?.setMoving(moving); }, [moving, drawn, seed, framing]);
   // A still face: its state's expression (the card's states row, T34), surprised while it has something unread.
   const expr = state.unread ? ATTENTION_EXPR : STILL_EXPR[mood];
-  useEffect(() => {
+  // Before paint: a face already rendered is put at once (drawFace), so a face newly mounted never shows blank for a
+  // frame (the transcript's, as its run moves on: T40).
+  useLayoutEffect(() => {
     const element = canvas.current;
     if (drawn || !element || !host) return;
     return host.drawFace(element, seed, expr);

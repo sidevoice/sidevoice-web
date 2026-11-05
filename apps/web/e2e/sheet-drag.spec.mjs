@@ -22,7 +22,8 @@ async function joined(page) {
 async function openTranscript(page) {
   await page.locator("#transcript-toggle").click();
   await expect(page.locator("#transcript[data-open]")).toBeVisible();
-  await expect.poll(() => page.locator("#transcript").evaluate((node) => node.getBoundingClientRect().top)).toBeLessThan(200);
+  // Risen: the sheet is 76% of the screen tall (the creature redesign's transcript), its top a quarter of the way down.
+  await expect.poll(() => page.locator("#transcript").evaluate((node) => node.getBoundingClientRect().top)).toBeLessThan(844 * 0.25);
 }
 
 /** Drags from the middle of `selector` by `dy` px in `steps` moves `stepMs` apart, holds `holdMs`, and lets go.
@@ -112,7 +113,9 @@ test.describe("the transcript sheet, on a phone", () => {
   test("the messages scroll as their own, away from the top; from the top they drag the sheet", async ({ page }) => {
     // Enough to scroll: a tall block at the end of the list, the list scrolled part-way down.
     await page.locator("#messages").evaluate((list) => {
-      const tall = document.createElement("div"); tall.id = "tall"; tall.style.height = "3000px"; list.append(tall); list.style.scrollBehavior = "auto"; list.scrollTop = 600;
+      // In the messages' own column, where a message would be (the list is a column whose newest sits at its foot).
+      const tall = document.createElement("div"); tall.id = "tall"; tall.style.height = "3000px"; tall.style.flex = "none";
+      (list.querySelector(".messages-content") ?? list).append(tall); list.style.scrollBehavior = "auto"; list.scrollTop = 600;
     });
     const scrolled = await drag(page, "#tall", 300, { kind: "touch", holdMs: 150 });
     expect(scrolled.prevented).toBe(false);

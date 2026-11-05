@@ -11,14 +11,15 @@ const view = (messages: ChatMessage[], pendingText = ""): ConversationView => ({
 
 afterEach(() => { delete window.sidevoiceActions; });
 
-test("renders consecutive incoming messages as one chat-style run, its face once at the foot and no names", () => {
+test("renders consecutive incoming messages as one chat-style run, its face once over its foot and no names", () => {
   const { container } = render(<MessageList conversation={view([message({ segment: "a" }), message({ segment: "b", text: "Sigo", time: base + 1_000 }), message({ segment: "c", role: "user", name: "Tú", text: "Vale", time: base + 2_000 })])} />);
   expect(container.querySelectorAll(".message-group")).toHaveLength(2);
   const rows = container.querySelectorAll('.message-group[data-role="assistant"] .chat-message-row');
-  expect(rows[0].firstElementChild).toHaveClass("chat-avatar-spacer");
-  expect(rows[1].firstElementChild).toHaveClass("ui-avatar");
-  expect(container.querySelectorAll('.message-group[data-role="assistant"] .ui-avatar')).toHaveLength(1);
-  expect(container.querySelector('.message-group[data-role="user"] .ui-avatar, .message-group[data-role="user"] .chat-avatar-spacer')).toBeNull();
+  // The face takes no room (T41): every row of the run starts at one edge, the face floats over the run, once.
+  for (const row of rows) expect(row.children).toHaveLength(1);
+  expect(container.querySelectorAll('.message-group[data-role="assistant"] > .chat-face')).toHaveLength(1);
+  expect(container.querySelector('.message-group[data-role="assistant"] > .chat-face .sv-avatar[data-style="creature"]')).not.toBeNull();
+  expect(container.querySelector('.message-group[data-role="user"] .chat-face')).toBeNull();
   // The run's foot is its tight corner; the name is only for screen readers.
   expect(rows[1].querySelector(".chat-bubble")).toHaveAttribute("data-position", "last");
   expect(screen.queryByText("Agente")).toBeNull();
@@ -48,16 +49,20 @@ test("a day further back reads as its date, with its year only when it is not th
   expect(dayLabel(new Date(2025, 11, 31).getTime(), t, now)).toContain("2025");
 });
 
-test("the thinking dots start the agent's next run, wearing its face", () => {
+test("working is a quiet row starting the agent's next run, wearing its face, in place of the thinking dots", () => {
   const { container } = render(<MessageList conversation={{ ...view([message({ segment: "u", role: "user", name: "Tú", text: "¿Y ahora?" })]), working: true }} />);
-  const thinking = container.querySelector(".chat-bubble.thinking")!;
-  expect(thinking).toHaveAccessibleName("The conversation is working on your message");
-  expect(thinking.previousElementSibling).toHaveClass("ui-avatar", "chat-character");
+  const working = container.querySelector(".chat-bubble.working")!;
+  expect(working).toHaveAccessibleName("The conversation is working on your message");
+  expect(working.textContent).toBe("Working...");
+  const run = working.closest(".message-group")!;
+  expect(run).toHaveAttribute("data-role", "assistant");
+  expect(run.querySelector(":scope > .chat-face")).not.toBeNull();
+  expect(container.querySelector(".thinking-dots")).toBeNull();
 });
 
 test("out of the call the thinking dots are not shown, and the empty state is", () => {
   const { container } = render(<MessageList inCall={false} conversation={{ ...view([]), working: true }} />);
-  expect(container.querySelector(".chat-bubble.thinking")).toBeNull();
+  expect(container.querySelector(".chat-bubble.working")).toBeNull();
   expect(container.querySelector(".messages-empty")).not.toBeNull();
 });
 
@@ -155,27 +160,30 @@ test("keeps the active transcribed draft cancellable after listening text disapp
   expect(cancelInput).toHaveBeenCalledOnce();
 });
 
-test("the open turn is the stage's person balloon, with cancelling in its own row inside it", () => {
+test("the open turn, without streaming, is a pill: the microphone, its bars and the round × that takes it back", () => {
   const { container } = render(<MessageList conversation={{ messages: [], pendingText: "", pendingCancellable: true, pendingPhase: "listening" }} />);
-  const bubble = container.querySelector(".person-turns[data-inline] > .speech-bubble.person-bubble[data-live]");
-  expect(bubble?.querySelector(".voice-wave .voice-wave-bars")).toBeInTheDocument();
-  expect(bubble?.querySelector(".person-live-actions .cancel-input")?.textContent).toBe("Cancel sending");
-  expect(bubble?.querySelector(".balloon-tail")).toBeInTheDocument();
-  expect(container.querySelector(".chat-bubble")).toBeNull();
-  expect(container.querySelector(".empty")).toBeNull();
+  const pill = container.querySelector(".message-group[data-role=user] .chat-bubble.turn-pill[data-phase=listening]");
+  expect(pill?.querySelectorAll(".turn-bars i")).toHaveLength(5);
+  expect(screen.getByRole("status")).toHaveAttribute("aria-label", "Listening");
+  const cancel = screen.getByRole("button", { name: "Cancel sending" });
+  expect(cancel).toHaveClass("turn-cancel");
+  expect(cancel.textContent).toBe("");
+  expect(container.querySelectorAll(".chat-bubble")).toHaveLength(1);
+  expect(container.querySelector(".messages-empty")).toBeNull();
 });
 
-test("transcribing keeps one bubble and says so, so both phases stay apart", () => {
+test("transcribing keeps one pill and says so, so both phases stay apart", () => {
   const { container } = render(<MessageList conversation={{ messages: [], pendingText: "", pendingCancellable: true, pendingPhase: "transcribing" }} />);
-  expect(container.querySelectorAll(".person-bubble")).toHaveLength(1);
-  expect(container.querySelector(".voice-wave")?.getAttribute("data-phase")).toBe("transcribing");
+  expect(container.querySelectorAll(".turn-pill")).toHaveLength(1);
+  expect(container.querySelector(".turn-pill")?.getAttribute("data-phase")).toBe("transcribing");
+  expect(container.querySelector(".turn-bars")).toBeNull();
   expect(screen.getByRole("status")).toHaveAttribute("aria-label", "Transcribing what you said");
+  expect(screen.getByRole("status").textContent).toBe("Transcribing...");
 });
 
 test("once the transcript arrives the bubble becomes the text and the waveform goes", () => {
   const { container } = render(<MessageList conversation={{ messages: [], pendingText: "Estoy diciendo esto", pendingCancellable: true, pendingPhase: "listening" }} />);
-  expect(container.querySelector(".voice-wave")).toBeNull();
-  expect(container.querySelector(".person-bubble")).toBeNull();
+  expect(container.querySelector(".turn-pill")).toBeNull();
   expect(screen.getByText("Estoy diciendo esto")).toBeInTheDocument();
 });
 
@@ -236,9 +244,9 @@ test("a delivery status this version does not know shows no mark, never the warn
     message({ segment: "u2", role: "user", name: "Tú", text: "Dos", delivery: "not_sent", time: base + 1_000 }),
     message({ segment: "u3", role: "user", name: "Tú", text: "Tres", delivery: "read", time: base + 2_000 }),
   ])} />);
-  const marks = [...container.querySelectorAll(".receipt.delivery")].map((mark) => mark.getAttribute("data-state"));
+  const marks = [...container.querySelectorAll(".chat-receipt.delivery")].map((mark) => mark.getAttribute("data-state"));
   expect(marks).toEqual(["not_sent", "read"]);
-  expect(screen.getByRole("article", { name: /Uno/ }).querySelector(".receipt")).toBeNull();
+  expect(screen.getByRole("article", { name: /Uno/ }).querySelector(".chat-receipt")).toBeNull();
 });
 
 test("a reply whose audio status this version does not know is drawn as plain text, and listening again stays the room's call (core#112)", () => {
@@ -250,38 +258,49 @@ test("a reply whose audio status this version does not know is drawn as plain te
 const LONG = "I fixed the clock fixture and the suite passes. Tell me if you want it in its own commit.";
 const CUT_AT = "I fixed the clock fixture".length;
 
-test("a reply cut part-way shows what was heard and a cut marker, the rest folded until it is opened", () => {
+test("a reply cut part-way shows what was heard, the mark at the cut, the rest it never got to and the Interrupted tag", () => {
   const { container } = render(<MessageList conversation={view([message({ segment: "cut", text: LONG, hearing: "partial", heard_chars: CUT_AT, interrupted: true })])} />);
-  expect(container.querySelector(".cut-heard")?.textContent).toBe("I fixed the clock fixture");
-  expect(container.querySelector(".cut-rest")).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Interrupted · Show the rest" }));
-  expect(container.querySelector(".cut-rest")?.textContent).toBe("and the suite passes. Tell me if you want it in its own commit.");
-  fireEvent.click(screen.getByRole("button", { name: "Interrupted · Hide the rest" }));
-  expect(container.querySelector(".cut-rest")).toBeNull();
+  const cut = container.querySelector(".cut-text")!;
+  expect(cut.querySelector(".cut-heard")?.textContent).toBe("I fixed the clock fixture");
+  // The mark sits exactly where it was cut, between what was heard and the rest; the rest is there, quiet (CSS), to read.
+  expect(cut.querySelector(".cut-heard + .cut-point + .cut-rest")).not.toBeNull();
+  expect(cut.querySelector(".cut-point")).toHaveAttribute("aria-hidden", "true");
+  expect(cut.querySelector(".cut-rest")?.textContent).toBe(" and the suite passes. Tell me if you want it in its own commit.");
+  expect(cut.querySelector(".cut-tag")?.textContent).toBe("Interrupted");
+  expect(screen.queryByRole("button", { name: /Interrupted/ })).toBeNull();
 });
 
 test("a cut inside a word is carried to its end, and a cut with nothing left unheard is a whole reply", () => {
   const { container, rerender } = render(<MessageList conversation={view([message({ segment: "word", text: LONG, hearing: "partial", heard_chars: 4 })])} />);
   expect(container.querySelector(".cut-heard")?.textContent).toBe("I fixed");
   rerender(<MessageList conversation={view([message({ segment: "word", text: LONG, hearing: "partial", heard_chars: [...LONG].length })])} />);
-  expect(container.querySelector(".cut-marker")).toBeNull();
+  expect(container.querySelector(".cut-tag")).toBeNull();
 });
 
-test("a reply that never played is a small mark in the run that opens to its text, and the face stays with the balloons", () => {
+test("a reply that never played is a folded grey bubble at the run's foot that opens to its words, its badge, time and replay", () => {
   const { container } = render(<MessageList conversation={view([
     message({ segment: "a", text: "Heard first", hearing: "heard", heard_chars: 11 }),
-    message({ segment: "b", text: LONG, hearing: "not_heard", heard_chars: 0, time: base + 1_000 }),
+    message({ segment: "b", text: LONG, hearing: "not_heard", heard_chars: 0, time: base + 1_000, replayable: true }),
   ])} />);
   expect(container.querySelectorAll(".message-group")).toHaveLength(1);
-  expect(container.querySelectorAll(".chat-bubble")).toHaveLength(1);
-  // The only balloon is the run's foot, so it wears the face; the mark does not.
-  expect(container.querySelector(".chat-bubble")).toHaveAttribute("data-position", "only");
-  expect(container.querySelectorAll(".ui-avatar")).toHaveLength(1);
-  // Folded it is the row's first words; opened, the reply is a balloon like any other under the row.
-  fireEvent.click(screen.getByRole("button", { name: "Not played · Show the reply" }));
-  expect(container.querySelectorAll(".chat-bubble")).toHaveLength(2);
-  expect(screen.getByRole("article", { name: `Agente: ${LONG}` })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Not played · Hide the reply" })).toHaveAttribute("aria-expanded", "true");
+  const folded = container.querySelector(".chat-bubble.unheard")!;
+  // The run's foot, so it is tucked and the face floats over it, once.
+  expect(folded).toHaveAttribute("data-position", "last");
+  expect(container.querySelector(".chat-bubble:not(.unheard)")).toHaveAttribute("data-position", "first");
+  expect(container.querySelectorAll(".chat-face")).toHaveLength(1);
+  // Folded: the struck circle and its first line, nothing else (no time, no replay, no badge).
+  expect(folded.querySelector(".unheard-snippet")?.textContent).toBe(LONG);
+  expect(folded.querySelector(".chat-meta, .unheard-badge, .listen-again")).toBeNull();
+  // A click anywhere on it opens it, the arrow's button says what it does.
+  fireEvent.click(folded.querySelector(".unheard-snippet")!);
+  expect(folded).toHaveAttribute("data-open");
+  expect(folded.querySelector(".unheard-badge")?.textContent).toBe("Not played");
+  expect(folded.querySelector(".chat-meta time")).not.toBeNull();
+  expect(folded.querySelector(".chat-meta .listen-again")).not.toBeNull();
+  expect(screen.getByRole("article", { name: `Agente: ${LONG}` })).toBe(folded);
+  fireEvent.click(screen.getByRole("button", { name: "Not played · Hide the reply" }));
+  expect(folded).not.toHaveAttribute("data-open");
+  expect(screen.getByRole("button", { name: "Not played · Show the reply" })).toHaveAttribute("aria-expanded", "false");
 });
 
 test("a reply that is playing keeps its whole balloon with the karaoke, whatever its earlier hearing says", () => {
@@ -294,15 +313,14 @@ test("a cut in Chinese falls on a word boundary the platform knows, not on white
   const text = "你好世界。下一句话。";
   const { container } = render(<MessageList conversation={view([message({ segment: "zh", text, hearing: "partial", heard_chars: 2 })])} />);
   expect(typeof Intl.Segmenter).toBe("function");
-  expect(container.querySelector(".cut-marker")).not.toBeNull();
+  expect(container.querySelector(".cut-tag")).not.toBeNull();
   expect(container.querySelector(".cut-heard")?.textContent).toBe("你好");
 });
 
 test("a cut in the middle of a Latin word is carried to the word's end", () => {
   const { container } = render(<MessageList conversation={view([message({ segment: "mid", text: "The migration is ready now", hearing: "partial", heard_chars: 8 })])} />);
   expect(container.querySelector(".cut-heard")?.textContent).toBe("The migration");
-  fireEvent.click(screen.getByRole("button", { name: "Interrupted · Show the rest" }));
-  expect(container.querySelector(".cut-rest")?.textContent).toBe("is ready now");
+  expect(container.querySelector(".cut-rest")?.textContent).toBe(" is ready now");
 });
 
 test("a never-played reply's opened mark keeps listen again and its failure explanation", () => {

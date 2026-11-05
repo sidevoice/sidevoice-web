@@ -50,9 +50,9 @@ test("the decided palette: the agent a white card (soft cards, 2026-10-14), the 
   assert.equal(resolve("dark")["--sv-chat-person-fg"], "#ffffff");
 });
 
-test("the person's bubble on the stage and in the transcript are one rule, on the chat's tokens", () => {
+test("the person's bubble on the stage is one rule on the chat's tokens; the transcript's are the stage cards' white", () => {
   const transcript = read("features/conversation/transcript.css");
-  const shared = transcript.slice(transcript.indexOf('.chat-bubble[data-role="user"], .person-bubble {'));
+  const shared = transcript.slice(transcript.indexOf(".person-bubble {"));
   const body = shared.slice(0, shared.indexOf("}"));
   assert.match(body, /background: var\(--sv-chat-person-bg\)/);
   assert.match(body, /--sv-text: var\(--sv-chat-person-fg\)/);
@@ -62,4 +62,7 @@ test("the person's bubble on the stage and in the transcript are one rule, on th
   const bubble = stage.slice(stage.indexOf(".person-bubble {"), stage.indexOf("}", stage.indexOf(".person-bubble {")));
   assert.doesNotMatch(bubble, /background|(^|[^-])color:/);
   assert.doesNotMatch(theme + transcript + stage, /--sv-bubble-(agent|self)/);
+  // The transcript's messages, the person's as the agent's, are the stage's cards in a bubble's shape (T40): white.
+  assert.doesNotMatch(transcript, /\.chat-bubble\[data-role="user"\][^{]*\{[^}]*--sv-chat-person-bg/);
+  assert.match(transcript, /--tr-bubble: #fff;/);
 });

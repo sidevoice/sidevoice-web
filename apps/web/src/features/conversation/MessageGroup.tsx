@@ -1,42 +1,54 @@
+import { memo } from "react";
 import { Avatar } from "../../components/ui/Avatar";
 import { avatarFor } from "../avatar/avatar-spec";
 import { stillAvatar } from "../avatar/avatar-state";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
+import { creatureFromSeed } from "../avatar/creature/catalogue";
 import { translator } from "../../i18n/translator";
-import { speakerName, type MessageGroupView } from "./group-messages";
-import { MessageBubble } from "./MessageBubble";
+import { speakerName } from "./group-messages";
+import { DraftBubble, TurnPill, WorkingRow } from "./LiveRows";
+import { MessageBubble, type BubblePosition } from "./MessageBubble";
 import { UnheardMark } from "./UnheardMark";
 import { hearingOf } from "./UnheardReply";
+import type { LiveRow, RunView } from "./transcript-blocks";
 
-/** The agent of a conversation wears the same face here as on the stage and in the list; a row from no known
- *  conversation keeps its initials. */
-export function Speaker({ name, thread }: { name: string; thread?: string | null }) {
-  if (!thread) return <Avatar name={name} decorative />;
-  return <span className="ui-avatar chat-character" aria-hidden="true"><CharacterAvatar spec={avatarFor(thread)} state={stillAvatar("present")} size="small" /></span>;
+/** The agent's face in the transcript ('overflow', T37, T41): its whole creature, 44px, no frame, a soft drop shadow,
+ *  floating over the foot left corner of its run's last message and taking no room. Drawn from its own render (the rig's
+ *  still face, creature/host.ts drawFace), never cropped from the stage. A run from no known conversation keeps its
+ *  initials. */
+function RunFace({ name, thread }: { name: string; thread: string | null }) {
+  return <span className="chat-face" aria-hidden="true">
+    {thread ? <CharacterAvatar spec={avatarFor(thread)} state={stillAvatar("present")} size="small" /> : <Avatar name={name} decorative />}
+  </span>;
 }
 
-/* A run of one side's messages, as a chat app draws it (2026-10-11): the agent's at the left with its face once, at
- * the run's foot, and a spacer beside the others so the run keeps one edge; the person's at the right, without one. */
-export function MessageGroup({ group }: { group: MessageGroupView }) {
+function LiveRowView({ row, position, accent }: { row: LiveRow; position: BubblePosition; accent?: string }) {
+  if (row.kind === "working") return <WorkingRow position={position} accent={accent} />;
+  if (row.kind === "turn") return <TurnPill phase={row.phase} cancellable={row.cancellable} />;
+  return <DraftBubble text={row.text} cancellable={row.cancellable} />;
+}
+
+/* A run of one side's messages, as a chat app draws it (2026-10-11): the agent's at the left, every message of the run at
+ * one edge and its face once, over the run's foot; the person's at the right. The run's last message is tucked toward
+ * its speaker, whatever it is (a reply never played, the working row). Drawn again only when what it shows changed
+ * (`sig`, transcript-blocks.ts): the live turn moving on never draws the runs above it again, and the face stays put as
+ * its run grows. */
+export const MessageGroup = memo(function MessageGroup({ run }: { run: RunView; sig: string }) {
   const t = translator();
-  const incoming = group.role === "assistant";
-  const thread = group.messages[0]?.thread;
-  // A reply that never played is a mark between the balloons, not one of them: the run's shape and its face follow the balloons.
-  const marks = group.messages.map((message) => hearingOf(message).kind === "never");
-  const balloons = group.messages.map((_, index) => index).filter((index) => !marks[index]);
-  const last = balloons.at(-1) ?? -1;
+  const total = run.messages.length + run.live.length;
+  const position = (index: number): BubblePosition => total === 1 ? "only" : index === 0 ? "first" : index === total - 1 ? "last" : "middle";
+  const accent = run.role === "assistant" && run.thread ? creatureFromSeed(run.thread).accent : undefined;
   return (
-    <section className="message-group" data-role={group.role} aria-label={t("messages.group", { name: speakerName(group, t) })}>
-      {group.messages.map((message, index) => {
-        if (marks[index]) return <div className="chat-message-row" key={message.segment || `${message.time}-${index}`}><span className="chat-avatar-spacer" aria-hidden="true" /><UnheardMark message={message} /></div>;
-        const position = balloons.length === 1 ? "only" : index === balloons[0] ? "first" : index === last ? "last" : "middle";
-        return (
-          <div className="chat-message-row" key={message.segment || `${message.time}-${index}`}>
-            {incoming && (index === last ? <Speaker name={speakerName(group, t)} thread={thread} /> : <span className="chat-avatar-spacer" aria-hidden="true" />)}
-            <MessageBubble message={message} position={position} />
-          </div>
-        );
-      })}
+    <section className="message-group" data-role={run.role} aria-label={t("messages.group", { name: speakerName(run, t) })}>
+      {run.messages.map((message, index) => (
+        <div className="chat-message-row" key={message.segment || `${message.time}-${index}`}>
+          {hearingOf(message).kind === "never" ? <UnheardMark message={message} position={position(index)} /> : <MessageBubble message={message} position={position(index)} />}
+        </div>
+      ))}
+      {run.live.map((row, index) => (
+        <div className="chat-message-row" key={"live-" + row.kind}><LiveRowView row={row} position={position(run.messages.length + index)} accent={accent} /></div>
+      ))}
+      {run.role === "assistant" && <RunFace name={speakerName(run, t)} thread={run.thread} />}
     </section>
   );
-}
+}, (before, after) => before.sig === after.sig);
