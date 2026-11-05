@@ -12,6 +12,10 @@ import type { MessageKey, Translate } from "../../i18n/translator";
 
 /** What every screen showing the status is told, so they all show the same one. */
 const shown = new Set<(value: MediaDuckStatus) => void>();
+/** The latest request per lane, across every screen: an answer is shown everywhere, so a late one from any screen must not
+ *  undo a newer request made on another (a read on focus answering after the Call row's choice). */
+const latest: Record<string, number> = {};
+const next = (lane: string) => (latest[lane] = (latest[lane] ?? 0) + 1);
 
 /** `host().mediaDuck`'s status, read as the screen shows and again whenever the person comes back to this window: they may
  *  have answered the system's question, or opened Music, in between. Only the answer to the latest request is kept (one
@@ -25,15 +29,13 @@ export function useMediaDuck() {
   const [status, own] = useState<MediaDuckStatus | null>(null);
   useEffect(() => { shown.add(own); return () => { shown.delete(own); }; }, []);
   const setStatus = (value: MediaDuckStatus) => { for (const show of shown) show(value); };
-  const latest = useRef<Record<string, number>>({});
-  const next = (lane: string) => (latest.current[lane] = (latest.current[lane] ?? 0) + 1);
   const [unread, setUnread] = useState(false);
   useEffect(() => {
     if (!bridge) return;
     let gone = false;
     const read = () => {
       const id = next("status");
-      void bridge.get().then((value) => { if (!gone && id === latest.current.status) setStatus(value); }, () => { if (!gone) setUnread(true); });
+      void bridge.get().then((value) => { if (!gone && id === latest.status) setStatus(value); }, () => { if (!gone) setUnread(true); });
     };
     const visible = () => { if (document.visibilityState === "visible") read(); };
     read();
@@ -45,7 +47,7 @@ export function useMediaDuck() {
    *  fails. */
   const run = (request: () => Promise<MediaDuckStatus>, failed?: MediaDuckStatus, lane = "status") => {
     const id = next(lane);
-    return request().then((value) => { if (id === latest.current[lane]) setStatus(value); }, () => { if (failed && id === latest.current[lane]) setStatus(failed); });
+    return request().then((value) => { if (id === latest[lane]) setStatus(value); }, () => { if (failed && id === latest[lane]) setStatus(failed); });
   };
   return { bridge, status, setStatus, run, known: !bridge || status !== null || unread };
 }

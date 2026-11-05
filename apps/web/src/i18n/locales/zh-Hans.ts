@@ -934,7 +934,7 @@ export const messages: Messages = {
   "settings.call.media.pause": "暂停",
   "settings.call.media.off": "不处理",
   "settings.call.media.level": "降低幅度",
-  "settings.call.media.levelHint": "将其他应用的音量降至原来的 50%（少许）、25%（较多），或设为静音（静音）。",
+  "settings.call.media.levelHint": "将其他应用的音量降至原来的 50%（少许）、25%（较多），或静音（静音）。",
   "settings.call.media.level.half": "少许",
   "settings.call.media.level.quarter": "较多",
   "settings.call.media.level.mute": "静音",

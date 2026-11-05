@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MediaDuckRow } from "./MediaDuckRow";
+import { useMediaDuck } from "../permissions/media-permissions";
 import { translator } from "../../i18n/translator";
 import type { MediaDuckLevel, MediaDuckMode, MediaDuckStatus } from "../../host";
 
@@ -163,4 +164,22 @@ test("Pause through the system's media controls says only players shown there ca
   inApp({ mediaDuck: bridge(status({ mode: "pause", pause: "media-controls" })) });
   render(<MediaDuckRow t={en} openPermissions={() => undefined} />);
   expect(await screen.findByText("Only players that show in the system’s media controls can be paused.")).toBeInTheDocument();
+});
+
+test("a read another screen sent before the choice, answering late, does not undo the choice anywhere", async () => {
+  const media = bridge(status());
+  inApp({ mediaDuck: media });
+  function Elsewhere() { return <output data-testid="elsewhere">{useMediaDuck().status?.mode ?? ""}</output>; }
+  render(<><Elsewhere /><MediaDuckRow t={en} openPermissions={() => undefined} /></>);
+  await screen.findByRole("radio", { name: "Lower volume" });
+  // Coming back to the window: every screen reads again, and those reads stay pending.
+  const pending: ((value: MediaDuckStatus) => void)[] = [];
+  media.get.mockImplementation(() => new Promise<MediaDuckStatus>((resolve) => { pending.push(resolve); }));
+  act(() => { window.dispatchEvent(new Event("focus")); });
+  expect(pending.length).toBeGreaterThan(1);
+  fireEvent.click(screen.getByRole("radio", { name: "Pause" }));
+  expect(await screen.findByRole("radio", { name: "Pause" })).toHaveAttribute("aria-checked", "true");
+  await act(async () => { for (const answer of pending) answer(status({ mode: "lower" })); });
+  expect(screen.getByRole("radio", { name: "Pause" })).toHaveAttribute("aria-checked", "true");
+  expect(screen.getByTestId("elsewhere")).toHaveTextContent("pause");
 });
