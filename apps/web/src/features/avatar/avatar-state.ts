@@ -55,9 +55,9 @@ export interface AvatarInputs {
 /** What every copy of a figure shows: the root's attributes (CharacterAvatar). */
 export interface AvatarState {
   mood: AvatarMood;
-  /** The working style in hand (data-work). */
+  /** The working style on the go (data-work): one of the creature's (creature/schedule.ts WORKS). */
   work?: string;
-  /** The idle step (data-idle): quiet, or a pastime; none while it sleeps or is busy. */
+  /** The idle step (data-idle): quiet, or a pastime (creature/schedule.ts PASTIMES); none while it sleeps or is busy. */
   idle?: string;
   /** For ENTER_MS after it starts listening, the mood it left (data-enter: the engine's startle), with what it had in
    *  hand still on so it can drop away. */
@@ -66,6 +66,9 @@ export interface AvatarState {
   /** When what it shows last changed, wall-clock (Date.now()): every copy runs its CSS animations from this moment (on
    *  its own document's timeline: `toTimeline`), so a copy drawn later, or in another window, moves in step with the rest. */
   since?: number;
+  /** When the working style or the pastime it shows is due to end, wall-clock (Date.now()): its spell is `until - since`
+   *  (the creature's act runs for it: creature/host.ts). None when nothing is due to change. */
+  until?: number;
 }
 
 /** A mouth level any number of copies paint from: `paint` gets every level, and 0 when it stops. */
@@ -124,7 +127,7 @@ export interface AvatarStates {
 
 const sameInputs = (a: AvatarInputs, b: AvatarInputs) => a.mood === b.mood && a.restStart === b.restStart && !!a.still === !!b.still && a.interaction === b.interaction
   && !!a.pastimes === !!b.pastimes && !!a.unread === !!b.unread && (a.voice ?? null) === (b.voice ?? null) && avatarKey(a.spec) === avatarKey(b.spec);
-const sameState = (a: Omit<AvatarState, "since">, b: AvatarState) => a.mood === b.mood && a.work === b.work && a.idle === b.idle
+const sameState = (a: Omit<AvatarState, "since" | "until">, b: AvatarState) => a.mood === b.mood && a.work === b.work && a.idle === b.idle
   && a.enter === b.enter && !!a.unread === !!b.unread;
 
 /** A set of figures, each in one state, on one clock. */
@@ -175,9 +178,11 @@ export function createAvatarStates(): AvatarStates {
     // The moment is the one every window computes alike, whenever it began to draw: when the step it shows began, or
     // else when its rest did.
     const since = begun > -Infinity ? begun : origin;
+    // When the step it shows ends: the next change, while a working style or a pastime is on.
+    const until = (working || (resting && resting !== "quiet")) && nextAt < Infinity ? nextAt : undefined;
     // `since` is the same function of (restStart, now) in every window, so a rest reset while quiet moves it too.
-    const changed = entry.state.since !== since || !sameState(next, entry.state);
-    if (changed) entry.state = { ...next, since };
+    const changed = entry.state.since !== since || entry.state.until !== until || !sameState(next, entry.state);
+    if (changed) entry.state = { ...next, since, until };
     followMouth(id, entry);
     return changed;
   }

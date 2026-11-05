@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { playbackLevel } from "../../state/playback-level";
 import { avatarFor } from "./avatar-spec";
-import { BORED_AFTER_MS, createAvatarStates, toTimeline, type AvatarInputs, type AvatarStates } from "./avatar-state";
+import { BORED_AFTER_MS, createAvatarStates, toTimeline, type AvatarInputs, type AvatarState, type AvatarStates } from "./avatar-state";
+import { IDLE_DEFS, PASTIMES, WORKS, WORK_DURATION } from "./creature/schedule";
 import { avatarRepertoire } from "./bicho-draw";
 import { ENTER_MS } from "./engine/styles/bichos";
 
@@ -43,6 +44,64 @@ test("resting, it is quiet for BORED_AFTER_MS, then goes in steps on its one clo
   expect(states.get("a")!.idle).toBe("quiet");
   // The first quiet lasts 4–10 s, then a pastime comes up (and ends in its turn).
   expect(pastimeWithin(40)).toBe(true);
+});
+
+/** Every state the figure shows over `ms` from now, on the fake clock, as its timers move it on. */
+function shown(id: string, ms: number): AvatarState[] {
+  const seen = [{ ...states.get(id)! }];
+  const stop = states.subscribe(() => seen.push({ ...states.get(id)! }));
+  vi.advanceTimersByTime(ms);
+  stop();
+  return seen;
+}
+
+test("at work, a creature takes the design reference's styles in turn, each for its spell (until - since), never twice running", () => {
+  const start = Date.now();
+  states.set("a", inputs({ mood: "working", restStart: start }));
+  const steps = shown("a", 600_000);
+  expect(steps[0]).toMatchObject({ mood: "working", since: start });
+  expect(steps.length).toBeGreaterThan(20);
+  steps.forEach((step, i) => {
+    expect(WORKS).toContain(step.work);
+    const [lo, hi] = WORK_DURATION[step.work as keyof typeof WORK_DURATION];
+    const spell = (step.until! - step.since!) / 1000;
+    expect(spell).toBeGreaterThanOrEqual(lo - 0.001);
+    expect(spell).toBeLessThanOrEqual(hi + 0.001);
+    // each style ends exactly when the next begins, and the next is another
+    if (i) { expect(step.since).toBe(steps[i - 1].until); expect(step.work).not.toBe(steps[i - 1].work); }
+  });
+});
+
+test("resting, after BORED_AFTER_MS a creature's quiet and its pastimes take turns, each pastime for its spell, never the last one again", () => {
+  const start = Date.now();
+  states.set("a", inputs({ restStart: start }));
+  const steps = shown("a", 900_000);
+  // quiet with nothing due until bored; the first change is at BORED_AFTER_MS + the first quiet spell
+  expect(steps[0]).toMatchObject({ idle: "quiet", until: undefined });
+  const pastimes = steps.filter((step) => step.idle !== "quiet");
+  expect(pastimes.length).toBeGreaterThan(12);
+  expect(pastimes[0].since! - start).toBeGreaterThanOrEqual(BORED_AFTER_MS + IDLE_DEFS.quiet[0] * 1000 - 1);
+  expect(pastimes[0].since! - start).toBeLessThanOrEqual(BORED_AFTER_MS + IDLE_DEFS.quiet[1] * 1000 + 1);
+  pastimes.forEach((step, i) => {
+    expect(PASTIMES).toContain(step.idle);
+    const [lo, hi] = IDLE_DEFS[step.idle as keyof typeof IDLE_DEFS];
+    const spell = (step.until! - step.since!) / 1000;
+    expect(spell).toBeGreaterThanOrEqual(lo - 0.001);
+    expect(spell).toBeLessThanOrEqual(hi + 0.001);
+    if (i) expect(step.idle).not.toBe(pastimes[i - 1].idle);
+  });
+  // between two pastimes, quiet (4–10 s), with nothing of its own due
+  steps.forEach((step, i) => {
+    if (i && step.idle !== "quiet") expect(steps[i - 1].idle).toBe("quiet");
+    if (step.idle === "quiet") expect(step.until).toBeUndefined();
+  });
+});
+
+test("present it is awake and quiet, nothing on the go however long; offline nothing at all", () => {
+  states.set("a", inputs({ mood: "present" }));
+  expect(shown("a", 120_000).every((step) => step.idle === "quiet" && step.work === undefined && step.until === undefined)).toBe(true);
+  states.set("a", inputs({ mood: "offline" }));
+  expect(shown("a", 120_000).every((step) => step.idle === undefined && step.work === undefined)).toBe(true);
 });
 
 test("a figure no copy draws moving rests quiet however long; drawn moving, it goes by the time since its rest began", () => {

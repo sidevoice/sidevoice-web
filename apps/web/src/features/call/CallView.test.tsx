@@ -130,7 +130,7 @@ test("the stage plays what the agent says as a karaoke bubble, the whole reply i
   expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "working");
   expect(document.querySelector(".stage-desk")).toBeNull();
   expect(stageAgent()).not.toHaveAttribute("data-desk");
-  expect(stageAgent().getAttribute("data-work")).toMatch(/^(crank|hammer|read|type)$/);
+  expect(stageAgent().getAttribute("data-work")).toMatch(/^(crank|hammer|files|type|think)$/);
   expect(stageAgent()).toHaveAttribute("data-mood", "working");
   expect(stageAgent()).not.toHaveAttribute("data-idle");
 
@@ -396,7 +396,7 @@ test("the stage's agent and its thumbnails are one creature in one state: rest a
   expect(inStep(login)).toContain("data-enter=null");
   // It works: the same tool in every hand, swapped in every hand.
   patch(store, { userLive: false, userTurn: null, pendingPhase: "", harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login") } as Partial<SessionFacts>);
-  expect(attr("data-work")).toMatch(/^(crank|hammer|read|type)$/);
+  expect(attr("data-work")).toMatch(/^(crank|hammer|files|type|think)$/);
   inStep(login);
   tick(31_000);
   inStep(login);

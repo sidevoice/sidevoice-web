@@ -1,10 +1,9 @@
 import type { Size } from "./engine/core";
-import { IDLE_STYLES, type Idle } from "./engine/bichos/idle";
 import type { Spec } from "./engine/bichos/kit";
 import { renderSpec } from "./engine/bichos/render";
 import { normalizeSpec } from "./engine/bichos/spec";
-import { WORKS, type Work } from "./engine/bichos/work";
 import { creatureFromSeed } from "./creature/catalogue";
+import { PASTIMES, WORKS } from "./creature/schedule";
 import { renderMascot } from "./engine/styles/bichos";
 import { avatarKey, type AvatarSpec } from "./avatar-spec";
 
@@ -26,11 +25,10 @@ export interface Drawing {
   html: string;
   /** The figure's main colour. */
   tone: string;
-  /** The working styles it can take (work.ts): none for the mascot, which keeps the classic crank. */
-  works: readonly Work[];
-  /** The idle steps it can take (idle.ts: quiet and the pastimes that suit it); none for the person or the mascot,
-   *  who keep the old sleep. */
-  idles: readonly Idle[];
+  /** The working styles it can take: none for the person or the mascot, which keeps the classic crank. */
+  works: readonly string[];
+  /** The idle steps it can take: none for the person or the mascot, who keep the old sleep. */
+  idles: readonly string[];
 }
 
 const people = new Map<string, Spec>();
@@ -81,11 +79,10 @@ function cached(spec: DrawnSpec, size: AvatarSize): Drawing {
 /** The main colour of `spec`'s figure (the same at every size): a creature's body colour. */
 export const avatarColor = (spec: AvatarSpec): string => (spec.kind === "bicho" ? creatureFromSeed(spec.seed).color : cached(spec, "small").tone);
 
-/** The working styles and idle steps `spec`'s figure can take (the same at every size). A creature takes every one (every
- *  act works on every body); what it draws for each comes with its acts (the moods, working styles and pastimes still to
- *  come over from the design reference), and until then the state's own motion stands for all of them. */
+/** The working styles and idle steps `spec`'s figure can take (the same at every size). A creature takes every one of the
+ *  design reference's (creature/schedule.ts: every act works on every body); the person and the mascot none. */
 export function avatarRepertoire(spec: AvatarSpec): Pick<Drawing, "works" | "idles"> {
-  if (spec.kind === "bicho") return { works: WORKS, idles: IDLE_STYLES };
+  if (spec.kind === "bicho") return { works: WORKS, idles: PASTIMES };
   const { works, idles } = cached(spec, "small");
   return { works, idles };
 }

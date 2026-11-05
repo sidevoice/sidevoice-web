@@ -19,7 +19,11 @@ import { creatureFromSeed, rigSpec, type CreatureChoice, type RigSpec } from "./
  *
  * A canvas that moves is drawn about 30 times a second (the creator's frame loop); one that holds still is drawn once per
  * change, in its state's key pose, as the creator draws under reduced motion. The eyes follow the pointer, or the finger
- * on touch, over the stage (the creator's gazeAt and easedGaze, T23); nothing else answers a touch. */
+ * on touch, over the stage (the creator's gazeAt and easedGaze, T23); nothing else answers a touch.
+ *
+ * What it acts out is its state and, on top, its acts (acts.js), on the rig's layers as the creator plays them: the
+ * working style or the pastime its state has on the go (`base`: avatar-state.ts picks it, by creature/schedule.ts), the
+ * busy cogs while it works (`cogs`), and a mood a host plays over all of it (`mood`). */
 
 /** The product's states, as the creator plays them (creator.js MODES): offline is the wanted poster, not the creature. */
 const MODES: Record<AvatarMood, { state?: string; voice?: boolean; enter?: boolean; poster?: boolean }> = {
@@ -38,6 +42,18 @@ export interface Framing { zoom: number; lookY: number }
 /** A scene framing by place: the creature's feet at `ground` and the top of its body (its head, without what it wears)
  *  at `crown`, both shares of the canvas's height from its top. */
 export interface FigureFraming { ground: number; crown: number }
+
+/** What it has on the go besides its state (avatar-state.ts AvatarState: work, idle, since, until): a working style
+ *  while it works, a pastime while it rests (quiet: none). */
+export interface CreatureStep {
+  work?: string;
+  idle?: string;
+  /** When it began, wall-clock (Date.now()): the act's clock starts there, so a copy drawn later shows the same moment
+   *  of it. Default: now. */
+  since?: number;
+  /** When it is due to end, wall-clock: a pastime runs for its spell (the creator's dur, secs + 0.5). None: its own. */
+  until?: number;
+}
 
 /** The reference's desktop stage distance (creator.js VIEWS.desktop). */
 export const SCENE_ZOOM = 1.32;
@@ -244,8 +260,9 @@ export interface LiveOptions {
   gazeFrom?: HTMLElement | null;
   /** The voice's level now, 0..1: the agent's while it speaks, the person's while it listens. */
   level?: (mood: AvatarMood) => number;
-  /** The state it starts in (no startle for it). */
+  /** The state it starts in (no startle for it), and what it has on the go. */
   mood?: AvatarMood;
+  step?: CreatureStep;
   /** Moving (default), or holding still in its key pose. */
   moving?: boolean;
 }
@@ -266,6 +283,10 @@ export class LiveCreature {
   private lookKey = "";
   private off: Array<() => void> = [];
   private sized = "";
+  private step: CreatureStep = {};
+  /** The base act built for the step (its name and start), so the same step is not built again. */
+  private baseKey: string | null = null;
+  private moodTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(stage: RigStage, private opts: LiveOptions) {
     this.stage = stage;
@@ -273,7 +294,7 @@ export class LiveCreature {
     this.item = stage.add(rigSpec(opts.choice ?? creatureFromSeed(opts.seed)), opts.canvas, face ? { ...FACE, off: 0 } : { turn: 0, off: 0 });
     this.fit();
     this.moving = opts.moving ?? true;
-    this.setMood(opts.mood ?? "idle", false);
+    this.setMood(opts.mood ?? "idle", { step: opts.step, startle: false });
     const box = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => { this.fit(); this.hidden = false; this.poke(); });
     box?.observe(opts.canvas);
     this.off.push(() => box?.disconnect());
@@ -343,16 +364,90 @@ export class LiveCreature {
 
   private poke() { this.needDraw = true; wake(); }
 
-  /** What it acts out: the product's state. Starting to listen, it is startled for a moment (the creator's mode change). */
-  setMood(mood: AvatarMood, startle = true) {
+  /** What it acts out: the product's state, and what it has on the go (`step`: kept from before when not given). Starting
+   *  to listen, it is startled for a moment (the creator's mode change). */
+  setMood(mood: AvatarMood, { step, startle = true }: { step?: CreatureStep; startle?: boolean } = {}) {
     const was = this.mood;
     this.mood = mood;
+    if (step) this.step = step;
     const c = this.item.c, M = MODES[mood];
-    // the busy cogs: over the head in every working style (T17), none otherwise; the poster clears every act
+    // the busy cogs: over the head in every working style (T17), none otherwise; the poster clears every act (applyMode)
     const cogs = mood === "working" ? "cogs" : null;
     if (c.act("cogs") !== cogs) c.setAct("cogs", cogs);
+    if (M.poster && c.act("mood")) this.playMood(null);
+    this.syncBase();
     if (M.enter && startle && was !== mood) this.react = { expr: "surprised", hop: 1.1, t0: nowS(), until: nowS() + 0.55 };
     this.poke();
+  }
+
+  /** What it has on the go, its state unchanged. */
+  setStep(step: CreatureStep) { this.step = step; if (this.syncBase()) this.poke(); }
+
+  /** The act its state and step ask for on the base layer: the working style while it works, the pastime while it rests. */
+  private baseAct(): string | null {
+    const s = this.step;
+    if (MODES[this.mood].poster) return null;
+    const name = this.mood === "working" && s.work ? "work-" + s.work : this.mood === "idle" && s.idle && s.idle !== "quiet" ? "rest-" + s.idle : null;
+    return name && name in ACTS ? name : null;
+  }
+
+  /** Builds the base act the step asks for (the creator's setBase), its clock started where the step began; whether it
+   *  changed. */
+  private syncBase(): boolean {
+    const c = this.item.c, s = this.step, name = this.baseAct();
+    const key = name && name + "@" + (s.since ?? "");
+    if (key === this.baseKey) return false;
+    this.baseKey = key;
+    if (!name) { c.setAct("base", null); return true; }
+    // A pastime runs for its spell and half a second more: the rotation moves on first (the creator's idleStep). A working
+    // style loops until the next one; a pastime with no spell given runs its own (the creator's pinned pastime).
+    const spell = s.since != null && s.until != null ? (s.until - s.since) / 1000 : null;
+    const L = c.setAct("base", name, name.startsWith("rest-") && spell != null ? { dur: spell + 0.5 } : {});
+    if (L) {
+      // Its clock from the step's start (the same moment in every window), on the clock the frames are drawn with.
+      L.t0 = nowS() - (s.since != null ? Math.max(0, Date.now() - s.since) / 1000 : 0);
+      // The cogs came on with the work (setMood, a moment ago, not drawn yet): they turn from the same moment.
+      const cogs = c.layers.cogs;
+      if (cogs && cogs.t0 == null && name.startsWith("work-")) cogs.t0 = L.t0;
+    }
+    return true;
+  }
+
+  /** Plays a mood over whatever it is doing (the creator's playMood): for `dur` seconds (default: the mood's own, about
+   *  3 s), or until replaced (`hold`); null ends the one playing. Meant to be picked from the conversation (DESIGN.md:
+   *  "Programmatic moods"); offline (the poster) plays none. */
+  playMood(name: string | null, { dur, hold = false }: { dur?: number; hold?: boolean } = {}) {
+    clearTimeout(this.moodTimer);
+    this.moodTimer = undefined;
+    const c = this.item.c, play = !!name && name in ACTS && !MODES[this.mood].poster;
+    const L = c.setAct("mood", play ? name : null, { hold, dur });
+    // Moving, the rig ends a timed mood itself (it fades out over its last 0.35 s). Held still, no frame comes to end it
+    // (the reference's mood stayed until pressed again): it is ended here, on time.
+    if (L && !L.hold && L.dur) {
+      const it = L;
+      this.moodTimer = setTimeout(() => {
+        this.moodTimer = undefined;
+        if (this.item.c.layers.mood === it && !this.active()) { this.item.c.setAct("mood", null); this.poke(); }
+      }, L.dur * 1000);
+    }
+    this.poke();
+  }
+
+  /** The acts playing now, by layer (base, cogs, mood): their names, how far into them it is and how long they run
+   *  (seconds; null: on until replaced). */
+  acting(): Record<string, { name: string; k: number | null; dur: number | null }> {
+    const out: Record<string, { name: string; k: number | null; dur: number | null }> = {};
+    for (const [layer, L] of Object.entries(this.item.c.layers)) out[layer] = { name: L.name, k: L.t0 == null ? null : nowS() - L.t0, dur: L.hold ? null : L.dur };
+    return out;
+  }
+
+  /** Draws the frame `t` seconds into everything it acts out (its state's motion and every act from its start), at once,
+   *  whatever the clock says; `still`: its key pose, the acts at `t` (the creator's captureSheet `at`). For the lab's
+   *  comparison against the design reference at fixed times. */
+  frameAt(t: number, still = false) {
+    for (const L of Object.values(this.item.c.layers)) { if (still) L.keyAt = t; else { L.t0 = 0; delete L.keyAt; } }
+    this.needDraw = false;
+    this.draw(still ? 0 : t, still);
   }
 
   /** Moving, or holding still in its key pose (reduced motion, no GPU). */
@@ -360,6 +455,9 @@ export class LiveCreature {
 
   /** Drawn again at once (a framing or a level source changed). */
   redraw() { this.poke(); }
+
+  /** Its scene's framing is asked again (`scene`), though the canvas kept its shape: the room around it changed. */
+  reframe() { this.look = null; this.lookKey = ""; this.poke(); }
 
   private active(): boolean {
     const M = MODES[this.mood];
@@ -417,6 +515,7 @@ export class LiveCreature {
   }
 
   dispose() {
+    clearTimeout(this.moodTimer);
     lives.delete(this);
     for (const off of this.off) off();
     dispose(this.item, this.stage);
@@ -507,7 +606,7 @@ export function creatureOf(seed: string): { choice: CreatureChoice; spec: RigSpe
   return { choice, spec: rigSpec(choice) };
 }
 
-/** Every act the rig knows (ACTS): what C2 (the moods, the working styles, the pastimes) registers into. */
+/** Every act the rig knows (ACTS: the moods, the working styles, the pastimes, the cogs). */
 export const actNames = () => Object.keys(ACTS as Record<string, unknown>);
 
 /** The still face of `seed` with `expr`, once rendered (a FACE_PX square), or null where creatures cannot be drawn. */
