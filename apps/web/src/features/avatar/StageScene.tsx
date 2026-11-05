@@ -1,8 +1,8 @@
-import { useCallback, useMemo, useRef, useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useLayoutEffect, useState, useSyncExternalStore } from "react";
 import { useMotion } from "../../lib/motion";
 import { usePageTheme } from "../../lib/theme";
 import { creatureFromSeed } from "./creature/catalogue";
-import { useCreatureHost } from "./creature-loader";
+import { creatureHostNow, loadCreatureHost, watchCreatureHost } from "./creature-loader";
 import { hangOf } from "./scene/backdrops.js";
 import { posterBounty, posterSeed, type PosterWords } from "./scene/poster.js";
 import { backdropOf, SCENE_GROUND, StagePainter } from "./scene/stage-paint";
@@ -86,8 +86,11 @@ export function StageBackdrop({ seed, tone, live, feet = SCENE_GROUND, poster }:
   const choice = useMemo(() => creatureFromSeed(seed), [seed]);
   const id = useMemo(() => backdropOf(choice), [choice]);
   const moving = useMotion() === "gpu" && !!live;
-  // The portrait waits for the creature host (three.js and the rig), which the stage's creature loads anyway.
-  const { host, failed } = useCreatureHost();
+  // The portrait waits for the creature host (three.js and the rig), which the stage's creature loads anyway; a scene
+  // without a poster never asks for it.
+  const { host, failed } = useSyncExternalStore(watchCreatureHost, creatureHostNow);
+  const offline = !!poster;
+  useEffect(() => { if (offline && !creatureHostNow().host) loadCreatureHost().catch(() => {}); }, [offline]);
   const paperSeed = posterSeed(choice), bounty = poster ? posterBounty(paperSeed, poster.language) : "";
   // The words by what they say: a caller may make them afresh on each render.
   const words = poster ? JSON.stringify(poster.words) : "";

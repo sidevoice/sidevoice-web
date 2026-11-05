@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { cn } from "../../lib/cn";
 import { useMotion } from "../../lib/motion";
-import { useCreatureHost } from "./creature-loader";
+import { creatureHostNow, loadCreatureHost, watchCreatureHost } from "./creature-loader";
 import { FALLBACK_PATH } from "./creature/fallback";
 import type { MicHero } from "./creature/mic-hero";
 import { MIC_HERO, micGreyed, type MicState } from "./creature/mic-hero-spec";
@@ -17,7 +17,8 @@ export function MicrophoneHero({ state, className }: { state: MicState; classNam
   const hero = useRef<MicHero | null>(null);
   const moving = useMotion() === "gpu";
   // Its code is the creature host's chunk (three.js and the rig), loaded the first time a creature is drawn.
-  const { host, failed } = useCreatureHost();
+  const { host, failed } = useSyncExternalStore(watchCreatureHost, creatureHostNow);
+  useEffect(() => { if (!creatureHostNow().host) loadCreatureHost().catch(() => {}); }, []);
   const [down, setDown] = useState(false);
   // What it shows when its host has loaded, whatever changed in the meantime.
   const now = useRef({ state, moving });
