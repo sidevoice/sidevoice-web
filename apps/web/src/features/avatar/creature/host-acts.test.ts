@@ -54,8 +54,10 @@ test("the acts are registered: twelve moods, five working styles, nine pastimes 
   for (const r of ["stretch", "water", "juggle", "soup", "fish", "bubbles", "music", "read", "nap"]) expect(names).toContain("rest-" + r);
   for (const m of ["happy", "laugh", "love", "surprised", "angry", "sad", "confused", "dizzy", "excited", "shy", "proud", "scared"]) expect(ACTS[m].kind).toBe("mood");
   expect(names).toContain("cogs");
-  // not ported: the desk (sidevoice-web#476), the shells, the mic hero, the voice lines
-  for (const out of ["desk", "work-desk", "shell-read", "mic", "voice-lines"]) expect(names).not.toContain(out);
+  // the microphone hero's act, for mic-hero.ts (appended after the export)
+  expect(names).toContain("mic");
+  // not ported: the desk (sidevoice-web#476), the shells, the voice lines
+  for (const out of ["desk", "work-desk", "shell-read", "voice-lines"]) expect(names).not.toContain(out);
 });
 
 test("working: the cogs, then its style as the base act, both on the clock of the step's start", () => {
