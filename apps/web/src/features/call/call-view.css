@@ -49,8 +49,9 @@
  * around it (useSceneScale fits it); the canvas fills the tile. Until it is fitted it fills the slot. */
 .stage-slot { flex: 1; min-width: 0; min-height: 0; display: grid; place-items: center; }
 .stage-slot > .stage-tile { width: 100%; height: 100%; flex: none; }
-.stage-tile[data-mood] { --stage-ratio: 16 / 9; }
-@media (min-width: 900px), (min-width: 560px) and (pointer: fine) { .stage-tile[data-mood][data-app] { --stage-ratio: 3 / 2; --stage-ref: 560; } }
+/* Web (2026-11-05): any shape from a phone's portrait to 21:9, as large as the slot allows: the room there is, never a strip. */
+.stage-tile[data-mood] { --stage-ratio: 9 / 16, 21 / 9; }
+@media (min-width: 900px), (min-width: 560px) and (pointer: fine) { .stage-tile[data-mood][data-app] { --stage-ratio: 9 / 16, 21 / 9; --stage-ref: 560; } }
 @media (max-width: 559px), (max-width: 899px) and (pointer: coarse) {
   /* The phone's tile fills the stage in portrait, as the design reference's phone stage (its framing is made for that
    * room: a square left the creature a few dozen px tall under a card); its chrome keeps the sizes the square gave it,
@@ -358,7 +359,9 @@
 
 /* Over the bicho's backdrop (dark or light, whatever its seed rolled) the tile's words sit on a frosted surface of the
  * theme, so they read on any of them: the conversation's name on a phone and the agent's badge. */
-.stage-name { padding: .3em .6em; border-radius: var(--sv-radius-lg); background: color-mix(in srgb, var(--sv-surface) 84%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+/* (2026-11-05) A plain card of the theme with a hairline edge rather than a frosted haze: it sits on the scene as the
+ * stage's other cards do, without a blur bleeding round it. */
+.stage-name { padding: .35em .65em; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: color-mix(in srgb, var(--sv-surface) 62%, transparent); }
 
 /* The conversation's name and its machine, over the stage (CallStage StageName; 2026-10-15): the name in a display
  * weight, one line cut with an ellipsis; the machine a small chip with its icon, under it. The same on a desktop, above

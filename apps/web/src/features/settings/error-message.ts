@@ -101,11 +101,14 @@ const ROOM_FAILURES: Record<string, MessageKey> = {
   choose_node: "room.failure.machineAway",
   "room.replay_unavailable": "room.failure.replayUnavailable",
   "room.input_backlog_full": "room.failure.inputBacklogFull",
+  "room.browser_absent": "room.failure.deviceAbsent",
 };
 
 /** A failure of the room or a machine (a refusal, a request that never got an answer) as a person reads it. */
 export function roomFailure(error: unknown, { what = "room", generic, t = translator() }: Omit<ErrorOptions, "known"> = {}): ErrorMessage {
-  return errorMessage(error, { what, generic, t, known: (code) => ROOM_FAILURES[code] ? t(ROOM_FAILURES[code]) : null });
+  const message = errorMessage(error, { what, generic, t, known: (code) => ROOM_FAILURES[code] ? t(ROOM_FAILURES[code]) : null });
+  // The core's sentence for an absent device speaks of a "browser", which the desktop app has none of: not even as a detail.
+  return failureParts(error).code === "room.browser_absent" ? { text: message.text } : message;
 }
 
 /** A failure of the desktop app's updater (sidevoice-desktop #56: its status's `error`, or a call it rejected) as a

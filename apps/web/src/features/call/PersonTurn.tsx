@@ -5,7 +5,7 @@ import type { ConversationView } from "../../state/room-types";
 import { LiveVoiceBalloon } from "./LiveVoiceBalloon";
 import type { Translate } from "../../i18n/translator";
 import { BalloonTail } from "./BalloonTail";
-import { DeliveryMark } from "../conversation/MessageBubble";
+import { DeliveryMark, TranscriptReceipt } from "../conversation/MessageBubble";
 import { receiptView } from "../../state/room-session-state.js";
 import { PAGE_MS } from "./PagedText";
 import { SENT_LEAVING_MS, useSentTurns, type SentTurn } from "./speech-reading";
@@ -66,6 +66,7 @@ function SentBubble({ turn, delivery, cut, under, away, from, onDone, look }: { 
   if (look === "card") return (
     <div ref={box} className="vcap card person sent" data-leaving={leaving || undefined} translate="no">
       <span className="vcap-said"><span>{turn.text}</span></span>
+      {receipt && <TranscriptReceipt state={receipt} className="chat-receipt vcap-receipt" />}
     </div>
   );
   return (
@@ -96,7 +97,8 @@ export function PersonTurn({ conversation, t, look = "balloon", cut: over = fals
     if (!pending && !turns.length && !taken.leaving) return null;
     const transcribing = conversation.pendingPhase === "transcribing";
     return <>
-      {turns.map((turn) => <SentBubble key={turn.key} turn={turn} onDone={done} look="card" cut={pending || over} under={false} away={turn.thread !== conversation.thread} from={null} />)}
+      {turns.map((turn) => <SentBubble key={turn.key} turn={turn} onDone={done} look="card"
+        delivery={conversation.messages.find((message) => message.role === "user" && (message.segment ?? String(message.time)) === turn.key)?.delivery} cut={pending || over} under={false} away={turn.thread !== conversation.thread} from={null} />)}
       {(pending || taken.leaving) && (
         <div key={"live-" + taken.round} className="vcap card person pill" data-phase={transcribing ? "transcribing" : "listening"} data-leaving={taken.leaving || undefined} translate="no">
           <span className="lead">{transcribing ? <VoiceBarsIcon size={13} /> : <MicIcon />}{transcribing

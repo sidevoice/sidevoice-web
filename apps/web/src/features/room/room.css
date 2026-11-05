@@ -35,15 +35,17 @@
    connected green while the agent is reachable, blinking in the working colour while it works, none while it is offline: an
    agent that cannot receive is still connected, its slashed tray is in its state line)
    and, when the agent needs the person, the burst with its "!" at its top-right. */
-.conversation-avatar[data-pop] { width: 56px; height: 56px; overflow: visible; }
+/* Compact (operator, 2026-11-05): a 34px square, so the creature (120% of it, fit-pop.ts) stays smaller than the card's title and
+   never reaches the card's edges; the margin above is what its head stands out by. */
+.conversation-avatar[data-pop] { width: 34px; height: 34px; margin-top: 7px; overflow: visible; }
 .conversation-avatar[data-pop] .sv-avatar { position: absolute; inset: 0; width: auto; height: auto; overflow: visible; border-radius: 30%;
   background: radial-gradient(circle at 50% 70%, color-mix(in srgb, var(--av-color) 34%, transparent), var(--sv-accent-soft) 72%); }
 .conversation-avatar[data-pop] .sv-avatar[data-style="creature"] canvas { position: absolute; }
 .conversation-avatar[data-pop] .sv-avatar[data-pop="fitting"] canvas { visibility: hidden; }
 .conversation-avatar[data-pop] .creature-fallback { position: absolute; inset: 0; width: 100%; height: 100%; }
-.conversation-avatar[data-pop] .state-dot { z-index: 2; right: -3px; bottom: -3px; width: 13px; height: 13px; border-width: 2.5px; background: var(--sv-state-listening); }
+.conversation-avatar[data-pop] .state-dot { z-index: 2; right: -3px; bottom: -3px; width: 10px; height: 10px; border-width: 2px; background: var(--sv-state-listening); }
 .conversation-avatar[data-pop] .state-dot[data-kind="working"] { background: var(--sv-state-working); }
-.attention-burst { position: absolute; z-index: 3; right: -14px; top: -16px; width: 30px; height: 30px; overflow: visible; pointer-events: none;
+.attention-burst { position: absolute; z-index: 3; right: -10px; top: -12px; width: 22px; height: 22px; overflow: visible; pointer-events: none;
   transform: rotate(12deg); filter: drop-shadow(0 2px 0 rgb(42 26 64 / 25%)); }
 
 /* ----- the header: the mark, and Settings at its end */
@@ -76,7 +78,7 @@
    smaller, for an icon this small. */
 .sidebar-group-label .state-on-icon { overflow: visible; }
 .sidebar-group-label .state-on-icon-dot { width: 5px; height: 5px; border-width: 1.5px; bottom: -2px; inset-inline-end: -3px; }
-.sidebar-rows { display: grid; gap: var(--sv-space-2); min-width: 0; }
+.sidebar-rows { display: grid; gap: var(--sv-space-1-5); min-width: 0; }
 .sidebar-empty { margin: 0; padding: var(--sv-space-5); border: 1px dashed var(--sv-border-strong); border-radius: var(--sv-radius-lg); font-size: var(--sv-font-sm); line-height: 1.25rem; text-align: center; color: var(--sv-text-muted); }
 
 /* A conversation is a card, as the avatar lab draws them: its bicho on its own tint with its dot, the title, the harness
@@ -85,7 +87,7 @@
   border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface); box-shadow: var(--sv-shadow-xs);
   transition: border-color var(--sv-dur-fast) var(--sv-ease), background-color var(--sv-dur-fast) var(--sv-ease); }
 .sidebar-rows .participant-row[data-selected] { --dot-ring: var(--sv-accent-soft); border-color: color-mix(in srgb, var(--sv-accent) 55%, var(--sv-border)); background: var(--sv-accent-soft); }
-.sidebar-rows .person { display: flex; align-items: center; gap: var(--sv-space-3); flex: 1; min-width: 0; margin: 0; padding: 16px var(--sv-space-1) 8px 10px; border: 0; border-radius: inherit; background: none; color: var(--sv-text); text-align: start; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.sidebar-rows .person { display: flex; align-items: center; gap: var(--sv-space-3); flex: 1; min-width: 0; margin: 0; padding: var(--sv-space-2) var(--sv-space-1) var(--sv-space-2) 10px; border: 0; border-radius: inherit; background: none; color: var(--sv-text); text-align: start; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .sidebar-rows .person:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
 .sidebar-rows .person:not(:disabled):active { background-image: linear-gradient(var(--sv-pressed), var(--sv-pressed)); }
 .sidebar-rows .person:disabled { cursor: default; opacity: .6; }
@@ -93,8 +95,8 @@
 /* The Live Activity cards' type: DM Sans, the title bold and a touch tight, the state line medium in the secondary grey. The state
    is the dot's colour alone; its words are never coloured. */
 .sidebar-rows .person { font-family: var(--sv-font-sans); }
-.sidebar-rows .person-name { overflow: hidden; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; text-overflow: ellipsis; }
-.sidebar-rows .person-sub { min-width: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; font-weight: 500; color: var(--sv-text-muted); }
+.sidebar-rows .person-name { overflow: hidden; font-size: .875rem; line-height: 1.125rem; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; text-overflow: ellipsis; }
+.sidebar-rows .person-sub { min-width: 0; font-size: var(--sv-font-xs); line-height: 1rem; font-weight: 500; color: var(--sv-text-muted); }
 .sidebar-state { display: flex; align-items: center; gap: var(--sv-space-1-5); min-width: 0; }
 .sidebar-state svg { flex: none; }
 .sidebar-state-text { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

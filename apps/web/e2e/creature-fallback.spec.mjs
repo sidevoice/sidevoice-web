@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { installHarness } from "./harness.mjs";
+import { installHarness, stageFramed } from "./harness.mjs";
 
 /* A creature never leaves an empty box (features/avatar/creature/fallback.ts). In a browser that gives no WebGL, every
  * copy of the agent shows its fallback: its body colour in a plain outline, standing where the creature stands. When the
@@ -64,6 +64,9 @@ test("a context the browser takes away and gives back: the creature is drawn aga
   test.skip(!await page.evaluate(() => window.__contexts.length), "this browser gives no WebGL");
   const agent = page.locator(".stage-agent[data-style=creature] > canvas");
   await expect.poll(() => pixels(agent), { timeout: 15_000 }).not.toBe("");
+  // What it is drawn as is what its framing is solved to (a trial render a frame, over by itself): taken before, the pixels
+  // compared with are those of a creature about to be framed again.
+  await stageFramed(page);
   const before = await pixels(agent);
   const losing = await page.evaluate(() => {
     window.__lose = window.__contexts.map((gl) => gl.getExtension("WEBGL_lose_context"));
@@ -76,9 +79,11 @@ test("a context the browser takes away and gives back: the creature is drawn aga
   expect(await pixels(agent)).toBe(before);
   await expect(page.locator(".stage-agent")).not.toHaveAttribute("data-fallback");
   // Given back: each stage gets a new renderer (a new context), and the creature is drawn again.
-  const made = await page.evaluate(() => window.__contexts.length);
   await page.evaluate(() => window.__lose.forEach((extension) => extension?.restoreContext()));
-  await expect.poll(() => page.evaluate(() => window.__contexts.length)).toBe(made + losing);
+  // Not counted against how many were taken away: one of them was already lost when the test took them (the browser logs
+  // "context restoration not allowed" for it), and nothing gives it back. The two stages the page draws on, the creature's
+  // and the faces', each hold a context again.
+  await expect.poll(() => page.evaluate(() => window.__contexts.filter((gl) => !gl.isContextLost()).length)).toBeGreaterThanOrEqual(2);
   // The new renderer draws what the old one did: redrawn at another size, then at this one, the same pixels.
   const size = page.viewportSize();
   await page.setViewportSize({ width: size.width - 180, height: size.height + 40 });

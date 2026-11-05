@@ -1427,6 +1427,8 @@ export const messages: Messages = {
   "session.audio.reason.heard_elsewhere": "已在另一台设备上收听",
   "room.failure.replayUnavailable": "语音回复关闭或你正在说话时，无法播放。",
   "room.failure.inputBacklogFull": "待处理消息过多。请稍后重试。",
+  "room.failure.deviceAbsent": "此设备已不在通话中。点按即可重新加入。",
+  "room.failure.deviceAbsentRejoining": "此设备已不在通话中。正在重新加入…",
   "settings.developer.systemCall": "将通话视为系统通话（CallKit / Telecom）",
   "settings.developer.systemCall.hint": "开启：通话使用系统通话功能，带有锁屏卡片、通话界面以及耳机或车载按键。关闭：应用自己的通话，使用自己的通知。下次通话时生效。",
   "settings.developer.group.calls": "通话",

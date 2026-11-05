@@ -1428,6 +1428,8 @@ export const messages: Messages = {
   "session.audio.reason.heard_elsewhere": "別の端末で再生済み",
   "room.failure.replayUnavailable": "音声返信がオフの間、またはあなたが話している間は再生できません。",
   "room.failure.inputBacklogFull": "待機中のメッセージが多すぎます。少ししてから再試行してください。",
+  "room.failure.deviceAbsent": "このデバイスはもう通話に参加していません。タップすると再び参加します。",
+  "room.failure.deviceAbsentRejoining": "このデバイスはもう通話に参加していません。再参加しています…",
   "settings.developer.systemCall": "通話をシステム通話として扱う（CallKit / Telecom）",
   "settings.developer.systemCall.hint": "オン：通話はシステムの通話機能と連携し、ロック画面のカード、通話画面、ヘッドセットや車のボタンが使えます。オフ：アプリ独自の通話で、独自の通知を使います。次の通話から反映されます。",
   "settings.developer.group.calls": "通話",

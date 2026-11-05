@@ -1471,6 +1471,8 @@ export const messages = {
   "session.audio.reason.heard_elsewhere": "Heard on another device",
   "room.failure.replayUnavailable": "Playback is unavailable while spoken replies are off or you are speaking.",
   "room.failure.inputBacklogFull": "Too many messages are waiting. Try again shortly.",
+  "room.failure.deviceAbsent": "This device is no longer in the call. Tap to join again.",
+  "room.failure.deviceAbsentRejoining": "This device is no longer in the call. Joining again…",
   "settings.developer.systemCall": "Treat calls as system calls (CallKit / Telecom)",
   "settings.developer.systemCall.hint": "On: the call uses the system's calling features, with its lock screen card, in-call screen and headset or car buttons. Off: the app's own call, with its own notification. Takes effect on the next call.",
   "settings.developer.group.calls": "Calls",

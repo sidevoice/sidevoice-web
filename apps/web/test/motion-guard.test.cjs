@@ -116,8 +116,8 @@ const css = (file) => fs.readFileSync(path.join(SRC, file), "utf8").replace(/\s+
 
 test("on a phone the closed conversation list and the closed transcript run no animation", () => {
   assert.match(css("features/room/room.css"), /\.conversation-sidebar:not\(\[data-open\]\) \* \{ animation: none !important; \}/);
-  // Both of its drawers: the phone's sheet and the compact window's.
-  assert.equal(css("features/conversation/transcript.css").match(/\.call-layout > \.transcript:not\(\[data-open\]\) \* \{ animation: none !important; \}/g)?.length, 2);
+  // Its three: the phone's sheet, the compact window's drawer and the desktop's column (2026-11-05).
+  assert.equal(css("features/conversation/transcript.css").match(/\.call-layout > \.transcript:not\(\[data-open\]\) \* \{ animation: none !important; \}/g)?.length, 3);
 });
 
 test("an offline agent, drawn at opacity 0 under the wanted poster, runs no animation", () => {
