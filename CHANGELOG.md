@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.22.0](https://github.com/sidevoice/sidevoice-web/compare/v0.21.0...v0.22.0) (2026-11-05)
+
+
+### Features
+
+* **avatar:** the creature's moods, working styles and pastimes, with the reference's turn-taking ([#480](https://github.com/sidevoice/sidevoice-web/issues/480)) ([f3ad154](https://github.com/sidevoice/sidevoice-web/commit/f3ad154fd87fa87e96c8ab926f8ff47c154f39e0))
+* **avatar:** the toon backdrops, the offline wanted poster and the mic permission hero from the design reference ([#483](https://github.com/sidevoice/sidevoice-web/issues/483)) ([3265ae1](https://github.com/sidevoice/sidevoice-web/commit/3265ae1c0f52e650478809660ffad4dc139ccd1c))
+* **call:** stage framing and voice text cards from the creature design reference ([#482](https://github.com/sidevoice/sidevoice-web/issues/482)) ([f1c9bc0](https://github.com/sidevoice/sidevoice-web/commit/f1c9bc00a6def597b44519d62bddc067c9f28b60))
+* **conversation:** the transcript in the creature redesign's closed look ([#484](https://github.com/sidevoice/sidevoice-web/issues/484)) ([4cc9aa2](https://github.com/sidevoice/sidevoice-web/commit/4cc9aa281fe30a9d8f3226d67e2852327c32ee2f))
+
 ## [0.21.0](https://github.com/sidevoice/sidevoice-web/compare/v0.20.0...v0.21.0) (2026-11-05)
 
 
