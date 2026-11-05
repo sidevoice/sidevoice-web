@@ -39,6 +39,9 @@ export function MessageList({ conversation: view, visible = true, inCall = true 
   const content = useRef<HTMLDivElement>(null);
   const atFoot = useRef(true);
   const pinnedUntil = useRef(0);
+  // Where the jump's smooth scroll is set exactly at the foot: one at a time, and none outliving the list or a close.
+  const settling = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const unpin = () => { clearTimeout(settling.current); settling.current = undefined; pinnedUntil.current = 0; };
   const [away, setAway] = useState(false);
   const [fresh, setFresh] = useState(false);
   const [width, setWidth] = useState(0);
@@ -66,9 +69,10 @@ export function MessageList({ conversation: view, visible = true, inCall = true 
     else setFresh(true);
   }, [lastId, conversation.messages.length, conversation.pendingText, conversation.pendingPhase, conversation.working]);
 
-  // Opening lands on the latest at once: "auto" would take the list's smooth scrolling and pass for being away.
+  // Opening lands on the latest at once: "auto" would take the list's smooth scrolling and pass for being away. Closing
+  // lets go of a jump still under way: reopened, the list is the reader's again.
   useLayoutEffect(() => {
-    if (!visible) return;
+    if (!visible) { unpin(); return; }
     toFoot("instant");
     atFoot.current = true;
     setAway(false);
@@ -91,6 +95,8 @@ export function MessageList({ conversation: view, visible = true, inCall = true 
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => unpin, []);
+
   // The face loads lazily: once it has, the lines are counted again.
   useEffect(() => {
     const faces = globalThis.document?.fonts;
@@ -106,7 +112,8 @@ export function MessageList({ conversation: view, visible = true, inCall = true 
     setAway(false);
     setFresh(false);
     toFoot(reducedMotion() ? "instant" : "smooth");
-    window.setTimeout(() => { toFoot(); readScroll(); }, JUMP_SETTLE_MS);
+    clearTimeout(settling.current);
+    settling.current = setTimeout(() => { settling.current = undefined; toFoot(); readScroll(); }, JUMP_SETTLE_MS);
   };
 
   const empty = !blocks.length;

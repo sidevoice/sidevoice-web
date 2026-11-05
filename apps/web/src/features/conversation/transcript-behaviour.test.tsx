@@ -87,6 +87,37 @@ test("the way back reaches the very foot and stays pinned there while the live t
   expect(scrollTo).not.toHaveBeenCalled();
 });
 
+test("a jump still under way is let go of when the transcript closes: reopened and scrolled up, nothing takes the reader back to the foot", () => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  let now = 10_000;
+  vi.spyOn(performance, "now").mockImplementation(() => now);
+  const rows = [message({ segment: "a" })];
+  const { container, rerender, unmount } = render(<MessageList conversation={view(rows)} />);
+  const { box, scrollTo, scrollAt } = scroller(container);
+  scrollAt(100);
+  fireEvent.click(screen.getByRole("button", { name: "Go to the end of the conversation" }));
+  // Closed within the jump's settling time, then opened again: it lands at the foot, as an opening does.
+  now += 200;
+  rerender(<MessageList conversation={view(again(rows))} visible={false} />);
+  rerender(<MessageList conversation={view(again(rows))} visible />);
+  expect(scrollTo).toHaveBeenLastCalledWith({ top: 900, behavior: "instant" });
+  // The reader scrolls up; the old jump's settling time passes, and what comes is not followed either (not pinned).
+  scrollAt(100);
+  scrollTo.mockClear();
+  act(() => { vi.advanceTimersByTime(JUMP_SETTLE_MS); });
+  expect(scrollTo).not.toHaveBeenCalled();
+  box.height = 960;
+  rerender(<MessageList conversation={view(again(rows), { pendingPhase: "listening" })} />);
+  expect(scrollTo).not.toHaveBeenCalled();
+  expect(jump()).toHaveAttribute("data-new");
+  // Unmounted mid-jump, its settling does nothing.
+  fireEvent.click(screen.getByRole("button", { name: "Go to the end of the conversation" }));
+  unmount();
+  scrollTo.mockClear();
+  act(() => { vi.advanceTimersByTime(JUMP_SETTLE_MS); });
+  expect(scrollTo).not.toHaveBeenCalled();
+});
+
 /** Lays the transcript out: 300px wide, and each message's text on one line per 40 characters. */
 function layOut() {
   vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(300);

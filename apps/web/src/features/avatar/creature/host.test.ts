@@ -212,3 +212,26 @@ test("each stage answers for itself: the faces' renderer down leaves the stage's
   expect(await host.faceImage("t1", "neutral")).not.toBeNull();
   expect(live.tick(2)).toBe(false);
 });
+
+test("a face asked for at once is rendered before drawFace returns, kept, and painted; with its context lost it waits for it instead", () => {
+  webgl();
+  expect(host.canDrawCreatures("face")).toBe(true);
+  const painted = (element: HTMLCanvasElement) => { const calls: string[] = []; element.getContext = (() => ({ clearRect() {}, drawImage() { calls.push("drawn"); } })) as never; return calls; };
+  const first = canvas(), firstCalls = painted(first), drawn = vi.fn();
+  host.drawFace(first, "t1", "neutral", undefined, { now: true, drawn });
+  expect(rig.drawn).toEqual([{ state: "idle", expr: "neutral", still: true }]);
+  expect(firstCalls).toEqual(["drawn"]);
+  expect(drawn).toHaveBeenCalledTimes(1);
+  // Kept: the next one is put from what was rendered, not rendered again.
+  const second = canvas(); painted(second);
+  host.drawFace(second, "t1", "neutral", undefined, { now: true, drawn });
+  expect(rig.drawn).toHaveLength(1);
+  expect(drawn).toHaveBeenCalledTimes(2);
+  // A lost context renders blank: the face is queued, not painted, until the context is back.
+  lose(stageFor("face"));
+  const third = canvas(), thirdCalls = painted(third), later = vi.fn();
+  host.drawFace(third, "t1", "happy", undefined, { now: true, drawn: later });
+  expect(rig.drawn).toHaveLength(1);
+  expect(thirdCalls).toEqual([]);
+  expect(later).not.toHaveBeenCalled();
+});

@@ -14,11 +14,12 @@ import type { LiveRow, RunView } from "./transcript-blocks";
 
 /** The agent's face in the transcript ('overflow', T37, T41): its whole creature, 44px, no frame, a soft drop shadow,
  *  floating over the foot left corner of its run's last message and taking no room. Drawn from its own render (the rig's
- *  still face, creature/host.ts drawFace), never cropped from the stage. A run from no known conversation keeps its
+ *  still face, creature/host.ts drawFace), never cropped from the stage, and never blank (T40): asked for at once, its
+ *  outline standing in until it is painted (CharacterAvatar immediate). A run from no known conversation keeps its
  *  initials. */
 function RunFace({ name, thread }: { name: string; thread: string | null }) {
   return <span className="chat-face" aria-hidden="true">
-    {thread ? <CharacterAvatar spec={avatarFor(thread)} state={stillAvatar("present")} size="small" /> : <Avatar name={name} decorative />}
+    {thread ? <CharacterAvatar spec={avatarFor(thread)} state={stillAvatar("present")} size="small" immediate /> : <Avatar name={name} decorative />}
   </span>;
 }
 

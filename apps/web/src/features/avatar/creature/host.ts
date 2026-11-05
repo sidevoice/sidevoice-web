@@ -612,6 +612,17 @@ function renderFace(seed: string, expr: string, choice?: CreatureChoice): HTMLCa
   return canvas;
 }
 
+/** The face of `key`, kept once rendered (the oldest let go past FACES); null where its stage cannot draw. */
+function faceOf(key: string, seed: string, expr: string, choice?: CreatureChoice): HTMLCanvasElement | null {
+  const kept = faces.get(key);
+  if (kept) return kept;
+  const face = renderFace(seed, expr, choice);
+  if (!face) return null;
+  if (faces.size >= FACES) faces.delete(faces.keys().next().value!);
+  faces.set(key, face);
+  return face;
+}
+
 function drain() {
   queued = 0;
   // A lost context renders blank: the faces wait for it to be back (or are dropped if it is not, setDown).
@@ -619,17 +630,22 @@ function drain() {
   const until = performance.now() + 12;
   while (queue.length && performance.now() < until) {
     const job = queue.shift()!;
-    const face = faces.get(job.key) ?? renderFace(job.seed, job.expr, job.choice);
+    const face = faceOf(job.key, job.seed, job.expr, job.choice);
     if (!face) { for (const done of job.done) done(null); dropFaces(); return; }
-    if (!faces.has(job.key)) { if (faces.size >= FACES) faces.delete(faces.keys().next().value!); faces.set(job.key, face); }
     for (const done of job.done) done(face);
   }
   if (queue.length) queued = requestAnimationFrame(drain);
 }
 
+/** How a still face is drawn: `now`, rendered before drawFace returns when it is not yet (a face that must never show
+ *  blank: the transcript's, T40), rather than with the faces queued a few a frame; `drawn`, told each time the canvas
+ *  is painted with it. */
+export interface FaceDrawing { now?: boolean; drawn?: () => void }
+
 /** The still face of `seed` with `expr` (STILL_EXPR), drawn into `canvas` (a FACE_PX square) as soon as it is rendered:
- *  at once when it already is. Returns what cancels it. `choice`: a creature picked by hand, keyed by `seed`. */
-export function drawFace(canvas: HTMLCanvasElement, seed: string, expr: string, choice?: CreatureChoice): () => void {
+ *  at once when it already is. The canvas keeps what it showed until then. Returns what cancels it. `choice`: a creature
+ *  picked by hand, keyed by `seed`. */
+export function drawFace(canvas: HTMLCanvasElement, seed: string, expr: string, choice?: CreatureChoice, { now = false, drawn }: FaceDrawing = {}): () => void {
   const key = seed + "\u0000" + expr;
   const put = (face: HTMLCanvasElement | null) => {
     if (!face) return;
@@ -638,10 +654,17 @@ export function drawFace(canvas: HTMLCanvasElement, seed: string, expr: string, 
     if (!g) return;
     g.clearRect(0, 0, canvas.width, canvas.height);
     g.drawImage(face, 0, 0);
+    drawn?.();
   };
   const ready = faces.get(key);
   if (ready) { put(ready); return () => {}; }
   if (!canDrawCreatures("face")) return () => {};
+  // Asked for at once: rendered here, unless its stage's context is lost (it renders blank then: the face waits with the
+  // queued ones for the context to be back).
+  if (now && !seats.face.lost) {
+    const face = faceOf(key, seed, expr, choice);
+    if (face) { put(face); return () => {}; }
+  }
   let job = queue.find((x) => x.key === key);
   if (!job) queue.push((job = { key, seed, expr, choice, done: new Set() }));
   job.done.add(put);
