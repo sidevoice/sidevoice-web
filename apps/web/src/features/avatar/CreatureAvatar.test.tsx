@@ -16,6 +16,8 @@ const host = vi.hoisted(() => {
 });
 vi.mock("./creature/host", () => {
   return {
+    creaturesDrawable: () => true,
+    onCreaturesChange: () => () => {},
     mountCreature: (opts: Record<string, unknown>) => {
       const live = { opts, moods: [] as string[], moving: [] as boolean[], disposed: false };
       host.lives.push(live);

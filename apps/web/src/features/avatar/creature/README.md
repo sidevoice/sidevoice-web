@@ -13,11 +13,27 @@ eyes (Void, MIT: see `THIRD_PARTY_NOTICES.md`).
 | `acts.js` | the acts' shared kit and, so far, the busy cogs every working state shows. The moods, working styles and pastimes come over from the reference's `acts.js` into this file |
 | `catalogue.ts` | what a creature can be (bodies, palette, irises, slots, rarity, colour harmony) and which one a conversation gets: the creator's Random button, its `Math.random` replaced by a stream seeded with the conversation's id. No three.js |
 | `faces.ts` | how a still face looks in each state |
-| `host.ts` | where creatures are drawn: two stages per page, the live loop (about 30 frames a second), the still faces, the framings, the pointer gaze |
+| `fallback.ts` | what stands in where no creature can be drawn: the body colour in a plain outline, no face. No three.js |
+| `host.ts` | where creatures are drawn: two stages per page, the live loop (about 30 frames a second), the still faces, the framings, the pointer gaze; what happens when WebGL is missing, refused or lost |
 
 `CharacterAvatar` (`../CharacterAvatar.tsx`) draws a conversation's creature (the `bicho` kind) through `host.ts`, which
-it loads the first time a creature is drawn (the room does not wait for three.js). The person and the Sidevoice mascot
-are still the bichos engine's drawings (`../engine/`).
+it loads the first time a creature is drawn (`../creature-loader.ts`; the room does not wait for three.js). The person and
+the Sidevoice mascot are still the bichos engine's drawings (`../engine/`).
+
+## Where it cannot be drawn
+
+An agent is never an empty box. Where no creature can be drawn, `fallback.ts` stands in, with the creature's label:
+
+- **Its code did not load** (a dropped chunk): the load is not kept as failed. The next creature mounted loads it again,
+  and the ones on the page try again after 1 s, doubling up to 30 s.
+- **No WebGL, or a context refused**: the page is told (`creaturesDrawable`, `onCreaturesChange`), and a creature mounted
+  10 s later tries again.
+- **A context lost**: nothing is drawn, and each canvas keeps its last frame. When the browser gives the context back,
+  the stage gets a new renderer (same scene, camera and creatures) and everything is drawn again. If it is not back
+  within 3 s, the fallback stands in until it is.
+- **A native call surface's still** is the fallback too where creatures cannot be drawn
+  (`../../../state/call-surface-still.ts`). Where the code did not load it gives no still yet, and the publisher asks
+  again with the next change.
 
 ## Drawing one
 

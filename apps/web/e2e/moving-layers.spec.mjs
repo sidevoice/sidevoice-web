@@ -23,9 +23,12 @@ const running = (page, selector) => page.evaluate((selector) => {
   return { all: all.length, svg: all.filter((a) => a.effect.target instanceof SVGElement).length };
 }, selector);
 
-/** Whether this browser gives the page WebGL at all (the creature needs it; without it its canvas stays empty). */
+/** Whether this browser gives the page WebGL at all (the creature needs it; without it its fallback stands in). */
 const webgl = (page) => page.evaluate(() => !!document.createElement("canvas").getContext("webgl"));
-const noWebgl = (page) => test.info().annotations.push({ type: "skip-pixels", description: "this browser gives no WebGL: the creature's canvas stays empty" });
+const noWebgl = async (page) => {
+  test.info().annotations.push({ type: "skip-pixels", description: "this browser gives no WebGL: the creature's fallback stands in" });
+  await expect(page.locator(".stage-agent[data-style=creature] svg.creature-fallback")).toBeVisible();
+};
 
 /** What a canvas shows now, as a data URL; "" while it is blank. */
 const pixels = (locator) => locator.evaluate((canvas) => {
@@ -59,7 +62,7 @@ test("without the GPU the stage's agent holds still in its key pose: drawn once,
   await expect(agent).toHaveCount(1);
   const drawn = await webgl(page);
   if (drawn) await expect.poll(() => pixels(agent), { timeout: 15_000 }).not.toBe("");
-  else noWebgl(page);
+  else await noWebgl(page);
   const still = await pixels(agent);
   // Nothing runs: no CSS animation in the scene, and no animation frame asked for while nothing changes.
   expect(await running(page, ".stage-scene")).toMatchObject({ all: 0 });

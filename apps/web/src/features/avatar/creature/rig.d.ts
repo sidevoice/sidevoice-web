@@ -50,9 +50,23 @@ export interface StageItem<Spec extends object = object> {
   off: number;
 }
 
+/** What the host reads of a stage's three.js WebGLRenderer: its canvas (where the browser says the context was lost or
+ *  given back), and what lets it go when a new one takes its place. */
+export interface RigRenderer {
+  domElement: HTMLCanvasElement;
+  setSize(width: number, height: number): void;
+  getContext(): { isContextLost(): boolean };
+  forceContextLoss(): void;
+  dispose(): void;
+}
+
 /** One renderer, many creatures blitted into 2D canvases. */
 export class Stage {
   constructor(look: "paint", px?: number, mode?: "" | "wide");
+  renderer: RigRenderer;
+  /** The renderer's size: the stage's px tall, as wide as its shape. */
+  w: number;
+  h: number;
   scene: { remove(o: RigObject): void };
   camera: RigCamera;
   items: StageItem[];

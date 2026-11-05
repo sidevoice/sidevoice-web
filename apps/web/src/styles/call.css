@@ -12,7 +12,11 @@
 /* A conversation's creature: one canvas, the avatar's whole box (features/avatar/creature/host.ts draws it). Offline, a
    still face fades to grey (the floating card's states row in the design reference, T34). */
 .sv-avatar[data-style=creature] canvas { display:block;width:100%;height:100% }
-.sv-avatar[data-style=creature][data-framing=face][data-offline] canvas { filter:grayscale(1);opacity:.55 }
+.sv-avatar[data-style=creature][data-framing=face][data-offline] :is(canvas,.creature-fallback) { filter:grayscale(1);opacity:.55 }
+/* Where no creature can be drawn, its fallback (creature/fallback.ts) stands in: its body colour in a plain outline, over
+   the avatar's box (on the stage, the figure box), standing where the creature stands. */
+.sv-avatar[data-style=creature][data-fallback] > canvas { display:none }
+.creature-fallback path { fill:var(--av-color) }
 /* The engine's theme inks are the design tokens' (styles/theme.css): the Sidevoice mascot's accent and the ink on it, in
    the light theme and the dark one alike. */
 .sv-avatar[data-style=bichos] { --bx-sv:var(--sv-accent);--bx-sv-face:var(--sv-on-accent);--fg-dim:var(--sv-text-muted) }

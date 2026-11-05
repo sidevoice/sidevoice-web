@@ -50,21 +50,122 @@ const SCENE_PX = 960, FACE_PX = 144;
 type Item = StageItem<RigSpec>;
 type RigStage = Stage;
 
-let stages: { scene: RigStage; face: RigStage } | null | undefined;
-/** The page's two stages, made the first time a creature is drawn; null where WebGL cannot be had (a test's DOM, a
- *  browser without it): the avatar's canvas then stays empty. */
-function stagesOf(): { scene: RigStage; face: RigStage } | null {
-  if (stages !== undefined) return stages;
+type Stages = { scene: RigStage; face: RigStage };
+
+/* WebGL can be missing (hardware acceleration off, a test's DOM), refused (no context to be had now), or taken away (the
+ * browser loses a context on a GPU reset, or when a page holds too many). None of these leaves an avatar empty for the
+ * rest of the page's life:
+ *  - Stages that could not be made are tried again by a creature mounted a while later (RETRY_MS).
+ *  - A lost context draws nothing until the browser gives it back. Each canvas keeps its last frame meanwhile. When it is
+ *    back, the stage gets a new renderer, with the same scene, camera and creatures, and every creature is drawn again.
+ *  - A context not given back within LOST_GRACE_MS counts as missing until it is. While creatures cannot be drawn,
+ *    CharacterAvatar shows the fallback (fallback.ts), told by onCreaturesChange. */
+
+/** How each stage is made, again for a new renderer when a lost context comes back. */
+const MAKE: Record<keyof Stages, () => RigStage> = { scene: () => new Stage("paint", 768, "wide"), face: () => new Stage("paint", 256) };
+const RETRY_MS = 10_000, LOST_GRACE_MS = 3000;
+
+let stages: Stages | null = null;
+/** Stages whose context the browser took away: they draw nothing until it is back. */
+const lost = new Set<RigStage>();
+/** Creatures cannot be drawn now: no WebGL, a context refused, or one lost and not back in time. */
+let cannot = false;
+let triedAt = -Infinity, warned = false;
+let giveUp: ReturnType<typeof setTimeout> | undefined;
+const watchers = new Set<() => void>();
+const unwatch = new Map<RigStage, () => void>();
+
+function setCannot(now: boolean) {
+  if (now === cannot) return;
+  cannot = now;
+  if (cannot) dropFaces();
+  for (const watcher of watchers) watcher();
+}
+
+/** A renderer let go of: its context too, unless the browser already took it. */
+function release(renderer: Stage["renderer"]) {
+  try { if (!renderer.getContext().isContextLost()) renderer.forceContextLoss(); } catch { /* nothing left to let go */ }
+  renderer.dispose();
+}
+
+/** A new renderer for `stage`, made as the stage made its own; its scene, camera and creatures are kept. Throws where no
+ *  context can be had. */
+function renew(stage: RigStage) {
+  const fresh = MAKE[stage === stages?.scene ? "scene" : "face"]();
+  unwatch.get(stage)?.();
+  release(stage.renderer);
+  stage.renderer = fresh.renderer;
+  if (fresh.w !== stage.w || fresh.h !== stage.h) stage.renderer.setSize(stage.w, stage.h);
+  watchContext(stage);
+  lost.delete(stage);
+}
+
+function watchContext(stage: RigStage) {
+  const canvas = stage.renderer.domElement;
+  const onLost = (event: Event) => {
+    event.preventDefault(); // it is wanted back (three.js asks too)
+    lost.add(stage);
+    clearTimeout(giveUp);
+    giveUp = setTimeout(() => { giveUp = undefined; if (lost.size) { triedAt = performance.now(); setCannot(true); } }, LOST_GRACE_MS);
+  };
+  const onBack = () => {
+    try { renew(stage); } catch (error) {
+      // No new one to be had: the old renderer, which three.js has set up again on the restored context, carries on.
+      console.warn("[creature] kept the restored renderer:", error instanceof Error ? error.message : error);
+      lost.delete(stage);
+    }
+    if (lost.size) return;
+    clearTimeout(giveUp);
+    giveUp = undefined;
+    setCannot(false);
+    for (const live of lives) live.redraw();
+    if (queue.length && !queued) queued = requestAnimationFrame(drain);
+  };
+  canvas.addEventListener("webglcontextlost", onLost);
+  canvas.addEventListener("webglcontextrestored", onBack);
+  unwatch.set(stage, () => {
+    canvas.removeEventListener("webglcontextlost", onLost);
+    canvas.removeEventListener("webglcontextrestored", onBack);
+    unwatch.delete(stage);
+  });
+}
+
+/** The page's two stages, made the first time a creature is drawn; null while creatures cannot be drawn. */
+function stagesOf(): Stages | null {
+  if (stages && !cannot) return stages;
+  if (cannot && performance.now() - triedAt < RETRY_MS) return null;
+  triedAt = performance.now();
   try {
     if (typeof WebGLRenderingContext === "undefined") throw new Error("no WebGL");
-    stages = { scene: new Stage("paint", 768, "wide"), face: new Stage("paint", 256) };
+    if (!stages) {
+      const scene = MAKE.scene();
+      let face: RigStage;
+      try { face = MAKE.face(); } catch (error) { release(scene.renderer); throw error; }
+      stages = { scene, face };
+      watchContext(scene);
+      watchContext(face);
+    } else for (const stage of [...lost]) renew(stage);
+    clearTimeout(giveUp);
+    giveUp = undefined;
+    setCannot(false);
   } catch (error) {
-    console.warn("[creature] cannot draw creatures:", error instanceof Error ? error.message : error);
-    stages = null;
+    if (!warned) console.warn("[creature] cannot draw creatures:", error instanceof Error ? error.message : error);
+    warned = true;
+    setCannot(true);
   }
-  return stages;
+  return cannot ? null : stages;
 }
+
+/** Whether creatures can be drawn on this page: makes the stages on first use, and tries again a while after they could
+ *  not be had. */
 export const canDrawCreatures = () => stagesOf() !== null;
+/** Whether creatures can be drawn, as last found, without trying (for a render). True until they have been tried. */
+export const creaturesDrawable = () => !cannot;
+/** `watcher` is told each time creatures can no longer be drawn, or can again. Returns what stops it. */
+export function onCreaturesChange(watcher: () => void): () => void {
+  watchers.add(watcher);
+  return () => { watchers.delete(watcher); };
+}
 
 function dispose(item: StageItem, stage: RigStage) {
   stage.scene.remove(item.c.root);
@@ -269,13 +370,15 @@ export class LiveCreature {
   }
 
   /** It has a frame to draw: a change not drawn yet, or motion (its own, the pointer's gaze, a startle). */
-  wantsFrames(): boolean { return !this.hidden && (this.needDraw || this.active()); }
+  wantsFrames(): boolean { return !this.hidden && !lost.has(this.stage) && (this.needDraw || this.active()); }
 
   /** Draws its frame if it has one; whether it drew. */
   tick(t: number): boolean {
     const { canvas } = this.opts;
     const on = this.active();
     if (!on && !this.needDraw) return false;
+    // Its stage's context is gone: the canvas keeps its last frame, and it is drawn again when the context is back.
+    if (lost.has(this.stage)) { this.needDraw = true; return false; }
     // Nobody sees a canvas out of the page or with no box (a closed panel, the phone's hidden list): it is drawn when it
     // has one again (its box observer asks for it).
     if (!canvas.isConnected || canvas.getClientRects().length === 0) { this.needDraw = true; this.hidden = true; return false; }
@@ -333,8 +436,13 @@ export function mountCreature(opts: LiveOptions): LiveCreature | null {
 const FACES = 48;
 const faces = new Map<string, HTMLCanvasElement>();
 const built = new Map<string, Item>();
-const queue: Array<{ key: string; seed: string; expr: string; choice?: CreatureChoice; done: Set<(face: HTMLCanvasElement) => void> }> = [];
+const queue: Array<{ key: string; seed: string; expr: string; choice?: CreatureChoice; done: Set<(face: HTMLCanvasElement | null) => void> }> = [];
 let queued = 0;
+
+/** The faces waiting are not rendered (creatures cannot be drawn): each is told so, with null. */
+function dropFaces() {
+  for (const job of queue.splice(0)) for (const done of job.done) done(null);
+}
 
 function renderFace(seed: string, expr: string, choice?: CreatureChoice): HTMLCanvasElement | null {
   const s = stagesOf();
@@ -357,11 +465,13 @@ function renderFace(seed: string, expr: string, choice?: CreatureChoice): HTMLCa
 
 function drain() {
   queued = 0;
+  // A lost context renders blank: the faces wait for it to be back (or are dropped if it is not, setCannot).
+  if (stages && lost.has(stages.face)) return;
   const until = performance.now() + 12;
   while (queue.length && performance.now() < until) {
     const job = queue.shift()!;
     const face = faces.get(job.key) ?? renderFace(job.seed, job.expr, job.choice);
-    if (!face) { queue.length = 0; return; }
+    if (!face) { for (const done of job.done) done(null); dropFaces(); return; }
     if (!faces.has(job.key)) { if (faces.size >= FACES) faces.delete(faces.keys().next().value!); faces.set(job.key, face); }
     for (const done of job.done) done(face);
   }
@@ -372,7 +482,8 @@ function drain() {
  *  at once when it already is. Returns what cancels it. `choice`: a creature picked by hand, keyed by `seed`. */
 export function drawFace(canvas: HTMLCanvasElement, seed: string, expr: string, choice?: CreatureChoice): () => void {
   const key = seed + "\u0000" + expr;
-  const put = (face: HTMLCanvasElement) => {
+  const put = (face: HTMLCanvasElement | null) => {
+    if (!face) return;
     if (canvas.width !== FACE_PX || canvas.height !== FACE_PX) { canvas.width = canvas.height = FACE_PX; }
     const g = canvas.getContext("2d");
     if (!g) return;
