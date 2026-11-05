@@ -10,6 +10,10 @@
 .conversation-avatar { position: relative; display: block; flex: none; width: 40px; height: 40px; }
 .conversation-avatar .sv-avatar { width: 100%; height: 100%; border-radius: 50%; background: color-mix(in srgb, var(--av-color) 22%, var(--sv-surface)); }
 [data-theme="dark"] .conversation-avatar .sv-avatar { background: var(--av-bg); }
+/* The creature and its halo are a picture on a card, not text: choosing a conversation, a double click or a drag across
+   the list never selects or highlights them, and they cannot be dragged or copied away; nor does a long press on iOS
+   bring up its image menu. The drawing is a canvas (an SVG while it loads), so there is no img to mark draggable. */
+.conversation-avatar, .conversation-avatar * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
 .state-dot { position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border: 2px solid var(--dot-ring, var(--sv-surface)); border-radius: 50%; background: var(--sv-state-idle); }
 /* The light is the colour of what its agent is doing (styles/tokens.css --sv-state-*, fixed in light and dark): listening,
    speaking, working (blinking), resting or just present (the one idle colour), or unreachable. Where motion is reduced it

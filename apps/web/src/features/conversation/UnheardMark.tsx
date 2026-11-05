@@ -8,9 +8,9 @@ import { MessageTime, type BubblePosition } from "./MessageBubble";
 
 /** A reply that never played ('bubble-badge', T49–T57). Folded, a grey bubble with the struck circle and its first line,
  *  and nothing else; on hover or focus the circle turns into the arrow (production's morph). A click opens it into a muted
- *  bubble of its own, "Not played" over its words and its time and replay at its foot; the arrow, turned down, folds it
- *  again. The whole mark takes the click, as the reference's does; its toggle is the arrow's button, which says what it
- *  does. */
+ *  bubble of its own, "Not played" over its words and its time and replay at its foot, and no subtitle under them (why it
+ *  did not play is not in the design); the arrow, turned down, folds it again. The whole mark takes the click, as the
+ *  reference's does; its toggle is the arrow's button, which says what it does. */
 export function UnheardMark({ message, position }: { message: ChatMessage; position: BubblePosition }) {
   const t = translator();
   const [open, setOpen] = useState(false);
@@ -28,6 +28,5 @@ export function UnheardMark({ message, position }: { message: ChatMessage; posit
     </div>
     {open && <span className="chat-meta"><MessageTime time={message.time} />{replay && <ListenAgain message={message} />}</span>}
     {open && message.deliveryNote && <span className="chat-audio-note">{message.deliveryNote}</span>}
-    {open && message.audioNote && <span className="chat-audio-note">{message.audioNote}</span>}
   </article>;
 }

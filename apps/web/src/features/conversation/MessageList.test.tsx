@@ -326,14 +326,32 @@ test("a cut in the middle of a Latin word is carried to the word's end", () => {
   expect(container.querySelector(".cut-rest")?.textContent).toBe(" is ready now");
 });
 
-test("a never-played reply's opened mark keeps listen again and its failure explanation", () => {
+test("a never-played reply's opened mark keeps listen again, and says nothing under its date and replay", () => {
   const replayReply = vi.fn();
   window.sidevoiceActions = { replayReply } as never;
   const failed = { audio: "failed", audio_reason: "playback_failed", heard_chars: 0, hearing: "not_heard" as const };
   render(<MessageList conversation={view([message({ segment: "nf", text: "Never started", replayable: true, ...failed, audioNote: audioNote(failed) })])} />);
   expect(screen.queryByRole("button", { name: "Listen again" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: /Not played/ }));
-  expect(screen.getByText("Playback failed")).toBeInTheDocument();
+  expect(screen.queryByText("Playback failed")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Listen again" }));
   expect(replayReply).toHaveBeenCalledWith("nf");
+});
+
+test("a reply nobody was there for opens with no 'No audio' subtitle, whatever the reason it did not play", () => {
+  const reasons = ["call_ended", "focus_changed", "voice_off", "agents_muted"].map((audio_reason) => ({ audio: "text_only", audio_reason, heard_chars: 0, hearing: "not_heard" as const }));
+  // The state still words each of them: it is the opened mark that does not show it.
+  expect(audioNote(reasons[0])).toBe("No audio · You were not in the call");
+  const { container } = render(<MessageList conversation={view(reasons.map((core) => message({ segment: core.audio_reason, text: `Reply ${core.audio_reason}`, replayable: true, ...core, audioNote: audioNote(core) })))} />);
+  const marks = [...container.querySelectorAll<HTMLElement>(".chat-bubble.unheard")];
+  expect(marks).toHaveLength(reasons.length);
+  for (const mark of marks) {
+    fireEvent.click(mark.querySelector(".unheard-snippet")!);
+    expect(mark).toHaveAttribute("data-open");
+    expect(mark.querySelector(".unheard-badge")?.textContent).toBe("Not played");
+    expect(mark.querySelector(".chat-meta time")).not.toBeNull();
+    expect(mark.querySelector(".chat-meta .listen-again")).not.toBeNull();
+    expect(mark.querySelector(".chat-audio-note")).toBeNull();
+    expect(mark.textContent).not.toMatch(/No audio|not in the call/i);
+  }
 });
