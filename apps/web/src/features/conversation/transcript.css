@@ -48,6 +48,19 @@
   border: 1px solid var(--tr-edge); border-radius: 22px; background: var(--tr-panel); color: var(--tr-ink); box-shadow: var(--tr-panel-shadow);
 }
 .call-layout > .transcript:not([data-open]) { display: none; }
+/* A desktop (2026-11-05): the column slides in from the right as the stage gives it room, and out the same way; its
+   contents keep their width meanwhile, so nothing inside reflows as it opens. Closed, it is out of sight and of the tab
+   order (visibility), and what pulses in it waits. */
+@media (min-width: 900px) {
+  .call-layout > .transcript { transition: width .28s var(--sv-ease), margin .28s var(--sv-ease), border-width .28s var(--sv-ease), opacity .2s ease, transform .28s var(--sv-ease); }
+  .call-layout > .transcript > * { min-width: 318px; }
+  .call-layout > .transcript:not([data-open]) { display: flex; width: 0; margin-right: 0; border-width: 0; opacity: 0; transform: translateX(24px); visibility: hidden;
+    transition: width .28s var(--sv-ease), margin .28s var(--sv-ease), border-width .28s var(--sv-ease), opacity .2s ease, transform .28s var(--sv-ease), visibility 0s linear .28s; }
+  .call-layout > .transcript:not([data-open]) * { animation: none !important; }
+}
+@media (min-width: 900px) and (prefers-reduced-motion: reduce) {
+  .call-layout > .transcript, .call-layout > .transcript:not([data-open]) { transition: none; }
+}
 .transcript { font: 14.5px/1.42 var(--sv-font-sans); letter-spacing: -.005em; }
 .transcript-grab, .transcript-scrim { display: none; }
 

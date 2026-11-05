@@ -258,8 +258,8 @@ test("card look: what was sent pops out where the pill was, cut to three lines, 
   expect(pill()).toBeNull();
   expect(sentCard()).toHaveTextContent(LONG);
   expect(sentCard()!.querySelector(".vcap-said > span")).not.toBeNull();
-  // No check on the stage's card (the transcript keeps the receipt).
-  expect(sentCard()!.querySelector(".receipt")).toBeNull();
+  // No delivery known yet: no mark.
+  expect(sentCard()!.querySelector(".vcap-receipt")).toBeNull();
   staysThenGoes(PAGE_MS, sentCard);
 });
 
@@ -275,4 +275,13 @@ test("card look: speaking again, or the agent's reply taking the place under the
   expect(sentCard()).not.toHaveAttribute("data-leaving");
   second.to(settled([said("u-1", LONG)]), true);
   expect(sentCard()).toHaveAttribute("data-leaving");
+});
+
+test.each(["delivered", "read", "not_sent"])("card look: a %s message wears the transcript's delivery mark (operator, 2026-11-05)", (state) => {
+  const { to } = cardTurn();
+  to(settled([withDelivery(state)]));
+  const mark = sentCard()!.querySelector<HTMLElement>(".vcap-receipt")
+  expect(mark).not.toBeNull();
+  expect(mark).toHaveAttribute("data-state", state);
+  expect(mark!.getAttribute("aria-label")).toBeTruthy();
 });
