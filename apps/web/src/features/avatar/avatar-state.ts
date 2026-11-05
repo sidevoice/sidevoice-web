@@ -62,6 +62,12 @@ export interface AvatarState {
   /** For ENTER_MS after it starts listening, the mood it left (data-enter: the engine's startle), with what it had in
    *  hand still on so it can drop away. */
   enter?: "idle" | "working";
+  /** While it listens, when it started to (wall-clock, the room's stamp, the same in every window), if it came from another
+   *  mood: the creature's startle runs from here (creature/host.ts, the design reference's 0.55 s), whoever draws it and
+   *  whenever. From any mood, a barge-in on its speech included, as the reference startles on every change into listening
+   *  (creator.js: the mode change, interrupt()). Unlike `enter` (the 2D figure's 420 ms prop drop), it lasts as long as the
+   *  listening does. */
+  enteredAt?: number;
   unread?: boolean;
   /** When what it shows last changed, wall-clock (Date.now()): every copy runs its CSS animations from this moment (on
    *  its own document's timeline: `toTimeline`), so a copy drawn later, or in another window, moves in step with the rest. */
@@ -106,6 +112,8 @@ interface Entry {
   stepTimer?: ReturnType<typeof setTimeout>;
   enter: "idle" | "working" | null;
   enterTimer?: ReturnType<typeof setTimeout>;
+  /** When it last came into listening from another mood (AvatarState.enteredAt). */
+  enteredAt?: number;
   last: Partial<Record<Kind, string>>;
   state: AvatarState;
   mouth: { shown: number; stale?: ReturnType<typeof setTimeout>; stop?: () => void };
@@ -128,7 +136,7 @@ export interface AvatarStates {
 const sameInputs = (a: AvatarInputs, b: AvatarInputs) => a.mood === b.mood && a.restStart === b.restStart && !!a.still === !!b.still && a.interaction === b.interaction
   && !!a.pastimes === !!b.pastimes && !!a.unread === !!b.unread && (a.voice ?? null) === (b.voice ?? null) && avatarKey(a.spec) === avatarKey(b.spec);
 const sameState = (a: Omit<AvatarState, "since" | "until">, b: AvatarState) => a.mood === b.mood && a.work === b.work && a.idle === b.idle
-  && a.enter === b.enter && !!a.unread === !!b.unread;
+  && a.enter === b.enter && a.enteredAt === b.enteredAt && !!a.unread === !!b.unread;
 
 /** A set of figures, each in one state, on one clock. */
 export function createAvatarStates(): AvatarStates {
@@ -173,6 +181,7 @@ export function createAvatarStates(): AvatarStates {
       // Resting before it is bored (or held still) is quiet: awake, nothing in hand. Offline sleeps: no step.
       idle: mood === "present" || (mood === "idle" && !bored) ? "quiet" : resting ?? (entry.enter === "idle" ? entry.last.idle : undefined),
       enter: entry.enter ?? undefined,
+      enteredAt: entry.acts === "listening" ? entry.enteredAt : undefined,
       unread: unread || undefined,
     };
     // The moment is the one every window computes alike, whenever it began to draw: when the step it shows began, or
@@ -249,6 +258,9 @@ export function createAvatarStates(): AvatarStates {
       // An entrance already over by the time this window hears of it is not made.
       const left = (inputs.restStart ?? Date.now()) + ENTER_MS - Date.now();
       entry.enter = left > 0 ? enterFrom(entry.acts, acts) : null;
+      // The creature's startle into listening: from any other mood, from the room's stamp (kept while it listens; a copy
+      // drawn late plays what is left of it, creature/host.ts). A first mood makes none.
+      entry.enteredAt = acts === "listening" ? inputs.restStart ?? Date.now() : undefined;
       entry.acts = acts;
       restartEnter(id, entry, left);
     }

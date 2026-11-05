@@ -142,7 +142,7 @@ function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, 
   // still shows it at rest, quiet, never a pastime frozen mid-way; a working style it shows in its key pose (the creator
   // under reduced motion).
   const idle = moving || state.idle === undefined ? state.idle : "quiet";
-  const step = useMemo<CreatureStep>(() => ({ work: state.work, idle, since: state.since, until: state.until, enter: state.enter }), [state.work, idle, state.since, state.until, state.enter]);
+  const step = useMemo<CreatureStep>(() => ({ work: state.work, idle, since: state.since, until: state.until, entered: state.enteredAt }), [state.work, idle, state.since, state.until, state.enteredAt]);
   // What it shows when its host has loaded, whatever changed in the meantime.
   const now = useRef({ mood, moving, step });
   now.current = { mood, moving, step };

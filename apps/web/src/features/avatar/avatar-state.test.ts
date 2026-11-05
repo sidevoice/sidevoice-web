@@ -149,6 +149,42 @@ test("startled into listening, what it had in hand stays on for the entrance, th
   expect(states.get("b")!.enter).toBeUndefined();
 });
 
+test("coming into listening from any mood, a barge-in on its speech included, it says when (the room's stamp), for as long as it listens", () => {
+  for (const from of ["working", "idle", "speaking", "present"] as const) {
+    const id = "e-" + from;
+    states.set(id, inputs({ mood: from, restStart: Date.now() - 10_000 }));
+    const came = Date.now();
+    states.set(id, inputs({ mood: "listening", restStart: came }));
+    expect(states.get(id)!.enteredAt, from).toBe(came);
+  }
+  // the 2D figure's entrance marker goes at ENTER_MS (420 ms); the creature's startle (0.55 s) still has its start at 480 ms
+  vi.advanceTimersByTime(480);
+  expect(states.get("e-working")).toMatchObject({ enter: undefined, enteredAt: Date.now() - 480 });
+  // and a barge-in never had the 2D marker (enterFrom: from idle or working), but has its start
+  expect(states.get("e-speaking")).toMatchObject({ enter: undefined, enteredAt: Date.now() - 480 });
+  // it lasts as long as the listening does, and goes with it
+  vi.advanceTimersByTime(60_000);
+  expect(states.get("e-idle")!.enteredAt).toBe(Date.now() - 60_480);
+  states.set("e-idle", inputs({ mood: "working", restStart: Date.now() }));
+  expect(states.get("e-idle")!.enteredAt).toBeUndefined();
+});
+
+test("a first mood makes no entrance; two windows given the same change say the same moment", () => {
+  states.set("first", inputs({ mood: "listening", restStart: Date.now() }));
+  expect(states.get("first")!.enteredAt).toBeUndefined();
+  const room = createAvatarStates(), card = createAvatarStates();
+  const restStart = Date.now() - 5_000;
+  for (const set of [room, card]) set.set("a", inputs({ mood: "speaking", restStart }));
+  const came = Date.now();
+  room.set("a", inputs({ mood: "listening", restStart: came }));
+  vi.advanceTimersByTime(470);
+  card.set("a", inputs({ mood: "listening", restStart: came }));
+  expect(card.get("a")!.enteredAt).toBe(came);
+  expect(room.get("a")!.enteredAt).toBe(came);
+  room.clear();
+  card.clear();
+});
+
 test("offline it sleeps: no step, and none starts however long it lasts", () => {
   states.set("a", inputs({ mood: "offline" }));
   vi.advanceTimersByTime(60_000);

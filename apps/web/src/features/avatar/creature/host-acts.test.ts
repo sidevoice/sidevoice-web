@@ -192,8 +192,8 @@ test("entering listening from working, the style and the cogs go at once and it 
   const tick = holdClock();
   make({ mood: "working", step: { work: "hammer", since: Date.now() } });
   expect(Object.keys(rig.layers).sort()).toEqual(["base", "cogs"]);
-  // the room stamped the entrance now; the state keeps the hammer for its entrance (enter: working)
-  live.setMood("listening", { step: { work: "hammer", since: Date.now(), enter: "working" } });
+  // the room stamped the change now; the state keeps the hammer for the 2D entrance, and says when it came in
+  live.setMood("listening", { step: { work: "hammer", since: Date.now(), entered: Date.now() } });
   expect(rig.layers).toEqual({});
   tick(225);
   live.frameAt(0);
@@ -209,37 +209,48 @@ test("entering listening from working, the style and the cogs go at once and it 
   expect(lastExtra()).toEqual({});
 });
 
-test("a window that hears of the entrance late startles at its moment, and not at all once it is over", () => {
-  holdClock();
-  make({ mood: "idle", step: { idle: "fish", since: Date.now() - 60_000, until: Date.now() + 1000 } });
-  live.setMood("listening", { step: { since: Date.now() - 300, enter: "idle" } });
+test("a barge-in on its speech startles it too, as the reference's interrupt() does, from the shared moment, once", () => {
+  const tick = holdClock();
+  make({ mood: "speaking", step: {} });
+  const entered = Date.now();
+  live.setMood("listening", { step: { since: entered, entered } });
+  tick(100);
   live.frameAt(0);
   expect(lastExtra().expr).toBe("surprised");
-  expect(lastExtra().dy).toBeCloseTo(-Math.sin((0.3 / 0.45) * Math.PI) * 9 * 1.1, 6);
-  // another one, mounted while that entrance is going on, startles in step with it
-  const other = new LiveCreature(rig.stage, { seed: "t-login", canvas: document.createElement("canvas"), framing: "scene", scene: { zoom: 1.32, lookY: 0.3 }, mood: "listening", step: { since: Date.now() - 300, enter: "idle" } });
-  other.frameAt(0);
-  expect(lastExtra().dy).toBeCloseTo(-Math.sin((0.3 / 0.45) * Math.PI) * 9 * 1.1, 6);
-  other.dispose();
-  // heard of 600 ms after it began: over (0.55 s), no startle
-  make({ mood: "idle", step: {} });
-  live.setMood("listening", { step: { since: Date.now() - 600, enter: "idle" } });
+  expect(lastExtra().dy).toBeCloseTo(-Math.sin((0.1 / 0.45) * Math.PI) * 9 * 1.1, 6);
+  // the same entrance told again (a new state object, the same stamp) does not startle again
+  tick(500);
+  live.setMood("listening", { step: { since: entered, entered } });
+  live.setStep({ since: entered, entered });
   live.frameAt(0);
   expect(lastExtra()).toEqual({});
 });
 
-test("no entrance, no startle: listening after speaking (production makes none), or the same entrance told again", () => {
+test("a copy drawn late plays what is left of the startle: mounted 480 ms in, past the 2D entrance's 420 ms, the last 70 ms", () => {
   const tick = holdClock();
-  make({ mood: "speaking", step: {} });
-  live.setMood("listening", { step: { since: Date.now() } });
+  const entered = Date.now() - 480;
+  make({ mood: "listening", step: { since: entered, entered } });
+  live.frameAt(0);
+  // surprised still; the hop landed at 0.45 s
+  expect(lastExtra().expr).toBe("surprised");
+  expect(lastExtra().dy).toBeCloseTo(0, 6);
+  tick(80);
   live.frameAt(0);
   expect(lastExtra()).toEqual({});
-  make({ mood: "working", step: { work: "type", since: Date.now() } });
-  const since = Date.now();
-  live.setMood("listening", { step: { since, enter: "working" } });
-  tick(600);
-  live.setMood("listening", { step: { since, enter: "working" } });
-  live.setStep({ since, enter: "working" });
+  // one that hears of it 300 ms in startles in step with it
+  const other = new LiveCreature(rig.stage, { seed: "t-login", canvas: document.createElement("canvas"), framing: "scene", scene: { zoom: 1.32, lookY: 0.3 }, mood: "listening", step: { since: Date.now() - 300, entered: Date.now() - 300 } });
+  other.frameAt(0);
+  expect(lastExtra().dy).toBeCloseTo(-Math.sin((0.3 / 0.45) * Math.PI) * 9 * 1.1, 6);
+  other.dispose();
+  // and one 600 ms in, none: it is over
+  make({ mood: "listening", step: { since: Date.now() - 600, entered: Date.now() - 600 } });
+  live.frameAt(0);
+  expect(lastExtra()).toEqual({});
+});
+
+test("no entrance, no startle: listening as its first state (the state says when it came in, or nothing)", () => {
+  holdClock();
+  make({ mood: "listening", step: { since: Date.now() } });
   live.frameAt(0);
   expect(lastExtra()).toEqual({});
 });

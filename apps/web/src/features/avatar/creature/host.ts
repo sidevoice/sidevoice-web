@@ -53,8 +53,9 @@ export interface CreatureStep {
   since?: number;
   /** When it is due to end, wall-clock: a pastime runs for its spell (the creator's dur, secs + 0.5). None: its own. */
   until?: number;
-  /** It is making an entrance into listening (avatar-state.ts `enter`: from idle or working), which began at `since`. */
-  enter?: "idle" | "working";
+  /** While it listens, when it came into listening from another mood (avatar-state.ts `enteredAt`, wall-clock): its startle
+   *  runs from here. */
+  entered?: number;
 }
 
 /** The startle on entering listening, as the creator plays it on a change of mode (creator.js react): surprised, a hop of
@@ -394,16 +395,16 @@ export class LiveCreature {
   /** What it has on the go, its state unchanged. */
   setStep(step: CreatureStep) { this.step = step; const startled = this.syncStartle(); if (this.syncBase() || startled) this.poke(); }
 
-  /** The creator's startle (STARTLE) when the state says it is making an entrance into listening: production decides when
-   *  (avatar-state.ts `enter`: into listening from idle or working, from the moment the room stamped, the same in every
-   *  window), the reference how it looks. Its clock starts at the entrance's start (`since`), so a window that hears of it
-   *  late startles at the same moment, or not at all once it is over. It lasts the reference's 0.55 s, not the 2D
-   *  figure's 420 ms entrance (ENTER_MS). Each entrance startles once. Whether it started one. */
+  /** The creator's startle (STARTLE) on coming into listening, as the reference plays it on every change into listening, a
+   *  barge-in on its speech included (creator.js: the mode change, interrupt()). Its clock starts when it came in
+   *  (avatar-state.ts `enteredAt`: the room's stamp, the same in every window, kept while it listens), so a copy drawn
+   *  late, a remount or another window, plays what is left of it, or nothing once it is over. The reference's 0.55 s, not
+   *  the 2D figure's 420 ms entrance (ENTER_MS). Each entrance startles once. Whether it started one. */
   private syncStartle(): boolean {
     const s = this.step;
-    if (!MODES[this.mood].enter || !s.enter || s.since == null || s.since === this.startledAt) return false;
-    this.startledAt = s.since;
-    const k = Math.max(0, Date.now() - s.since) / 1000;
+    if (!MODES[this.mood].enter || s.entered == null || s.entered === this.startledAt) return false;
+    this.startledAt = s.entered;
+    const k = Math.max(0, Date.now() - s.entered) / 1000;
     if (k >= STARTLE.secs) return false;
     const t0 = nowS() - k;
     this.react = { expr: STARTLE.expr, hop: STARTLE.hop, t0, until: t0 + STARTLE.secs };
