@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { installHarness } from "./harness.mjs";
+import { installHarness, stageFramed } from "./harness.mjs";
 
 /* What moves on the stage (web#278): the agent is its creature, one canvas its rig draws into (features/avatar/creature/).
  * With the GPU it is drawn live, about thirty frames a second; without it, it holds still in its state's key pose and asks
@@ -63,6 +63,9 @@ test("without the GPU the stage's agent holds still in its key pose: drawn once,
   const drawn = await webgl(page);
   if (drawn) await expect.poll(() => pixels(agent), { timeout: 15_000 }).not.toBe("");
   else await noWebgl(page);
+  // Drawn once its framing is solved (a trial render a frame, which a software GL takes a second or two over): the pose
+  // it holds is the one it is framed on, and the frames that solve asks for are not the creature's.
+  await stageFramed(page);
   const still = await pixels(agent);
   // Nothing runs: no CSS animation in the scene, and no animation frame asked for while nothing changes.
   expect(await running(page, ".stage-scene")).toMatchObject({ all: 0 });
