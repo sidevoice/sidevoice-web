@@ -359,7 +359,9 @@
 
 /* Over the bicho's backdrop (dark or light, whatever its seed rolled) the tile's words sit on a frosted surface of the
  * theme, so they read on any of them: the conversation's name on a phone and the agent's badge. */
-.stage-name { padding: .3em .6em; border-radius: var(--sv-radius-lg); background: color-mix(in srgb, var(--sv-surface) 84%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+/* (2026-11-05) A plain card of the theme with a hairline edge rather than a frosted haze: it sits on the scene as the
+ * stage's other cards do, without a blur bleeding round it. */
+.stage-name { padding: .35em .65em; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: color-mix(in srgb, var(--sv-surface) 62%, transparent); }
 
 /* The conversation's name and its machine, over the stage (CallStage StageName; 2026-10-15): the name in a display
  * weight, one line cut with an ellipsis; the machine a small chip with its icon, under it. The same on a desktop, above

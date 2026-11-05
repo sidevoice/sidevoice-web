@@ -102,3 +102,11 @@
 .docked-voice > .vcap { position: static; grid-area: 1 / 1; max-width: 100%; transform: none; transform-origin: 50% 0; }
 .docked-voice > .vcap.card, .docked-voice > .vcap.card.person { width: auto; max-width: 100%; }
 .docked-voice > .vcap.card.person { width: max-content; }
+
+/* The sent turn's delivery mark, as the transcript draws it (T42), at the card's foot-right after the words. */
+.vcap.card.sent:has(.vcap-receipt) { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; column-gap: 8px; }
+.vcap-receipt { display: inline-flex; padding-bottom: 2px; color: #8a8496; }
+.vcap-receipt[data-state="read"] { color: var(--sv-accent-text); }
+.vcap-receipt[data-state="unconfirmed"] { color: var(--sv-disabled-text); }
+.vcap-receipt:is([data-state="uncertain"], [data-state="not_sent"]) { color: var(--sv-danger); }
+[data-theme="dark"] .vcap-receipt { color: #a7a1b4; }
