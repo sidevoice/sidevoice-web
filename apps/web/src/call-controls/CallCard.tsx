@@ -18,7 +18,7 @@
  * plumbing are card-shell.tsx. */
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { CaptionsIcon, CaptionsOffIcon, ChevronIcon, CloseIcon, ConversationsIcon, HangupIcon, HarnessIcon, MachinesIcon, MicrophoneIcon,
-  MicrophoneOffIcon, OpenAppIcon, SettingsIcon, SkipIcon } from "../components/ui/Icons";
+  MicrophoneOffIcon, OpenAppIcon, SettingsIcon, SkipIcon, StateGlyph, type StateGlyphKind } from "../components/ui/Icons";
 import { ConversationPicker, DevicePicker, useCardShell, useHostState, useWave, type CardShell } from "./card-shell";
 import { hasUnread, moodText } from "../features/call/conversation-state";
 import { ConversationAvatar } from "../features/call/ConversationAvatar";
@@ -166,6 +166,14 @@ function YourWave({ level, muted, still, t }: { level: number; muted: boolean; s
   );
 }
 
+/** The icon the state line leads with, in the state's colour (StateGlyph): what the agent acts out, or you muted. Resting, present and
+ *  reconnecting are told by the plain dot. */
+function stateGlyph(mood: CallControlsState["call"]["mood"], muted: boolean, reconnecting: boolean): StateGlyphKind | null {
+  if (reconnecting) return null;
+  if (muted) return "muted";
+  return mood === "listening" || mood === "speaking" || mood === "working" || mood === "holding" || mood === "offline" ? mood : null;
+}
+
 /** A1's two rows; `compact` (just the avatar's card) keeps A1's first row without the face, the machine, the state and your
  *  wave, over A1's controls row, which is always out. */
 function TitleCard({ state, shell, t, compact = false }: { state: CallControlsState; shell: CardShell; t: Translate; compact?: boolean }) {
@@ -180,6 +188,7 @@ function TitleCard({ state, shell, t, compact = false }: { state: CallControlsSt
   // What is happening, in one line: you muted, the call reconnecting, else what the agent acts out.
   const line = reconnecting ? t("card.reconnecting") : muted ? t("card.youAreMuted") : moodText(call.mood, t);
   const tone = agent.threadId ? avatarColor(agent.spec) : undefined;
+  const glyph = stateGlyph(call.mood, muted, reconnecting);
   return (
     <div ref={compact ? undefined : shell.body} className={"call-card title-card" + (compact ? " compact-card" : "")} data-expanded={expanded || undefined}>
       <div className="card-row">
@@ -195,7 +204,7 @@ function TitleCard({ state, shell, t, compact = false }: { state: CallControlsSt
             selected?.machine && <span key="machine" className="card-machine"><MachinesIcon size={11} /> <span>{selected.machine}</span></span>,
             (selected?.harness || selected?.model) && <span key="harness" className="card-harness">{selected?.harness && <HarnessIcon harness={selected.harness} size={11} />} <span>{[selected?.model, selected?.effort].filter(Boolean).join(" · ")}</span></span>,
           ].filter(Boolean).flatMap((part, i) => (i ? [<span key={"dot" + i} aria-hidden="true">·</span>, part] : [part]))}</span>}
-          {!compact && <span className="card-state" data-mood={reconnecting ? "reconnecting" : muted ? "muted" : call.mood}><i aria-hidden="true" />{line}</span>}
+          {!compact && <span className="card-state" data-mood={reconnecting ? "reconnecting" : muted ? "muted" : call.mood}>{glyph ? <StateGlyph kind={glyph} size={14} /> : <i aria-hidden="true" />}{line}</span>}
         </div>
         {!compact && <YourWave level={state.level} muted={muted} still={reconnecting} t={t} />}
       </div>

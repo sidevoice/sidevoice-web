@@ -371,3 +371,16 @@
 .ui-select-item:has(.ui-select-item-badge) .ui-select-item-text { flex: 0 1 auto; }
 .ui-select-item:has(.ui-select-item-badge) .ui-select-item-check { order: 1; margin-left: calc(-1 * var(--sv-space-1)); }
 .ui-select-item:has(.ui-select-item-badge) .ui-select-item-badge { order: 2; margin-left: auto; }
+
+/* ----- a state's icon (StateGlyph in Icons.tsx): the colour of the state it tells, from the one set of tokens (styles/tokens.css
+ * --sv-state-*), on every surface that draws one. Only the icon wears it: the words beside it are never tinted. Listening and
+ * transcribing are one state's colour (it is the person's turn); working blinks as its dot does everywhere (1.2 s). */
+.state-glyph { flex: none; }
+.state-glyph-listening, .state-glyph-transcribing { color: var(--sv-state-listening); }
+.state-glyph-speaking { color: var(--sv-state-speaking); }
+.state-glyph-working { color: var(--sv-state-working); animation: state-glyph-blink 1.2s ease-in-out infinite; }
+.state-glyph-muted { color: var(--sv-state-muted); }
+.state-glyph-holding { color: var(--sv-state-attention); }
+.state-glyph-offline { color: var(--sv-state-offline); }
+@keyframes state-glyph-blink { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .state-glyph-working { animation: none; } }

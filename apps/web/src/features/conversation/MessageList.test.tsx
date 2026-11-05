@@ -55,7 +55,7 @@ test("working is a quiet row starting the agent's next run, wearing its face, in
   expect(working).toHaveAccessibleName("The conversation is working on your message");
   expect(working.textContent).toBe("Working...");
   // Led by the working glyph (three dots), as the conversations' state says it, not by a dot of the creature's accent.
-  expect(working.querySelector(".working-label > svg")).not.toBeNull();
+  expect(working.querySelector(".working-label > svg")).toHaveClass("state-glyph", "state-glyph-working");
   expect(working.querySelector(".working-label > i")).toBeNull();
   const run = working.closest(".message-group")!;
   expect(run).toHaveAttribute("data-role", "assistant");
@@ -167,6 +167,8 @@ test("the open turn, without streaming, is a pill: the microphone, its bars and 
   const { container } = render(<MessageList conversation={{ messages: [], pendingText: "", pendingCancellable: true, pendingPhase: "listening" }} />);
   const pill = container.querySelector(".message-group[data-role=user] .chat-bubble.turn-pill[data-phase=listening]");
   expect(pill?.querySelectorAll(".turn-bars i")).toHaveLength(5);
+  // Its microphone wears the colour of listening (the state's icon); the word is never tinted.
+  expect(pill?.querySelector(".turn-lead > svg")).toHaveClass("state-glyph-listening");
   expect(screen.getByRole("status")).toHaveAttribute("aria-label", "Listening");
   const cancel = screen.getByRole("button", { name: "Cancel sending" });
   expect(cancel).toHaveClass("turn-cancel");
@@ -180,6 +182,8 @@ test("transcribing keeps one pill and says so, so both phases stay apart", () =>
   expect(container.querySelectorAll(".turn-pill")).toHaveLength(1);
   expect(container.querySelector(".turn-pill")?.getAttribute("data-phase")).toBe("transcribing");
   expect(container.querySelector(".turn-bars")).toBeNull();
+  // Transcribing is the voice mark's bars, in the same colour as listening.
+  expect(container.querySelector(".turn-lead > svg")).toHaveClass("state-glyph-transcribing");
   expect(screen.getByRole("status")).toHaveAttribute("aria-label", "Transcribing what you said");
   expect(screen.getByRole("status").textContent).toBe("Transcribing...");
 });

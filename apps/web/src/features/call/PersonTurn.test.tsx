@@ -214,6 +214,8 @@ test("card look: while they speak, the icon pill (the microphone, the voice's ba
   expect(pill()).toHaveAttribute("data-phase", "listening");
   expect(pill()!.querySelector("svg")).not.toBeNull();
   expect(pill()!.querySelector(".voice-wave, .voice-bars")).not.toBeNull();
+  // The microphone: five bars of the voice mark are transcribing's, not listening's.
+  expect(pill()!.querySelector(".lead > svg rect")).not.toBeNull();
   expect(pill()).not.toHaveTextContent(LONG.slice(0, 10));
   const cancel = pill()!.querySelector("button.cancel")!;
   expect(cancel).toHaveAccessibleName("Cancel sending");
@@ -228,6 +230,9 @@ test("card look: transcribing shows in the pill, as words with a running ellipsi
   expect(pill()!.querySelector(".tlabel")).toHaveTextContent("Transcribing...");
   expect(pill()!.querySelector(".tlabel")).toHaveAttribute("role", "status");
   expect(pill()!.querySelector(".voice-wave, .voice-bars")).toBeNull();
+  // Transcribing is the voice mark's bars (the microphone's rect is gone), beside the word, which is not an icon.
+  expect(pill()!.querySelector(".lead > svg rect")).toBeNull();
+  expect(pill()!.querySelector(".lead > svg path")!.getAttribute("d")!.match(/M/g)).toHaveLength(5);
   expect(pill()!.querySelector("button.cancel")).toHaveAccessibleName("Cancel sending");
 });
 

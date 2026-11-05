@@ -63,8 +63,8 @@
 }
 .stage-canvas { position: absolute; inset: 0; overflow: hidden;
   background: radial-gradient(circle at 50% 55%, color-mix(in srgb, var(--av-color, var(--sv-accent)) 18%, transparent), transparent 60%), var(--sv-stage-bg); }
-/* Speaking: a quiet ring in the accent around the whole tile. */
-.stage-tile[data-mood="speaking"] { border-color: color-mix(in srgb, var(--sv-accent) 45%, var(--sv-border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-accent) 20%, transparent); }
+/* Speaking: a quiet ring in speaking's blue (the state tokens, tokens.css) around the whole tile. */
+.stage-tile[data-mood="speaking"] { border-color: color-mix(in srgb, var(--sv-state-speaking) 45%, var(--sv-border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-state-speaking) 20%, transparent); }
 
 /* The conversation's name and its machine, in the tile's top corner as a call names whoever is on screen. */
 .stage-name { position: absolute; z-index: 2; top: var(--stage-inset); left: calc(var(--stage-inset) + 4 * var(--u)); display: grid; max-width: min(60%, calc(100% - 2 * var(--stage-inset)));
@@ -210,7 +210,7 @@
   @keyframes person-sent-fade { to { opacity: 0; } }
 }
 /* The waveform elsewhere (transcript.css, shared with the transcript's open turn) is sized here. */
-.person-bubble .voice-wave { display: block; flex: none; width: calc(160 * var(--u)); height: calc(28 * var(--u)); color: var(--sv-accent); }
+.person-bubble .voice-wave { display: block; flex: none; width: calc(160 * var(--u)); height: calc(28 * var(--u)); color: var(--sv-state-listening); }
 /* The bars stand in for the waveform where the device asks for less motion: still, at rest heights. */
 .person-bubble .voice-bars { display: inline-flex; flex: none; align-items: center; gap: calc(3 * var(--u)); height: calc(20 * var(--u)); }
 .person-bubble .voice-bars i { display: block; width: calc(3 * var(--u)); height: calc(12 * var(--u)); border-radius: calc(2 * var(--u)); background: currentColor; }
@@ -262,8 +262,8 @@
  * (room-session-controller.js voiceLevel); each bar scales from it, so the wave draws itself with no render. The bars
  * scale (transform) instead of changing height: a height per reading laid out and repainted the call bar about 30 times a
  * second while the person spoke, which cost the page and WebKit's GPU process about 45 % of a core (desktop#149). On hover, on
- * focus, with the bar open or muted, the bars give way to the chevron. Muted, the pill turns danger; held to talk while
- * muted, it turns positive. */
+ * focus, with the bar open or muted, the bars give way to the chevron. The bars are listening's green; muted, the pill's
+ * microphone turns the muted red (the state tokens, tokens.css); held to talk while muted, it turns listening's green. */
 #call-controls .mic-control { display: flex; align-items: center; gap: 0; border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken); isolation: isolate; }
 #call-controls #mute { border-radius: var(--sv-radius-pill); }
 .mic-wave { display: flex; align-items: center; gap: 2.4px; height: 22px; transition: opacity var(--sv-dur-fast) var(--sv-ease); }
@@ -271,7 +271,7 @@
    moving part is a transform (the middle spans its height less the ends, 2.6px). No transition: readings come ~30 a
    second, and retargeting a 70ms transition on each one cost ~10 points of a core while the person spoke (desktop#149). */
 .mic-wave i { --h: calc(3 + var(--mic-level, 0) * var(--bar) * 18.92); position: relative; display: block; width: 2.6px; height: 22px; }
-.mic-wave i::before, .mic-wave i::after, .mic-wave b { content: ""; position: absolute; left: 0; top: 50%; width: 2.6px; background: var(--sv-accent); will-change: transform; }
+.mic-wave i::before, .mic-wave i::after, .mic-wave b { content: ""; position: absolute; left: 0; top: 50%; width: 2.6px; background: var(--sv-state-listening); will-change: transform; }
 .mic-wave i::before, .mic-wave i::after { height: 2.6px; margin-top: -1.3px; border-radius: 50%; }
 .mic-wave i::before { transform: translateY(calc((var(--h) - 2.6) * -.5px)); }
 .mic-wave i::after { transform: translateY(calc((var(--h) - 2.6) * .5px)); }
@@ -282,10 +282,10 @@
 .mic-wave i:nth-child(4) { --bar: .7; }
 .mic-wave i:nth-child(5) { --bar: .4; }
 #mic-control[data-muted="true"] { background: var(--sv-danger-soft); }
-#mic-control[data-muted="true"] #mute { background: var(--sv-danger-soft); color: var(--sv-danger); }
+#mic-control[data-muted="true"] #mute { background: var(--sv-danger-soft); color: var(--sv-state-muted); }
 @media (hover: hover) { #mic-control[data-muted="true"] #mute:not(:disabled):hover { background: color-mix(in srgb, var(--sv-danger) 14%, var(--sv-danger-soft)); } }
 #mic-control[data-muted] #mute:disabled { background: var(--sv-bg-sunken); color: var(--sv-disabled-text); }
-#mic-control #mute.holding { background: var(--sv-positive-soft); color: var(--sv-positive); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-positive) 25%, transparent); }
+#mic-control #mute.holding { background: color-mix(in srgb, var(--sv-state-listening) 16%, var(--sv-surface)); color: var(--sv-state-listening); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-state-listening) 25%, transparent); }
 
 #call-controls #connect { width: 64px; background: var(--sv-positive); color: var(--sv-positive-soft); }
 #call-controls #connect:not(.joined) svg { transform: rotate(-135deg); }
@@ -390,7 +390,7 @@
 .stage-heading-name > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .stage-heading-chevron { flex: none; width: .7em; height: .7em; color: var(--sv-text-muted); transition: transform var(--sv-dur-fast) var(--sv-ease); }
 .stage-heading[aria-expanded="true"] .stage-heading-chevron { transform: rotate(180deg); }
-.stage-attention { flex: none; width: .42em; height: .42em; border-radius: 50%; background: var(--sv-warning); box-shadow: 0 0 0 2px var(--sv-surface); }
+.stage-attention { flex: none; width: .42em; height: .42em; border-radius: 50%; background: var(--sv-state-attention); box-shadow: 0 0 0 2px var(--sv-surface); }
 @media (prefers-reduced-motion: reduce) { .stage-name, .stage-heading, .stage-heading-chevron { transition: none; } }
 @media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
   .room-shell .stage-title { display: grid; justify-items: start; align-content: center; gap: var(--sv-space-2); }
@@ -468,7 +468,7 @@
 :is(.mic-silent-note, .call-listen-note) { position: absolute; z-index: 4; left: 50%; bottom: calc(100% + var(--sv-space-2)); transform: translateX(-50%); display: inline-flex; align-items: center; gap: var(--sv-space-1-5);
   width: max-content; max-width: min(320px, calc(100vw - 2 * var(--sv-space-4))); padding: var(--sv-space-1-5) var(--sv-space-3); border: 1px solid color-mix(in srgb, var(--sv-warning) 45%, transparent);
   border-radius: var(--sv-radius-lg); background: var(--sv-warning-soft); color: var(--sv-text); font-size: var(--sv-font-sm); line-height: 1.25rem; box-shadow: var(--sv-shadow-sm); }
-:is(.mic-silent-note, .call-listen-note) svg { flex: none; color: var(--sv-warning); }
+:is(.mic-silent-note, .call-listen-note) svg { flex: none; color: var(--sv-state-attention); }
 /* Listen only is no warning: the same note, quiet. */
 .call-listen-note { border-color: var(--sv-border); background: var(--sv-bg-sunken); }
 .call-listen-note svg { color: var(--sv-text-muted); }
@@ -496,11 +496,12 @@
 .voice-setup-card > .voice-models { justify-self: stretch; margin-top: var(--sv-space-3); text-align: start; }
 .voice-model-progress { grid-column: 1 / -1; width: 100%; height: 4px; accent-color: var(--sv-accent); }
 
-/* Can't receive (reach holding): its own look, amber like the warning, never the resting one. */
+/* Can't receive (reach holding): its own look, never the resting one: the slashed tray in the mustard of the state tokens and a wash of it
+ * behind the words, which stay in the ink. */
 /* Laid in the title block, under the name and its machine (the name's frame on a phone, the title band on a desktop), in
  * flow: it covers neither the name nor the balloons. */
 .stage-holding { display: grid; justify-items: start; gap: .25em; justify-self: start; max-width: min(100%, 32em); margin: .3em 0 0; padding: .35em .7em; border-radius: var(--sv-radius-lg, 14px);
-  background: var(--sv-warning-soft); color: var(--sv-warning); font-size: .6em; line-height: 1.3333em; font-weight: var(--sv-weight-semibold); text-align: start; }
+  background: color-mix(in srgb, var(--sv-state-attention) 16%, var(--sv-surface)); color: var(--sv-text); font-size: .6em; line-height: 1.3333em; font-weight: var(--sv-weight-semibold); text-align: start; }
 .stage-holding-line { display: inline-flex; align-items: center; gap: .4em; }
 .stage-holding-why { font-size: 1em; font-weight: var(--sv-weight-normal, 400); color: var(--sv-text-muted); overflow-wrap: anywhere; }
-.call-details-holding h3 { color: var(--sv-warning); }
+.call-details-holding h3 { display: flex; align-items: center; gap: var(--sv-space-1-5); }

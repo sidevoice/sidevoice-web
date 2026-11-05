@@ -2,7 +2,7 @@
  * nearness, the click guard, the drag, the window's size, and the two panels — the conversation picker and the
  * devices. */
 import { useCallback, useEffect, useRef, useState, type ReactNode, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
-import { ChevronIcon, HarnessIcon, MachinesIcon, MicrophoneIcon, SpeakerIcon } from "../components/ui/Icons";
+import { ChevronIcon, HarnessIcon, MachinesIcon, MicrophoneIcon, SpeakerIcon, StateGlyph } from "../components/ui/Icons";
 import { ConversationRows } from "../features/room/ConversationRows";
 import { hasUnread } from "../features/call/conversation-state";
 import type { ParticipantView } from "../state/room-types";
@@ -337,14 +337,15 @@ export function DevicePicker({ call, run, onDone, t }: { call: CallSnapshot; run
   );
 }
 
-/** One row's line in the card's words: where it runs, and a reach that is not normal (the dot says the rest). */
+/** One row's line in the card's words: where it runs, and a reach that is not normal (the dot says the rest; can't receive leads with
+ *  its slashed tray). */
 function conversationSub(row: ParticipantView, t: Translate) {
   const reach = row.reach === "holding" ? t("card.reach.holding") : row.reach === "offline" || !row.available ? t("card.reach.offline") : null;
   return (
     <>
       {row.machine && <span className="person-machine"><MachinesIcon size={11} /> {row.machine}</span>}
       {(row.harness || row.model) && <span className="person-harness">{row.harness && <HarnessIcon harness={row.harness} size={11} />} {[row.model, row.effort].filter(Boolean).join(" · ")}</span>}
-      {reach && <span className="person-reach"> · {reach}</span>}
+      {reach && <span className="person-reach"> · {row.reach === "holding" && <StateGlyph kind="holding" size={12} />}{reach}</span>}
     </>
   );
 }

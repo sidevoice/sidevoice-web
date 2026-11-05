@@ -116,6 +116,26 @@ test("the avatar shows only the agent, the wave only you: muted crosses the wave
   expect(document.querySelector(".card-state")).toHaveAttribute("data-mood", "muted");
 });
 
+test("the state line leads with the state's icon, in the state's colour; its words are never tinted (scheme E)", () => {
+  const host = fakeHost();
+  render(<Card host={host} />);
+  const line = () => document.querySelector(".card-state")!;
+  const glyph = () => line().querySelector("svg.state-glyph");
+  const cases: [Partial<CallSnapshot>, string | null][] = [
+    [{ mood: "listening" }, "listening"], [{ mood: "speaking" }, "speaking"], [{ mood: "working" }, "working"], [{ mood: "holding" }, "holding"],
+    [{ mood: "offline" }, "offline"], [{ mood: "listening", micEnabled: false }, "muted"], [{ mood: "idle" }, null], [{ mood: "listening", busy: true }, null],
+  ];
+  for (const [change, kind] of cases) {
+    host.push({ call: snapshot(change) });
+    if (kind) expect(glyph(), JSON.stringify(change)).toHaveClass("state-glyph-" + kind);
+    else { expect(glyph(), JSON.stringify(change)).toBeNull(); expect(line().querySelector("i")).not.toBeNull(); }
+  }
+  // Can't receive is the slashed tray with its words beside it, in the one ink: the icon is the only thing coloured.
+  host.push({ call: snapshot({ mood: "holding" }) });
+  expect(line()).toHaveTextContent("Can't receive");
+  expect(glyph()!.querySelector("mask")).not.toBeNull();
+});
+
 test("a mood this version does not know reads as resting, never a raw key (core#112)", () => {
   const host = fakeHost();
   render(<Card host={host} />);

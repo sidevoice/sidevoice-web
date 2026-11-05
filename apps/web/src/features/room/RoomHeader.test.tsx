@@ -242,3 +242,17 @@ test("the sidebar wears the count inside the conversations icon, as the card's s
   expect(head.querySelectorAll(".conversations-count")).toHaveLength(1);
   expect(chip.nextSibling).toHaveTextContent("Conversations");
 });
+
+test("an agent that cannot receive says so on its card with the slashed tray, in the state's own colour; the dot stays the connected green", () => {
+  room([...PEOPLE.slice(0, 3), person("t-week", "Plan the week", { reach: { state: "holding" } }), person("t-off", "Old notes", { available: false, reach: { state: "offline" } })]);
+  const row = (title: string) => [...document.querySelectorAll(".conversation-sidebar .person")].find((button) => button.textContent?.includes(title))!;
+  const holding = row("Plan the week");
+  expect(holding.querySelector(".sidebar-state-text")).toHaveTextContent(/^Can't receive$/);
+  expect(holding.querySelector(".sidebar-state svg.state-glyph-holding")).not.toBeNull();
+  // The card's dot says connected (spec §4): the can't-receive mustard is the icon's and the header avatar's.
+  expect(holding.querySelector(".state-dot")).toHaveAttribute("data-kind", "holding");
+  // Offline and waiting say it in words alone: no state icon beside them.
+  expect(row("Old notes").querySelector(".sidebar-state svg.state-glyph")).toBeNull();
+  expect(row("Migrate the payments API").querySelector(".sidebar-state svg.state-glyph")).toBeNull();
+  expect(row("Old notes").querySelector(".sidebar-state-text")).toHaveTextContent(/^Offline$/);
+});

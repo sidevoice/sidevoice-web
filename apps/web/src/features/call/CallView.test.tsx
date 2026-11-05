@@ -487,6 +487,9 @@ test("holding stands in idle's place: the notice is in the title block, the crea
   const notice = document.querySelector(".stage-holding")!;
   expect(notice).toHaveTextContent("Can't receive");
   expect(notice).toHaveTextContent("The editor is closed. Open it.");
+  // Led by the slashed tray in the state's mustard (never the old pause); the words stay in the ink.
+  expect(notice.querySelector(".stage-holding-line svg.state-glyph-holding mask")).not.toBeNull();
+  expect(notice.querySelector(".stage-holding-line")!.textContent).toBe("Can't receive");
   // Neither over the balloons nor the title: it is in the title block, not in the stage's top cell.
   expect(notice.closest(".stage-top")).toBeNull();
   expect(notice.closest(".stage-name, .stage-title")).not.toBeNull();

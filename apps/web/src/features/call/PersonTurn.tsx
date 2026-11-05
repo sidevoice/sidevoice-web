@@ -10,6 +10,7 @@ import { receiptView } from "../../state/room-session-state.js";
 import { PAGE_MS } from "./PagedText";
 import { SENT_LEAVING_MS, useSentTurns, type SentTurn } from "./speech-reading";
 import { VoiceWaveform } from "../conversation/VoiceWaveform";
+import { VoiceBarsIcon } from "../../components/ui/Icons";
 import { CancelGlyph, MicIcon } from "./StageVoice";
 
 /* The person's balloon at the tile's foot, drawn as the agent's is (call-view.css), its tail out of the tile's corner
@@ -98,7 +99,7 @@ export function PersonTurn({ conversation, t, look = "balloon", cut: over = fals
       {turns.map((turn) => <SentBubble key={turn.key} turn={turn} onDone={done} look="card" cut={pending || over} under={false} away={turn.thread !== conversation.thread} from={null} />)}
       {(pending || taken.leaving) && (
         <div key={"live-" + taken.round} className="vcap card person pill" data-phase={transcribing ? "transcribing" : "listening"} data-leaving={taken.leaving || undefined} translate="no">
-          <span className="lead"><MicIcon />{transcribing
+          <span className="lead">{transcribing ? <VoiceBarsIcon size={13} /> : <MicIcon />}{transcribing
             ? <span className="tlabel" role="status">{t("stage.transcribing")}<span className="ell" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span></span>
             : <VoiceWaveform phase="listening" />}</span>
           {(conversation.pendingCancellable || taken.leaving) && <Tooltip action content={t("stage.cancelTurn")}>

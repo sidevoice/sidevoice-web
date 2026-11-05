@@ -122,7 +122,7 @@
 .pt-wave i { width: 3px; border-radius: 2px; background: var(--sv-accent); }
 .pt-wave i:nth-child(1) { height: 6px; } .pt-wave i:nth-child(2) { height: 14px; } .pt-wave i:nth-child(3) { height: 10px; } .pt-wave i:nth-child(4) { height: 4px; }
 .pt-mic[data-muted] { background: var(--sv-danger-soft); }
-.pt-mic[data-muted] .pt-mute { color: var(--sv-danger); }
+.pt-mic[data-muted] .pt-mute { color: var(--sv-state-muted); }
 .pt-mic[data-muted] .pt-wave { opacity: .3; }
 .pt-menu-anchor { position: relative; }
 

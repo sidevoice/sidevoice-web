@@ -2,7 +2,7 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState, type CSS
 import { Alert } from "../../components/ui/Alert";
 import { UpdateNotice } from "../updates/UpdateNotice";
 import { Button } from "../../components/ui/Button";
-import { CloseIcon, HarnessIcon, MachinesIcon, PauseIcon } from "../../components/ui/Icons";
+import { CloseIcon, HarnessIcon, MachinesIcon, StateGlyph } from "../../components/ui/Icons";
 import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import type { ChatMessage, ConversationView } from "../../state/room-types";
@@ -136,10 +136,10 @@ function VoiceCards({ stage, conversation, reply, reading, onUp, t }: { stage: S
 }
 
 /** The agent cannot receive what the person says: the words, and why and what to do when the core says (ParticipantView.detail
- *  carries the reason and its remedy). Not the resting look: an amber pause, laid in the title block under the name and
- *  machine (StageName), so it never covers the name nor the balloons. */
+ *  carries the reason and its remedy). Not the resting look: the slashed tray in the state's mustard, with the words in the
+ *  ink's colour, laid in the title block under the name and machine (StageName), so it never covers the name nor the balloons. */
 function StageHolding({ stage, t }: { stage: StageConversation; t: Translate }) {
-  return <p className="stage-holding" role="status"><span className="stage-holding-line"><PauseIcon size={14} />{t("state.holding")}</span>
+  return <p className="stage-holding" role="status"><span className="stage-holding-line"><StateGlyph kind="holding" size={14} />{t("state.holding")}</span>
     {stage.row?.detail && <span className="stage-holding-why" translate="no">{stage.row.detail}</span>}</p>;
 }
 

@@ -16,7 +16,7 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .call-card {
   --fg: var(--sv-text); --mu: var(--sv-muted); --btn: rgb(255 255 255 / 9%); --btn-hover: rgb(255 255 255 / 16%);
   --line: rgb(255 255 255 / 9%); --accent: var(--sv-primary); --accent-bg: var(--sv-primary-muted);
-  --avatar: #4a2f6b; --muted-bg: #f9dedc; --muted-fg: #601410; --end: #dc362e; --end-hover: #ef443b; --cross: #ff8a80;
+  --avatar: #4a2f6b; --end: #dc362e; --end-hover: #ef443b;
   box-sizing: border-box; width: 320px; padding: 10px 12px; border-radius: 16px; color: var(--fg);
   background: rgb(22 25 31 / 92%); border: 1px solid var(--line); box-shadow: 0 2px 8px rgb(0 0 0 / 45%);
   -webkit-backdrop-filter: blur(22px) saturate(1.4); backdrop-filter: blur(22px) saturate(1.4);
@@ -24,7 +24,7 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 :root[data-theme=light] {
   .call-card {
     --fg: #1b1d24; --mu: #5d6470; --btn: rgb(27 29 36 / 7%); --btn-hover: rgb(27 29 36 / 13%); --line: rgb(42 26 64 / 12%);
-    --accent: #4a2f6b; --accent-bg: #f3eefa; --cross: #d93025;
+    --accent: #4a2f6b; --accent-bg: #f3eefa;
     background: rgb(255 255 255 / 92%); box-shadow: 0 2px 8px rgb(42 26 64 / 28%);
   }
 }
@@ -60,7 +60,7 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 /* The chevron and "open Sidevoice" keep their space at rest and only appear near the pointer: nothing moves. */
 .card-title-chevron { width: 14px; flex: none; visibility: hidden; opacity: 0; color: var(--mu); transition: opacity .15s; }
 .call-card[data-expanded] .card-title-chevron { visibility: visible; opacity: 1; }
-.card-unread { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; margin-left: 2px; }
+.card-unread { width: 6px; height: 6px; border-radius: 50%; background: var(--sv-state-attention); flex: none; margin-left: 2px; }
 .card-title[aria-expanded=true] .card-title-chevron svg { transform: rotate(180deg); }
 .card-sub { font-size: 11px; color: var(--mu); display: flex; align-items: center; gap: 5px; white-space: nowrap; overflow: hidden; max-width: 100%; }
 .card-sub.reconnecting { color: var(--fg); opacity: .8; }
@@ -78,7 +78,7 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 /* A bar is 3px to 16px tall (--h) and fully rounded: a middle that scales and two round ends that slide with it, so
    every moving part is a transform. */
 .your-wave i { --h: 3; position: relative; width: 2.6px; height: 16px; }
-.your-wave i::before, .your-wave i::after, .your-wave b { content: ""; position: absolute; left: 0; top: 50%; width: 2.6px; background: var(--accent); transition: transform 70ms linear; will-change: transform; }
+.your-wave i::before, .your-wave i::after, .your-wave b { content: ""; position: absolute; left: 0; top: 50%; width: 2.6px; background: var(--sv-state-listening); transition: transform 70ms linear; will-change: transform; }
 .your-wave i::before, .your-wave i::after { height: 2.6px; margin-top: -1.3px; border-radius: 50%; }
 .your-wave i::before { transform: translateY(calc((var(--h) - 2.6) * -.5px)); }
 .your-wave i::after { transform: translateY(calc((var(--h) - 2.6) * .5px)); }
@@ -86,16 +86,17 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .your-wave[data-still] i { opacity: .4; }
 .your-wave[data-muted] i { opacity: .5; }
 .your-wave[data-muted] i::before, .your-wave[data-muted] i::after, .your-wave[data-muted] b { background: var(--mu); }
-.your-wave[data-muted]::after { content: ""; position: absolute; left: -2px; right: -2px; top: 50%; height: 1.6px; border-radius: 1px; background: var(--cross); transform: rotate(-32deg); }
+.your-wave[data-muted]::after { content: ""; position: absolute; left: -2px; right: -2px; top: 50%; height: 1.6px; border-radius: 1px; background: var(--sv-state-muted); transform: rotate(-32deg); }
 
 /* Near the pointer: the room's call controls, edge to edge. */
 .card-controls { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding: 0 6px; }
 .card-mic { display: inline-flex; align-items: center; height: 30px; border-radius: 15px; background: var(--btn); }
-.card-mic[data-muted] { background: var(--muted-bg); color: var(--muted-fg); }
+.card-mic[data-muted] { background: color-mix(in srgb, var(--sv-state-muted) 18%, transparent); }
+.card-mic[data-muted] .card-mute { color: var(--sv-state-muted); }
 .call-card .card-devices { width: 20px; height: 30px; border-radius: 15px 0 0 15px; color: var(--mu); border-right: 1px solid var(--line); }
 /* The devices open below the controls: the chevron points down, and up while they are open. */
 .call-card .card-devices[aria-expanded=true] svg { transform: rotate(180deg); }
-.card-mic[data-muted] .card-devices { color: var(--muted-fg); border-right-color: rgb(96 20 16 / 20%); }
+.card-mic[data-muted] .card-devices { border-right-color: color-mix(in srgb, var(--sv-state-muted) 30%, transparent); }
 .call-card .card-mute { width: 30px; height: 30px; border-radius: 0 15px 15px 0; }
 .call-card .card-mic button:hover:not(:disabled) { background: var(--btn-hover); }
 .call-card .card-skip { width: 30px; height: 30px; border-radius: 50%; color: var(--fg); }
@@ -115,15 +116,16 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .call-card .card-panel .person:hover { background: var(--btn); }
 .card-panel .person-initials { display: none; }
 .card-panel .person-state { display: inline-flex; flex: none; }
-/* The picker's light is the state's fixed colour (styles/tokens.css --sv-state-*): listening, working (blinking), resting while
-   it holds, unreachable while offline. */
+/* The picker's light is the state's fixed colour (styles/tokens.css --sv-state-*): listening, working (blinking), the mustard of
+   "can't receive" while it holds, unreachable while offline. */
 .card-panel .person-state .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sv-state-listening); }
-.card-panel .person-state[data-state=holding] .dot { background: var(--sv-state-idle); }
+.card-panel .person-state[data-state=holding] .dot { background: var(--sv-state-attention); }
 .card-panel .person-state[data-state=offline] .dot { background: var(--sv-state-offline); }
 .card-panel .person-state[data-working] .dot { background: var(--sv-state-working); animation: card-think 1.1s ease-in-out infinite; }
 .card-panel .participant-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .card-panel .person-name { font-size: 12.5px; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-panel .person-sub { font-size: 11px; color: var(--mu); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-panel .person-reach > svg { display: inline-block; margin-inline-end: 3px; vertical-align: -2px; }
 .card-panel .person-machine, .card-panel .person-harness { display: inline-flex; align-items: center; gap: 3px; vertical-align: -1px; }
 .card-panel .person-harness { margin-inline-start: 4px; }
 :root[data-theme=light] {
@@ -199,15 +201,11 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .floating-card[data-size=l] .title-card .card-title { font-size: 15px; }
 .floating-card[data-size=l] .title-card .card-sub { font-size: 12px; }
 .title-card .card-title-text { min-width: 0; }
+/* What is happening: the state's icon in the state's colour (StateGlyph, ui.css: the `--sv-state-*` tokens), then its words in the card's
+   ink, never tinted. Resting, present and reconnecting have no icon: the plain dot, the idle grey. */
 .card-state { display: inline-flex; align-items: center; gap: 5px; margin-top: 2px; font-size: 12px; font-weight: 600; white-space: nowrap; }
-.card-state i { width: 7px; height: 7px; border-radius: 50%; background: var(--mu); }
-.card-state[data-mood=listening] i { background: var(--accent); }
-.card-state[data-mood=speaking] i { background: var(--sv-voice, #e0a82e); }
-.card-state[data-mood=working] i { background: #5bbf8a; animation: card-think 1.4s ease-in-out infinite; }
-.card-state[data-mood=holding] { color: var(--sv-warning); }
-.card-state[data-mood=holding] i { background: var(--sv-warning); }
-.card-state[data-mood=muted] i { background: var(--end); }
-@media (prefers-reduced-motion: reduce) { .card-state i { animation: none !important; } }
+.card-state i { width: 7px; height: 7px; margin: 0 3.5px; border-radius: 50%; background: var(--sv-state-idle); }
+.card-state > svg { width: 14px; height: 14px; margin: -2px 0; }
 .title-card .your-wave { align-self: center; }
 .title-card .your-wave[data-muted]::after { left: 3px; right: 3px; height: 1.2px; transform: rotate(-14deg); opacity: .85; }
 /* ×, and near the pointer the gear and "open", in the top right corner, over what is there. */

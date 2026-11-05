@@ -38,13 +38,21 @@ export function conversationState(row: ParticipantView, inCall: boolean): Conver
   return "waiting";
 }
 
+/** Whether a conversation's agent is there and cannot take what the person says (reach holding): "Can't receive". Offline is
+ *  another thing (nothing there), and so is an agent the machine cannot reach. */
+export function isHolding(row: Pick<ParticipantView, "reach" | "available">): boolean {
+  return row.reach === "holding" && !!row.available;
+}
+
 /** The colour a conversation's state is told by (the `--sv-state-*` tokens, styles/tokens.css): working while its harness says so
- *  (as its words do, whatever its avatar acts out under the stage's balloon), otherwise what its avatar is doing. A resting
- *  agent and one that is merely present share the one colour; one that cannot be reached has its own. Needing the person
- *  ("attention") is a mark of its own (hasUnread), not a state here. */
-export type StateKind = "listening" | "speaking" | "working" | "idle" | "offline";
-export function stateKind(state: ConversationState, mood: AvatarMood): StateKind {
+ *  (as its words do, whatever its avatar acts out under the stage's balloon), then can't receive (`holding`, which the avatar
+ *  never acts out: it rests), otherwise what its avatar is doing. A resting agent and one that is merely present share the one
+ *  colour; one that cannot be reached has its own. Needing the person ("attention") is a mark of its own (hasUnread), not a state
+ *  here. */
+export type StateKind = "listening" | "speaking" | "working" | "holding" | "idle" | "offline";
+export function stateKind(state: ConversationState, mood: AvatarMood, holding = false): StateKind {
   if (state === "working") return "working";
+  if (holding) return "holding";
   return mood === "listening" || mood === "speaking" || mood === "working" || mood === "offline" ? mood : "idle";
 }
 
@@ -65,7 +73,7 @@ export function hasUnread(row: Pick<ParticipantView, "threadId" | "unread" | "se
 export function stateText(row: ParticipantView, inCall: boolean, t: Translate): string {
   const state = conversationState(row, inCall);
   return state === "in-call" ? t("state.inCall") : state === "working" ? t("state.working")
-    : state === "waiting" ? t("state.waiting") : row.reach === "holding" && row.available ? t("state.holding") : t("state.offline");
+    : state === "waiting" ? t("state.waiting") : isHolding(row) ? t("state.holding") : t("state.offline");
 }
 
 /** The words for what an agent's avatar is acting out: the stage says them with its name. */
