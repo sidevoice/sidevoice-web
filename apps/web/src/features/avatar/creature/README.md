@@ -15,7 +15,8 @@ eyes (Void, MIT: see `THIRD_PARTY_NOTICES.md`).
 | `catalogue.ts` | what a creature can be (bodies, palette, irises, slots, rarity, colour harmony) and which one a conversation gets: the creator's Random button, its `Math.random` replaced by a stream seeded with the conversation's key (`<machine fingerprint>\|<thread id>`). No three.js |
 | `faces.ts` | how a still face looks in each state |
 | `fallback.ts` | what stands in where no creature can be drawn: the body colour in a plain outline, no face. No three.js |
-| `host.ts` | where creatures are drawn: two stages per page, the live loop (about 30 frames a second), the still faces, the framings, the pointer gaze, and the acts on the rig's layers; what happens when WebGL is missing, refused or lost |
+| `host.ts` | where creatures are drawn: two stages per page, the live loop (about 30 frames a second), the still faces, the framings, the pointer gaze, and the acts on the rig's layers; what happens when WebGL is missing, refused or lost; the offline poster's portrait (`posterPortrait`, for `../scene/`) |
+| `mic-hero.ts`, `mic-hero-spec.ts` | the microphone permission hero (T23): the same mostaza creature with headphones on every permissions screen, a square stage of its own while one is shown, acting out the microphone's state with the `mic` act (in `acts.js`, after the export) and its transitions (excited, sad, confused) |
 
 `CharacterAvatar` (`../CharacterAvatar.tsx`) draws a conversation's creature (the `bicho` kind) through `host.ts`, which
 it loads the first time a creature is drawn (`../creature-loader.ts`; the room does not wait for three.js). The person and
