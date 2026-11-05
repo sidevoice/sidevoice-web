@@ -148,6 +148,20 @@ export async function installHarness(page, { onboarding = { version: 1, choice: 
 }
 
 
+/** Waits for the stage's framing to be solved, and for the frame its answer asks for to be drawn. The creature host solves
+ *  it on the pixels, one trial render a frame (StageFramer): once the creature is up, and again whenever the tile, the
+ *  cards or the turn change. A browser with a GPU does it in a blink; one drawing in software (the CI's) spends a second or
+ *  two of ~70 ms frames, in which the page asks for frames, its timers run late and the layer's own properties are
+ *  written: a spec of what a settled page does (nothing), or of something timed, waits for this first. It returns at once
+ *  where the browser can draw no creature (nothing is solved there), and after `timeout` where the answer never lands. */
+export async function stageFramed(page, timeout = 30_000) {
+  if (!await page.evaluate(() => !!document.createElement("canvas").getContext("webgl"))) return;
+  // The asks of a change just made are made in the frames after it: a layer marked from the answer before it is stale.
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+  await page.locator(".stage-tile .stage-voice[data-framed]").waitFor({ state: "attached", timeout }).catch(() => {});
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+}
+
 /** Serve the installed voice package as browser modules for deterministic host/WASM contract tests. */
 export async function installVoicePackageRoute(page) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../node_modules/@sidevoice/voice");
