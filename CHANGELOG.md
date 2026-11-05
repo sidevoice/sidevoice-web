@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.22.1](https://github.com/sidevoice/sidevoice-web/compare/v0.22.0...v0.22.1) (2026-11-05)
+
+
+### Bug Fixes
+
+* **call-card:** the floating card's creature moves and is sharp ([#488](https://github.com/sidevoice/sidevoice-web/issues/488)) ([2b6aaed](https://github.com/sidevoice/sidevoice-web/commit/2b6aaed8eda4d77060e619b22925664ba296575b))
+
 ## [0.22.0](https://github.com/sidevoice/sidevoice-web/compare/v0.21.0...v0.22.0) (2026-11-05)
 
 
