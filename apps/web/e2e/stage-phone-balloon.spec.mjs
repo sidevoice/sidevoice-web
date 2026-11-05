@@ -93,22 +93,25 @@ async function onStage(page, theme, state) {
 /** Whether this browser gives the page WebGL (the creature needs it; without it its fallback stands in). */
 const webgl = (page) => page.evaluate(() => !!document.createElement("canvas").getContext("webgl"));
 
-/** Every animation frame for `ms` after `facts` are patched in: each card's box (its pop-in transform included), the
- *  creature's drawn pixels under it and the gap from its top to the lowest drawn row above it. */
+/** Every animation frame for `ms` after `facts` are patched in: each card seen (its pop-in transform included; one held
+ *  unseen is skipped), whether the creature's canvas has anything drawn, the creature's drawn pixels under the card, the
+ *  gap from its top to the lowest drawn row above it, and whether it is inside the tile. */
 const sampleTransition = (page, facts, ms) => page.evaluate(([facts, ms]) => new Promise((done) => {
   const out = [], t0 = performance.now();
   window.sidevoiceUI.store.patch(facts);
   const sample = () => {
     const t = performance.now() - t0, cv = document.querySelector(".stage-agent canvas"), g = cv?.width ? cv.getContext("2d") : null;
+    const tile = document.querySelector(".stage-tile"), tr = tile.getBoundingClientRect(), inner = { top: tr.top + tile.clientTop, bottom: tr.top + tile.clientTop + tile.clientHeight };
     if (g) {
       const vr = cv.getBoundingClientRect(), k = cv.width / vr.width, W = cv.width, H = cv.height, d = g.getImageData(0, 0, W, H).data;
+      let drawn = false; for (let i = 3; i < d.length; i += 4 * 7) if (d[i] > 16) { drawn = true; break; }
       for (const card of document.querySelectorAll(".stage-tile .stage-voice > .vcap:not(.meas)")) {
-        const er = card.getBoundingClientRect();
-        if (!er.width || +getComputedStyle(card).opacity < 0.05) continue;
+        const er = card.getBoundingClientRect(), style = getComputedStyle(card);
+        if (!er.width || style.visibility === "hidden" || +style.opacity < 0.05) continue;
         const x0 = Math.max(0, Math.floor((er.left - vr.left) * k)), x1 = Math.min(W, Math.ceil((er.right - vr.left) * k)), y0 = Math.max(0, Math.floor((er.top - vr.top) * k)), y1 = Math.min(H, Math.ceil((er.bottom - vr.top) * k));
         let over = 0, low = -1;
         for (let y = 0; y < y1; y++) for (let x = x0; x < x1; x++) if (d[(y * W + x) * 4 + 3] > 16) { if (y >= y0) over++; else if (y > low) low = y; }
-        out.push({ t: Math.round(t), over, gap: low < 0 ? null : (y0 - low) / k });
+        out.push({ t: Math.round(t), drawn, over, gap: low < 0 ? null : (y0 - low) / k, inside: er.top >= inner.top - 0.5 && er.bottom <= inner.bottom + 0.5 });
       }
     }
     if (t < ms) requestAnimationFrame(sample); else done(out);
@@ -224,8 +227,11 @@ test.describe("desktop", () => {
       const key = await page.evaluate(() => { const person = window.sidevoiceUI.store.getState().facts.people.find((p) => p.thread_id === "t1"); return `${person.node}|t1`; });
       const samples = await sampleTransition(page, STATES[state].at(-1)(key), 2500);
       const tileHeight = await page.evaluate(() => document.querySelector(".stage-tile").clientHeight);
-      if (await webgl(page)) expect(samples.length, "the card seen over the creature's canvas").toBeGreaterThan(0);
+      const drawn = await webgl(page);
+      if (drawn) expect(samples.length, "the card seen over the creature's canvas").toBeGreaterThan(0);
       for (const s of samples) {
+        if (drawn) expect(s.drawn, `${s.t} ms: the creature is drawn`).toBe(true);
+        expect(s.inside, `${s.t} ms: the card inside the tile`).toBe(true);
         expect(s.over, `${s.t} ms: the creature's pixels under the card`).toBe(0);
         if (s.gap != null) expect(s.gap, `${s.t} ms: the gap to the creature`).toBeGreaterThanOrEqual(Math.max(14, tileHeight * 0.035) - 1.5);
       }

@@ -76,6 +76,12 @@
 [data-theme="dark"] .vcap .cancel { background: rgb(255 255 255 / 14%); }
 .vcap[data-leaving] .cancel { pointer-events: none; }
 
+/* Held while it could not both keep the gap to the creature and stay inside the tile (the creature still standing close,
+ * stepping back for it): unseen, its pop-in waiting to start (StageVoice, data-hold). */
+.stage-voice[data-hold~="agent"] > .vcap.agent:not(.meas, [data-leaving]),
+.stage-voice[data-hold~="pill"] > .vcap.pill:not(.meas, [data-leaving]),
+.stage-voice[data-hold~="sent"] > .vcap.sent:not(.meas, [data-leaving]) { visibility: hidden; animation-play-state: paused; }
+
 /* Measured, never seen: each card at its largest, for the framing to make room for it. */
 .vcap.meas { visibility: hidden; animation: none; }
 

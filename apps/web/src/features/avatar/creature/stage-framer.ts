@@ -159,7 +159,7 @@ export class StageFramer {
   private ease = { from: { lift: 0, zk: 1 } as Framing, corrFrom: 0, corrTo: 0, span: 0 };
 
   constructor(private host: FramerHost, private frame: StageFrame) {
-    this.off = frame.listen(() => { this.solve(); this.host.poke(); });
+    this.off = frame.listen(() => { this.boxed = null; this.solve(); this.host.poke(); });
   }
 
   dispose() {
@@ -173,7 +173,14 @@ export class StageFramer {
   hold(still: boolean) { this.held = still; }
 
   /** The canvas's box, css px, and where it sits in the tile (the stage's ask). */
-  private box() { const r = this.host.canvas.getBoundingClientRect(), a = this.frame.request; return { w: r.width, h: r.height, dx: a?.dx ?? 0, dy: a?.dy ?? 0 }; }
+  private box() {
+    if (!this.boxed) { const r = this.host.canvas.getBoundingClientRect(); this.boxed = { w: r.width, h: r.height }; }
+    const a = this.frame.request;
+    return { w: this.boxed.w, h: this.boxed.h, dx: a?.dx ?? 0, dy: a?.dy ?? 0 };
+  }
+  /** The canvas's box on screen, read once per layout change (its resize, a new ask), never on the frames' path where the
+   *  cards' and the backdrop's positions are written. */
+  private boxed: { w: number; h: number } | null = null;
 
   /** The view the framing scales: the desktop's, or the phone's measured one (measured between frames when the creature
    *  is new to the page; the last framing holds meanwhile). */
@@ -231,7 +238,7 @@ export class StageFramer {
       const cv = (this.trial ??= document.createElement("canvas"));
       if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
       host.render(cam.zoom, cam.lookY, state, cv);
-      const vr = shown.getBoundingClientRect(), k = W / vr.width;
+      const k = W / this.box().w;
       const x0 = Math.max(0, Math.floor(xa * k)), x1 = Math.min(W, Math.ceil(xb * k));
       const d = cv.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, W, H).data;
       let low = -1, top = H, lowAny = -1;
@@ -431,10 +438,13 @@ export class StageFramer {
   }
 
   /** The creature's lowest drawn row where it stands now (eased), css px of the tile: its projected bounds, moved by how
-   *  they differ from the pixels at the framings eased between (all of it at the target), and a px of care mid-way. */
+   *  they differ from the pixels at the framings eased between (all of it at the target). Mid-way, care besides: a couple
+   *  of px, and while it moves the room its breathing and its squash with the voice take below its key pose; none once it
+   *  stands at the target, so a card settles exactly where the framing puts it. */
   private lowNow(v: View, est: Rows): number {
     const e = this.ease, to = this.to!, p = e.span > 1e-6 ? Math.max(0, Math.min(1, 1 - Math.hypot(to.lift - this.cap.lift, to.zk - this.cap.zk) / e.span)) : 1;
-    return est.low + e.corrFrom + (e.corrTo - e.corrFrom) * p + (1 - p) * 2;
+    const sway = this.held ? 0 : (to.low - to.top) * MOTION_ROOM + 1;
+    return est.low + e.corrFrom + (e.corrTo - e.corrFrom) * p + (1 - p) * (2 + sway);
   }
 
   /** The camera to draw this frame with, eased a step toward the target (creator.js draw); whether it is still moving. Says
@@ -448,20 +458,17 @@ export class StageFramer {
     if (this.held) this.cap = { lift: to.lift, zk: to.zk };
     else if (this.cap.lift !== to.lift || this.cap.zk !== to.zk) this.cap = easeFraming(this.cap, to);
     const moving = this.cap.lift !== to.lift || this.cap.zk !== to.zk;
-    const box = this.box(), { gap } = stageBands(ask.h, ask.phone), est = this.estimate(v, this.cap);
-    this.frame.feet(this.footAt(v, this.cap, box.h) + box.dy);
-    if (est) {
-      // Moving, it breathes and speaks a little below its key pose (a squash with the voice): room for that besides.
-      const sway = this.held ? 0 : (to.low - to.top) * MOTION_ROOM + 1;
-      const low = (moving ? this.lowNow(v, est) : to.low) + sway, reach = Math.max(0, (to.reach ?? to.low) - to.low);
-      this.frame.edge({ floor: low + gap, floorAny: low + reach + gap });
-    } else this.frame.edge(null);
+    // everything read first (the cached box, projections), then written (the feet, the cards' floor)
+    const box = this.box(), { gap } = stageBands(ask.h, ask.phone), est = moving ? this.estimate(v, this.cap) : null;
+    const feet = this.footAt(v, this.cap, box.h) + box.dy, low = est ? this.lowNow(v, est) : to.low, reach = Math.max(0, (to.reach ?? to.low) - to.low);
+    this.frame.feet(feet);
+    this.frame.edge({ floor: low + gap, floorAny: low + reach + gap });
     return { ...this.camera(v, this.cap), moving };
   }
 
   /** Forgets the framing solved (the canvas changed shape, or the creature's room did): solved again when next asked. */
   invalidate() {
-    this.key = ""; this.phone = null; this.solved.clear();
+    this.key = ""; this.phone = null; this.solved.clear(); this.boxed = null;
     for (const j of this.jobs) j.steps.return(undefined as unknown as FrameTarget);
     this.jobs = [];
     this.solve();

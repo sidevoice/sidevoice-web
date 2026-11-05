@@ -39,7 +39,7 @@ export function StageVoice({ frame, turn, phone, children }: { frame: StageFrame
   const pill = useRef<HTMLDivElement>(null);
   const sent = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<{ w: number; h: number; dx: number; dy: number; sh: number } | null>(null);
-  const [cards, setCards] = useState<(FrameCards & { sent: number }) | null>(null);
+  const [cards, setCards] = useState<(FrameCards & { sent: number; agent: number; pill: number }) | null>(null);
   const [up, setUp] = useState(false);
 
   // The tile's inner size, and where the creature's canvas sits in it (its scene may overhang the tile's border).
@@ -84,8 +84,8 @@ export function StageVoice({ frame, turn, phone, children }: { frame: StageFrame
     const node = layer.current, A = agent.current, P = pill.current, S = sent.current;
     if (!node || !A || !P || !S || !size) return;
     const box = node.getBoundingClientRect(), r = A.getBoundingClientRect();
-    const next = { below: Math.max(A.offsetHeight, P.offsetHeight, S.offsetHeight), above: 0, xa: r.left - box.left, xb: r.right - box.left, sent: S.offsetHeight };
-    setCards((was) => was && was.below === next.below && was.sent === next.sent && was.above === next.above && Math.abs(was.xa - next.xa) < 0.01 && Math.abs(was.xb - next.xb) < 0.01 ? was : next);
+    const next = { below: Math.max(A.offsetHeight, P.offsetHeight, S.offsetHeight), above: 0, xa: r.left - box.left, xb: r.right - box.left, sent: S.offsetHeight, agent: A.offsetHeight, pill: P.offsetHeight };
+    setCards((was) => was && was.below === next.below && was.sent === next.sent && was.agent === next.agent && was.pill === next.pill && was.above === next.above && Math.abs(was.xa - next.xa) < 0.01 && Math.abs(was.xb - next.xb) < 0.01 ? was : next);
   }, [size, fonts, phone]);
 
   // Whether a card is on the stage: the framing steps back for it, whatever the agent is doing (a reply lingering after
@@ -107,15 +107,21 @@ export function StageVoice({ frame, turn, phone, children }: { frame: StageFrame
 
   // No card over the creature while it eases back for one (or before its framing is solved): each card's top is a gap
   // under the creature's lowest drawn row as it stands now, at least (--voice-floor; stage-voice.css takes the larger).
+  // Nor out of the tile: a card that cannot be both yet (a reply's three lines while the creature still stands close, at
+  // rest) is held, unseen and its pop-in not started, until it can (data-hold). Heights are the measured ones: nothing is
+  // read on this path, only written.
   useEffect(() => {
     const node = layer.current;
-    if (!node) return;
+    if (!node || !size || !cards) return;
+    const fits = (floor: number, height: number) => floor + height <= size.h - 2 + 0.5;
     return frame.watchEdge((edge) => {
-      if (!edge) { node.style.removeProperty("--voice-floor"); node.style.removeProperty("--voice-floor-sent"); return; }
+      if (!edge) { node.style.removeProperty("--voice-floor"); node.style.removeProperty("--voice-floor-sent"); node.removeAttribute("data-hold"); return; }
       node.style.setProperty("--voice-floor", edge.floor.toFixed(2) + "px");
       node.style.setProperty("--voice-floor-sent", edge.floorAny.toFixed(2) + "px");
+      const hold = [!fits(edge.floor, cards.agent) && "agent", !fits(edge.floor, cards.pill) && "pill", !fits(edge.floorAny, cards.sent) && "sent"].filter(Boolean).join(" ");
+      if (hold) node.setAttribute("data-hold", hold); else node.removeAttribute("data-hold");
     });
-  }, [frame]);
+  }, [frame, size, cards]);
 
   // The backdrop's ground line follows the creature's feet as the framing moves it (the reference's backdrops: their frame's
   // y 357 on the feet): the tile's canvas says where they are drawn (--stage-feet, px from the tile's inner top) and how far that moves
