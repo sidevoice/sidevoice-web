@@ -9,7 +9,7 @@
 .stage-voice { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
 
 .vcap { --fs: var(--fsA, 18px); --lh: var(--lhA, 25px); --vcap-fill: #fff;
-  position: absolute; top: max(var(--voice-top, 0px), var(--voice-floor, 0px)); left: 50%; z-index: 3; pointer-events: none;
+  position: absolute; top: var(--voice-top, 0px); left: 50%; z-index: 3; pointer-events: none;
   font-family: var(--sv-font-sans); font-weight: 450; letter-spacing: -.01em; text-wrap: pretty; font-size: var(--fs); line-height: var(--lh);
   transform: translateX(-50%); transform-origin: 50% 0; animation: vcap-in 460ms cubic-bezier(.3, 1.5, .5, 1) both; }
 .vcap.person { --fs: var(--fsP, 16px); --lh: var(--lhP, 23px); }
@@ -44,7 +44,7 @@
 
 /* What was sent: under the lowest pose the creature may take while it shows (the agent resting or working by then); its
  * first three lines, an ellipsis where it is cut. */
-.vcap.sent { top: max(var(--voice-top-sent, var(--voice-top, 0px)), var(--voice-floor-sent, var(--voice-floor, 0px))); }
+.vcap.sent { top: var(--voice-top-sent, var(--voice-top, 0px)); }
 .vcap.sent .vcap-said { display: block; padding-top: calc(var(--lh) * .55); margin-top: calc(var(--lh) * -.55); }
 .vcap.sent .vcap-said > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
 

@@ -49,7 +49,7 @@ async function settled(page) {
   }
 }
 
-async function onStage(page, theme, state) {
+async function onStage(page, theme, state, { held = false } = {}) {
   await installHarness(page, { participants: { first: [conversation] } });
   // The call below is the page's own state, not a room's: the room would answer its binding poll (/api/presentation,
   // on the beat and after the pick) with no binding, and the page would take the call as ended by it and clear the
@@ -82,7 +82,7 @@ async function onStage(page, theme, state) {
   }
   // Where a state has one, its balloon is up before it is measured (a slow runner takes its time), and it pops in over
   // 460ms: measure it where it stands.
-  if (state !== "idle" && state !== "working") await page.locator(".stage-tile .stage-voice > .vcap:not(.meas)").first().waitFor({ timeout: 10_000 });
+  if (state !== "idle" && state !== "working") await page.locator(".stage-tile .stage-voice > .vcap:not(.meas)").first().waitFor({ timeout: 10_000, state: held ? "attached" : "visible" });
   // What was sent shows PAGE_MS: measured as it lands, the framing having settled while the person spoke (above).
   if (state.endsWith("sent")) await page.waitForTimeout(300);
   else { await page.waitForTimeout(900); await settled(page); }
@@ -215,12 +215,13 @@ test.describe("844x390 landscape", () => {
   test.use({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
   for (const state of ["idle", "speaking", "listening"]) {
     test(`${state}: the creature stays on the stage and no card covers it`, async ({ page }) => {
-      await onStage(page, "light", state);
+      // a card that cannot fit under the creature in so short a tile waits unseen: never over it, never out of the tile
+      await onStage(page, "light", state, { held: true });
       const m = await measure(page);
       if (await webgl(page)) {
         expect(m.creature, "the creature is drawn").not.toBeNull();
         expect(m.creature.top, "its top on the stage").toBeGreaterThanOrEqual(m.tile.top - 0.5);
-        expect(m.creature.bottom - m.creature.top, "more of it than a sliver").toBeGreaterThan(m.tileHeight * 0.25);
+        expect(m.creature.bottom, "its foot on the stage").toBeLessThanOrEqual(m.tile.bottom + 0.5);
       }
       for (const [i, drawn] of (m.drawn ?? []).entries()) expect(drawn.over, `${m.balloons[i].kind}: the creature's pixels under it`).toBe(0);
       for (const balloon of m.balloons) expect(balloon.bottom, "inside the tile").toBeLessThanOrEqual(m.tile.bottom + 0.5);

@@ -147,9 +147,11 @@ export interface FrameSolved { target: FrameTarget; gap: number; below: number; 
    *  its poses. */
   belowAny: number }
 
-/** The cards' floor while the creature eases between framings, css px of the tile: a gap under its lowest drawn row as it
- *  stands now (`floorAny`: under the lowest of the poses it may take while what the person sent shows). */
-export interface FrameEdge { floor: number; floorAny: number }
+/** A framing change as it will play, said once when it starts: from `t0` (performance.now), every `step` ms, the cards'
+ *  floor (a gap under the creature's lowest drawn row as it eases, css px of the tile) and where its feet are drawn; the
+ *  last of each where it settles. One of each: taken at once. The stage plays it as composited animations, writing nothing
+ *  a frame. */
+export interface FrameMotion { t0: number; step: number; floor: number[]; feet: number[] }
 
 /** The stage's framing channel: the stage says what it shows (FrameAsk); the creature host, which can draw trial framings,
  *  solves it and says where the cards go (FrameSolved) and where its feet are drawn. One per stage tile. */
@@ -159,8 +161,8 @@ export class StageFrame {
   /** What the stage reads: the answer, and whether its latest ask is still being solved (the answer is the last one). */
   private snap: { solved: FrameSolved | null; pending: boolean } = { solved: null, pending: false };
   private feetAt: number | null = null;
-  private edgeAt: FrameEdge | null = null;
-  private onEdge = new Set<(edge: FrameEdge | null) => void>();
+  private motionAt: FrameMotion | null = null;
+  private onMotion = new Set<(motion: FrameMotion | null) => void>();
   private onAsk = new Set<() => void>();
   private onSolved = new Set<() => void>();
   private onFeet = new Set<(feet: number | null) => void>();
@@ -205,14 +207,12 @@ export class StageFrame {
   }
   watchFeet(fn: (feet: number | null) => void): () => void { this.onFeet.add(fn); fn(this.feetAt); return () => { this.onFeet.delete(fn); }; }
 
-  /** The cards' floor where the creature stands now, as it eases (null: none drawn): no card goes over it. */
-  edge(next: FrameEdge | null) {
-    const was = this.edgeAt;
-    if (next === was || (next && was && Math.abs(next.floor - was.floor) < 0.25 && Math.abs(next.floorAny - was.floorAny) < 0.25)) return;
-    this.edgeAt = next;
-    for (const fn of this.onEdge) fn(next);
+  /** A framing change starting (null: no creature drawn, the poster): how the cards' floor and the feet will move. */
+  motion(next: FrameMotion | null) {
+    this.motionAt = next;
+    for (const fn of this.onMotion) fn(next);
   }
-  watchEdge(fn: (edge: FrameEdge | null) => void): () => void { this.onEdge.add(fn); fn(this.edgeAt); return () => { this.onEdge.delete(fn); }; }
+  watchMotion(fn: (motion: FrameMotion | null) => void): () => void { this.onMotion.add(fn); fn(this.motionAt); return () => { this.onMotion.delete(fn); }; }
 }
 
 function sameCards(a: FrameCards | null, b: FrameCards | null) {

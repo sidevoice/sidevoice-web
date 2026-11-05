@@ -1,5 +1,5 @@
 import { ACTS, type RigCamera, type RigVector, type Stage, type StageItem } from "./rig.js";
-import { capCentre, capCentreSteps, easeFraming, REST_HEAD, REST_ZK, stageBands, type FrameAsk, type FrameProbe, type FrameSolved, type Framing, type FrameTarget, type Rows,
+import { capCentre, capCentreSteps, FRAME_EASE, REST_HEAD, REST_ZK, stageBands, type FrameAsk, type FrameMotion, type FrameProbe, type FrameSolved, type Framing, type FrameTarget, type Rows,
   type StageFrame } from "./stage-frame";
 
 /* The creature host's side of the stage's framing (stage-frame.ts): it draws trial framings of the creature into its own
@@ -163,7 +163,7 @@ export class StageFramer {
   dispose() {
     clearTimeout(this.running); this.cancelIdle?.(); this.jobs = []; this.off();
     if (this.measuring) { this.measuring.gen.return(undefined as unknown as Footprint); this.measuring = null; }
-    this.frame.feet(null); this.frame.edge(null);
+    this.frame.feet(null); this.frame.motion(null);
   }
 
   /** Held still (reduced motion, no GPU): a new framing is taken at once instead of eased into (the reference under
@@ -179,6 +179,8 @@ export class StageFramer {
   /** The canvas's box on screen, read once per layout change (its resize, a new ask), never on the frames' path where the
    *  cards' and the backdrop's positions are written. */
   private boxed: { w: number; h: number } | null = null;
+  /** When the ease running started (performance.now). */
+  private easeT0 = 0;
 
   /** The view the framing scales: the desktop's, or the phone's measured one (measured between frames when the creature
    *  is new to the page; the last framing holds meanwhile). */
@@ -349,6 +351,8 @@ export class StageFramer {
       // The first framing is taken at once (the stage opens with the creature where it stands); every change after it is
       // eased into, or taken at once while it holds still.
       if (first || this.held) { this.cap = { lift: to.lift, zk: to.zk }; this.ease.span = 0; }
+      this.easeT0 = performance.now();
+      this.frame.motion(this.motionOf(v, gap));
       this.host.poke();
       // The other framings (at rest, or a turn's, opened by either) worked out while nothing happens, so the first card is
       // not held up by them.
@@ -443,28 +447,46 @@ export class StageFramer {
    *  they differ from the pixels at the framings eased between (all of it at the target). Mid-way, care besides: a couple
    *  of px, and while it moves the room its breathing and its squash with the voice take below its key pose; none once it
    *  stands at the target, so a card settles exactly where the framing puts it. */
-  private lowNow(v: View, est: Rows): number {
-    const e = this.ease, to = this.to!, p = e.span > 1e-6 ? Math.max(0, Math.min(1, 1 - Math.hypot(to.lift - this.cap.lift, to.zk - this.cap.zk) / e.span)) : 1;
+  private lowNow(v: View, est: Rows): number { void v; return this.lowAt(est, this.cap); }
+  private lowAt(est: Rows, at: Framing): number {
+    const e = this.ease, to = this.to!, p = e.span > 1e-6 ? Math.max(0, Math.min(1, 1 - Math.hypot(to.lift - at.lift, to.zk - at.zk) / e.span)) : 1;
     const sway = this.held ? 0 : (to.low - to.top) * MOTION_ROOM + 1;
     return est.low + e.corrFrom + (e.corrTo - e.corrFrom) * p + (1 - p) * (2 + sway);
   }
 
-  /** The camera to draw this frame with, eased a step toward the target (creator.js draw); whether it is still moving. Says
-   *  where the feet are drawn and the cards' floor: a gap under the creature as it stands now, so no card is ever over it
-   *  while it eases back for one. */
+  /** Where the ease stands `n` steps (1/30 s each) after it started: FRAME_EASE of the way a step, as the reference's
+   *  frames at 30 a second, landing once within 1e-3. */
+  private easedAt(n: number): Framing {
+    const { from } = this.ease, to = this.to!, k = (1 - FRAME_EASE) ** n;
+    const f = { lift: to.lift + (from.lift - to.lift) * k, zk: to.zk + (from.zk - to.zk) * k };
+    return Math.abs(f.lift - to.lift) < 1e-3 && Math.abs(f.zk - to.zk) < 1e-3 ? { lift: to.lift, zk: to.zk } : f;
+  }
+
+  /** The change starting now, as it will play: every step, the cards' floor (a gap under the creature's lowest drawn row,
+   *  that row from its projected bounds corrected to the pixels, with care mid-way) and where its feet are drawn. */
+  private motionOf(v: View, gap: number): FrameMotion {
+    const to = this.to!, { h, dy } = this.box(), floor: number[] = [], feet: number[] = [];
+    for (let n = 0; n <= MOTION_STEPS; n++) {
+      const f = this.ease.span > 0 ? this.easedAt(n) : { lift: to.lift, zk: to.zk }, settled = f.lift === to.lift && f.zk === to.zk;
+      const est = settled ? null : this.estimate(v, f);
+      floor.push((est ? this.lowAt(est, f) : to.low) + gap);
+      feet.push(this.footAt(v, f, h) + dy);
+      if (settled) break;
+    }
+    return { t0: performance.now(), step: STEP_MS, floor, feet };
+  }
+
+  /** The camera to draw this frame with, where the ease stands now (creator.js draw, on the clock rather than per frame
+   *  drawn, so a slow renderer's frames show it where the cards' animation has it); whether it is still moving. Nothing is
+   *  written here: the change was said once, as it started (motionOf). */
   step(): { zoom: number; lookY: number | undefined; moving: boolean } | null {
     const ask = this.frame.request, pose = this.host.mood();
     if (ask && (!this.to || pose !== this.pose)) { this.pose = pose; this.solve(); }
     if (!ask || !this.to) return null;
     const v = this.view(ask.phone), to = this.to;
-    if (this.held) this.cap = { lift: to.lift, zk: to.zk };
-    else if (this.cap.lift !== to.lift || this.cap.zk !== to.zk) this.cap = easeFraming(this.cap, to);
+    if (this.held || this.ease.span === 0) this.cap = { lift: to.lift, zk: to.zk };
+    else if (this.cap.lift !== to.lift || this.cap.zk !== to.zk) this.cap = this.easedAt((performance.now() - this.easeT0) / STEP_MS);
     const moving = this.cap.lift !== to.lift || this.cap.zk !== to.zk;
-    // everything read first (the cached box, projections), then written (the feet, the cards' floor)
-    const box = this.box(), { gap } = stageBands(ask.h, ask.phone), est = moving ? this.estimate(v, this.cap) : null;
-    const feet = this.footAt(v, this.cap, box.h) + box.dy, low = est ? this.lowNow(v, est) : to.low, reach = Math.max(0, (to.reach ?? to.low) - to.low);
-    this.frame.feet(feet);
-    this.frame.edge({ floor: low + gap, floorAny: low + reach + gap });
     return { ...this.camera(v, this.cap), moving };
   }
 
@@ -477,6 +499,8 @@ export class StageFramer {
   }
 }
 
+/** The ease's step (the reference's frame at 30 a second), and the most steps a change is sampled for (it lands sooner). */
+const STEP_MS = 1000 / 30, MOTION_STEPS = 60;
 /** How long the first framing is solved for at once, on the pixels, before an estimate stands in for it (a renderer without
  *  a GPU takes a second or so; on a GPU it all takes a fraction of that). */
 const FIRST_BUDGET_MS = 1500;

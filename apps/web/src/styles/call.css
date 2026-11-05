@@ -86,8 +86,9 @@
 .stage-backdrop { position:absolute;inset:0 }
 .stage-backdrop > canvas { position:absolute;inset:0;width:100%;height:100%;display:block }
 /* Its ground line (y 357) on the creature's feet, wherever the stage's framing stands it (StageVoice keeps --stage-ground);
-   offline, where the poster hangs on the frame as drawn, left in place. */
-.stage-tile:not([data-mood=offline]) .stage-backdrop { translate:0 var(--stage-ground, 0px) }
+   offline, where the poster hangs on the frame as drawn, left in place. Eased by a transition (compositor-only), over the
+   framing's own ease (--stage-ground-ms). */
+.stage-tile:not([data-mood=offline]) .stage-backdrop { translate:0 var(--stage-ground, 0px);transition:translate var(--stage-ground-ms, 0ms) cubic-bezier(.16,.84,.44,1) }
 /* The agent stands on the ground (its feet, y 106 of its 120 box, on y 357 of the frame), 300px tall as in the lab
    unless the tile is too narrow for it. The agent is its creature (features/avatar/creature/): the camera stands it in
    this box (its feet on the box's, the top of its head at the box's crown: CharacterAvatar), and its canvas is the whole
