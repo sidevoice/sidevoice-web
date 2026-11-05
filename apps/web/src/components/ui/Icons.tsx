@@ -9,8 +9,8 @@ import {
   Download, Trash2, Activity, Check, CheckCheck, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, ExternalLink, Keyboard, KeyRound,
   MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
   PanelLeftOpen, Pause, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
-  Box, AudioWaveform, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RefreshCcwDot, Pencil, Laptop, Server,
-  Timer, ScrollText, Link, Unlink, Search, ChevronLeft, ChevronRight, Eye, EyeOff, Square, Sparkle, ShieldCheck, Captions, CaptionsOff, PictureInPicture2, Terminal, VolumeX,
+  Box, AudioWaveform, ArrowUp, ArrowLeft, ArrowRight, RefreshCcwDot, Pencil, Laptop, Server,
+  Timer, ScrollText, Link, Unlink, Search, ChevronLeft, ChevronRight, Eye, EyeOff, Square, Sparkle, ShieldCheck, Captions, CaptionsOff, PictureInPicture2, Terminal,
 } from "lucide-react";
 import type { ComponentType } from "react";
 // Other products' own marks, from their brand kits (assets/logos/README.md: where each comes from and its rules).
@@ -91,11 +91,7 @@ export const HangupIcon = mark(PhoneOff, 22);
 export const SkipIcon = mark(SkipForward, 22);
 export const DownloadsIcon = mark(Download, 18);
 export const ListenAgainIcon = mark(Play, 14);
-/** A reply that never played, and the cut marker's pause bars (the landing draws the same). */
-export const UnplayedIcon = mark(VolumeX, 14);
 export const PauseIcon = mark(Pause, 16);
-export const CutIcon = mark(Pause, 12);
-export const CutMoreIcon = mark(ChevronRight, 12);
 /** A try's recording, played and paused (TryTake). */
 export const PlayRecordingIcon = mark(Play, 16);
 export const PauseRecordingIcon = mark(Pause, 16);
@@ -107,7 +103,6 @@ export const CaptionsIcon = mark(Captions, 22);
 export const CaptionsOffIcon = mark(CaptionsOff, 22);
 /** Sends what was written. */
 export const SendIcon = mark(ArrowUp, 18);
-export const ToLatestIcon = mark(ArrowDown, 18);
 
 // ----- a message's delivery, drawn like the play mark beside it so both sit on the time's line at one size
 export const SentIcon = mark(Check, 12);
@@ -157,6 +152,37 @@ export const InfoIcon = mark(Info, 18);
 export function NewSparkleIcon({ className, size = 12 }: IconProps) {
   return <Sparkle className={className} size={size} strokeWidth={1.8} fill="currentColor" aria-hidden />;
 }
+
+/* The transcript's own marks (features/conversation), drawn as the creature redesign's frozen reference draws them
+ * (research creature-void-design-2026-11-01, reference/2026-11-04: creator.js ICON, micSvg, the transcript's markup;
+ * T38, T42, T49, T57, T59): the transcript is built to it pixel for pixel, so these are its drawings, not the set's.
+ * Moving the rest of the room to marks in this line is a pass of its own. */
+type DrawnProps = IconProps & { stroke?: number };
+function drawn(paths: string, viewBox: string, fallbackSize: number | [number, number], fill = false, fallbackStroke = 2) {
+  return function Drawn({ className, size, stroke = fallbackStroke }: DrawnProps) {
+    const [w, h] = typeof fallbackSize === "number" ? [size ?? fallbackSize, size ?? fallbackSize] : size ? [size, size * fallbackSize[1] / fallbackSize[0]] : fallbackSize;
+    return <svg className={className} width={w} height={h} viewBox={viewBox} fill={fill ? "currentColor" : "none"} stroke={fill ? undefined : "currentColor"}
+      strokeWidth={fill ? undefined : stroke} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" dangerouslySetInnerHTML={{ __html: paths }} />;
+  };
+}
+/** The transcript, by its three lines (its head, T59: the stage's transcript button's). */
+export const TranscriptLinesIcon = drawn('<path d="M4 6h16M4 12h16M4 18h10"/>', "0 0 24 24", 16, false, 2.2);
+/** Puts the transcript away (its head's ×). */
+export const TranscriptCloseIcon = drawn('<path d="M6 6l12 12M18 6L6 18"/>', "0 0 24 24", 15, false, 2.4);
+/** Plays a reply again, inside its message (T42). */
+export const ReplayIcon = drawn('<path d="M7 5v14l11-7z"/>', "0 0 24 24", 12, true);
+/** A message the agent has read: the two ticks; one, delivered. */
+export const ReadTicksIcon = drawn('<path d="M2 11l5 5L18 4M13 15l1 1L26 4"/>', "0 0 30 20", [15, 10], false, 3);
+export const SentTickIcon = drawn('<path d="M2 11l5 5L18 4"/>', "0 0 30 20", [15, 10], false, 3);
+/** A reply that never played (T49): a circle struck through. */
+export const NotPlayedIcon = drawn('<circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/>', "0 0 24 24", 15, false, 2.2);
+/** Opens and closes what is folded: the arrow the not-played mark turns into. */
+export const UnfoldIcon = drawn('<path d="M9 5.5l6.5 6.5L9 18.5"/>', "0 0 24 24", 15, false, 2.4);
+/** Back to the latest message (T38). */
+export const ToLatestArrowIcon = drawn('<path d="M12 5v13M6 12l6 6 6-6"/>', "0 0 24 24", 16, false, 2.6);
+/** The person's open turn: the microphone, and the × that takes the turn back. */
+export const TurnMicIcon = drawn('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>', "0 0 24 24", 13, false, 2.4);
+export const TurnCancelIcon = drawn('<path d="M6 6l12 12M18 6L6 18"/>', "0 0 24 24", 11, false, 3);
 
 /* Drawn here, because they are somebody's mark and not a generic icon. */
 export function AppleIcon({ className, size = 12 }: IconProps) {

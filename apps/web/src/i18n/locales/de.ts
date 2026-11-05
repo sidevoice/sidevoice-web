@@ -206,6 +206,10 @@ export const messages: Messages = {
   "messages.thinking": "Die Unterhaltung arbeitet an deiner Nachricht",
   "messages.new": "Neue Nachrichten",
   "messages.toLatest": "Zum Ende der Unterhaltung",
+  "messages.seeMore": "Mehr anzeigen",
+  "messages.seeLess": "Weniger anzeigen",
+  "messages.working": "Arbeitet",
+  "messages.transcribing": "Wird transkribiert",
 
   "wave.listening": "Hört zu",
   "wave.listeningTitle": "Hört zu…",

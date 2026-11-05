@@ -76,6 +76,10 @@ export interface CharacterAvatarProps {
   scene?: boolean;
   /** A creature listening: the level of the voice it hears (the person's microphone), 0..1. */
   hearLevel?: MouthLevel;
+  /** A still face that must never show blank (the transcript's, T40): rendered at once when it is not yet, and its
+   *  fallback outline stands in until its canvas is painted (while the creature's code loads too). Once painted, it keeps
+   *  its image until the next one is drawn over it. */
+  immediate?: boolean;
   /** Said for the avatar; without one it is decoration. */
   label?: string;
   className?: string;
@@ -103,7 +107,7 @@ export function CharacterAvatar(props: CharacterAvatarProps) {
 const FIGURE = { feet: 106 / 120, crown: 20 / 120 };
 
 /** A conversation's creature (creature/host.ts): live on the stage's scene, a still face elsewhere. */
-function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, hearLevel, live, scene, label, className, ref }: CharacterAvatarProps & { seed: string }) {
+function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, hearLevel, live, scene, immediate = false, label, className, ref }: CharacterAvatarProps & { seed: string }) {
   const root = useRef<HTMLSpanElement | null>(null);
   const canvas = useRef<HTMLCanvasElement | null>(null);
   const creature = useRef<LiveCreature | null>(null);
@@ -136,13 +140,17 @@ function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, 
   // The host (three.js and the rig) loads the first time a creature is drawn; the room does not wait for it.
   const { host, failed } = useCreatureHost();
   const canDraw = useDrawable(host, framing);
-  // Nothing to draw it with: the fallback stands in. While the host is loading for the first time, nothing does yet.
-  const fallback = host ? !canDraw : failed;
   // What it has on the go (its working style or pastime: creature/host.ts plays it as the rig's base act). A copy that holds
   // still shows it at rest, quiet, never a pastime frozen mid-way; a working style it shows in its key pose (the creator
   // under reduced motion).
   const idle = moving || state.idle === undefined ? state.idle : "quiet";
   const step = useMemo<CreatureStep>(() => ({ work: state.work, idle, since: state.since, until: state.until, entered: state.enteredAt }), [state.work, idle, state.since, state.until, state.enteredAt]);
+  // A face asked for at once (immediate): painted yet? Until it is, its fallback stands in, so it is never an empty box.
+  const [painted, setPainted] = useState(false);
+  const waiting = immediate && !scene && !painted;
+  // Nothing to draw it with: the fallback stands in. While the host is loading for the first time, nothing does yet,
+  // but for a face asked for at once.
+  const fallback = host ? !canDraw || waiting : failed || waiting;
   // What it shows when its host has loaded, whatever changed in the meantime.
   const now = useRef({ mood, moving, step });
   now.current = { mood, moving, step };
@@ -168,11 +176,13 @@ function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, 
   useEffect(() => { creature.current?.setMoving(moving); }, [moving, drawn, seed, framing]);
   // A still face: its state's expression (the card's states row, T34), surprised while it has something unread.
   const expr = state.unread ? ATTENTION_EXPR : STILL_EXPR[mood];
-  useEffect(() => {
+  // Before paint: a face already rendered is put at once (drawFace), so a face newly mounted never shows blank for a
+  // frame; one asked for at once (immediate) is rendered then if it is not yet, and says when it is painted.
+  useLayoutEffect(() => {
     const element = canvas.current;
     if (drawn || !element || !host) return;
-    return host.drawFace(element, seed, expr);
-  }, [drawn, seed, expr, host, canDraw]);
+    return host.drawFace(element, seed, expr, undefined, immediate ? { now: true, drawn: () => setPainted(true) } : undefined);
+  }, [drawn, seed, expr, host, canDraw, immediate]);
   // The state as the root says it, the same words as the engine's drawings (what it acts out, what it has on the go, its
   // entrance).
   return (

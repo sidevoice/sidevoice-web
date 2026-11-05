@@ -11,8 +11,10 @@ import { creatureFromSeed } from "./creature/catalogue";
 
 const host = vi.hoisted(() => {
   const lives: { opts: Record<string, unknown>; moods: string[]; steps: unknown[]; moving: boolean[]; disposed: boolean }[] = [];
-  const faces: { seed: string; expr: string; cancelled: boolean }[] = [];
-  return { lives, faces };
+  const faces: { seed: string; expr: string; cancelled: boolean; drawing?: { now?: boolean; drawn?: () => void } }[] = [];
+  // How the mocked host paints a face asked for at once: rendered there and then ("now"), or later, by the test ("later").
+  const paint = { mode: "now" as "now" | "later" };
+  return { lives, faces, paint };
 });
 vi.mock("./creature/host", () => {
   return {
@@ -26,9 +28,10 @@ vi.mock("./creature/host", () => {
         setMoving: (m: boolean) => live.moving.push(m), dispose: () => { live.disposed = true; },
       };
     },
-    drawFace: (_canvas: HTMLCanvasElement, seed: string, expr: string) => {
-      const face = { seed, expr, cancelled: false };
+    drawFace: (_canvas: HTMLCanvasElement, seed: string, expr: string, _choice?: unknown, drawing?: { now?: boolean; drawn?: () => void }) => {
+      const face = { seed, expr, cancelled: false, drawing };
       host.faces.push(face);
+      if (drawing?.now && host.paint.mode === "now") drawing.drawn?.();
       return () => { face.cancelled = true; };
     },
   };
@@ -38,7 +41,7 @@ const { CharacterAvatar } = await import("./CharacterAvatar");
 const motion = (how: "gpu" | "still") => { localStorage.setItem(MOTION_KEY, how); act(() => startMotion()); };
 /** The host is loaded on first use (a dynamic import): lets it land. */
 const settle = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
-beforeEach(() => { host.lives.length = 0; host.faces.length = 0; motion("gpu"); });
+beforeEach(() => { host.lives.length = 0; host.faces.length = 0; host.paint.mode = "now"; motion("gpu"); });
 afterEach(() => { motion("still"); localStorage.clear(); });
 
 const spec = avatarFor("t-login");
@@ -152,4 +155,36 @@ test("the person and the mascot are still the engine's drawings", async () => {
   }
   expect(host.lives).toHaveLength(0);
   expect(host.faces).toHaveLength(0);
+});
+
+test("a face asked for at once (the transcript's) is painted before it shows: a cache miss rendered then and there, no outline left", async () => {
+  const view = render(<CharacterAvatar spec={spec} state={state("present")} size="small" immediate />);
+  const avatar = () => view.container.querySelector(".sv-avatar")!;
+  await settle();
+  // Loaded: asked for at once, painted then and there (a cache miss rendered before paint), so the outline is gone.
+  expect(host.faces.at(-1)).toMatchObject({ seed: "t-login", expr: "neutral", drawing: { now: true } });
+  expect(avatar()).not.toHaveAttribute("data-fallback");
+  expect(avatar().querySelector(".creature-fallback")).toBeNull();
+});
+
+test("a face asked for at once that cannot be painted yet keeps its outline until it is; painted, it keeps its image while the next expression is drawn", async () => {
+  host.paint.mode = "later";
+  const view = render(<CharacterAvatar spec={spec} state={state("present")} size="small" immediate />);
+  await settle();
+  const avatar = () => view.container.querySelector(".sv-avatar")!;
+  expect(avatar()).toHaveAttribute("data-fallback");
+  act(() => host.faces.at(-1)!.drawing!.drawn!());
+  expect(avatar()).not.toHaveAttribute("data-fallback");
+  // Something unread: the surprised face is asked for; until it is painted the canvas keeps the face it had, not the outline.
+  view.rerender(<CharacterAvatar spec={spec} state={state("present", { unread: true })} size="small" immediate />);
+  expect(host.faces.at(-1)).toMatchObject({ expr: "surprised", drawing: { now: true } });
+  expect(avatar()).not.toHaveAttribute("data-fallback");
+});
+
+test("every other still face is queued as before: nothing stands in while the code loads, and it is not asked for at once", async () => {
+  const view = render(<CharacterAvatar spec={spec} state={state("present")} size="small" />);
+  expect(view.container.querySelector(".sv-avatar")).not.toHaveAttribute("data-fallback");
+  await settle();
+  expect(host.faces.at(-1)?.drawing).toBeUndefined();
+  expect(view.container.querySelector(".sv-avatar")).not.toHaveAttribute("data-fallback");
 });
