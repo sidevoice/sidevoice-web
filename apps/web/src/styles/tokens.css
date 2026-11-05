@@ -22,9 +22,17 @@
   --sv-radius-pill: 999px;
   --sv-shadow-dialog: 0 24px 80px rgb(0 0 0 / 55%);
   --sv-header-height: 64px;
-  /* A conversation's state, as the dot on its avatar says it. */
-  --sv-state-in-call: var(--sv-positive);
-  --sv-state-working: var(--sv-voice);
-  --sv-state-waiting: var(--sv-primary);
-  --sv-state-idle: #6b7885;
+  /* The colour of an agent's state, fixed (the same in light and dark, never themed): wherever the app shows the state
+     as a colour it is one of these: a conversation's dot, the floating card's. Scheme A (Sidevoice's own violet for the
+     agent's voice). The operator has not picked between it and B (iOS system colours: listening #34c759, speaking
+     #0a84ff, working #5e5ce6, attention #ff9f0a, muted #ff3b30, idle #aeaeb2, offline #8e8e93) and C (call apps:
+     listening #1a73e8, speaking #23a55a, working #8e6cef, attention #f9ab00, muted #ea4335, idle #bdc1c6, offline
+     #80868b). Swapping is these seven lines. Muted is the microphone's switch over any state, not a state. */
+  --sv-state-listening: #2fb67c;
+  --sv-state-speaking: #6b4fd8;
+  --sv-state-working: #3d8bfd;
+  --sv-state-attention: #e0a82e;
+  --sv-state-muted: #e5484d;
+  --sv-state-idle: #b9b3c4;
+  --sv-state-offline: #8a8594;
 }

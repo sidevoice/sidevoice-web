@@ -132,7 +132,7 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
         <div className="sidebar-head">
           {/* Icon and count are one face, as the call card's switcher wears them (call-card.css .card-conversations-button);
               no chevron: the list is already open here. */}
-          <h2>{blocked ? <ConversationsIcon /> : <span className="conversations-chip" aria-hidden="true"><ConversationsIcon size={14} /><span className="conversations-count">{participants.length}</span></span>}{t("sidebar.title")}</h2>
+          <h2>{blocked ? <ConversationsIcon /> : <span className="conversations-chip" aria-hidden="true"><ConversationsIcon size={14} /><span className="conversations-count">{participants.length}</span></span>}<span className="sidebar-title">{t("sidebar.title")}</span></h2>
           <Tooltip action content={rail ? t("sidebar.expand") : t("sidebar.collapse")}>
             <Button variant="ghost" tone="neutral" size="icon-sm" className="sidebar-collapse" aria-controls="conversations" aria-expanded={!rail}
               aria-label={rail ? t("sidebar.expand") : t("sidebar.collapse")}
@@ -158,7 +158,7 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
                   className="sidebar-rows"
                   rows={group.rows.map((row) => row.threadId === onStage && !row.selected ? { ...row, selected: true } : row)}
                   onSelect={select}
-                  lead={(row) => <ConversationAvatar row={row} />}
+                  lead={(row) => <ConversationAvatar row={row} pop attention={unread(row)} />}
                   tooltip={(row) => [row.title + " · " + stateText(row, inCall, t), harnessLine(row), row.detail, row.activityNote].filter(Boolean).join("\n\n")}
                   label={(row) => [row.title, stateText(row, inCall, t), unread(row) ? t("state.unread") : null].filter(Boolean).join(" · ")}
                   sub={(row) => (
@@ -167,9 +167,6 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
                       <span className="sidebar-state-text">{stateText(row, inCall, t)}</span>
                     </span>
                   )}
-                  end={(row) => <>
-                    {unread(row) && <span className="sidebar-unread" aria-hidden="true" />}
-                  </>}
                   // The same options on the secondary click anywhere on the row (operator, 2026-10-16): Remove from this device, for now.
                   wrap={(row, node) => <ContextMenu label={t("sidebar.options", { title: row.title })}
                     items={<ContextMenuItem danger onSelect={() => void window.sidevoiceActions?.closeParticipant(row.threadId)}><CloseIcon />{t("sidebar.removeConversation")}</ContextMenuItem>}>{node}</ContextMenu>}

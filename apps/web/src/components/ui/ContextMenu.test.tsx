@@ -18,3 +18,16 @@ test("the secondary click on the row opens its options, and choosing one runs it
   expect(close).toHaveBeenCalledOnce();
   expect(screen.queryByRole("menu")).toBeNull();
 });
+
+test("from the keyboard (Shift+F10 or the menu key reach the row's button as a context menu): it opens, Escape closes it, and focus goes back", async () => {
+  render(<ContextMenu label="Options for Fix the bug" items={<ContextMenuItem onSelect={() => {}}>Remove from this device</ContextMenuItem>}>
+    <div data-testid="row"><button type="button">Fix the bug</button></div>
+  </ContextMenu>);
+  const button = screen.getByRole("button", { name: "Fix the bug" });
+  button.focus();
+  await act(async () => { fireEvent.contextMenu(button); });
+  expect(screen.getByRole("menu")).toBeInTheDocument();
+  await act(async () => { fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" }); });
+  expect(screen.queryByRole("menu")).toBeNull();
+  expect(button).toHaveFocus();
+});

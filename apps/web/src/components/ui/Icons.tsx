@@ -7,9 +7,9 @@
  * generic icons and are drawn here. */
 import {
   Download, Trash2, Activity, Check, CheckCheck, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, ExternalLink, Keyboard, KeyRound,
-  MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
-  PanelLeftOpen, Pause, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
-  Box, AudioWaveform, ArrowUp, ArrowLeft, ArrowRight, RefreshCcwDot, Pencil, Laptop, Server,
+  MessagesSquare, Monitor, MoreVertical, Plus, Info, PanelLeftClose,
+  PanelLeftOpen, Pause, Phone, PhoneOff, Play, Plug, RefreshCw, SkipForward, SlidersHorizontal, Wrench, X,
+  Box, AudioWaveform, ArrowLeft, ArrowRight, RefreshCcwDot, Pencil, Laptop, Server,
   Timer, ScrollText, Link, Unlink, Search, ChevronLeft, ChevronRight, Eye, EyeOff, Square, Sparkle, ShieldCheck, Captions, CaptionsOff, PictureInPicture2, Terminal,
 } from "lucide-react";
 import type { ComponentType } from "react";
@@ -22,14 +22,29 @@ import openAiLogo from "../../assets/logos/openai.svg?raw";
 import mcpLogo from "../../assets/logos/mcp.svg?raw";
 
 type IconProps = { className?: string; size?: number };
-type LucideLike = ComponentType<{ className?: string; size?: number; strokeWidth?: number; "aria-hidden"?: boolean }>;
+type LucideLike = ComponentType<{ className?: string; size?: number; strokeWidth?: number; strokeLinecap?: "round"; strokeLinejoin?: "round"; "aria-hidden"?: boolean }>;
 
-/** One drawing, wearing the room's stroke and hidden from anything that reads the page aloud. */
+/** The room's stroke, as the state-colours demo draws its icons (2.2, round caps and joins: softer, and still legible at 12px). */
+const STROKE = 2.2;
+
+/** One drawing, wearing the room's stroke and hidden from anything that reads the page aloud. lucide draws with round caps
+ *  and joins already; the demo's own paths below (`HAND`) are drawn with the same. */
 function mark(Drawing: LucideLike, fallbackSize: number) {
   return function Mark({ className, size = fallbackSize }: IconProps) {
-    return <Drawing className={className} size={size} strokeWidth={1.8} aria-hidden />;
+    return <Drawing className={className} size={size} strokeWidth={STROKE} strokeLinecap="round" strokeLinejoin="round" aria-hidden />;
   };
 }
+
+/** The hand-drawn paths of the state-colours demo (24 grid): the ones a state is told by wear them in place of lucide's. */
+const HAND = {
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+  micOff: '<path d="M15 9.3V6a3 3 0 0 0-5.7-1.3M9 9v2a3 3 0 0 0 5.1 2.1M5 11a7 7 0 0 0 11.6 5.3M19 11a7 7 0 0 1-.6 2.8M12 18v3M3 3l18 18"/>',
+  ear: '<path d="M6 8.5a6 6 0 0 1 12 0c0 3.5-3 4.5-3 7.5a3.5 3.5 0 0 1-7 0"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-1.5 2-1.5 3.5"/>',
+  speaker: '<path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>',
+  hourglass: '<path d="M6 3h12M6 21h12M7 3c0 5 10 5 10 9s-10 4-10 9M17 3c0 5-10 5-10 9s10 4 10 9"/>',
+  cog: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+  dots: '<path d="M6 12h.01M12 12h.01M18 12h.01" stroke-width="3.4"/>',
+};
 
 // ----- the room
 export const ConversationsIcon = mark(MessagesSquare, 16);
@@ -38,9 +53,9 @@ export const MachinesIcon = mark(Monitor, 16);
 export const ThisComputerIcon = mark(Laptop, 18);
 /** Another machine (one paired with this device): a server — never the same glyph as this computer's. Its square fills
  *  the whole grid where the laptop is wide and short, so it is drawn at 0.86 of its box (the laptop's area), its
- *  stroke thickened to match: the same footprint, the same weight on screen. */
+ *  stroke thickened to match: the same footprint, the same weight on screen (2.2 / 0.86). */
 export function OtherMachineIcon({ className, size = 18 }: IconProps) {
-  return <Server className={className} size={size} viewBox="-1.95 -1.95 27.9 27.9" strokeWidth={2.09} aria-hidden />;
+  return <Server className={className} size={size} viewBox="-1.95 -1.95 27.9 27.9" strokeWidth={2.56} aria-hidden />;
 }
 /** Renames what it sits beside. */
 export const EditIcon = mark(Pencil, 14);
@@ -56,16 +71,16 @@ export const MoreAboveIcon = mark(ChevronUp, 14);
 export const MoreBelowIcon = mark(ChevronDown, 14);
 export const SidebarCollapseIcon = mark(PanelLeftClose, 18);
 export const SidebarExpandIcon = mark(PanelLeftOpen, 18);
-export const MoreIcon = mark(MoreHorizontal, 18);
+export const MoreIcon = drawn(HAND.dots, "0 0 24 24", 18, false, STROKE);
 export const MoreVerticalIcon = mark(MoreVertical, 18);
 export const CloseIcon = mark(X, 18);
 export const CopyIcon = mark(Copy, 18);
 export const RefreshIcon = mark(RefreshCw, 18);
-export const SettingsIcon = mark(Settings, 22);
+export const SettingsIcon = drawn(HAND.cog, "0 0 24 24", 22, false, STROKE);
 
 // ----- the call
-export const MicrophoneIcon = mark(Mic, 24);
-export const MicrophoneOffIcon = mark(MicOff, 24);
+export const MicrophoneIcon = drawn(HAND.mic, "0 0 24 24", 24, false, STROKE);
+export const MicrophoneOffIcon = drawn(HAND.micOff, "0 0 24 24", 24, false, STROKE);
 /** Back to the whole app, from the desktop app's call controls card. */
 export const OpenAppIcon = mark(ExternalLink, 16);
 /** A link that opens somewhere else, in a new tab. */
@@ -85,7 +100,11 @@ export const BackIcon = mark(ChevronLeft, 16);
 export const OpenPageIcon = mark(ChevronRight, 16);
 /** Searching a list. */
 export const SearchIcon = mark(Search, 16);
-export const SpeakerIcon = mark(Volume2, 20);
+export const SpeakerIcon = drawn(HAND.speaker, "0 0 24 24", 20, false, STROKE);
+/** What an agent that hears you is told by, and one that works (the state-colours demo's alternatives to the microphone; the
+ *  conversations' states are said by colour and words for now, so nothing draws these yet). */
+export const EarIcon = drawn(HAND.ear, "0 0 24 24", 16, false, STROKE);
+export const HourglassIcon = drawn(HAND.hourglass, "0 0 24 24", 16, false, STROKE);
 export const CallIcon = mark(Phone, 22);
 export const HangupIcon = mark(PhoneOff, 22);
 export const SkipIcon = mark(SkipForward, 22);
@@ -101,8 +120,13 @@ export const TranscriptIcon = mark(ScrollText, 22);
 /** What is said, shown on the stage as it is said: on, or turned off. */
 export const CaptionsIcon = mark(Captions, 22);
 export const CaptionsOffIcon = mark(CaptionsOff, 22);
-/** Sends what was written. */
-export const SendIcon = mark(ArrowUp, 18);
+/** Sends what was written: the paper plane of the transcript's composer in the frozen design reference (reference/2026-11-04,
+ *  src/creator.js: its `send` mark, `M4 12l16-8-6 16-2.5-6.5z`), filled, its corners softened by a round-joined hairline of the
+ *  room's line. */
+export function SendIcon({ className, size = 18 }: IconProps) {
+  return <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth={1.6}
+    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 12l16-8-6 16-2.5-6.5z" /></svg>;
+}
 
 // ----- a message's delivery, drawn like the play mark beside it so both sit on the time's line at one size
 export const SentIcon = mark(Check, 12);
@@ -114,13 +138,13 @@ export const UncertainIcon = mark(CircleAlert, 12);
 // One object each, in one stroke: what you say going in is the microphone, the voice coming out its waveform, a model a
 // box you download — the same drawing wherever the meaning shows.
 export const ModelsIcon = mark(Box, 16);
-export const ListensIcon = mark(Mic, 12);
+export const ListensIcon = drawn(HAND.mic, "0 0 24 24", 12, false, STROKE);
 export const SpeaksIcon = mark(AudioWaveform, 12);
 
 // ----- the settings, one mark per section
 export const GeneralIcon = mark(SlidersHorizontal, 16);
 export const VoicesIcon = mark(AudioWaveform, 16);
-export const TranscriptionIcon = mark(Mic, 16);
+export const TranscriptionIcon = drawn(HAND.mic, "0 0 24 24", 16, false, STROKE);
 /** When the person's turn ends: the smart end of turn's model. */
 export const EndOfTurnIcon = mark(Timer, 16);
 /** On into what comes next: the setup's last button. */
@@ -150,7 +174,7 @@ export const InfoIcon = mark(Info, 18);
 /** Something new under it (VARIANTS `new-mark` A): a filled sparkle, as a star is never a state anywhere in the room.
  *  The outline in the ground behind it is the stylesheet's. */
 export function NewSparkleIcon({ className, size = 12 }: IconProps) {
-  return <Sparkle className={className} size={size} strokeWidth={1.8} fill="currentColor" aria-hidden />;
+  return <Sparkle className={className} size={size} strokeWidth={STROKE} fill="currentColor" aria-hidden />;
 }
 
 /* The transcript's own marks (features/conversation), drawn as the creature redesign's frozen reference draws them
@@ -183,6 +207,16 @@ export const ToLatestArrowIcon = drawn('<path d="M12 5v13M6 12l6 6 6-6"/>', "0 0
 /** The person's open turn: the microphone, and the × that takes the turn back. */
 export const TurnMicIcon = drawn('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>', "0 0 24 24", 13, false, 2.4);
 export const TurnCancelIcon = drawn('<path d="M6 6l12 12M18 6L6 18"/>', "0 0 24 24", 11, false, 3);
+
+/** The cartoon burst with its "!" that says a conversation needs the person (the state-colours demo's `BANG`): a yellow burst in a dark ink
+ *  outline, a little tilted, on the corner of the creature's square. Its colours are its own, not the theme's: it reads on any card. */
+export function AttentionBurstIcon({ className, size = 30 }: IconProps) {
+  return <svg className={className} viewBox="0 0 30 30" width={size} height={size} aria-hidden="true">
+    <path d="M15 1.5l3.4 5.2 6-1.7-1.2 6.1 5.3 3.4-5.3 3.4 1.2 6.1-6-1.7L15 27.5l-3.4-5.2-6 1.7 1.2-6.1-5.3-3.4 5.3-3.4-1.2-6.1 6 1.7z" fill="#ffcf4a" stroke="#2a1a40" strokeWidth="2" strokeLinejoin="round" />
+    <path d="M13.4 8.6h3.2l-.7 8h-1.8z" fill="#2a1a40" stroke="#2a1a40" strokeWidth="1.2" strokeLinejoin="round" />
+    <circle cx="15" cy="20.4" r="1.9" fill="#2a1a40" />
+  </svg>;
+}
 
 /* Drawn here, because they are somebody's mark and not a generic icon. */
 export function AppleIcon({ className, size = 12 }: IconProps) {

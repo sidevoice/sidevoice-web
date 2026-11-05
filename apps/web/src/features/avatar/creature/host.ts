@@ -689,7 +689,29 @@ function drain() {
 /** How a still face is drawn: `now`, rendered before drawFace returns when it is not yet (a face that must never show
  *  blank: the transcript's, T40), rather than with the faces queued a few a frame; `drawn`, told each time the canvas
  *  is painted with it. */
-export interface FaceDrawing { now?: boolean; drawn?: () => void }
+export interface FaceDrawing { now?: boolean; drawn?: (face: HTMLCanvasElement) => void }
+
+/** Where a still face's creature stands inside its FACE_PX square, in pixels of the render: the extent of what is drawn
+ *  (hats and ears included; the floor shadow, which is translucent, is not: it would pull the creature off its centre and its feet
+ *  off the baseline), measured once per kept face. A card that stands the creature out of its square
+ *  fits it from this (../fit-pop.ts). */
+export interface FaceBox { t: number; b: number; l: number; r: number; w: number; h: number }
+/** The alpha above which a pixel is the creature and not its shadow (its ink outline is opaque). */
+const SOLID = 140;
+const boxes = new WeakMap<HTMLCanvasElement, FaceBox | null>();
+export function faceBox(face: HTMLCanvasElement): FaceBox | null {
+  if (boxes.has(face)) return boxes.get(face)!;
+  let box: FaceBox | null = null;
+  const g = face.getContext("2d");
+  if (g) {
+    const { width: w, height: h } = face, d = g.getImageData(0, 0, w, h).data;
+    let t = h, b = -1, l = w, r = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > SOLID) { if (y < t) t = y; if (y > b) b = y; if (x < l) l = x; if (x > r) r = x; }
+    if (b >= 0) box = { t, b, l, r, w, h };
+  }
+  boxes.set(face, box);
+  return box;
+}
 
 /** The still face of `seed` with `expr` (STILL_EXPR), drawn into `canvas` (a FACE_PX square) as soon as it is rendered:
  *  at once when it already is. The canvas keeps what it showed until then. Returns what cancels it. `choice`: a creature
@@ -703,7 +725,7 @@ export function drawFace(canvas: HTMLCanvasElement, seed: string, expr: string, 
     if (!g) return;
     g.clearRect(0, 0, canvas.width, canvas.height);
     g.drawImage(face, 0, 0);
-    drawn?.();
+    drawn?.(face);
   };
   const ready = faces.get(key);
   if (ready) { put(ready); return () => {}; }

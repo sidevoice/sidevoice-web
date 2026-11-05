@@ -10,19 +10,32 @@
 .conversation-avatar { position: relative; display: block; flex: none; width: 40px; height: 40px; }
 .conversation-avatar .sv-avatar { width: 100%; height: 100%; border-radius: 50%; background: color-mix(in srgb, var(--av-color) 22%, var(--sv-surface)); }
 [data-theme="dark"] .conversation-avatar .sv-avatar { background: var(--av-bg); }
-.state-dot { position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border: 2px solid var(--dot-ring, var(--sv-surface)); border-radius: 50%; background: var(--sv-text-subtle); }
-/* The light says whether its agent is there (desktop trial, item 11): steady green while it can hear you (in the call or
-   waiting for you), blinking green while it works, grey while it cannot hear you. Where motion is reduced it holds
-   still, and working wears a green halo instead, so it still differs from plain green. */
-.state-dot:is([data-state="in-call"], [data-state="waiting"], [data-state="working"]) { background: var(--sv-positive); }
-.state-dot[data-state="working"] { animation: state-dot-blink 1.2s ease-in-out infinite; }
+.state-dot { position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border: 2px solid var(--dot-ring, var(--sv-surface)); border-radius: 50%; background: var(--sv-state-idle); }
+/* The light is the colour of what its agent is doing (styles/tokens.css --sv-state-*, fixed in light and dark): listening,
+   speaking, working (blinking), resting or just present (the one idle colour), or unreachable. Where motion is reduced it
+   holds still, and working wears a halo of its colour instead, so it still differs from the rest. */
+.state-dot[data-kind="listening"] { background: var(--sv-state-listening); }
+.state-dot[data-kind="speaking"] { background: var(--sv-state-speaking); }
+.state-dot[data-kind="working"] { background: var(--sv-state-working); animation: state-dot-blink 1.2s ease-in-out infinite; }
+.state-dot[data-kind="offline"] { background: var(--sv-state-offline); }
 @keyframes state-dot-blink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) {
-  .state-dot[data-state="working"] { animation: none !important; box-shadow: 0 0 0 2px color-mix(in srgb, var(--sv-positive) 45%, transparent); }
+  .state-dot[data-kind="working"] { animation: none !important; box-shadow: 0 0 0 2px color-mix(in srgb, var(--sv-state-working) 45%, transparent); }
 }
-/* On the sidebar's cards a light says only that the agent is there; one that cannot hear you has none (its words are
-   on the card, its avatar asleep or dimmed). */
-.sidebar-rows .state-dot[data-state="idle"] { display: none; }
+
+/* A conversation's card in the sidebar and its rail (ConversationAvatar `pop`): the creature stands in a rounded square
+   and comes out of it, feet on its foot, head and hat over its edge (features/avatar/fit-pop.ts sets the canvas). The
+   square's own tint is the creature's colour over the soft accent. Only two things sit on it: the working dot at its
+   foot-right (the colour of working) and, when the agent needs the person, the burst with its "!" at its top-right. */
+.conversation-avatar[data-pop] { width: 56px; height: 56px; overflow: visible; }
+.conversation-avatar[data-pop] .sv-avatar { position: absolute; inset: 0; width: auto; height: auto; overflow: visible; border-radius: 30%;
+  background: radial-gradient(circle at 50% 70%, color-mix(in srgb, var(--av-color) 34%, transparent), var(--sv-accent-soft) 72%); }
+.conversation-avatar[data-pop] .sv-avatar[data-style="creature"] canvas { position: absolute; }
+.conversation-avatar[data-pop] .sv-avatar[data-pop="fitting"] canvas { visibility: hidden; }
+.conversation-avatar[data-pop] .creature-fallback { position: absolute; inset: 0; width: 100%; height: 100%; }
+.conversation-avatar[data-pop] .state-dot { z-index: 2; right: -3px; bottom: -3px; width: 13px; height: 13px; border-width: 2.5px; }
+.attention-burst { position: absolute; z-index: 3; right: -14px; top: -16px; width: 30px; height: 30px; overflow: visible; pointer-events: none;
+  transform: rotate(12deg); filter: drop-shadow(0 2px 0 rgb(42 26 64 / 25%)); }
 
 /* ----- the header: the mark, and Settings at its end */
 .room-header { --dot-ring: var(--sv-bg); display: flex; align-items: center; gap: var(--sv-space-3); height: calc(var(--sv-header-height) + var(--sv-inset-top)); padding: var(--sv-inset-top) var(--sv-space-4) 0 var(--sv-space-5); border-bottom: 1px solid var(--sv-border); background: var(--sv-bg); }
@@ -47,14 +60,14 @@
 .conversation-sidebar .sidebar-close { display: none; }
 .sidebar-body { display: grid; align-content: start; gap: var(--sv-space-4); min-width: 0; }
 .sidebar-group { display: grid; gap: var(--sv-space-0-5); min-width: 0; }
-.sidebar-group-label { display: flex; align-items: center; gap: var(--sv-space-1-5); min-width: 0; margin: 0 0 var(--sv-space-1); padding-inline-start: var(--sv-space-2); font-size: var(--sv-font-xs); line-height: 1rem; font-weight: 600; color: var(--sv-text-subtle); }
+.sidebar-group-label { display: flex; align-items: center; gap: var(--sv-space-1-5); min-width: 0; margin: 0 0 var(--sv-space-3); padding-inline-start: var(--sv-space-2); font-size: var(--sv-font-xs); line-height: 1rem; font-weight: 600; color: var(--sv-text-subtle); }
 .sidebar-group-label svg { flex: none; }
 .sidebar-group-label span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 /* The machine's connected mark (StateOnIcon) sits on its icon's corner, outside the icon's box: it is not cut like the name, and
    smaller, for an icon this small. */
 .sidebar-group-label .state-on-icon { overflow: visible; }
 .sidebar-group-label .state-on-icon-dot { width: 5px; height: 5px; border-width: 1.5px; bottom: -2px; inset-inline-end: -3px; }
-.sidebar-rows { display: grid; gap: var(--sv-space-1-5); min-width: 0; }
+.sidebar-rows { display: grid; gap: var(--sv-space-2); min-width: 0; }
 .sidebar-empty { margin: 0; padding: var(--sv-space-5); border: 1px dashed var(--sv-border-strong); border-radius: var(--sv-radius-lg); font-size: var(--sv-font-sm); line-height: 1.25rem; text-align: center; color: var(--sv-text-muted); }
 
 /* A conversation is a card, as the avatar lab draws them: its bicho on its own tint with its dot, the title, the harness
@@ -63,7 +76,7 @@
   border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface); box-shadow: var(--sv-shadow-xs);
   transition: border-color var(--sv-dur-fast) var(--sv-ease), background-color var(--sv-dur-fast) var(--sv-ease); }
 .sidebar-rows .participant-row[data-selected] { --dot-ring: var(--sv-accent-soft); border-color: color-mix(in srgb, var(--sv-accent) 55%, var(--sv-border)); background: var(--sv-accent-soft); }
-.sidebar-rows .person { display: flex; align-items: center; gap: var(--sv-space-3); flex: 1; min-width: 0; margin: 0; padding: var(--sv-space-2) var(--sv-space-3) var(--sv-space-2) var(--sv-space-2); border: 0; border-radius: inherit; background: none; color: var(--sv-text); text-align: start; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.sidebar-rows .person { display: flex; align-items: center; gap: var(--sv-space-3); flex: 1; min-width: 0; margin: 0; padding: 16px var(--sv-space-1) 8px 10px; border: 0; border-radius: inherit; background: none; color: var(--sv-text); text-align: start; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .sidebar-rows .person:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
 .sidebar-rows .person:not(:disabled):active { background-image: linear-gradient(var(--sv-pressed), var(--sv-pressed)); }
 .sidebar-rows .person:disabled { cursor: default; opacity: .6; }
@@ -74,31 +87,45 @@
 .sidebar-state svg { flex: none; }
 .sidebar-state-text { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 /* What cannot hear you steps back: its words in the subtle grey, beside its dimmed avatar. */
-.sidebar-rows .participant-row:has(.state-dot[data-state="idle"]) :is(.person-name, .person-sub) { color: var(--sv-text-subtle); }
+.sidebar-rows .participant-row:has(.conversation-avatar[data-state="idle"]) :is(.person-name, .person-sub) { color: var(--sv-text-subtle); }
+/* It needs the person: a mustard ring on the card, as the burst on its creature says it too (never the burst alone). */
+.sidebar-rows .participant-row:has(.conversation-avatar[data-attention]) { border-color: var(--sv-state-attention); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-state-attention) 24%, transparent); }
+/* While it works, a soft light breathes along the card's foot (opacity only). Held still where motion is reduced. */
+.sidebar-rows .participant-row:has(.conversation-avatar[data-state="working"])::after { content: ""; position: absolute; inset: auto var(--sv-space-4) 0; height: 3px; border-radius: 3px 3px 0 0; pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--sv-state-working), transparent); animation: sidebar-working-strip 1.8s ease-in-out infinite; }
+@keyframes sidebar-working-strip { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-rows .participant-row:has(.conversation-avatar[data-state="working"])::after { animation: none; opacity: .6; }
+}
 /* The options wait, invisible but in place and focusable, until the row is pointed at, focused or chosen; nothing
  * hovers on a touch screen, so there they are always shown. */
-.sidebar-rows .participant-more { flex: none; margin-inline-end: var(--sv-space-1); opacity: 0;
+.sidebar-rows .participant-row .participant-more { flex: none; width: 26px; margin-inline-end: var(--sv-space-1-5); opacity: 0;
   transition: opacity var(--sv-dur-fast) var(--sv-ease), background-color var(--sv-dur-fast) var(--sv-ease), color var(--sv-dur-fast) var(--sv-ease); }
 .sidebar-rows .participant-row:is(:focus-within, [data-selected]) .participant-more, .sidebar-rows .participant-more[data-state="open"] { opacity: 1; }
 @media (hover: hover) { .sidebar-rows .participant-row:hover .participant-more { opacity: 1; } }
 @media (hover: hover) { .sidebar-rows .participant-row:not([data-selected]):hover { border-color: var(--sv-border-strong); } }
 @media (hover: none), (pointer: coarse) { .sidebar-rows .participant-more { opacity: 1; } }
 
-/* The rail: the same avatars in a narrow column, the machines told apart by a line. */
-.sidebar-unread { width: 8px; height: 8px; margin-right: 4px; border-radius: 50%; background: var(--sv-accent); flex: none; }
+/* The rail: the same cards' creatures in a narrow column, the machines told apart by a line. The count and the expand button
+   stay on one row (the chip is its icon alone there). A card has no frame there but the chosen one (lilac, edged) and the one that needs the person (ringed). */
 @media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
-  .conversation-sidebar[data-collapsed] { width: 68px; padding-inline: 10px; }
-  .conversation-sidebar[data-collapsed] .sidebar-head { justify-content: center; padding: 0; }
-  .conversation-sidebar[data-collapsed] :is(.sidebar-head h2, .sidebar-group-label, .participant-copy, .sidebar-unread, .participant-more, .sidebar-empty) { display: none; }
+  .conversation-sidebar[data-collapsed] { width: 84px; padding-inline: 6px; }
+  .conversation-sidebar[data-collapsed] .sidebar-head { flex-wrap: nowrap; justify-content: center; gap: var(--sv-space-1); padding: 0; }
+  .conversation-sidebar[data-collapsed] .sidebar-head h2 { flex: none; overflow: visible; }
+  .conversation-sidebar[data-collapsed] :is(.sidebar-title, .conversations-count, .sidebar-group-label, .participant-copy, .participant-more, .sidebar-empty) { display: none; }
   .conversation-sidebar[data-collapsed] .sidebar-group + .sidebar-group { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
-  .conversation-sidebar[data-collapsed] .person { flex: none; padding: var(--sv-space-1); }
+  .conversation-sidebar[data-collapsed] .participant-row:not([data-selected]):not(:has(.conversation-avatar[data-attention])) { border-color: transparent; background: none; box-shadow: none; }
+  @media (hover: hover) { .conversation-sidebar[data-collapsed] .participant-row:not([data-selected]):hover { background: color-mix(in srgb, var(--sv-accent) 6%, transparent); } }
+  .conversation-sidebar[data-collapsed] .person { flex: none; justify-content: center; padding: 22px 4px 8px; }
 }
 
 /* ----- a row's options menu (components/ui/DropdownMenu.tsx: only these rows use it) */
-.ui-dropdown { z-index: 100; display: grid; min-width: 13rem; padding: var(--sv-space-1-5); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface-raised); box-shadow: var(--sv-shadow-md); animation: room-menu-in var(--sv-dur-fast) var(--sv-ease); }
-.ui-dropdown-item { display: flex; align-items: center; gap: var(--sv-space-2); height: 36px; padding: 0 var(--sv-space-3); border-radius: var(--sv-radius-sm); color: var(--sv-text); font-size: var(--sv-font-md); white-space: nowrap; outline: none; cursor: pointer; user-select: none; }
+.ui-dropdown { --menu-hover: #f3eefa; z-index: 100; display: grid; min-width: 13rem; padding: 6px; border: 1px solid var(--sv-bubble-edge); border-radius: 14px; background: var(--sv-surface-raised);
+  box-shadow: 0 1px 2px rgb(42 26 64 / 10%), 0 10px 24px rgb(42 26 64 / 14%), 0 26px 50px -18px rgb(74 47 107 / 45%); animation: room-menu-in var(--sv-dur-fast) var(--sv-ease); }
+[data-theme="dark"] .ui-dropdown { --menu-hover: #2b2733; box-shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 10px 24px rgb(0 0 0 / 45%), 0 26px 50px -18px rgb(0 0 0 / 70%); }
+.ui-dropdown-item { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 9px; color: var(--sv-text); font-size: var(--sv-font-md); white-space: nowrap; outline: none; cursor: pointer; user-select: none; }
 .ui-dropdown-item svg { flex: none; width: 16px; height: 16px; color: var(--sv-text-muted); }
-.ui-dropdown-item[data-highlighted] { background: var(--sv-accent-soft); }
+.ui-dropdown-item[data-highlighted] { background: var(--menu-hover); }
 .ui-dropdown-item[data-danger], .ui-dropdown-item[data-danger] svg { color: var(--sv-danger); }
 .ui-dropdown-item[data-danger][data-highlighted] { background: var(--sv-danger-soft); }
 /* A finger gets no highlight before it lets go: pressed, the item says so at once. */
@@ -170,7 +197,7 @@
  * moves under it (and the stage's tile is not refitted). */
 @media (min-width: 560px) and (max-width: 899px) and (pointer: fine) {
   .conversation-sidebar { transition: width var(--sv-dur-slow) var(--sv-ease), margin var(--sv-dur-slow) var(--sv-ease); }
-  .conversation-sidebar[data-open] { position: relative; z-index: 31; margin-inline-end: calc(68px - 288px); box-shadow: var(--sv-shadow-lg); }
+  .conversation-sidebar[data-open] { position: relative; z-index: 31; margin-inline-end: calc(84px - 288px); box-shadow: var(--sv-shadow-lg); }
   .conversations-scrim { position: fixed; inset: 0; z-index: 30; display: block; background: var(--sv-scrim); opacity: 0; pointer-events: none; transition: opacity var(--sv-dur-base) var(--sv-ease); }
   .conversations-scrim[data-open] { opacity: 1; pointer-events: auto; }
 }
@@ -189,7 +216,7 @@
 }
 @media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
   /* The rail has no card frames. Its scrollport uses the full rail width so a classic scrollbar cannot clip avatars. */
-  .conversation-sidebar[data-collapsed] > .sidebar-body { margin-inline: -10px; padding-inline: 0; }
+  .conversation-sidebar[data-collapsed] > .sidebar-body { margin-inline: -6px; padding-inline: 0; }
   .conversation-sidebar[data-collapsed] .sidebar-rows .participant-row { justify-content: center; }
 }
 /* The sidebar's foot: its entries stacked, each the full width (Updates over Settings), never squeezed on one line;
