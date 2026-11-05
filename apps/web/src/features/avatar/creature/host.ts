@@ -378,18 +378,21 @@ export class LiveCreature {
   /** What it acts out: the product's state, and what it has on the go (`step`: kept from before when not given). Making
    *  an entrance into listening, it is startled for a moment (syncStartle). */
   setMood(mood: AvatarMood, { step }: { step?: CreatureStep } = {}) {
+    let changed = mood !== this.mood;
     this.mood = mood;
     if (step) this.step = step;
     const c = this.item.c, M = MODES[mood];
     // the busy cogs: over the head in every working style (T17), none otherwise; the poster clears every act (applyMode)
     const cogs = mood === "working" ? "cogs" : null;
-    if (c.act("cogs") !== cogs) c.setAct("cogs", cogs);
-    if (M.poster && c.act("mood")) this.playMood(null);
+    if (c.act("cogs") !== cogs) { c.setAct("cogs", cogs); changed = true; }
+    if (M.poster && c.act("mood")) { this.playMood(null); changed = true; }
     // Entering listening, whatever it had going goes at once, as the creator's applyMode drops the base act and the cogs
     // (the 2D figure's props fell away over its entrance instead): the startle is the whole transition.
-    this.syncBase();
-    this.syncStartle();
-    this.poke();
+    if (this.syncBase()) changed = true;
+    if (this.syncStartle()) changed = true;
+    // Drawn again only when what it shows changed: told the same state again (its rest restamped while it is quiet, a new
+    // state object), a creature held still asks for no frame (the motion guard's rule, e2e/moving-layers.spec.mjs).
+    if (changed) this.poke();
   }
 
   /** What it has on the go, its state unchanged. */

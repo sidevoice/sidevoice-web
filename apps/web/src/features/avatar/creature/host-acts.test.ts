@@ -254,3 +254,20 @@ test("no entrance, no startle: listening as its first state (the state says when
   live.frameAt(0);
   expect(lastExtra()).toEqual({});
 });
+
+test("held still, it is drawn again only when what it shows changes: its rest restamped while quiet asks for no frame", () => {
+  make({ mood: "idle", moving: false, step: { idle: "quiet", since: Date.now() } });
+  live.frameAt(0, true);
+  expect(live.wantsFrames()).toBe(false);
+  // the room restamps its rest (an interaction), the state object is new: the same drawing, no frame asked for
+  live.setMood("idle", { step: { idle: "quiet", since: Date.now() + 1500 } });
+  live.setStep({ idle: "quiet", since: Date.now() + 3000 });
+  expect(live.wantsFrames()).toBe(false);
+  // a change of what it shows is drawn once: a new state, or a working style coming on
+  live.setMood("working", { step: { work: "crank", since: Date.now() } });
+  expect(live.wantsFrames()).toBe(true);
+  live.frameAt(0, true);
+  expect(live.wantsFrames()).toBe(false);
+  live.setMood("working", { step: { work: "crank", since: Date.now() - 1 } });
+  expect(live.wantsFrames()).toBe(true);
+});
