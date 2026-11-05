@@ -315,6 +315,20 @@ export interface LiveOptions {
 
 const slotOf = ({ framing, sharp }: Pick<LiveOptions, "framing" | "sharp">): Slot => (framing === "face" && sharp ? "card" : framing);
 
+/** `changed` is called each time the page's pixel ratio changes (a window moved to another screen, the browser zoomed): a canvas's
+ *  css box stays as it was then, which is all a ResizeObserver says. A media query for one ratio says once that it stopped
+ *  matching, so each change arms the next. Returns what stops it. */
+function watchPixelRatio(changed: () => void): () => void {
+  let query: MediaQueryList | undefined;
+  function arm() {
+    query = globalThis.matchMedia?.(`(resolution: ${globalThis.devicePixelRatio || 1}dppx)`);
+    query?.addEventListener("change", on, { once: true });
+  }
+  function on() { arm(); changed(); } // (armed first: the next change is not lost to what `changed` does)
+  arm();
+  return () => query?.removeEventListener("change", on);
+}
+
 /** A creature drawn into a canvas for as long as it is mounted: moving (its state's motion, about 30 frames a second) or
  *  still (its key pose, drawn again on each change and while the pointer moves its eyes). */
 export class LiveCreature {
@@ -363,6 +377,10 @@ export class LiveCreature {
     // A sharp face also follows its pixel ratio (a window moved to another screen), where the browser says so.
     if (opts.sharp) { try { box?.observe(opts.canvas, { box: "device-pixel-content-box" }); } catch { box?.observe(opts.canvas); } } else box?.observe(opts.canvas);
     this.off.push(() => box?.disconnect());
+    // Where the pixels depend on the pixel ratio (the stage's, a sharp face's), the ratio is watched too: a window moved between
+    // a 1× and a 2× screen keeps its css box, so no observer above would refit the canvas (blurry on the sharper screen, wasted
+    // fill on the other); and not every browser has the device-pixel box the sharp face asks for.
+    if (opts.framing !== "face" || opts.sharp) this.off.push(watchPixelRatio(() => { if (this.fit()) { this.framer?.invalidate(); this.poke(); } }));
     const from = opts.gazeFrom;
     if (from) {
       // T23: only the gaze follows the pointer (the finger while touching); touching does nothing else

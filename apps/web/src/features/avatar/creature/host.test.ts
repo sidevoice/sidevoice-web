@@ -320,3 +320,71 @@ test("only a creature that moves is judged by the governor: held still, or the p
   live.setMoving(true);
   expect(live.animates()).toBe(false); // the poster stands in for it
 });
+
+/** A `matchMedia` whose queries can be told to change, as the page's do when a window is moved to another screen: the queries
+ *  made, and the listeners on each (a `once` one hears a change only the first time). `change()` is the latest query changing. */
+function mediaQueries() {
+  interface Listener { fn: () => void; once: boolean }
+  const made: Array<{ media: string; listeners: Listener[] }> = [];
+  vi.stubGlobal("matchMedia", (media: string) => {
+    const query = { media, listeners: [] as Listener[] };
+    made.push(query);
+    return {
+      media,
+      matches: true,
+      addEventListener: (_type: string, fn: () => void, options?: { once?: boolean }) => { query.listeners.push({ fn, once: !!options?.once }); },
+      removeEventListener: (_type: string, fn: () => void) => { query.listeners = query.listeners.filter((l) => l.fn !== fn); },
+    };
+  });
+  const change = () => {
+    const query = made.at(-1)!;
+    for (const l of [...query.listeners]) { if (l.once) query.listeners = query.listeners.filter((x) => x !== l); l.fn(); }
+  };
+  return { made, change };
+}
+
+test("the stage's canvas follows the page's pixel ratio when its css box stays the same, as a window moved to another screen", () => {
+  webgl();
+  const dpr = vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(1);
+  const screens = mediaQueries();
+  const element = tile(364, 655);
+  const live = host.mountCreature({ ...onStage, canvas: element })!;
+  expect([element.width, element.height]).toEqual([364, 655]);
+  expect(live.tick(0)).toBe(true);
+  expect(live.wantsFrames()).toBe(false); // held still: nothing asks for a frame
+  expect(screens.made.map((query) => query.media)).toEqual(["(resolution: 1dppx)"]);
+  // To a 2x screen: the same css box, so the box observer says nothing; the canvas is refit and drawn again.
+  dpr.mockReturnValue(2);
+  screens.change();
+  expect([element.width, element.height]).toEqual([533, 960]);
+  expect(live.wantsFrames()).toBe(true);
+  expect(live.tick(1)).toBe(true);
+  expect([stageFor("scene").w, stageFor("scene").h]).toEqual([533, 960]);
+  // Armed again for the new ratio, so the next move is heard too: back to 1x.
+  expect(screens.made.map((query) => query.media)).toEqual(["(resolution: 1dppx)", "(resolution: 2dppx)"]);
+  dpr.mockReturnValue(1);
+  screens.change();
+  expect([element.width, element.height]).toEqual([364, 655]);
+  expect(live.tick(2)).toBe(true);
+  // A ratio past 2 changes nothing of what the tile holds (it draws for 2 at most): nothing is redrawn.
+  dpr.mockReturnValue(2);
+  screens.change();
+  expect(live.tick(3)).toBe(true);
+  dpr.mockReturnValue(3);
+  screens.change();
+  expect([element.width, element.height]).toEqual([533, 960]);
+  expect(live.wantsFrames()).toBe(false);
+  expect(screens.made).toHaveLength(5);
+  // Let go of with the creature: the query that is armed is not listened to any more.
+  live.dispose();
+  expect(screens.made.at(-1)!.listeners).toHaveLength(0);
+});
+
+test("a still face, whose pixels do not depend on the pixel ratio, does not watch it; a sharp one does", () => {
+  webgl();
+  const screens = mediaQueries();
+  mount({ seed: "t1", canvas: tile(100, 100), framing: "face", moving: false });
+  expect(screens.made).toHaveLength(0);
+  mount({ seed: "t2", canvas: tile(100, 100), framing: "face", sharp: true, moving: false });
+  expect(screens.made).toHaveLength(1);
+});
