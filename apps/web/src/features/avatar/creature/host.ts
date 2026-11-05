@@ -19,6 +19,10 @@ import { StageFramer } from "./stage-framer";
  *  - "face": the whole creature fitted in a square, never cropped from the stage: the creator's face render (renderFace,
  *    T35: fit, zoom 1.5, look height 0.22), the transcript's 44 px face and the floating card's.
  *
+ * A face can also be live and sharp (`sharp`: the floating card's creature): drawn about 30 times a second like the
+ * stage's, on a stage of its own ("card") whose renderer takes the canvas's size, and the canvas takes its box's size in
+ * device pixels (capped at CARD_MAX_PX), so it is neither a still nor a 144 px picture stretched over a 2x screen.
+ *
  * A canvas that moves is drawn about 30 times a second (the creator's frame loop); one that holds still is drawn once per
  * change, in its state's key pose, as the creator draws under reduced motion. The eyes follow the pointer, or the finger
  * on touch, over the stage (the creator's gazeAt and easedGaze, T23); nothing else answers a touch.
@@ -70,13 +74,16 @@ export const SCENE_ZOOM = 1.32;
 const FACE = { fit: true, zoom: 1.5, lookY: 0.22 } as const;
 /** The canvases' heights, as the creator's: the stage's preview, and the face. */
 const SCENE_PX = 960, FACE_PX = 144;
+/** A sharp live face's canvas: its box in device pixels, within these (the stage draws exactly as many pixels as it shows). */
+const CARD_MIN_PX = 64, CARD_MAX_PX = 512;
 
 // ---------- the stages ----------
 type Item = StageItem<RigSpec>;
 type RigStage = Stage;
 
-/** The page's two stages: "scene" draws the stage's creature, "face" every still face (and a live face). */
-type Slot = "scene" | "face";
+/** The page's three stages: "scene" draws the stage's creature, "face" every still face (and a live face), "card" the sharp
+ *  live faces (the floating card's creature), a renderer of their own so a still face's 256 px render is never stretched. */
+export type Slot = "scene" | "face" | "card";
 
 /* WebGL can be missing (hardware acceleration off, a test's DOM), refused (no context to be had now), or taken away (the
  * browser loses a context on a GPU reset, or when a page holds too many). None of these leaves an avatar empty for the
@@ -89,13 +96,14 @@ type Slot = "scene" | "face";
  *    shows the fallback (fallback.ts) for the creatures it draws, told by onCreaturesChange. */
 
 /** How each stage is made, again for a new renderer when a lost context comes back. */
-const MAKE: Record<Slot, () => RigStage> = { scene: () => new Stage("paint", 768, "wide"), face: () => new Stage("paint", 256) };
+const MAKE: Record<Slot, () => RigStage> = { scene: () => new Stage("paint", 768, "wide"), face: () => new Stage("paint", 256), card: () => new Stage("paint", 256) };
 const RETRY_MS = 10_000, LOST_GRACE_MS = 3000;
 
 /** A stage and how it is: `lost`, its context taken away (it draws nothing until it is back); `down`, it cannot draw (no
  *  WebGL, a context refused, or lost and not back in time). */
 interface Seat { stage: RigStage | null; lost: boolean; down: boolean; triedAt: number; giveUp?: ReturnType<typeof setTimeout>; unwatch?: () => void }
-const seats: Record<Slot, Seat> = { scene: { stage: null, lost: false, down: false, triedAt: -Infinity }, face: { stage: null, lost: false, down: false, triedAt: -Infinity } };
+const seat0 = (): Seat => ({ stage: null, lost: false, down: false, triedAt: -Infinity });
+const seats: Record<Slot, Seat> = { scene: seat0(), face: seat0(), card: seat0() };
 let warned = false;
 const watchers = new Set<() => void>();
 
@@ -279,12 +287,17 @@ export interface LiveOptions {
   step?: CreatureStep;
   /** Moving (default), or holding still in its key pose. */
   moving?: boolean;
+  /** A face drawn sharp: on the "card" stage, its canvas as many device pixels as its box (the floating card's creature). */
+  sharp?: boolean;
 }
+
+const slotOf = ({ framing, sharp }: Pick<LiveOptions, "framing" | "sharp">): Slot => (framing === "face" && sharp ? "card" : framing);
 
 /** A creature drawn into a canvas for as long as it is mounted: moving (its state's motion, about 30 frames a second) or
  *  still (its key pose, drawn again on each change and while the pointer moves its eyes). */
 export class LiveCreature {
   private stage: RigStage;
+  private slot: Slot;
   private item: Item;
   private mood: AvatarMood = "idle";
   private moving = true;
@@ -309,6 +322,7 @@ export class LiveCreature {
 
   constructor(stage: RigStage, private opts: LiveOptions) {
     this.stage = stage;
+    this.slot = slotOf(opts);
     const face = opts.framing === "face";
     this.item = stage.add(rigSpec(opts.choice ?? creatureFromSeed(opts.seed)), opts.canvas, face ? { ...FACE, off: 0 } : { turn: 0, off: 0 });
     this.fit();
@@ -321,7 +335,8 @@ export class LiveCreature {
     }
     this.setMood(opts.mood ?? "idle", { step: opts.step });
     const box = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => { this.fit(); this.hidden = false; this.framer?.invalidate(); this.poke(); });
-    box?.observe(opts.canvas);
+    // A sharp face also follows its pixel ratio (a window moved to another screen), where the browser says so.
+    if (opts.sharp) { try { box?.observe(opts.canvas, { box: "device-pixel-content-box" }); } catch { box?.observe(opts.canvas); } } else box?.observe(opts.canvas);
     this.off.push(() => box?.disconnect());
     const from = opts.gazeFrom;
     if (from) {
@@ -342,7 +357,10 @@ export class LiveCreature {
     // the box as laid out, fractions kept (the creator's getBoundingClientRect): a scaled scene keeps its shape
     const { canvas } = this.opts, box = canvas.getBoundingClientRect(), w = box.width, h = box.height;
     let W: number, H: number;
-    if (this.opts.framing === "face") { W = H = FACE_PX; } else {
+    if (this.opts.framing === "face") {
+      // A sharp one: its box's device pixels (a box not laid out yet: the still face's size, until it is and the observer asks again)
+      W = H = this.opts.sharp && (w > 0 || h > 0) ? Math.min(CARD_MAX_PX, Math.max(CARD_MIN_PX, Math.ceil(Math.max(w, h) * (globalThis.devicePixelRatio || 1)))) : FACE_PX;
+    } else {
       const ar = w > 0 && h > 0 ? w / h : 1.5;
       H = SCENE_PX; W = Math.round(SCENE_PX * ar);
     }
@@ -510,7 +528,7 @@ export class LiveCreature {
   }
 
   /** It has a frame to draw: a change not drawn yet, or motion (its own, the pointer's gaze, a startle). */
-  wantsFrames(): boolean { return !this.hidden && !seats[this.opts.framing].lost && (this.needDraw || this.active()); }
+  wantsFrames(): boolean { return !this.hidden && !seats[this.slot].lost && (this.needDraw || this.active()); }
 
   /** Whether `stage` is the one it is drawn by. */
   drawnBy(stage: RigStage | null): boolean { return stage === this.stage; }
@@ -521,7 +539,7 @@ export class LiveCreature {
     const on = this.active();
     if (!on && !this.needDraw) return false;
     // Its stage's context is gone: the canvas keeps its last frame, and it is drawn again when the context is back.
-    if (seats[this.opts.framing].lost) { this.needDraw = true; return false; }
+    if (seats[this.slot].lost) { this.needDraw = true; return false; }
     // Nobody sees a canvas out of the page or with no box (a closed panel, the phone's hidden list): it is drawn when it
     // has one again (its box observer asks for it).
     if (!canvas.isConnected || canvas.getClientRects().length === 0) { this.needDraw = true; this.hidden = true; return false; }
@@ -559,8 +577,18 @@ export class LiveCreature {
     if (framed) { item.opts.zoom = framed.zoom; item.opts.lookY = framed.lookY; }
     else if (view) { item.opts.zoom = view.zoom; item.opts.lookY = view.lookY; }
     const lvl = M.voice && this.opts.level ? this.opts.level(this.mood) : 0;
+    // The card's stage draws as many pixels as its canvas holds (and is drawn into it one to one).
+    if (this.slot === "card") this.sizeStage();
     this.warm(t, lvl, still);
     this.stage.draw(item, t, lvl, still);
+  }
+
+  /** The card stage's renderer takes its canvas's size (square), when that changed. */
+  private sizeStage() {
+    const { stage } = this, px = this.opts.canvas.width;
+    if (stage.w === px && stage.h === px) return;
+    stage.w = stage.h = px;
+    stage.renderer.setSize(px, px);
   }
 
   /** product: the first time a renderer draws acts, it first draws the reference's first two frames of them (k = 0, then
@@ -594,7 +622,7 @@ export class LiveCreature {
 
 /** A creature drawn into `canvas` until disposed; null where creatures cannot be drawn. */
 export function mountCreature(opts: LiveOptions): LiveCreature | null {
-  const stage = stageOf(opts.framing);
+  const stage = stageOf(slotOf(opts));
   return stage ? new LiveCreature(stage, opts) : null;
 }
 
