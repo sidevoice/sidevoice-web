@@ -49,8 +49,9 @@
  * around it (useSceneScale fits it); the canvas fills the tile. Until it is fitted it fills the slot. */
 .stage-slot { flex: 1; min-width: 0; min-height: 0; display: grid; place-items: center; }
 .stage-slot > .stage-tile { width: 100%; height: 100%; flex: none; }
-.stage-tile[data-mood] { --stage-ratio: 16 / 9; }
-@media (min-width: 900px), (min-width: 560px) and (pointer: fine) { .stage-tile[data-mood][data-app] { --stage-ratio: 3 / 2; --stage-ref: 560; } }
+/* Web (2026-11-05): any shape from a phone's portrait to 21:9, as large as the slot allows: the room there is, never a strip. */
+.stage-tile[data-mood] { --stage-ratio: 9 / 16, 21 / 9; }
+@media (min-width: 900px), (min-width: 560px) and (pointer: fine) { .stage-tile[data-mood][data-app] { --stage-ratio: 9 / 16, 21 / 9; --stage-ref: 560; } }
 @media (max-width: 559px), (max-width: 899px) and (pointer: coarse) {
   /* The phone's tile fills the stage in portrait, as the design reference's phone stage (its framing is made for that
    * room: a square left the creature a few dozen px tall under a card); its chrome keeps the sizes the square gave it,
