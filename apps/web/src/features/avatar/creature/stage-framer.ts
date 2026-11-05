@@ -20,8 +20,6 @@ const PHONE = { side: 0.05, mid: 0.5, zoom: 2.6 };
 /** How long a step of a solve waits, at most, for the page to be idle. */
 const SOLVE_WAIT_MS = 500;
 
-/** The poses the creature can take while a turn's card shows: the turn's own, and resting or working after it. */
-const TURN_POSES = ["speaking", "listening", "idle", "working"];
 
 /** The view a framing scales: the camera's distance factor, and an exact look height where the view has one (the phone). */
 interface View { zoom: number; lookY?: number }
@@ -314,7 +312,14 @@ export class StageFramer {
     // A turn is fitted on the pose of the turn that opened it (the reference fits on entering the state), and keeps that
     // framing whoever speaks next, until the stage is at rest again.
     if (rest) this.turnPose = null;
-    else if (!this.turnPose) this.turnPose = ask.opener ?? "speaking";
+    else if (ask.phone) {
+      // A phone's one framing is fitted again each time the agent enters idle, working or present (on that pose), and kept
+      // through the turns after it, as the reference does (it fits again on every state without voice).
+      const m = this.host.mood();
+      if (m === "idle" || m === "present") this.turnPose = "idle";
+      else if (m === "working") this.turnPose = "working";
+      else if (!this.turnPose) this.turnPose = ask.opener ?? (m === "listening" ? "listening" : "speaking");
+    } else if (!this.turnPose) this.turnPose = ask.opener ?? "speaking";
     const pose = rest ? (this.host.mood() === "working" ? "working" : "idle") : this.turnPose!;
     const v = this.view(ask.phone), key = this.keyOf(ask, rest, pose, v);
     if (!key) return;
@@ -397,15 +402,12 @@ export class StageFramer {
       : capCentre(probe, Math.max(0, ask.cards!.above), ask.cards!.below, ask.h, ceil, floor, gap, ask.cards!.xa, ask.cards!.xb);
   }
 
-  /** A turn's framing: fitted on the pose that opened it, as the reference fits it (the agent's reply and the person's
-   *  pill show only in the turn's own states). What the person sent may show while the agent rests or works: how low every
-   *  pose it can take then reaches is kept (`reach`), and that card goes under the lowest, the gap kept. */
+  /** A turn's framing: fitted on the pose it was entered in, as the reference fits it. Every card of the turn goes where
+   *  it puts them, what the person sent where their pill was (it pops out of it), even while the agent rests or works by
+   *  then (a pose that may reach a few px lower: recorded for the human, PR "Decisions"). */
   private *turnSteps(v: View, probe: FrameProbe, pose: string, cards: NonNullable<FrameAsk["cards"]>, vh: number, ceil: number, floor: number, gap: number): Generator<void, FrameTarget> {
-    const { xa, xb } = cards, hTop = Math.max(0, cards.above);
-    const to = yield* capCentreSteps(probe, hTop, cards.below, vh, ceil, floor, gap, xa, xb);
-    let reach = to.low;
-    for (const other of TURN_POSES.filter((p) => p !== pose)) { yield; reach = Math.max(reach, this.probe(v, other).rows(to.lift, to.zk, xa, xb).low); }
-    return reach > to.low ? { ...to, reach } : to;
+    void v; void pose;
+    return yield* capCentreSteps(probe, Math.max(0, cards.above), cards.below, vh, ceil, floor, gap, cards.xa, cards.xb);
   }
 
   /** Steps the solves a trial render at a time, in the page's idle time (its layout, input and frames come first; a
@@ -451,7 +453,7 @@ export class StageFramer {
    *  where the feet are drawn and the cards' floor: a gap under the creature as it stands now, so no card is ever over it
    *  while it eases back for one. */
   step(): { zoom: number; lookY: number | undefined; moving: boolean } | null {
-    const ask = this.frame.request, pose = this.host.mood() === "working" ? "working" : "idle";
+    const ask = this.frame.request, pose = this.host.mood();
     if (ask && (!this.to || pose !== this.pose)) { this.pose = pose; this.solve(); }
     if (!ask || !this.to) return null;
     const v = this.view(ask.phone), to = this.to;
@@ -475,8 +477,9 @@ export class StageFramer {
   }
 }
 
-/** How long the first framing is solved for at once, on the pixels, before an estimate stands in for it. */
-const FIRST_BUDGET_MS = 600;
+/** How long the first framing is solved for at once, on the pixels, before an estimate stands in for it (a renderer without
+ *  a GPU takes a second or so; on a GPU it all takes a fraction of that). */
+const FIRST_BUDGET_MS = 1500;
 /** How far a moving creature reaches below its key pose, a share of its drawn height (the rig's breathing, and its
  *  squash with the voice: 0.045 at full voice against 0.027 in the key pose). */
 const MOTION_ROOM = 0.01;

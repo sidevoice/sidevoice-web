@@ -71,6 +71,10 @@ export function StageVoice({ frame, turn, phone, children }: { frame: StageFrame
   }, []);
 
   const type = size ? voiceType(size.w, size.h) : null;
+  // A phone's rules are for its portrait tile; turned on its side (a short, wide tile), the desktop's: the phone's room for
+  // the name over the creature and for its widest card would leave the creature no room (the reference has no landscape
+  // phone: PR "Decisions").
+  phone = phone && !!size && size.h >= size.w;
   // Each card at its largest (the agent's: always three lines; the person's pill; what was sent, three lines), measured on
   // the tile with its type, again once the stage's face (DM Sans) has loaded (measured in a fallback face, the framing left
   // too little room and a card could sit on the creature: T33).

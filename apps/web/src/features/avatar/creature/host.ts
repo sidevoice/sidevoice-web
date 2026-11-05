@@ -583,6 +583,9 @@ export class LiveCreature {
   dispose() {
     clearTimeout(this.moodTimer);
     this.framer?.dispose();
+    // Its canvas may be drawn into next by another creature (a conversation switched on the stage): it never shows this one.
+    const { canvas } = this.opts;
+    canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
     lives.delete(this);
     for (const off of this.off) off();
     dispose(this.item, this.stage);

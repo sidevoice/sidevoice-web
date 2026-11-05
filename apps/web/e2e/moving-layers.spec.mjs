@@ -75,3 +75,28 @@ test("without the GPU the stage's agent holds still in its key pose: drawn once,
   expect(frames).toBe(0);
   expect(await pixels(agent)).toBe(still);
 });
+
+test("switching conversations, the stage never shows the previous conversation's creature", async ({ page }) => {
+  await stage(page, "still");
+  const agent = page.locator(".stage-agent[data-style=creature] > canvas");
+  if (!await webgl(page)) return noWebgl(page);
+  await expect.poll(() => pixels(agent), { timeout: 30_000 }).not.toBe("");
+  // A coarse print of what the first creature looks like; then, every frame from the switch on, what the canvas shows.
+  const print = () => {
+    const c = document.querySelector(".stage-agent[data-style=creature] > canvas"), g = c?.width ? c.getContext("2d") : null;
+    if (!g) return "";
+    const d = g.getImageData(0, 0, c.width, c.height).data, out = [];
+    for (let y = 0; y < 36; y++) for (let x = 0; x < 64; x++) { const i = (Math.floor((y + 0.5) * c.height / 36) * c.width + Math.floor((x + 0.5) * c.width / 64)) * 4; out.push(d[i] >> 4, d[i + 3] >> 4); }
+    return out.join(",");
+  };
+  const before = await page.evaluate(`(${print})()`);
+  await page.locator("#participants").getByText("sidevoice-web").first().click();
+  const seen = await page.evaluate(([print, before]) => new Promise((done) => {
+    const take = new Function(`return (${print})()`), t0 = performance.now(), out = [];
+    // only once the stage is the new conversation's (the agent's label names it)
+    const sample = () => { if (document.querySelector(".stage-agent")?.getAttribute("aria-label")?.includes("sidevoice-web")) out.push(take() === before); if (performance.now() - t0 < 4000) requestAnimationFrame(sample); else done(out); };
+    requestAnimationFrame(sample);
+  }), [String(print), before]);
+  expect(seen.length).toBeGreaterThan(0);
+  expect(seen.filter(Boolean).length, "frames showing the previous creature after the switch").toBe(0);
+});

@@ -110,7 +110,9 @@ export function* capCentreSteps(probe: FrameProbe, hTop: number, hBot: number, v
   }
   let best = r.f;
   if (!r.fits) {
-    const zk = best.zk, wantLow = floor - hBot - gap;
+    // ... but never out of the tile: its top stays on it (a tile too short for a card and the creature both, as a phone on
+    // its side: the card then waits, unseen, rather than cover it: StageVoice)
+    const zk = best.zk, wantLow = Math.max(floor - hBot - gap, best.low - best.top);
     yield;
     let lift = best.lift, m = probe.rows(lift, zk, xa, xb);
     for (let n = 0; n < 7 && Math.abs(m.low - wantLow) > 1; n++) { lift += (m.low - wantLow) / probe.slope(zk); yield; m = probe.rows(lift, zk, xa, xb); }

@@ -76,6 +76,12 @@ describe("capCentre", () => {
     expect(cardTop + card).toBeLessThanOrEqual(floor + 1.01);
   });
 
+  test("a tile too short for the card and the creature both: it never rises out of the tile, its top kept on it", () => {
+    const vh2 = 95, b = stageBands(vh2, false), f = capCentre(creature({ tall: 300, mid0: 60 }).probe, 0, 102, vh2, b.ceil, b.floor, b.gap, 0, 1);
+    expect(f.top).toBeGreaterThanOrEqual(-1.01);
+    expect(f.low).toBeLessThanOrEqual(vh2);
+  });
+
   test("the gap rule holds for every card size: the card's top a gap or more under the creature's lowest drawn row, shadow included", () => {
     for (const card of [0, 60, 120, 180, 240, 300, 360]) for (const shadow of [0, 12]) {
       const f = capCentre(creature({ shadow }).probe, 0, card, vh, ceil, floor, gap, 0, 1118);
