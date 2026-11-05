@@ -37,13 +37,17 @@ const STATES = {
   "working-sent": [working, listening, sent],
 };
 
-/** The stage's framing settled: solved (the layer says so where the browser draws the creature) and the creature standing
- *  still there (its feet, as the framing keeps them, unchanged a moment). The cards go straight to where it will stand. */
+/** The stage's framing settled: solved (the layer says so where the browser draws the creature) and no card's layer still
+ *  easing down to stay clear of the creature (its animation over, the cards' boxes unchanged a moment). */
 async function settled(page) {
   await page.locator(".stage-tile .stage-voice[data-framed]").waitFor({ timeout: 60_000 }).catch(() => {});
   let last = null;
   for (let i = 0, same = 0; i < 80 && same < 3; i++) {
-    const now = await page.evaluate(() => document.querySelector(".stage-tile .stage-canvas")?.style.getPropertyValue("--stage-feet") ?? "");
+    const now = await page.evaluate(() => {
+      const layer = document.querySelector(".stage-tile .stage-voice");
+      const easing = layer ? layer.getAnimations().filter((a) => a.effect?.target === layer).length : 0;
+      return easing + "|" + [...(layer?.querySelectorAll(":scope > .vcap:not(.meas)") ?? [])].map((c) => { const r = c.getBoundingClientRect(); return Math.round(r.top) + "," + Math.round(r.left); }).join(";");
+    });
     same = now === last ? same + 1 : 0; last = now;
     await page.waitForTimeout(300);
   }

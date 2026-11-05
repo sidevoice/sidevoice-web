@@ -59,7 +59,9 @@ export function LitText({ text, spoken }: { text: string; spoken: number }) {
     mark.hidden = !at;
     mark.style.transform = `translate(${across}px, ${down}px)`;
     // The line it is on, for whatever pages these words (PagedText): measured here, on the words' own client rects.
-    mark.dataset.line = at ? String(at.line) : "0";
+    // Written when it changes only (a line a few times a second at most, not on every word lit).
+    const said = at ? String(at.line) : "0";
+    if (mark.dataset.line !== said) mark.dataset.line = said;
   };
   // Where the lit end is, whenever it moves or the text is set again (a new window size is the observer's).
   useLayoutEffect(place, [text, end]); // eslint-disable-line react-hooks/exhaustive-deps

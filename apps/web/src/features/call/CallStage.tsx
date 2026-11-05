@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, type CSSProperties, type RefObject } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { UpdateNotice } from "../updates/UpdateNotice";
 import { Button } from "../../components/ui/Button";
@@ -215,6 +215,9 @@ export function StageTile({ card = false }: { card?: boolean }) {
   }, []);
   // The stage's framing: the voice text asks for room under the creature, the creature drawn there answers (StageVoice).
   const frame = useStageFrame();
+  // Where its feet stand (a share of the scene's height) once the framing settles: the backdrop's ground line is painted there.
+  const [ground, setGround] = useState<number | undefined>();
+  const onGround = useCallback((share: number | null) => setGround(share ?? undefined), []);
   if (!stage.threadId) return null;
   const spec = avatarFor(stage.threadId);
   const tone = avatarColor(spec);
@@ -227,7 +230,7 @@ export function StageTile({ card = false }: { card?: boolean }) {
       <div ref={stageRef} className="stage-tile" data-mood={avatar.mood} data-app={host().identity.build ? "" : undefined} data-card={card || undefined} style={avatarTone(tone) as CSSProperties}>
         <div className="stage-canvas">
           <div className="stage-scene">
-            <StageBackdrop seed={stage.threadId} tone={tone} live poster={avatar.mood === "offline" ? { words: posterWords(t), language: uiLanguage() } : undefined} />
+            <StageBackdrop seed={stage.threadId} tone={tone} live feet={avatar.mood === "offline" ? undefined : ground} poster={avatar.mood === "offline" ? { words: posterWords(t), language: uiLanguage() } : undefined} />
             <CharacterAvatar className="stage-agent" spec={spec} state={avatar} size="stage" scene live frame={frame}
               mouth="playback" mouthLevel={avatars.mouth(stage.threadId)} hearLevel={hearLevel} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
           </div>
@@ -241,7 +244,7 @@ export function StageTile({ card = false }: { card?: boolean }) {
         <div className="stage-tags"><AgentBadge stage={stage} /></div>
         {/* What is said, under the creature: one turn's card at a time there, the newer sending the older away. Its own
             conversation's: another one on the stage starts with none of the replies before it. */}
-        <StageVoice frame={frame} turn={avatar.mood === "speaking" || avatar.mood === "listening" ? avatar.mood : null} phone={narrow && !card}>
+        <StageVoice frame={frame} turn={avatar.mood === "speaking" || avatar.mood === "listening" ? avatar.mood : null} phone={narrow && !card} onGround={onGround}>
           {captions && <AgentBubbles key={stage.threadId} reading={reading} reply={reply} sounding={stage.speaking} messages={conversation.messages} onUp={holdStill}
             look="card" cut={pending} />}
           {captions && <PersonTurn conversation={conversation} t={t} look="card" cut={!!reply && stage.speaking} />}

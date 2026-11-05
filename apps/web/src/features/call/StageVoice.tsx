@@ -33,7 +33,10 @@ export function CancelGlyph() {
 
 /** The layer: `turn`, whose turn the agent's state says it is (null between turns: a desktop then stands closer while no
  *  card shows), `phone` for the phone's framing (one for all states). */
-export function StageVoice({ frame, turn, phone, children }: { frame: StageFrame; turn: "listening" | "speaking" | null; phone: boolean; children?: ReactNode }) {
+export function StageVoice({ frame, turn, phone, onGround, children }: { frame: StageFrame; turn: "listening" | "speaking" | null; phone: boolean;
+  /** Where the creature's feet stand once a framing change settles, a share of the scene's height (null: no creature drawn):
+   *  the stage's backdrop paints its ground line there (StageBackdrop `feet`). */
+  onGround?: (share: number | null) => void; children?: ReactNode }) {
   const layer = useRef<HTMLDivElement>(null);
   const agent = useRef<HTMLDivElement>(null);
   const pill = useRef<HTMLDivElement>(null);
@@ -109,10 +112,6 @@ export function StageVoice({ frame, turn, phone, children }: { frame: StageFrame
     if (size) frame.ask({ w: size.w, h: size.h, dx: size.dx, dy: size.dy, phone, rest, cards: cards && { below: cards.below, above: cards.above, xa: cards.xa, xb: cards.xb }, opener: turn });
   }, [frame, size, phone, rest, cards, turn]);
 
-  // (The backdrop's ground line follows the creature's feet, as the reference's backdrops do: their frame's y 357 on the
-  // feet. Written once per framing change above: --stage-feet, px from the tile's inner top, and --stage-ground, how far
-  // that moves the scene's ground in its own px, drawn 440 tall and scaled to the tile.)
-
   const { solved, pending } = useSyncExternalStore(frame.subscribe, frame.snapshot);
   // Under the creature, a gap below its lowest drawn row; never past the tile's foot (the largest card kept inside it).
   // Until the creature is drawn and framed (its host loading, or a browser that cannot draw it), at the cards' floor.
@@ -124,24 +123,24 @@ export function StageVoice({ frame, turn, phone, children }: { frame: StageFrame
   // layer plays it as one composited animation, kept a gap under the creature (no card ever moves up onto it), and a card
   // that cannot be both under it and inside the tile yet (a reply's three lines while the creature still stands close, at
   // rest) is held, unseen and its pop-in not started, until it can (data-hold, released on a timer). Nothing is written
-  // per frame; the backdrop's ground takes the feet's end with a transition (stage-voice.css, styles/call.css).
+  // per frame; the backdrop's ground line is told where the feet end (onGround).
   const place = useRef({ top: 0, h: 0, heights: { agent: 0, pill: 0, sent: 0 } });
+  const ground = useRef(onGround);
+  ground.current = onGround;
   place.current = { top: top ?? 0, h: size?.h ?? 0, heights: { agent: cards?.agent ?? 0, pill: cards?.pill ?? 0, sent: cards?.sent ?? 0 } };
   useEffect(() => {
-    const node = layer.current, scene = node?.parentElement?.querySelector<HTMLElement>(".stage-canvas");
-    if (!node || !scene) return;
+    const node = layer.current;
+    if (!node) return;
     let playing: Animation | null = null;
     const timers: number[] = [];
     const stop = () => { playing?.cancel(); playing = null; for (const t of timers.splice(0)) window.clearTimeout(t); };
     const off = frame.watchMotion((m) => {
       stop();
-      if (!m) { node.removeAttribute("data-hold"); scene.style.removeProperty("--stage-feet"); scene.style.removeProperty("--stage-ground"); return; }
+      if (!m) { node.removeAttribute("data-hold"); ground.current?.(null); return; }
       const { top, h, heights } = place.current, sh = size?.sh || h, dy = size?.dy ?? 0;
-      // the backdrop's ground where the feet will stand, eased there by its transition (none when taken at once)
-      const feet = m.feet[m.feet.length - 1];
-      scene.style.setProperty("--stage-ground-ms", m.feet.length > 1 ? Math.round(m.feet.length * m.step) + "ms" : "0ms");
-      scene.style.setProperty("--stage-feet", feet.toFixed(2) + "px");
-      scene.style.setProperty("--stage-ground", (((feet - dy) * 440) / sh - 357).toFixed(2) + "px");
+      // the backdrop's ground line where the feet will stand (its canvas is painted once, there: the ground reaches the
+      // tile's foot, as the reference's backdrops do with the feet it is given)
+      ground.current?.(Math.round(((m.feet[m.feet.length - 1] - dy) / sh) * 1e4) / 1e4);
       // the cards a gap under the creature as it eases: how far below their place, step by step
       const below = m.floor.map((f) => Math.max(0, f - top));
       if (below.some((d) => d > 0.25)) {
