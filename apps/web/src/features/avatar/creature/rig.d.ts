@@ -74,7 +74,14 @@ export interface RigRenderer {
 
 /** One renderer, many creatures blitted into 2D canvases. */
 export class Stage {
-  constructor(look: "paint", px?: number, mode?: "" | "wide");
+  /** `fixed`: the host sizes the renderer (setRenderSize) to the canvas it shows. */
+  constructor(look: "paint", px?: number, mode?: "" | "wide", opts?: { fixed?: boolean });
+  /** The renderer takes this size (no style set). */
+  setRenderSize(w: number, h: number): void;
+  /** The shadow map's side (px), its filter radius in proportion; whether it changed. */
+  setShadowPx(px: number): boolean;
+  /** The shadow map's side now (px). */
+  shadowPx: number;
   renderer: RigRenderer;
   /** The renderer's size: the stage's px tall, as wide as its shape. */
   w: number;

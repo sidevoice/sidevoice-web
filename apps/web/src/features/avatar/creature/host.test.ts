@@ -7,7 +7,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 const rig = vi.hoisted(() => ({
   refuse: false,
-  made: [] as Array<{ renderer: FakeRenderer; draws: number; kind: "scene" | "face" }>,
+  made: [] as Array<{ renderer: FakeRenderer; draws: number; kind: "scene" | "face"; w: number; h: number; draw: (item: { spec: { state?: string; expr?: string } }, t: number, level: number, still: boolean) => void }>,
   /** What each draw was asked to show: its state (a pose) and its expression. */
   drawn: [] as Array<{ state?: string; expr?: string; still: boolean }>,
 }));
@@ -27,7 +27,9 @@ vi.mock("./rig.js", () => {
     items: unknown[] = [];
     scene = { remove() {} };
     camera = { aspect: 1, updateProjectionMatrix() {} };
-    constructor(_look: string, _px: number, mode?: string) {
+    /** As the real stage's: the renderer takes the size (and says so). */
+    setRenderSize(w: number, h: number) { if (this.w === w && this.h === h) return; this.w = w; this.h = h; this.renderer.setSize(w, h); }
+    constructor(_look: string, _px: number, mode?: string, _opts?: object) {
       if (rig.refuse) throw new Error("THREE.WebGLRenderer: Error creating WebGL context.");
       this.kind = mode === "wide" ? "scene" : "face";
       this.renderer = renderer();
@@ -260,4 +262,161 @@ test("a face asked for at once is rendered before drawFace returns, kept, and pa
   expect(rig.drawn).toHaveLength(1);
   expect(thirdCalls).toEqual([]);
   expect(later).not.toHaveBeenCalled();
+});
+
+/** A stage canvas in the page whose box is `w` × `h` css px. */
+function tile(w: number, h: number) {
+  const element = canvas();
+  element.getBoundingClientRect = () => new DOMRect(0, 0, w, h);
+  element.getContext = (() => null) as never; // (a dispose clears it)
+  return element;
+}
+
+test("the stage's canvas holds the pixels its tile shows (the pixel ratio to 2, to 960 px tall), and its renderer is sized to it", () => {
+  webgl();
+  const dpr = vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(3);
+  const phone = tile(364, 655);
+  const live = mount({ ...onStage, canvas: phone })!;
+  expect([phone.width, phone.height]).toEqual([533, 960]);
+  expect(live.tick(0)).toBe(true);
+  const scene = stageFor("scene");
+  expect([scene.w, scene.h]).toEqual([533, 960]);
+  // A desktop at pixel ratio 1 draws what it shows, not 960 px.
+  dpr.mockReturnValue(1);
+  const desk = tile(1118, 628);
+  const second = mount({ ...onStage, canvas: desk })!;
+  expect([desk.width, desk.height]).toEqual([1118, 628]);
+  expect(second.tick(0)).toBe(true);
+  expect([scene.w, scene.h]).toEqual([1118, 628]);
+});
+
+test("when the governor steps down, the canvas takes fewer pixels in the very task that draws it, so it is never shown cleared", () => {
+  webgl();
+  vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(3);
+  const element = tile(364, 655);
+  const live = mount({ ...onStage, canvas: element, moving: true })!; // (the governor steps on frames of motion)
+  const scene = stageFor("scene"), seen: Array<[number, number]> = [], draw = scene.draw.bind(scene);
+  scene.draw = (...args: Parameters<typeof draw>) => { seen.push([element.width, element.height]); draw(...args); };
+  expect(live.tick(0)).toBe(true);
+  host.creatureQuality.pin(3); // 0.6 of the full size
+  expect(live.wantsFrames()).toBe(true); // asked for a frame, to size the canvas in the task that draws it
+  expect([element.width, element.height]).toEqual([533, 960]); // not yet: nothing is shown cleared in between
+  expect(live.tick(1)).toBe(true);
+  expect(seen).toEqual([[533, 960], [320, 576]]); // what the frame drew into
+  expect([scene.w, scene.h]).toEqual([320, 576]);
+  host.creatureQuality.pin(null);
+  expect(live.tick(2)).toBe(true);
+  expect(seen.at(-1)).toEqual([533, 960]);
+});
+
+test("a retier resizes and redraws only the creatures in motion: one held still is left as it was until something draws it", () => {
+  webgl();
+  vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(3);
+  const heldCanvas = tile(364, 655), movingCanvas = tile(364, 655);
+  const held = mount({ ...onStage, canvas: heldCanvas, moving: false })!;
+  const moving = mount({ ...onStage, canvas: movingCanvas, moving: true })!;
+  const scene = stageFor("scene"), drawnInto: HTMLCanvasElement[] = [], draw = scene.draw.bind(scene);
+  scene.draw = (...args: Parameters<typeof draw>) => { drawnInto.push((args[0] as unknown as { canvas: HTMLCanvasElement }).canvas); draw(...args); };
+  expect(held.tick(0)).toBe(true);
+  expect(moving.tick(0)).toBe(true);
+  drawnInto.length = 0;
+  // Another creature's frames stepped the governor down (a pin is the same retier).
+  host.creatureQuality.pin(3); // 0.6 of the full size
+  expect(moving.wantsFrames()).toBe(true);
+  expect(held.wantsFrames()).toBe(false); // not woken: nothing of it changed
+  expect(held.tick(1)).toBe(false);
+  expect([heldCanvas.width, heldCanvas.height]).toEqual([533, 960]); // not resized, so not cleared either
+  expect(moving.tick(1)).toBe(true);
+  expect([movingCanvas.width, movingCanvas.height]).toEqual([320, 576]);
+  expect(drawnInto).toEqual([movingCanvas]); // the one drawing, and only it
+  // Letting go of the pin is a retier too: still not woken.
+  host.creatureQuality.pin(null);
+  expect(held.wantsFrames()).toBe(false);
+  expect([heldCanvas.width, heldCanvas.height]).toEqual([533, 960]);
+  // Drawn for another reason (a change, the pointer), it takes the rung the governor is on then.
+  host.creatureQuality.pin(3);
+  held.redraw();
+  expect(held.tick(2)).toBe(true);
+  expect([heldCanvas.width, heldCanvas.height]).toEqual([320, 576]);
+  expect(drawnInto).toEqual([movingCanvas, heldCanvas]);
+});
+
+test("only a creature that moves is judged by the governor: held still, or the poster, its frames are not motion", () => {
+  webgl();
+  expect(mount({ ...onStage, canvas: tile(364, 655), moving: false })!.animates()).toBe(false);
+  const live = mount({ ...onStage, canvas: tile(364, 655), moving: true })!;
+  expect(live.animates()).toBe(true);
+  live.setMoving(false);
+  expect(live.animates()).toBe(false);
+  live.setMood("offline");
+  live.setMoving(true);
+  expect(live.animates()).toBe(false); // the poster stands in for it
+});
+
+/** A `matchMedia` whose queries can be told to change, as the page's do when a window is moved to another screen: the queries
+ *  made, and the listeners on each (a `once` one hears a change only the first time). `change()` is the latest query changing. */
+function mediaQueries() {
+  interface Listener { fn: () => void; once: boolean }
+  const made: Array<{ media: string; listeners: Listener[] }> = [];
+  vi.stubGlobal("matchMedia", (media: string) => {
+    const query = { media, listeners: [] as Listener[] };
+    made.push(query);
+    return {
+      media,
+      matches: true,
+      addEventListener: (_type: string, fn: () => void, options?: { once?: boolean }) => { query.listeners.push({ fn, once: !!options?.once }); },
+      removeEventListener: (_type: string, fn: () => void) => { query.listeners = query.listeners.filter((l) => l.fn !== fn); },
+    };
+  });
+  const change = () => {
+    const query = made.at(-1)!;
+    for (const l of [...query.listeners]) { if (l.once) query.listeners = query.listeners.filter((x) => x !== l); l.fn(); }
+  };
+  return { made, change };
+}
+
+test("the stage's canvas follows the page's pixel ratio when its css box stays the same, as a window moved to another screen", () => {
+  webgl();
+  const dpr = vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(1);
+  const screens = mediaQueries();
+  const element = tile(364, 655);
+  const live = host.mountCreature({ ...onStage, canvas: element })!;
+  expect([element.width, element.height]).toEqual([364, 655]);
+  expect(live.tick(0)).toBe(true);
+  expect(live.wantsFrames()).toBe(false); // held still: nothing asks for a frame
+  expect(screens.made.map((query) => query.media)).toEqual(["(resolution: 1dppx)"]);
+  // To a 2x screen: the same css box, so the box observer says nothing; the canvas is refit and drawn again.
+  dpr.mockReturnValue(2);
+  screens.change();
+  expect([element.width, element.height]).toEqual([533, 960]);
+  expect(live.wantsFrames()).toBe(true);
+  expect(live.tick(1)).toBe(true);
+  expect([stageFor("scene").w, stageFor("scene").h]).toEqual([533, 960]);
+  // Armed again for the new ratio, so the next move is heard too: back to 1x.
+  expect(screens.made.map((query) => query.media)).toEqual(["(resolution: 1dppx)", "(resolution: 2dppx)"]);
+  dpr.mockReturnValue(1);
+  screens.change();
+  expect([element.width, element.height]).toEqual([364, 655]);
+  expect(live.tick(2)).toBe(true);
+  // A ratio past 2 changes nothing of what the tile holds (it draws for 2 at most): nothing is redrawn.
+  dpr.mockReturnValue(2);
+  screens.change();
+  expect(live.tick(3)).toBe(true);
+  dpr.mockReturnValue(3);
+  screens.change();
+  expect([element.width, element.height]).toEqual([533, 960]);
+  expect(live.wantsFrames()).toBe(false);
+  expect(screens.made).toHaveLength(5);
+  // Let go of with the creature: the query that is armed is not listened to any more.
+  live.dispose();
+  expect(screens.made.at(-1)!.listeners).toHaveLength(0);
+});
+
+test("a still face, whose pixels do not depend on the pixel ratio, does not watch it; a sharp one does", () => {
+  webgl();
+  const screens = mediaQueries();
+  mount({ seed: "t1", canvas: tile(100, 100), framing: "face", moving: false });
+  expect(screens.made).toHaveLength(0);
+  mount({ seed: "t2", canvas: tile(100, 100), framing: "face", sharp: true, moving: false });
+  expect(screens.made).toHaveLength(1);
 });

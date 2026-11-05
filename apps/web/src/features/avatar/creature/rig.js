@@ -960,20 +960,29 @@ export class Creature3D {
 }
 
 // ---------- stage: one renderer, many creatures blitted into 2D canvases ----------
+// The key light's shadow map: the reference had 1024², filtered over 6 texels. The filter's reach is a size in the world, so a
+// map of another size takes the radius in proportion; at 512² (a quarter of the depth pass and of what the floor and the
+// creature sample) the soft edge is the same (the stage's frame differs from the 1024² one by 0.002 of 255 per channel).
+const SHADOW_PX = 1024, SHADOW_RADIUS = 6, SHADOW_MAP_PX = 512;
+const _ld = new THREE.Vector3(); // scratch: the key light's direction in view space, per frame
 export class Stage {
-  constructor(look, px = 256, mode = '') {
-    this.look = look; this.px = px; this.cine = mode === 'cine';
+  /** `fixed`: the host sizes the renderer (setRenderSize) to the canvas it shows, so a frame is rendered at the pixels it is
+   *  shown in, and drawn into another canvas of that shape (a trial render's smaller one) it is only resampled. */
+  constructor(look, px = 256, mode = '', { fixed = false } = {}) {
+    this.look = look; this.px = px; this.cine = mode === 'cine'; this.fixed = fixed;
     const aspect = this.cine ? 16 / 9 : mode === 'wide' ? 3 / 2 : 1; this.w = Math.round(px * aspect); this.h = px; // wide: the app's stage tile (3:2)
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    // Not preserved: a frame is copied into its canvas in the task that renders it, and a kept buffer makes the browser copy
+    // (and a tile-based GPU store) every frame for nothing; the renderer's own canvas is never shown.
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: false });
     this.renderer.setPixelRatio(1); this.renderer.setSize(this.w, this.h);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = look === "render" ? THREE.NeutralToneMapping : look === 'glow' ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
-    this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFShadowMap; // (three 0.187 has no PCFSoft: it warned and fell back to this)
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(26, aspect, 0.1, 60);
     this.camera.position.set(0, 0.6, 6.7); this.camera.lookAt(0, 0.3, 0);
     const key = new THREE.DirectionalLight(0xffffff, look === 'cel' ? 3.2 : 2.4); key.position.set(-2.2, 4.2, 5); key.castShadow = true;
-    key.shadow.mapSize.set(px >= 1024 ? 2048 : 1024, px >= 1024 ? 2048 : 1024); key.shadow.radius = 6; key.shadow.camera.left = key.shadow.camera.bottom = -2.5; key.shadow.camera.right = key.shadow.camera.top = 2.5; key.shadow.bias = -0.0006; key.shadow.normalBias = 0.07; this.key = key;
+    this.shadowPx = px >= 1024 ? 2048 : SHADOW_MAP_PX; key.shadow.mapSize.set(this.shadowPx, this.shadowPx); key.shadow.radius = SHADOW_RADIUS * this.shadowPx / SHADOW_PX; key.shadow.camera.left = key.shadow.camera.bottom = -2.5; key.shadow.camera.right = key.shadow.camera.top = 2.5; key.shadow.bias = -0.0006; key.shadow.normalBias = 0.07; this.key = key;
     // past the toon terminator: the body's own shadow comes from its two tones, not the shadow map (its self-shadow band ran ahead of the terminator and the eye lids, lit by the same tones, showed as light patches against it)
     this.scene.add(key); key.layers.enable(OVER); key.shadow.camera.layers.enable(OVER);
     this.fillLight = new THREE.HemisphereLight(0xfff4e6, 0x6b5a70, look === 'cel' ? 0.75 : 0.55); this.scene.add(this.fillLight); this.fillLight.layers.enable(OVER);
@@ -981,6 +990,19 @@ export class Stage {
     this.floor = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.ShadowMaterial({ opacity: look === 'cel' ? 0.22 : 0.28 }));
     this.floor.rotation.x = -Math.PI / 2; this.floor.receiveShadow = true; this.scene.add(this.floor);
     this.items = [];
+  }
+  /** The renderer takes this size (a frame is drawn at as many pixels as the canvas it is shown in holds). */
+  setRenderSize(w, h) {
+    if (this.w === w && this.h === h) return;
+    this.w = w; this.h = h; this.renderer.setSize(w, h, false);
+  }
+  /** The shadow map's side (px): its filter radius follows (SHADOW_RADIUS), so the soft edge keeps its size; false: unchanged. */
+  setShadowPx(px) {
+    if (px === this.shadowPx) return false;
+    const sh = this.key.shadow;
+    this.shadowPx = px; sh.mapSize.set(px, px); sh.radius = SHADOW_RADIUS * px / SHADOW_PX;
+    if (sh.map) { sh.map.dispose(); sh.map = null; } // made again at the new size by the next frame
+    return true;
   }
   add(spec, canvas, opts = {}) {
     const c = new Creature3D(spec, this.look);
@@ -993,7 +1015,7 @@ export class Stage {
   draw(item, t, lvl, isStatic) {
     const { c, spec, canvas, opts } = item;
     // the camera's aspect and the renderer's size follow the canvas: a creature is never stretched, whatever it is drawn into
-    if (!this.cine) { const ar = canvas.width / canvas.height; if (Math.abs(ar - this.camera.aspect) > 1e-3) { this.camera.aspect = ar; this.camera.updateProjectionMatrix(); this.w = Math.round(this.h * ar); this.renderer.setSize(this.w, this.h); } }
+    if (!this.cine && !this.fixed) { const ar = canvas.width / canvas.height; if (Math.abs(ar - this.camera.aspect) > 1e-3) { this.camera.aspect = ar; this.camera.updateProjectionMatrix(); this.w = Math.round(this.h * ar); this.renderer.setSize(this.w, this.h); } }
     let st = {};
     if (spec.state) { const [kt, kl] = KEY[spec.state] || [0, 0]; st = STATES3D[spec.state](isStatic ? kt : t + item.off, isStatic ? kl : lvl); }
     if (spec.state === 'speaking') st.voice = true; // the mouth follows the voice whatever mood plays over it
@@ -1021,7 +1043,7 @@ export class Stage {
     if (this.look === 'paint') { if (c.P && c.P.cast) this.key.position.set(-2.5, 4.4, 4.6); else this.key.position.set(-2.2, 4.2, 5); }
     if (this.look === 'paint') {
       this.camera.updateMatrixWorld();
-      const ld = this.key.position.clone().normalize().transformDirection(this.camera.matrixWorldInverse);
+      const ld = _ld.copy(this.key.position).normalize().transformDirection(this.camera.matrixWorldInverse);
       c.root.traverse((o) => { const m = o.material; if (m && m.userData && m.userData.followKey) m.uniforms.uL.value.copy(ld); });
       const tinted = c.P && c.P.cast;
       this.floor.material.color.set(tinted ? '#3b2f63' : '#000000'); this.floor.material.opacity = tinted ? 0.3 : 0.28;

@@ -5,10 +5,12 @@ import type { AvatarMood } from "../avatar-spec";
 import { creatureFromSeed, rigSpec, type CreatureChoice, type RigSpec } from "./catalogue";
 import type { StageFrame } from "./stage-frame";
 import { StageFramer } from "./stage-framer";
+import { Governor, sceneSize } from "./quality";
 
 /* Where creatures are drawn on a page: two three.js stages (one WebGL context each, whatever the number of creatures),
  * each creature built once into a stage's scene and blitted into its own 2D canvas, as the design reference's creator
- * draws (reference/2026-11-04/src/creator.js): its 1152 × 768 stage into a canvas 960 px tall, and its 256 px square
+ * draws (reference/2026-11-04/src/creator.js): its stage into a canvas as tall as the tile shows, up to 960 px (the reference
+ * rendered 1152 × 768 and resampled it; this renders at the canvas's own pixels, quality.ts), and its 256 px square
  * stage for small faces, into a 144 px square. A canvas is drawn from one of two framings:
  *
  *  - "scene": the stage's tile. The camera at the reference's desktop distance (VIEWS.desktop, zoom 1.32: "the figure
@@ -72,8 +74,8 @@ const STARTLE = { expr: "surprised", hop: 1.1, secs: 0.55 } as const;
 export const SCENE_ZOOM = 1.32;
 /** The face render (creator.js renderFace): fitted, stepped back and aimed a little higher, so a hat or ears fit. */
 const FACE = { fit: true, zoom: 1.5, lookY: 0.22 } as const;
-/** The canvases' heights, as the creator's: the stage's preview, and the face. */
-const SCENE_PX = 960, FACE_PX = 144;
+/** The face canvas's height, as the creator's. The stage's canvas is as large as the tile shows (quality.ts sceneSize). */
+const FACE_PX = 144;
 /** A sharp live face's canvas: its box in device pixels, within these (the stage draws exactly as many pixels as it shows). */
 const CARD_MIN_PX = 64, CARD_MAX_PX = 512;
 
@@ -96,7 +98,7 @@ export type Slot = "scene" | "face" | "card";
  *    shows the fallback (fallback.ts) for the creatures it draws, told by onCreaturesChange. */
 
 /** How each stage is made, again for a new renderer when a lost context comes back. */
-const MAKE: Record<Slot, () => RigStage> = { scene: () => new Stage("paint", 768, "wide"), face: () => new Stage("paint", 256), card: () => new Stage("paint", 256) };
+const MAKE: Record<Slot, () => RigStage> = { scene: () => new Stage("paint", 768, "wide", { fixed: true }), face: () => new Stage("paint", 256), card: () => new Stage("paint", 256) };
 const RETRY_MS = 10_000, LOST_GRACE_MS = 3000;
 
 /** A stage and how it is: `lost`, its context taken away (it draws nothing until it is back); `down`, it cannot draw (no
@@ -240,24 +242,44 @@ export function placeFigure(stage: RigStage, c: Creature3D, aspect: number, { gr
 // ---------- the frame loop ----------
 // One loop for the page, running only while a creature has something to draw: a page where every creature holds still
 // asks for no frame at all (the motion guard's rule, e2e/motion-guard.spec.mjs).
-// About 30 frames a second, as the creator; fewer where a frame costs more than an eighth of that (a renderer without a
-// GPU, which the page only meets when the motion is forced on: lib/motion.ts holds the drawings still there), so the
-// creature never takes more than an eighth of the page's thread.
+// About 30 frames a second, as the creator. Where they cost the thread more than its share (BUDGET_MS) or arrive late, the
+// governor (quality.ts) draws the creature at fewer pixels first, then at fewer frames, until they hold, and back up when
+// there is room. At the bottom of its ladder a frame that still costs more than a sixth of the page's thread is spaced
+// out until it does not (a renderer without a GPU, which the page only meets when the motion is forced on: lib/motion.ts
+// holds the drawings still there).
 const lives = new Set<LiveCreature>();
+const governor = new Governor();
+/** Whether the governor has been started (on the first frame of motion: the first frames, which compile programs, are not judged). */
+let judging = false;
+/** For diagnostics and tests: the creature's quality rung now, or fixed at one (null: judged again). */
+export const creatureQuality = {
+  tier: () => governor.tier,
+  pin(tier: number | null) { if (governor.pin(tier)) retier(); },
+};
+function retier() { for (const live of lives) live.requality(); }
 /** Renderers that have drawn acts: their act outline shader is compiled (LiveCreature.draw). */
 const warmed = new WeakSet<object>();
-let frameId = 0, last = 0, every = 33, cost = 0;
+let frameId = 0, last = 0;
+/** A refresh's jitter: a frame asked for every 33.3 ms is drawn on the refresh within this of it (a 60, 90 or 120 Hz screen alike). */
+const SLACK_MS = 4;
 const wanted = () => { for (const live of lives) if (live.wantsFrames()) return true; return false; };
 function frame(ms: number) {
   frameId = 0;
-  if (ms - last >= every) {
+  const gap = ms - last;
+  if (gap >= governor.every - SLACK_MS) {
     last = ms;
     const t0 = performance.now();
-    let drew = false;
-    for (const live of lives) drew = live.tick(ms / 1000) || drew;
-    if (drew) { const took = performance.now() - t0; cost = cost ? cost * 0.8 + took * 0.2 : took; every = Math.max(33, Math.min(500, cost * 8)); }
+    // Only motion is judged: a creature held still (reduced motion, a key pose drawn on a change) asks for few frames, and
+    // drawing it at fewer pixels would only change what it shows.
+    let animated = false;
+    for (const live of lives) if (live.tick(ms / 1000) && live.animates()) animated = true;
+    if (animated) {
+      if (!judging) { judging = true; governor.start(0, ms); }
+      else if (governor.observe(ms, performance.now() - t0, gap)) retier();
+    }
   }
-  if (wanted()) frameId = requestAnimationFrame(frame);
+  // (not when a creature woke the loop while it drew: that one is already asked for)
+  if (!frameId && wanted()) frameId = requestAnimationFrame(frame);
 }
 function wake() { if (!frameId && wanted()) frameId = requestAnimationFrame(frame); }
 
@@ -293,6 +315,20 @@ export interface LiveOptions {
 
 const slotOf = ({ framing, sharp }: Pick<LiveOptions, "framing" | "sharp">): Slot => (framing === "face" && sharp ? "card" : framing);
 
+/** `changed` is called each time the page's pixel ratio changes (a window moved to another screen, the browser zoomed): a canvas's
+ *  css box stays as it was then, which is all a ResizeObserver says. A media query for one ratio says once that it stopped
+ *  matching, so each change arms the next. Returns what stops it. */
+function watchPixelRatio(changed: () => void): () => void {
+  let query: MediaQueryList | undefined;
+  function arm() {
+    query = globalThis.matchMedia?.(`(resolution: ${globalThis.devicePixelRatio || 1}dppx)`);
+    query?.addEventListener("change", on, { once: true });
+  }
+  function on() { arm(); changed(); } // (armed first: the next change is not lost to what `changed` does)
+  arm();
+  return () => query?.removeEventListener("change", on);
+}
+
 /** A creature drawn into a canvas for as long as it is mounted: moving (its state's motion, about 30 frames a second) or
  *  still (its key pose, drawn again on each change and while the pointer moves its eyes). */
 export class LiveCreature {
@@ -310,6 +346,9 @@ export class LiveCreature {
   private lookKey = "";
   private off: Array<() => void> = [];
   private sized = "";
+  /** The canvas's box as last laid out (css px), and the governor's scale its pixels were sized for. */
+  private css = { w: 0, h: 0 };
+  private scaled = 1;
   private step: CreatureStep = {};
   /** The base act built for the step (its name and start), so the same step is not built again. */
   private baseKey: string | null = null;
@@ -338,6 +377,10 @@ export class LiveCreature {
     // A sharp face also follows its pixel ratio (a window moved to another screen), where the browser says so.
     if (opts.sharp) { try { box?.observe(opts.canvas, { box: "device-pixel-content-box" }); } catch { box?.observe(opts.canvas); } } else box?.observe(opts.canvas);
     this.off.push(() => box?.disconnect());
+    // Where the pixels depend on the pixel ratio (the stage's, a sharp face's), the ratio is watched too: a window moved between
+    // a 1× and a 2× screen keeps its css box, so no observer above would refit the canvas (blurry on the sharper screen, wasted
+    // fill on the other); and not every browser has the device-pixel box the sharp face asks for.
+    if (opts.framing !== "face" || opts.sharp) this.off.push(watchPixelRatio(() => { if (this.fit()) { this.framer?.invalidate(); this.poke(); } }));
     const from = opts.gazeFrom;
     if (from) {
       // T23: only the gaze follows the pointer (the finger while touching); touching does nothing else
@@ -352,17 +395,20 @@ export class LiveCreature {
     wake();
   }
 
-  /** The canvas takes its box's shape (960 px tall for the scene, as the creator's preview), so nothing is stretched. */
-  private fit(): boolean {
+  /** The canvas takes its box's shape, so nothing is stretched, and as many pixels as the box shows (quality.ts sceneSize, at
+   *  the governor's scale), up to the creator's 960 px tall. `measure`: the box is read again (a layout), else it is as last read. */
+  private fit(measure = true): boolean {
     // the box as laid out, fractions kept (the creator's getBoundingClientRect): a scaled scene keeps its shape
-    const { canvas } = this.opts, box = canvas.getBoundingClientRect(), w = box.width, h = box.height;
+    const { canvas } = this.opts;
+    if (measure) { const box = canvas.getBoundingClientRect(); this.css = { w: box.width, h: box.height }; }
+    const { w, h } = this.css;
     let W: number, H: number;
     if (this.opts.framing === "face") {
       // A sharp one: its box's device pixels (a box not laid out yet: the still face's size, until it is and the observer asks again)
       W = H = this.opts.sharp && (w > 0 || h > 0) ? Math.min(CARD_MAX_PX, Math.max(CARD_MIN_PX, Math.ceil(Math.max(w, h) * (globalThis.devicePixelRatio || 1)))) : FACE_PX;
     } else {
-      const ar = w > 0 && h > 0 ? w / h : 1.5;
-      H = SCENE_PX; W = Math.round(SCENE_PX * ar);
+      this.scaled = governor.scale;
+      ({ width: W, height: H } = sceneSize(w, h, globalThis.devicePixelRatio || 1, this.scaled));
     }
     const key = W + "x" + H;
     if (key === this.sized) return false;
@@ -516,6 +562,12 @@ export class LiveCreature {
   /** Moving, or holding still in its key pose (reduced motion, no GPU). */
   setMoving(moving: boolean) { if (moving !== this.moving) { this.moving = moving; this.framer?.hold(!moving); this.poke(); } }
 
+  /** The governor moved to another rung: a creature in motion has this canvas sized to it by its next frame (in the task that
+   *  draws it, so it is never shown cleared), and drawn then. One held still (reduced motion, a key pose) is left as it is: it
+   *  was not what the governor judged, and resizing it would clear and redraw a picture nothing changed; it takes the rung
+   *  the governor is on when it is next drawn (tick). */
+  requality() { if (this.slot === "scene" && this.animates() && this.scaled !== governor.scale) this.poke(); }
+
   /** Drawn again at once (a framing or a level source changed). */
   redraw() { this.poke(); }
 
@@ -526,6 +578,9 @@ export class LiveCreature {
     const M = MODES[this.mood];
     return !M.poster && (!!this.ix.gaze || this.ix.w > 0 || !!this.react || this.moving || this.easing);
   }
+
+  /** Its frames are motion (it moves, and is not the poster), so the governor judges what they cost. */
+  animates(): boolean { return this.moving && !MODES[this.mood].poster; }
 
   /** It has a frame to draw: a change not drawn yet, or motion (its own, the pointer's gaze, a startle). */
   wantsFrames(): boolean { return !this.hidden && !seats[this.slot].lost && (this.needDraw || this.active()); }
@@ -544,6 +599,7 @@ export class LiveCreature {
     // has one again (its box observer asks for it).
     if (!canvas.isConnected || canvas.getClientRects().length === 0) { this.needDraw = true; this.hidden = true; return false; }
     this.needDraw = false;
+    if (this.slot === "scene" && this.scaled !== governor.scale) this.fit(false);
     this.draw(t, !this.moving || !on);
     return true;
   }
@@ -565,9 +621,8 @@ export class LiveCreature {
     const item = this.item, framed = camera ?? this.framer?.step() ?? null, view = framed ? null : this.framingNow();
     if (!camera) this.easing = !!framed && "moving" in framed && !!framed.moving;
     if (view || framed) {
-      // As the creator draws its stage (viewCam): the camera takes the canvas's shape, and the renderer keeps the stage's
-      // own size (1152 × 768), so Stage.draw does not resize it and the frame is resampled into the canvas, whatever its
-      // shape. Rendered at the canvas's own shape instead, a phone's tile came out a pixel off along every edge.
+      // As the creator draws its stage (viewCam): the camera takes the canvas's shape. The renderer takes it too (sizeStage), so
+      // the frame is rendered at the pixels it is shown in; the reference rendered 1152 × 768 and resampled it into the canvas.
       const cam = this.stage.camera, ar = this.opts.canvas.width / this.opts.canvas.height;
       if (cam.aspect !== ar) { cam.aspect = ar; cam.updateProjectionMatrix(); }
     }
@@ -577,18 +632,17 @@ export class LiveCreature {
     if (framed) { item.opts.zoom = framed.zoom; item.opts.lookY = framed.lookY; }
     else if (view) { item.opts.zoom = view.zoom; item.opts.lookY = view.lookY; }
     const lvl = M.voice && this.opts.level ? this.opts.level(this.mood) : 0;
-    // The card's stage draws as many pixels as its canvas holds (and is drawn into it one to one).
-    if (this.slot === "card") this.sizeStage();
+    // The scene's and the card's stage draw as many pixels as the canvas holds (and are drawn into it one to one; a trial
+    // render's smaller canvas takes the same frame resampled).
+    if (this.slot !== "face") this.sizeStage();
     this.warm(t, lvl, still);
     this.stage.draw(item, t, lvl, still);
   }
 
-  /** The card stage's renderer takes its canvas's size (square), when that changed. */
+  /** The scene's and the card's stage renderer take their canvas's size, when that changed. */
   private sizeStage() {
-    const { stage } = this, px = this.opts.canvas.width;
-    if (stage.w === px && stage.h === px) return;
-    stage.w = stage.h = px;
-    stage.renderer.setSize(px, px);
+    const { width, height } = this.opts.canvas;
+    this.stage.setRenderSize(width, height);
   }
 
   /** product: the first time a renderer draws acts, it first draws the reference's first two frames of them (k = 0, then
@@ -785,6 +839,7 @@ export function posterPortrait(seed: string, choice?: CreatureChoice): { img: HT
   const s = stage as Stage & { floor: { visible: boolean }; camera: Stage["camera"] }, keep = { w: stage.w, h: stage.h, aspect: stage.camera.aspect };
   const c = item.c as Creature3D & { contact?: { visible: boolean }; setProps(kind: null): void };
   try {
+    stage.camera.aspect = 1; stage.camera.updateProjectionMatrix(); stage.setRenderSize(PORTRAIT_PX, PORTRAIT_PX); // (a fixed stage is sized by its host)
     item.spec.state = undefined; item.spec.expr = "happy"; c.setProps(null); item.opts.zoom = 1.5; item.opts.turn = 0; item.opts.lookY = undefined;
     // very happy: smiling eyes (the happy lower-lid curve, relaxed lids) and a big open grin, facing straight on
     item.opts.extra = { expr: "happy", bot: 0.42, lid: 0.06, grin: true, gx: 0, gy: 0, tilt: 0, dx: 0, dy: 0, breathe: 0, squash: 0 };
@@ -793,7 +848,7 @@ export function posterPortrait(seed: string, choice?: CreatureChoice): { img: HT
   } finally {
     s.floor.visible = true;
     dispose(item, stage);
-    if (stage.w !== keep.w || stage.h !== keep.h) { stage.w = keep.w; stage.renderer.setSize(keep.w, keep.h); }
+    stage.setRenderSize(keep.w, keep.h);
     stage.camera.aspect = keep.aspect; stage.camera.updateProjectionMatrix();
   }
   // its real extent (hats and ears included), from the pixels

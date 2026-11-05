@@ -26,6 +26,8 @@ function fakeStage() {
   const stage = {
     camera: { aspect: 1.5, updateProjectionMatrix() {} },
     renderer: {},
+    w: 1152, h: 768,
+    setRenderSize(w: number, h: number) { this.w = w; this.h = h; },
     items: [],
     add: (spec: object, canvas: HTMLCanvasElement) => ({ c, canvas, spec, opts: {}, off: 0 }),
     draw: (item: { opts: { extra?: Record<string, unknown> } }, t: number, _lvl: number, still: boolean) => {
