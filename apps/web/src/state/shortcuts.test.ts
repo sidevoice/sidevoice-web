@@ -1,45 +1,77 @@
-import { expect, test } from "vitest";
-import { SHORTCUTS, ariaKeyShortcuts, shortcutCombo, shortcutOf } from "./shortcuts";
+import { afterEach, expect, test, vi } from "vitest";
+import { SHORTCUTS, SHORTCUTS_KEY, ariaKeyShortcuts, binding, holdPressed, isDefault, resetBinding, setBinding, shortcutCombo, shortcutOf, subscribeShortcuts } from "./shortcuts";
 
 const press = (code: string, extra: Partial<Parameters<typeof shortcutOf>[0]> = {}) =>
   ({ code, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, ...extra });
 const free = { typing: false };
 
-test("the table holds mute, hold to talk and skip, and no two share a key and modifiers", () => {
-  expect(SHORTCUTS.map((s) => s.id)).toEqual(["mute", "holdToTalk", "skip"]);
-  const seen = SHORTCUTS.map((s) => [s.code, !!s.mod, !!s.shift].join());
-  expect(new Set(seen).size).toBe(seen.length);
+afterEach(() => { localStorage.clear(); for (const entry of SHORTCUTS) resetBinding(entry.id); });
+
+test("the table holds hold to talk, mute and skip, by default Space, Cmd/Ctrl+D and Cmd/Ctrl+S", () => {
+  expect(SHORTCUTS.map((s) => s.id)).toEqual(["holdToTalk", "mute", "skip"]);
+  expect(SHORTCUTS.map((s) => [s.default.code, !!s.default.mod])).toEqual([["Space", false], ["KeyD", true], ["KeyS", true]]);
 });
 
-test("a mod key answers to Cmd or Ctrl, only with its own shift, never with Alt, never while typing", () => {
+test("a mod key answers to Cmd or Ctrl, only with its own modifiers, never while typing", () => {
   expect(shortcutOf(press("KeyD", { metaKey: true }), free)?.id).toBe("mute");
   expect(shortcutOf(press("KeyD", { ctrlKey: true }), free)?.id).toBe("mute");
-  expect(shortcutOf(press("KeyS", { metaKey: true }), free)?.id).toBe("skip");
   expect(shortcutOf(press("KeyS", { ctrlKey: true }), free)?.id).toBe("skip");
   expect(shortcutOf(press("KeyD", { ctrlKey: true, shiftKey: true }), free)).toBeNull();
   expect(shortcutOf(press("KeyD", { ctrlKey: true, altKey: true }), free)).toBeNull();
   expect(shortcutOf(press("KeyD", { ctrlKey: true }), { typing: true })).toBeNull();
-});
-
-test("the removed keys answer nothing, and a bare S is not Skip", () => {
   expect(shortcutOf(press("KeyS"), free)).toBeNull();
-  for (const code of ["KeyT", "KeyC"]) expect(shortcutOf(press(code), free)).toBeNull();
-  expect(shortcutOf(press("KeyZ", { metaKey: true }), free)).toBeNull();
-  expect(shortcutOf(press("KeyE", { ctrlKey: true, shiftKey: true }), free)).toBeNull();
 });
 
-test("the held key is the runtime's, not the handler's", () => {
+test("the held key is the runtime's, not the handler's; holdPressed knows it", () => {
   expect(shortcutOf(press("Space"), free)).toBeNull();
+  expect(holdPressed(press("Space"))).toBe(true);
+  expect(holdPressed(press("Space", { ctrlKey: true }))).toBe(false);
 });
 
 test("combos are written with the host's modifier, and for aria-keyshortcuts", () => {
   expect(shortcutCombo("mute", "⌘")).toBe("⌘D");
   expect(shortcutCombo("mute", "Ctrl")).toBe("Ctrl+D");
-  expect(shortcutCombo("skip", "⌘")).toBe("⌘S");
-  expect(shortcutCombo("skip", "Ctrl")).toBe("Ctrl+S");
   expect(shortcutCombo("holdToTalk", "Ctrl", "Espacio")).toBe("Espacio");
-  // A modifier that is a word, in whatever language the host writes it, is joined with a plus.
   expect(shortcutCombo("mute", "Strg")).toBe("Strg+D");
   expect(ariaKeyShortcuts("mute")).toBe("Meta+D Control+D");
-  expect(ariaKeyShortcuts("skip")).toBe("Meta+S Control+S");
+  expect(ariaKeyShortcuts("holdToTalk")).toBe("Space");
+});
+
+test("a changed shortcut is the one handled, shown and kept; a cleared one does nothing and shows nothing", () => {
+  const listener = vi.fn();
+  const stop = subscribeShortcuts(listener);
+  setBinding("mute", { code: "KeyM", key: "M", ctrl: true, alt: true });
+  expect(listener).toHaveBeenCalledTimes(1);
+  expect(shortcutOf(press("KeyD", { ctrlKey: true }), free)).toBeNull();
+  expect(shortcutOf(press("KeyM", { ctrlKey: true, altKey: true }), free)?.id).toBe("mute");
+  expect(shortcutCombo("mute", "⌘")).toBe("⌃⌥M");
+  expect(shortcutCombo("mute", "Ctrl")).toBe("Ctrl+Alt+M");
+  expect(ariaKeyShortcuts("mute")).toBe("Control+Alt+M");
+  expect(isDefault("mute")).toBe(false);
+  expect(JSON.parse(localStorage.getItem(SHORTCUTS_KEY)!).mute.code).toBe("KeyM");
+  setBinding("skip", null);
+  expect(binding("skip")).toBeNull();
+  expect(shortcutCombo("skip", "Ctrl")).toBe("");
+  expect(ariaKeyShortcuts("skip")).toBeUndefined();
+  expect(shortcutOf(press("KeyS", { ctrlKey: true }), free)).toBeNull();
+  resetBinding("mute");
+  expect(isDefault("mute")).toBe(true);
+  expect(shortcutOf(press("KeyD", { ctrlKey: true }), free)?.id).toBe("mute");
+  stop();
+  setBinding("mute", null);
+  expect(listener).toHaveBeenCalledTimes(3);
+});
+
+test("another page's change reaches this one through the storage event; a damaged value is the defaults", () => {
+  const listener = vi.fn();
+  const stop = subscribeShortcuts(listener);
+  localStorage.setItem(SHORTCUTS_KEY, JSON.stringify({ mute: { code: "KeyK", key: "K", mod: true }, skip: null }));
+  window.dispatchEvent(new StorageEvent("storage", { key: SHORTCUTS_KEY }));
+  expect(listener).toHaveBeenCalled();
+  expect(binding("mute")?.code).toBe("KeyK");
+  expect(binding("skip")).toBeNull();
+  localStorage.setItem(SHORTCUTS_KEY, "{broken");
+  window.dispatchEvent(new StorageEvent("storage", { key: SHORTCUTS_KEY }));
+  expect(binding("mute")?.code).toBe("KeyD");
+  stop();
 });

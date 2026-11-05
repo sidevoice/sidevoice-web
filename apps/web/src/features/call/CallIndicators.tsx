@@ -4,8 +4,10 @@ import { CallIcon, CaptionsIcon, CaptionsOffIcon, HangupIcon, MicrophoneIcon, Mi
 import { setCaptions, useCaptions } from "../../state/captions";
 import { translator, type MessageKey } from "../../i18n/translator";
 import { Tooltip } from "../../components/ui/Tooltip";
-import { shortcutTip } from "../../components/ui/Keycaps";
-import { ariaKeyShortcuts } from "../../state/shortcuts";
+import { Keys, shortcutTip } from "../../components/ui/Keycaps";
+import { ariaKeyShortcuts, shortcutCombo } from "../../state/shortcuts";
+import { useBindings } from "../../state/use-shortcuts";
+import { host } from "../../host";
 import { cn } from "../../lib/cn";
 import { useOnboardingIfAny } from "../onboarding/onboarding-context";
 
@@ -30,6 +32,7 @@ export function ScreenLock() {
 export function SkipButton() {
   const t = translator();
   const playing = useRoomStore((state) => state.facts.botLive);
+  useBindings();
   return (
     <Tooltip action content={shortcutTip(t("toolbar.skip"), "skip")}>
       <Button id="skip-reply" variant="ghost" className="call-button" disabled={!playing} aria-label={t("toolbar.skip")} aria-keyshortcuts={ariaKeyShortcuts("skip")}
@@ -74,8 +77,15 @@ export function useMicSilent() {
 export function MuteButton() {
   const mic = useRoomStore((state) => state.mic);
   const silent = useMicSilent();
+  const t = translator();
+  useBindings();
+  // What holding the microphone open says, with the key now chosen for it: nothing about a hold when none is.
+  const holdKey = shortcutCombo("holdToTalk", host().identity.shortcutModifier, t("settings.shortcuts.space"));
+  const text = silent ?? mic.title;
+  // Under it, what holding the microphone open says, with the key now chosen for it as a cap: nothing when none is.
+  const hint = !silent && !mic.disabled && holdKey ? t("session.mic.holdHint", { key: "\u0000" }).split("\u0000").flatMap((part, index) => index ? [<Keys key="k" combo={holdKey} />, part] : [part]) : undefined;
   return (
-    <Tooltip action content={shortcutTip(silent ?? mic.title, "mute")}>
+    <Tooltip action content={shortcutTip(text, "mute", hint)}>
       <Button id="mute" variant="ghost" className={cn("call-button", mic.holding && "holding")} aria-label={mic.label}
         aria-description={silent ?? undefined} data-silent={silent ? true : undefined}
         aria-pressed={mic.pressed} disabled={mic.disabled} aria-keyshortcuts={ariaKeyShortcuts("mute")}

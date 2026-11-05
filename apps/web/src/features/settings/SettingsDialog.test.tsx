@@ -70,21 +70,21 @@ function inDesktopApp() {
 
 const navLabels = () => [...document.querySelectorAll(".settings-nav > button")].map((button) => button.textContent);
 
-test("Shortcuts is hidden for now (sidevoice-web#148): not with a keyboard, not in the desktop app, and a place asked in it opens General", async () => {
+test("Shortcuts shows where a keyboard is likely, after Permissions, and opens", async () => {
   withKeyboard();
   withMicrophone();
   const store = open("whisper-base");
-  expect(navLabels()).toEqual(["General", "Transcription", "Voice", "Call", "Permissions", "Providers", "Machines", "Advanced"]);
-  expect(document.getElementById("pane-shortcuts")).toBeNull();
+  expect(navLabels()).toEqual(["General", "Transcription", "Voice", "Call", "Permissions", "Shortcuts", "Providers", "Machines", "Advanced"]);
   act(() => store.patch({ settingsSection: "shortcuts" }));
-  expect(store.getState().facts.settingsSection).toBe("general");
-  expect(document.getElementById("pane-general")).not.toHaveAttribute("hidden");
+  expect(store.getState().facts.settingsSection).toBe("shortcuts");
+  expect(document.getElementById("pane-shortcuts")).not.toHaveAttribute("hidden");
+  expect(within(document.getElementById("pane-shortcuts")!).getByText("In Sidevoice")).toBeInTheDocument();
 });
 
-test("in the desktop app Shortcuts is hidden too, and the floating card has its own section after Call", async () => {
+test("in the desktop app Shortcuts shows with its global shortcuts, and the floating card has its own section after Call", async () => {
   inDesktopApp();
   open("whisper-base");
-  expect(navLabels()).not.toContain("Shortcuts");
+  expect(navLabels()).toContain("Shortcuts");
   expect(navLabels().slice(3, 5)).toEqual(["Call", "Floating card"]);
   fireEvent.click(document.getElementById("settings-call")!);
   const call = document.getElementById("pane-call")!;

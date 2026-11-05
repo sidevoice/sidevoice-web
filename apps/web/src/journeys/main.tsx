@@ -51,6 +51,12 @@ function renderShot(shot: Shot) {
       settings: async () => ({ alwaysShown: false, corner: "tr", moved: true }), setAlwaysShown: async (alwaysShown: boolean) => ({ alwaysShown }),
       setCorner: async (corner: string) => ({ corner }), resetPlace: later, preview: noop } });
   }
+  if (shot.shortcuts) {
+    const now = shot.shortcuts as unknown as { shortcuts: Record<string, unknown> };
+    installApp({ ...installedMembers(), shortcuts: {
+      get: async () => now, set: async (_action: string, accelerator: string | null) => ({ accelerator, label: accelerator, state: "on", alternatives: [], voiceOver: false }),
+      subscribe: () => noop, request: async () => now, setHeadset: async () => now } });
+  }
   if (shot.desktop) {
     const status = shot.desktop.state as Record<string, unknown>;
     installApp({ ...installedMembers(), localHost: {

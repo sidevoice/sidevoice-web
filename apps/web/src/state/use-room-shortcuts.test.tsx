@@ -42,3 +42,17 @@ test("Skip's key never opens the browser's Save, in a text box too; the text box
   expect(actions.skipReply).toHaveBeenCalledTimes(2);
   expect(actions.toggleMic).not.toHaveBeenCalled();
 });
+
+test("the handler follows the shortcuts table at once: a changed key acts, the old one does not, a cleared one does nothing", async () => {
+  const { setBinding, resetBinding } = await import("./shortcuts");
+  setup();
+  setBinding("mute", { code: "KeyM", key: "M", ctrl: true, alt: true });
+  fireEvent.keyDown(document.body, { code: "KeyD", ctrlKey: true });
+  expect(actions.toggleMic).not.toHaveBeenCalled();
+  fireEvent.keyDown(document.body, { code: "KeyM", ctrlKey: true, altKey: true });
+  expect(actions.toggleMic).toHaveBeenCalledTimes(1);
+  setBinding("skip", null);
+  fireEvent.keyDown(document.body, { code: "KeyS", ctrlKey: true });
+  expect(actions.skipReply).not.toHaveBeenCalled();
+  resetBinding("mute"); resetBinding("skip");
+});

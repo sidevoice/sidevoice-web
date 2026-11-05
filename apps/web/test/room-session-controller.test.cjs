@@ -1583,7 +1583,7 @@ function fakeVoice({start=async()=>{},update=async()=>{}}={}){
   },
   async routeInput(call){if(call&&!call.active)throw new TypeError('a started call');routes.push(call?.id??null);this.routed=call},
   async preload(settings){calls.push(['preload',settings])},
-  say,mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),
+  say,mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),endInput:async()=>{calls.push(['endInput'])},
  };
  return owner;
 }
@@ -4665,4 +4665,70 @@ test('A conversation whose replies are still pending 60 s after the close is clo
  await new Promise(resolve=>setTimeout(resolve,120));await settleSoon();
  assert.deepEqual(peopleOf(c),[],'the reply never ended, the conversation goes');
  c.s.run('disconnect()');
+});
+
+// ----- Say one thing, and the host's global hold to talk -----
+function inCall(){
+ const s=setup();const voice=fakeVoice();s.context.__voice=voice;
+ s.run("voice=__voice;ws={};micEnabled=false;conversationCalls.set('test',{call:__voice})");
+ const mutes=()=>voice.calls.filter(call=>call[0]==='mute').map(call=>call[1]);
+ const turn=phase=>s.run("voiceTurn({turn_id:'t1',phase:'"+phase+"',started_at:1,text:'hi',ended_at:2})");
+ return {s,voice,mutes,turn};
+}
+test('Say one thing opens the microphone for one turn and mutes again when that turn is sent',()=>{
+ const {s,mutes,turn}=inCall();
+ s.run('window.sidevoiceActions.oneTurn()');
+ assert.equal(s.run('micEnabled'),true);assert.deepEqual(mutes().at(-1),false);
+ // Nothing said yet: the microphone stays open for the turn.
+ assert.equal(s.run('micEnabled'),true);
+ turn('started');assert.equal(s.run('micEnabled'),true,'open while the person speaks');
+ turn('finished');assert.equal(s.run('micEnabled'),false,'muted again once the turn is sent');
+ assert.equal(mutes().at(-1),true);
+ turn('started');turn('finished');assert.equal(s.run('micEnabled'),false,'the next turn is not the one turn');
+});
+test('Say one thing mutes again when the turn is cancelled',()=>{
+ const {s,turn}=inCall();
+ s.run('window.sidevoiceActions.oneTurn()');turn('started');turn('cancelled');
+ assert.equal(s.run('micEnabled'),false);
+});
+test('Say one thing pressed while open ends the turn, which sends what was said; with nothing said it mutes at once',()=>{
+ const {s,voice,turn}=inCall();
+ s.run('window.sidevoiceActions.oneTurn()');turn('started');
+ s.run("userTurn={id:'t1',segment:'s',thread:'test'}");
+ s.run('window.sidevoiceActions.oneTurn()');
+ assert.deepEqual(voice.calls.at(-1),['endInput']);assert.equal(s.run('micEnabled'),true,'muted when the turn is told, not before');
+ turn('finished');assert.equal(s.run('micEnabled'),false);
+ s.run('window.sidevoiceActions.oneTurn()');s.run('userTurn=null');
+ s.run('window.sidevoiceActions.oneTurn()');
+ assert.equal(s.run('micEnabled'),false,'nothing said: the second press closes it');
+});
+test('Say one thing with the microphone already open changes nothing, and outside a call does nothing',()=>{
+ const {s,mutes,turn}=inCall();
+ s.run('micEnabled=true');s.run('window.sidevoiceActions.oneTurn()');
+ assert.equal(s.run('micEnabled'),true);turn('started');turn('finished');
+ assert.equal(s.run('micEnabled'),true,'opened by the person: left to them');assert.deepEqual(mutes(),[]);
+ const out=setup();out.run('micEnabled=false');out.run('window.sidevoiceActions.oneTurn()');assert.equal(out.run('micEnabled'),false);
+});
+test('Muting by hand during Say one thing leaves the turn alone: it is not muted again, nor opened again',()=>{
+ const {s,turn}=inCall();
+ s.run('window.sidevoiceActions.oneTurn()');s.run('toggleMic()');
+ s.run('toggleMic()');turn('started');turn('finished');
+ assert.equal(s.run('micEnabled'),true,'the person opened it: it stays open');
+});
+test('The host holds to talk: it opens like Space, closes on holdEnd, and the page losing focus does not let go',()=>{
+ const {s,mutes}=inCall();
+ s.run('window.sidevoiceActions.holdStart()');assert.equal(s.run('micEnabled'),true);
+ s.handlers.blur();assert.equal(s.run('micEnabled'),true,'blur does not release the host hold');
+ s.run('window.sidevoiceActions.holdEnd()');assert.equal(s.run('micEnabled'),false);assert.equal(mutes().at(-1),true);
+ const out=setup();out.run('micEnabled=false');out.run('window.sidevoiceActions.holdStart()');assert.equal(out.run('micEnabled'),false,'no call: nothing is held');
+});
+test('The in-app hold key is the one in the table, read as it is pressed',()=>{
+ const {s}=inCall();
+ const key=(code,extra={})=>({code,target:new s.Element(),preventDefault(){},...extra});
+ s.run("localStorage.setItem('sidevoice.shortcuts',JSON.stringify({holdToTalk:{code:'KeyT',key:'T'}}))");
+ s.handlers.keydown(key('Space'));assert.equal(s.run('micEnabled'),false,'the old key is no longer it');
+ s.handlers.keydown(key('KeyT'));assert.equal(s.run('micEnabled'),true);
+ s.handlers.keyup(key('KeyT'));assert.equal(s.run('micEnabled'),false);
+ s.run("localStorage.setItem('sidevoice.shortcuts',JSON.stringify({holdToTalk:null}))");
+ s.handlers.keydown(key('Space'));s.handlers.keydown(key('KeyT'));assert.equal(s.run('micEnabled'),false,'cleared: no key holds');
 });

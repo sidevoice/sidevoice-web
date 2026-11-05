@@ -36,11 +36,13 @@ export function Section({ title, description, actions, id, className, children }
   );
 }
 
-/* A group of rows on one card, with an optional title above it. */
-export function Group({ title, className, children }: { title?: ReactNode; className?: string; children: ReactNode }) {
+/* A group of rows on one card, with an optional title above it, and under the title a `note` (an Alert) that says
+ * something about the whole group. */
+export function Group({ title, note, className, children }: { title?: ReactNode; note?: ReactNode; className?: string; children: ReactNode }) {
   return (
     <div className={cn("ui-group", className)}>
       {title && <h3 className="ui-group-title">{title}</h3>}
+      {note}
       <div className="ui-group-card">{children}</div>
     </div>
   );

@@ -284,7 +284,9 @@ export interface ResetBridge {
 export interface MuteShortcut {
   accelerator: string | null;
   label: string | null;
-  state: "on" | "off" | "refused";
+  /** `refused`: another app has it; `needsPermission`: it waits for a permission the system has not given (a single key
+   *  on macOS: Input Monitoring); `unavailable`: this system cannot take it. */
+  state: "on" | "off" | "refused" | "needsPermission" | "unavailable";
   alternatives: string[];
   voiceOver: boolean;
 }
@@ -292,6 +294,41 @@ export interface MuteShortcutBridge {
   get(): Promise<MuteShortcut>;
   set(accelerator: string | null): Promise<MuteShortcut>;
   subscribe?(listener: (shortcut: MuteShortcut) => void): () => void;
+}
+
+/** A global shortcut of the new `host.shortcuts` (desktop#447, GLOBAL_SHORTCUTS.md §7): today's mute shortcut, plus whether
+ *  the system itself owns it (`managedBySystem`: a Wayland portal) and what it clashes with, by name. A single key is an
+ *  accelerator too, with the trigger as a suffix: `"Fn:hold"`, `"RightAlt:tap"`, `"F13:double"`; the key is one of `Fn`,
+ *  `RightAlt`, `RightCommand`, `RightControl`, `F13`..., the trigger `:hold`, `:tap` or `:double`. */
+export interface GlobalShortcut extends MuteShortcut {
+  managedBySystem?: boolean;
+  conflictWith?: string;
+}
+export type ShortcutAction = "mute" | "holdToTalk" | "oneTurn";
+export type HeadsetPress = "mute" | "oneTurn" | "skip" | "none";
+export interface HeadsetStatus {
+  press: HeadsetPress;
+  /** null: this headset cannot send a double press. */
+  doublePress: HeadsetPress | null;
+  outsideCall: "leave" | "join";
+}
+export interface ShortcutsStatus {
+  shortcuts: Record<ShortcutAction, GlobalShortcut>;
+  /** What the system must allow for single keys (`inputMonitoring`, macOS) or for the shortcuts at all (`portal`, Linux). */
+  permission: { kind: "inputMonitoring" | "portal"; state: "granted" | "notAsked" | "denied" } | null;
+  /** null: no headset path on this host. */
+  headset: HeadsetStatus | null;
+}
+export interface ShortcutsBridge {
+  get(): Promise<ShortcutsStatus>;
+  /** Rejects `{ key: "shortcut_invalid" }` for an accelerator the app cannot register. */
+  set(action: ShortcutAction, accelerator: string | null): Promise<GlobalShortcut>;
+  subscribe?(listener: (status: ShortcutsStatus) => void): () => void;
+  /** Asks the system for the permission, only now. */
+  request?(permission: "inputMonitoring" | "portal"): Promise<ShortcutsStatus>;
+  setHeadset?(partial: Partial<HeadsetStatus>): Promise<ShortcutsStatus>;
+  /** The app captures the next key itself (Fn included, which a page cannot see): resolves with the accelerator, null on Esc. */
+  record?(action: ShortcutAction): Promise<string | null>;
 }
 
 /** What the app does to other apps' media while the microphone is open or the agent is speaking in a call (sidevoice-desktop
@@ -433,6 +470,8 @@ export interface Host {
   localHost: LocalHostBridge | null;
   reset: ResetBridge | null;
   muteShortcut: MuteShortcutBridge | null;
+  /** The global shortcuts and the headset's buttons (supersedes `muteShortcut`, which stays for an app without it). */
+  shortcuts: ShortcutsBridge | null;
   mediaDuck: MediaDuckBridge | null;
   callControls: CallControlsBridge | null;
   callSurface: CallSurfaceBridge | null;

@@ -213,6 +213,15 @@ export interface SidevoiceActions {
   loadVoiceCatalogue(): Promise<void>;
   replayReply(historyId: string | null): Promise<void>;
   toggleMic(): void;
+  /** The host's global hold to talk begins: the effect of holding the hold key in the page, but not let go of when the page loses
+   *  focus or is hidden (the person is in another app). No effect outside a call. */
+  holdStart?(): void;
+  /** The host's global hold to talk ends: the microphone mutes again, as on releasing the key. */
+  holdEnd?(): void;
+  /** Say one thing, from the global shortcut, the headset or any other trigger: the microphone opens for one turn and mutes
+   *  again when that turn is sent or taken back; pressed again while open it ends the turn (sending what was said). With the
+   *  microphone already open it does nothing. No effect outside a call. */
+  oneTurn?(): void;
   toggleCall(): Promise<void>;
   /** A sign of the person: the desktop card's Keep on the idle warning (its `keep-alive`, FLOATING-CARD-SPEC FC6),
    *  which keeps the call on. */
