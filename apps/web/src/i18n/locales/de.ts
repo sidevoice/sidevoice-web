@@ -1359,6 +1359,7 @@ export const messages: Messages = {
   "card.skip": "Aktuelle Wiedergabe überspringen",
   "card.hangUp": "Auflegen",
   "liveActivity.skipShort": "Überspringen",
+  "liveActivity.cancelShort": "Abbrechen",
   "liveActivity.routeName": "Audioausgabe: {route}",
   "card.yourMicrophone": "Dein Mikrofon",
   "card.reach.holding": "kein Empfang",

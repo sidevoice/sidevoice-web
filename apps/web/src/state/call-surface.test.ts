@@ -21,7 +21,7 @@ const surface = (facts: Record<string, unknown> = {}) => createRoomSessionStore(
 test("the projection's shape and defaults: nothing live, nothing pending, the words resolved", () => {
   const view = surface();
   expect(view).toMatchObject({ pendingCancellable: false, reach: "listening", page: null, said: null, still: null, workingSince: null });
-  expect(view.words).toMatchObject({ state: "state.resting", mute: "card.mute", skip: "liveActivity.skipShort", skipName: "card.skip", cancelSend: "stage.cancelTurn", hangUp: "card.hangUp" });
+  expect(view.words).toMatchObject({ state: "state.resting", mute: "card.mute", skip: "liveActivity.skipShort", skipName: "card.skip", cancelSend: "stage.cancelTurn", cancelShort: "liveActivity.cancelShort", hangUp: "card.hangUp" });
   expect(view.words.route).toBe('liveActivity.routeName {"route":"{route}"}');
 });
 
