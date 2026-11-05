@@ -137,7 +137,7 @@ export function surfaceWords(state, say, total) {
         state, offline: say('state.offline'),
         mute: say('card.mute'), unmute: say('card.unmute'),
         skip: say('liveActivity.skipShort'), skipName: say('card.skip'),
-        cancelSend: say('stage.cancelTurn'), cancelShort: say('liveActivity.cancelShort'), hangUp: say('card.hangUp'),
+        cancelSend: say('stage.cancelTurn'), hangUp: say('card.hangUp'),
         route: say('liveActivity.routeName', { route: '{route}' }), speaker: say('card.speaker'),
         conversations: say('card.conversationsCount', { n: total }), switchConversation: say('card.switchConversation'),
         openApp: say('card.openApp'),

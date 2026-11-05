@@ -35,8 +35,7 @@ export interface SurfaceWords {
   mute: string; unmute: string;
   /** The pill's word and the accessible name of the same button. */
   skip: string; skipName: string;
-  /** Cancel send's accessible name, and its short label where a button has little room (the Lock Screen's row). */
-  cancelSend: string; cancelShort: string; hangUp: string;
+  cancelSend: string; hangUp: string;
   /** The audio output's accessible name, with `{route}` left in it for the host to fill. */
   route: string; speaker: string;
   conversations: string; switchConversation: string; openApp: string;
