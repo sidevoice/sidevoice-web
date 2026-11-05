@@ -94,6 +94,10 @@
 .stage-agent { position:absolute;left:50%;top:calc(357px - var(--fig) * 106 / 120);width:var(--fig);height:var(--fig);margin-left:calc(var(--fig) / -2);
   transform-origin:50% 77.92%;transition:transform .45s cubic-bezier(.3,1.4,.5,1),translate .3s var(--sv-ease),opacity .3s }
 .stage-scene .stage-agent[data-style=creature] > canvas { position:absolute;left:calc(var(--fig) / 2 - 50cqw);top:calc(var(--fig) * 106 / 120 - 357px);width:100cqw;height:100cqh }
+/* The creature's eyes follow the finger over the whole tile (CharacterAvatar gazeFrom, T23). The browser keeps the touch
+   for that instead of starting a scroll or a zoom, which cancels the pointer after its first move. This is the
+   reference's #preview { touch-action:none }. The cost: no scroll or pinch can start on the stage. */
+.stage-tile:has(.stage-agent[data-style=creature]) { touch-action:none }
 .stage-tile[data-mood=offline] .stage-agent { opacity:0 }
 /* Offline the agent is not shown (the poster is up): nothing in it runs unseen (its rig draws nothing either). */
 .stage-tile[data-mood=offline] .stage-agent, .stage-tile[data-mood=offline] .stage-agent * { animation:none !important }

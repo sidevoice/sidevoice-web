@@ -8,6 +8,8 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 const rig = vi.hoisted(() => ({
   refuse: false,
   made: [] as Array<{ renderer: FakeRenderer; draws: number }>,
+  /** What each draw was asked to show: its state (a pose) and its expression. */
+  drawn: [] as Array<{ state?: string; expr?: string; still: boolean }>,
 }));
 interface FakeRenderer { domElement: HTMLCanvasElement; setSize: () => void; getContext: () => { isContextLost: () => boolean }; forceContextLoss: () => void; dispose: () => void; disposed: boolean }
 
@@ -34,7 +36,10 @@ vi.mock("./rig.js", () => {
       this.items.push(item);
       return item;
     }
-    draw() { this.draws += 1; }
+    draw(item: { spec: { state?: string; expr?: string } }, _t: number, _level: number, still: boolean) {
+      this.draws += 1;
+      rig.drawn.push({ state: item.spec.state, expr: item.spec.expr, still });
+    }
   }
   return { Stage, ACTS: {} };
 });
@@ -48,19 +53,25 @@ beforeEach(async () => {
   vi.resetModules();
   rig.refuse = false;
   rig.made.length = 0;
+  rig.drawn.length = 0;
   clock = 1000;
   vi.spyOn(performance, "now").mockImplementation(() => clock);
   vi.spyOn(console, "warn").mockImplementation(() => {});
   host = await import("./host");
 });
-afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); vi.restoreAllMocks(); });
+/** The creatures a test mounted, let go of after it, so none draws on into the next test. */
+const mounted: Array<{ dispose(): void }> = [];
+const mount = (opts: Parameters<Host["mountCreature"]>[0]) => { const live = host.mountCreature(opts); if (live) mounted.push(live); return live; };
+afterEach(() => { for (const live of mounted.splice(0)) live.dispose(); for (const element of canvases.splice(0)) element.remove(); vi.unstubAllGlobals(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 const webgl = () => vi.stubGlobal("WebGLRenderingContext", function WebGLRenderingContext() {});
 /** A canvas in the page with a box, as a creature's is. */
+const canvases: HTMLCanvasElement[] = [];
 function canvas() {
   const element = document.createElement("canvas");
   element.getClientRects = () => [new DOMRect(0, 0, 144, 144)] as unknown as DOMRectList;
   document.body.append(element);
+  canvases.push(element);
   return element;
 }
 const lose = (stage: (typeof rig.made)[number]) => {
@@ -74,7 +85,7 @@ test("without WebGL nothing is drawn and the page is told so; a mount a while la
   const told = vi.fn();
   host.onCreaturesChange(told);
   expect(host.creaturesDrawable()).toBe(true); // not tried yet
-  expect(host.mountCreature({ seed: "t1", canvas: canvas(), framing: "face" })).toBeNull();
+  expect(mount({ seed: "t1", canvas: canvas(), framing: "face" })).toBeNull();
   expect(host.creaturesDrawable()).toBe(false);
   expect(told).toHaveBeenCalledTimes(1);
   expect(await host.faceImage("t1", "neutral")).toBeNull();
@@ -84,7 +95,7 @@ test("without WebGL nothing is drawn and the page is told so; a mount a while la
   expect(rig.made).toHaveLength(0);
   // ...but by a mount a while later.
   clock += 10_000;
-  expect(host.mountCreature({ seed: "t1", canvas: canvas(), framing: "face" })).not.toBeNull();
+  expect(mount({ seed: "t1", canvas: canvas(), framing: "face" })).not.toBeNull();
   expect(host.creaturesDrawable()).toBe(true);
   expect(told).toHaveBeenCalledTimes(2);
 });
@@ -104,7 +115,7 @@ test("a lost context draws nothing; when it is back the stage gets a new rendere
   webgl();
   const told = vi.fn();
   host.onCreaturesChange(told);
-  const live = host.mountCreature({ seed: "t1", canvas: canvas(), framing: "face", moving: false })!;
+  const live = mount({ seed: "t1", canvas: canvas(), framing: "face", moving: false })!;
   const face = rig.made[1];
   expect(live.tick(0)).toBe(true);
   expect(face.draws).toBe(1);
@@ -143,9 +154,19 @@ test("a context not given back in time counts as missing: waiting faces get none
   expect(host.creaturesDrawable()).toBe(false);
   expect(told).toHaveBeenCalledTimes(1);
   await expect(still).resolves.toBeNull();
-  expect(host.mountCreature({ seed: "t1", canvas: canvas(), framing: "face" })).toBeNull();
+  expect(mount({ seed: "t1", canvas: canvas(), framing: "face" })).toBeNull();
   giveBack(face);
   expect(host.creaturesDrawable()).toBe(true);
   expect(told).toHaveBeenCalledTimes(2);
-  expect(host.mountCreature({ seed: "t1", canvas: canvas(), framing: "face" })).not.toBeNull();
+  expect(mount({ seed: "t1", canvas: canvas(), framing: "face" })).not.toBeNull();
+});
+
+test("a still face is the idle key pose with its state's expression, as the reference draws every still face", async () => {
+  webgl();
+  for (const expr of ["neutral", "happy", "surprised"]) expect(await host.faceImage("t1", expr)).not.toBeNull();
+  expect(rig.drawn).toEqual([
+    { state: "idle", expr: "neutral", still: true },
+    { state: "idle", expr: "happy", still: true },
+    { state: "idle", expr: "surprised", still: true },
+  ]);
 });

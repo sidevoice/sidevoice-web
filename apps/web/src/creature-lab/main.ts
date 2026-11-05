@@ -7,7 +7,8 @@ import type { AvatarMood } from "../features/avatar/avatar-spec";
  * it (features/avatar/creature/host.ts), on its own, for review and for the pixel comparison against the design
  * reference's creator. Everything is in the URL hash, as the creator keeps it:
  *
- *   seed=<thread id>                 the creature a conversation rolls; or the creator's own keys, for any creature:
+ *   seed=<conversation key>          the creature a conversation rolls (its key: `<machine fingerprint>|<thread id>`);
+ *                                    or the creator's own keys, for any creature:
  *   body= color= accent= iris= eyes= ears= head= face= eyewear=   (labels, as the creator's hash spells them)
  *   mode=idle|listening|speaking|working|present|offline         the state (default idle)
  *   still=1                          held still in its key pose (as under reduced motion); default: moving
@@ -30,7 +31,7 @@ const css = document.createElement("style");
 css.textContent = `
   body { margin: 0; background: #f4f1ec; font: 13px/1.4 "DM Sans", system-ui, sans-serif; color: #1b1d24; }
   #lab { display: grid; gap: 14px; padding: 14px; justify-items: start; }
-  .tile { position: relative; background: #fbf9f6; overflow: hidden; }
+  .tile { position: relative; background: #fbf9f6; overflow: hidden; touch-action: none; }
   .tile canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .faces { display: flex; gap: 12px; flex-wrap: wrap; }
   .face { display: grid; justify-items: center; gap: 4px; }

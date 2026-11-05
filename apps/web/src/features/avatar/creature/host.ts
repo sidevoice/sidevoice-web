@@ -456,7 +456,9 @@ function renderFace(seed: string, expr: string, choice?: CreatureChoice): HTMLCa
     built.set(seed, item);
   }
   item.canvas = canvas;
-  item.spec.state = undefined;
+  // As the reference draws every still face (creator.js specOf, animate on: renderFace, the card's states row): the idle
+  // key pose, with the state's expression over it.
+  item.spec.state = "idle";
   item.spec.expr = expr;
   item.opts.extra = {};
   stage.draw(item, 0, 0, true);
