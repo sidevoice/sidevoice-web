@@ -255,3 +255,17 @@ test("two lines a page, when asked", () => {
   tick(PAGE_MS);
   expect(windowOf().style.height).toBe(`calc(${LINE}px + var(--peek))`);
 });
+
+/* The lit text says the line its last word heard is on (LitText's mark, data-line: measured there on the words' own
+ * client rects, whatever scales the box, a card popping in from .6 included): the page follows it, and follows it again
+ * when the mark moves without a render here (its words reflowed: the stage's face arriving, a resize). */
+test("with the voice: the page holding the line the lit text says, and again when that mark moves on its own", async () => {
+  render(<PagedText measure="m" follow=".mark" lines={3} turn="page" fixed><span>{text(7)}</span><span className="mark" data-mark="" data-line="4" /></PagedText>);
+  expect(page()).toBe(1);
+  const mark = document.querySelector<HTMLElement>(".mark")!;
+  await act(async () => { mark.dataset.line = "1"; });
+  expect(page()).toBe(0);
+  // the last page turns only as far as the last line, full
+  await act(async () => { mark.dataset.line = "6"; });
+  expect(shift(run()) / LINE).toBe(4);
+});

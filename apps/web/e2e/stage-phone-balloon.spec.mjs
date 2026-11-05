@@ -3,8 +3,9 @@ import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { installHarness } from "./harness.mjs";
 
-/* On a phone the stage is a small square: the agent's face, and the balloons laid on the tile (the agent's reply, the
- * person's bars with Cancel sending, its transcribing, the page after it is sent), must never cover the face, and each
+/* On a phone the stage fills the screen in portrait: what is said on it (the agent's reply, the person's pill with Cancel
+ * sending, its transcribing, what was sent), laid under the creature by the stage's framing, must never cover the
+ * creature (a gap from its lowest drawn row, its shadow included: max(14px, 3.5% of the tile's height)), and each card
  * stays inside the tile. The tooltips of the call bar and the header open beside their trigger, inside the viewport and
  * the safe areas. Measured in real browsers at the phone sizes (440 × 956, 390 × 844), light and dark; the desktop's
  * layout is left as it was (SCREENSHOTS=<dir> also writes the stage as a picture, for a review). */
@@ -68,21 +69,40 @@ async function onStage(page, theme, state) {
   }
   // Where a state has one, its balloon is up before it is measured (a slow runner takes its time), and it pops in over
   // 460ms: measure it where it stands.
-  if (state !== "idle" && state !== "working") await page.locator(".stage-tile .stage-bubble, .stage-tile .person-bubble").first().waitFor({ timeout: 10_000 });
+  if (state !== "idle" && state !== "working") await page.locator(".stage-tile .stage-voice > .vcap:not(.meas)").first().waitFor({ timeout: 10_000 });
   await page.waitForTimeout(900);
+  // The creature eases into the turn's framing (the cards go straight to where it will stand): measured once it is solved
+  // (the layer says so where the browser draws the creature) and the creature stands still there (its feet, as the stage's
+  // framing keeps them, unchanged a moment).
+  await page.locator(".stage-tile .stage-voice[data-framed]").waitFor({ timeout: 60_000 }).catch(() => {});
+  let last = null;
+  for (let i = 0, same = 0; i < 80 && same < 3; i++) {
+    const now = await page.evaluate(() => document.querySelector(".stage-tile .stage-canvas")?.style.getPropertyValue("--stage-feet") ?? "");
+    same = now === last ? same + 1 : 0; last = now;
+    await page.waitForTimeout(300);
+  }
 }
 
-/** The boxes on the stage, in the page's own pixels. */
+/** The boxes on the stage, in the page's own pixels, and the creature as drawn under them: its canvas's drawn pixels inside
+ *  each card, and the gap from a card's top to the lowest drawn row above it (none where the browser gives no WebGL). */
 const measure = (page) => page.evaluate(() => {
   const box = (node) => { if (!node) return null; const { left, top, right, bottom, width, height } = node.getBoundingClientRect(); return width && height ? { left, top, right, bottom, width, height } : null; };
-  const agent = box(document.querySelector(".stage-agent"));
-  // The face: the head of the figure, its middle half across and from its crown to under its chin (the figure's box is
-  // 120 tall with its crown at ~20 and its chin at ~85, call-view.css --stage-head-y).
-  const face = agent && { left: agent.left + agent.width * .25, right: agent.right - agent.width * .25, top: agent.top + agent.height * (30 / 120), bottom: agent.top + agent.height * (85 / 120) };
-  return { viewport: { width: innerWidth, height: innerHeight }, tile: box(document.querySelector(".stage-tile")), face,
-    balloons: [...document.querySelectorAll(".stage-tile .stage-bubble, .stage-tile .person-turns .person-bubble")].map((node) => ({ kind: node.className.split(" ")[1] ?? node.className, ...box(node) })).filter((b) => b.width) };
+  const tile = document.querySelector(".stage-tile"), canvas = document.querySelector(".stage-agent canvas");
+  const cards = [...document.querySelectorAll(".stage-tile .stage-voice > .vcap:not(.meas)")].map((node) => ({ kind: node.className, ...box(node) })).filter((b) => b.width);
+  let drawn = null;
+  const g = canvas?.width ? canvas.getContext("2d") : null;
+  if (g) {
+    const r = canvas.getBoundingClientRect(), k = canvas.width / r.width, d = g.getImageData(0, 0, canvas.width, canvas.height).data, W = canvas.width;
+    let any = 0; for (let i = 3; i < d.length; i += 64) if (d[i] > 16) { any = 1; break; }
+    if (any) drawn = cards.map((c) => {
+      const x0 = Math.max(0, Math.floor((c.left - r.left) * k)), x1 = Math.min(W, Math.ceil((c.right - r.left) * k)), y0 = Math.max(0, Math.floor((c.top - r.top) * k)), y1 = Math.min(canvas.height, Math.ceil((c.bottom - r.top) * k));
+      let over = 0, low = -1;
+      for (let y = 0; y < y1; y++) for (let x = x0; x < x1; x++) if (d[(y * W + x) * 4 + 3] > 16) { if (y >= y0) over++; else if (y > low) low = y; }
+      return { over, gap: low < 0 ? null : (y0 - low) / k };
+    });
+  }
+  return { viewport: { width: innerWidth, height: innerHeight }, tile: box(tile), tileHeight: tile.clientHeight, balloons: cards, drawn };
 });
-const overlaps = (a, b) => a.left < b.right - 0.5 && a.right > b.left + 0.5 && a.top < b.bottom - 0.5 && a.bottom > b.top + 0.5;
 
 for (const [name, viewport] of [["440x956", { width: 440, height: 956 }], ["390x844", { width: 390, height: 844 }]]) {
   for (const theme of ["light", "dark"]) {
@@ -94,11 +114,14 @@ for (const [name, viewport] of [["440x956", { width: 440, height: 956 }], ["390x
           await onStage(page, theme, state);
           if (SHOTS) { mkdirSync(SHOTS, { recursive: true }); await page.screenshot({ path: path.join(SHOTS, `${name}-${theme}-${state}.png`) }); }
           const m = await measure(page);
-          expect(m.face, "the agent is on the stage").not.toBeNull();
-          if (state !== "idle" && state !== "working") expect(m.balloons.length, "a balloon is up").toBeGreaterThan(0);
-          if (state.endsWith("sent")) expect(await page.locator(".stage-tile .person-bubble[data-sent]").count(), "what was sent is on the stage").toBe(1);
+          if (state !== "idle" && state !== "working") expect(m.balloons.length, "a card is up").toBeGreaterThan(0);
+          if (state.endsWith("sent")) expect(await page.locator(".stage-tile .stage-voice > .vcap.sent:not(.meas)").count(), "what was sent is on the stage").toBe(1);
+          // The creature as drawn: none of it under a card, and a gap over each (where the browser draws it).
+          for (const [i, drawn] of (m.drawn ?? []).entries()) {
+            expect(drawn.over, `${m.balloons[i].kind}: the creature's pixels under it`).toBe(0);
+            if (drawn.gap != null) expect(drawn.gap, `${m.balloons[i].kind}: the gap to the creature`).toBeGreaterThanOrEqual(Math.max(14, m.tileHeight * 0.035) - 1.5);
+          }
           for (const balloon of m.balloons) {
-            expect(overlaps(balloon, m.face), `${balloon.kind} ${JSON.stringify(balloon)} over the face ${JSON.stringify(m.face)}`).toBe(false);
             expect(balloon.left, "inside the tile, left").toBeGreaterThanOrEqual(m.tile.left - 0.5);
             expect(balloon.right, "inside the tile, right").toBeLessThanOrEqual(m.tile.right + 0.5);
             expect(balloon.top, "inside the tile, top").toBeGreaterThanOrEqual(m.tile.top - 0.5);

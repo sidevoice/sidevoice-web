@@ -58,6 +58,7 @@ export const messages: Messages = {
   "stage.empty": "話す会話を選んでください。",
   "stage.chooseConversation": "会話を選ぶ",
   "stage.cancelTurn": "送信をキャンセル",
+  "stage.transcribing": "文字起こし中",
   "stage.sent": "送信済み",
   "stage.poster.title": "指名手配",
   "stage.poster.status": "オンラインでも一時停止中でも可",

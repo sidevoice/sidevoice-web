@@ -54,7 +54,7 @@ function room(extra: Partial<SessionFacts> = {}) {
 const patch = (store: RoomStore, facts: Partial<SessionFacts>) => act(() => store.patch(facts));
 const stageAgent = () => document.querySelector(".stage-agent")!;
 /** The stage's "Working…" line over the agent: a status for assistive tech only (the sidebar shows it to the eye). */
-const workingLine = () => document.querySelector<HTMLElement>(".stage-top > p[role='status']");
+const workingLine = () => document.querySelector<HTMLElement>(".stage-tile > p[role='status']");
 const rowOf = (title: string) => [...document.querySelectorAll(".conversation-sidebar .person")].find((button) => button.textContent?.includes(title))!;
 
 let selectParticipant: ReturnType<typeof vi.fn>;
@@ -87,14 +87,14 @@ test("the stage plays what the agent says as a karaoke bubble, the whole reply i
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "speaking");
   expect(stageAgent()).toHaveAttribute("data-mood", "speaking");
   expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "speaking");
-  const bubble = document.querySelector(".stage-bubble")!;
-  expect(bubble).toHaveAttribute("data-visible");
+  const bubble = document.querySelector(".stage-voice .vcap.agent:not(.meas)")!;
+  expect(bubble).toHaveClass("card");
   expect(bubble).not.toHaveAttribute("data-leaving");
   // The whole reply, lit as far as it was heard, in a window of three lines (PagedText): no chunk, nothing dim above.
   expect(bubble.querySelector(".paged-text > .paged-text-run > .lit-text")).not.toBeNull();
   expect(litPart(bubble).played).toBe("Okay. I'll start with the login and then look at the cart");
   expect(litPart(bubble).upcoming).toBe(" tests. I'll tell you as soon as I have something.");
-  expect(document.querySelectorAll(".stage-bubble")).toHaveLength(1);
+  expect(document.querySelectorAll(".stage-voice .vcap.agent:not(.meas)")).toHaveLength(1);
   // Karaoke progress never makes the mouth move without a speaker level.
   expect(stageAgent()).toHaveAttribute("data-mouth", "playback");
   expect(stageAgent()).not.toHaveAttribute("data-beat");
@@ -110,10 +110,10 @@ test("the stage plays what the agent says as a karaoke bubble, the whole reply i
   vi.useFakeTimers();
   patch(store, { botLive: false, karaokeState: null, harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login"),
     history: [{ ...store.getState().facts.history[0], audio: "played" }] } as Partial<SessionFacts>);
-  expect(litPart(document.querySelector(".stage-bubble")!).played).toBe(REPLY);
-  expect(document.querySelector(".stage-bubble")).not.toHaveAttribute("data-leaving");
+  expect(litPart(document.querySelector(".stage-voice .vcap.agent:not(.meas)")!).played).toBe(REPLY);
+  expect(document.querySelector(".stage-voice .vcap.agent:not(.meas)")).not.toHaveAttribute("data-leaving");
   // The balloon is the decided look: its place is the stored one (centre by default), always three lines.
-  expect(document.querySelector(".stage-bubble")).not.toHaveAttribute("data-lines");
+  expect(document.querySelector(".stage-voice .vcap.agent:not(.meas)")).not.toHaveAttribute("data-lines");
   // Said to assistive tech only: no badge over the agent (the sidebar shows it).
   expect(workingLine()).toHaveClass("sr-only");
   expect(workingLine()).toHaveTextContent("Working…");
@@ -125,7 +125,7 @@ test("the stage plays what the agent says as a karaoke bubble, the whole reply i
   expect(document.querySelector(".stage-desk")).toBeNull();
   // The balloon gone, it works, a tool in hand, the cogs turning (drawn by its rig: creature/acts.js).
   tick(AGENT_LINGER_MS + SENT_LEAVING_MS);
-  expect(document.querySelector(".stage-bubble")).toBeNull();
+  expect(document.querySelector(".stage-voice .vcap.agent:not(.meas)")).toBeNull();
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "working");
   expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "working");
   expect(document.querySelector(".stage-desk")).toBeNull();
@@ -151,11 +151,11 @@ test("the stage plays what the agent says as a karaoke bubble, the whole reply i
 test("the person has no picture on the stage, only a bubble of their own while they speak", async () => {
   const store = room();
   expect(document.querySelector(".stage-pip")).toBeNull();
-  expect(document.querySelector(".person-bubble")).toBeNull();
+  expect(document.querySelector(".stage-voice .vcap.person:not(.meas)")).toBeNull();
   patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening", pendingUserText: "Split it into two commits." });
   // What they say is not on the stage while they say it: only the voice's bars (the transcript has the words).
-  expect(document.querySelector(".person-bubble")).not.toHaveTextContent("Split it into two commits.");
-  expect(document.querySelector(".person-bubble .voice-wave")).toHaveAttribute("data-phase", "listening");
+  expect(document.querySelector(".stage-voice .vcap.person:not(.meas)")).not.toHaveTextContent("Split it into two commits.");
+  expect(document.querySelector(".stage-voice .vcap.pill:not(.meas) .voice-wave")).toHaveAttribute("data-phase", "listening");
   // The agent listens to the person meanwhile, and goes on listening while it is transcribed.
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "listening");
   expect(stageAgent()).toHaveAttribute("data-mood", "listening");
@@ -171,7 +171,7 @@ test("the person has no picture on the stage, only a bubble of their own while t
 
 const said = (segment: string, text: string, time: number) =>
   ({ segment, thread: "fp-1|t-login", role: "user" as const, text, name: "You", time, session: "s1" });
-const personBubble = () => document.querySelector<HTMLElement>(".person-bubble");
+const personBubble = () => document.querySelector<HTMLElement>(".stage-voice .vcap.person:not(.meas)");
 const tick = (ms: number) => act(() => { vi.advanceTimersByTime(ms); });
 
 test("while the person speaks and while it is transcribed, their bubble holds only the voice's bars", () => {
@@ -179,9 +179,10 @@ test("while the person speaks and while it is transcribed, their bubble holds on
   patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening", pendingUserText: "Split it" });
   expect(personBubble()!.querySelector(".voice-wave")).toHaveAttribute("data-phase", "listening");
   expect(personBubble()).not.toHaveTextContent("Split it");
-  expect(personBubble()).not.toHaveAttribute("data-sent");
+  expect(personBubble()).not.toHaveClass("sent");
   patch(store, { userLive: false, pendingPhase: "transcribing" });
-  expect(personBubble()!.querySelector(".voice-wave")).toHaveAttribute("data-phase", "transcribing");
+  expect(personBubble()).toHaveAttribute("data-phase", "transcribing");
+  expect(personBubble()).toHaveTextContent("Transcribing");
   expect(personBubble()).not.toHaveTextContent("Split it");
 }, WHOLE_APP_MS);
 
@@ -191,7 +192,7 @@ test("what a spoken turn sent stays a moment, then leaves, then is gone", () => 
   patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening" });
   patch(store, { userLive: false, pendingPhase: "transcribing" });
   patch(store, { pendingPhase: "", userTurn: null, history: [...store.getState().facts.history, said("u-1", "Split it into two commits.", 2)] } as Partial<SessionFacts>);
-  expect(personBubble()).toHaveAttribute("data-sent");
+  expect(personBubble()).toHaveClass("sent");
   expect(personBubble()).toHaveTextContent("Split it into two commits.");
   expect(personBubble()!.querySelector(".voice-wave")).toBeNull();
   expect(personBubble()).not.toHaveAttribute("data-leaving");
@@ -282,12 +283,12 @@ test("a second spoken turn arriving while the first leaves starts over cleanly, 
   // The next turn: the bars while spoken, below the first as it goes on leaving; then what it sent, from the start of
   // its moment.
   patch(store, { userLive: true, userTurn: { id: "u-2", segment: "turn:u-2", thread: "fp-1|t-login" }, pendingPhase: "listening" });
-  const live = () => document.querySelector<HTMLElement>(".person-bubble:not([data-sent])");
+  const live = () => document.querySelector<HTMLElement>(".stage-voice .vcap.pill:not(.meas)");
   expect(live()!.querySelector(".voice-wave")).not.toBeNull();
   expect(live()).not.toHaveAttribute("data-leaving");
-  expect(document.querySelector(".person-bubble[data-sent]")).toHaveAttribute("data-leaving");
+  expect(document.querySelector(".stage-voice .vcap.sent:not(.meas)")).toHaveAttribute("data-leaving");
   tick(SENT_LEAVING_MS);
-  expect(document.querySelector(".person-bubble[data-sent]")).toBeNull();
+  expect(document.querySelector(".stage-voice .vcap.sent:not(.meas)")).toBeNull();
   patch(store, { userLive: false, pendingPhase: "" , userTurn: null, history: [...store.getState().facts.history, said("u-2", "Second thing.", 3)] } as Partial<SessionFacts>);
   expect(personBubble()).toHaveTextContent("Second thing.");
   expect(personBubble()).not.toHaveAttribute("data-leaving");
@@ -618,8 +619,8 @@ test("two machines with the same name, or none, are two groups, each with its ow
 test("the bubble lights whole words, and its tooltip speaks the interface's language", () => {
   room({ botLive: true, karaokeState: { segment: "h-2", from: 42, to: 42 } });
   // What was heard ends inside "look": the word lights whole.
-  expect(litPart(document.querySelector(".stage-bubble")!).played).toBe("Okay. I'll start with the login and then look");
-  expect(document.querySelector(".stage-bubble .lit-text")).toHaveAttribute("title", "Playing this reply");
+  expect(litPart(document.querySelector(".stage-voice .vcap.agent:not(.meas)")!).played).toBe("Okay. I'll start with the login and then look");
+  expect(document.querySelector(".stage-voice .vcap.agent:not(.meas) .lit-text")).toHaveAttribute("title", "Playing this reply");
 });
 
 test("a whole sentence sounding is read at a speaking pace, never past its end", () => {
@@ -627,17 +628,17 @@ test("a whole sentence sounding is read at a speaking pace, never past its end",
   // The voice's chunk is the reply's first sentence and a half: "Okay. I'll start with the login".
   room({ botLive: true, karaokeState: { segment: "h-2", from: 0, to: 31 } });
   // The sentence has just started: the whole reply is up, nothing lit yet.
-  expect(litPart(document.querySelector(".stage-bubble")!).upcoming).toBe(REPLY);
-  expect(litPart(document.querySelector(".stage-bubble")!).played).toBe("");
+  expect(litPart(document.querySelector(".stage-voice .vcap.agent:not(.meas)")!).upcoming).toBe(REPLY);
+  expect(litPart(document.querySelector(".stage-voice .vcap.agent:not(.meas)")!).played).toBe("");
   act(() => { vi.advanceTimersByTime(1000); });
-  expect(litPart(document.querySelector(".stage-bubble")!).played.length).toBeGreaterThan(0);
+  expect(litPart(document.querySelector(".stage-voice .vcap.agent:not(.meas)")!).played.length).toBeGreaterThan(0);
   // Long after the voice would have got there, the bubble waits at the end of the part sounding.
   act(() => { vi.advanceTimersByTime(20000); });
-  expect(litPart(document.querySelector(".stage-bubble")!).played).toBe("Okay. I'll start with the login");
-  expect(litPart(document.querySelector(".stage-bubble")!).upcoming).toBe(REPLY.slice("Okay. I'll start with the login".length));
+  expect(litPart(document.querySelector(".stage-voice .vcap.agent:not(.meas)")!).played).toBe("Okay. I'll start with the login");
+  expect(litPart(document.querySelector(".stage-voice .vcap.agent:not(.meas)")!).upcoming).toBe(REPLY.slice("Okay. I'll start with the login".length));
 });
 
-const stageBubbles = () => [...document.querySelectorAll<HTMLElement>(".stage-bubble")];
+const stageBubbles = () => [...document.querySelectorAll<HTMLElement>(".stage-voice .vcap.agent:not(.meas)")];
 /** The reply `segment` as the room has it, its voice `audio` ("playing", or "played" once said). */
 const reply = (segment: string, text: string, audio: string, time: number) =>
   ({ segment, thread: "fp-1|t-login", role: "assistant" as const, text, name: "Fix the slow login", time, session: "s1", audio });
@@ -935,7 +936,7 @@ test("the Working… line over the agent is an sr-only status, with no visible b
   vi.useFakeTimers();
   patch(store, { harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login") });
   // While the reply's balloon is up the stage shows speaking; the sr-only status still follows the real mood.
-  expect(document.querySelector(".stage-bubble")).not.toBeNull();
+  expect(document.querySelector(".stage-voice .vcap.agent:not(.meas)")).not.toBeNull();
   expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "speaking");
   expect(stageAgent()).toHaveAttribute("data-mood", "speaking");
   expect(workingLine()).toHaveClass("sr-only");
@@ -993,13 +994,13 @@ test("captions off in the call bar takes the balloons off the stage, for this de
   const toggle = () => screen.getByRole("button", { name: /captions$/ });
   expect(toggle()).toHaveAccessibleName("Hide captions");
   expect(toggle()).toHaveAttribute("aria-pressed", "true");
-  expect(document.querySelector(".stage-bubble")).not.toBeNull();
+  expect(document.querySelector(".stage-voice .vcap.agent:not(.meas)")).not.toBeNull();
   act(() => { toggle().click(); });
   expect(toggle()).toHaveAccessibleName("Show captions");
-  expect(document.querySelector(".stage-bubble")).toBeNull();
+  expect(document.querySelector(".stage-voice .vcap.agent:not(.meas)")).toBeNull();
   expect(localStorage.getItem(CAPTIONS_KEY)).toBe("off");
   act(() => { toggle().click(); });
-  expect(document.querySelector(".stage-bubble")).not.toBeNull();
+  expect(document.querySelector(".stage-voice .vcap.agent:not(.meas)")).not.toBeNull();
   expect(localStorage.getItem(CAPTIONS_KEY)).toBeNull();
 });
 
@@ -1008,3 +1009,20 @@ test("held still, the stage's mouth does not follow the voice either", () => {
   room({ botLive: true, karaokeState: { segment: "h-2", from: 57, to: 57 } });
   expect(stageAgent()).toHaveAttribute("data-mouth", "still");
 });
+
+/* Under the creature, one turn's card at a time (the design reference's 'place': both turns below it): the person's turn
+ * coming in sends the agent's lingering reply away at once, and the agent's reply sounding sends away what was sent. */
+test("the person's turn coming in lifts the agent's lingering reply away at once; the reply sounding lifts away what was sent", () => {
+  const store = room({ botLive: true, karaokeState: { segment: "h-2", from: 20, to: 20 } });
+  vi.useFakeTimers();
+  patch(store, { botLive: false, karaokeState: null, history: [reply("h-2", REPLY, "played", 1)] } as Partial<SessionFacts>);
+  expect(stageBubbles()[0]).not.toHaveAttribute("data-leaving");
+  patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening" });
+  expect(stageBubbles()[0]).toHaveAttribute("data-leaving");
+  expect(document.querySelector(".stage-voice .vcap.pill:not(.meas)")).not.toBeNull();
+  patch(store, { userLive: false, pendingPhase: "" , userTurn: null, history: [reply("h-2", REPLY, "played", 1), said("u-1", "Split it into two commits.", 2)] } as Partial<SessionFacts>);
+  const sent = () => document.querySelector(".stage-voice .vcap.sent:not(.meas)");
+  expect(sent()).not.toHaveAttribute("data-leaving");
+  patch(store, { botLive: true, karaokeState: { segment: "h-3", from: 0, to: 0 }, history: [reply("h-2", REPLY, "played", 1), said("u-1", "Split it into two commits.", 2), reply("h-3", NEXT, "playing", 3)] } as Partial<SessionFacts>);
+  expect(sent()).toHaveAttribute("data-leaving");
+}, WHOLE_APP_MS);

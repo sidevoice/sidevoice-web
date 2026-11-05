@@ -57,6 +57,7 @@ export const messages: Messages = {
   "stage.empty": "选择一个对话开始交谈。",
   "stage.chooseConversation": "选择对话",
   "stage.cancelTurn": "取消发送",
+  "stage.transcribing": "正在转写",
   "stage.sent": "已发送",
   "stage.poster.title": "通缉",
   "stage.poster.status": "在线暂停不论",

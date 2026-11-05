@@ -45,7 +45,7 @@ test("the picture is the room's own stage tile and call bar, on the facts the ro
   vi.useFakeTimers();
   const host = page("pip");
   expect(document.querySelector(".picture-card .stage-tile[data-card]")).toHaveAttribute("data-mood", "speaking");
-  expect(litPart(document.querySelector(".stage-bubble")!).played).toBe("Okay. I'll start with");
+  expect(litPart(document.querySelector(".stage-voice .vcap.agent:not(.meas)")!).played).toBe("Okay. I'll start with");
   expect(screen.getByText("Laptop")).toBeInTheDocument();
   // The room's call bar, without its ⋮; what it asks the room for goes to the app as the card's commands.
   expect(document.querySelector(".picture-card #call-menu")).toBeNull();

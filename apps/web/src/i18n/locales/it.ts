@@ -60,6 +60,7 @@ export const messages: Messages = {
   "stage.empty": "Scegli una conversazione per parlare.",
   "stage.chooseConversation": "Scegli una conversazione",
   "stage.cancelTurn": "Annulla invio",
+  "stage.transcribing": "Trascrizione",
   "stage.sent": "Inviato",
   "stage.poster.title": "RICERCATO",
   "stage.poster.status": "VIVO O IN PAUSA",
