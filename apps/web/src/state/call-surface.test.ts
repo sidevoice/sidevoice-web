@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { createRoomSessionStore, speakWith, WORKING_SHOWN_AFTER_MS } from "./room-session-state.js";
 import { spokenPage, stillId, SURFACE_PAGE_CHARS, STILL_PX, FACE_PX } from "./call-surface.js";
-import { startCallSurface, PAGE_SURFACE_MS, type SurfaceClock } from "./call-surface-publisher";
+import { startCallSurface, PAGE_SURFACE_MS, STILL_RETRY_FIRST_MS, STILL_RETRY_LAST_MS, type SurfaceClock } from "./call-surface-publisher";
 import { readOn } from "../features/call/speech-chunks";
 import { PAGE_MS } from "../features/call/PagedText";
 
@@ -433,4 +433,67 @@ test("a still is let go of only after the snapshot stops naming it: on removal, 
   expect(store.getState().facts.surfaceLive).toBeNull();
   expect(api.forget).toHaveBeenCalledTimes(2);
   expect(forgotten).toEqual([[], []]);
+});
+
+test("a still that could not be drawn is asked for again by itself, on an idle call: after 1 s, then doubling", async () => {
+  const time = clock();
+  const store = room();
+  const api = host();
+  // The creature's code fails to load twice (renderStill gives null), then loads.
+  let failures = 2;
+  const draw = vi.fn(async (id: string, px: number) => (failures > 0 ? null : { png: "png-" + id, px, k: 1 }));
+  startCallSurface(store, options(api, time, draw));
+  await vi.waitFor(() => expect(draw).toHaveBeenCalledTimes(4));
+  await Promise.resolve();
+  failures -= 1;
+  expect(api.still).not.toHaveBeenCalled();
+  // Nothing in the room changes: the publisher asks again on its own.
+  time.advance(STILL_RETRY_FIRST_MS - 1);
+  expect(draw).toHaveBeenCalledTimes(4);
+  time.advance(1);
+  await vi.waitFor(() => expect(draw).toHaveBeenCalledTimes(8));
+  await Promise.resolve();
+  failures -= 1;
+  // The next wait is twice as long.
+  time.advance(STILL_RETRY_FIRST_MS * 2 - 1);
+  expect(draw).toHaveBeenCalledTimes(8);
+  time.advance(1);
+  await vi.waitFor(() => expect(api.still).toHaveBeenCalledTimes(4));
+  expect(store.getState().callSurface.still).toEqual({ id: stillId("n|a", STILL_PX), k: 1 });
+  // Drawn: nothing more is asked.
+  time.advance(STILL_RETRY_LAST_MS * 2);
+  expect(draw).toHaveBeenCalledTimes(12);
+});
+
+test("a still retry ends with the surface: none is asked for after it closes or stops", async () => {
+  const time = clock();
+  const store = room();
+  const api = host();
+  const draw = vi.fn(async () => null);
+  const stop = startCallSurface(store, options(api, time, draw));
+  await vi.waitFor(() => expect(draw).toHaveBeenCalledTimes(4));
+  await Promise.resolve();
+  stop();
+  time.advance(STILL_RETRY_LAST_MS * 4);
+  expect(draw).toHaveBeenCalledTimes(4);
+});
+
+test("a failed still is tried again by its own clock, not by the words: none with each word, one after the wait", async () => {
+  const time = clock();
+  const store = room();
+  const api = host();
+  let fails = true;
+  const draw = vi.fn(async (id: string, px: number) => (id === "n|b" && fails ? null : { png: "png-" + id, px, k: 1 }));
+  startCallSurface(store, options(api, time, draw));
+  await vi.waitFor(() => expect(api.still).toHaveBeenCalledTimes(3));
+  for (const to of [1, 2, 3]) {
+    store.patch({ karaokeState: { segment: "s1", from: 0, to } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  expect(draw).toHaveBeenCalledTimes(4);
+  fails = false;
+  time.advance(STILL_RETRY_FIRST_MS);
+  await vi.waitFor(() => expect(api.still).toHaveBeenCalledTimes(4));
+  expect(draw).toHaveBeenCalledTimes(5);
+  expect(store.getState().callSurface.others.map((o) => o.still?.id)).toContain(stillId("n|b", FACE_PX));
 });

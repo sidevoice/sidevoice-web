@@ -9,6 +9,14 @@
 .chat-character .sv-avatar { width:100%;height:100%;background:var(--av-bg) }
 .sv-avatar { position:relative;display:inline-block;flex:none;line-height:0 }
 .sv-avatar svg { display:block;width:100%;height:100%;overflow:visible }
+/* A conversation's creature: one canvas, the avatar's whole box (features/avatar/creature/host.ts draws it). Offline, a
+   still face fades to grey (the floating card's states row in the design reference, T34). */
+.sv-avatar[data-style=creature] canvas { display:block;width:100%;height:100% }
+.sv-avatar[data-style=creature][data-framing=face][data-offline] :is(canvas,.creature-fallback) { filter:grayscale(1);opacity:.55 }
+/* Where no creature can be drawn, its fallback (creature/fallback.ts) stands in: its body colour in a plain outline, over
+   the avatar's box (on the stage, the figure box), standing where the creature stands. */
+.sv-avatar[data-style=creature][data-fallback] > canvas { display:none }
+.creature-fallback path { fill:var(--av-color) }
 /* The engine's theme inks are the design tokens' (styles/theme.css): the Sidevoice mascot's accent and the ink on it, in
    the light theme and the dark one alike. */
 .sv-avatar[data-style=bichos] { --bx-sv:var(--sv-accent);--bx-sv-face:var(--sv-on-accent);--fg-dim:var(--sv-text-muted) }
@@ -80,34 +88,21 @@
 .stage-tile:is([data-mood=idle],[data-mood=offline]) .backdrop * { animation-play-state:paused }
 .stage-tile[data-mood=offline] .backdrop .bd-mount { display:inline }
 /* The agent stands on the ground (its feet, y 106 of its 120 box, on y 357 of the frame), 300px tall as in the lab
-   unless the tile is too narrow for it. */
+   unless the tile is too narrow for it. The agent is its creature (features/avatar/creature/): the camera stands it in
+   this box (its feet on the box's, the top of its head at the box's crown: CharacterAvatar), and its canvas is the whole
+   scene, so what it acts out round it (the busy cogs over its head) has the tile to be drawn in. */
 .stage-agent { position:absolute;left:50%;top:calc(357px - var(--fig) * 106 / 120);width:var(--fig);height:var(--fig);margin-left:calc(var(--fig) / -2);
   transform-origin:50% 77.92%;transition:transform .45s cubic-bezier(.3,1.4,.5,1),translate .3s var(--sv-ease),opacity .3s }
-/* Working, the desk slides up from below and the agent steps up behind it, a little larger, cut at the belly: its
-   y 93.5 (work.ts DESK_Y, where its props rest) meets the desk's top edge at y 306.65 of the frame. */
-.stage-tile[data-mood=working] .stage-agent { transform:translateY(calc(var(--fig) * .1042 - 50.35px)) scale(1.133) }
+.stage-scene .stage-agent[data-style=creature] > canvas { position:absolute;left:calc(var(--fig) / 2 - 50cqw);top:calc(var(--fig) * 106 / 120 - 357px);width:100cqw;height:100cqh }
+/* The creature's eyes follow the finger over the whole tile (CharacterAvatar gazeFrom, T23). The browser keeps the touch
+   for that instead of starting a scroll or a zoom, which cancels the pointer after its first move. This is the
+   reference's #preview { touch-action:none }. The cost: no scroll or pinch can start on the stage. */
+.stage-tile:has(.stage-agent[data-style=creature]) { touch-action:none }
 .stage-tile[data-mood=offline] .stage-agent { opacity:0 }
-/* Offline the agent is not shown (the poster is up): what loops in it (its z's, its breathing) does not run unseen. */
+/* Offline the agent is not shown (the poster is up): nothing in it runs unseen (its rig draws nothing either). */
 .stage-tile[data-mood=offline] .stage-agent, .stage-tile[data-mood=offline] .stage-agent * { animation:none !important }
 /* Idle, the agent a touch larger (--stage-avatar-idle), from its feet: still on the ground. */
 .stage-tile[data-mood=idle] .stage-agent { transform:scale(var(--stage-avatar-idle, 1.1)) }
-/* The desk drawing is 420 × 150 at the frame's foot (scale 1.05, its top edge 133.35 above the foot); beside it the
-   desk's top and front run on to the edges in the drawing's own colours, at the same heights (its gradients'
-   colours where the drawing ends). */
-.stage-desk { position:absolute;left:0;right:0;bottom:0;height:150px;transform:translateY(170%);transition:transform .45s cubic-bezier(.3,1.4,.5,1);
-  background:linear-gradient(to bottom,transparent 18.3px,#1b1428 0 24.6px,color-mix(in srgb, var(--desk-top-deep) 35%, var(--desk-top)) 0,
-    color-mix(in srgb, var(--desk-top-deep) 87%, var(--desk-top)) 37.65px,#1b1428 0 43.95px,color-mix(in srgb, var(--desk-front-deep) 4%, var(--desk-front)) 0,var(--desk-front-deep) 171px) }
-.stage-desk .desk { position:absolute;left:50%;bottom:0;width:420px;height:150px;margin-left:-210px;overflow:visible;clip-path:inset(-100% 0 0 0) }
-.stage-tile[data-mood=working] .stage-desk { transform:none }
-.stage-desk :is(.desk-steam,.desk-glow) { opacity:0 }
-.stage-desk :is(.desk-sway,.desk-bob,.desk-hand) { transform-box:fill-box;transform-origin:50% 100% }
-.stage-tile[data-mood=working] .desk-steam { animation:desk-steam 1.6s ease-in-out infinite }
-.stage-tile[data-mood=working] .desk-glow { opacity:.35 }
-.stage-tile[data-mood=working] .desk-bob { animation:desk-bob .6s ease-in-out infinite }
-.stage-tile[data-mood=working] .desk-hand { animation:desk-tick 2s steps(8) infinite }
-@keyframes desk-steam { 0% { opacity:0;transform:translateY(4px) } 40% { opacity:.9 } 100% { opacity:0;transform:translateY(-8px) } }
-@keyframes desk-bob { 0%,100% { transform:rotate(-6deg) } 50% { transform:rotate(6deg) } }
-@keyframes desk-tick { to { transform:rotate(360deg) } }
 /* The wanted poster (offline), after One Piece's bounty posters: near the frame's top, where the backdrops hang it. */
 .wanted { --w-ink:#4a3a31;position:absolute;left:50%;top:40px;width:214px;box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:4px;overflow:hidden;
   padding:6px 9px;transform:translateX(-50%) scale(.84) rotate(-2deg);transform-origin:50% 0;color:var(--w-ink);
@@ -169,6 +164,6 @@
   .sv-avatar[data-style=bichos][data-mouth=playback] .m-rest { opacity:1 }
   .sv-avatar[data-style=bichos][data-mood=speaking][data-mouth=playback][data-mouth-active] .m-open { opacity:1;transform:scaleY(.55) !important }
   .sv-avatar[data-style=bichos][data-mood=speaking][data-mouth=playback][data-mouth-active] .m-rest { opacity:0 }
-  .stage-scene *,.stage-desk,.wanted { animation:none !important;transition:none !important }
+  .stage-scene *,.wanted { animation:none !important;transition:none !important }
   .stage-spinner { border-right-color:currentColor;opacity:.7 }
 }
