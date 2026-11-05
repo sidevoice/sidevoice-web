@@ -85,12 +85,15 @@
    design reference's, drawn 960px tall at the tile's shape), at full strength in every state, as the reference shows it. */
 .stage-backdrop { position:absolute;inset:0 }
 .stage-backdrop > canvas { position:absolute;inset:0;width:100%;height:100%;display:block }
+/* Its ground line (y 357) on the creature's feet, wherever the stage's framing stands it (StageVoice keeps --stage-ground);
+   offline, where the poster hangs on the frame as drawn, left in place. */
+.stage-tile:not([data-mood=offline]) .stage-backdrop { translate:0 var(--stage-ground, 0px) }
 /* The agent stands on the ground (its feet, y 106 of its 120 box, on y 357 of the frame), 300px tall as in the lab
    unless the tile is too narrow for it. The agent is its creature (features/avatar/creature/): the camera stands it in
    this box (its feet on the box's, the top of its head at the box's crown: CharacterAvatar), and its canvas is the whole
    scene, so what it acts out round it (the busy cogs over its head) has the tile to be drawn in. */
 .stage-agent { position:absolute;left:50%;top:calc(357px - var(--fig) * 106 / 120);width:var(--fig);height:var(--fig);margin-left:calc(var(--fig) / -2);
-  transform-origin:50% 77.92%;transition:transform .45s cubic-bezier(.3,1.4,.5,1),translate .3s var(--sv-ease),opacity .3s }
+  transition:opacity .3s }
 .stage-scene .stage-agent[data-style=creature] > canvas { position:absolute;left:calc(var(--fig) / 2 - 50cqw);top:calc(var(--fig) * 106 / 120 - 357px);width:100cqw;height:100cqh }
 /* The creature's eyes follow the finger over the whole tile (CharacterAvatar gazeFrom, T23). The browser keeps the touch
    for that instead of starting a scroll or a zoom, which cancels the pointer after its first move. This is the
@@ -99,8 +102,9 @@
 .stage-tile[data-mood=offline] .stage-agent { opacity:0 }
 /* Offline the agent is not shown (the poster is up): nothing in it runs unseen (its rig draws nothing either). */
 .stage-tile[data-mood=offline] .stage-agent, .stage-tile[data-mood=offline] .stage-agent * { animation:none !important }
-/* Idle, the agent a touch larger (--stage-avatar-idle), from its feet: still on the ground. */
-.stage-tile[data-mood=idle] .stage-agent { transform:scale(var(--stage-avatar-idle, 1.1)) }
+/* Where it stands and how large is the stage's framing (creature/stage-frame.ts: the optical centre, closer at rest on a
+   desktop, stepping back for a turn's card), eased by its camera: the box itself never scales or moves (the reference has
+   no idle scale; scaled, the box also skewed the area its eyes follow the pointer over). */
 /* The creatures and their scene stay still (web#272): WebKit repaints a moving SVG on the CPU every frame, so an idle
    room with a few conversations kept the app's GPU process and page busy and the fans on (desktop#149). The state
    reads from the still drawing (its pose, what it holds, the desk while it works), the dot beside it and the words.

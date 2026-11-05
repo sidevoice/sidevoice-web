@@ -3,6 +3,8 @@ import "./accessories.js";
 import "./acts.js";
 import type { AvatarMood } from "../avatar-spec";
 import { creatureFromSeed, rigSpec, type CreatureChoice, type RigSpec } from "./catalogue";
+import type { StageFrame } from "./stage-frame";
+import { StageFramer } from "./stage-framer";
 
 /* Where creatures are drawn on a page: two three.js stages (one WebGL context each, whatever the number of creatures),
  * each creature built once into a stage's scene and blitted into its own 2D canvas, as the design reference's creator
@@ -265,6 +267,9 @@ export interface LiveOptions {
   /** The scene's framing, asked each time the canvas changes shape: a camera (the creator's), or a place for the
    *  creature (default: the reference's desktop distance, the feet on the stage scene's ground line). */
   scene?: Framing | FigureFraming | (() => Framing | FigureFraming | null);
+  /** The stage's framing (stage-frame.ts): with one, a scene is framed as the stage's voice text needs (the creature at the
+   *  tile's optical centre, stepping back for a turn's card), and `scene` is not asked. */
+  frame?: StageFrame;
   /** Where the pointer is followed (the stage's tile); none: the eyes keep their own gaze. */
   gazeFrom?: HTMLElement | null;
   /** The voice's level now, 0..1: the agent's while it speaks, the person's while it listens. */
@@ -298,6 +303,9 @@ export class LiveCreature {
   private moodTimer: ReturnType<typeof setTimeout> | undefined;
   /** The start of the last entrance it was startled for (wall-clock). */
   private startledAt: number | null = null;
+  /** The stage's framing, where it has one (`frame`), and whether it is still easing toward its target. */
+  private framer: StageFramer | null = null;
+  private easing = false;
 
   constructor(stage: RigStage, private opts: LiveOptions) {
     this.stage = stage;
@@ -305,8 +313,14 @@ export class LiveCreature {
     this.item = stage.add(rigSpec(opts.choice ?? creatureFromSeed(opts.seed)), opts.canvas, face ? { ...FACE, off: 0 } : { turn: 0, off: 0 });
     this.fit();
     this.moving = opts.moving ?? true;
+    if (opts.frame && !face) {
+      this.framer = new StageFramer({ stage, item: this.item, canvas: opts.canvas, poke: () => this.poke(),
+        render: (zoom, lookY, state, into) => { const shown = this.item.canvas; this.item.canvas = into; try { this.draw(nowS(), true, { zoom, lookY, state }); } finally { this.item.canvas = shown; } },
+        mood: () => this.mood, drawn: () => !MODES[this.mood].poster }, opts.frame);
+      this.framer.hold(!this.moving);
+    }
     this.setMood(opts.mood ?? "idle", { step: opts.step });
-    const box = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => { this.fit(); this.hidden = false; this.poke(); });
+    const box = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => { this.fit(); this.hidden = false; this.framer?.invalidate(); this.poke(); });
     box?.observe(opts.canvas);
     this.off.push(() => box?.disconnect());
     const from = opts.gazeFrom;
@@ -482,7 +496,7 @@ export class LiveCreature {
   }
 
   /** Moving, or holding still in its key pose (reduced motion, no GPU). */
-  setMoving(moving: boolean) { if (moving !== this.moving) { this.moving = moving; this.poke(); } }
+  setMoving(moving: boolean) { if (moving !== this.moving) { this.moving = moving; this.framer?.hold(!moving); this.poke(); } }
 
   /** Drawn again at once (a framing or a level source changed). */
   redraw() { this.poke(); }
@@ -492,11 +506,11 @@ export class LiveCreature {
 
   private active(): boolean {
     const M = MODES[this.mood];
-    return !M.poster && (!!this.ix.gaze || this.ix.w > 0 || !!this.react || this.moving);
+    return !M.poster && (!!this.ix.gaze || this.ix.w > 0 || !!this.react || this.moving || this.easing);
   }
 
   /** It has a frame to draw: a change not drawn yet, or motion (its own, the pointer's gaze, a startle). */
-  wantsFrames(): boolean { return !this.hidden && !seats[this.opts.framing].lost && (this.needDraw || this.active()); }
+  wantsFrames(): boolean { return !this.hidden && !seats[this.opts.framing].lost && (this.needDraw || this.active()) && !this.framer?.waiting(); }
 
   /** Whether `stage` is the one it is drawn by. */
   drawnBy(stage: RigStage | null): boolean { return stage === this.stage; }
@@ -506,6 +520,8 @@ export class LiveCreature {
     const { canvas } = this.opts;
     const on = this.active();
     if (!on && !this.needDraw) return false;
+    // Waiting for its first framing (the stage's): drawn once it has it (the framer asks for the frame then).
+    if (this.framer?.waiting()) { this.needDraw = true; return false; }
     // Its stage's context is gone: the canvas keeps its last frame, and it is drawn again when the context is back.
     if (seats[this.opts.framing].lost) { this.needDraw = true; return false; }
     // Nobody sees a canvas out of the page or with no box (a closed panel, the phone's hidden list): it is drawn when it
@@ -516,31 +532,34 @@ export class LiveCreature {
     return true;
   }
 
-  private draw(t: number, still: boolean) {
+  private draw(t: number, still: boolean, camera?: { zoom: number; lookY: number | undefined; state?: string }) {
     const M = MODES[this.mood];
     if (M.poster) return; // offline: the poster stands in for the creature
     if (this.opts.canvas.width === 0 || this.opts.canvas.height === 0) return;
     if (this.react && nowS() > this.react.until) this.react = null;
-    const r = this.react, extra: Record<string, unknown> = {};
-    const g = this.opts.gazeFrom ? this.easedGaze() : null;
+    // A trial framing (camera.state) is drawn without the pointer's gaze or a startle: the same pose whenever it is drawn.
+    const r = camera?.state ? null : this.react, extra: Record<string, unknown> = {};
+    const g = this.opts.gazeFrom && !camera?.state ? this.easedGaze() : null;
     if (g) { extra.gx = g[0]; extra.gy = g[1]; }
     if (r) {
       const k = nowS() - r.t0;
       if (r.hop) extra.dy = -Math.sin(Math.min(1, k / 0.45) * Math.PI) * 9 * r.hop;
       extra.expr = r.expr;
     }
-    const item = this.item, view = this.framingNow();
-    if (view) {
+    const item = this.item, framed = camera ?? this.framer?.step() ?? null, view = framed ? null : this.framingNow();
+    if (!camera) this.easing = !!framed && "moving" in framed && !!framed.moving;
+    if (view || framed) {
       // As the creator draws its stage (viewCam): the camera takes the canvas's shape, and the renderer keeps the stage's
       // own size (1152 × 768), so Stage.draw does not resize it and the frame is resampled into the canvas, whatever its
       // shape. Rendered at the canvas's own shape instead, a phone's tile came out a pixel off along every edge.
       const cam = this.stage.camera, ar = this.opts.canvas.width / this.opts.canvas.height;
       if (cam.aspect !== ar) { cam.aspect = ar; cam.updateProjectionMatrix(); }
     }
-    item.spec.state = M.state;
+    item.spec.state = camera?.state ?? M.state;
     item.spec.expr = item.spec.state ? undefined : "neutral";
     item.opts.extra = extra;
-    if (view) { item.opts.zoom = view.zoom; item.opts.lookY = view.lookY; }
+    if (framed) { item.opts.zoom = framed.zoom; item.opts.lookY = framed.lookY; }
+    else if (view) { item.opts.zoom = view.zoom; item.opts.lookY = view.lookY; }
     const lvl = M.voice && this.opts.level ? this.opts.level(this.mood) : 0;
     this.warm(t, lvl, still);
     this.stage.draw(item, t, lvl, still);
@@ -565,6 +584,7 @@ export class LiveCreature {
 
   dispose() {
     clearTimeout(this.moodTimer);
+    this.framer?.dispose();
     lives.delete(this);
     for (const off of this.off) off();
     dispose(this.item, this.stage);
