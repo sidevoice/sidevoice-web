@@ -105,6 +105,18 @@ export function StageVoice({ frame, turn, phone, children }: { frame: StageFrame
     if (size) frame.ask({ w: size.w, h: size.h, dx: size.dx, dy: size.dy, phone, rest, cards: cards && { below: cards.below, above: cards.above, xa: cards.xa, xb: cards.xb }, opener: turn });
   }, [frame, size, phone, rest, cards, turn]);
 
+  // No card over the creature while it eases back for one (or before its framing is solved): each card's top is a gap
+  // under the creature's lowest drawn row as it stands now, at least (--voice-floor; stage-voice.css takes the larger).
+  useEffect(() => {
+    const node = layer.current;
+    if (!node) return;
+    return frame.watchEdge((edge) => {
+      if (!edge) { node.style.removeProperty("--voice-floor"); node.style.removeProperty("--voice-floor-sent"); return; }
+      node.style.setProperty("--voice-floor", edge.floor.toFixed(2) + "px");
+      node.style.setProperty("--voice-floor-sent", edge.floorAny.toFixed(2) + "px");
+    });
+  }, [frame]);
+
   // The backdrop's ground line follows the creature's feet as the framing moves it (the reference's backdrops: their frame's
   // y 357 on the feet): the tile's canvas says where they are drawn (--stage-feet, px from the tile's inner top) and how far that moves
   // the scene's ground (--stage-ground, the scene's own px: it is drawn 440 tall and scaled to the tile).

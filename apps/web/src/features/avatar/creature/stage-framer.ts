@@ -1,5 +1,5 @@
 import { ACTS, type RigCamera, type RigVector, type Stage, type StageItem } from "./rig.js";
-import { capCentreSteps, easeFraming, REST_HEAD, REST_ZK, stageBands, type FrameAsk, type FrameProbe, type FrameSolved, type Framing, type FrameTarget, type Rows,
+import { capCentre, capCentreSteps, easeFraming, REST_HEAD, REST_ZK, stageBands, type FrameAsk, type FrameProbe, type FrameSolved, type Framing, type FrameTarget, type Rows,
   type StageFrame } from "./stage-frame";
 
 /* The creature host's side of the stage's framing (stage-frame.ts): it draws trial framings of the creature into its own
@@ -19,8 +19,6 @@ const PHONE = { side: 0.05, mid: 0.5, zoom: 2.6 };
 
 /** How long a step of a solve waits, at most, for the page to be idle. */
 const SOLVE_WAIT_MS = 500;
-/** How long the creature waits, at most, for its first framing before it is drawn. */
-const FIRST_WAIT_MS = 8000;
 
 /** The poses the creature can take while a turn's card shows: the turn's own, and resting or working after it. */
 const TURN_POSES = ["speaking", "listening", "idle", "working"];
@@ -128,9 +126,13 @@ export interface FramerHost {
   poke(): void;
 }
 
+/** A solve in progress: its steps (a trial render each), what to do with its answer, and whether the stage waits for it. */
+interface Job { key: string; steps: Generator<void, FrameTarget>; done: (to: FrameTarget) => void; wanted: boolean }
+
 export class StageFramer {
   private cap: Framing = { lift: 0, zk: 1 };
   private to: FrameTarget | null = null;
+  /** What the framing applied was solved for, "~" after it while it is the estimate (its pixel solve still to come). */
   private key = "";
   private phone: View | null = null;
   private phoneKey = "";
@@ -140,34 +142,31 @@ export class StageFramer {
   private pose = "";
   /** The pose the open turn was fitted on (null at rest). */
   private turnPose: string | null = null;
-  /** The framings solved, by what they were solved for (a few: the tile's sizes, at rest and for a turn). */
+  /** The framings solved on the pixels, by what they were solved for (a few: the tile's sizes, at rest and for a turn). */
   private solved = new Map<string, FrameTarget>();
-  /** Framings being solved, a trial render per task (the page never waits on a whole solve): the stage's ask first, the
-   *  others worked out ahead after it. */
-  private jobs: Array<{ key: string; steps: Generator<void, FrameTarget>; done: (to: FrameTarget) => void; wanted: boolean }> = [];
+  /** Solves on the pixels in progress, a trial render per step in the page's idle time: the stage's ask first, the others
+   *  worked out ahead after it. */
+  private jobs: Job[] = [];
   private running: ReturnType<typeof setTimeout> | undefined;
+  private cancelIdle: (() => void) | null = null;
   /** Where trial framings are drawn: off screen, so none shows between two frames. */
   private trial: HTMLCanvasElement | null = null;
-
-  private born = Date.now();
-  private deadline: ReturnType<typeof setTimeout> | undefined;
+  /** The creature's bounds, as points in the world (its drawn box and its shadow's front on the floor): projected through
+   *  any camera they give where it stands without a render (`low`, the cards' floor while it eases). */
+  private points: Vec3[] | null = null;
+  /** How the projected bounds' lowest row differs from the one measured on the pixels, at the framing eased from and at the
+   *  target, and how far the ease from one to the other has come (the cards' floor follows it). */
+  private ease = { from: { lift: 0, zk: 1 } as Framing, corrFrom: 0, corrTo: 0, span: 0 };
 
   constructor(private host: FramerHost, private frame: StageFrame) {
     this.off = frame.listen(() => { this.solve(); this.host.poke(); });
-    // past the wait it is drawn as it is
-    this.deadline = setTimeout(() => this.host.poke(), FIRST_WAIT_MS + 50);
   }
 
-  /** Whether the creature waits for its first framing before it is drawn (the stage opens with it where it stands, never
-   *  jumping there): while one is being solved, for a few seconds at most (past them it is drawn as it is, and framed when
-   *  solved). */
-  waiting(): boolean {
-    if (this.to || !this.frame.request || Date.now() - this.born > FIRST_WAIT_MS) return false;
-    if (!this.jobs.length) this.solve();
-    return !this.to;
+  dispose() {
+    clearTimeout(this.running); this.cancelIdle?.(); this.jobs = []; this.off();
+    if (this.measuring) { this.measuring.gen.return(undefined as unknown as Footprint); this.measuring = null; }
+    this.frame.feet(null); this.frame.edge(null);
   }
-
-  dispose() { clearTimeout(this.deadline); clearTimeout(this.running); this.cancelIdle?.(); this.jobs = []; this.off(); if (this.measuring) { this.measuring.gen.return(undefined as unknown as Footprint); this.measuring = null; } this.frame.feet(null); }
 
   /** Held still (reduced motion, no GPU): a new framing is taken at once instead of eased into (the reference under
    *  reduced motion). */
@@ -214,6 +213,14 @@ export class StageFramer {
     return { zoom, lookY: (v.lookY != null ? v.lookY : 0.3 - (zoom - 1) * 0.55) - f.lift };
   }
 
+  /** A camera for a framing, as the stage draws it, for projecting points (no render). */
+  private projector(v: View, f: Framing) {
+    const { stage, item, canvas } = this.host, cam = stage.camera.clone(), c = item.c, { zoom, lookY } = this.camera(v, f);
+    cam.aspect = canvas.width / canvas.height; cam.updateProjectionMatrix();
+    cam.position.set(0, 0.6, 6.7 * zoom); cam.lookAt(0, lookY != null ? lookY : 0.3 + ((c as unknown as { float?: number }).float || 0) * 0.5 - (zoom - 1) * 0.55, 0); cam.updateMatrixWorld();
+    return cam;
+  }
+
   /** The creature's rows at a trial framing, in css px of the tile (creator.js drawnRows). */
   private probe(v: View, state: string): FrameProbe {
     const { host } = this, { dx, dy } = this.box();
@@ -233,24 +240,65 @@ export class StageFramer {
       for (let y = H - 1; y >= 0 && lowAny < 0; y--) for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3] > 16) { lowAny = y; break; }
       return { low: (low < 0 ? 0 : low + 1) / k + dy, top: top / k + dy, lowAny: (lowAny + 1) / k + dy };
     };
-    const slope = (zk: number) => {
-      const vh = this.box().h, a = this.footAt(v, { lift: 0, zk }, vh), b = this.footAt(v, { lift: 0.1, zk }, vh);
-      return Math.max(1, (a - b) / 0.1);
+    return { rows, slope: (zk) => this.slope(v, zk) };
+  }
+
+  /** How many px a unit of lift moves the creature's feet up the tile at a step back (from the projection). */
+  private slope(v: View, zk: number) {
+    const vh = this.box().h, a = this.footAt(v, { lift: 0, zk }, vh), b = this.footAt(v, { lift: 0.1, zk }, vh);
+    return Math.max(1, (a - b) / 0.1);
+  }
+
+  /** The creature's bounds where it stands now: its drawn box (hats, props, the cogs) and its shadow's front edge on the
+   *  floor, as world points; taken again with each new framing (its pose may have changed). */
+  private bounds(): Vec3[] {
+    const c = this.host.item.c as unknown as ActingCreature, root = c.root, V = (root as unknown as { position: Vec3 }).position.constructor as unknown as new () => Vec3;
+    const was = root.visible; root.visible = true; root.updateMatrixWorld(true);
+    const v = new V(), lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    const visit = (o: Obj3) => {
+      if (!o.visible || o.userData.noFit) return;
+      const g = o.geometry;
+      if (g && (o.isMesh || o.isSprite || o.isLine || o.isPoints)) {
+        if (!g.boundingBox) g.computeBoundingBox();
+        const b = g.boundingBox!;
+        for (let i = 0; i < 8; i++) {
+          v.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).applyMatrix4(o.matrixWorld);
+          lo[0] = Math.min(lo[0], v.x); lo[1] = Math.min(lo[1], v.y); lo[2] = Math.min(lo[2], v.z); hi[0] = Math.max(hi[0], v.x); hi[1] = Math.max(hi[1], v.y); hi[2] = Math.max(hi[2], v.z);
+        }
+      }
+      for (const ch of o.children) visit(ch);
     };
-    return { rows, slope };
+    visit(root);
+    root.visible = was;
+    const pts: Vec3[] = [];
+    if (!(hi[1] > lo[1])) return pts;
+    for (let i = 0; i < 8; i++) pts.push(new V().set(i & 1 ? hi[0] : lo[0], i & 2 ? hi[1] : lo[1], i & 4 ? hi[2] : lo[2]));
+    // the shadow on the floor reaches a little in front of the body, and a little wider
+    const floor = Math.min(lo[1], c.minY), wide = (hi[0] - lo[0]) * 0.6, front = hi[2] + (hi[2] - lo[2]) * 0.3;
+    for (const x of [-wide, 0, wide]) pts.push(new V().set(x, floor, front));
+    return pts;
+  }
+
+  /** The projected bounds' rows at a framing, css px of the tile: the estimate drawn before the pixels have been read. */
+  private estimate(v: View, f: Framing): Rows | null {
+    const pts = this.points;
+    if (!pts?.length) return null;
+    const cam = this.projector(v, f), q = pts[0].clone(), { h, dy } = this.box();
+    let top = Infinity, low = -Infinity;
+    for (const p of pts) { const y = ((1 - q.copy(p).project(cam).y) / 2) * h + dy; top = Math.min(top, y); low = Math.max(low, y); }
+    return { top: top - ESTIMATE_MARGIN, low: low + ESTIMATE_MARGIN, lowAny: low + ESTIMATE_MARGIN };
   }
 
   /** Where the creature's feet are at a framing, css px from the canvas's top (from the projection: no render). */
   private footAt(v: View, f: Framing, vh: number): number {
-    const { stage, item, canvas } = this.host, cam = stage.camera.clone(), c = item.c, V = c.root.position.constructor;
-    const { zoom, lookY } = this.camera(v, f);
-    cam.aspect = canvas.width / canvas.height; cam.updateProjectionMatrix();
-    cam.position.set(0, 0.6, 6.7 * zoom); cam.lookAt(0, lookY != null ? lookY : 0.3 + ((c as unknown as { float?: number }).float || 0) * 0.5 - (zoom - 1) * 0.55, 0); cam.updateMatrixWorld();
+    const c = this.host.item.c, V = c.root.position.constructor, cam = this.projector(v, f);
     return ((1 - new V(0, c.minY, 0).project(cam).y) / 2) * vh;
   }
 
   /** Solves what the stage asks, if it changed (creator.js fitFrame): at rest on a desktop, closer, with less headroom;
-   *  for a turn, stepped back as far as its largest card needs. Then says where the cards go. */
+   *  for a turn, stepped back as far as its largest card needs. The pixels' answer where it is known (solved now for the
+   *  first framing, within FIRST_BUDGET_MS); else at once an estimate from the creature's projected bounds, the pixels'
+   *  answer worked out in the page's idle time and taken when it comes. Then says where the cards go. */
   solve() {
     const ask = this.frame.request;
     if (!ask || !this.ready()) return;
@@ -260,51 +308,86 @@ export class StageFramer {
     // framing whoever speaks next, until the stage is at rest again.
     if (rest) this.turnPose = null;
     else if (!this.turnPose) this.turnPose = ask.opener ?? "speaking";
-    const solved = this.target(ask, rest, this.turnPose ?? undefined, () => this.solve());
-    if (!solved) { this.frame.working(); return; } // being solved: asked again once it is
-    if (solved.key !== this.key) {
-      this.key = solved.key;
+    const pose = rest ? (this.host.mood() === "working" ? "working" : "idle") : this.turnPose!;
+    const v = this.view(ask.phone), key = this.keyOf(ask, rest, pose, v);
+    if (!key) return;
+    const { gap } = stageBands(ask.h, ask.phone);
+    let to = this.solved.get(key), pending = false;
+    if (!to) {
+      const job = this.job(ask, rest, pose, v, key, () => this.solve());
+      // The first framing: solved now, within the budget (on a GPU it all fits: the stage opens framed).
+      if (!this.to) to = this.drive(job, FIRST_BUDGET_MS) ?? undefined;
+      if (!to) {
+        this.points = this.bounds();
+        const guess = this.points.length ? this.estimated(ask, rest, pose, v) : null;
+        if (!guess) { this.frame.working(); return; }
+        to = guess; pending = true;
+      }
+    }
+    const applied = key + (pending ? "~" : "");
+    if (applied !== this.key) {
+      this.key = applied;
       const first = !this.to;
-      this.to = solved.target;
+      this.points = this.bounds();
+      // the cards' floor follows the ease: from the framing it stands at now, to the new one
+      const now = this.estimate(v, this.cap), at = this.estimate(v, to);
+      const corrNow = this.to && now ? this.lowNow(v, now) - now.low : 0;
+      this.ease = { from: { ...this.cap }, corrFrom: corrNow, corrTo: at ? to.low - at.low : 0, span: Math.hypot(to.lift - this.cap.lift, to.zk - this.cap.zk) };
+      this.to = to;
       // The first framing is taken at once (the stage opens with the creature where it stands); every change after it is
       // eased into, or taken at once while it holds still.
-      if (first || this.held) this.cap = { lift: this.to.lift, zk: this.to.zk };
+      if (first || this.held) { this.cap = { lift: to.lift, zk: to.zk }; this.ease.span = 0; }
       this.host.poke();
       // The other framings (at rest, or a turn's, opened by either) worked out while nothing happens, so the first card is
       // not held up by them.
-      this.prefetch(ask, rest);
+      if (!pending) this.prefetch(ask, rest, v);
     }
-    this.frame.solve(solved);
+    this.frame.solve({ target: to, gap, below: to.low + gap, belowAny: Math.max(to.low, to.reach ?? 0) + gap, above: to.top - to.head - gap, key }, pending);
   }
 
   /** Whether trial framings can be drawn now: the creature drawn, its canvas laid out. */
   private ready() { const { canvas } = this.host; return this.host.drawn() && !!canvas.width && canvas.isConnected && canvas.getClientRects().length > 0; }
 
-  /** The framing for `ask` (at rest or for a turn) from the solved ones kept; else it is solved on trial renders, a render
-   *  per task, `then` called once it is (`ahead`: worked out ahead, after whatever the stage waits for). */
-  private target(ask: FrameAsk, rest: boolean, turnPose = "speaking", then?: () => void, ahead = false): FrameSolved | null {
-    const v = this.view(ask.phone), vh = ask.h, vw = ask.w, cards = ask.cards;
-    if (!(vh > 0 && vw > 0) || (!rest && !cards)) return null;
-    const { floor, ceil, gap } = stageBands(vh, ask.phone);
-    // Measured in the key pose of the state it was entered in (the reference fits on entering it): a turn in the speaking or
-    // the listening pose (kept across turns: the creature never moves between them); at rest, working (its cogs over its
-    // head) or idle.
-    const pose = rest ? (this.host.mood() === "working" ? "working" : "idle") : turnPose;
-    const key = [rest ? "rest" : "turn", pose, ask.phone, vw.toFixed(1), vh.toFixed(1), ask.dy.toFixed(1), v.zoom, v.lookY, shapeKey(this.host.item.spec), rest ? "" : JSON.stringify(cards)].join("|");
-    const to = this.solved.get(key);
-    if (to) return { target: to, gap, below: to.low + gap, belowAny: Math.max(to.low, to.reach ?? 0) + gap, above: to.top - to.head - gap, key };
+  /** What a framing is solved for: at rest or a turn, the pose it is fitted on, the tile and the cards, the creature. */
+  private keyOf(ask: FrameAsk, rest: boolean, pose: string, v: View): string | null {
+    if (!(ask.h > 0 && ask.w > 0) || (!rest && !ask.cards)) return null;
+    return [rest ? "rest" : "turn", pose, ask.phone, ask.w.toFixed(1), ask.h.toFixed(1), ask.dy.toFixed(1), v.zoom, v.lookY, shapeKey(this.host.item.spec), rest ? "" : JSON.stringify(ask.cards)].join("|");
+  }
+
+  /** The solve on the pixels for `key` (queued, or found queued): `then` once it is done. */
+  private job(ask: FrameAsk, rest: boolean, pose: string, v: View, key: string, then?: () => void, ahead = false): Job {
     const queued = this.jobs.find((j) => j.key === key);
     if (queued) {
       // asked for now: it goes first, and says when it is done (once)
-      if (then && !queued.wanted) { const was = queued.done; queued.done = (t) => { was(t); then(); }; queued.wanted = true; this.jobs = [queued, ...this.jobs.filter((j) => j !== queued)]; }
-      return null;
+      if (then && !queued.wanted) { const was = queued.done; queued.done = (t) => { was(t); then(); }; queued.wanted = true; this.jobs = [queued, ...this.jobs.filter((j) => j !== queued)]; this.run(); }
+      return queued;
     }
-    const probe = this.probe(v, pose);
-    const steps = rest ? capCentreSteps(probe, 0, 0, vh, ceil, floor, gap, 0, vw, REST_ZK, REST_HEAD) : this.turnSteps(v, probe, pose, cards!, vh, ceil, floor, gap);
-    const job = { key, steps, wanted: !!then, done: (t: FrameTarget) => { this.solved.set(key, t); if (this.solved.size > 8) this.solved.delete(this.solved.keys().next().value!); then?.(); } };
+    const { floor, ceil, gap } = stageBands(ask.h, ask.phone), probe = this.probe(v, pose);
+    const steps = rest ? capCentreSteps(probe, 0, 0, ask.h, ceil, floor, gap, 0, ask.w, REST_ZK, REST_HEAD) : this.turnSteps(v, probe, pose, ask.cards!, ask.h, ceil, floor, gap);
+    const job: Job = { key, steps, wanted: !!then, done: (t) => { this.solved.set(key, t); if (this.solved.size > 8) this.solved.delete(this.solved.keys().next().value!); then?.(); } };
     if (ahead) this.jobs.push(job); else this.jobs.unshift(job);
     this.run();
+    return job;
+  }
+
+  /** Steps `job` now for `budget` ms at most: its answer if it got there (the job is done then), else null (it goes on in
+   *  the page's idle time). */
+  private drive(job: Job, budget: number): FrameTarget | null {
+    const until = performance.now() + budget;
+    while (performance.now() < until) {
+      const r = job.steps.next();
+      if (r.done) { this.jobs = this.jobs.filter((j) => j !== job); this.solved.set(job.key, r.value); return r.value; }
+    }
     return null;
+  }
+
+  /** The framing estimated from the creature's projected bounds: the same solver, no render. */
+  private estimated(ask: FrameAsk, rest: boolean, pose: string, v: View): FrameTarget | null {
+    const { floor, ceil, gap } = stageBands(ask.h, ask.phone);
+    const probe: FrameProbe = { rows: (lift, zk) => this.estimate(v, { lift, zk }) ?? { top: 0, low: 0, lowAny: 0 }, slope: (zk) => this.slope(v, zk) };
+    void pose;
+    return rest ? capCentre(probe, 0, 0, ask.h, ceil, floor, gap, 0, ask.w, REST_ZK, REST_HEAD)
+      : capCentre(probe, Math.max(0, ask.cards!.above), ask.cards!.below, ask.h, ceil, floor, gap, ask.cards!.xa, ask.cards!.xb);
   }
 
   /** A turn's framing: fitted on the pose that opened it, as the reference fits it (the agent's reply and the person's
@@ -321,10 +404,10 @@ export class StageFramer {
   /** Steps the solves a trial render at a time, in the page's idle time (its layout, input and frames come first; a
    *  step waits SOLVE_WAIT_MS at most), while the creature can be drawn. */
   private run() {
-    if (this.running !== undefined) return;
+    if (this.running !== undefined || this.cancelIdle) return;
     const later = (fn: () => void, ms: number) => { this.running = setTimeout(fn, ms); };
     const idle = (fn: () => void) => {
-      if (typeof requestIdleCallback === "function") { const id = requestIdleCallback(fn, { timeout: SOLVE_WAIT_MS }); this.running = id as unknown as ReturnType<typeof setTimeout>; this.cancelIdle = () => cancelIdleCallback(id); }
+      if (typeof requestIdleCallback === "function") { const id = requestIdleCallback(fn, { timeout: SOLVE_WAIT_MS }); this.cancelIdle = () => cancelIdleCallback(id); }
       else later(fn, 16);
     };
     const tick = () => {
@@ -338,14 +421,25 @@ export class StageFramer {
     };
     idle(tick);
   }
-  private cancelIdle: (() => void) | null = null;
 
-  private prefetch(ask: FrameAsk, rest: boolean) {
-    const todo: Array<[boolean, string]> = rest ? [[false, "listening"], [false, "speaking"]] : ask.phone ? [] : [[true, "speaking"]];
-    for (const [r, pose] of todo) this.target({ ...ask, rest: r }, r, pose, undefined, true);
+  private prefetch(ask: FrameAsk, rest: boolean, v: View) {
+    const todo: Array<[boolean, string]> = rest ? [[false, "listening"], [false, "speaking"]] : ask.phone ? [] : [[true, this.host.mood() === "working" ? "working" : "idle"]];
+    for (const [r, pose] of todo) {
+      const a = { ...ask, rest: r }, key = this.keyOf(a, r, pose, v);
+      if (key && !this.solved.has(key)) this.job(a, r, pose, v, key, undefined, true);
+    }
   }
 
-  /** The camera to draw this frame with, eased a step toward the target (creator.js draw); whether it is still moving. */
+  /** The creature's lowest drawn row where it stands now (eased), css px of the tile: its projected bounds, moved by how
+   *  they differ from the pixels at the framings eased between (all of it at the target), and a px of care mid-way. */
+  private lowNow(v: View, est: Rows): number {
+    const e = this.ease, to = this.to!, p = e.span > 1e-6 ? Math.max(0, Math.min(1, 1 - Math.hypot(to.lift - this.cap.lift, to.zk - this.cap.zk) / e.span)) : 1;
+    return est.low + e.corrFrom + (e.corrTo - e.corrFrom) * p + (1 - p) * 2;
+  }
+
+  /** The camera to draw this frame with, eased a step toward the target (creator.js draw); whether it is still moving. Says
+   *  where the feet are drawn and the cards' floor: a gap under the creature as it stands now, so no card is ever over it
+   *  while it eases back for one. */
   step(): { zoom: number; lookY: number | undefined; moving: boolean } | null {
     const ask = this.frame.request, pose = this.host.mood() === "working" ? "working" : "idle";
     if (ask && (!this.to || pose !== this.pose)) { this.pose = pose; this.solve(); }
@@ -354,11 +448,30 @@ export class StageFramer {
     if (this.held) this.cap = { lift: to.lift, zk: to.zk };
     else if (this.cap.lift !== to.lift || this.cap.zk !== to.zk) this.cap = easeFraming(this.cap, to);
     const moving = this.cap.lift !== to.lift || this.cap.zk !== to.zk;
-    const box = this.box();
+    const box = this.box(), { gap } = stageBands(ask.h, ask.phone), est = this.estimate(v, this.cap);
     this.frame.feet(this.footAt(v, this.cap, box.h) + box.dy);
+    if (est) {
+      // Moving, it breathes and speaks a little below its key pose (a squash with the voice): room for that besides.
+      const sway = this.held ? 0 : (to.low - to.top) * MOTION_ROOM + 1;
+      const low = (moving ? this.lowNow(v, est) : to.low) + sway, reach = Math.max(0, (to.reach ?? to.low) - to.low);
+      this.frame.edge({ floor: low + gap, floorAny: low + reach + gap });
+    } else this.frame.edge(null);
     return { ...this.camera(v, this.cap), moving };
   }
 
   /** Forgets the framing solved (the canvas changed shape, or the creature's room did): solved again when next asked. */
-  invalidate() { this.key = ""; this.phone = null; this.solved.clear(); for (const j of this.jobs) j.steps.return(undefined as unknown as FrameTarget); this.jobs = []; this.solve(); }
+  invalidate() {
+    this.key = ""; this.phone = null; this.solved.clear();
+    for (const j of this.jobs) j.steps.return(undefined as unknown as FrameTarget);
+    this.jobs = [];
+    this.solve();
+  }
 }
+
+/** How long the first framing is solved for at once, on the pixels, before an estimate stands in for it. */
+const FIRST_BUDGET_MS = 600;
+/** How far a moving creature reaches below its key pose, a share of its drawn height (the rig's breathing, and its
+ *  squash with the voice: 0.045 at full voice against 0.027 in the key pose). */
+const MOTION_ROOM = 0.01;
+/** Care around the projected bounds (px): the estimate errs on the side of a larger creature. */
+const ESTIMATE_MARGIN = 3;

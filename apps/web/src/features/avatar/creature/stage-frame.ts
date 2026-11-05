@@ -145,6 +145,10 @@ export interface FrameSolved { target: FrameTarget; gap: number; below: number; 
    *  its poses. */
   belowAny: number }
 
+/** The cards' floor while the creature eases between framings, css px of the tile: a gap under its lowest drawn row as it
+ *  stands now (`floorAny`: under the lowest of the poses it may take while what the person sent shows). */
+export interface FrameEdge { floor: number; floorAny: number }
+
 /** The stage's framing channel: the stage says what it shows (FrameAsk); the creature host, which can draw trial framings,
  *  solves it and says where the cards go (FrameSolved) and where its feet are drawn. One per stage tile. */
 export class StageFrame {
@@ -153,6 +157,8 @@ export class StageFrame {
   /** What the stage reads: the answer, and whether its latest ask is still being solved (the answer is the last one). */
   private snap: { solved: FrameSolved | null; pending: boolean } = { solved: null, pending: false };
   private feetAt: number | null = null;
+  private edgeAt: FrameEdge | null = null;
+  private onEdge = new Set<(edge: FrameEdge | null) => void>();
   private onAsk = new Set<() => void>();
   private onSolved = new Set<() => void>();
   private onFeet = new Set<(feet: number | null) => void>();
@@ -170,11 +176,12 @@ export class StageFrame {
   listen(fn: () => void): () => void { this.onAsk.add(fn); return () => { this.onAsk.delete(fn); }; }
 
   /** The host's answer. */
-  solve(next: FrameSolved | null) {
+  /** The host's answer; `pending`: an estimate, its pixel solve still to come. */
+  solve(next: FrameSolved | null, pending = false) {
     const same = next === this.solved || (!!next && !!this.solved && next.key === this.solved.key && next.below === this.solved.below && next.above === this.solved.above && next.belowAny === this.solved.belowAny);
-    if (same && !this.snap.pending) return;
+    if (same && this.snap.pending === pending) return;
     this.solved = next;
-    this.snap = { solved: next, pending: false };
+    this.snap = { solved: next, pending };
     for (const fn of this.onSolved) fn();
   }
   /** The host is solving the latest ask: the answer stands until it has. */
@@ -195,6 +202,15 @@ export class StageFrame {
     for (const fn of this.onFeet) fn(next);
   }
   watchFeet(fn: (feet: number | null) => void): () => void { this.onFeet.add(fn); fn(this.feetAt); return () => { this.onFeet.delete(fn); }; }
+
+  /** The cards' floor where the creature stands now, as it eases (null: none drawn): no card goes over it. */
+  edge(next: FrameEdge | null) {
+    const was = this.edgeAt;
+    if (next === was || (next && was && Math.abs(next.floor - was.floor) < 0.25 && Math.abs(next.floorAny - was.floorAny) < 0.25)) return;
+    this.edgeAt = next;
+    for (const fn of this.onEdge) fn(next);
+  }
+  watchEdge(fn: (edge: FrameEdge | null) => void): () => void { this.onEdge.add(fn); fn(this.edgeAt); return () => { this.onEdge.delete(fn); }; }
 }
 
 function sameCards(a: FrameCards | null, b: FrameCards | null) {

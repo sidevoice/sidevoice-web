@@ -510,7 +510,7 @@ export class LiveCreature {
   }
 
   /** It has a frame to draw: a change not drawn yet, or motion (its own, the pointer's gaze, a startle). */
-  wantsFrames(): boolean { return !this.hidden && !seats[this.opts.framing].lost && (this.needDraw || this.active()) && !this.framer?.waiting(); }
+  wantsFrames(): boolean { return !this.hidden && !seats[this.opts.framing].lost && (this.needDraw || this.active()); }
 
   /** Whether `stage` is the one it is drawn by. */
   drawnBy(stage: RigStage | null): boolean { return stage === this.stage; }
@@ -520,8 +520,6 @@ export class LiveCreature {
     const { canvas } = this.opts;
     const on = this.active();
     if (!on && !this.needDraw) return false;
-    // Waiting for its first framing (the stage's): drawn once it has it (the framer asks for the frame then).
-    if (this.framer?.waiting()) { this.needDraw = true; return false; }
     // Its stage's context is gone: the canvas keeps its last frame, and it is drawn again when the context is back.
     if (seats[this.opts.framing].lost) { this.needDraw = true; return false; }
     // Nobody sees a canvas out of the page or with no box (a closed panel, the phone's hidden list): it is drawn when it
