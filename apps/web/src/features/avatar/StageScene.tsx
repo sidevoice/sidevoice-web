@@ -75,6 +75,11 @@ export function useSceneScale() {
  *  it from; its photo is the creature, laughing (creature/host.ts posterPortrait). A `live` scene (the stage's) lets the
  *  poster move where the page's drawings move; anywhere else it holds still. Decoration: the stage's agent says its state.
  *  The canvas's fallback content is what the poster says. */
+const noWatch = () => () => {};
+/** A portrait the scene's stage could not render while it can draw (its context taken for a moment) is asked for again
+ *  this often, this many times. */
+const PORTRAIT_RETRY_MS = 1000, PORTRAIT_TRIES = 5;
+
 export function StageBackdrop({ seed, tone, live, feet = SCENE_GROUND, poster }: { seed: string; tone: string; live?: boolean; feet?: number;
   poster?: { words: PosterWords; language: string } }) {
   const page = usePageTheme();
@@ -91,6 +96,12 @@ export function StageBackdrop({ seed, tone, live, feet = SCENE_GROUND, poster }:
   const { host, failed } = useSyncExternalStore(watchCreatureHost, creatureHostNow);
   const offline = !!poster;
   useEffect(() => { if (offline && !creatureHostNow().host) loadCreatureHost().catch(() => {}); }, [offline]);
+  // The portrait is rendered on the scene's stage: where that stage cannot draw (its context lost, refused), the poster's
+  // photo is the fallback's outline, and the portrait is asked for again when the stage can draw again (the host says
+  // so: onCreaturesChange), or, for a context taken for a moment and given back before the host counts it as down, a
+  // few times a second apart.
+  const drawable = useSyncExternalStore(host?.onCreaturesChange ?? noWatch, () => host?.creaturesDrawable("scene") ?? true);
+  const [again, setAgain] = useState(0);
   const paperSeed = posterSeed(choice), bounty = poster ? posterBounty(paperSeed, poster.language) : "";
   // The words by what they say: a caller may make them afresh on each render.
   const words = poster ? JSON.stringify(poster.words) : "";
@@ -102,9 +113,14 @@ export function StageBackdrop({ seed, tone, live, feet = SCENE_GROUND, poster }:
   }, []);
   useLayoutEffect(() => {
     // Offline, the poster once the host has loaded (or could not: its photo is then the fallback's outline).
-    const shown = words && (host || failed) ? { seed: paperSeed, words: JSON.parse(words) as PosterWords, bounty, portrait: host?.posterPortrait(seed) ?? null, color: choice.color } : null;
+    const portrait = words && host ? host.posterPortrait(seed) : null;
+    const shown = words && (host || failed) ? { seed: paperSeed, words: JSON.parse(words) as PosterWords, bounty, portrait, color: choice.color } : null;
     painter.current?.set({ id, tone, dark: theme === "dark", feet, poster: shown, moving });
-  }, [id, tone, theme, feet, words, bounty, paperSeed, host, failed, seed, choice.color, moving]);
+    if (portrait && again) setAgain(0); // drawn: a later loss gets its tries afresh
+    if (!words || !host || portrait || !drawable || again >= PORTRAIT_TRIES) return;
+    const timer = setTimeout(() => setAgain((n) => n + 1), PORTRAIT_RETRY_MS);
+    return () => clearTimeout(timer);
+  }, [id, tone, theme, feet, words, bounty, paperSeed, host, failed, seed, choice.color, moving, drawable, again]);
   return <div ref={ref} className="stage-backdrop" data-backdrop={id} data-hang={hangOf(id)} data-poster={poster ? "" : undefined} aria-hidden="true">
     <canvas ref={canvas}>{poster && <span className="wanted">
       <span>{poster.words.title}</span> <span className="w-name">{poster.words.status}</span> <span className="w-bounty">{bounty}</span>
