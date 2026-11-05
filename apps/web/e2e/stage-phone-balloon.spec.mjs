@@ -37,6 +37,18 @@ const STATES = {
   "working-sent": [working, listening, sent],
 };
 
+/** The stage's framing settled: solved (the layer says so where the browser draws the creature) and the creature standing
+ *  still there (its feet, as the framing keeps them, unchanged a moment). The cards go straight to where it will stand. */
+async function settled(page) {
+  await page.locator(".stage-tile .stage-voice[data-framed]").waitFor({ timeout: 60_000 }).catch(() => {});
+  let last = null;
+  for (let i = 0, same = 0; i < 80 && same < 3; i++) {
+    const now = await page.evaluate(() => document.querySelector(".stage-tile .stage-canvas")?.style.getPropertyValue("--stage-feet") ?? "");
+    same = now === last ? same + 1 : 0; last = now;
+    await page.waitForTimeout(300);
+  }
+}
+
 async function onStage(page, theme, state) {
   await installHarness(page, { participants: { first: [conversation] } });
   // The call below is the page's own state, not a room's: the room would answer its binding poll (/api/presentation,
@@ -62,7 +74,8 @@ async function onStage(page, theme, state) {
   await page.evaluate((insets) => {
     for (const [side, px] of Object.entries(insets)) document.documentElement.style.setProperty(`--sv-inset-${side}`, `calc(${px}px + 0px)`);
   }, INSETS);
-  for (const facts of STATES[state]) {
+  for (const [i, facts] of STATES[state].entries()) {
+    if (state.endsWith("sent") && i === STATES[state].length - 1) await settled(page);
     await page.evaluate((facts) => window.sidevoiceUI.store.patch(facts), facts(key));
     // The turns' hooks read each step as they render it (a sent turn is shown only after the bars were).
     await page.waitForTimeout(250);
@@ -70,17 +83,9 @@ async function onStage(page, theme, state) {
   // Where a state has one, its balloon is up before it is measured (a slow runner takes its time), and it pops in over
   // 460ms: measure it where it stands.
   if (state !== "idle" && state !== "working") await page.locator(".stage-tile .stage-voice > .vcap:not(.meas)").first().waitFor({ timeout: 10_000 });
-  await page.waitForTimeout(900);
-  // The creature eases into the turn's framing (the cards go straight to where it will stand): measured once it is solved
-  // (the layer says so where the browser draws the creature) and the creature stands still there (its feet, as the stage's
-  // framing keeps them, unchanged a moment).
-  await page.locator(".stage-tile .stage-voice[data-framed]").waitFor({ timeout: 60_000 }).catch(() => {});
-  let last = null;
-  for (let i = 0, same = 0; i < 80 && same < 3; i++) {
-    const now = await page.evaluate(() => document.querySelector(".stage-tile .stage-canvas")?.style.getPropertyValue("--stage-feet") ?? "");
-    same = now === last ? same + 1 : 0; last = now;
-    await page.waitForTimeout(300);
-  }
+  // What was sent shows PAGE_MS: measured as it lands, the framing having settled while the person spoke (above).
+  if (state.endsWith("sent")) await page.waitForTimeout(300);
+  else { await page.waitForTimeout(900); await settled(page); }
 }
 
 /** The boxes on the stage, in the page's own pixels, and the creature as drawn under them: its canvas's drawn pixels inside
@@ -164,23 +169,22 @@ for (const [name, viewport] of [["440x956", { width: 440, height: 956 }], ["390x
 test.describe("desktop", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
   for (const state of ["listening", "transcribing", "sent", "working-listening"]) {
-    test(`${state}: the stage is not laid out for a phone: the balloon stays in the tile's corner and the agent does not move`, async ({ page }) => {
+    test(`${state}: the person's card is centred under the creature and clear of it, and the agent's box does not move`, async ({ page }) => {
       await onStage(page, "light", state);
       if (SHOTS) { mkdirSync(SHOTS, { recursive: true }); await page.screenshot({ path: path.join(SHOTS, `1280x800-light-${state}.png`) }); }
       const m = await measure(page);
       expect(m.balloons.length).toBe(1);
-      const [balloon] = m.balloons;
-      // At the tile's foot, on its right (beside the transcript's button, which a desktop keeps at the call bar's right):
-      // the stage's inset (16 of a 600px-tall slide, scaled by the tile) from its edges.
-      const inset = m.tile.height / 600 * 440 / 440 * 16;
-      expect(Math.abs(m.tile.right - balloon.right - inset), `right ${JSON.stringify({ balloon, tile: m.tile })}`).toBeLessThanOrEqual(2);
-      expect(Math.abs(m.tile.bottom - balloon.bottom - inset), "bottom").toBeLessThanOrEqual(2);
-      // The tile's own size for it (--person-live-w: 272 of the slide), as it always was.
-      expect(Math.abs(balloon.width - 272 * m.tile.height / 600), "width").toBeLessThanOrEqual(2);
-      // No lift: the agent keeps its place.
-      const lift = await page.evaluate(() => ({ agent: getComputedStyle(document.querySelector(".stage-agent")).translate, lift: getComputedStyle(document.querySelector(".stage-tile")).getPropertyValue("--person-lift").trim() }));
-      expect(["none", "0px", "0px 0px"], JSON.stringify(lift)).toContain(lift.agent);
-      expect(lift.lift).toBe("0px");
+      const [card] = m.balloons;
+      // Centred on the tile, under the creature (the design reference's 'place': both turns below it).
+      expect(Math.abs((card.left + card.right) / 2 - (m.tile.left + m.tile.right) / 2), JSON.stringify({ card, tile: m.tile })).toBeLessThanOrEqual(1.5);
+      expect(card.bottom, "inside the tile").toBeLessThanOrEqual(m.tile.bottom + 0.5);
+      for (const drawn of m.drawn ?? []) {
+        expect(drawn.over, "the creature's pixels under the card").toBe(0);
+        if (drawn.gap != null) expect(drawn.gap, "the gap to the creature").toBeGreaterThanOrEqual(Math.max(14, m.tileHeight * 0.035) - 1.5);
+      }
+      // The stage's framing moves the creature by its camera: its box never moves.
+      const agent = await page.evaluate(() => getComputedStyle(document.querySelector(".stage-agent")).translate);
+      expect(["none", "0px", "0px 0px"]).toContain(agent);
     });
   }
 });
