@@ -108,7 +108,11 @@ export class StagePainter {
     const o: LayOptions = { W, PX: H, id, hang, place, art: this.art.canvas, ground, drawBg: (box, t) => drawBg(box, t) };
     layPoster(g, o, 0);
     // it floats in space, and on the clouds it sways under the balloons, while the page's drawings move
-    if (input.moving && posterMoves(id, hang)) { const t0 = nowS(); this.timer = setInterval(() => layPoster(g, o, nowS() - t0), 50); }
+    // (the reference's 50 ms timer, from the moment it is drawn; nothing is drawn while nobody can see the canvas)
+    if (input.moving && posterMoves(id, hang)) {
+      const t0 = nowS(), shown = () => this.canvas.isConnected && this.canvas.getClientRects().length > 0;
+      this.timer = setInterval(() => { if (shown()) layPoster(g, o, nowS() - t0); }, 50);
+    }
   }
 
   dispose() {
