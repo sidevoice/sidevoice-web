@@ -135,3 +135,15 @@ test("what a provider refuses with is five distinct sentences, each followed by 
   expect(en("voice.failure.permission-missing")).toMatch(/missing a permission.*text to speech/);
   expect(en("voice.failure.plan-not-allowed")).toMatch(/plan doesn't allow/);
 });
+
+test("the room's absent-device refusal is said in this page's words, in every language, never as the machine's sentence or as a browser", () => {
+  const refusal = { key: "room.browser_absent", message: "That browser is not in the call." };
+  expect(roomFailure(refusal, { t: en })).toEqual({ text: "This device is no longer in the call. Tap to join again." });
+  expect(roomFailure(refusal, { t: es }).text).toBe("Este dispositivo ya no está en la llamada. Pulsa para volver a entrar.");
+  for (const language of UI_LANGUAGES) {
+    const t = translator(language);
+    expect(roomFailure(refusal, { t }).text, language).toBe(t("room.failure.deviceAbsent"));
+    expect(t("room.failure.deviceAbsent") + t("room.failure.deviceAbsentRejoining"), language).not.toMatch(/browser/i);
+  }
+  expect(en("room.failure.deviceAbsentRejoining")).toBe("This device is no longer in the call. Joining again…");
+});

@@ -22,7 +22,7 @@ import {createTurnRelay} from './turn-relay.js';
 import {turnMessage,playbackReport,sayingRange} from './voice-room.js';
 import {replyEligibility} from './reply-eligibility.js';
 import {playbackHearing,writtenReplyHearing} from './reply-hearing-policy.js';
-import {refusalError} from './refusals.js';
+import {refusalError,shouldRejoin,DEVICE_ABSENT} from './refusals.js';
 import {followWorking} from './working-clock.ts';
 import {shortcut} from '../state/shortcuts.ts';
 import {watchAudioDeviceRefresh} from './audio-device-refresh.ts';
@@ -616,9 +616,27 @@ function historyThreadId(){return viewedOf(state)}
 
 // A refusal is a sentence, or a key with its sentence (sidevoice-core's refusals): rejected with both, for `roomError`
 // to say by its key — the sentence, in whatever language it came, only behind Details.
-async function api(path,options,fp=state.callNode){const token=pairings.list.find(p=>p.fp===fp)?.token,r=await request(path,options,fp);
+async function api(path,options,fp=state.callNode){const lived=state.sessionId,token=pairings.list.find(p=>p.fp===fp)?.token,r=await request(path,options,fp);
  // A 401 is the machine refusing this token, said at once, not once the pairing is saved as revoked; a pairing replaced meanwhile is not accused.
- if(r.status===401)throw worded(unreached(roomStore.getState().facts,fp,pairings.list.find(p=>p.fp===fp)?.token===token));const d=await r.json();if(!r.ok)throw refusalError(d.detail);return d}
+ if(r.status===401)throw worded(unreached(roomStore.getState().facts,fp,pairings.list.find(p=>p.fp===fp)?.token===token));const d=await r.json();if(!r.ok)throw refusedRequest(d.detail,fp,lived);return d}
+// The room no longer has this device in the call (`room.browser_absent`): its session was dropped, the machine restarted
+// or the call moved to no conversation. The call is taken again the way a dropped socket's is, on a new session; what the
+// refused request says meanwhile is this page's own sentence, never the machine's.
+function refusedRequest(detail,fp,lived){
+ const refusal=refusalError(detail);
+ if(refusal.key!==DEVICE_ABSENT)return refusal;
+ const rejoin=shouldRejoin(refusal,{inCall:fp===state.callNode&&!!state.ws&&!!state.sessionId&&!state.connecting,sameSession:lived===state.sessionId,reconnecting:state.reconnecting});
+ if(!rejoin)return refusal;
+ rejoinAbsent();
+ return worded(bundled('room.failure.deviceAbsentRejoining').text);
+}
+function rejoinAbsent(){
+ const epoch=connectEpoch,socket=state.ws;
+ // The old session is gone for the room: nothing to resume, and its socket is let go as a hang-up.
+ resumeToken=null;state.ws=null;
+ if(socket){socket.onclose=socket.onmessage=socket.onerror=null;try{socket.close(1000)}catch{}}
+ void lostConnection(null,epoch);
+}
 const post=(path,body,fp=state.callNode)=>api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)},fp);
 /* ----- what the call owes its machine: the outbox (`outbox.js`) -----
  * A turn of the person's and what became of a reply are each one message with its own `client_msg_id`, which the machine
@@ -1835,6 +1853,8 @@ function recordMessage(raw, socket) {
         }
     }
     if (t === 'error') {
+        // The room no longer has this session: the call is taken again on a new one, not failed.
+        const absent=shouldRejoin(d,{inCall:socket===state.ws&&!!state.sessionId&&!state.connecting,sameSession:true,reconnecting:state.reconnecting});
         // A refusal of one of this page's own messages is about that message (`turn-relay.js`): a turn the room has no
         // room for yet (`room.turns_full`) is kept, words and all, and started again once another ends; any other
         // refused start makes its turn's words go as said while away; the rest is the room keeping its own books.
@@ -1847,10 +1867,12 @@ function recordMessage(raw, socket) {
                 keepMessage('user-turn', 'voice-user-turn', words);
             flushOutbox();
             drainReplies();
-            if(!QUIET_REFUSALS.has(d.key)&&!machineAway(d))setRoomError(roomError(refusalError(d)));
+            if(absent)rejoinAbsent();
+            else if(!QUIET_REFUSALS.has(d.key)&&!machineAway(d))setRoomError(roomError(refusalError(d)));
             return;
         }
-        if(!machineAway(d))setRoomError(roomError(refusalError(d)));
+        if(absent)rejoinAbsent();
+        else if(!machineAway(d))setRoomError(roomError(refusalError(d)));
     }
 }
 /* ----- the voice's reports -----
