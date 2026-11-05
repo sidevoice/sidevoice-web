@@ -79,10 +79,12 @@ export class StagePainter {
 
   set(input: PaintInput) { this.input = input; this.fit(); this.paint(); }
 
-  /** The canvas takes its box's shape, 960 px tall (the creator's preview), so nothing is stretched; whether it changed. */
+  /** The canvas takes its box's shape, 960 px tall (the creator's preview), so nothing is stretched; whether it changed.
+   *  A canvas with no box (not laid out, or hidden) is painted once it has one (its box observer). */
   private fit(): boolean {
-    const { canvas } = this, box = canvas.getBoundingClientRect(), ar = box.width > 0 && box.height > 0 ? box.width / box.height : 1.5;
-    const W = Math.round(STAGE_PX * ar), H = STAGE_PX, key = W + "x" + H;
+    const { canvas } = this, box = canvas.getBoundingClientRect();
+    if (!(box.width > 0 && box.height > 0)) return false;
+    const W = Math.round(STAGE_PX * (box.width / box.height)), H = STAGE_PX, key = W + "x" + H;
     if (key === this.sized) return false;
     this.sized = key;
     if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
@@ -92,8 +94,9 @@ export class StagePainter {
   private paint() {
     clearInterval(this.timer);
     this.timer = undefined;
+    if (!this.input || !this.sized) return;
     const input = this.input, g = this.canvas.getContext("2d");
-    if (!input || !g) return;
+    if (!g) return;
     const W = this.canvas.width, H = this.canvas.height, feet = input.feet * H, { id, tone, dark } = input;
     // the creator's drawBg: the backdrop, its ground line under the creature's feet (and, for a poster, its mount)
     const drawBg = (poster?: PosterBox, t = 0) => { g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H); drawBackdrop(g, W, H, id, { tone, dark, feet, poster, t }); };
