@@ -42,10 +42,17 @@ async function setHidden(page, hidden) {
   }, hidden);
 }
 
+/** What the paired machine says of its conversation's work: the room asks again every few seconds (its machines' beat) and takes
+ *  the machine's word, so a state only patched into the page is gone at the next beat, which on a slow runner falls inside the
+ *  spec. `working` is null while it says nothing. */
+const machines = new WeakMap();
+
 async function inCall(page, presence) {
   await page.addInitScript(watchWebAudio);
   await page.addInitScript((presence) => localStorage.setItem("sidevoice.call-preferences", JSON.stringify({ presence, keepAwake: false })), presence);
-  await installHarness(page, { participants: { first: [conversation] } });
+  const machine = { working: null };
+  machines.set(page, machine);
+  await installHarness(page, { participants: { get first() { return [{ ...conversation, working: machine.working }]; } } });
   // The call is the page's own state: nothing answers the room's binding poll, which would end it.
   await page.route((url) => url.pathname === "/api/presentation", (route) => route.abort());
   await page.goto("/voice/");
@@ -64,8 +71,11 @@ async function inCall(page, presence) {
   });
 }
 
-const work = (page, key, busy) => page.evaluate(({ key, busy }) => window.sidevoiceUI.store.patch(busy
-  ? { harness: { [key]: true }, workingSince: { [key]: 0 }, now: 60_000 } : { harness: { [key]: false }, workingSince: {} }), { key, busy });
+const work = (page, key, busy) => {
+  machines.get(page).working = busy;
+  return page.evaluate(({ key, busy }) => window.sidevoiceUI.store.patch(busy
+    ? { harness: { [key]: true }, workingSince: { [key]: 0 }, now: 60_000 } : { harness: { [key]: false }, workingSince: {} }), { key, busy });
+};
 
 const playing = (page) => page.evaluate(() => window.__breath.playing());
 

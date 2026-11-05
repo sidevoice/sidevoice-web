@@ -5,9 +5,12 @@ import { conversation } from "./motion-states.mjs";
 // Playwright hides Chromium's scrollbars by default. These checks must exercise the real scrollport.
 test.use({ launchOptions: { ignoreDefaultArgs: ["--hide-scrollbars"] } });
 const people = Array.from({ length: 20 }, (_, i) => conversation(i + 1));
+// A few, for the specs that need the list to fit the window first: a card is two lines of a conversation's creature and
+// state (about 90 px with its gap), so twenty need 1800 px and more; eight fit in a 1800 px window with the rest of the sidebar.
+const few = people.slice(0, 8);
 
-async function openList(page, theme = "light") {
-  await installHarness(page, { participants: { first: people } });
+async function openList(page, theme = "light", list = people) {
+  await installHarness(page, { participants: { first: list } });
   await page.addInitScript((theme) => {
     localStorage.setItem("sidevoice.appearance", theme);
     localStorage.setItem("sidevoice.motion", "still");
@@ -36,7 +39,9 @@ const geometry = (page) => page.locator("#participants").evaluate((el) => {
 
 for (const theme of ["light", "dark"]) {
   test(`${theme}: expanded cards leave room for the scrollbar through window resizes`, async ({ page }, testInfo) => {
-    test.setTimeout(60_000);
+    // Six sizes, each with a screenshot, and each resize has the stage solve its framing again on the pixels: the creature's
+    // trial renders (about 70 ms a frame in a software GL) share the thread this spec reads the list's geometry on.
+    test.setTimeout(120_000);
     await page.setViewportSize({ width: 1100, height: 700 });
     await openList(page, theme);
     for (const width of [1440, 1100, 900, 899, 700, 390]) {
@@ -65,7 +70,7 @@ for (const theme of ["light", "dark"]) {
 
 test("classic scrollbar appearance does not change card width", async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 1800 });
-  await openList(page);
+  await openList(page, "light", few);
   const before = await geometry(page);
   expect(before.overflow).toBe(false);
   await page.setViewportSize({ width: 1100, height: 400 });
@@ -84,7 +89,7 @@ test("cards keep their width without scrollbar-gutter support", async ({ page })
     await route.fulfill({ response, body: css });
   });
   await page.setViewportSize({ width: 1100, height: 1800 });
-  await openList(page);
+  await openList(page, "light", few);
   const list = page.locator("#participants");
   const before = await geometry(page);
   expect(before.overflow).toBe(false);
