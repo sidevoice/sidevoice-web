@@ -2893,7 +2893,7 @@ test('A refusal after its acknowledgement still finds the start it refuses, and 
  const id=turnSent(c,c.first,'turn','started')[0].client_msg_id;
  // The room acknowledges a message before it answers or refuses it.
  c.push(c.first,{type:'voice-ack',data:{client_msg_id:id}});
- c.push(c.first,{type:'error',data:{client_msg_id:id,key:'room.browser_absent'}});
+ c.push(c.first,{type:'error',data:{client_msg_id:id,key:'room.start_refused'}});
  voice.emit('turn',finished('turn','words'));
  assert.equal(turnSent(c,c.first,'turn','finished')[0].offline,true,'its words go as said while away');
  s.run('disconnect()');
@@ -4665,4 +4665,77 @@ test('A conversation whose replies are still pending 60 s after the close is clo
  await new Promise(resolve=>setTimeout(resolve,120));await settleSoon();
  assert.deepEqual(peopleOf(c),[],'the reply never ended, the conversation goes');
  c.s.run('disconnect()');
+});
+// ----- the room no longer has this device in the call (core `room.browser_absent`) -----
+const absentAnswer=()=>({ok:false,status:409,json:async()=>({detail:{key:'room.browser_absent',message:'That browser is not in the call.'}})});
+test('Refused as absent from the call, the page rejoins on a new session, saying its own words and never the machine\'s',async()=>{
+ const c=await callOnRoom();const {s}=c,shown=[];
+ s.context.window.sidevoiceUI=new Proxy({setBootError:value=>shown.push(value)},{get:(ui,name)=>name in ui?ui[name]:()=>{}});
+ s.context.fetch=async()=>absentAnswer();
+ const error=await s.run("post('/api/presentation/text',{text:'hi'})").then(()=>null,e=>e);
+ assert.equal(error.message,'This device is no longer in the call. Joining again…');
+ assert.doesNotMatch(JSON.stringify(s.run('roomError')(error)),/browser/i);
+ assert.equal(s.run('state.reconnecting'),true,'the existing reconnect path is taken');
+ await c.until(()=>c.sockets.length===2,'a new socket');
+ assert.equal(c.frames(c.sockets[1]).find(f=>f.type==='client-ready')?.data.resume,undefined,'nothing of the lost session is resumed');
+ s.context.fetch=async path=>({ok:true,status:200,json:async()=>path.includes('/participants')?{participants:[{thread_id:'a',title:'A',available:true,reach:{state:'listening'},epoch:0}]}:{binding:{thread_id:'a',title:'A',binding_id:'b'},room:{revision:0},clients:[],call:null,messages:[]}});
+ await c.answer({session_id:'s2',resume:{token:'tok-b',seconds:60},resumed:false});
+ await c.until(()=>!s.run('state.reconnecting'),'back in the call');
+ assert.equal(s.run('state.sessionId'),'s2');
+ assert.equal(c.sockets.length,2,'one rejoin, no loop');
+ s.run('disconnect()');
+});
+test('A refusal of a request made under an earlier session, or while already rejoining, starts no rejoin',async()=>{
+ const c=await callOnRoom();const {s}=c;
+ s.context.fetch=async()=>absentAnswer();
+ const late=s.run("(()=>{const p=post('/api/presentation/text',{});sessionId='s-newer';return p})()");
+ const error=await late.then(()=>null,e=>e);
+ assert.equal(error.key,'room.browser_absent');
+ assert.equal(s.run('state.reconnecting'),false);
+ assert.equal(c.sockets.length,1);
+ s.run("sessionId='s1'");
+ await s.run("post('/api/presentation/text',{})").then(()=>null,()=>null);
+ assert.equal(s.run('state.reconnecting'),true);
+ await s.run("post('/api/presentation/text',{})").then(()=>null,()=>null);
+ await settleSoon();
+ assert.equal(c.sockets.length<=2,true,'a second refusal while rejoining adds no second rejoin');
+ s.run('disconnect()');
+});
+test('A rejoin that is itself refused for good ends the call with a failure in this page\'s words',async()=>{
+ const c=await callOnRoom();const {s}=c;
+ s.context.fetch=async()=>absentAnswer();
+ await s.run("post('/api/presentation/text',{})").then(()=>null,()=>null);
+ await c.until(()=>c.sockets.length===2,'a new socket');
+ const socket=c.sockets[1];socket.readyState=1;socket.onopen();
+ socket.onmessage({data:JSON.stringify({type:'error',data:{key:'room.browser_absent',message:'That browser is not in the call.'},seq:1,trace:{id:'t'}})});
+ socket.onclose({code:1008});
+ await c.until(()=>!s.run('state.reconnecting'),'rejoin over');
+ const view=s.run('roomStore.getState()');
+ assert.equal(view.facts?.joinFailure??s.run('state.joinFailure'),'This device is no longer in the call. Tap to join again.');
+ assert.equal(s.run('state.joinFailureDetails'),'','the machine\'s sentence is not shown, not even behind Details');
+ assert.equal(c.sockets.length,2,'no loop');
+ assert.equal(s.run('state.ws'),null);
+ s.run('disconnect()');
+});
+test('Absent-from-call refusals rejoin only for a page in a call, on its own session, and not twice',()=>{
+ const s=setup();const {shouldRejoin}=s.run('Refusals');
+ const page={inCall:true,sameSession:true,reconnecting:false};
+ assert.equal(shouldRejoin({key:'room.browser_absent'},page),true);
+ assert.equal(shouldRejoin({detail:'x',key:'room.turns_full'},page),false);
+ assert.equal(shouldRejoin('That browser is not in the call.',page),false,'a sentence with no key is no decision');
+ for(const off of ['inCall','sameSession'])assert.equal(shouldRejoin({key:'room.browser_absent'},{...page,[off]:false}),false,off);
+ assert.equal(shouldRejoin({key:'room.browser_absent'},{...page,reconnecting:true}),false);
+});
+test('A message refused as absent from the call rejoins, keeping its words for the new session instead of failing the call',async()=>{
+ const c=await callOnRoom();const {s,voice}=c;
+ voice.emit('turn',started('turn'));
+ const id=turnSent(c,c.first,'turn','started')[0].client_msg_id;
+ c.push(c.first,{type:'error',data:{client_msg_id:id,key:'room.browser_absent',message:'That browser is not in the call.'}});
+ assert.equal(s.run('state.reconnecting'),true);
+ await c.until(()=>c.sockets.length===2,'a new socket');
+ voice.emit('turn',finished('turn','words'));
+ const {socket}=await c.answer({session_id:'s2',resume:{token:'tok-b',seconds:60},resumed:false});
+ await c.until(()=>turnSent(c,socket,'turn','finished').length===1,'its words on the new session');
+ assert.equal(s.run('state.joinFailure'),'');
+ s.run('disconnect()');
 });
