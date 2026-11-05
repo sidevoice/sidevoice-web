@@ -694,3 +694,47 @@ export function faceImage(seed: string, expr: string): Promise<HTMLCanvasElement
     job.done.add((face) => resolve(face));
   });
 }
+
+// ---------- the offline poster's portrait ----------
+// The wanted poster's photo (../scene/poster.js): the creature laughing — smiling eyes and a big open grin, facing straight
+// on, without its floor shadow — rendered on the scene's stage into a 768 px square, and measured from its pixels (hats
+// and ears included), as the creator's posterPortrait draws it (reference/2026-11-04/src/creator.js). Kept per creature:
+// the poster is drawn again on every resize and theme change, the portrait is not.
+const PORTRAIT_PX = 768;
+const portraits = new Map<string, { img: HTMLCanvasElement; box: [number, number, number, number] }>();
+/** The poster's portrait of `seed`'s creature (`choice`: one picked by hand), or null where the stage cannot draw. */
+export function posterPortrait(seed: string, choice?: CreatureChoice): { img: HTMLCanvasElement; box: [number, number, number, number] } | null {
+  const key = choice ? JSON.stringify(choice) : seed, ready = portraits.get(key);
+  if (ready) return ready;
+  const stage = stageOf("scene");
+  if (!stage || seats.scene.lost) return null;
+  const off = document.createElement("canvas"); off.width = off.height = PORTRAIT_PX;
+  const item = stage.add(rigSpec(choice ?? creatureFromSeed(seed)), off, { off: 0 });
+  // Stage.draw takes the canvas's shape: the stage is put back as it was after (its creature is drawn at its own shape).
+  const s = stage as Stage & { floor: { visible: boolean }; camera: Stage["camera"] }, keep = { w: stage.w, h: stage.h, aspect: stage.camera.aspect };
+  const c = item.c as Creature3D & { contact?: { visible: boolean }; setProps(kind: null): void };
+  try {
+    item.spec.state = undefined; item.spec.expr = "happy"; c.setProps(null); item.opts.zoom = 1.5; item.opts.turn = 0; item.opts.lookY = undefined;
+    // very happy: smiling eyes (the happy lower-lid curve, relaxed lids) and a big open grin, facing straight on
+    item.opts.extra = { expr: "happy", bot: 0.42, lid: 0.06, grin: true, gx: 0, gy: 0, tilt: 0, dx: 0, dy: 0, breathe: 0, squash: 0 };
+    s.floor.visible = false; if (c.contact) c.contact.visible = false;
+    stage.draw(item, 0, 0.7, true);
+  } finally {
+    s.floor.visible = true;
+    dispose(item, stage);
+    if (stage.w !== keep.w || stage.h !== keep.h) { stage.w = keep.w; stage.renderer.setSize(keep.w, keep.h); }
+    stage.camera.aspect = keep.aspect; stage.camera.updateProjectionMatrix();
+  }
+  // its real extent (hats and ears included), from the pixels
+  const g = off.getContext("2d");
+  if (!g) return null;
+  const d = g.getImageData(0, 0, off.width, off.height).data; let x0 = off.width, y0 = off.height, x1 = 0, y1 = 0;
+  for (let y = 0; y < off.height; y += 2) for (let x = 0; x < off.width; x += 2) if (d[(y * off.width + x) * 4 + 3] > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  const portrait = { img: off, box: (x1 > x0 ? [x0, y0, x1 - x0 + 2, y1 - y0 + 2] : [0, 0, off.width, off.height]) as [number, number, number, number] };
+  if (portraits.size >= 8) portraits.delete(portraits.keys().next().value!);
+  portraits.set(key, portrait);
+  return portrait;
+}
+
+// The microphone permission hero (the setup's permissions step, Settings › Permissions): its own stage, in this chunk.
+export { mountMicHero, type MicHero } from "./mic-hero";

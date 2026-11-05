@@ -1,14 +1,12 @@
 import { createHash } from "node:crypto";
 import { expect, test } from "vitest";
-import { backdropFromSeed, backdropSvg } from "./engine/backdrop";
 import { uid, type Size } from "./engine/core";
 import { renderSpec } from "./engine/bichos/render";
 import { normalizeSpec } from "./engine/bichos/spec";
 import { renderMascot } from "./engine/styles/bichos";
-import { creatureFromSeed } from "./creature/catalogue";
 
-/* The engine draws the person, the Sidevoice mascot and the stage's backdrops (a conversation's agent is its creature:
- * creature/). It is edited in place, so what it draws is held to a committed snapshot: one line per drawing, the markup's
+/* The engine draws the person and the Sidevoice mascot (a conversation's agent is its creature: creature/; the stage's
+ * backdrops are scene/). It is edited in place, so what it draws is held to a committed snapshot: one line per drawing, the markup's
  * hash and length. Any change that moves a drawing (a part, a roll, the renderer, a cue) shows in review as the lines it
  * moved in __snapshots__/engine-render.txt; a change that is meant is accepted with
  * `npx vitest run -u src/features/avatar/engine-render.test.ts` (from apps/web). It was first written from a run that
@@ -18,9 +16,9 @@ import { creatureFromSeed } from "./creature/catalogue";
 
 const SIZES: Size[] = ["stage", "sidebar", "rail"];
 
-/** The markup with its per-drawing id prefix (`bx<n>`, `bd<n>`: the n-th drawing this module made) taken out, so a
- *  drawing's line does not depend on how many were drawn before it. */
-function stable(prefix: "bx" | "bd", draw: () => string): string {
+/** The markup with its per-drawing id prefix (`bx<n>`: the n-th drawing this module made) taken out, so a drawing's
+ *  line does not depend on how many were drawn before it. */
+function stable(prefix: "bx", draw: () => string): string {
   const counter = (parseInt(uid(""), 36) + 1).toString(36);
   const html = draw();
   const own = html.replaceAll(`${prefix}${counter}`, `${prefix}#`);
@@ -31,14 +29,7 @@ function stable(prefix: "bx" | "bd", draw: () => string): string {
 const line = (name: string, html: string) => `${name} ${createHash("sha256").update(html).digest("hex").slice(0, 16)} ${html.length}`;
 
 function sample(): string[] {
-  // Conversation ids as the app has them, and an odd one.
-  const seeds = [...Array.from({ length: 20 }, (_, i) => `thread-${i}`), "t-login", "7f3c2a91-thread", "Ünïcødé ✓"];
   const lines: string[] = [];
-  // The backdrop a seed rolls, on each theme, tinted with its creature's colour.
-  for (const seed of seeds) {
-    const tone = creatureFromSeed(seed).color, id = backdropFromSeed(seed);
-    for (const theme of ["dark", "light"] as const) lines.push(line(`${seed} backdrop ${id} ${theme}`, stable("bd", () => backdropSvg(id, tone, theme))));
-  }
   // The person (the old person avatar, in the cast's style: as bicho-draw.ts pins it), with and without the microphone,
   // and the mascot.
   for (const hold of [undefined, "microphone"] as const) {
@@ -55,7 +46,7 @@ function sample(): string[] {
   return lines;
 }
 
-test("the engine draws what it drew: a sample of seeds, sizes and scenes holds to its snapshot", async () => {
+test("the engine draws what it drew: a sample of figures and sizes holds to its snapshot", async () => {
   await expect(sample().join("\n") + "\n").toMatchFileSnapshot("./__snapshots__/engine-render.txt");
 });
 

@@ -1,20 +1,17 @@
 import { useCallback, useMemo, useRef, useLayoutEffect, useState } from "react";
-import { backdropFromSeed, backdropSvg } from "./engine/backdrop";
-import { rng } from "./engine/core";
-import type { AvatarSpec } from "./avatar-spec";
 import { useMotion } from "../../lib/motion";
 import { usePageTheme } from "../../lib/theme";
-import { stillAvatar } from "./avatar-state";
-import { CharacterAvatar } from "./CharacterAvatar";
-import { useLayers } from "./layers";
+import { creatureFromSeed } from "./creature/catalogue";
+import { useCreatureHost } from "./creature-loader";
+import { hangOf } from "./scene/backdrops.js";
+import { posterBounty, posterSeed, type PosterWords } from "./scene/poster.js";
+import { backdropOf, SCENE_GROUND, StagePainter } from "./scene/stage-paint";
 
-/* The stage as the avatar lab draws it: a backdrop behind the agent, and the wanted poster that stands in for it while
- * it is offline. Both come from the conversation's seed, like its creature. The lab lays the
- * stage out on a tile 440px tall, and the backdrops' mounts (the post, the tree, the balloons a poster hangs from) are
- * drawn in its pixels; so the scene keeps that frame and scales it to the tile's height (styles/call.css,
- * `.stage-scene`), and the poster and the agent meet where the lab put them (the creature stands on the backdrop's
- * ground: creature/host.ts). A `live` backdrop (the stage's) moves where the GPU moves it, drawn in layers (layers.ts);
- * anywhere else it holds still. */
+/* The stage: a backdrop behind the agent, and the wanted poster that stands in for it while it is offline, both drawn as
+ * the design reference draws them (scene/: the toon backdrops, the poster and its mounts) and both from the conversation's
+ * creature. The stage is laid out on a tile 440px tall and scaled to the tile's height (styles/call.css, `.stage-scene`):
+ * the creature stands on the scene's ground line (creature/host.ts), and the backdrop's canvas, the whole tile, puts its
+ * ground under the creature's feet. */
 
 /** The height of the lab's stage, in its pixels. */
 export const SCENE_HEIGHT = 440;
@@ -70,62 +67,48 @@ export function useSceneScale() {
   }, []);
 }
 
-/** The seed's backdrop, in the theme it is drawn in (its light and dark drawings are the engine's): the nearest one
- *  above it — the page's, or a part of a page shown in the other theme (the design system's columns). */
-export function StageBackdrop({ seed, tone, live }: { seed: string; tone: string; live?: boolean }) {
+/** The conversation's scene behind its creature (scene/stage-paint.ts): the backdrop its creature rolls, in the theme it is
+ *  drawn in (each has a light and a dark drawing), the nearest one above it — the page's, or a part of a page shown in the
+ *  other theme (the design system's columns). Its ground line stands on the creature's feet: `feet`, a share of the
+ *  tile's height (the stage's framing says where they are; by default the scene's ground, where CharacterAvatar stands
+ *  the creature). Offline (`poster`), the wanted poster hangs in the creature's place, from what the backdrop has to hang
+ *  it from; its photo is the creature, laughing (creature/host.ts posterPortrait). A `live` scene (the stage's) lets the
+ *  poster move where the page's drawings move; anywhere else it holds still. Decoration: the stage's agent says its state.
+ *  The canvas's fallback content is what the poster says. */
+export function StageBackdrop({ seed, tone, live, feet = SCENE_GROUND, poster }: { seed: string; tone: string; live?: boolean; feet?: number;
+  poster?: { words: PosterWords; language: string } }) {
   const page = usePageTheme();
   const ref = useRef<HTMLDivElement>(null);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const painter = useRef<StagePainter | null>(null);
   const [theme, setTheme] = useState(page);
   useLayoutEffect(() => { setTheme(ref.current?.closest("[data-theme]")?.getAttribute("data-theme") === "dark" ? "dark" : "light"); }, [page]);
-  const html = useMemo(() => backdropSvg(backdropFromSeed(seed), tone, theme), [seed, tone, theme]);
-  useLayers(ref, useMotion() === "gpu" && !!live, html);
-  return <div ref={ref} className="stage-backdrop" aria-hidden="true" dangerouslySetInnerHTML={{ __html: html }} />;
+  const choice = useMemo(() => creatureFromSeed(seed), [seed]);
+  const id = useMemo(() => backdropOf(choice), [choice]);
+  const moving = useMotion() === "gpu" && !!live;
+  // The portrait waits for the creature host (three.js and the rig), which the stage's creature loads anyway.
+  const { host, failed } = useCreatureHost();
+  const paperSeed = posterSeed(choice), bounty = poster ? posterBounty(paperSeed, poster.language) : "";
+  // The words by what they say: a caller may make them afresh on each render.
+  const words = poster ? JSON.stringify(poster.words) : "";
+  useLayoutEffect(() => {
+    const element = canvas.current;
+    if (!element) return;
+    const made = (painter.current = new StagePainter(element));
+    return () => { made.dispose(); painter.current = null; };
+  }, []);
+  useLayoutEffect(() => {
+    // Offline, the poster once the host has loaded (or could not: its photo is then the fallback's outline).
+    const shown = words && (host || failed) ? { seed: paperSeed, words: JSON.parse(words) as PosterWords, bounty, portrait: host?.posterPortrait(seed) ?? null, color: choice.color } : null;
+    painter.current?.set({ id, tone, dark: theme === "dark", feet, poster: shown, moving });
+  }, [id, tone, theme, feet, words, bounty, paperSeed, host, failed, seed, choice.color, moving]);
+  return <div ref={ref} className="stage-backdrop" data-backdrop={id} data-hang={hangOf(id)} data-poster={poster ? "" : undefined} aria-hidden="true">
+    <canvas ref={canvas}>{poster && <span className="wanted">
+      <span>{poster.words.title}</span> <span className="w-name">{poster.words.status}</span> <span className="w-bounty">{bounty}</span>
+      {poster.words.fine.map((line) => <span key={line}> {line}</span>)} <span>SIDEVOICE</span>
+    </span>}</canvas>
+  </div>;
 }
 
 /** The poster's words, in the interface's language (i18n/locales). */
-export interface PosterWords {
-  title: string;
-  status: string;
-  fine: [string, string, string];
-}
-
-/** The bounty: whole millions under a billion, so it always has the same width and always fits. From the seed for now;
- *  it could be the conversation's real token spend one day, rounded the same way. */
-export function posterBounty(seed: string, language: string): string {
-  return new Intl.NumberFormat(language).format(rng(seed, "bounty").int(100, 999) * 1_000_000) + "-";
-}
-
-/** The token sign, in the spirit of One Piece's berry: a T crossed twice (10 × 14, at the origin). */
-const TokenSign = () => <path d="M1 2 H9 M5 2 V12.5 Q5 13.6 3.4 13.6 M1 5.6 H9 M1.6 8.8 H8.4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />;
-const Scroll = () => (
-  <>
-    <path d="M7 1 Q1 2 2.5 7 Q4 11 1 13 Q5 16 2.5 20 Q0.5 25 4 27.5 Q7.5 30 5 34 Q3.5 36.5 7 37" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-    <circle cx="7" cy="1.3" r="1.2" fill="currentColor" /><circle cx="7" cy="36.7" r="1.2" fill="currentColor" />
-  </>
-);
-const fit = { lengthAdjust: "spacingAndGlyphs" } as const;
-
-/** The easter egg of an offline conversation (the lab's, after One Piece's bounty posters): its creature, smiling, on a
- *  wanted poster. Text is SVG with a fixed length, so it fits whatever fonts the browser has. Decoration: the stage's
- *  agent still says its state. */
-export function WantedPoster({ spec, seed, words, language }: { spec: AvatarSpec; seed: string; words: PosterWords; language: string }) {
-  return (
-    <div className="wanted" aria-hidden="true">
-      <svg className="w-title" viewBox="0 0 180 44"><text x="90" y="40" textAnchor="middle" textLength="172" {...fit}>{words.title}</text></svg>
-      <div className="w-photo"><CharacterAvatar spec={spec} state={stillAvatar("speaking")} size="stage" /></div>
-      <svg className="w-lower" viewBox="0 0 180 64">
-        <g transform="translate(2 6)"><Scroll /></g><g transform="translate(178 6) scale(-1 1)"><Scroll /></g>
-        <text className="w-name" x="90" y="30" textAnchor="middle" textLength="150" {...fit}>{words.status}</text>
-        <g transform="translate(26 47)"><TokenSign /></g>
-        <text className="w-bounty" x="40" y="59.5" textLength="118" {...fit}>{posterBounty(seed, language)}</text>
-      </svg>
-      <svg className="w-foot" viewBox="0 0 180 22">
-        <text className="w-fine" x="2" y="7" textLength="114" {...fit}>{words.fine[0]}</text>
-        <text className="w-fine" x="2" y="12" textLength="104" {...fit}>{words.fine[1]}</text>
-        <text className="w-fine" x="2" y="17" textLength="100" {...fit}>{words.fine[2]}</text>
-        {/* The issuer is the product's name, which is not translated. */}
-        <text className="w-brand" x="178" y="18" textAnchor="end" textLength="62" {...fit}>SIDEVOICE</text>
-      </svg>
-    </div>
-  );
-}
+export type { PosterWords } from "./scene/poster.js";

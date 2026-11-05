@@ -9,7 +9,7 @@ import type { ChatMessage } from "../../state/room-types";
 import { avatarFor, avatarTone } from "../avatar/avatar-spec";
 import { avatarColor } from "../avatar/bicho-draw";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
-import { StageBackdrop, useSceneScale, WantedPoster, type PosterWords } from "../avatar/StageScene";
+import { StageBackdrop, useSceneScale, type PosterWords } from "../avatar/StageScene";
 import type { MouthLevel } from "../avatar/avatar-state";
 import { uiLanguage, translator, type Translate } from "../../i18n/translator";
 import { moodText } from "./conversation-state";
@@ -210,8 +210,7 @@ export function StageTile({ card = false }: { card?: boolean }) {
       <div ref={stageRef} className="stage-tile" data-mood={avatar.mood} data-app={host().identity.build ? "" : undefined} data-card={card || undefined} style={avatarTone(tone) as CSSProperties}>
         <div className="stage-canvas">
           <div className="stage-scene">
-            <StageBackdrop seed={stage.threadId} tone={tone} live />
-            {avatar.mood === "offline" && <WantedPoster spec={spec} seed={stage.threadId} words={posterWords(t)} language={uiLanguage()} />}
+            <StageBackdrop seed={stage.threadId} tone={tone} live poster={avatar.mood === "offline" ? { words: posterWords(t), language: uiLanguage() } : undefined} />
             <CharacterAvatar className="stage-agent" spec={spec} state={avatar} size="stage" scene live
               mouth="playback" mouthLevel={avatars.mouth(stage.threadId)} hearLevel={hearLevel} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
           </div>
