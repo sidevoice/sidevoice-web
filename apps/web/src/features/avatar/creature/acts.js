@@ -848,3 +848,58 @@ act('rest-nap', 'rest', 'nap', { key: 1.3 }, (K, X) => {
 // are decided off. The menus and timings the reference exports here are schedule.ts's.
 
 export { ACTS };
+
+// ================================================================ the microphone permission hero ================================================================
+// product: the reference's 'mic' act (reference/2026-11-04/src/acts.js, the block under this title), unchanged, in a block
+// of its own after the export, so the moods, working styles and pastimes come over above it without touching it. Its
+// one helper (inFrame, which the reference shares with the working styles) is its own here. The hero that plays it is
+// mic-hero.ts.
+
+// Setup's permissions step and Settings › Permissions (sidevoice-web features/permissions): the person's creature over
+// the microphone's row. The new creatures have no hands, so the microphone floats by the mouth: a toon handheld mic.
+//   prompt     not asked yet: calm, looking down at the row's Allow button; no mic
+//   requesting an attentive lean, eyes up toward where the browser or the computer asks
+//   granted    the mic pops in by the mouth, a hop once, happy, little sound arcs off the mic
+//   denied     blocked: the mic greyed and struck through; a droop, sad (the page also desaturates it, as the product)
+//   missing    none found: a droop, looking round for it, a "?"
+// The product does the lean, the hop and the droop on a wrapper (its engine had no expressions); here they are the
+// creature's own pose and expressions.
+act('mic', 'scene', 'microphone', { key: 1.3 }, (K, X, o) => {
+  const inFrame = (obj, p) => { obj.updateMatrix(); return p.clone().applyMatrix4(obj.matrix); }; // product: a point in obj's space → its parent's (the reference's shared helper)
+  // a handheld toon mic floating beside the mouth, its head toward it, in front of the cheek and clear of the eyes;
+  // allowed: in colour, with sound arcs; blocked: grey with a red no-sign; none found: grey with a "?" over it
+  const state = o.state || 'prompt', g = K.fx('fixed');
+  const grey = state === 'denied' || state === 'missing', shown = state === 'granted' || grey;
+  const f = K.face, eyeBottom = f.ey - f.eyeH, r = 0.14;
+  const mx = f.fx0 + f.ex * 0.95 + 0.06, my = Math.min(f.mouthY - 0.04, eyeBottom - 0.2 - r), mz = K.front(my, mx) + 0.24;
+  const mic = new THREE.Group(); g.add(mic); mic.position.set(mx, my, mz); mic.rotation.z = 0.6; mic.visible = shown; // the head leans toward the mouth
+  const head = new THREE.Group(); mic.add(head); // the head's centre is the group's origin: it sits at (mx, my)
+  const silver = grey ? '#c4c7ce' : C.silver, handle = grey ? '#7d818c' : '#3a3f4a', collar = grey ? '#a6a9b2' : K.accent;
+  K.mesh(blob(r, r * 1.12, r, 28, 20), silver, { to: head, metal: 1 });
+  for (const [yy, rr] of [[-0.06, 0.88], [0, 1], [0.06, 0.88]]) K.mesh(new THREE.TorusGeometry(r * rr, 0.008, 6, 32), grey ? '#9a9ea8' : '#8a92a6', { to: head, pos: [0, yy, 0], rot: [Math.PI / 2, 0, 0], basic: true, ol: 0 });
+  K.mesh(new THREE.CylinderGeometry(r * 0.72, r * 0.66, 0.05, 28), collar, { to: mic, pos: [0, -r * 1.12 - 0.02, 0], ol: 0.014 });
+  K.mesh(new THREE.CylinderGeometry(r * 0.52, r * 0.34, 0.3, 24), handle, { to: mic, pos: [0, -r * 1.12 - 0.19, 0], ol: 0.016 });
+  K.mesh(blob(r * 0.34, r * 0.2, r * 0.34, 16, 10), handle, { to: mic, pos: [0, -r * 1.12 - 0.34, 0], ol: 0.012 });
+  const tipW = inFrame(mic, V(0, 0, 0)); // the mic's head
+  const arcs = state === 'granted' ? [0, 1].map((i) => { const ar = K.mesh(new THREE.TorusGeometry(0.13 + i * 0.09, 0.02, 6, 24, 1.3), K.accent, { to: g, ol: 0.012 }); ar.position.copy(tipW).add(V(0.04, 0.04, 0.02)); ar.rotation.z = -0.25; return ar; }) : [];
+  let no = null, q = null;
+  if (state === 'denied') { no = new THREE.Group(); g.add(no); no.position.copy(tipW).add(V(0, 0, 0.18)); K.mesh(new THREE.TorusGeometry(r * 1.45, 0.035, 10, 40), C.red, { to: no, ol: 0.014 }); K.mesh(new THREE.CapsuleGeometry(0.033, r * 2.5, 4, 10), C.red, { to: no, rot: [0, 0, Math.PI / 4], ol: 0.014 }); }
+  if (state === 'missing') {
+    q = new THREE.Group(); g.add(q); q.position.copy(tipW).add(V(0.27, -0.02, 0.1)); // beside the mic's head, on the outer side: below the eye
+    const pts = [[-0.2, 0.3], [-0.16, 0.47], [0, 0.55], [0.18, 0.47], [0.19, 0.29], [0.04, 0.17], [0, 0.0]].map(([x, y]) => V(x * 0.55, y * 0.55, 0));
+    K.mesh(tube(new THREE.CatmullRomCurve3(pts), () => 0.04, 48, 12), '#8a92a6', { to: q, ol: 0.012 }); K.mesh(blob(0.045, 0.045, 0.04, 16, 12), '#8a92a6', { to: q, pos: [0, -0.09, 0], ol: 0.012 });
+  }
+  return { frame(a) {
+    const { k } = a;
+    if (state === 'granted') {
+      show(mic, backOut(k / 0.45)); mic.position.y = my + Math.sin(k * 2.2) * 0.015; mic.rotation.z = 0.6 + Math.sin(k * 1.6) * 0.05;
+      arcs.forEach((ar, i) => { const ph = fract(k * 0.9 - i * 0.3); show(ar, a.still ? 1 : Math.sin(ph * Math.PI)); });
+      const hop = a.still ? 0 : bump(k, 0.1, 0.55), land = a.still ? 0 : bump(k, 0.65, 0.2);
+      return { expr: 'happy', bot: 0.2, gx: 0.12, gy: 0.12, dy: -hop * 14, squash: land * 0.07 - hop * 0.03 }; // back at us, pleased
+    }
+    if (state === 'requesting') return { expr: 'curious', gx: -0.35, gy: -0.5, tilt: 7 + Math.sin(k * 1.4) * 1.5, dx: 1.5 };
+    if (state === 'denied') { mic.position.y = my - 0.03; const gz = K.gaze(tipW); return { expr: 'sad', gx: gz.gx * 0.55, gy: gz.gy * 0.55, dy: 4, tilt: -5, squash: 0.03 }; } // a glance at the mic
+    if (state === 'missing') { q.rotation.z = Math.sin(k * 2) * 0.15; mic.position.y = my - 0.03; return { expr: 'sad', gx: Math.sin(k * 1.3) * 0.5, gy: 0.2, dy: 4, tilt: -4, squash: 0.03 }; }
+    return { expr: 'neutral', gx: 0.05, gy: 0.3, lid: 0 };
+  } };
+});
