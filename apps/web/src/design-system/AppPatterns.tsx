@@ -12,7 +12,7 @@ import { Switch } from "../components/ui/Switch";
 import {
   AddIcon, CallIcon, CheckIcon, ChevronIcon, CloseIcon, CloseUpIcon, ConnectorIcon, HangupIcon, HarnessIcon, ProviderLogo,
   ListenAgainIcon, MachinesIcon, OtherMachineIcon, ThisComputerIcon, MicrophoneIcon, MicrophoneOffIcon, MoreIcon, MoreVerticalIcon, PlatformIcon, ReadIcon, RefreshIcon, SentIcon,
-  SettingsIcon, SendIcon, SidebarCollapseIcon, SidebarExpandIcon, SidevoiceMark, SkipIcon, TranscriptIcon,
+  SettingsIcon, SendIcon, SidebarCollapseIcon, SidebarExpandIcon, SidevoiceMark, SkipIcon, TranscriptLinesIcon,
 } from "../components/ui/Icons";
 import { avatarFor, PERSON_AVATAR, type AvatarMood } from "../features/avatar/avatar-spec";
 import { avatarColor } from "../features/avatar/bicho-draw";
@@ -175,7 +175,7 @@ function StageTile({ mood, compact = false, phone = false }: { mood: "speaking" 
         <Button variant="ghost" tone="neutral" size="sm">{t("stage.cancelTurn")}</Button>
       </div>}
       {/* The way into the transcript, phone and desktop: a round button in the tile's corner. */}
-      <Button size="icon" variant="secondary" className="pt-transcript" aria-label={t("transcript.show")}><TranscriptIcon size={20} /></Button>
+      <Button size="icon" variant="secondary" className="pt-transcript" aria-label={t("transcript.show")}><TranscriptLinesIcon size={20} /></Button>
     </div>
   );
 }

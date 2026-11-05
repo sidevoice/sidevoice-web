@@ -7,7 +7,8 @@ import { avatarColor, drawAvatar, engineSize, type AvatarSize, type DrawnSpec } 
 import { useLayers } from "./layers";
 import { ATTENTION_EXPR, STILL_EXPR } from "./creature/faces";
 import { FALLBACK_PATH } from "./creature/fallback";
-import type { CreatureStep, LiveCreature, Slot } from "./creature/host";
+import type { CreatureStep, FaceBox, LiveCreature, Slot } from "./creature/host";
+import { popFit } from "./fit-pop";
 import { creatureHostNow, loadCreatureHost, watchCreatureHost, type CreatureHost, type CreatureHostLoading } from "./creature-loader";
 import type { StageFrame } from "./creature/stage-frame";
 
@@ -20,6 +21,7 @@ function useCreatureHost(): CreatureHostLoading {
 }
 
 const noWatch = () => () => {};
+const pct = (fraction: number) => Math.round(fraction * 10000) / 100 + "%";
 /** Whether the page can draw creatures now on the stage for `framing` (creature/host.ts: the stage's creature and the
  *  still faces have a renderer each). It is read again each time that changes: a context lost and not given back, or
  *  given back. */
@@ -85,6 +87,10 @@ export interface CharacterAvatarProps {
    *  fallback outline stands in until its canvas is painted (while the creature's code loads too). Once painted, it keeps
    *  its image until the next one is drawn over it. */
   immediate?: boolean;
+  /** A still face that stands out of its square (a conversation's card): the whole creature, fitted from the extent of what is
+   *  drawn (fit-pop.ts) and standing on the square's foot, its head and its hat free to go over the square's edge. It is
+   *  hidden until its extent is known, so it never shows in a place it then leaves. */
+  pop?: boolean;
   /** The stage's framing (creature/stage-frame.ts): the creature on the scene stands where the stage's voice text needs it. */
   frame?: StageFrame;
   /** Said for the avatar; without one it is decoration. */
@@ -114,7 +120,7 @@ export function CharacterAvatar(props: CharacterAvatarProps) {
 const FIGURE = { feet: 106 / 120, crown: 20 / 120 };
 
 /** A conversation's creature (creature/host.ts): live on the stage's scene, a still face elsewhere. */
-function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, hearLevel, live, liveFace = false, scene, frame, immediate = false, label, className, ref }: CharacterAvatarProps & { seed: string }) {
+function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, hearLevel, live, liveFace = false, scene, frame, immediate = false, pop = false, label, className, ref }: CharacterAvatarProps & { seed: string }) {
   const root = useRef<HTMLSpanElement | null>(null);
   const canvas = useRef<HTMLCanvasElement | null>(null);
   const creature = useRef<LiveCreature | null>(null);
@@ -157,6 +163,8 @@ function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, 
   const step = useMemo<CreatureStep>(() => ({ work: state.work, idle, since: state.since, until: state.until, entered: state.enteredAt }), [state.work, idle, state.since, state.until, state.enteredAt]);
   // A face asked for at once (immediate): painted yet? Until it is, its fallback stands in, so it is never an empty box.
   const [painted, setPainted] = useState(false);
+  // Where a popping face's creature stands in its render, once painted (the face's own extent).
+  const [extent, setExtent] = useState<FaceBox | null>(null);
   const waiting = immediate && !drawn && !painted;
   // Nothing to draw it with: the fallback stands in. While the host is loading for the first time, nothing does yet,
   // but for a face asked for at once.
@@ -191,17 +199,19 @@ function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, 
   useLayoutEffect(() => {
     const element = canvas.current;
     if (drawn || !element || !host) return;
-    return host.drawFace(element, seed, expr, undefined, immediate ? { now: true, drawn: () => setPainted(true) } : undefined);
-  }, [drawn, seed, expr, host, canDraw, immediate]);
+    const drawing = immediate || pop ? { now: immediate, drawn: (face: HTMLCanvasElement) => { if (immediate) setPainted(true); if (pop) setExtent(host.faceBox(face)); } } : undefined;
+    return host.drawFace(element, seed, expr, undefined, drawing);
+  }, [drawn, seed, expr, host, canDraw, immediate, pop]);
+  const fit = pop && !drawn && extent ? popFit(extent) : null;
   // The state as the root says it, the same words as the engine's drawings (what it acts out, what it has on the go, its
   // entrance).
   return (
     <span ref={(element) => { root.current = element; if (typeof ref === "function") ref(element); else if (ref) ref.current = element; }} className={cn("sv-avatar", className)}
-      data-style="creature" data-framing={framing} data-avatar-state={mood} data-mood={ENGINE_MOOD[mood]} data-size={engineSize(size)}
+      data-style="creature" data-framing={framing} data-pop={pop && !drawn ? (fit ? "fitted" : "fitting") : undefined} data-avatar-state={mood} data-mood={ENGINE_MOOD[mood]} data-size={engineSize(size)}
       data-mouth={mouth === "playback" && motion === "still" ? "still" : mouth} data-work={state.work} data-idle={idle} data-enter={state.enter}
       data-unread={state.unread || undefined} data-offline={mood === "offline" || undefined} data-fallback={fallback || undefined}
       style={avatarTone(avatarColor(spec)) as CSSProperties} role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true}>
-      <canvas ref={canvas} />
+      <canvas ref={canvas} style={fit ? { width: pct(fit.width), height: pct(fit.height), left: pct(fit.left), bottom: pct(fit.bottom) } : undefined} />
       {fallback && <svg className="creature-fallback" viewBox="0 0 100 100" aria-hidden="true"><path d={FALLBACK_PATH} /></svg>}
     </span>
   );

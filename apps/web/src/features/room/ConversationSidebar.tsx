@@ -2,7 +2,7 @@ import { useContext, useEffect, useLayoutEffect, useRef } from "react";
 import { Button } from "../../components/ui/Button";
 import { DropdownMenu, DropdownMenuItem } from "../../components/ui/DropdownMenu";
 import { ContextMenu, ContextMenuItem } from "../../components/ui/ContextMenu";
-import { CloseIcon, CloseUpIcon, ConversationsIcon, HarnessIcon, MoreIcon, OtherMachineIcon, SidebarCollapseIcon, SidebarExpandIcon, SettingsIcon, SidevoiceMark, ThisComputerIcon } from "../../components/ui/Icons";
+import { CloseIcon, CloseUpIcon, ConversationsIcon, HarnessIcon, MoreIcon, OtherMachineIcon, SidebarCollapseIcon, SettingsIcon, SidevoiceMark, ThisComputerIcon } from "../../components/ui/Icons";
 import { useSurface } from "../../lib/use-surface";
 import { useSheetDrag } from "../../lib/use-sheet-drag";
 import { COMPACT_QUERY, isNarrow, NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
@@ -137,7 +137,8 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
             <Button variant="ghost" tone="neutral" size="icon-sm" className="sidebar-collapse" aria-controls="conversations" aria-expanded={!rail}
               aria-label={rail ? t("sidebar.expand") : t("sidebar.collapse")}
               onClick={toggle}>
-              {rail ? <SidebarExpandIcon /> : <SidebarCollapseIcon />}
+              {/* The rail has no second button: the conversations' icon is the one that expands it, with their number as its badge. */}
+              {rail ? <><ConversationsIcon size={20} />{!blocked && participants.length > 0 && <span className="sidebar-count-badge" aria-hidden="true">{participants.length}</span>}</> : <SidebarCollapseIcon />}
             </Button>
           </Tooltip>
           <Button variant="ghost" tone="neutral" size="icon-sm" className="sidebar-close" aria-label={t("sidebar.close")} title={t("sidebar.close")} onClick={close}>
@@ -158,7 +159,7 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
                   className="sidebar-rows"
                   rows={group.rows.map((row) => row.threadId === onStage && !row.selected ? { ...row, selected: true } : row)}
                   onSelect={select}
-                  lead={(row) => <ConversationAvatar row={row} />}
+                  lead={(row) => <ConversationAvatar row={row} pop attention={unread(row)} />}
                   tooltip={(row) => [row.title + " · " + stateText(row, inCall, t), harnessLine(row), row.detail, row.activityNote].filter(Boolean).join("\n\n")}
                   label={(row) => [row.title, stateText(row, inCall, t), unread(row) ? t("state.unread") : null].filter(Boolean).join(" · ")}
                   sub={(row) => (
@@ -167,9 +168,6 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
                       <span className="sidebar-state-text">{stateText(row, inCall, t)}</span>
                     </span>
                   )}
-                  end={(row) => <>
-                    {unread(row) && <span className="sidebar-unread" aria-hidden="true" />}
-                  </>}
                   // The same options on the secondary click anywhere on the row (operator, 2026-10-16): Remove from this device, for now.
                   wrap={(row, node) => <ContextMenu label={t("sidebar.options", { title: row.title })}
                     items={<ContextMenuItem danger onSelect={() => void window.sidevoiceActions?.closeParticipant(row.threadId)}><CloseIcon />{t("sidebar.removeConversation")}</ContextMenuItem>}>{node}</ContextMenu>}

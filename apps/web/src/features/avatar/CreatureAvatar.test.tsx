@@ -11,7 +11,7 @@ import { creatureFromSeed } from "./creature/catalogue";
 
 const host = vi.hoisted(() => {
   const lives: { opts: Record<string, unknown>; moods: string[]; steps: unknown[]; moving: boolean[]; disposed: boolean }[] = [];
-  const faces: { seed: string; expr: string; cancelled: boolean; drawing?: { now?: boolean; drawn?: () => void } }[] = [];
+  const faces: { seed: string; expr: string; cancelled: boolean; drawing?: { now?: boolean; drawn?: (face: HTMLCanvasElement) => void } }[] = [];
   // How the mocked host paints a face asked for at once: rendered there and then ("now"), or later, by the test ("later").
   const paint = { mode: "now" as "now" | "later" };
   return { lives, faces, paint };
@@ -28,10 +28,11 @@ vi.mock("./creature/host", () => {
         setMoving: (m: boolean) => live.moving.push(m), dispose: () => { live.disposed = true; },
       };
     },
-    drawFace: (_canvas: HTMLCanvasElement, seed: string, expr: string, _choice?: unknown, drawing?: { now?: boolean; drawn?: () => void }) => {
+    faceBox: () => ({ l: 40, r: 100, t: 20, b: 119, w: 144, h: 144 }),
+    drawFace: (_canvas: HTMLCanvasElement, seed: string, expr: string, _choice?: unknown, drawing?: { now?: boolean; drawn?: (face: HTMLCanvasElement) => void }) => {
       const face = { seed, expr, cancelled: false, drawing };
       host.faces.push(face);
-      if (drawing?.now && host.paint.mode === "now") drawing.drawn?.();
+      if (drawing?.now && host.paint.mode === "now") drawing.drawn?.(document.createElement("canvas"));
       return () => { face.cancelled = true; };
     },
   };
@@ -194,7 +195,7 @@ test("a face asked for at once that cannot be painted yet keeps its outline unti
   await settle();
   const avatar = () => view.container.querySelector(".sv-avatar")!;
   expect(avatar()).toHaveAttribute("data-fallback");
-  act(() => host.faces.at(-1)!.drawing!.drawn!());
+  act(() => host.faces.at(-1)!.drawing!.drawn!(document.createElement("canvas")));
   expect(avatar()).not.toHaveAttribute("data-fallback");
   // Something unread: the surprised face is asked for; until it is painted the canvas keeps the face it had, not the outline.
   view.rerender(<CharacterAvatar spec={spec} state={state("present", { unread: true })} size="small" immediate />);
@@ -208,4 +209,20 @@ test("every other still face is queued as before: nothing stands in while the co
   await settle();
   expect(host.faces.at(-1)?.drawing).toBeUndefined();
   expect(view.container.querySelector(".sv-avatar")).not.toHaveAttribute("data-fallback");
+});
+
+test("a face that pops out of its square is fitted from the extent of what is drawn, and hidden until it is known", async () => {
+  const view = render(<CharacterAvatar spec={spec} state={state("idle")} size="small" mouth="still" pop />);
+  await settle();
+  const avatar = view.container.querySelector(".sv-avatar") as HTMLElement;
+  // The mocked host paints when asked for at once; a popping face is not asked for at once, so it waits to be painted.
+  expect(avatar).toHaveAttribute("data-pop", "fitting");
+  expect(host.faces).toHaveLength(1);
+  act(() => host.faces[0].drawing!.drawn!(document.createElement("canvas")));
+  expect(avatar).toHaveAttribute("data-pop", "fitted");
+  const canvas = avatar.querySelector("canvas")!;
+  // 60 px wide and 100 px tall in a 144 px render: 120% of the square tall, so 1.2 / 100 of the square per px.
+  expect(parseFloat(canvas.style.height)).toBeCloseTo(144 * 1.2 / 100 * 100, 1);
+  expect(canvas.style.left).not.toBe("");
+  expect(canvas.style.bottom).not.toBe("");
 });

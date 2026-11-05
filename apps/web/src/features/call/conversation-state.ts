@@ -38,6 +38,16 @@ export function conversationState(row: ParticipantView, inCall: boolean): Conver
   return "waiting";
 }
 
+/** The colour a conversation's state is told by (the `--sv-state-*` tokens, styles/tokens.css): working while its harness says so
+ *  (as its words do, whatever its avatar acts out under the stage's balloon), otherwise what its avatar is doing. A resting
+ *  agent and one that is merely present share the one colour; one that cannot be reached has its own. Needing the person
+ *  ("attention") is a mark of its own (hasUnread), not a state here. */
+export type StateKind = "listening" | "speaking" | "working" | "idle" | "offline";
+export function stateKind(state: ConversationState, mood: AvatarMood): StateKind {
+  if (state === "working") return "working";
+  return mood === "listening" || mood === "speaking" || mood === "working" || mood === "offline" ? mood : "idle";
+}
+
 /** The person in the picture-in-picture. */
 export function personMood({ inCall, speaking }: { inCall: boolean; speaking: boolean }): AvatarMood {
   if (!inCall) return "idle";

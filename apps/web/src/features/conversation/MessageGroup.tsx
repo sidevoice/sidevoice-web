@@ -3,7 +3,6 @@ import { Avatar } from "../../components/ui/Avatar";
 import { avatarFor } from "../avatar/avatar-spec";
 import { stillAvatar } from "../avatar/avatar-state";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
-import { creatureFromSeed } from "../avatar/creature/catalogue";
 import { translator } from "../../i18n/translator";
 import { speakerName } from "./group-messages";
 import { DraftBubble, TurnPill, WorkingRow } from "./LiveRows";
@@ -23,8 +22,8 @@ function RunFace({ name, thread }: { name: string; thread: string | null }) {
   </span>;
 }
 
-function LiveRowView({ row, position, accent }: { row: LiveRow; position: BubblePosition; accent?: string }) {
-  if (row.kind === "working") return <WorkingRow position={position} accent={accent} />;
+function LiveRowView({ row, position }: { row: LiveRow; position: BubblePosition }) {
+  if (row.kind === "working") return <WorkingRow position={position} />;
   if (row.kind === "turn") return <TurnPill phase={row.phase} cancellable={row.cancellable} />;
   return <DraftBubble text={row.text} cancellable={row.cancellable} />;
 }
@@ -38,7 +37,6 @@ export const MessageGroup = memo(function MessageGroup({ run }: { run: RunView; 
   const t = translator();
   const total = run.messages.length + run.live.length;
   const position = (index: number): BubblePosition => total === 1 ? "only" : index === 0 ? "first" : index === total - 1 ? "last" : "middle";
-  const accent = run.role === "assistant" && run.thread ? creatureFromSeed(run.thread).accent : undefined;
   return (
     <section className="message-group" data-role={run.role} aria-label={t("messages.group", { name: speakerName(run, t) })}>
       {run.messages.map((message, index) => (
@@ -47,7 +45,7 @@ export const MessageGroup = memo(function MessageGroup({ run }: { run: RunView; 
         </div>
       ))}
       {run.live.map((row, index) => (
-        <div className="chat-message-row" key={"live-" + row.kind}><LiveRowView row={row} position={position(run.messages.length + index)} accent={accent} /></div>
+        <div className="chat-message-row" key={"live-" + row.kind}><LiveRowView row={row} position={position(run.messages.length + index)} /></div>
       ))}
       {run.role === "assistant" && <RunFace name={speakerName(run, t)} thread={run.thread} />}
     </section>

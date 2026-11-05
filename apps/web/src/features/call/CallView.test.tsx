@@ -322,7 +322,7 @@ test("the preview holds the stage avatar in a mood, with something unheard when 
 test("state dots and small avatars follow each conversation's state, grouped by machine", () => {
   // Its reply already played: no balloon holds the agent still here (the stage's own test follows that).
   const store = room({ history: [played] });
-  const dot = (title: string) => rowOf(title).querySelector(".state-dot")!.getAttribute("data-state");
+  const dot = (title: string) => rowOf(title).querySelector(".conversation-avatar")!.getAttribute("data-state");
   const mood = (title: string) => rowOf(title).querySelector(".sv-avatar")!.getAttribute("data-avatar-state");
   // The dot says whether it hears you; the bicho is offline, working or resting.
   expect([dot("Fix the slow login"), mood("Fix the slow login")]).toEqual(["in-call", "idle"]);
@@ -337,11 +337,14 @@ test("state dots and small avatars follow each conversation's state, grouped by 
   expect([...document.querySelectorAll(".sidebar-group-label")].map((label) => label.textContent)).toEqual(["Laptop", "Home server"]);
   expect(rowOf("Migrate the payments API")).toHaveTextContent("Working");
   expect(rowOf("Plan the week")).toHaveTextContent("Offline");
-  // The light is the dot: green while it hears you, blinking while it works (room.css); a card hides the one of a
-  // conversation that cannot hear you, whose words say so. A dot carries no mark of its own.
+  // A card's creature wears nothing but the dot at its foot (room.css): the connected green while its agent is reachable, blinking
+  // in the working colour while it works, none while it is offline; the rest is said by its words and its face. A dot carries no
+  // mark of its own.
   const cardDots = [...document.querySelectorAll(".sidebar-rows .state-dot")];
-  expect(cardDots.map((d) => d.getAttribute("data-state"))).toEqual(["in-call", "working", "waiting", "idle"]);
+  expect(cardDots.map((d) => [d.getAttribute("data-state"), d.getAttribute("data-kind")])).toEqual([["in-call", "idle"], ["working", "working"], ["waiting", "idle"]]);
   expect(cardDots.every((d) => d.childElementCount === 0)).toBe(true);
+  expect(rowOf("Plan the week").querySelector(".state-dot")).toBeNull();
+  expect(document.querySelector(".sidebar-rows .attention-burst")).toBeNull();
   // The call's own conversation at work says Working, on its line and its light (desktop trial, item 11).
   // At work for a minute: past any wait before Working shows (#112).
   patch(store, { harness: { "fp-1|t-pay": true, "fp-1|t-login": true }, workingSince: { "fp-1|t-pay": 0, "fp-1|t-login": 0 }, now: 60_000 } as Partial<SessionFacts>);
@@ -588,10 +591,10 @@ test("the header holds Settings, and the call bar's ⋯ the statistics, under th
 
 test("out of a call the room's binding is not a call: no conversation is in call", () => {
   const store = room({ ws: null, sessionId: null });
-  expect(rowOf("Fix the slow login").querySelector(".state-dot")).toHaveAttribute("data-state", "waiting");
+  expect(rowOf("Fix the slow login").querySelector(".conversation-avatar")).toHaveAttribute("data-state", "waiting");
   expect(rowOf("Fix the slow login")).toHaveTextContent("Waiting for you");
   patch(store, { ws: {}, sessionId: "s1" });
-  expect(rowOf("Fix the slow login").querySelector(".state-dot")).toHaveAttribute("data-state", "in-call");
+  expect(rowOf("Fix the slow login").querySelector(".conversation-avatar")).toHaveAttribute("data-state", "in-call");
 });
 
 test("the transcript opens on its latest message, whatever arrived while it was closed", async () => {

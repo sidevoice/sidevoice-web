@@ -59,20 +59,23 @@ test("while the list is down the header stays above it, and an avatar there swit
   expect(header()).not.toHaveAttribute("data-list-down");
 });
 
-test("a row says its state in words beside its dot, and what is unread as one quiet mark without a count", () => {
+test("a row says its state in words, and what is unread as the one burst on its creature and a ring on the card, without a count", () => {
   const store = room();
   const reply = (segment: string, seq: number) => ({ segment, thread: "fp-1|t-backup", role: "assistant" as const, text: segment, name: "x", time: seq, session: "s1", seq });
   act(() => store.patch({ history: [reply("r-1", 1), reply("r-2", 2)], roomSeen: {} }));
   const row = [...document.querySelectorAll(".conversation-sidebar .person")].find((button) => button.textContent?.includes("Review the nightly backups"))!;
+  expect(row.querySelector(".conversation-avatar")).toHaveAttribute("data-state", "waiting");
   expect(row.querySelector(".state-dot")).toHaveAttribute("data-state", "waiting");
   expect(row.querySelector(".sidebar-state-text")).toHaveTextContent(/^Waiting for you$/);
-  expect(row.querySelectorAll(".sidebar-unread")).toHaveLength(1);
-  expect(row.querySelector(".sidebar-unread")).toBeEmptyDOMElement();
+  expect(row.querySelectorAll(".attention-burst")).toHaveLength(1);
+  expect(row.querySelector(".conversation-avatar")).toHaveAttribute("data-attention");
+  expect(row.querySelector(".attention-burst")).not.toHaveTextContent(/\d/);
   expect(row).toHaveAccessibleName(/Unread message/);
   expect(row).not.toHaveAccessibleName(/\d/);
   // Focusing the conversation clears it.
   act(() => store.patch({ roomSeen: { "fp-1|t-backup": 2 } }));
-  expect(row.querySelector(".sidebar-unread")).toBeNull();
+  expect(row.querySelector(".attention-burst")).toBeNull();
+  expect(row.querySelector(".conversation-avatar")).not.toHaveAttribute("data-attention");
   expect(row).not.toHaveAccessibleName(/Unread/);
 });
 test("T06 audio that went unheard marks nothing: only what arrived after leaving does", () => {
@@ -82,7 +85,7 @@ test("T06 audio that went unheard marks nothing: only what arrived after leaving
   const railButton=[...document.querySelectorAll<HTMLButtonElement>(".conversation-sidebar .person")].find(button=>button.textContent?.includes("Review the nightly backups"))!;
   expect(phoneButton).not.toHaveAccessibleName(/unheard|unread/i);
   expect(railButton).not.toHaveAccessibleName(/unheard|unread/i);
-  expect(document.querySelector(".sidebar-unread")).toBeNull();
+  expect(document.querySelector(".attention-burst")).toBeNull();
 });
 
 test("Settings sits at the conversations' foot: it opens Settings through the header's own button, and a new conversation follows the list", () => {
