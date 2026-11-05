@@ -8,9 +8,10 @@ export const STILL_PX: number;
 export const FACE_PX: number;
 export function stillId(threadId: string, px: number): string;
 export function wordBoundaries(text: string, locale?: string): number[];
-export type CallState = 'offline' | 'listening' | 'transcribing' | 'speaking' | 'working' | 'holding' | 'idle';
-/** The one precedence: offline > the person's turn > speaking > working > holding > idle. */
-export function callState(facts: { offline: boolean; turn: 'listening' | 'transcribing' | null; speaking: boolean; working: boolean; holding: boolean }): CallState;
+export type CallState = 'offline' | 'listening' | 'transcribing' | 'speaking' | 'said' | 'working' | 'holding' | 'idle';
+/** The one precedence: offline > the person's turn > speaking > said > working > holding > idle. `said` (the person's
+ *  words just sent are up) is the native surface's only. */
+export function callState(facts: { offline: boolean; turn: 'listening' | 'transcribing' | null; speaking: boolean; said?: boolean; working: boolean; holding: boolean }): CallState;
 
 /** The page of the reply the voice is on: its text (an ellipsis ends it where more follows) and how many of its UTF-16
  *  code units are lit, rounded down to the start of a word (never ahead of the voice). */
@@ -27,7 +28,7 @@ export interface SurfaceStillRef { id: string; k: number }
 export interface SurfaceLive { page: SpokenPage | null; said: string | null; stills: Record<string, SurfaceStillRef> }
 
 export interface SurfaceWords {
-  /** The one line saying what the call is doing, with no time in it. */
+  /** The one line saying what the call is doing, with no time in it; empty while the said text shows (it is all there is). */
   state: string;
   /** What a surface that cannot vouch for the call any more says; always carried, whatever the state. */
   offline: string;

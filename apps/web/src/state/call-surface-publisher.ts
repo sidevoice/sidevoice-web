@@ -8,14 +8,15 @@ import { conversationView } from "./room-session-state.js";
 import type { RoomStore } from "./room-store";
 
 /* What a native call surface needs by the clock, which the room's pure projections do not read (state/call-surface.js
- * `callSurfaceView` takes it as `surfaceLive`): the page the voice is on, sent at most every PAGE_SURFACE_MS; the person's
- * words just sent, for PAGE_MS (what the stage shows them for); and the creatures' stills, which cross to the host once
- * per id (CallSurfaceBridge.still) while the snapshot only refers to them. All of it follows the CALL's conversation, not
- * the one being browsed. It does nothing until the host has a native surface (`callSurface.active()`), and gives
+ * `callSurfaceView` takes it as `surfaceLive`): the reply the voice is on (one page, all of it), its position sent at most
+ * every PAGE_SURFACE_MS; the person's words just sent, for PAGE_MS (what the stage shows them for); and the creatures'
+ * stills, which cross to the host once per id (CallSurfaceBridge.still) while the snapshot only refers to them. All of it
+ * follows the CALL's conversation, not the one being browsed. It does nothing until the host has a native surface (`callSurface.active()`), and gives
  * everything back when that stops, so a page without one pays nothing. */
 
-/** The spoken page goes out at most this often: a Live Activity is rate limited and a caption needs no more. */
-export const PAGE_SURFACE_MS = 2000;
+/** The voice's position goes out at most this often: the host updates its surface only when what it draws changes (the
+ *  iOS activity, once per chunk), and the next chunk is due when the voice reaches it, not up to two seconds later. */
+export const PAGE_SURFACE_MS = 500;
 /** A still that could not be drawn (the creature's code did not load, most likely for a moment) is asked for again after
  *  this, doubling up to STILL_RETRY_LAST_MS while none can be drawn: an idle call brings no change to ask again on. */
 export const STILL_RETRY_FIRST_MS = 1000, STILL_RETRY_LAST_MS = 30_000;
@@ -108,7 +109,9 @@ export function startCallSurface(store: RoomStore, options: SurfaceOptions = {})
     const reply = callView().saying ?? null;
     reading = readOn(reading && reply && reading.segment === reply.segment ? reading : null, reply?.segment ?? null, !!reply && state.facts.botLive === true, reply?.karaoke ?? null, clock.now(), Math.floor);
     if (!reply || !reading || reading.segment !== reply.segment) return null;
-    return spokenPage(reply.text, readingPosition(reading), undefined, state.callCard.language);
+    // The whole reply as one page: a host that cuts it in chunks to fit (the iOS activity) cuts it once, never at a page's
+    // end, which left a short tail chunk and the page's ellipsis in it.
+    return spokenPage(reply.text, readingPosition(reading), reply.text.length, state.callCard.language);
   }
 
   function flushPage() {

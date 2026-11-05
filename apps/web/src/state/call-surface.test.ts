@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { createRoomSessionStore, speakWith, WORKING_SHOWN_AFTER_MS } from "./room-session-state.js";
-import { spokenPage, stillId, SURFACE_PAGE_CHARS, STILL_PX, FACE_PX } from "./call-surface.js";
+import { callState, spokenPage, stillId, SURFACE_PAGE_CHARS, STILL_PX, FACE_PX } from "./call-surface.js";
 import { startCallSurface, PAGE_SURFACE_MS, STILL_RETRY_FIRST_MS, STILL_RETRY_LAST_MS, type SurfaceClock } from "./call-surface-publisher";
 import { readOn } from "../features/call/speech-chunks";
 import { PAGE_MS } from "../features/call/PagedText";
@@ -157,7 +157,7 @@ test("an app without a surface gets nothing published", () => {
   expect(draw).not.toHaveBeenCalled();
 });
 
-test("the page is sent at most every two seconds, and follows the voice", () => {
+test("the page is sent at most every half second, and follows the voice", () => {
   const time = clock();
   const store = room();
   const pages: unknown[] = [];
@@ -168,9 +168,9 @@ test("the page is sent at most every two seconds, and follows the voice", () => 
   const sent = pages.length;
   // Cues arrive faster than that: none of them is sent before the time is up.
   store.patch({ karaokeState: { segment: "s1", from: 0, to: 8 } });
-  time.advance(500);
+  time.advance(200);
   store.patch({ karaokeState: { segment: "s1", from: 0, to: 20 } });
-  time.advance(500);
+  time.advance(200);
   expect(store.getState().callSurface.page).toEqual(first);
   expect(pages.length).toBe(sent);
   time.advance(PAGE_SURFACE_MS);
@@ -187,17 +187,20 @@ function sent(facts: Record<string, unknown> = {}, busy = 1000) {
   return { store, time, view: () => store.getState().callSurface };
 }
 
-test("while the person's words show, the native surface says working at once, with its timer: not after the 3 s the stage waits", () => {
+test("while the person's words show, they are all the native surface says: no state line, no timer (D-LA-SAID-PRECEDENCE)", () => {
   const { store, view } = sent();
-  // Busy for half a second: the stage and the card do not say working yet, the native surface's line and timer do.
-  expect(store.getState().callCard.mood).not.toBe("working");
-  expect(view()).toMatchObject({ said: "Run the tests", words: { state: "state.working" }, workingSince: 1000 });
-  // Nothing busy: no time is made up.
+  expect(view()).toMatchObject({ said: "Run the tests", words: { state: "" }, workingSince: null });
+  // Working under them, even once the stage says so: the words still win.
+  store.patch({ now: 1000 + WORKING_SHOWN_AFTER_MS });
+  expect(store.getState().callCard.mood).toBe("working");
+  expect(view()).toMatchObject({ said: "Run the tests", words: { state: "" }, workingSince: null });
   const idle = sent({ harness: {}, workingSince: {} });
-  expect(idle.view()).toMatchObject({ said: "Run the tests", words: { state: "state.working" }, workingSince: null });
+  expect(idle.view()).toMatchObject({ said: "Run the tests", words: { state: "" }, workingSince: null });
+  expect(callState({ offline: false, turn: null, speaking: false, said: true, working: true, holding: true })).toBe("said");
+  expect(callState({ offline: false, turn: null, speaking: true, said: true, working: false, holding: false })).toBe("speaking");
 });
 
-test("the working line is carried past the said text until the stage's Working takes over, with the same timer", () => {
+test("after the said text, the working line comes at once and is carried until the stage's Working takes over, with the same timer", () => {
   const { store, time, view } = sent();
   time.advance(PAGE_MS + 1);
   expect(view().said).toBeNull();
@@ -224,10 +227,11 @@ test("the carried working line ends with the work, and is not made from nothing"
   expect(quiet.getState().callSurface).toMatchObject({ words: { state: "state.resting" }, workingSince: null });
 });
 
-test("what is happening wins over the said text's working line, and over its carry", () => {
+test("what is happening wins over the said text, and over the working line's carry", () => {
   const lines = (facts: Record<string, unknown>) => sent(facts).view().words.state;
   const turn = { userTurn: { id: "u", segment: "u", thread: "n|a" } };
-  // The said text is up, and then the person speaks again, the agent speaks, the call drops, or the conversation holds.
+  // The said text is up, and then the person speaks again, the agent speaks or the call drops. A conversation that
+  // cannot receive is a standing condition: the said text wins over it, as over idle.
   const again = sent();
   again.store.patch({ ...turn, pendingPhase: "listening" });
   expect(again.view().words.state).toBe("state.listening");
@@ -238,7 +242,7 @@ test("what is happening wins over the said text's working line, and over its car
   again.store.patch({ botLive: false, reconnectShown: true });
   expect(again.view().words.state).toBe("state.offline");
   const hold = people.map((p) => p.thread_id === "a" ? { ...p, reach: { state: "holding" } } : p);
-  expect(lines({ people: hold })).toBe("state.holding");
+  expect(lines({ people: hold })).toBe("");
   // Carried: the same, once the said text is over.
   const carried = sent();
   carried.time.advance(PAGE_MS + 1);
