@@ -132,6 +132,72 @@ describe("Governor: gives ground a step at a time, and takes it back", () => {
     expect(back.at - failed.at).toBeGreaterThan(16_000);
     expect(back.at - failed.at).toBeLessThan(20_000);
   });
+  it("a steady frame well under budget gets the full look back: 4 ms on the second rung is under 8 ms, and about 5.5 ms on the first", () => {
+    const g = new Governor();
+    g.start(1, 0); // (a transient slowdown stepped it down)
+    const { moves, at } = run(g, 0, 600, 4); // 20 s
+    expect(moves).toEqual([0]);
+    expect(g.tier).toBe(0);
+    expect(at).toBeGreaterThan(8000); // after a calm spell, not at once
+    expect(run(g, at, 900, 4).moves).toEqual([]); // and it holds there
+  });
+  it("a steady frame it expects to be over budget one rung up is left where it is", () => {
+    const g = new Governor();
+    g.start(1, 0);
+    // 6.5 ms on the second rung is about 9 ms on the first: over its 8 ms.
+    expect(run(g, 0, 5400, 6.5).moves).toEqual([]); // 3 minutes
+    expect(g.tier).toBe(1);
+  });
+  it("the rate comes back by the same rule: 5 ms steps from 20 to 30 fps, and no further up where the resolution would cost 7 ms", () => {
+    const g = new Governor();
+    const slow = TIERS.findIndex((t) => t.fps === 20);
+    g.start(slow, 0);
+    run(g, 0, 1500, 5); // 50 s
+    expect(TIERS[g.tier]).toEqual({ scale: 0.6, fps: 30 }); // the same pixels, so the same 5 ms: under 6
+    expect(g.tier).toBe(slow - 1);
+  });
+  /** A workload whose frames cost `fill` ms at the full resolution and go with the pixels drawn (the scale squared), plus `fixed`
+   *  ms that do not; `jitter` of it swings with the frames. Runs `secs` seconds from the rung `from`: the rungs it moved to, and
+   *  when it last moved (s). */
+  const workload = (fill: number, from: number, { secs = 600, fixed = 0, jitter = 0 } = {}) => {
+    const g = new Governor(), moves: number[] = [];
+    let lastAt = 0;
+    g.start(from, 0);
+    for (let at = 0, i = 0; at < secs * 1000; i++) {
+      const gap = g.every, noise = 1 + jitter * Math.sin(i * 1.7) * Math.cos(i * 0.31);
+      at += gap;
+      if (g.observe(at, (fixed + fill * g.scale ** 2) * noise, gap)) { moves.push(g.tier); lastAt = at / 1000; }
+    }
+    return { moves, tier: g.tier, lastAt };
+  };
+  it("never oscillates: whatever the workload and the rung it starts on, a step up it makes is never stepped back down", () => {
+    for (const fill of [2, 4, 5.5, 6.5, 7.5, 8.5, 10, 14, 30]) {
+      for (const fixed of [0, 2]) {
+        for (const jitter of [0, 0.15]) {
+          for (let from = 0; from < TIERS.length; from++) {
+            const { moves } = workload(fill, from, { fixed, jitter });
+            let tier = from, up = false;
+            for (const to of moves) {
+              if (to > tier) expect(up, `fill ${fill} fixed ${fixed} jitter ${jitter} from ${from}: ${moves}`).toBe(false); // down after an up
+              if (to < tier) up = true;
+              tier = to;
+            }
+          }
+        }
+      }
+    }
+  });
+  it("settles: a steady workload is given its rung within a minute and nothing moves for the nine after", () => {
+    // 12 ms at the full look: 8.7 ms on the second rung (over 8), 6.2 ms on the third (holds); one rung up from there is 8.7 again.
+    expect(workload(12, 0)).toMatchObject({ moves: [1, 2], tier: 2 });
+    expect(workload(12, 0).lastAt).toBeLessThan(60);
+    // 7.5 ms holds at the full look (under 8), though a rung that is stepped up to needs it under 6: where it stands it stays.
+    expect(workload(7.5, 0)).toMatchObject({ moves: [], tier: 0 });
+    expect(workload(7.5, 1)).toMatchObject({ moves: [], tier: 1 });
+    // 4 ms recovers from any rung, a step at a time, 8 s apart
+    expect(workload(4, TIERS.length - 1)).toMatchObject({ moves: [5, 4, 3, 2, 1, 0], tier: 0 });
+    expect(workload(4, TIERS.length - 1).lastAt).toBeLessThan(60);
+  });
   it("at a lower rate the same share of the thread allows a dearer frame: 10 ms holds at 20 fps, not at 30", () => {
     const slow = new Governor();
     slow.start(TIERS.findIndex((t) => t.fps === 20), 0);

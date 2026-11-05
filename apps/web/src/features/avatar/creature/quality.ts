@@ -4,7 +4,8 @@
  * WebGL, whose work (the pixels it fills, the shadow map it renders first) is what a cheap phone cannot keep up with. So
  *  - the canvas holds the pixels the tile shows (sceneSize), no more, within the stage's own 900 k px render;
  *  - a Governor watches what the frames cost and when they arrive, and steps down the resolution the creature is drawn at
- *    (TIERS), then the frame rate, until the frames hold; it steps back up when there is room and it did not just fail there.
+ *    (TIERS), then the frame rate, until the frames hold; it steps back up when the rung above is expected to hold with room to
+ *    spare, and it did not just fail there.
  * Pure: the host (host.ts) feeds it and applies what it says. */
 
 /** The canvas's height at most, as the creator's preview (960 px tall). */
@@ -54,8 +55,13 @@ const PAUSE_MS = 400;
 const OVER_FRAMES = 8;
 /** After a change the frames are not judged for this long: the new size, the first draw of a shadow map, a program compiling. */
 const SETTLE_MS = 1200;
-/** Room (cost under this share of the budget, nothing late) for this long before it steps back up, doubled each time a step up failed. */
+/** Room (the frame, as dear as it is expected to be on the rung above, under ROOM of that rung's limit; nothing late) for this
+ *  long before it steps back up, doubled each time a step up failed. */
 const CALM_MS = 8000, CALM_MAX_MS = 64_000;
+/** The share of a rung's limit a frame is expected to cost there for a step up to it to be tried. Under 1 so that what is
+ *  tried holds with some to spare: a step down needs the whole limit, so the gap between the two (ROOM to 1) is the hysteresis
+ *  that keeps a rung just stepped up to from being stepped down from on the first frames' noise. */
+const ROOM = 0.75;
 
 export class Governor {
   private index = 0;
@@ -74,6 +80,9 @@ export class Governor {
   get scale(): number { return this.tiers[this.tier].scale; }
   /** What a frame may cost on rung `index` (ms): the budget's share of the thread, at that rung's rate. */
   private limit(index: number): number { return this.budget * 30 / this.tiers[index].fps; }
+  /** By how much a frame is expected to cost more on rung `index` than on the one below it: the pixels it fills, which go with the
+   *  square of the scale (a frame's other costs do not, so this is the high estimate: a step up it allows is one that holds). */
+  private growth(index: number): number { const r = this.tiers[index].scale / this.tiers[index + 1].scale; return r * r; }
   /** The frames' spacing now (ms). On the last rung, a frame that still costs more than a sixth of the thread's time is spaced
    *  out until it does not (to 500 ms): a renderer with no GPU gets a slow creature, not a frozen page. */
   get every(): number {
@@ -113,7 +122,10 @@ export class Governor {
     }
     this.over = 0;
     if (this.calmFrom === -Infinity) this.calmFrom = now;
-    if (this.index > 0 && this.cost < this.limit(this.index - 1) * 0.4 && this.late < 1.1 && now - this.calmFrom > this.calm) {
+    // Up when the frame, as dear as it is expected to be on the rung above, would be under ROOM of that rung's limit there (a
+    // steady 4 ms on the second rung is 5.5 ms on the first: under 6), not when it is under a fixed share of the budget now.
+    const up = this.index - 1;
+    if (up >= 0 && this.cost * this.growth(up) < this.limit(up) * ROOM && this.late < 1.1 && now - this.calmFrom > this.calm) {
       this.upAt = now;
       return this.move(this.index - 1, now);
     }

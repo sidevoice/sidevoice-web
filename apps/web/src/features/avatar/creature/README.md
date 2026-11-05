@@ -47,8 +47,9 @@ throttle is under 1 ms of script and 3–6 ms of three.js submit; the rest is th
 So `quality.ts` holds the knobs: the canvas's size (`sceneSize`), the key light's shadow map (512², its filter radius in
 proportion so the soft edge keeps its size), no preserved drawing buffer, and a `Governor` the frame loop (`host.ts`)
 feeds with each frame's cost and lateness: it steps the resolution down (`TIERS`: 1, .85, .72, .6 of the full size), then
-the rate (30, 20, 15 fps, even on a 60 Hz screen) until the frames hold, and back up after a calm spell (doubling the wait
-each time a step up failed). A stage on its last rung that still costs more than a sixth of the thread spaces its frames
+the rate (30, 20, 15 fps, even on a 60 Hz screen) until the frames hold, and back up after a calm spell once the rung above
+is expected to hold with room to spare (a frame's cost goes with its pixels, so a steady 4 ms on the second rung is about
+5.5 ms on the first, under 6; a step down needs the whole 8), doubling the wait each time a step up failed. A stage on its last rung that still costs more than a sixth of the thread spaces its frames
 out (to 500 ms), as the page's no-GPU case always did. Only frames of motion are judged (a creature held still, or its
 first frames, which compile programs, are not), so a stage that asks for few frames is never redrawn at another size. `creatureQuality.pin(n)` fixes a rung (diagnostics, tests).
 
