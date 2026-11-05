@@ -23,6 +23,18 @@ export function fitCanvas(width: number, height: number, ratio: number): { width
   return width / height > ratio ? { width: height * ratio, height } : { width, height: width / ratio };
 }
 
+/** The shape a tile takes in a slot: the slot's own, kept between the narrowest and the widest the form factor allows
+ *  (operator, 2026-11-05: use the room there is, from a phone's portrait to a wide window, but never a strip). */
+export function stageShape(width: number, height: number, [narrowest, widest]: readonly [number, number]): number {
+  return Math.min(widest, Math.max(narrowest, width / height));
+}
+
+/** A range of ratios as the stylesheet writes it, "narrowest, widest" ("9 / 16, 21 / 9"); one ratio is a fixed shape. */
+function parseRange(value: string): [number, number] | null {
+  const [low, high = low] = value.split(",").map((part) => parseRatio(part.trim()));
+  return low > 0 && high > 0 ? [Math.min(low, high), Math.max(low, high)] : null;
+}
+
 /** A ratio as CSS writes it: "16 / 9", "3/2" or "1". */
 function parseRatio(value: string): number {
   const [over, under = "1"] = value.split("/");
@@ -51,7 +63,8 @@ export function useSceneScale() {
       // A slot holding the tile: the tile itself takes its shape, as large as the slot allows (a slide in its window).
       const tile = node.querySelector<HTMLElement>(":scope > .stage-tile");
       if (tile) {
-        const shape = parseRatio(getComputedStyle(tile).getPropertyValue("--stage-ratio"));
+        const range = parseRange(getComputedStyle(tile).getPropertyValue("--stage-ratio"));
+        const shape = range ? stageShape(width, height, range) : NaN;
         if (shape > 0) {
           const fitted = fitCanvas(width, height, shape);
           tile.style.width = fitted.width + "px";
