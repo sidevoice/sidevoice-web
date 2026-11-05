@@ -4,9 +4,9 @@ import { pcg32 } from "../engine/core";
 /* What a creature can be, and which one a conversation gets. The tables, the rarity and the colour harmony are the frozen
  * design reference's creator (reference/2026-11-04/src/creator.js: BODIES, PAL, IRIS, SLOTS, RARE, UNCOMMON, FILL, RATES,
  * T25 harmonyAccent and harmonyIris, the Random button, specOf), with one change: where the creator throws Math.random,
- * a conversation's creature draws from a stream seeded by its identity (its thread id), in the same order, so the same
- * conversation gets the same creature on every reload and every device, and nothing is stored. Nothing here needs
- * three.js: the stage's tint (avatarColor) and the tests read a creature without drawing it.
+ * a conversation's creature draws from a stream seeded by its identity (its key, `<machine fingerprint>|<thread id>`), in
+ * the same order, so the same conversation gets the same creature on every reload and every device, and nothing is
+ * stored. Nothing here needs three.js: the stage's tint (avatarColor) and the tests read a creature without drawing it.
  *
  * The slots are the creator's, with the accessories accessories.js registers appended to their slot in registration
  * order, exactly as the creator builds them at load; catalogue.test.ts holds this table to those registries. */
@@ -149,7 +149,7 @@ export function creatureStream(seed: string): Random {
 }
 
 const rolled = new Map<string, CreatureChoice>();
-/** The creature of the conversation behind `seed` (its thread id). */
+/** The creature of the conversation behind `seed` (its key, `<machine fingerprint>|<thread id>`). */
 export function creatureFromSeed(seed: string): CreatureChoice {
   let choice = rolled.get(seed);
   if (!choice) {

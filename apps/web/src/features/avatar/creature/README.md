@@ -11,7 +11,7 @@ eyes (Void, MIT: see `THIRD_PARTY_NOTICES.md`).
 | `rig.js` | the rig (`Creature3D`) and the stage that draws it (`Stage`): the 18 bodies, the eyes and lids, the toon ink shader (paint level `v1`), the outline, the shadows, the states' motion (`STATES3D`). Plain JavaScript, kept diffable line by line against the reference's `creature3d.js`; `rig.d.ts` declares what TypeScript reads of it |
 | `accessories.js` | the ears, hats, face items and eyewear, and the special eye styles, registered into the rig's registries. The reference's file, unchanged but for its header and the rig's file name |
 | `acts.js` | the acts' shared kit and, so far, the busy cogs every working state shows. The moods, working styles and pastimes come over from the reference's `acts.js` into this file |
-| `catalogue.ts` | what a creature can be (bodies, palette, irises, slots, rarity, colour harmony) and which one a conversation gets: the creator's Random button, its `Math.random` replaced by a stream seeded with the conversation's id. No three.js |
+| `catalogue.ts` | what a creature can be (bodies, palette, irises, slots, rarity, colour harmony) and which one a conversation gets: the creator's Random button, its `Math.random` replaced by a stream seeded with the conversation's key (`<machine fingerprint>\|<thread id>`). No three.js |
 | `faces.ts` | how a still face looks in each state |
 | `fallback.ts` | what stands in where no creature can be drawn: the body colour in a plain outline, no face. No three.js |
 | `host.ts` | where creatures are drawn: two stages per page, the live loop (about 30 frames a second), the still faces, the framings, the pointer gaze; what happens when WebGL is missing, refused or lost |

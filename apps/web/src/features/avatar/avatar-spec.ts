@@ -1,8 +1,8 @@
 /* What an avatar shows, and how it is feeling. A conversation's agent is a creature rolled from the conversation's
- * identity (its thread id) and nothing else: the same conversation gets the same creature on every reload and every
- * device, and nothing is stored (creature/catalogue.ts). Choosing one by hand, and keeping the choice, is
- * sidevoice/sidevoice-web#65. The creature is drawn by creature/ (a 3D rig); the person and the mascot are still the
- * bichos engine's drawings (engine/, reached through bicho-draw.ts). The kind keeps its old name, "bicho". */
+ * identity (its key, `<machine fingerprint>|<thread id>`) and nothing else: the same conversation gets the same creature
+ * on every reload and every device, and nothing is stored (creature/catalogue.ts). Choosing one by hand, and keeping the
+ * choice, is sidevoice/sidevoice-web#65. The creature is drawn by creature/ (a 3D rig); the person and the mascot are
+ * still the bichos engine's drawings (engine/, reached through bicho-draw.ts). The kind keeps its old name, "bicho". */
 
 /** What an avatar draws: a conversation's creature ("bicho"), the person's own, or — only when asked for by name — the
  *  Sidevoice mascot. A seed is never read as a mascot's name. */
@@ -12,7 +12,8 @@ export type AvatarSpec = { kind: "bicho"; seed: string } | { kind: "person"; hol
  *  (features/call/conversation-state.ts derives them). `present` is the person in a call, not speaking. */
 export type AvatarMood = "offline" | "speaking" | "listening" | "working" | "idle" | "present";
 
-/** The creature of the agent behind `identity` (the conversation's thread id). */
+/** The creature of the agent behind `identity`: the conversation's key, `<machine fingerprint>|<thread id>`
+ *  (state/room-session-state.js conversationKey). */
 export function avatarFor(identity: string): AvatarSpec {
   return { kind: "bicho", seed: identity };
 }
