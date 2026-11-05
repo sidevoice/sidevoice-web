@@ -101,28 +101,32 @@ export function spokenPage(text, spoken, max = SURFACE_PAGE_CHARS, locale) {
 
 /** What a call is doing, resolved by ONE precedence (the stage's mood, the card's state line, the native call surface and
  *  its Live Activity all read it, so web, iOS and Android agree): offline > the person's turn (listening, transcribing) >
- *  speaking > working > holding > idle. Holding is a standing condition, so it takes idle's place; what is happening now
- *  always wins. `turn` is the person's open turn ('listening', 'transcribing') or null. */
-export function callState({ offline, turn, speaking, working, holding }) {
+ *  speaking > said > working > holding > idle. Holding is a standing condition, so it takes idle's place; what is happening
+ *  now always wins. `turn` is the person's open turn ('listening', 'transcribing') or null. `said`: the person's words just
+ *  sent are up, which only the native surface shows; while they are, they are all it says (D-LA-SAID-PRECEDENCE). */
+export function callState({ offline, turn, speaking, said = false, working, holding }) {
     if (offline)
         return 'offline';
     if (turn === 'listening' || turn === 'transcribing')
         return turn;
     if (speaking)
         return 'speaking';
+    if (said)
+        return 'said';
     if (working)
         return 'working';
     return holding ? 'holding' : 'idle';
 }
 /** The line that says what the call is doing, in the page's words: the same words the stage, the card and the wave say
  *  for it (conversation-state.ts moodText, wave.transcribingTitle). */
-function stateKey(card) {
+function stateKey(card, said) {
     const state = callState({ offline: card.busyReason === 'reconnecting' || card.mood === 'offline',
-        turn: card.turn ?? (card.mood === 'listening' ? 'listening' : null), speaking: card.mood === 'speaking', working: card.mood === 'working', holding: card.mood === 'holding' });
+        turn: card.turn ?? (card.mood === 'listening' ? 'listening' : null), speaking: card.mood === 'speaking', said, working: card.mood === 'working', holding: card.mood === 'holding' });
     return STATE_KEYS[state];
 }
+/** Your words have no line of their own: under the title they are all there is. */
 const STATE_KEYS = { offline: 'state.offline', listening: 'state.listening', transcribing: 'wave.transcribingTitle', speaking: 'state.speaking',
-    working: 'state.working', holding: 'state.holding', idle: 'state.resting' };
+    said: null, working: 'state.working', holding: 'state.holding', idle: 'state.resting' };
 
 /** The words the surface draws, resolved in the page's language (the web catalogue under the app's overlay). A
  *  native catalogue never holds them. `offline` is always there, whatever the state: what a host cannot vouch for any
@@ -154,22 +158,25 @@ export function callSurfaceView(card, participants, live, say, call, previous) {
     const reach = row?.reach ?? null;
     const others = participants.filter(p => p.threadId !== card.conversation).slice(0, SURFACE_OTHERS);
     const keeping = card.busyReason === 'switching' && previous;
-    const key = stateKey(card);
-    // The person's words just sent (their said text is up) are not a state: while nothing else is happening the call is
-    // working on them, and a native surface says so at once, not after the 3 s the stage waits before it shows Working
-    // (D-LA-SAID-STATE). It goes on saying so, as long as the same conversation stays busy, until the stage's Working
+    const thread = card.conversation ?? null;
+    const key = stateKey(card, false);
+    // The person's words just sent (their said text is up) win over what the call is doing under them, working included:
+    // while they show, a native surface draws them and no state line (D-LA-SAID-PRECEDENCE). Only what is happening now
+    // (the person's turn, the voice, offline) takes over.
+    const said = !!thread && !!live?.said && stateKey(card, true) === null;
+    // Once they are over, the call is working on them, and the surface says so at once, not after the 3 s the stage waits
+    // before it shows Working. It goes on saying so, as long as the same conversation stays busy, until the stage's Working
     // takes over (the said text lasts 3 s from the message and the stage's wait 3 s from the work's start: between them the
     // line would drop to Resting and back). Only the native surface's snapshot: the stage and the card keep their own wait.
-    const thread = card.conversation ?? null;
     const saying = key === 'state.resting' && !!thread
         && (!!live?.said || (previous?.saying === thread && call.busySince != null));
-    const line = keeping ? previous.words.state : say(saying ? 'state.working' : key);
+    const line = keeping ? previous.words.state : said ? '' : say(saying ? 'state.working' : key);
     return {
         pendingCancellable: !!call.pendingCancellable,
         reach,
         model: row?.model ?? null, effort: row?.effort ?? null, machine: row?.machine ?? null,
         // Since when the call's conversation has been busy without a break, while it shows as working; absent when the room does not know.
-        workingSince: keeping ? previous.workingSince ?? null : key === 'state.working' && call.workingSince != null ? call.workingSince
+        workingSince: keeping ? previous.workingSince ?? null : said ? null : key === 'state.working' && call.workingSince != null ? call.workingSince
             : saying && call.busySince != null ? call.busySince : null,
         conversationCount: participants.length,
         others: others.map(p => ({ threadId: p.threadId, title: p.title, reach: p.reach, unread: p.unread, still: ref(live, p.threadId, FACE_PX) })),
