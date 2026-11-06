@@ -40,6 +40,9 @@ export interface CallControlsState {
    *  middle (below it in the upper half, above it in the lower), and the avatar's dock opens on its left or right.
    *  Absent: upper right. */
   place?: { vertical: "upper" | "lower"; horizontal: "left" | "right" };
+  /** The room the avatar's creature has to each side before the screen's work area ends (CSS pixels, from its box's edges). The avatar's voice
+   *  text is centred on the creature and slides inward by what is missing on a side. Absent where the host cannot tell: always centred. */
+  room?: { left: number; right: number };
   /** The picture-in-picture's window, as the person last resized it (CSS pixels, its margin included); null or absent at
    *  a preset size, which the card lays out itself (`layout`). */
   size?: { width: number; height: number } | null;
