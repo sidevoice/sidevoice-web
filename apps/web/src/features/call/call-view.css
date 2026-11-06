@@ -33,9 +33,9 @@
  * window width's. */
 .stage-tile { --stage-ref: 600; --u: calc(var(--k, 1) * 440px / var(--stage-ref));
   --stage-inset: calc(16 * var(--u)); --entry: clamp(36px, calc(44 * var(--u)), 56px);
-  --chip-fs: clamp(11px, calc(12 * var(--u)), 15px); --name-fs: clamp(14px, calc(20 * var(--u)), 26px);
-  --bubble-fs: clamp(18px, calc(25.6 * var(--u)), 34px); --bubble-lh: 1.375; --bubble-pad: 24; --peek: 20; --tail-w: calc(72 * var(--u)); --tail-h: calc(40 * var(--u));
-  --person-fs: clamp(16px, calc(22.4 * var(--u)), 28px); --person-lh: 1.4286; --person-pad-b: 12; --person-pad-i: 20; --person-live-w: 272;
+  --chip-fs: calc(clamp(11px, calc(12 * var(--u)), 15px) * var(--sv-stage-text-scale, 1)); --name-fs: calc(clamp(14px, calc(20 * var(--u)), 26px) * var(--sv-stage-text-scale, 1));
+  --bubble-fs: calc(clamp(18px, calc(25.6 * var(--u)), 34px) * var(--sv-stage-text-scale, 1)); --bubble-lh: 1.375; --bubble-pad: 24; --peek: 20; --tail-w: calc(72 * var(--u)); --tail-h: calc(40 * var(--u));
+  --person-fs: calc(clamp(16px, calc(22.4 * var(--u)), 28px) * var(--sv-stage-text-scale, 1)); --person-lh: 1.4286; --person-pad-b: 12; --person-pad-i: 20; --person-live-w: 272;
   --fig-px: min(calc(var(--stage-avatar-share, .56) * 440px * var(--k, 1)), var(--stage-avatar-max, 420px)); }
 /* The person's balloon's height: three of its whole-pixel lines, its margins and padding. Where the balloons are laid (the
  * tile), from that place's own sizes. */
@@ -59,8 +59,8 @@
   .stage-tile[data-mood] { --stage-ratio: fill; --stage-ref: 360; --u: calc(var(--kw, var(--k, 1)) * 440px / var(--stage-ref)); }
   /* The phone's slide: a tighter inset, smaller balloons and a smaller tail. */
   .stage-tile { --stage-inset: calc(12 * var(--u));
-    --bubble-fs: clamp(18px, calc(22.4 * var(--u)), 34px); --bubble-lh: 1.4286; --bubble-pad: 20; --peek: 16; --tail-w: calc(58 * var(--u)); --tail-h: calc(32 * var(--u));
-    --person-fs: clamp(16px, calc(19.2 * var(--u)), 28px); --person-lh: 1.5; --person-pad-b: 8; --person-pad-i: 16; --person-live-w: 240; }
+    --bubble-fs: calc(clamp(18px, calc(22.4 * var(--u)), 34px) * var(--sv-stage-text-scale, 1)); --bubble-lh: 1.4286; --bubble-pad: 20; --peek: 16; --tail-w: calc(58 * var(--u)); --tail-h: calc(32 * var(--u));
+    --person-fs: calc(clamp(16px, calc(19.2 * var(--u)), 28px) * var(--sv-stage-text-scale, 1)); --person-lh: 1.5; --person-pad-b: 8; --person-pad-i: 16; --person-live-w: 240; }
 }
 .stage-canvas { position: absolute; inset: 0; overflow: hidden;
   background: radial-gradient(circle at 50% 55%, color-mix(in srgb, var(--av-color, var(--sv-accent)) 18%, transparent), transparent 60%), var(--sv-stage-bg); }
@@ -161,7 +161,7 @@
 /* The same balloon in the transcript's message list (MessageList): capped like the final chat bubble at 86% or 34rem,
  * drawn as the stage's for a tile of about 590px (--u); no corner to sit in, so it flows, its tail hung below it. */
 .person-turns[data-inline] { --u: .75px; --peek: 20; --tail-w: calc(72 * var(--u)); --tail-h: calc(40 * var(--u));
-  --person-fs: clamp(16px, calc(22.4 * var(--u)), 28px); --person-lh: 1.4286; --person-pad-b: 12; --person-pad-i: 20;
+  --person-fs: calc(clamp(16px, calc(22.4 * var(--u)), 28px) * var(--sv-stage-text-scale, 1)); --person-lh: 1.4286; --person-pad-b: 12; --person-pad-i: 20;
   --live-w: min(86%, 34rem); --live-h: auto; position: relative; inset: auto; align-items: flex-end; width: 100%; margin-bottom: var(--tail-h); }
 .person-turns[data-inline] .person-bubble { max-width: min(86%, 34rem); }
 .person-bubble { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: calc(4 * var(--u)) calc(8 * var(--u));
@@ -171,7 +171,7 @@
   isolation: isolate; border: 0; background: none; box-shadow: none; }
 .person-turns .balloon-tail { left: auto; right: calc(6 * var(--u)); }
 /* Taking the turn back, said as clearly as the bars over it: on the slide too, never under 24px to touch. */
-.person-bubble .ui-button.cancel-input { flex: none; height: max(28px, 2.1333em); padding: 0 .6em; gap: .4em; font-size: clamp(13px, calc(15 * var(--u)), 18px); }
+.person-bubble .ui-button.cancel-input { flex: none; height: max(28px, 2.1333em); padding: 0 .6em; gap: .4em; font-size: calc(clamp(13px, calc(15 * var(--u)), 18px) * var(--sv-stage-text-scale, 1)); }
 .person-bubble .ui-button.cancel-input svg { width: 1.0667em; height: 1.0667em; }
 /* Speaking again: the sent one lifts away from the very place the bars come in, under them. */
 .person-turns > .person-bubble[data-under] { position: absolute; right: 0; bottom: 0; }
@@ -237,7 +237,7 @@
 .call-bar-end .transcript-entry { position: relative; width: var(--sv-call-button); height: var(--sv-call-button); }
 
 /* Centred, its mark inline with the first line however many lines it takes. */
-.join-status { grid-row: 1; align-self: end; max-width: min(100%, 30rem); font-size: var(--sv-font-xs); line-height: 1rem; font-weight: var(--sv-weight-semibold); text-align: center; color: var(--sv-text-muted); }
+.join-status { grid-row: 1; align-self: end; max-width: min(100%, 30rem); font-size: var(--sv-font-xs); line-height: calc(1rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-semibold); text-align: center; color: var(--sv-text-muted); }
 .join-status > svg { display: inline-block; margin-inline-end: var(--sv-space-1-5); vertical-align: -3px; }
 .join-status[data-state="failed"] { color: var(--sv-danger); }
 .join-status-dot { display: inline-block; width: 8px; height: 8px; margin-inline-end: var(--sv-space-1-5); vertical-align: 0; border-radius: 50%; background: var(--sv-accent); animation: call-join-pulse 1.4s ease-in-out infinite; }
@@ -407,10 +407,10 @@
  * action under its words. In a popover under the title. */
 .call-details { display: grid; gap: var(--sv-space-4); min-width: 0; }
 .call-details-group { display: grid; gap: var(--sv-space-1-5); min-width: 0; }
-.call-details-group h3 { margin: 0; font-size: var(--sv-font-xs); line-height: 1rem; font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
-.call-details-machine { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; margin: 0; font-size: var(--sv-font-md); line-height: 1.375rem;
+.call-details-group h3 { margin: 0; font-size: var(--sv-font-xs); line-height: calc(1rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
+.call-details-machine { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; margin: 0; font-size: var(--sv-font-md); line-height: calc(1.375rem * var(--sv-line-k, 1));
   font-weight: var(--sv-weight-semibold); color: var(--sv-text); overflow-wrap: anywhere; }
-.call-details-agent { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sv-space-1) var(--sv-space-3); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.call-details-agent { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sv-space-1) var(--sv-space-3); margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); }
 .call-details-agent > div { display: contents; }
 .call-details-agent dt { color: var(--sv-text-muted); }
 .call-details-agent dd { display: flex; align-items: center; gap: var(--sv-space-1-5); min-width: 0; margin: 0; font-weight: var(--sv-weight-semibold); color: var(--sv-text); overflow-wrap: anywhere; }
@@ -423,8 +423,8 @@
 .voice-model-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--sv-surface); color: var(--sv-text-muted); }
 .voice-model[data-attention] .voice-model-icon { color: var(--sv-warning); }
 .voice-model-copy { display: grid; min-width: 0; }
-.voice-model-task, .voice-model-where { font-size: var(--sv-font-xs); line-height: 1rem; color: var(--sv-text-muted); }
-.voice-model-id { overflow: hidden; font-size: var(--sv-font-sm); line-height: 1.25rem; font-weight: var(--sv-weight-semibold); white-space: nowrap; text-overflow: ellipsis; color: var(--sv-text); }
+.voice-model-task, .voice-model-where { font-size: var(--sv-font-xs); line-height: calc(1rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
+.voice-model-id { overflow: hidden; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-semibold); white-space: nowrap; text-overflow: ellipsis; color: var(--sv-text); }
 .voice-model-state::before { content: "·"; margin-inline: .35em; }
 .voice-model[data-attention] .voice-model-state { font-weight: var(--sv-weight-semibold); color: var(--sv-text); }
 .voice-model-action { grid-column: 2; justify-self: start; }
@@ -454,7 +454,7 @@
  * screen above the call's controls, as the bar did. */
 .ui-popover.audio-devices { width: min(18rem, calc(100vw - 24px)); padding: var(--sv-space-3) var(--sv-space-4) var(--sv-space-4); border-radius: var(--sv-radius-xl); }
 @media (max-width: 559px), (max-width: 899px) and (pointer: coarse) { .ui-popover.audio-devices { width: calc(100vw - 24px); } }
-.audio-devices-note, .audio-devices-lost, .audio-devices-error { display: flex; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.audio-devices-note, .audio-devices-lost, .audio-devices-error { display: flex; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
 .audio-devices-choice { display: grid; gap: var(--sv-space-1); min-width: 0; }
 .audio-devices-lost { color: var(--sv-text); }
 .audio-devices-error { flex-direction: column; align-items: flex-start; gap: 0; color: var(--sv-danger); }
@@ -470,7 +470,7 @@
 .call-bar .controls .call-listen-note { bottom: calc(var(--sv-call-button) + 3 * var(--sv-space-2)); }
 :is(.mic-silent-note, .call-listen-note) { position: absolute; z-index: 4; left: 50%; bottom: calc(100% + var(--sv-space-2)); transform: translateX(-50%); display: inline-flex; align-items: center; gap: var(--sv-space-1-5);
   width: max-content; max-width: min(320px, calc(100vw - 2 * var(--sv-space-4))); padding: var(--sv-space-1-5) var(--sv-space-3); border: 1px solid color-mix(in srgb, var(--sv-warning) 45%, transparent);
-  border-radius: var(--sv-radius-lg); background: var(--sv-warning-soft); color: var(--sv-text); font-size: var(--sv-font-sm); line-height: 1.25rem; box-shadow: var(--sv-shadow-sm); }
+  border-radius: var(--sv-radius-lg); background: var(--sv-warning-soft); color: var(--sv-text); font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); box-shadow: var(--sv-shadow-sm); }
 :is(.mic-silent-note, .call-listen-note) svg { flex: none; color: var(--sv-state-attention); }
 /* Listen only is no warning: the same note, quiet. */
 .call-listen-note { border-color: var(--sv-border); background: var(--sv-bg-sunken); }
@@ -494,8 +494,8 @@
   border: 1px solid var(--sv-border); border-radius: var(--sv-radius-2xl); background: var(--sv-stage-bg); text-align: center;
 }
 .voice-setup-mark { display: grid; place-items: center; width: 56px; height: 56px; border-radius: var(--sv-radius-xl); background: var(--sv-accent-soft); color: var(--sv-accent-text); }
-.voice-setup-card h1 { margin: var(--sv-space-2) 0 0; font-size: var(--sv-font-xl); line-height: 1.625rem; font-weight: var(--sv-weight-bold); letter-spacing: -.015em; color: var(--sv-text); }
-.voice-setup-card > p { max-width: 42ch; margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
+.voice-setup-card h1 { margin: var(--sv-space-2) 0 0; font-size: var(--sv-font-xl); line-height: calc(1.625rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-bold); letter-spacing: -.015em; color: var(--sv-text); }
+.voice-setup-card > p { max-width: 42ch; margin: 0; line-height: calc(1.5rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
 .voice-setup-card > .voice-models { justify-self: stretch; margin-top: var(--sv-space-3); text-align: start; }
 .voice-model-progress { grid-column: 1 / -1; width: 100%; height: 4px; accent-color: var(--sv-accent); }
 

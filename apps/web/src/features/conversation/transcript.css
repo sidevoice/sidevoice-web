@@ -61,13 +61,13 @@
 @media (min-width: 900px) and (prefers-reduced-motion: reduce) {
   .call-layout > .transcript, .call-layout > .transcript:not([data-open]) { transition: none; }
 }
-.transcript { font: 14.5px/1.42 var(--sv-font-sans); letter-spacing: -.005em; }
+.transcript { font: calc(14.5px * var(--sv-text-scale, 1)) / 1.42 var(--sv-font-sans); letter-spacing: -.005em; }
 .transcript-grab, .transcript-scrim { display: none; }
 
 /* The head (T58, T59): the transcript's three lines in a soft square, "Transcript", and the ×. */
 .transcript-head { display: flex; flex: none; align-items: center; gap: 8px; min-width: 0; padding: 10px 10px 9px 16px; border-bottom: 1px solid var(--tr-line); }
 .transcript-heading { display: grid; flex: 1; min-width: 0; margin: 0; font-size: inherit; font-weight: inherit; line-height: 1.2; }
-.transcript-title { display: inline-flex; align-items: center; gap: 9px; min-width: 0; font-size: 16px; font-weight: 650; }
+.transcript-title { display: inline-flex; align-items: center; gap: 9px; min-width: 0; font-size: calc(16px * var(--sv-text-scale, 1)); font-weight: 650; }
 .transcript-icon { display: grid; flex: none; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: var(--tr-icon-bg); color: var(--tr-icon-ink); }
 .transcript-close {
   appearance: none; position: relative; display: grid; flex: none; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%;
@@ -87,7 +87,7 @@
 .messages-content { display: flex; flex-direction: column; gap: 14px; min-width: 0; margin-top: auto; }
 .message-day {
   align-self: center; margin: 0; padding: 2px 10px; border: 1px solid var(--tr-day-edge); border-radius: 999px; background: transparent;
-  font-size: 11.5px; font-weight: 600; letter-spacing: .01em; color: var(--tr-tag-ink);
+  font-size: calc(11.5px * var(--sv-text-scale, 1)); font-weight: 600; letter-spacing: .01em; color: var(--tr-tag-ink);
 }
 /* A run: the agent's at the left, its creature floating over the foot of its last message and taking no room (T41); the
  * person's at the right. */
@@ -102,14 +102,14 @@
 .chat-face > .sv-avatar { display: block; width: 100%; height: 100%; background: none; }
 .chat-face > .sv-avatar > :is(canvas, .creature-fallback) { filter: drop-shadow(0 2px 2px rgb(42 26 64 / 22%)); }
 /* A run from no known conversation keeps its initials, where the face would be. */
-.chat-face > .ui-avatar { display: grid; place-items: center; width: 32px; height: 32px; margin: 6px; border-radius: 50%; background: var(--tr-icon-bg); color: var(--tr-play-ink); font-size: 12px; font-weight: 700; }
+.chat-face > .ui-avatar { display: grid; place-items: center; width: 32px; height: 32px; margin: 6px; border-radius: 50%; background: var(--tr-icon-bg); color: var(--tr-play-ink); font-size: calc(12px * var(--sv-text-scale, 1)); font-weight: 700; }
 
 /* ----- a message (T40): the stage cards' face, colours and edge in a chat bubble's shape; the run's last tucked toward
  * its speaker. */
 .chat-bubble {
   min-width: 0; max-width: 82%; padding: 9px 14px 10px; border: 1px solid var(--tr-bubble-edge); border-radius: 20px;
   background: var(--tr-bubble); color: var(--tr-bubble-ink); box-shadow: var(--tr-bubble-shadow);
-  font: 450 15.5px/22px var(--sv-font-sans); letter-spacing: -.01em; text-wrap: pretty; white-space: pre-wrap; overflow-wrap: anywhere;
+  font: 450 calc(15.5px * var(--sv-text-scale, 1)) / calc(22px * var(--sv-line-k, 1)) var(--sv-font-sans); letter-spacing: -.01em; text-wrap: pretty; white-space: pre-wrap; overflow-wrap: anywhere;
 }
 /* The agent's messages, once said, are laid over what follows them (their shadows over the next run's top), as the
  * reference stacks them; the person's and the live rows lie in the flow. */
@@ -123,7 +123,7 @@
  * person's with the ticks. */
 .chat-meta {
   float: right; display: inline-flex; align-items: center; gap: 5px; margin: 7px -5px -5px 12px;
-  font-size: 11.5px; line-height: 1; color: var(--tr-time); white-space: nowrap;
+  font-size: calc(11.5px * var(--sv-text-scale, 1)); line-height: 1; color: var(--tr-time); white-space: nowrap;
 }
 .chat-receipt { display: inline-flex; color: var(--tr-time); }
 .chat-receipt[data-state="read"] { color: var(--tr-accent); }
@@ -136,7 +136,7 @@
 .listen-again:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
 /* Small to the eye, not to a finger: its tap area reaches past what it draws. */
 .listen-again::after { content: ""; position: absolute; inset: -11px; }
-.chat-audio-note { display: block; clear: both; padding-top: 4px; font-size: 12px; line-height: 16px; color: var(--tr-time); white-space: normal; }
+.chat-audio-note { display: block; clear: both; padding-top: 4px; font-size: calc(12px * var(--sv-text-scale, 1)); line-height: calc(16px * var(--sv-line-k, 1)); color: var(--tr-time); white-space: normal; }
 
 /* Taking a written draft back: the person's round ×, its own line, at the end. */
 .chat-bubble[data-draft] > .turn-cancel { float: right; margin: 0 -6px 0 9px; }
@@ -146,7 +146,7 @@
 .chat-text[data-fold="folded"] { white-space: pre-line; display: -webkit-box; -webkit-line-clamp: var(--fold-lines, 10); -webkit-box-orient: vertical; overflow: hidden; }
 .see-more {
   appearance: none; display: inline-block; margin: 5px 0 0; padding: 0; border: 0; background: none; cursor: pointer;
-  font: inherit; font-size: 14px; font-weight: 600; letter-spacing: inherit; color: var(--tr-accent);
+  font: inherit; font-size: calc(14px * var(--sv-text-scale, 1)); font-weight: 600; letter-spacing: inherit; color: var(--tr-accent);
 }
 .see-more:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: 4px; }
 
@@ -165,7 +165,7 @@
 }
 .cut-tag {
   display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 999px; vertical-align: 1px;
-  font-size: 11.5px; font-weight: 600; line-height: 18px; color: var(--tr-tag-ink); background: var(--tr-tag-bg); white-space: nowrap;
+  font-size: calc(11.5px * var(--sv-text-scale, 1)); font-weight: 600; line-height: calc(18px * var(--sv-line-k, 1)); color: var(--tr-tag-ink); background: var(--tr-tag-bg); white-space: nowrap;
 }
 
 /* ----- a reply that never played ('bubble-badge', T49–T57): folded, a grey bubble with the struck circle and its first
@@ -200,7 +200,7 @@
 /* Opened, down, hovered or not. */
 .chat-bubble.unheard[data-open] .unheard-chevron { transform: rotate(90deg); }
 .unheard-badge {
-  grid-column: 2; justify-self: start; padding: 0 7px; border-radius: 999px; font-size: 11.5px; font-weight: 650; line-height: 18px; letter-spacing: .01em;
+  grid-column: 2; justify-self: start; padding: 0 7px; border-radius: 999px; font-size: calc(11.5px * var(--sv-text-scale, 1)); font-weight: 650; line-height: calc(18px * var(--sv-line-k, 1)); letter-spacing: .01em;
   color: var(--tr-tag-ink); background: var(--tr-tag-bg); white-space: nowrap;
 }
 .unheard-snippet { grid-column: 2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -209,7 +209,7 @@
 
 /* ----- the conversation working on the person's turn ('label', T51): a quiet row, its dot in the creature's accent */
 .chat-bubble.working { display: flex; align-items: center; gap: 8px; width: 82%; border-color: transparent; background: none; box-shadow: none; }
-.working-label { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--tr-tag-ink); }
+.working-label { display: inline-flex; align-items: center; gap: 7px; font-size: calc(13.5px * var(--sv-text-scale, 1)); color: var(--tr-tag-ink); }
 /* The working glyph (StateGlyph): three dots in the working state's colour, blinking as the conversations' dot does (ui.css). */
 .working-label > svg { width: 16px; height: 16px; }
 /* A running ellipsis after a live row's word. */
@@ -262,12 +262,12 @@
 .composer-field:focus-within { border-color: var(--sv-focus); }
 .text-composer .composer-field .ui-textarea {
   flex: 1; min-width: 0; padding: 5.35px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none;
-  font-size: 15px; line-height: 1.42; letter-spacing: inherit; color: var(--tr-ink);
+  font-size: calc(15px * var(--sv-text-scale, 1)); line-height: 1.42; letter-spacing: inherit; color: var(--tr-ink);
 }
 .text-composer .composer-field .ui-textarea::placeholder { color: var(--tr-field-ink); }
 /* A touch screen keeps the field's text at 16px (ui.css), or Safari zooms the page in as it is focused: the field stays
  * 44px tall all the same. */
-@media (pointer: coarse) { .text-composer .composer-field .ui-textarea { padding-block: 4.64px; font-size: 16px; } }
+@media (any-pointer: coarse) { .text-composer .composer-field .ui-textarea { padding-block: 4.64px; font-size: max(16px, var(--sv-font-md)); } }
 .text-composer .composer-field .ui-textarea:focus, .text-composer .composer-field .ui-textarea:focus-visible { outline: none; }
 .text-composer .composer-field .ui-textarea:disabled { background: transparent; }
 .text-composer .composer-send { flex: none; align-self: flex-end; width: 32px; height: 32px; border-radius: 50%; background: var(--sv-accent); color: var(--sv-on-accent); }
@@ -362,4 +362,4 @@
 .messages-content:has(> .messages-empty) { flex: 1; }
 .messages-empty { display: grid; justify-items: center; align-content: center; gap: 12px; margin: auto 0; padding: 32px 24px; text-align: center; color: var(--tr-time); }
 .messages-empty svg { color: var(--tr-tag-ink); }
-.messages-empty p { max-width: 28ch; margin: 0; font-size: 13px; line-height: 20px; }
+.messages-empty p { max-width: 28ch; margin: 0; font-size: calc(13px * var(--sv-text-scale, 1)); line-height: calc(20px * var(--sv-line-k, 1)); }

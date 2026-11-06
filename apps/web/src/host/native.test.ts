@@ -18,7 +18,7 @@ describe("a page outside an app", () => {
     expect(outside.presence.media).toBe("page");
     expect(outside.voice.runs).toBe("page");
     expect(nativeHost().storage).toBeNull();
-    for (const member of [nativeHost().microphone, outside.localHost, outside.reset, outside.muteShortcut, outside.mediaDuck,
+    for (const member of [nativeHost().microphone, outside.localHost, outside.reset, outside.muteShortcut, outside.mediaDuck, outside.textScale,
       outside.callControls, outside.callSurface, outside.updater, outside.debug]) expect(member).toBeNull();
     expect(cardSeam()).toBeNull();
   });

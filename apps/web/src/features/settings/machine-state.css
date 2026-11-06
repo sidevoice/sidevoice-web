@@ -1,7 +1,7 @@
 /* A machine's state (MachineState.tsx). In words, in its tone, as the agents' status line colours it: the machine's page,
  * and an entry's second line when it needs the person. Never the
  * accent: that means new (and selected), so the current entry's own colour never reaches it. */
-.machine-state { font-size: var(--sv-font-xs); line-height: 1rem; font-weight: var(--sv-weight-medium); white-space: nowrap; color: var(--sv-text-muted); }
+.machine-state { font-size: var(--sv-font-xs); line-height: calc(1rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-medium); white-space: nowrap; color: var(--sv-text-muted); }
 /* Connected: the models' "Ready" badge itself (Badge tone positive, its dot); only its size is the line's. */
 .machine-state.machine-state-badge { font-size: inherit; line-height: inherit; }
 .machine-state[data-tone="warning"] { color: var(--sv-warning); }

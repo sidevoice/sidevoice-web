@@ -17,7 +17,7 @@
 .machine-icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken); color: var(--sv-text-muted); }
 .machine-copy { display: grid; gap: 2px; min-width: 0; }
 .machine-name { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
-.machine-brief { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.machine-brief { font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
 .machine-actions { display: flex; align-items: center; gap: var(--sv-space-3); flex: none; }
 .machine-chevron { color: var(--sv-text-subtle); transform: rotate(-90deg); }
 
@@ -27,26 +27,26 @@
 .host-back-icon { transform: rotate(90deg); }
 .host-detail-header { display: flex; align-items: center; gap: var(--sv-space-3); flex-wrap: wrap; }
 .host-detail-copy { display: grid; flex: 1; min-width: 12rem; }
-.host-detail-header h3 { display: flex; align-items: center; margin: 0; font-size: var(--sv-font-xl); line-height: 1.625rem; font-weight: var(--sv-weight-bold); letter-spacing: -.015em; }
+.host-detail-header h3 { display: flex; align-items: center; margin: 0; font-size: var(--sv-font-xl); line-height: calc(1.625rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-bold); letter-spacing: -.015em; }
 .host-detail-header p { margin: 0; font-size: var(--sv-font-sm); }
 /* Its state at length under its name, a word in its tone, semibold; what to do about it, when there is something, on
    the line under. */
 .host-detail-state { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-1) var(--sv-space-2); min-height: 1.25rem; }
-.host-detail-state .machine-state { font-size: var(--sv-font-sm); line-height: 1.25rem; font-weight: var(--sv-weight-semibold); }
+.host-detail-state .machine-state { font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-semibold); }
 .host-detail-state .ui-badge.machine-state-pill { height: 22px; padding: 0 var(--sv-space-2); }
-.host-detail-hint { color: var(--sv-text-muted); line-height: 1.25rem; }
+.host-detail-hint { color: var(--sv-text-muted); line-height: calc(1.25rem * var(--sv-line-k, 1)); }
 /* No longer paired: Pair again under what to do about it, its own width. */
 .host-pair-again { justify-self: start; margin-top: var(--sv-space-2); }
 /* Its sections one under another, each headed, a rule between them: everything a machine has, none behind a tab. */
 .host-section { display: grid; gap: var(--sv-space-3); min-width: 0; padding-top: var(--sv-space-5); border-top: 1px solid var(--sv-border); scroll-margin-top: var(--sv-space-4); }
 .host-section > h4 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); }
 .host-forget-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); flex-wrap: wrap; }
-.host-forget-row p, .host-forget .device-revoke-confirm .muted { flex: 1 1 18rem; margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.host-forget-row p, .host-forget .device-revoke-confirm .muted { flex: 1 1 18rem; margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); }
 .pair-device-command { padding: var(--sv-space-2) var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken); font-size: var(--sv-font-sm); user-select: all; -webkit-user-select: all; }
 
 /* This computer's service: what it says, its figures, and its actions; stopping asks first. */
 .host-status-panel, .host-devices-panel { display: grid; gap: var(--sv-space-3); min-width: 0; }
-.host-status-panel p, .host-devices-panel p { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.host-status-panel p, .host-devices-panel p { margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); }
 .host-status-summary { font-size: var(--sv-font-md) !important; font-weight: 600; }
 .host-status-panel[data-state="failed"] .host-status-summary, .host-status-panel[data-state="service-failed"] .host-status-summary { color: var(--sv-danger); }
 .host-failure-details { padding: var(--sv-space-3) 14px; border-radius: var(--sv-radius-md); background: var(--sv-danger-soft); }
@@ -68,11 +68,11 @@
 .device-revoke-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); }
 .pair-another-device { display: grid; justify-items: start; gap: var(--sv-space-3); padding-top: var(--sv-space-4); border-top: 1px solid var(--sv-border); }
 .local-pairing-code { display: grid; justify-items: start; gap: var(--sv-space-2); }
-.issued-pairing-code { display: block; padding: var(--sv-space-3) var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken); font: 600 1.375rem / 1.75rem var(--sv-font-mono); letter-spacing: .08em; overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; cursor: text; }
+.issued-pairing-code { display: block; padding: var(--sv-space-3) var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken); font: 600 calc(1.375rem * var(--sv-text-scale, 1)) / calc(1.75rem * var(--sv-line-k, 1)) var(--sv-font-mono); letter-spacing: .08em; overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; cursor: text; }
 .local-install-entry--machines { margin-top: var(--sv-space-2); }
 /* This device not prepared yet: what preparing it does, then the install's panel (while it shows one) and the two ways. */
 .this-computer-prepare { display: grid; gap: var(--sv-space-4); min-width: 0; }
-.this-computer-prepare > p { max-width: 60ch; margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
+.this-computer-prepare > p { max-width: 60ch; margin: 0; line-height: calc(1.5rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
 .this-computer-prepare > .this-computer-absent { color: var(--sv-text); font-weight: var(--sv-weight-semibold); }
 .this-computer-prepare > .local-install-entry--machines { margin-top: 0; }
 
@@ -95,7 +95,7 @@
 .ui-nav-item--sub { min-height: 34px; font-size: var(--sv-font-sm); }
 .ui-nav-item.machine-entry { height: auto; min-height: 34px; padding-block: 6px; min-width: 0; max-width: 100%; overflow: hidden; }
 .ui-nav-item.machine-entry:has(.machine-state) { min-height: 46px; }
-.machine-entry .machine-nav-name { font-size: var(--sv-font-sm); line-height: 18px; }
+.machine-entry .machine-nav-name { font-size: var(--sv-font-sm); line-height: calc(18px * var(--sv-line-k, 1)); }
 .machine-nav-icon { display: inline-grid; place-items: center; flex: none; color: var(--sv-text-muted); }
 .machine-nav-add { color: var(--sv-text-muted); }
 .machine-nav-add svg { width: 16px; height: 16px; }
@@ -104,7 +104,7 @@
 
 /* Pairing another device, in its own small dialog: the code large and selectable, its time left under it. */
 .pair-device-dialog { display: grid; justify-items: start; gap: var(--sv-space-3); }
-.pair-device-dialog p { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.pair-device-dialog p { margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); }
 .pair-device-expiry { font-variant-numeric: tabular-nums; }
 /* This computer's own machine, marked in the list. */
 
@@ -113,7 +113,7 @@
    version alone: its state is its page's header's. */
 .host-status-card { display: grid; gap: var(--sv-space-3); min-width: 0; padding: var(--sv-space-4) var(--sv-space-5); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-surface); box-shadow: var(--sv-shadow-sm); }
 [data-theme="dark"] .host-status-card { background: var(--sv-surface-raised); }
-.host-status-card p { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.host-status-card p { margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); }
 .host-status-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); }
 .host-status-head h4 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); }
 .host-status-state { display: inline-flex; align-items: center; gap: var(--sv-space-2); font-weight: var(--sv-weight-semibold); }

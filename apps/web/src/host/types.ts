@@ -375,6 +375,14 @@ export interface MediaDuckStatus {
    *  there is no such permission. `unknown`: the app could not ask. `restart`: allowed, applied by `restart()`. */
   capture?: MediaDuckAccess;
 }
+/** The phone's text size, as a multiple of its default (sidevoice-desktop `host.textScale`: iOS Dynamic Type, Android font
+ *  scale; 1 is the default). Only an app whose WebView does not follow it by itself offers this (an Android WebView keeps
+ *  `textZoom` at 100); the page clamps the value (lib/text-scale.ts). `subscribe` calls back when the person changes it. */
+export interface TextScaleBridge {
+  get(): number;
+  subscribe?(listener: (scale: number) => void): () => void;
+}
+
 export interface MediaDuckBridge {
   get(): Promise<MediaDuckStatus>;
   /** The person's own request, from the list of permissions, to let the app do what `permission` names: the system may
@@ -488,6 +496,9 @@ export interface Host {
   presence: HostPresence;
   storage: HostStorage;
   /** One tab at a time for a named piece of work across this site's tabs (the browser's Web Locks); see `exclusively`. */
+  /** The size in px of the platform's body text where it follows the person's text size and the page can measure it (iOS
+   *  WebKit's `-apple-system-body`: 17 at the default size); null elsewhere. lib/text-scale.ts turns it into a scale. */
+  systemTextSize(): number | null;
   exclusive<T>(name: string, run: () => T | Promise<T>, options?: { ifAvailable?: boolean }): Promise<T | undefined>;
   reach: ReachTransport;
   localHost: LocalHostBridge | null;
@@ -496,6 +507,8 @@ export interface Host {
   /** The global shortcuts and the headset's buttons (supersedes `muteShortcut`, which stays for an app without it). */
   shortcuts: ShortcutsBridge | null;
   mediaDuck: MediaDuckBridge | null;
+  /** The phone's text scale, when the app reports it; null where the page reads it itself (lib/text-scale.ts) or there is none. */
+  textScale: TextScaleBridge | null;
   callControls: CallControlsBridge | null;
   callSurface: CallSurfaceBridge | null;
   updater: AppUpdater | null;
