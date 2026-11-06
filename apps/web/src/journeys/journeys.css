@@ -14,4 +14,4 @@ html:not([data-shot]) body { background: var(--sv-bg-subtle); }
 .journey-frames { display: flex; align-items: flex-start; gap: var(--sv-space-3); }
 .journey-frame { overflow: hidden; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg); box-shadow: var(--sv-shadow-sm); }
 .journey-frame iframe { display: block; border: 0; transform-origin: 0 0; pointer-events: none; }
-.journey-caption { margin: 0; max-width: 560px; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.journey-caption { margin: 0; max-width: 560px; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }

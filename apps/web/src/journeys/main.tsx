@@ -6,6 +6,7 @@ import "../components/ui/ui.css";
 import "../styles/app.css";
 import "./journeys.css";
 import { createRoot } from "react-dom/client";
+import { LARGE_TEXT_SCALE } from "../lib/text-scale";
 import { App } from "../app/App";
 import { createRoomStore } from "../state/room-store";
 import { createOnboardingRepository, emptyOnboardingRecord } from "../services/onboarding-state";
@@ -21,6 +22,12 @@ const shotId = params.get("shot");
 const theme = params.get("theme") === "dark" ? "dark" : "light";
 document.documentElement.dataset.theme = theme;
 document.documentElement.style.colorScheme = theme;
+// ?scale=1.35: the phone's text size, as lib/text-scale.ts says it, for a shot of the layout at that size.
+const scale = Number(params.get("scale"));
+if (scale > 0) {
+  document.documentElement.style.setProperty("--sv-text-scale", String(scale));
+  document.documentElement.toggleAttribute("data-text-large", scale >= LARGE_TEXT_SCALE);
+}
 const root = createRoot(document.getElementById("root")!);
 
 // Set up on this release: no news to show, unless a shot says otherwise.

@@ -14,7 +14,7 @@
 .host-agent-name { display: flex; align-items: center; gap: var(--sv-space-1-5); min-width: 0; overflow: hidden; white-space: nowrap; font-weight: 600; }
 .host-agent-name .muted { font-weight: 400; color: var(--sv-text-subtle); }
 /* One line, always: a row keeps its height whatever it says (the whole of it in its title). */
-.host-agent-status { overflow: hidden; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); white-space: nowrap; text-overflow: ellipsis; transition: color var(--sv-dur-fast, .15s) var(--sv-ease, ease); }
+.host-agent-status { overflow: hidden; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); white-space: nowrap; text-overflow: ellipsis; transition: color var(--sv-dur-fast, .15s) var(--sv-ease, ease); }
 .host-agent-ok { color: var(--sv-positive); }
 .host-agent-error { color: var(--sv-danger); }
 /* Needs attention: the state in the warning colour, its reason after it in the muted one. */
@@ -23,7 +23,7 @@
 .host-agent-actions { display: flex; flex: none; align-items: center; justify-content: flex-end; gap: var(--sv-space-1); }
 .host-agent-chevron-up { transform: rotate(180deg); }
 .host-agent-howto { display: grid; gap: var(--sv-space-2); min-width: 0; margin: 0 var(--sv-space-5) var(--sv-space-4); padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
-.host-agent-howto p { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.host-agent-howto p { margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); }
 .host-agent-howto-label { font-weight: 600; color: var(--sv-text-muted); }
 /* The way to an agent the list does not show: a quiet link under it, its instructions opening below. */
 .host-agent-other { display: grid; gap: var(--sv-space-2); min-width: 0; }
@@ -44,7 +44,7 @@
 }
 
 .host-agent-confirm { display: grid; gap: var(--sv-space-2); margin: 0 var(--sv-space-5) var(--sv-space-4); padding: var(--sv-space-3) var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
-.host-agent-confirm p { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.host-agent-confirm p { margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); }
 .host-agent-confirm-actions { display: flex; justify-content: flex-end; gap: var(--sv-space-2); }
 .host-agents-stale { margin: 0; font-size: var(--sv-font-xs); }
 .host-agents-scanned[data-failed] { color: var(--sv-danger); }

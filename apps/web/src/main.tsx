@@ -16,6 +16,7 @@ import { translator } from "./i18n/translator";
 
 import { startPageTheme } from "./lib/theme";
 import { startMotion } from "./lib/motion";
+import { startTextScale } from "./lib/text-scale";
 import { forgetVariant } from "./lib/variants";
 
 // Uncaught errors are reported to the room before anything else is loaded: the controller owns the
@@ -36,6 +37,8 @@ window.addEventListener("unhandledrejection", (event) => {
 startPageTheme();
 // Whether its drawings move: only where the GPU moves them (lib/motion.ts).
 startMotion();
+// The phone's text size, which the type tokens follow (lib/text-scale.ts).
+startTextScale();
 
 const root = createRoot(document.getElementById("root")!);
 

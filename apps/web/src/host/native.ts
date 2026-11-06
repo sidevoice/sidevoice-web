@@ -1,6 +1,6 @@
 import type {
   AppBuild, AppUpdater, AppVoice, CallControlsBridge, CallSurfaceBridge, Host, HostDebugBridge, HostIdentity, HostPresence, HostStorage, LocalHostBridge,
-  MediaDuckBridge, MessageOverlay, MicrophoneBridge, MuteShortcutBridge, PairingsStore, ReachTransport, ResetBridge, ShortcutsBridge,
+  MediaDuckBridge, MessageOverlay, MicrophoneBridge, MuteShortcutBridge, PairingsStore, ReachTransport, ResetBridge, ShortcutsBridge, TextScaleBridge,
 } from "./types";
 
 /* What an app injects into its page: `window.__sidevoiceHost`, the object the desktop and mobile apps share
@@ -97,6 +97,7 @@ export function nativeHost(): NativeHost {
     muteShortcut: member<MuteShortcutBridge>(app, "muteShortcut", ["get", "set"]),
     shortcuts: member<ShortcutsBridge>(app, "shortcuts", ["get", "set"]),
     mediaDuck: member<MediaDuckBridge>(app, "mediaDuck", ["get", "set"]),
+    textScale: member<TextScaleBridge>(app, "textScale", ["get"]),
     callControls: member<CallControlsBridge>(app, "callControls", ["settings", "setAlwaysShown"]),
     callSurface: member<CallSurfaceBridge>(app, "callSurface", ["active", "still", "forget"]),
     updater: updater && typeof updater.status === "function" ? updater : null,

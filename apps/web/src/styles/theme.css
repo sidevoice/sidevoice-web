@@ -7,18 +7,38 @@
 @font-face { font-family: "DM Sans"; src: url("/voice/fonts/DMSans-Variable-latin.woff2") format("woff2"); font-weight: 100 1000; font-display: swap; }
 
 :root {
-  /* Type: DM Sans, as the landing; a 15px body, a tool's density. 12px is the floor. */
+  /* Type: DM Sans, as the landing; a 15px body on a desktop (17px on a phone, below), a tool's density. 12px is the floor on a desktop. */
   --sv-font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, var(--sv-font-cjk), sans-serif;
   /* DM Sans has no Chinese or Japanese: the system's own faces, never a webfont, in the page language's order (below)
    * so Han characters take that language's forms; after the Latin ones, which keep Latin text in them. */
   --sv-font-cjk: "PingFang SC", "Hiragino Sans", "Noto Sans CJK SC", "Noto Sans CJK JP", "Microsoft YaHei", "Yu Gothic", "Meiryo";
   --sv-font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace, var(--sv-font-cjk);
-  --sv-font-xs: .75rem;      /* 12/16 — badges, timestamps */
-  --sv-font-sm: .8125rem;    /* 13/20 — hints, descriptions, labels */
-  --sv-font-md: .9375rem;    /* 15/22 — body, controls, rows */
-  --sv-font-lg: 1.0625rem;   /* 17/24 — card and dialog titles */
-  --sv-font-xl: 1.25rem;     /* 20/26 — page and section titles */
-  --sv-font-2xl: 1.625rem;   /* 26/32 — onboarding headline, empty states */
+  /* Each is its base size times the phone's own text scale (--sv-text-scale, lib/text-scale.ts: 1 on a desktop, and wherever
+   * the person has not changed it). Only type scales: spacing, icons and the stage keep their size. The bases are in rem,
+   * and the root's font-size is fixed at 15px (below), so a rem is 15px everywhere: the px in the comments are what is
+   * drawn (a desktop's, which is not the 15/13/12 the names once promised). A phone's bases are the next block's. */
+  /* Text that names no size inherits the body's: 15px, and a phone's 17px, as it always was. */
+  --sv-font-body-base: 15px;
+  --sv-font-body: calc(var(--sv-font-body-base) * var(--sv-text-scale, 1));
+  --sv-font-xs-base: .75rem;     /* 11.25 — badges, timestamps */
+  --sv-font-sm-base: .8125rem;   /* 12.2 — hints, descriptions, labels */
+  --sv-font-md-base: .9375rem;   /* 14.1 — body, controls, rows */
+  --sv-font-lg-base: 1.0625rem;  /* 15.9 — card and dialog titles */
+  --sv-font-xl-base: 1.25rem;    /* 18.8 — page and section titles */
+  --sv-font-2xl-base: 1.625rem;  /* 24.4 — onboarding headline, empty states */
+  --sv-font-xs: calc(var(--sv-font-xs-base) * var(--sv-text-scale, 1));
+  --sv-font-sm: calc(var(--sv-font-sm-base) * var(--sv-text-scale, 1));
+  --sv-font-md: calc(var(--sv-font-md-base) * var(--sv-text-scale, 1));
+  --sv-font-lg: calc(var(--sv-font-lg-base) * var(--sv-text-scale, 1));
+  --sv-font-xl: calc(var(--sv-font-xl-base) * var(--sv-text-scale, 1));
+  --sv-font-2xl: calc(var(--sv-font-2xl-base) * var(--sv-text-scale, 1));
+  /* Line heights go with the sizes: a fixed one (in rem or px, beside a token) is its length times --sv-line-k, which is the
+   * text scale and the phone's step (1 on a desktop, ~1.12 on a phone), so a row's lines grow with its text. */
+  --sv-line-step: 1;
+  /* The stage's own text (the balloons, the person's live text, the name and chips over the creature) lives in a frame that
+   * is sized in stage units and holds three lines a page: it follows the text size only a little, 0.9-1.25, so it fits. */
+  --sv-stage-text-scale: clamp(.9, var(--sv-text-scale, 1), 1.25);
+  --sv-line-k: calc(var(--sv-text-scale, 1) * var(--sv-line-step));
   --sv-weight-regular: 400;
   --sv-weight-medium: 550;
   --sv-weight-semibold: 650;
@@ -65,6 +85,12 @@
 :root:lang(zh) { --sv-font-cjk: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", "Hiragino Sans", "Noto Sans CJK JP", "Yu Gothic", "Meiryo"; }
 @media (pointer: coarse) { :root { --sv-control-sm: 36px; --sv-control-md: 44px; --sv-call-button: 56px; } }
 @media (max-width: 767px) { :root { --sv-header-height: 56px; } }
+/* A phone (a touch screen that is narrow, or short in landscape) reads at arm's length: the body is iOS's own 17px, the
+ * hints 15px and the small print 13px, in px as drawn (a rem is 15px, so these are 17/15, 15/15 and 13/15 of it). The
+ * root font-size stays at 15px: rem spacing would grow with it. */
+@media (pointer: coarse) and (max-width: 767px), (pointer: coarse) and (max-height: 500px) {
+  :root { --sv-font-xs-base: 13px; --sv-font-sm-base: 15px; --sv-font-md-base: 17px; --sv-font-body-base: 17px; --sv-line-step: 1.12; }
+}
 @media (prefers-reduced-motion: reduce) { :root { --sv-dur-base: var(--sv-dur-fast); --sv-dur-slow: var(--sv-dur-fast); } }
 
 :root, [data-theme="light"] {
@@ -169,13 +195,19 @@
 :root, [data-theme] {
   color: var(--sv-text);
   font-family: var(--sv-font-sans);
-  font-size: var(--sv-font-md);
+  font-size: var(--sv-font-body);
   line-height: 1.4667;
   -webkit-font-smoothing: antialiased;
   font-optical-sizing: auto;
   /* The browser/OS chooses the thumb, track and overlay behaviour, in this surface's color-scheme. */
   scrollbar-color: auto;
 }
+
+/* The root's font-size is the 15px every rem is measured in (it was the body size, which is the same number at a text scale of
+ * 1): it must not follow the text scale, or spacing in rem would grow with it. The body takes the size that inherited text
+ * has, scaled. */
+:root, :root[data-theme] { font-size: .9375rem; }
+body { font-size: var(--sv-font-body); }
 
 /* The type scale, for text that is not inside a component. Sentence case throughout. */
 .sv-text-2xl { margin: 0; font-size: var(--sv-font-2xl); line-height: 2rem; font-weight: var(--sv-weight-heavy); letter-spacing: -.02em; }
