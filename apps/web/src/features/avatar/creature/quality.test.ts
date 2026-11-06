@@ -52,26 +52,26 @@ describe("sceneSize: as many pixels as the tile shows", () => {
   });
 });
 
-describe("sceneSize on a desktop stage: the screen's own pixels, up to a 4K frame", () => {
+describe("sceneSize on a desktop stage: the screen's own pixels, up to the creature canvas's 4 Mpx", () => {
   it("is drawn at the pixel ratio (2) where a phone's ceilings left it below 1 device px per css px", () => {
-    for (const [w, h] of [[958, 596], [1278, 796], [1598, 876]] as const) {
+    for (const [w, h] of [[404, 596], [528, 796], [599, 876]] as const) {
       const s = sceneSize(w, h, 2, 1, true);
       expect(s.height).toBe(Math.round(h * 2));
       expect(s.width / w).toBeCloseTo(2, 1);
       expect(sceneSize(w, h, 2).width * sceneSize(w, h, 2).height).toBeLessThanOrEqual(SCENE_MAX_AREA); // (the phone's, unchanged)
     }
   });
-  it("never passes a 4K frame, whatever the window", () => {
-    for (const [w, h] of [[2238, 1236], [3400, 1900], [5000, 2800], [2000, 100]] as const) {
+  it("never passes the ceiling, whatever the window", () => {
+    for (const [w, h] of [[900, 1236], [1300, 1900], [2000, 2800], [2000, 100]] as const) {
       const s = sceneSize(w, h, 2, 1, true);
       expect(s.height).toBeLessThanOrEqual(DESKTOP_MAX_H);
       expect(s.width * s.height).toBeLessThanOrEqual(DESKTOP_MAX_AREA);
     }
-    const big = sceneSize(2238, 1236, 2, 1, true);
-    expect(big.width / 2238).toBeGreaterThan(1.7);
+    const big = sceneSize(900, 1236, 2, 1, true);
+    expect(big.width / 900).toBeGreaterThan(1.7);
   });
   it("the ladder steps down to the phone's own floor: its last rung draws what it always did", () => {
-    for (const [w, h] of [[958, 596], [1598, 876], [2238, 1236]] as const) {
+    for (const [w, h] of [[404, 596], [599, 876], [900, 1236]] as const) {
       expect(sceneSize(w, h, 2, 0.5, true)).toEqual(sceneSize(w, h, 2, 0.5));
       let above = Infinity; // (down the ladder, no rung draws more than the one above it)
       for (const t of TIERS) {
@@ -88,31 +88,31 @@ describe("sceneSize on a desktop stage: the screen's own pixels, up to a 4K fram
 
 describe("a desktop's rungs: the areas, and what the governor makes of them", () => {
   const areas = (w: number, h: number) => TIERS.map((t) => { const s = sceneSize(w, h, 2, t.scale, true); return s.width * s.height; });
-  it("pins what each rung draws at 1598 x 876 (a 1920 x 1080 window) at pixel ratio 2", () => {
-    expect(areas(1598, 876)).toEqual([5_599_392, 3_159_716, 1_208_790, 429_225, 429_225, 224_640, 224_640]);
+  it("pins what each rung draws at 599 x 876 (the creature's canvas on a 1920 x 1080 window) at pixel ratio 2", () => {
+    expect(areas(599, 876)).toEqual([2_098_896, 1_184_400, 503_646, 250_470, 250_470, 157_440, 157_440]);
   });
   /** The rate's own cost: a frame costs this many ms a million pixels (a stand-in for a GPU's fill). */
   const climb = (g: Governor, msPerMpx: number, seconds: number) => {
     let at = 0, moves = 0;
     g.start(2, at);
     for (let i = 0; i < seconds * 30; i++, at += 1000 / 30) {
-      const area = areas(1598, 876)[g.tier];
+      const area = areas(599, 876)[g.tier];
       if (g.observe(at, msPerMpx * area / 1e6, g.every)) moves++;
     }
     return { moves, tier: g.tier };
   };
   it("does not step up to a rung whose real area (not its scale squared) would not hold, so it does not oscillate", () => {
-    // 3 ms a million px: rung 2 (1.2 M px) costs 3.6 ms and holds; rung 1 (3.2 M px) costs 9.5 ms and does not.
+    // 8 ms a million px: rung 2 (0.5 M px) costs 4 ms and holds; rung 1 (1.2 M px) costs 9.5 ms and does not.
     const g = new Governor();
-    g.measureBy((scale) => { const s = sceneSize(1598, 876, 2, scale, true); return s.width * s.height; });
-    expect(climb(g, 3, 600)).toEqual({ moves: 0, tier: 2 });
+    g.measureBy((scale) => { const s = sceneSize(599, 876, 2, scale, true); return s.width * s.height; });
+    expect(climb(g, 8, 600)).toEqual({ moves: 0, tier: 2 });
     // (the estimate by the scale alone, 1.39 for that step, tried it and failed, again after every back-off)
-    expect(climb(new Governor(), 3, 600).moves).toBeGreaterThan(2);
+    expect(climb(new Governor(), 8, 600).moves).toBeGreaterThan(2);
   });
   it("still steps up where the real areas leave room", () => {
     const g = new Governor();
-    g.measureBy((scale) => { const s = sceneSize(1598, 876, 2, scale, true); return s.width * s.height; });
-    expect(climb(g, 0.5, 600).tier).toBe(0); // rung 0 (5.6 M px) costs 2.8 ms
+    g.measureBy((scale) => { const s = sceneSize(599, 876, 2, scale, true); return s.width * s.height; });
+    expect(climb(g, 1.5, 600).tier).toBe(0); // rung 0 (2.1 M px) costs 3.1 ms
   });
 });
 
