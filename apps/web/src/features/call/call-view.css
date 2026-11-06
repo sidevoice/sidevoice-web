@@ -171,7 +171,7 @@
   isolation: isolate; border: 0; background: none; box-shadow: none; }
 .person-turns .balloon-tail { left: auto; right: calc(6 * var(--u)); }
 /* Taking the turn back, said as clearly as the bars over it: on the slide too, never under 24px to touch. */
-.person-bubble .ui-button.cancel-input { flex: none; height: max(28px, 2.1333em); padding: 0 .6em; gap: .4em; font-size: clamp(13px, calc(15 * var(--u)), 18px); }
+.person-bubble .ui-button.cancel-input { flex: none; height: max(28px, 2.1333em); padding: 0 .6em; gap: .4em; font-size: calc(clamp(13px, calc(15 * var(--u)), 18px) * var(--sv-stage-text-scale, 1)); }
 .person-bubble .ui-button.cancel-input svg { width: 1.0667em; height: 1.0667em; }
 /* Speaking again: the sent one lifts away from the very place the bars come in, under them. */
 .person-turns > .person-bubble[data-under] { position: absolute; right: 0; bottom: 0; }

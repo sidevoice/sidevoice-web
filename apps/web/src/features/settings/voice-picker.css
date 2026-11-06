@@ -6,7 +6,7 @@
 .voice-picker-search { display: flex; align-items: center; gap: 9px; min-height: 44px; padding: 4px 5px 4px 11px; border: 1px solid var(--sv-border-strong); border-radius: var(--sv-radius-md); color: var(--sv-text-muted); background: var(--sv-input-bg); }
 .voice-picker-search:focus-within { outline: 2px solid var(--sv-focus); outline-offset: 1px; }
 .voice-picker-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--sv-text); font: inherit; }
-@media (any-pointer: coarse) { .voice-picker-search input { font-size: max(1rem, calc(1rem * var(--sv-text-scale, 1))); } }
+@media (any-pointer: coarse) { .voice-picker-search input { font-size: max(16px, var(--sv-font-md)); } }
 .voice-picker-search input::placeholder { color: var(--sv-text-subtle); }
 .voice-picker-search .language-picker-trigger { background: var(--sv-surface-raised); }
 .voice-picker-list { max-height: min(320px, 48vh); overflow: auto; overscroll-behavior: contain; padding: 6px; }

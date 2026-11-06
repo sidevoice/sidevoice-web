@@ -75,3 +75,29 @@ test("a fixed height on text is a minimum: a row, button, input or chip grows wi
   assert.doesNotMatch(rule,/(^|[\s;{])height:/,selector);
  }
 });
+
+test("the short-landscape clause is a landscape phone's only: a width cap",()=>{
+ assert.match(theme,/\(pointer: coarse\) and \(max-height: 500px\) and \(max-width: 950px\)/);
+});
+
+test("a touch input is 16px at least (a rem is 15px) and the body's size where that is more",()=>{
+ const floors=[];
+ for(const file of cssFiles(src)){
+  const text=fs.readFileSync(file,"utf8");
+  for(const m of text.matchAll(/@media \(any-pointer: coarse\) \{[^}]*font-size: ([^;}]+)/g))floors.push([path.relative(src,file),m[1].trim()]);
+ }
+ assert.ok(floors.length>=6,"the touch overrides: "+floors.length);
+ for(const [file,value] of floors)assert.match(value,/^max\(16px, var\(--sv-font-md\)\)$/,file);
+ assert.doesNotMatch(fs.readFileSync(path.join(src,"features/conversation/transcript.css"),"utf8"),/max\(1rem/);
+});
+
+test(".sv-text-* line heights grow with the scale, like the tokens",()=>{
+ const rules=[...theme.matchAll(/\n\.sv-text-(\w+) \{([^}]*)\}/g)];
+ assert.equal(rules.length,6);
+ for(const [,size,body] of rules)assert.match(body,/line-height: calc\([\d.]+rem \* var\(--sv-line-k, 1\)\)/,size);
+});
+
+test("the stage's Cancel follows the stage's capped scale",()=>{
+ const view=fs.readFileSync(path.join(src,"features/call/call-view.css"),"utf8");
+ assert.match(view,/\.cancel-input \{[^}]*font-size: calc\(clamp\(13px, calc\(15 \* var\(--u\)\), 18px\) \* var\(--sv-stage-text-scale, 1\)\)/);
+});

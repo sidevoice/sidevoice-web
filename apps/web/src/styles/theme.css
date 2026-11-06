@@ -88,7 +88,7 @@
 /* A phone (a touch screen that is narrow, or short in landscape) reads at arm's length: the body is iOS's own 17px, the
  * hints 15px and the small print 13px, in px as drawn (a rem is 15px, so these are 17/15, 15/15 and 13/15 of it). The
  * root font-size stays at 15px: rem spacing would grow with it. */
-@media (pointer: coarse) and (max-width: 767px), (pointer: coarse) and (max-height: 500px) {
+@media (pointer: coarse) and (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
   :root { --sv-font-xs-base: 13px; --sv-font-sm-base: 15px; --sv-font-md-base: 17px; --sv-font-body-base: 17px; --sv-line-step: 1.12; }
 }
 @media (prefers-reduced-motion: reduce) { :root { --sv-dur-base: var(--sv-dur-fast); --sv-dur-slow: var(--sv-dur-fast); } }
@@ -210,9 +210,9 @@
 body { font-size: var(--sv-font-body); }
 
 /* The type scale, for text that is not inside a component. Sentence case throughout. */
-.sv-text-2xl { margin: 0; font-size: var(--sv-font-2xl); line-height: 2rem; font-weight: var(--sv-weight-heavy); letter-spacing: -.02em; }
-.sv-text-xl { margin: 0; font-size: var(--sv-font-xl); line-height: 1.625rem; font-weight: var(--sv-weight-bold); letter-spacing: -.015em; }
-.sv-text-lg { margin: 0; font-size: var(--sv-font-lg); line-height: 1.5rem; font-weight: var(--sv-weight-bold); letter-spacing: -.01em; }
-.sv-text-md { margin: 0; font-size: var(--sv-font-md); line-height: 1.375rem; }
-.sv-text-sm { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
-.sv-text-xs { margin: 0; font-size: var(--sv-font-xs); line-height: 1rem; font-weight: 600; color: var(--sv-text-subtle); }
+.sv-text-2xl { margin: 0; font-size: var(--sv-font-2xl); line-height: calc(2rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-heavy); letter-spacing: -.02em; }
+.sv-text-xl { margin: 0; font-size: var(--sv-font-xl); line-height: calc(1.625rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-bold); letter-spacing: -.015em; }
+.sv-text-lg { margin: 0; font-size: var(--sv-font-lg); line-height: calc(1.5rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-bold); letter-spacing: -.01em; }
+.sv-text-md { margin: 0; font-size: var(--sv-font-md); line-height: calc(1.375rem * var(--sv-line-k, 1)); }
+.sv-text-sm { margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
+.sv-text-xs { margin: 0; font-size: var(--sv-font-xs); line-height: calc(1rem * var(--sv-line-k, 1)); font-weight: 600; color: var(--sv-text-subtle); }
