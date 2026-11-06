@@ -11,6 +11,7 @@ import { messageOverlay, nativeCardSeam, nativeHost } from "./native";
 import { setMessageOverlay } from "../i18n/translator";
 
 export type * from "./types";
+export { iosBodyProbe } from "./browser-text-scale";
 export type { PageAnswer, PageMicrophone, PermissionView } from "./browser-microphone";
 
 /** The browser's side of the microphone: the mechanisms only, for `MicrophoneAccess` to build the states a person sees on. */

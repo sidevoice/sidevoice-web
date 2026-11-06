@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { applyTextScale, clampTextScale, iosBodyProbe, MAX_TEXT_SCALE, MIN_TEXT_SCALE, startTextScale, systemTextScale } from "./text-scale";
+import { iosBodyProbe } from "../host";
+import { applyTextScale, clampTextScale, MAX_TEXT_SCALE, MIN_TEXT_SCALE, startTextScale, systemTextScale } from "./text-scale";
 
 const noHost = { host: null } as const;
 

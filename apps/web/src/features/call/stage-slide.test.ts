@@ -19,7 +19,7 @@ test("every form factor's slide shape comes with the height its overlays are dra
 });
 
 test("the stage's words follow the tile within readable bounds", () => {
-  const bounds = (name: string) => [...css.matchAll(new RegExp(`--${name}:\\s*clamp\\((\\d+)px,\\s*calc\\([^;]*?\\),\\s*(\\d+)px\\)`, "g"))].map((m) => [Number(m[1]), Number(m[2])]);
+  const bounds = (name: string) => [...css.matchAll(new RegExp(`--${name}:\\s*(?:calc\\()?clamp\\((\\d+)px,\\s*calc\\([^;]*?\\),\\s*(\\d+)px\\)`, "g"))].map((m) => [Number(m[1]), Number(m[2])]);
   for (const [min, max] of bounds("bubble-fs")) expect([min, max]).toEqual([18, 34]);
   for (const [min, max] of bounds("person-fs")) expect([min, max]).toEqual([16, 28]);
   expect(bounds("bubble-fs").length).toBeGreaterThan(0);
