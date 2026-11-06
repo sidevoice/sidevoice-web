@@ -5,6 +5,7 @@ import type { MicrophoneSnapshot } from "../../services/microphone-access";
 import { createMicrophoneAccess } from "../../services/microphone-access";
 import { MicrophoneContinue, PermissionsStep } from "../onboarding/PermissionsStep";
 import { useMicrophoneAccess } from "./permission-view";
+import { createRoomStore, RoomStoreContext } from "../../state/room-store";
 import { PermissionsSettings } from "../settings/PermissionsSettings";
 
 /* What Sidevoice needs allowed, in the setup (the person's bicho) and in Settings › Permissions. */
@@ -409,4 +410,55 @@ test("two Allows answered in any order are both kept", async () => {
   await act(async () => { answers[1]({ ...base, capture: "undetermined", access: "granted" }); });
   await act(async () => { answers[0]({ ...base, lower: "per-app", capture: "granted", access: "granted" }); });
   expect(screen.getAllByText("Allowed")).toHaveLength(3);
+});
+
+/* System Audio Recording allowed while the app still reads it as not (macOS answers a process only as it was at its start):
+ * the app says `restart`, and the row offers to restart it. */
+test("capture allowed but waiting for a restart: the row says so and Restart now asks the app to restart", async () => {
+  const media = mediaApp({ capture: "restart", access: "granted" }, { restart: vi.fn(async () => ({ mode: "lower", lower: "some-apps", pause: "some-apps", capture: "restart" })) });
+  render(<PermissionsSettings t={t} access={null} microphone={snapshot("granted")} />);
+  expect(await screen.findByText("Allowed. Restart Sidevoice to apply it")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Open System Settings" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Restart now" }));
+  expect((media as { restart?: unknown }).restart).toHaveBeenCalledTimes(1);
+  expect(media.allow).not.toHaveBeenCalled();
+});
+
+test("a restart the app refuses during a call is said, and the button waits while a call is joined", async () => {
+  const refuse = vi.fn(async () => { throw { key: "media_duck.restart-in-call" }; });
+  mediaApp({ capture: "restart", access: "granted" }, { restart: refuse });
+  render(<PermissionsSettings t={t} access={null} microphone={snapshot("granted")} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Restart now" }));
+  // Said in the row and in the live region.
+  expect((await screen.findAllByText("Allowed. The restart waits until the call ends")).length).toBeGreaterThan(0);
+  cleanup();
+  const failing = vi.fn(async () => { throw new Error("nope"); });
+  mediaApp({ capture: "restart", access: "granted" }, { restart: failing });
+  render(<PermissionsSettings t={t} access={null} microphone={snapshot("granted")} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Restart now" }));
+  expect((await screen.findAllByText(/could not restart/)).length).toBeGreaterThan(0);
+});
+
+test("while a call is joined the Restart button is disabled and says it waits", async () => {
+  const restart = vi.fn(async () => ({ mode: "lower", lower: "some-apps", pause: "some-apps" }));
+  mediaApp({ capture: "restart", access: "granted" }, { restart });
+  const store = createRoomStore();
+  const inCall = vi.spyOn(store, "getState").mockReturnValue({ call: { joined: true } } as never);
+  render(<RoomStoreContext.Provider value={store}><PermissionsSettings t={t} access={null} microphone={snapshot("granted")} /></RoomStoreContext.Provider>);
+  expect(await screen.findByText("Allowed. The restart waits until the call ends")).toBeInTheDocument();
+  const button = screen.getByRole("button", { name: "Restart now" });
+  expect(button).toBeDisabled();
+  fireEvent.click(button);
+  expect(restart).not.toHaveBeenCalled();
+  inCall.mockRestore();
+});
+
+test("an app without the restart action falls back to Open System Settings with the same line", async () => {
+  const media = mediaApp({ capture: "restart", access: "granted" });
+  render(<PermissionsSettings t={t} access={null} microphone={snapshot("granted")} />);
+  expect(await screen.findByText("Allowed. Restart Sidevoice to apply it")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Open System Settings" }));
+  expect(media.openSettings).toHaveBeenCalledWith("capture");
+  expect(screen.queryByRole("button", { name: "Restart now" })).toBeNull();
 });

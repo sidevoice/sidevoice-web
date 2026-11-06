@@ -543,7 +543,7 @@ test("no microphone to ask, but the app reports a media permission: Permissions 
   onTestFinished(() => { delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; });
   const store = open("whisper-base");
   act(() => store.patch({ settingsSection: "call" }));
-  fireEvent.click(await within(document.getElementById("pane-call")!).findByRole("button", { name: "Open Permissions" }));
+  fireEvent.click(await within(document.getElementById("pane-call")!).findByRole("button", { name: "Open Permissions ›" }));
   expect(store.getState().facts.settingsSection).toBe("permissions");
   expect(navLabels()).toContain("Permissions");
   expect(await within(document.getElementById("pane-permissions")!).findByText("System Audio Recording")).toBeInTheDocument();
