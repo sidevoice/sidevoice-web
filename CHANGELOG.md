@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.25.0](https://github.com/sidevoice/sidevoice-web/compare/v0.24.0...v0.25.0) (2026-11-06)
+
+
+### Features
+
+* **shortcuts:** restore-default icon, host-reported defaults, named duplicates, recording warnings, Say one thing in the app ([#523](https://github.com/sidevoice/sidevoice-web/issues/523)) ([e6474bb](https://github.com/sidevoice/sidevoice-web/commit/e6474bb212d56377e501fa2f5a937638f00e2bb5))
+* **shortcuts:** Settings &gt; Shortcuts renders what the host reports; a phone shows the headset rows alone ([#526](https://github.com/sidevoice/sidevoice-web/issues/526)) ([e08c19c](https://github.com/sidevoice/sidevoice-web/commit/e08c19cbbd2f384bcb9c96545fe42cb267fda0ee))
+* **web:** type follows the phone's text size; +2px type on phones ([#525](https://github.com/sidevoice/sidevoice-web/issues/525)) ([2b61237](https://github.com/sidevoice/sidevoice-web/commit/2b612372f65d5537da5b34a57e958b5e7be0e142))
+
+
+### Bug Fixes
+
+* **call:** the transcribing pill shows pulsing bars, not the word ([#528](https://github.com/sidevoice/sidevoice-web/issues/528)) ([012d64d](https://github.com/sidevoice/sidevoice-web/commit/012d64d1b76de508b271f2e9954bbafd324c7c18))
+* **card:** offline agent's creature and state; centre the avatar's voice text ([#516](https://github.com/sidevoice/sidevoice-web/issues/516)) ([fdb08c7](https://github.com/sidevoice/sidevoice-web/commit/fdb08c73229017851c173c10f5c5b0374592f621))
+* **creature:** phone with a mouse is not a desktop; Governor sums drawn scenes ([#513](https://github.com/sidevoice/sidevoice-web/issues/513)) ([#529](https://github.com/sidevoice/sidevoice-web/issues/529)) ([e600447](https://github.com/sidevoice/sidevoice-web/commit/e600447d4d3f7ca3b98384df17cd87513253bc03))
+* **creature:** the creature at rest is as large as during a turn ([#521](https://github.com/sidevoice/sidevoice-web/issues/521)) ([c6df930](https://github.com/sidevoice/sidevoice-web/commit/c6df9305ea0e146a5ef6be34c3243e0e0f1d0f50))
+* **shortcuts:** name keys by the physical key, not the character they type ([#514](https://github.com/sidevoice/sidevoice-web/issues/514)) ([5539f8d](https://github.com/sidevoice/sidevoice-web/commit/5539f8d8bdac0ee5cb94f666398305e0d4ef0630))
+* **transcript:** messages show ten lines before See more ([#520](https://github.com/sidevoice/sidevoice-web/issues/520)) ([4107c01](https://github.com/sidevoice/sidevoice-web/commit/4107c0177629d7137b5b1a7dd9e911b95a326920))
+* **ui:** the person's voice bars back to the brand purple ([#518](https://github.com/sidevoice/sidevoice-web/issues/518)) ([e0ab3bc](https://github.com/sidevoice/sidevoice-web/commit/e0ab3bcdfb60250489fd569e449e23682613a0f3))
+* **viewport:** no pinch-zoom in the native phone app; no focus zoom in iOS Safari ([#522](https://github.com/sidevoice/sidevoice-web/issues/522)) ([8476f1d](https://github.com/sidevoice/sidevoice-web/commit/8476f1d8c6c7dcc744365874942c2996199970da))
+
+
+### Performance Improvements
+
+* **stage:** the creature on a canvas of its own, as wide as it reaches ([#524](https://github.com/sidevoice/sidevoice-web/issues/524)) ([19af779](https://github.com/sidevoice/sidevoice-web/commit/19af779ee5c2bb8049e30f1216ce4b5583ff25fa))
+
 ## [0.24.0](https://github.com/sidevoice/sidevoice-web/compare/v0.23.0...v0.24.0) (2026-11-06)
 
 
