@@ -24,6 +24,9 @@ export interface RigCamera {
   lookAt(x: number, y: number, z: number): void;
   updateProjectionMatrix(): void;
   updateMatrixWorld(): void;
+  /** Renders a window of a larger frame (three.js): the same projection, only part of it. */
+  setViewOffset(fullWidth: number, fullHeight: number, x: number, y: number, width: number, height: number): void;
+  clearViewOffset(): void;
   clone(): RigCamera;
 }
 

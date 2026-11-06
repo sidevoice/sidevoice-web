@@ -30,13 +30,18 @@ interface View { zoom: number; lookY?: number }
 
 // ---------- the phone's framing, from the widest act (creator.js measure, footprint, phoneFit) ----------
 interface Obj3 {
+  castShadow?: boolean;
   visible: boolean; userData: Record<string, unknown>; children: Obj3[]; matrixWorld: unknown;
   isMesh?: boolean; isSprite?: boolean; isLine?: boolean; isPoints?: boolean;
   geometry?: { boundingBox: { min: Vec3; max: Vec3 } | null; computeBoundingBox(): void; dispose(): void };
   rotation: { y: number }; updateMatrixWorld(force?: boolean): void;
 }
 interface Vec3 extends RigVector { set(x: number, y: number, z: number): Vec3; applyMatrix4(m: unknown): Vec3; clone(): Vec3; copy(v: Vec3): Vec3 }
-interface Footprint { pts: Vec3[]; minY: number; top: number }
+/** What the creature can reach: `pts`, the points furthest out at each side as a camera ~14 units away sees them (the phone's framing);
+ *  `bounds`, the corners of the box round everything it draws in every sampled pose, and `ground`, those of everything that casts a
+ *  shadow, taken down to the floor along the key light (the desktop's crop: projected with the camera it is drawn with, so what
+ *  reaches furthest there is found there, not by another camera's depth). */
+interface Footprint { pts: Vec3[]; minY: number; top: number; bounds: Vec3[]; ground: Vec3[] }
 interface ActingCreature { root: Obj3; minY: number; setAct(layer: string, name: string | null, opts?: object): unknown; actFrame(t: number, still: boolean, st: Record<string, number>, lvl: number): unknown }
 
 /** What the creature can act out, as the reference's FOOT_ACTS lists it (creator.js; acts.js WORKS, PASTIMES, MOODS): the
@@ -58,19 +63,19 @@ const shapeKey = (spec: object) => { const s = spec as { body?: unknown; parts?:
  *  between frames): the points furthest out at each side as a camera ~14 units away sees them, and its own top at rest. */
 function* measure(stage: Stage, spec: object): Generator<void, Footprint> {
   const it = stage.add({ ...spec, state: "idle", expr: undefined }, null, { off: 0 }), c = it.c as unknown as ActingCreature;
-  const V = (c.root as unknown as { position: Vec3 }).position.constructor as unknown as new () => Vec3, v = new V(), pts: Vec3[] = [];
+  const V = (c.root as unknown as { position: Vec3 }).position.constructor as unknown as new () => Vec3, v = new V(), pts: Vec3[] = [], bounds: Vec3[] = [], ground: Vec3[] = [];
   c.root.visible = true; // a scratch copy: measured, never drawn
   c.root.updateMatrixWorld(true);
   let top = -Infinity;
-  const visit = (o: Obj3, keep: (q: Vec3) => void) => {
+  const visit = (o: Obj3, keep: (q: Vec3) => void, casters = false) => {
     if (!o.visible || o.userData.noFit) return; // noFit: a burst of light meant to run off the frame
     const g = o.geometry;
     if (g && (o.isMesh || o.isSprite || o.isLine || o.isPoints)) {
       if (!g.boundingBox) g.computeBoundingBox();
       const b = g.boundingBox!;
-      for (let i = 0; i < 8; i++) { v.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).applyMatrix4(o.matrixWorld); keep(v); }
+      if (!casters || o.castShadow) for (let i = 0; i < 8; i++) { v.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).applyMatrix4(o.matrixWorld); keep(v); }
     }
-    for (const ch of o.children) visit(ch, keep);
+    for (const ch of o.children) visit(ch, keep, casters);
   };
   visit(c.root, (q) => { top = Math.max(top, q.y); });
   try {
@@ -82,11 +87,21 @@ function* measure(stage: Stage, spec: object): Generator<void, Footprint> {
         let L: { k: number; p: Vec3 } | null = null, R: { k: number; p: Vec3 } | null = null;
         visit(c.root, (q) => { const k = q.x / (14 - q.z); if (!L || k < L.k) L = { k, p: q.clone() }; if (!R || k > R.k) R = { k, p: q.clone() }; });
         if (L && R) pts.push((L as { p: Vec3 }).p, (R as { p: Vec3 }).p);
+        // the box round all of it in this pose, and where what casts a shadow throws it on the floor (by both key lights)
+        const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity], clo = [Infinity, Infinity, Infinity], chi = [-Infinity, -Infinity, -Infinity];
+        const grow = (a: number[], z: number[], q: Vec3) => { a[0] = Math.min(a[0], q.x); a[1] = Math.min(a[1], q.y); a[2] = Math.min(a[2], q.z); z[0] = Math.max(z[0], q.x); z[1] = Math.max(z[1], q.y); z[2] = Math.max(z[2], q.z); };
+        visit(c.root, (q) => grow(lo, hi, q));
+        visit(c.root, (q) => grow(clo, chi, q), true);
+        if (hi[0] >= lo[0]) for (let i = 0; i < 8; i++) bounds.push(new V().set(i & 1 ? hi[0] : lo[0], i & 2 ? hi[1] : lo[1], i & 4 ? hi[2] : lo[2]));
+        if (chi[0] >= clo[0]) for (let i = 0; i < 8; i++) for (const light of KEY_LIGHTS) {
+          const x = i & 1 ? chi[0] : clo[0], y = i & 2 ? chi[1] : clo[1], z = i & 4 ? chi[2] : clo[2], k = Math.max(0, y - c.minY) / light[1];
+          ground.push(new V().set(x - light[0] * k, c.minY, z - light[2] * k));
+        }
       }
       c.setAct(layer, null);
       yield;
     }
-    return { pts, minY: c.minY, top };
+    return { pts, minY: c.minY, top, bounds, ground };
   } finally {
     stage.scene.remove(it.c.root);
     it.c.root.traverse((o) => { o.geometry?.dispose(); });
@@ -126,6 +141,10 @@ export interface FramerHost {
   drawn(): boolean;
   /** Something changed that needs a frame drawn. */
   poke(): void;
+  /** The camera's aspect: the tile's, whatever part of it the canvas shows (the scene canvas may be only its middle). */
+  aspect(): number;
+  /** The creature's widest reach was measured (reach() has an answer now). */
+  measured(): void;
 }
 
 /** A solve in progress: its steps (a trial render each), what to do with its answer, and whether the stage waits for it. */
@@ -210,6 +229,7 @@ export class StageFramer {
       footprints.set(key, r.value);
       this.measuring = null;
       this.phone = null; this.key = ""; // framed again on what it measured
+      this.host.measured();
       this.solve();
       this.host.poke();
     };
@@ -227,8 +247,8 @@ export class StageFramer {
 
   /** A camera for a framing, as the stage draws it, for projecting points (no render). */
   private projector(v: View, f: Framing) {
-    const { stage, item, canvas } = this.host, cam = stage.camera.clone(), c = item.c, { zoom, lookY } = this.camera(v, f);
-    cam.aspect = canvas.width / canvas.height; cam.updateProjectionMatrix();
+    const { stage, item } = this.host, cam = stage.camera.clone(), c = item.c, { zoom, lookY } = this.camera(v, f);
+    cam.aspect = this.host.aspect(); cam.updateProjectionMatrix();
     cam.position.set(0, 0.6, 6.7 * zoom); cam.lookAt(0, lookY != null ? lookY : 0.3 + ((c as unknown as { float?: number }).float || 0) * 0.5 - (zoom - 1) * 0.55, 0); cam.updateMatrixWorld();
     return cam;
   }
@@ -257,6 +277,28 @@ export class StageFramer {
     };
     return { rows, slope: (zk) => this.slope(v, zk) };
   }
+
+  /** How far from the tile's middle the creature reaches at its closest framing (zk 1), css px, over every act it can play and its
+   *  shadow (what the scene canvas must hold, host.ts cropFor) for a desktop tile `w` × `h`; null while its acts are measured (this
+   *  starts that) or on a phone, whose framing is made to the tile's width. */
+  reach(w: number, h: number): number | null {
+    const ask = this.frame.request, key = shapeKey(this.host.item.spec);
+    if (!ask || ask.phone) return null;
+    const F = footprints.get(key);
+    if (!F) { this.measure(); return null; }
+    const at = key + "|" + w.toFixed(1) + "|" + h.toFixed(1);
+    if (this.reached?.at === at) return this.reached.px;
+    const { stage, item } = this.host, cam = stage.camera.clone(), c = item.c, { zoom, lookY } = this.camera({ zoom: DESKTOP_ZOOM }, { lift: 0, zk: 1 });
+    cam.aspect = w / h; cam.updateProjectionMatrix();
+    cam.position.set(0, 0.6, 6.7 * zoom); cam.lookAt(0, lookY != null ? lookY : 0.3 + ((c as unknown as { float?: number }).float || 0) * 0.5 - (zoom - 1) * 0.55, 0); cam.updateMatrixWorld();
+    const q = F.pts[0].clone();
+    let most = 0;
+    for (const set of [F.bounds, F.ground]) for (const p of set) most = Math.max(most, Math.abs(q.copy(p).project(cam).x));
+    const px = most * w / 2;
+    this.reached = { at, px };
+    return px;
+  }
+  private reached: { at: string; px: number } | null = null;
 
   /** How many px a unit of lift moves the creature's feet up the tile at a step back (from the projection). */
   private slope(v: View, zk: number) {
@@ -507,6 +549,9 @@ export class StageFramer {
   }
 }
 
+/** Where the stage's key light stands (rig.js Stage: its default, and the cast-shadow variants' higher, more lateral one): a shadow
+ *  falls from a point to the floor along the direction from the light, so a point at height y lands y / light.y of the way back along it. */
+const KEY_LIGHTS: ReadonlyArray<readonly [number, number, number]> = [[-2.2, 4.2, 5], [-2.5, 4.4, 4.6]];
 /** The ease's step (the reference's frame at 30 a second), and the most steps a change is sampled for (it lands sooner). */
 const STEP_MS = 1000 / 30, MOTION_STEPS = 60;
 /** How long the first framing is solved for at once, on the pixels, before an estimate stands in for it (a renderer without

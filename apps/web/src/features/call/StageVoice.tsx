@@ -50,28 +50,33 @@ export function StageVoice({ frame, turn, phone, onGround, children }: { frame: 
   useLayoutEffect(() => {
     const node = layer.current, tile = node?.parentElement;
     if (!node || !tile) return;
+    let watched: Element | null = null;
     const read = () => {
       const w = tile.clientWidth, h = tile.clientHeight;
       if (!(w > 0 && h > 0)) return;
       const box = tile.getBoundingClientRect(), scene = tile.querySelector(".stage-agent canvas") ?? tile.querySelector(".stage-scene");
+      // (the creature's canvas may be only the middle of the tile, and is laid out again when its crop changes: watched too)
+      if (scene && scene !== watched && scene.matches(".stage-agent canvas")) { watched = scene; observer?.observe(scene); }
       const at = scene?.getBoundingClientRect();
       const dx = at ? at.left - box.left - tile.clientLeft : 0, dy = at ? at.top - box.top - tile.clientTop : 0, sh = at?.height || h;
       // Not scaled to the tile yet (its scale comes after this layer's first layout): read again once it is.
       if (at && Math.abs(sh - h) > 4) return;
       setSize((was) => was && was.w === w && was.h === h && Math.abs(was.dx - dx) < 0.01 && Math.abs(was.dy - dy) < 0.01 && Math.abs(was.sh - sh) < 0.01 ? was : { w, h, dx, dy, sh });
     };
+    let observer: ResizeObserver | null = null;
     read();
     if (typeof ResizeObserver === "undefined") return;
     // The scene is scaled to the tile after this layer is laid out (useSceneScale keeps --k on the tile, which sizes the
     // scene): where the creature's canvas sits is read again whenever the tile or the scene changes size.
-    const observer = new ResizeObserver(read);
+    observer = new ResizeObserver(read);
     observer.observe(tile);
+    if (watched) observer.observe(watched);
     const scene = tile.querySelector(".stage-scene");
     if (scene) observer.observe(scene);
     const mounted = new MutationObserver(read);
     mounted.observe(tile, { attributes: true, attributeFilter: ["style"] });
     const later = requestAnimationFrame(read);
-    return () => { observer.disconnect(); mounted.disconnect(); cancelAnimationFrame(later); };
+    return () => { observer?.disconnect(); mounted.disconnect(); cancelAnimationFrame(later); };
   }, []);
 
   const type = size ? voiceType(size.w, size.h) : null;
