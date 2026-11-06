@@ -496,6 +496,9 @@ export interface Host {
   presence: HostPresence;
   storage: HostStorage;
   /** One tab at a time for a named piece of work across this site's tabs (the browser's Web Locks); see `exclusively`. */
+  /** The size in px of the platform's body text where it follows the person's text size and the page can measure it (iOS
+   *  WebKit's `-apple-system-body`: 17 at the default size); null elsewhere. lib/text-scale.ts turns it into a scale. */
+  systemTextSize(): number | null;
   exclusive<T>(name: string, run: () => T | Promise<T>, options?: { ifAvailable?: boolean }): Promise<T | undefined>;
   reach: ReachTransport;
   localHost: LocalHostBridge | null;

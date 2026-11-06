@@ -1,4 +1,4 @@
-import { host, iosBodyProbe } from "../host";
+import { host } from "../host";
 import type { TextScaleBridge } from "../host";
 
 /* How much bigger or smaller than its default the person has set the text on this phone (iOS Dynamic Type, Android font
@@ -44,7 +44,7 @@ function hostScale(bridge: TextScaleSources["host"]): number | null {
 export function systemTextScale(sources: TextScaleSources = {}): number {
   const reported = hostScale("host" in sources ? sources.host : host().textScale);
   if (reported !== null) return clampTextScale(reported);
-  const px = (sources.probe ?? iosBodyProbe)();
+  const px = (sources.probe ?? host().systemTextSize)();
   return px === null ? 1 : clampTextScale(px / IOS_BODY_PX);
 }
 

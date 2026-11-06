@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { iosBodyProbe } from "../host";
+import { host } from "../host";
 import { applyTextScale, clampTextScale, MAX_TEXT_SCALE, MIN_TEXT_SCALE, startTextScale, systemTextScale } from "./text-scale";
 
 const noHost = { host: null } as const;
@@ -31,7 +31,7 @@ describe("systemTextScale", () => {
   test("a browser that is not iOS WebKit has no probe, and is 1", () => {
     expect(systemTextScale({ ...noHost, probe: () => null })).toBe(1);
     // The real probe, in this test browser (not iOS): nothing.
-    expect(iosBodyProbe()).toBeNull();
+    expect(host().systemTextSize()).toBeNull();
     expect(systemTextScale(noHost)).toBe(1);
   });
   test("a number that is not a size is 1", () => {
