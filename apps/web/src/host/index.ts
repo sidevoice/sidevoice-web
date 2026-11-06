@@ -6,7 +6,7 @@ import { beginBrowserAudioActivation, pageVoice } from "./browser-voice.js";
 import { browserReach, reachOfOrigin as reachOfPage } from "./browser-reach";
 import { browserStorage, exclusively } from "./browser-storage";
 import { followKeyboardLayout } from "./browser-keyboard";
-import { browserDeviceName, browserShortcutModifier } from "./identity";
+import { browserDeviceName, browserShortcutModifier, iosBodyProbe } from "./identity";
 import { applyViewport as applyViewportOf } from "./viewport";
 import { messageOverlay, nativeCardSeam, nativeHost } from "./native";
 import { setMessageOverlay } from "../i18n/translator";
@@ -61,6 +61,7 @@ export function host(): Host {
     // The app's when it keeps them; else this browser's own storage.
     storage: app.storage ?? browserStorage(),
     exclusive: exclusively,
+    systemTextSize: iosBodyProbe,
     identity: {
       build: app.identity.build,
       // The app's name for the computer; else what this browser is.

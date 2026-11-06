@@ -1,6 +1,6 @@
 import type {
   AppBuild, AppUpdater, AppVoice, CallControlsBridge, CallSurfaceBridge, Host, HostDebugBridge, HostIdentity, HostPresence, HostStorage, LocalHostBridge,
-  MediaDuckBridge, MessageOverlay, MicrophoneBridge, MuteShortcutBridge, PairingsStore, ReachTransport, ResetBridge, ShortcutsBridge,
+  MediaDuckBridge, MessageOverlay, MicrophoneBridge, MuteShortcutBridge, PairingsStore, ReachTransport, ResetBridge, ShortcutsBridge, TextScaleBridge,
 } from "./types";
 
 /* What an app injects into its page: `window.__sidevoiceHost`, the object the desktop and mobile apps share
@@ -41,7 +41,7 @@ const named = (value: unknown) => typeof value === "string" && value.trim() ? va
 
 /** The members an app offers through the global it injects, `null` for the rest; the identity here is what the app says
  *  (its build, its computer's name, its shortcut modifier), the browser's to tell where it does not. */
-export type NativeHost = Omit<Host, "exclusive" | "identity" | "microphone" | "presence" | "reach" | "storage" | "voice"> & {
+export type NativeHost = Omit<Host, "exclusive" | "systemTextSize" | "identity" | "microphone" | "presence" | "reach" | "storage" | "voice"> & {
   identity: Omit<HostIdentity, "deviceName" | "shortcutModifier" | "followKeyboardLayout"> & { deviceName(): string | null; shortcutModifier: string | null };
   /** The app's permission bridge, and its help for a blocked one when it words it. */
   microphone: Partial<MicrophoneBridge> | null;
@@ -97,6 +97,7 @@ export function nativeHost(): NativeHost {
     muteShortcut: member<MuteShortcutBridge>(app, "muteShortcut", ["get", "set"]),
     shortcuts: member<ShortcutsBridge>(app, "shortcuts", ["get", "set"]),
     mediaDuck: member<MediaDuckBridge>(app, "mediaDuck", ["get", "set"]),
+    textScale: member<TextScaleBridge>(app, "textScale", ["get"]),
     callControls: member<CallControlsBridge>(app, "callControls", ["settings", "setAlwaysShown"]),
     callSurface: member<CallSurfaceBridge>(app, "callSurface", ["active", "still", "forget"]),
     updater: updater && typeof updater.status === "function" ? updater : null,

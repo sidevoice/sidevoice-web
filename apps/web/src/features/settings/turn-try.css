@@ -1,7 +1,7 @@
 /* Trying the end of turn (TurnTry.tsx): where it stands in words, a small waveform beside them while the voice listens,
    Try and Stop as one button; then the latest turn's words and what to change. A block of its own after the choices,
    framed as a model's block is, its try under a line as a model's try is (model-prepare.css). */
-.turn-try { display: grid; gap: var(--sv-space-2); min-width: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.turn-try { display: grid; gap: var(--sv-space-2); min-width: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); }
 .turn-try-main { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sv-space-3); min-width: 0; min-height: 36px; }
 .turn-try-lead { flex: 1; min-width: 0; }
 .turn-try-hint { display: grid; gap: 2px; }

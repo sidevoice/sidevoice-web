@@ -12,8 +12,8 @@ html, body { margin: 0; min-height: 100%; background: var(--sv-bg-subtle); }
 .ds-column-label { margin: 0 0 var(--sv-space-4); font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
 .ds-showcase { display: grid; gap: var(--sv-space-5); }
 .ds-specimen { min-width: 0; padding: var(--sv-space-6); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-bg); }
-.ds-specimen-title { margin: 0; font-size: var(--sv-font-lg); line-height: 1.5rem; font-weight: var(--sv-weight-bold); letter-spacing: -.01em; }
-.ds-specimen-note { margin: var(--sv-space-1) 0 0; color: var(--sv-text-muted); font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.ds-specimen-title { margin: 0; font-size: var(--sv-font-lg); line-height: calc(1.5rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-bold); letter-spacing: -.01em; }
+.ds-specimen-note { margin: var(--sv-space-1) 0 0; color: var(--sv-text-muted); font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); }
 .ds-specimen-body { display: grid; gap: var(--sv-space-4); margin-top: var(--sv-space-5); }
 .ds-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-3); }
 /* The Settings gear as the room shows it, its "new" mark on its corner. */
@@ -23,7 +23,7 @@ html, body { margin: 0; min-height: 100%; background: var(--sv-bg-subtle); }
 .ds-grid-2 p { margin: var(--sv-space-1) 0 0; }
 .ds-tab-panel { padding-top: var(--sv-space-3); }
 .ds-state { display: grid; gap: var(--sv-space-1-5); }
-.ds-state > code, .ds-swatch code { font: var(--sv-font-xs) / 1rem var(--sv-font-mono); color: var(--sv-text-muted); }
+.ds-state > code, .ds-swatch code { font: var(--sv-font-xs) / calc(1rem * var(--sv-line-k, 1)) var(--sv-font-mono); color: var(--sv-text-muted); }
 .ds-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr)); gap: var(--sv-space-3); }
 .ds-swatch { display: grid; gap: var(--sv-space-1); }
 .ds-swatch span { height: 2.75rem; border-radius: var(--sv-radius-md); border: 1px solid var(--sv-border); }

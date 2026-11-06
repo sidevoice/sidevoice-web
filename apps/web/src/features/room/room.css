@@ -50,7 +50,7 @@
 
 /* ----- the header: the mark, and Settings at its end */
 .room-header { --dot-ring: var(--sv-bg); display: flex; align-items: center; gap: var(--sv-space-3); height: calc(var(--sv-header-height) + var(--sv-inset-top)); padding: var(--sv-inset-top) var(--sv-space-4) 0 var(--sv-space-5); border-bottom: 1px solid var(--sv-border); background: var(--sv-bg); }
-.room-header .brand { display: inline-flex; align-items: center; gap: var(--sv-space-2); flex: none; font-size: var(--sv-font-lg); line-height: 1.5rem; font-weight: var(--sv-weight-bold); letter-spacing: -.01em; color: var(--sv-text); }
+.room-header .brand { display: inline-flex; align-items: center; gap: var(--sv-space-2); flex: none; font-size: var(--sv-font-lg); line-height: calc(1.5rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-bold); letter-spacing: -.01em; color: var(--sv-text); }
 .room-header .brand svg { flex: none; color: var(--sv-accent-text); }
 .header-settings { flex: none; margin-inline-start: auto; }
 /* Something new under Settings: its mark on the gear's top-right corner (highlights.tsx GearNewMark, highlights.css),
@@ -60,18 +60,18 @@
 /* ----- the conversations: a column on a desktop */
 .conversation-sidebar { --dot-ring: var(--sv-bg-subtle); display: flex; flex-direction: column; gap: var(--sv-space-4); flex: none; width: 288px; min-height: 0; padding: var(--sv-space-3); overflow: hidden auto; border-right: 1px solid var(--sv-border); background: var(--sv-bg-subtle); transition: width var(--sv-dur-slow) var(--sv-ease); }
 .sidebar-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-2); flex: none; min-height: 32px; padding-inline-start: var(--sv-space-2); }
-.sidebar-head h2 { display: flex; align-items: center; gap: var(--sv-space-2); flex: 1; min-width: 0; overflow: hidden; font-size: var(--sv-font-sm); line-height: 1.25rem; font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); white-space: nowrap; text-overflow: ellipsis; }
+.sidebar-head h2 { display: flex; align-items: center; gap: var(--sv-space-2); flex: 1; min-width: 0; overflow: hidden; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); white-space: nowrap; text-overflow: ellipsis; }
 .sidebar-head h2 svg { flex: none; width: 16px; height: 16px; }
 /* The number of conversations, as the call card's switcher says it (call-card.css .card-conversations-button): tabular, in the muted weight. */
-.sidebar-head h2 .conversations-chip { display: inline-flex; align-items: center; gap: 3px; flex: none; height: 20px; padding: 0 6px; border-radius: 8px;
-  background: color-mix(in srgb, var(--sv-text) 8%, transparent); color: var(--sv-text-muted); font: 600 12.5px/1 var(--sv-font-sans, inherit); font-variant-numeric: tabular-nums; }
+.sidebar-head h2 .conversations-chip { display: inline-flex; align-items: center; gap: 3px; flex: none; min-height: 20px; padding: 0 6px; border-radius: 8px;
+  background: color-mix(in srgb, var(--sv-text) 8%, transparent); color: var(--sv-text-muted); font: 600 calc(12.5px * var(--sv-text-scale, 1)) / 1 var(--sv-font-sans, inherit); font-variant-numeric: tabular-nums; }
 .sidebar-head h2 .conversations-chip svg { width: 14px; height: 14px; }
 .conversations-chip .conversations-count { font: inherit; color: inherit; }
 .conversations-count { flex: none; font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); font-variant-numeric: tabular-nums; }
 .conversation-sidebar .sidebar-close { display: none; }
 .sidebar-body { display: grid; align-content: start; gap: var(--sv-space-4); min-width: 0; }
 .sidebar-group { display: grid; gap: var(--sv-space-0-5); min-width: 0; }
-.sidebar-group-label { display: flex; align-items: center; height: 1rem; gap: var(--sv-space-1-5); min-width: 0; margin: 0 0 var(--sv-space-3); padding-inline-start: var(--sv-space-2); font-size: var(--sv-font-xs); line-height: 1rem; font-weight: 600; color: var(--sv-text-subtle); }
+.sidebar-group-label { display: flex; align-items: center; min-height: 1rem; gap: var(--sv-space-1-5); min-width: 0; margin: 0 0 var(--sv-space-3); padding-inline-start: var(--sv-space-2); font-size: var(--sv-font-xs); line-height: calc(1rem * var(--sv-line-k, 1)); font-weight: 600; color: var(--sv-text-subtle); }
 .sidebar-group-label svg { flex: none; }
 .sidebar-group-label span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 /* The machine's connected mark (StateOnIcon) sits on its icon's corner, outside the icon's box: it is not cut like the name, and
@@ -79,7 +79,7 @@
 .sidebar-group-label .state-on-icon { overflow: visible; }
 .sidebar-group-label .state-on-icon-dot { width: 5px; height: 5px; border-width: 1.5px; bottom: -2px; inset-inline-end: -3px; }
 .sidebar-rows { display: grid; gap: var(--sv-space-1-5); min-width: 0; }
-.sidebar-empty { margin: 0; padding: var(--sv-space-5); border: 1px dashed var(--sv-border-strong); border-radius: var(--sv-radius-lg); font-size: var(--sv-font-sm); line-height: 1.25rem; text-align: center; color: var(--sv-text-muted); }
+.sidebar-empty { margin: 0; padding: var(--sv-space-5); border: 1px dashed var(--sv-border-strong); border-radius: var(--sv-radius-lg); font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); text-align: center; color: var(--sv-text-muted); }
 
 /* A conversation is a card, as the avatar lab draws them: its bicho on its own tint with its dot, the title, the harness
  * and the state in words, what is unread, and its options; the one on the stage edged in the accent. */
@@ -95,8 +95,8 @@
 /* The Live Activity cards' type: DM Sans, the title bold and a touch tight, the state line medium in the secondary grey. The state
    is the dot's colour alone; its words are never coloured. */
 .sidebar-rows .person { font-family: var(--sv-font-sans); }
-.sidebar-rows .person-name { overflow: hidden; font-size: .875rem; line-height: 1.125rem; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; text-overflow: ellipsis; }
-.sidebar-rows .person-sub { min-width: 0; font-size: var(--sv-font-xs); line-height: 1rem; font-weight: 500; color: var(--sv-text-muted); }
+.sidebar-rows .person-name { overflow: hidden; font-size: calc(.875rem * var(--sv-text-scale, 1)); line-height: calc(1.125rem * var(--sv-line-k, 1)); font-weight: 700; letter-spacing: -.01em; white-space: nowrap; text-overflow: ellipsis; }
+.sidebar-rows .person-sub { min-width: 0; font-size: var(--sv-font-xs); line-height: calc(1rem * var(--sv-line-k, 1)); font-weight: 500; color: var(--sv-text-muted); }
 .sidebar-state { display: flex; align-items: center; gap: var(--sv-space-1-5); min-width: 0; }
 .sidebar-state svg { flex: none; }
 .sidebar-state-text { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -118,8 +118,8 @@
    header is one button, the conversations' icon with their number as its badge: it expands the list. A card has no white
    card and no border there: just the creature; the chosen one has a soft lilac rounded background and a hovered one a very
    faint tint; one that needs the person says so by its burst alone. */
-.sidebar-count-badge { position: absolute; top: -5px; right: -7px; display: grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px;
-  background: var(--sv-accent); color: var(--sv-on-accent); box-shadow: 0 0 0 2px var(--sv-bg-subtle); font: 700 10.5px/1 var(--sv-font-sans, inherit); font-variant-numeric: tabular-nums; pointer-events: none; }
+.sidebar-count-badge { position: absolute; top: -5px; right: -7px; display: grid; place-items: center; min-width: 16px; min-height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px;
+  background: var(--sv-accent); color: var(--sv-on-accent); box-shadow: 0 0 0 2px var(--sv-bg-subtle); font: 700 calc(10.5px * var(--sv-text-scale, 1)) / 1 var(--sv-font-sans, inherit); font-variant-numeric: tabular-nums; pointer-events: none; }
 @media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
   .conversation-sidebar[data-collapsed] { width: 84px; padding-inline: 6px; }
   .conversation-sidebar[data-collapsed] .sidebar-head { justify-content: center; padding: 0; }
@@ -140,7 +140,7 @@
 .ui-dropdown { --menu-hover: #f3eefa; z-index: 100; display: grid; min-width: 13rem; padding: 6px; border: 1px solid var(--sv-bubble-edge); border-radius: 14px; background: var(--sv-surface-raised);
   box-shadow: 0 1px 2px rgb(42 26 64 / 10%), 0 10px 24px rgb(42 26 64 / 14%), 0 26px 50px -18px rgb(74 47 107 / 45%); animation: room-menu-in var(--sv-dur-fast) var(--sv-ease); }
 [data-theme="dark"] .ui-dropdown { --menu-hover: #2b2733; box-shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 10px 24px rgb(0 0 0 / 45%), 0 26px 50px -18px rgb(0 0 0 / 70%); }
-.ui-dropdown-item { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 9px; color: var(--sv-text); font-size: var(--sv-font-md); white-space: nowrap; outline: none; cursor: pointer; user-select: none; }
+.ui-dropdown-item { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 10px; border-radius: 9px; color: var(--sv-text); font-size: var(--sv-font-md); white-space: nowrap; outline: none; cursor: pointer; user-select: none; }
 .ui-dropdown-item svg { flex: none; width: 16px; height: 16px; color: var(--sv-text-muted); }
 .ui-dropdown-item[data-highlighted] { background: var(--menu-hover); }
 .ui-dropdown-item[data-danger], .ui-dropdown-item[data-danger] svg { color: var(--sv-danger); }
@@ -257,7 +257,7 @@
 .sidebar-brand { display: none; }
 @media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
   .room-shell > .room-header { display: none; }
-  .room-shell .sidebar-brand { display: flex; align-items: center; gap: var(--sv-space-2); flex: none; min-height: 40px; padding-inline-start: var(--sv-space-2); font-size: var(--sv-font-lg); line-height: 1.5rem; font-weight: var(--sv-weight-bold); letter-spacing: -.01em; color: var(--sv-text); }
+  .room-shell .sidebar-brand { display: flex; align-items: center; gap: var(--sv-space-2); flex: none; min-height: 40px; padding-inline-start: var(--sv-space-2); font-size: var(--sv-font-lg); line-height: calc(1.5rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-bold); letter-spacing: -.01em; color: var(--sv-text); }
   .room-shell .sidebar-brand svg { flex: none; color: var(--sv-accent-text); }
   .room-shell .conversation-sidebar[data-collapsed] .sidebar-brand { justify-content: center; padding: 0; }
   .room-shell .conversation-sidebar[data-collapsed] .sidebar-brand span { display: none; }

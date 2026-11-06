@@ -17,14 +17,14 @@
 /* Feature styles load before ui.css: a rule that moves a shared button says where it is, to outweigh the button's own. */
 
 .wizard-stepper { display: grid; gap: var(--sv-space-2); flex: none; padding: var(--sv-space-4) var(--sv-space-6) 0; }
-.wizard-stepper-label { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.wizard-stepper-label { margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
 .wizard-steps { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--sv-space-1); margin: 0; padding: 0; list-style: none; }
 .wizard-steps li { height: 4px; border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken); }
 [data-theme="dark"] .wizard-steps li { background: var(--sv-border); }
 .wizard-steps li[data-state="done"], .wizard-steps li[data-state="current"] { background: var(--sv-accent); }
 
 /* The space under the title is the title's, not the body's: scrolled content then stops short of it. */
-.wizard-title { flex: none; margin: 0; padding: var(--sv-space-4) var(--sv-space-6) var(--sv-space-3); font-size: var(--sv-font-2xl); line-height: 2rem; font-weight: var(--sv-weight-heavy); letter-spacing: -.02em; color: var(--sv-text); }
+.wizard-title { flex: none; margin: 0; padding: var(--sv-space-4) var(--sv-space-6) var(--sv-space-3); font-size: var(--sv-font-2xl); line-height: calc(2rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-heavy); letter-spacing: -.02em; color: var(--sv-text); }
 .wizard-title:focus { outline: none; }
 
 .wizard-body { display: grid; align-content: start; gap: var(--sv-space-4); flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--sv-space-1) var(--sv-space-6) var(--sv-space-6); }
@@ -37,11 +37,11 @@
 .wizard-title:has(+ .wizard-body[data-scrolled]) { position: relative; z-index: 1; box-shadow: 0 1px 0 var(--sv-border); }
 .wizard-body[data-scrolled] { mask-image: linear-gradient(to bottom, transparent 0, #000 var(--sv-space-4)); }
 .wizard-body > section { display: grid; align-content: start; gap: var(--sv-space-4); min-width: 0; }
-.wizard-body > section > p { margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
+.wizard-body > section > p { margin: 0; line-height: calc(1.5rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
 .wizard-loading { display: flex; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
 /* Prepare this computer, installed but not running: what it says of itself, then its one action under it. */
 .wizard-prepare-recover { display: grid; justify-items: start; gap: var(--sv-space-3); min-width: 0; }
-.wizard-prepare-recover > p { margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
+.wizard-prepare-recover > p { margin: 0; line-height: calc(1.5rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
 
 .wizard-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--sv-space-2); flex: none; padding: var(--sv-space-4) var(--sv-space-6); border-top: 1px solid var(--sv-border); }
 .wizard-actions:not(:has(.ui-button)) { display: none; }
@@ -62,7 +62,7 @@
 /* ----- transcription and voice: the choices (Settings' own), the try in the model's block; the sentence to hear is
    edited there too, or beside it while the try has its own dialog */
 .wizard-stage-step { display: grid; align-content: start; gap: var(--sv-space-4); min-width: 0; }
-.wizard-stage-step > p { margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
+.wizard-stage-step > p { margin: 0; line-height: calc(1.5rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
 .wizard-stage { min-width: 0; }
 
 
@@ -93,9 +93,9 @@
 .wizard-recap-row:nth-child(5) { animation-delay: 480ms; }
 .wizard-recap-row:nth-child(6) { animation-delay: 530ms; }
 .wizard-recap-icon { grid-area: icon; display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--sv-radius-md); background: var(--sv-accent-soft); color: var(--sv-accent-text); }
-.wizard-recap-row dt { grid-area: label; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.wizard-recap-row dt { grid-area: label; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
 /* One line, whatever the model's name: what does not fit ends in an ellipsis (the whole name on hover). */
-.wizard-recap-row dd { grid-area: value; margin: 0; font-weight: var(--sv-weight-semibold); line-height: 1.375rem; color: var(--sv-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wizard-recap-row dd { grid-area: value; margin: 0; font-weight: var(--sv-weight-semibold); line-height: calc(1.375rem * var(--sv-line-k, 1)); color: var(--sv-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wizard-recap-detail { font-weight: var(--sv-weight-regular, 400); color: var(--sv-text-muted); }
 .wizard-recap-check { grid-area: check; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--sv-positive-soft); color: var(--sv-positive); animation: wizard-ready-pop 220ms var(--sv-ease) both; }
 .wizard-recap-row:nth-child(1) .wizard-recap-check { animation-delay: 420ms; }
@@ -125,7 +125,7 @@
 .wizard-ready .wizard-ready-connect { padding-top: var(--sv-space-5); border-top: 1px solid var(--sv-border); }
 
 @media (max-width: 599px), (max-height: 520px) {
-  .wizard-ready .wizard-ready-title { font-size: var(--sv-font-xl); line-height: 1.625rem; }
+  .wizard-ready .wizard-ready-title { font-size: var(--sv-font-xl); line-height: calc(1.625rem * var(--sv-line-k, 1)); }
   .wizard-ready .wizard-ready-mark { width: 56px; height: 56px; }
   .wizard-ready .wizard-ready-mark svg { width: 40px; height: 40px; }
   .wizard-ready .wizard-recap-list { grid-template-columns: 1fr; gap: 0; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); }
@@ -145,7 +145,7 @@
   .wizard-dialog { position: fixed; inset: 0; width: 100%; height: 100%; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
   .wizard-head { padding: calc(var(--sv-space-3) + env(safe-area-inset-top)) var(--sv-space-4) 0; }
   .wizard-stepper { padding: var(--sv-space-3) var(--sv-space-4) 0; }
-  .wizard-title { padding: var(--sv-space-3) var(--sv-space-4); font-size: var(--sv-font-xl); line-height: 1.625rem; }
+  .wizard-title { padding: var(--sv-space-3) var(--sv-space-4); font-size: var(--sv-font-xl); line-height: calc(1.625rem * var(--sv-line-k, 1)); }
   .wizard-body { padding: var(--sv-space-1) var(--sv-space-4) var(--sv-space-4); }
   .wizard-actions { padding: var(--sv-space-3) var(--sv-space-4) calc(var(--sv-space-3) + env(safe-area-inset-bottom)); }
   .wizard-actions > .ui-button--primary, .wizard-slot > .ui-button { flex: 1 1 auto; }
@@ -174,6 +174,11 @@
   .wizard-actions:has(> .wizard-quiet) > .wizard-back { padding-inline: var(--sv-space-3); }
   .wizard-actions[data-model-step]:has(> .wizard-quiet) .wizard-back-label { position: static; width: auto; height: auto; clip-path: none; }
 }
+/* At a phone's larger text sizes (lib/text-scale.ts sets data-text-large from 1.2) the one-line footers cannot hold: the
+ * labels wrap and so do the actions, before anything leaves the screen. The one-line look is the default's. */
+:root[data-text-large] .wizard-actions { flex-wrap: wrap; }
+:root[data-text-large] .wizard-actions .ui-button { max-width: 100%; white-space: normal; line-height: 1.25; padding-block: var(--sv-space-2); }
+:root[data-text-large] .wizard-actions > .ui-button:not(.wizard-back) { flex: 1 1 auto; }
 /* Ready, read live: a row not there yet wears a neutral dash, never red; one downloading, nothing. */
 .wizard-recap-dash { grid-area: check; display: grid; place-items: center; width: 16px; height: 16px; color: var(--sv-text-muted); font-weight: var(--sv-weight-semibold); }
 .wizard-recap-row[data-state="missing"] dd { color: var(--sv-text-muted); }

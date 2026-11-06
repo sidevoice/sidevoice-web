@@ -5,7 +5,7 @@
 .perm-badge { flex: none; gap: var(--sv-space-1); white-space: nowrap; }
 .perm-badge svg { width: 12px; height: 12px; }
 .perm-help { margin-top: var(--sv-space-1); }
-.wizard-body > section > p.perm-also, .perm-also { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.wizard-body > section > p.perm-also, .perm-also { margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
 
 /* The microphone hero (features/avatar/MicrophoneHero.tsx), 112px as the design reference's: the lean, the hop and the
  * droop are the creature's own pose; blocked or none found, the page greys it a little (the reference's .desat). */
