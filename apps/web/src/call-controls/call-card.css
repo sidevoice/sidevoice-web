@@ -282,7 +282,7 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .avatar-figure .sv-avatar { display: block; width: 100%; height: 100%; }
 /* Centred on the creature (R13), as far as the screen's room allows: --voice-shift (set by the card from the host's `room`) slides it
  * inward, by margins on the far side so the window still holds it. */
-.avatar-voice { grid-area: voice; width: max-content; max-width: var(--avatar-col); justify-self: center; justify-items: center;
+.avatar-voice { grid-area: voice; width: max-content; max-width: min(var(--avatar-col), var(--voice-max, var(--avatar-col))); justify-self: center; justify-items: center;
   margin-left: max(0px, calc(2 * var(--voice-shift, 0px))); margin-right: max(0px, calc(-2 * var(--voice-shift, 0px))); }
 /* Close to the creature: its box has room under its feet for its shadow, and over its head for its antics. */
 .floating-card[data-open=down] .avatar-voice { align-self: start; margin-top: 2px; }

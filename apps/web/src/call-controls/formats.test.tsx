@@ -421,3 +421,26 @@ test("just the avatar: with the creature near the left edge the voice text slide
     expect(document.querySelector<HTMLElement>(".avatar-card")!.style.getPropertyValue("--voice-shift")).toBe("0px");
   } finally { width.mockRestore(); }
 });
+
+test("just the avatar: where the creature and its room are narrower than the text, the text is capped to that width and placed after the cap", () => {
+  vi.useFakeTimers();
+  // The boxes report the text's width as the cap leaves it: 300px wide, wrapped to what the card set.
+  const width = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get");
+  width.mockImplementation(function (this: HTMLElement) {
+    if (this.classList.contains("avatar-figure")) return 160;
+    if (!this.classList.contains("avatar-voice")) return 0;
+    const cap = parseFloat(this.closest<HTMLElement>(".avatar-card")!.style.getPropertyValue("--voice-max"));
+    return Number.isNaN(cap) ? 300 : Math.min(300, cap);
+  });
+  try {
+    // 20px a side: 200px to be in, so the 300px text wraps to 200 and is centred (nothing left to slide).
+    page("avatar", { room: { left: 20, right: 20 } });
+    const card = document.querySelector<HTMLElement>(".avatar-card")!;
+    expect(card.style.getPropertyValue("--voice-max")).toBe("200px");
+    expect(card.style.getPropertyValue("--voice-shift")).toBe("0px");
+    cleanup();
+    // A host that cannot say: no cap.
+    page("avatar");
+    expect(document.querySelector<HTMLElement>(".avatar-card")!.style.getPropertyValue("--voice-max")).toBe("");
+  } finally { width.mockRestore(); }
+});

@@ -37,7 +37,7 @@ import type { Translate } from "../i18n/translator";
 
 export { CARD_MARGIN, CLICK_GUARD_MS, DRAG_THRESHOLD_PX, HIDE_DELAY_MS, PANEL_CLOSE_MS, SHOW_DELAY_MS, WAVE_SAMPLE_MS, duration } from "./card-shell";
 import { CARD_MARGIN } from "./card-shell";
-import { voiceShift } from "./voice-centre";
+import { voiceMax, voiceShift } from "./voice-centre";
 
 type Place = NonNullable<CallControlsState["place"]>;
 const UPPER_RIGHT: Place = { vertical: "upper", horizontal: "right" };
@@ -353,6 +353,9 @@ function AvatarCard({ state, shell, t }: { state: CallControlsState; shell: Card
       const figure = card.querySelector<HTMLElement>(".avatar-figure");
       card.style.setProperty("--voice-reach", out && figure ? node.getBoundingClientRect().bottom - figure.getBoundingClientRect().bottom + "px" : "0px");
       // Centred on the creature, inside the room it has to the screen's sides; the margins keep the window holding the text.
+      // Where even the whole room is narrower than the text, the text wraps to it (--voice-max) before it is placed.
+      const limit = out && figure ? voiceMax(figure.offsetWidth, room) : null;
+      if (limit === null) card.style.removeProperty("--voice-max"); else card.style.setProperty("--voice-max", limit + "px");
       const shift = out && figure ? voiceShift(node.offsetWidth, figure.offsetWidth, room) : 0;
       card.style.setProperty("--voice-shift", shift + "px");
     };
