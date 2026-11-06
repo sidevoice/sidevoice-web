@@ -4731,6 +4731,21 @@ test('Say one thing is its conversation\'s turn and its call\'s: another convers
  assert.equal(s.run('micEnabled'),true,'open while its own turn goes on');
  turn('finished');assert.equal(s.run('micEnabled'),false);assert.equal(mutes().at(-1),true);
 });
+test('Say one thing is tied to the call instance it was pressed on: a late turn of a call replaced by another neither takes it nor ends it',()=>{
+ const {s,voice,mutes}=inCall();
+ s.context.__key=s.run('targetId()');
+ voice.id='b';
+ // Call B is the conversation's call now; call A was replaced without its turns being cleared.
+ s.run("conversationCalls.set(__key,{call:__voice,node:state.callNode,thread_id:targetThread(),generation:callGeneration})");
+ s.run('window.sidevoiceActions.oneTurn()');
+ const say=(phase,id,call)=>s.run("voiceTurn({turn_id:'"+id+"',phase:'"+phase+"',started_at:1,text:'hi',ended_at:2},{call:{id:'"+call+"'},node:state.callNode,thread_id:targetThread(),generation:callGeneration})");
+ say('started','x1','a');say('finished','x1','a');
+ assert.equal(s.run('micEnabled'),true,'a late turn of call A did not end it');
+ say('started','x2','b');say('finished','x1','a');
+ assert.equal(s.run('micEnabled'),true,'nor did A end the turn B took');
+ say('finished','x2','b');
+ assert.equal(s.run('micEnabled'),false);assert.equal(mutes().at(-1),true);
+});
 test('The host holds to talk: it opens like Space, closes on holdEnd, and the page losing focus does not let go',()=>{
  const {s,mutes}=inCall();
  s.run('window.sidevoiceActions.holdStart()');assert.equal(s.run('micEnabled'),true);

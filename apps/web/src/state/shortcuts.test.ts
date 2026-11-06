@@ -88,4 +88,13 @@ test("a key of the room is warned about where AltGr or the browser or the system
   expect(bindingClash({ code: "Tab", key: "Tab", alt: true }, false)).toBe("reserved");
   expect(bindingClash({ code: "KeyD", key: "D", mod: true }, false)).toBeNull();
   expect(bindingClash({ code: "Space", key: "Space" }, false)).toBeNull();
+  // A Mac's own keys, Cmd only and only there (Q and Tab are in the shared list).
+  for (const code of ["KeyM", "KeyH", "Space", "Backquote"]) {
+    expect(bindingClash({ code, key: code, mod: true }, true)).toBe("reserved");
+    expect(bindingClash({ code, key: code, meta: true }, true)).toBe("reserved");
+    expect(bindingClash({ code, key: code, mod: true }, false)).toBeNull();
+    expect(bindingClash({ code, key: code, ctrl: true }, true)).toBeNull();
+  }
+  // Ctrl+Alt+Shift+M, the Windows and Linux default for the global mute, is not an AltGr warning.
+  expect(bindingClash({ code: "KeyM", key: "M", ctrl: true, alt: true, shift: true }, false)).toBeNull();
 });

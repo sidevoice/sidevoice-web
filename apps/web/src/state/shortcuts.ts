@@ -243,12 +243,19 @@ export function keyName(code: string, key = ""): string {
 
 /** What is wrong with keeping `bound` as a key of the room, if anything (a warning: the person may still keep it): on
  *  Windows and Linux Ctrl+Alt+letter is AltGr+letter on many layouts and types a character; and the browser or the system
- *  takes some keys before the page sees them (Cmd/Ctrl+W, T, N, Q, R, L, Tab; Alt+Tab, Alt+F4). */
+ *  takes some keys before the page sees them (Cmd/Ctrl+W, T, N, Q, R, L, Tab; Alt+Tab, Alt+F4; on a Mac also the system's
+ *  own Cmd+M minimise, Cmd+H hide, Cmd+Space Spotlight and Cmd+` next window).
+ *
+ *  Ctrl+Alt+Shift+letter is deliberately not an AltGr warning (`!bound.shift`): AltGr+Shift+letter types a character on a
+ *  few layouts only, and Ctrl+Alt+Shift+M is the Windows and Linux default the app itself registers for the global mute
+ *  (operator's choice), so the room's own mute could not be offered the same keys without a warning on its default. */
 export function bindingClash(bound: Binding, mac: boolean): "altgr" | "reserved" | null {
   const control = !!(bound.mod || bound.ctrl) && !mac;
   if (control && bound.alt && !bound.meta && !bound.shift && /^Key[A-Z]$/.test(bound.code)) return "altgr";
   const primary = !!(bound.mod || bound.ctrl || bound.meta);
   if (primary && !bound.alt && ["KeyW", "KeyT", "KeyN", "KeyQ", "KeyR", "KeyL", "Tab"].includes(bound.code)) return "reserved";
+  const command = mac && !!(bound.mod || bound.meta);
+  if (command && !bound.alt && !bound.ctrl && ["KeyM", "KeyH", "Space", "Backquote"].includes(bound.code)) return "reserved";
   if (bound.alt && !primary && (bound.code === "Tab" || (!mac && bound.code === "F4"))) return "reserved";
   return null;
 }

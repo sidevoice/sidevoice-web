@@ -968,15 +968,15 @@ function oneTurn(){
   return;
  }
  if(state.micEnabled)return;
- holding=false;oneTurnOpen={spoke:false,key:targetId(),generation:callGeneration,turn:null};setMic(true,{keepOneTurn:true});
+ holding=false;oneTurnOpen={spoke:false,key:targetId(),generation:callGeneration,call:conversationCalls.get(targetId())?.call.id??'local',turn:null};setMic(true,{keepOneTurn:true});
 }
 function closeOneTurn(){if(!oneTurnOpen)return;oneTurnOpen=null;setMic(false)}
 // The voice's turns, as they begin and end: the one turn is the first that starts in the conversation and the call it was
 // opened for, and it is over when that very turn is told (sent) or cancelled. A turn of another conversation, or of another
-// call (a late one of a call since replaced), is not it: it neither takes it nor ends it.
+// call (a late one of a call since replaced), is not it: the call is the instance the key was pressed on, by its own id: it neither takes it nor ends it.
 function oneTurnSeen(event,source){
  const open=oneTurnOpen;
- if(!open||source.generation!==open.generation||open.generation!==callGeneration||conversationKey(source.node,source.thread_id)!==open.key)return;
+ if(!open||source.generation!==open.generation||open.generation!==callGeneration||conversationKey(source.node,source.thread_id)!==open.key||source.call.id!==open.call)return;
  const id=source.call.id+'\0'+event.turn_id;
  if(event.phase==='started'){if(!open.turn){open.turn=id;open.spoke=true}}
  else if(open.turn===id)closeOneTurn();
