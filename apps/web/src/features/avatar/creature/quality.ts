@@ -13,12 +13,14 @@
 export const SCENE_MAX_H = 960;
 /** The canvas's area at most (px): what the stage's own 1152 × 768 render held, so no tile is drawn at more fill than before. */
 export const SCENE_MAX_AREA = 900_000;
-/** A desktop stage's own ceilings (the stage's framing says it is not a phone: the layout's own rule): the room it takes can be a
- *  whole 4K screen's, drawn at the screen's pixel ratio instead of below it (900 k px on a 1920 x 1080 window at 2x was 0.78 device
- *  px to a css px). A desktop has the fill rate and a thread of its own; the governor still steps the scale down when its frames
- *  do not hold. 8 294 400 is a 3840 x 2160 frame: a 1920 x 1080 stage at 2x is drawn whole, a 2560 x 1440 one at about 1.75. */
+/** A desktop stage's own ceilings (the stage's framing says it is not a phone: the layout's own rule): the creature is drawn at the
+ *  screen's pixel ratio instead of below it (900 k px on a 1920 x 1080 window at 2x was 0.78 device px to a css px). The canvas is only
+ *  as wide as the creature reaches (host.ts cropFor: about 0.4 of the tile), so the ceiling is the creature's own pixels, not the
+ *  tile's: 4 194 304 (2048 x 2048) holds a 1920 x 1080 window at 2x whole (about 2.1 M) and a 2560 x 1440 one at about 1.8, where the
+ *  whole tile's 4K frame (8 294 400, web#512) was twice that fill for pixels nothing is drawn in. A desktop has the fill rate and a
+ *  thread of its own; the governor still steps the scale down when its frames do not hold. */
 export const DESKTOP_MAX_H = 2160;
-export const DESKTOP_MAX_AREA = 8_294_400;
+export const DESKTOP_MAX_AREA = 4_194_304;
 /** The scale of the ladder's last rung (TIERS): where a desktop's ceilings are back to a phone's. */
 const LOWEST_SCALE = 0.5;
 /** The canvas's height at least (px): below this the creature's outline and face would smear. SCENE_MAX_AREA wins over it, for

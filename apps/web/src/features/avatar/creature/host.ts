@@ -287,6 +287,9 @@ function wake() { if (!frameId && wanted()) frameId = requestAnimationFrame(fram
 
 const nowS = () => performance.now() / 1000;
 const clamp = (v: number) => Math.max(-1, Math.min(1, v));
+/** The scene canvas's crop (cropFor): the creature's reach is taken at CROP_MARGIN of its measure, plus CROP_PAD_PX css px, in whole
+ *  1/CROP_STEPS of the tile's width; a crop that would be more than CROP_WHOLE of it is the whole tile. */
+const CROP_MARGIN = 1.1, CROP_PAD_PX = 14, CROP_STEPS = 64, CROP_WHOLE = 0.9;
 const GAZE_IN = 0.35, GAZE_HOLD = 0.4, GAZE_OUT = 0.8;
 
 export interface LiveOptions {
@@ -351,6 +354,8 @@ export class LiveCreature {
   /** The canvas's box as last laid out (css px), and the governor's scale its pixels were sized for. */
   private css = { w: 0, h: 0 };
   private scaled = 1;
+  /** The share of the stage's width the scene canvas is laid out at (1: the whole tile; see cropFor). */
+  private laid = 1;
   private step: CreatureStep = {};
   /** The base act built for the step (its name and start), so the same step is not built again. */
   private baseKey: string | null = null;
@@ -371,8 +376,10 @@ export class LiveCreature {
     if (opts.frame && !face) {
       this.framer = new StageFramer({ stage, item: this.item, canvas: opts.canvas, poke: () => this.poke(),
         render: (zoom, lookY, state, into) => { const shown = this.item.canvas; this.item.canvas = into; try { this.draw(nowS(), true, { zoom, lookY, state }); } finally { this.item.canvas = shown; } },
-        mood: () => this.mood, drawn: () => !MODES[this.mood].poster }, opts.frame);
+        mood: () => this.mood, drawn: () => !MODES[this.mood].poster, aspect: () => this.fullAspect(),
+        measured: () => { if (this.fit(false)) { this.framer?.invalidate(); this.poke(); } } }, opts.frame);
       this.framer.hold(!this.moving);
+      this.fit(false); // (asks the framer for the creature's reach: its acts are measured from here, and the canvas cropped when they are)
     }
     this.setMood(opts.mood ?? "idle", { step: opts.step });
     const box = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => { this.fit(); this.hidden = false; this.framer?.invalidate(); this.poke(); });
@@ -410,6 +417,7 @@ export class LiveCreature {
     // the box as laid out, fractions kept (the creator's getBoundingClientRect): a scaled scene keeps its shape
     const { canvas } = this.opts;
     if (measure) { const box = canvas.getBoundingClientRect(); this.css = { w: box.width, h: box.height }; }
+    if (this.opts.framing !== "face" && this.cropTo()) { const box = canvas.getBoundingClientRect(); this.css = { w: box.width, h: box.height }; }
     const { w, h } = this.css;
     let W: number, H: number;
     if (this.opts.framing === "face") {
@@ -426,12 +434,36 @@ export class LiveCreature {
     return true;
   }
 
+  /** The scene canvas is laid out over the middle of the tile that the creature can reach, not the whole of it (the creature is about
+   *  half the stage's height and a fraction of its width; the rest was fill for nothing): the share of the tile's width it needs on a
+   *  desktop (the framer measures the widest of its acts), 1 elsewhere. Its box stays the tile's full height and centred on the
+   *  creature, so every row of the framing is the tile's. Whole 1/CROP_STEPS, so a resize does not shift it by a pixel. */
+  private cropFor(fullW: number, h: number): number {
+    if (!this.framer || !this.desktop() || !(fullW > 0 && h > 0)) return 1;
+    const reach = this.framer.reach(fullW, h); // css px from the middle, or null while it is being measured
+    if (reach == null) return 1;
+    const share = Math.ceil((2 * (reach * CROP_MARGIN + CROP_PAD_PX) / fullW) * CROP_STEPS) / CROP_STEPS;
+    return share > CROP_WHOLE ? 1 : share;
+  }
+
+  /** Lays the canvas out at the share cropFor says (a custom property styles/call.css reads); whether that changed. */
+  private cropTo(): boolean {
+    const { canvas } = this.opts, fullW = this.css.w / this.laid, want = this.cropFor(fullW, this.css.h);
+    if (want === this.laid) return false;
+    this.laid = want;
+    if (want === 1) canvas.style.removeProperty("--crop"); else canvas.style.setProperty("--crop", String(want));
+    return true;
+  }
+
+  /** The camera's aspect: the tile's, whatever part of it the canvas shows. */
+  fullAspect(): number { const { canvas } = this.opts; return canvas.width / (this.laid * canvas.height); }
+
   /** The scene's camera for the canvas's shape now. */
   private framingNow(): Framing | null {
     if (this.opts.framing === "face") return null;
     // Worked out again only when the canvas changed shape (fit): a place is asked of the page's layout once, not per frame.
     if (this.look && this.lookKey === this.sized) return this.look;
-    const { canvas } = this.opts, ar = canvas.width / canvas.height, asked = this.opts.scene;
+    const { canvas } = this.opts, ar = this.fullAspect(), asked = this.opts.scene;
     const scene = typeof asked === "function" ? asked() : asked;
     this.lookKey = this.sized;
     if (scene && "lookY" in scene) return (this.look = scene);
@@ -446,8 +478,9 @@ export class LiveCreature {
 
   // pointer → gaze, kept moderate: the head also turns toward the gaze, and full range looks cross-eyed (creator.js gazeAt)
   private gazeAt(e: PointerEvent): [number, number] {
-    const r = this.opts.canvas.getBoundingClientRect();
-    return [clamp(((e.clientX - r.left) / r.width * 2 - 1) * 0.9) * 0.6, clamp(((e.clientY - r.top) / r.height * 2 - 1) * 0.9 - 0.05) * 0.5];
+    // (over the whole tile: the canvas may be only the middle of it, cropFor)
+    const c = this.opts.canvas.getBoundingClientRect(), width = c.width / this.laid, left = c.left - (width - c.width) / 2;
+    return [clamp(((e.clientX - left) / width * 2 - 1) * 0.9) * 0.6, clamp(((e.clientY - c.top) / c.height * 2 - 1) * 0.9 - 0.05) * 0.5];
   }
   // the eased pointer gaze for this frame: [gx, gy] scaled by how present the pointer is (0 → the creature's own gaze):
   // it eases in on entering (~0.35 s) and, on leaving, holds a moment (0.4 s), then eases calmly back (~0.8 s)
@@ -644,7 +677,7 @@ export class LiveCreature {
     if (view || framed) {
       // As the creator draws its stage (viewCam): the camera takes the canvas's shape. The renderer takes it too (sizeStage), so
       // the frame is rendered at the pixels it is shown in; the reference rendered 1152 × 768 and resampled it into the canvas.
-      const cam = this.stage.camera, ar = this.opts.canvas.width / this.opts.canvas.height;
+      const cam = this.stage.camera, ar = this.fullAspect();
       if (cam.aspect !== ar) { cam.aspect = ar; cam.updateProjectionMatrix(); }
     }
     item.spec.state = camera?.state ?? M.state;
@@ -657,7 +690,10 @@ export class LiveCreature {
     // render's smaller canvas takes the same frame resampled).
     if (this.slot !== "face") this.sizeStage();
     this.warm(t, lvl, still);
-    this.stage.draw(item, t, lvl, still);
+    // A cropped canvas shows its part of the tile's frame: the same camera, windowed (the view offset is only on for the draw).
+    const { canvas } = this.opts, camera3 = this.stage.camera, windowed = this.slot === "scene" && this.laid < 1 && canvas.width > 0;
+    if (windowed) { const fullW = canvas.width / this.laid; camera3.setViewOffset(fullW, canvas.height, (fullW - canvas.width) / 2, 0, canvas.width, canvas.height); }
+    try { this.stage.draw(item, t, lvl, still); } finally { if (windowed) camera3.clearViewOffset(); }
   }
 
   /** The scene's and the card's stage renderer take their canvas's size, when that changed. */
@@ -860,7 +896,7 @@ export function posterPortrait(seed: string, choice?: CreatureChoice): { img: HT
   const s = stage as Stage & { floor: { visible: boolean }; camera: Stage["camera"] }, keep = { w: stage.w, h: stage.h, aspect: stage.camera.aspect };
   const c = item.c as Creature3D & { contact?: { visible: boolean }; setProps(kind: null): void };
   try {
-    stage.camera.aspect = 1; stage.camera.updateProjectionMatrix(); stage.setRenderSize(PORTRAIT_PX, PORTRAIT_PX); // (a fixed stage is sized by its host)
+    stage.camera.clearViewOffset(); stage.camera.aspect = 1; stage.camera.updateProjectionMatrix(); stage.setRenderSize(PORTRAIT_PX, PORTRAIT_PX); // (a fixed stage is sized by its host)
     item.spec.state = undefined; item.spec.expr = "happy"; c.setProps(null); item.opts.zoom = 1.5; item.opts.turn = 0; item.opts.lookY = undefined;
     // very happy: smiling eyes (the happy lower-lid curve, relaxed lids) and a big open grin, facing straight on
     item.opts.extra = { expr: "happy", bot: 0.42, lid: 0.06, grin: true, gx: 0, gy: 0, tilt: 0, dx: 0, dy: 0, breathe: 0, squash: 0 };

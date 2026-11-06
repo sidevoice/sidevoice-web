@@ -11,6 +11,10 @@ const rig = vi.hoisted(() => ({
   made: [] as Array<{ renderer: FakeRenderer; draws: number; kind: "scene" | "face"; w: number; h: number; draw: (item: { spec: { state?: string; expr?: string } }, t: number, level: number, still: boolean) => void }>,
   /** What each draw was asked to show: its state (a pose) and its expression. */
   drawn: [] as Array<{ state?: string; expr?: string; still: boolean }>,
+  /** What the framer says the creature reaches from the tile's middle (css px), null: not measured yet. */
+  reach: null as number | null,
+  /** The camera's view offsets set and cleared, in order. */
+  views: [] as string[],
 }));
 interface FakeRenderer { domElement: HTMLCanvasElement; setSize: (width?: number, height?: number) => void; getContext: () => { isContextLost: () => boolean }; forceContextLoss: () => void; dispose: () => void; disposed: boolean }
 
@@ -27,7 +31,9 @@ vi.mock("./rig.js", () => {
     draws = 0;
     items: unknown[] = [];
     scene = { remove() {} };
-    camera = { aspect: 1, updateProjectionMatrix() {} };
+    camera = { aspect: 1, updateProjectionMatrix() {},
+      setViewOffset: (fw: number, fh: number, x: number, y: number, w: number, h: number) => { rig.views.push([fw, fh, x, y, w, h].join(",")); },
+      clearViewOffset: () => { rig.views.push("clear"); } };
     /** As the real stage's: the renderer takes the size (and says so). */
     setRenderSize(w: number, h: number) { if (this.w === w && this.h === h) return; this.w = w; this.h = h; this.renderer.setSize(w, h); }
     constructor(_look: string, _px: number, mode?: string, _opts?: object) {
@@ -50,7 +56,7 @@ vi.mock("./rig.js", () => {
 });
 // The framer solves a framing on the pixels it renders (a 2D readback this DOM does not have): here it answers nothing, and the
 // host's own part of the stage's ask (its pixels) is what is tested.
-vi.mock("./stage-framer", () => ({ StageFramer: class { hold() {} invalidate() {} step() { return null; } dispose() {} } }));
+vi.mock("./stage-framer", () => ({ StageFramer: class { hold() {} invalidate() {} step() { return null; } dispose() {} reach() { return rig.reach; } } }));
 vi.mock("./accessories.js", () => ({}));
 vi.mock("./acts.js", () => ({}));
 
@@ -62,6 +68,8 @@ beforeEach(async () => {
   rig.refuse = false;
   rig.made.length = 0;
   rig.drawn.length = 0;
+  rig.views.length = 0;
+  rig.reach = null;
   clock = 1000;
   vi.spyOn(performance, "now").mockImplementation(() => clock);
   vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -302,7 +310,7 @@ test("a moving stage whose framing says it is a desktop's is drawn at the screen
   vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(2);
   const desk = tile(1598, 876);
   mount({ ...onStage, moving: true, canvas: desk, frame: asked({ desktop: true }) });
-  expect([desk.width, desk.height]).toEqual([3196, 1752]); // 2 device px to a css px
+  expect([desk.width, desk.height]).toEqual([2765, 1516]); // 2 device px to a css px
   const phone = tile(1598, 876);
   mount({ ...onStage, moving: true, canvas: phone, frame: asked({ phone: true }) });
   expect([phone.width, phone.height]).toEqual([1281, 702]);
@@ -327,7 +335,7 @@ test("a held-still stage (reduced motion, no GPU) is drawn once at the phone's p
   const live = mount({ ...onStage, moving: false, canvas: element, frame: asked({ desktop: true }) })!;
   expect([element.width, element.height]).toEqual([1281, 702]);
   live.setMoving(true);
-  expect([element.width, element.height]).toEqual([3196, 1752]);
+  expect([element.width, element.height]).toEqual([2765, 1516]);
   live.setMoving(false);
   expect([element.width, element.height]).toEqual([1281, 702]);
 });
@@ -341,11 +349,11 @@ test("the scene's ceilings follow what the stage asks, as it asks", () => {
     mount({ ...onStage, moving: true, canvas: element, frame });
     expect([element.width, element.height]).toEqual([1281, 702]); // not asked yet: the phone's ceilings
     frame.ask({ w: 1598, h: 876, dx: 0, dy: 0, phone: false, desktop: true, rest: true, cards: null, opener: null });
-    expect([element.width, element.height]).toEqual([3196, 1752]);
+    expect([element.width, element.height]).toEqual([2765, 1516]);
     frame.ask({ w: 1598, h: 876, dx: 0, dy: 0, phone: false, desktop: false, rest: true, cards: null, opener: null }); // turned on its side
     expect([element.width, element.height]).toEqual([1281, 702]);
     frame.ask({ w: 1598, h: 876, dx: 0, dy: 0, phone: false, desktop: true, rest: true, cards: null, opener: null });
-    expect([element.width, element.height]).toEqual([3196, 1752]);
+    expect([element.width, element.height]).toEqual([2765, 1516]);
   }
 });
 
@@ -478,4 +486,72 @@ test("a still face, whose pixels do not depend on the pixel ratio, does not watc
   expect(screens.made).toHaveLength(0);
   mount({ seed: "t2", canvas: tile(100, 100), framing: "face", sharp: true, moving: false });
   expect(screens.made).toHaveLength(1);
+});
+
+/** A stage canvas laid out as styles/call.css does: `--crop` of the tile's `w` width, centred, `h` tall; the allocations counted. */
+function cropped(w: number, h: number) {
+  const element = canvas(), set = { width: 0, height: 0 };
+  element.getBoundingClientRect = () => new DOMRect(0, 0, w * (Number(element.style.getPropertyValue("--crop")) || 1), h);
+  element.getContext = (() => null) as never;
+  for (const side of ["width", "height"] as const) {
+    const own = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, side)!;
+    Object.defineProperty(element, side, { get: () => own.get!.call(element), set: (v: number) => { set[side]++; own.set!.call(element, v); }, configurable: true });
+  }
+  return { element, set };
+}
+
+test("a desktop's scene canvas is only as wide as the creature reaches, at the screen's pixels, and is drawn through a window of the tile's camera", () => {
+  webgl();
+  vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(2);
+  rig.reach = 200; // css px from the middle
+  const { element } = cropped(1598, 876);
+  const live = mount({ ...onStage, moving: true, canvas: element, frame: asked({ desktop: true }) })!;
+  const share = Number(element.style.getPropertyValue("--crop"));
+  expect(share).toBeCloseTo((2 * (200 * 1.1 + 14)) / 1598, 1);
+  expect(share).toBeLessThan(0.5);
+  expect(share * 64).toBeCloseTo(Math.round(share * 64), 6); // whole steps
+  expect([element.width, element.height]).toEqual([Math.round(1598 * share * 2), 1752]); // 2 device px to a css px, the tile's whole height
+  live.tick(0);
+  const fullW = element.width / share;
+  expect(rig.views).toEqual([[fullW, 1752, (fullW - element.width) / 2, 0, element.width, 1752].join(","), "clear"]); // windowed for the draw only
+  expect(live.fullAspect()).toBeCloseTo(1598 / 876, 2);
+  expect((stageFor("scene") as unknown as { camera: { aspect: number } }).camera.aspect).toBeCloseTo(1598 / 876, 2); // the tile's camera
+});
+
+test("the scene canvas is the whole tile where the creature is not measured, reaches most of it, is a phone's, or holds still", () => {
+  webgl();
+  vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(2);
+  const unmeasured = cropped(1598, 876).element;
+  mount({ ...onStage, moving: true, canvas: unmeasured, frame: asked({ desktop: true }) });
+  expect(unmeasured.style.getPropertyValue("--crop")).toBe("");
+  rig.reach = 700;
+  const wide = cropped(1598, 876).element;
+  mount({ ...onStage, moving: true, canvas: wide, frame: asked({ desktop: true }) });
+  expect(wide.style.getPropertyValue("--crop")).toBe("");
+  rig.reach = 200;
+  const phone = cropped(1598, 876).element;
+  mount({ ...onStage, moving: true, canvas: phone, frame: asked({ phone: true }) });
+  expect(phone.style.getPropertyValue("--crop")).toBe("");
+  const held = cropped(1598, 876).element;
+  mount({ ...onStage, moving: false, canvas: held, frame: asked({ desktop: true }) });
+  expect(held.style.getPropertyValue("--crop")).toBe("");
+  expect(rig.views).not.toContain("clear");
+});
+
+test("the creature canvas is allocated again only when its size changes: not by a refit that finds the same box, nor a retier back to the same rung", () => {
+  webgl();
+  vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(2);
+  rig.reach = 200;
+  const { element, set } = cropped(1598, 876);
+  const live = mount({ ...onStage, moving: true, canvas: element, frame: asked({ desktop: true }) })!;
+  const once = { ...set };
+  for (let n = 0; n < 5; n++) { live.redraw(); live.tick(n); }
+  expect(set).toEqual(once); // frames, pokes: no allocation
+  host.creatureQuality.pin(0); // the rung it is on
+  live.tick(9);
+  expect(set).toEqual(once);
+  host.creatureQuality.pin(3);
+  live.tick(10);
+  expect(set.height).toBe(once.height + 1);
+  expect(element.height).toBeLessThan(1752);
 });

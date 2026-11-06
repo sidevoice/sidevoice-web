@@ -126,6 +126,10 @@ export interface FramerHost {
   drawn(): boolean;
   /** Something changed that needs a frame drawn. */
   poke(): void;
+  /** The camera's aspect: the tile's, whatever part of it the canvas shows (the scene canvas may be only its middle). */
+  aspect(): number;
+  /** The creature's widest reach was measured (reach() has an answer now). */
+  measured(): void;
 }
 
 /** A solve in progress: its steps (a trial render each), what to do with its answer, and whether the stage waits for it. */
@@ -210,6 +214,7 @@ export class StageFramer {
       footprints.set(key, r.value);
       this.measuring = null;
       this.phone = null; this.key = ""; // framed again on what it measured
+      this.host.measured();
       this.solve();
       this.host.poke();
     };
@@ -227,8 +232,8 @@ export class StageFramer {
 
   /** A camera for a framing, as the stage draws it, for projecting points (no render). */
   private projector(v: View, f: Framing) {
-    const { stage, item, canvas } = this.host, cam = stage.camera.clone(), c = item.c, { zoom, lookY } = this.camera(v, f);
-    cam.aspect = canvas.width / canvas.height; cam.updateProjectionMatrix();
+    const { stage, item } = this.host, cam = stage.camera.clone(), c = item.c, { zoom, lookY } = this.camera(v, f);
+    cam.aspect = this.host.aspect(); cam.updateProjectionMatrix();
     cam.position.set(0, 0.6, 6.7 * zoom); cam.lookAt(0, lookY != null ? lookY : 0.3 + ((c as unknown as { float?: number }).float || 0) * 0.5 - (zoom - 1) * 0.55, 0); cam.updateMatrixWorld();
     return cam;
   }
@@ -256,6 +261,41 @@ export class StageFramer {
       return { low: (low < 0 ? 0 : low + 1) / k + dy, top: top / k + dy, lowAny: (lowAny + 1) / k + dy };
     };
     return { rows, slope: (zk) => this.slope(v, zk) };
+  }
+
+  /** How far from the tile's middle the creature reaches at its closest framing (zk 1), css px, over every act it can play and its
+   *  shadow (what the scene canvas must hold, host.ts cropFor) for a desktop tile `w` × `h`; null while its acts are measured (this
+   *  starts that) or on a phone, whose framing is made to the tile's width. */
+  reach(w: number, h: number): number | null {
+    const ask = this.frame.request, key = shapeKey(this.host.item.spec);
+    if (!ask || ask.phone) return null;
+    const F = footprints.get(key);
+    if (!F) { this.measure(); return null; }
+    const at = key + "|" + w.toFixed(1) + "|" + h.toFixed(1);
+    if (this.reached?.at === at) return this.reached.px;
+    const { stage, item } = this.host, cam = stage.camera.clone(), c = item.c, { zoom, lookY } = this.camera({ zoom: DESKTOP_ZOOM }, { lift: 0, zk: 1 });
+    cam.aspect = w / h; cam.updateProjectionMatrix();
+    cam.position.set(0, 0.6, 6.7 * zoom); cam.lookAt(0, lookY != null ? lookY : 0.3 + ((c as unknown as { float?: number }).float || 0) * 0.5 - (zoom - 1) * 0.55, 0); cam.updateMatrixWorld();
+    const q = F.pts[0].clone();
+    let most = 0;
+    for (const p of F.pts) most = Math.max(most, Math.abs(q.copy(p).project(cam).x));
+    // its shadow on the floor: it falls to the key light's far side, up to its height's share beyond the feet
+    for (const p of this.shadowPoints(F)) most = Math.max(most, Math.abs(q.copy(p).project(cam).x));
+    const px = most * w / 2;
+    this.reached = { at, px };
+    return px;
+  }
+  private reached: { at: string; px: number } | null = null;
+
+  /** Where the creature's shadow reaches on the floor, as world points: its widest, from the footprint. */
+  private shadowPoints(F: Footprint): Vec3[] {
+    const V = F.pts[0].constructor as unknown as new () => Vec3;
+    let wide = 0;
+    for (const p of F.pts) wide = Math.max(wide, Math.abs(p.x));
+    // (the key light is up, to the left and in front: the shadow leans right and away from us, by about the height of what casts it, so
+    // nowhere nearer than the feet's own depth)
+    const lean = (F.top - F.minY) * SHADOW_LEAN;
+    return [new V().set(wide + lean, F.minY, 0), new V().set(-wide, F.minY, 0)];
   }
 
   /** How many px a unit of lift moves the creature's feet up the tile at a step back (from the projection). */
@@ -507,6 +547,8 @@ export class StageFramer {
   }
 }
 
+/** How far the key light's shadow leans, a share of the height of what casts it (the light is at (-2.2, 4.2, 5): 2.2 / 4.2 across at most; measured on the pixels, the shadow of a hat reaches about 0.3). */
+const SHADOW_LEAN = 0.35;
 /** The ease's step (the reference's frame at 30 a second), and the most steps a change is sampled for (it lands sooner). */
 const STEP_MS = 1000 / 30, MOTION_STEPS = 60;
 /** How long the first framing is solved for at once, on the pixels, before an estimate stands in for it (a renderer without

@@ -88,10 +88,11 @@
 /* The agent stands on the ground (its feet, y 106 of its 120 box, on y 357 of the frame), 300px tall as in the lab
    unless the tile is too narrow for it. The agent is its creature (features/avatar/creature/): the camera stands it in
    this box (its feet on the box's, the top of its head at the box's crown: CharacterAvatar), and its canvas is the whole
-   scene, so what it acts out round it (the busy cogs over its head) has the tile to be drawn in. */
+   scene's height, so what it acts out round it (the busy cogs over its head) has the room to be drawn in; as wide as the creature
+   reaches (--crop, a share of the scene's width, set by creature/host.ts on a desktop; the whole scene where none is set). */
 .stage-agent { position:absolute;left:50%;top:calc(357px - var(--fig) * 106 / 120);width:var(--fig);height:var(--fig);margin-left:calc(var(--fig) / -2);
   transition:opacity .3s }
-.stage-scene .stage-agent[data-style=creature] > canvas { position:absolute;left:calc(var(--fig) / 2 - 50cqw);top:calc(var(--fig) * 106 / 120 - 357px);width:100cqw;height:100cqh }
+.stage-scene .stage-agent[data-style=creature] > canvas { position:absolute;left:calc(var(--fig) / 2 - 50cqw * var(--crop, 1));top:calc(var(--fig) * 106 / 120 - 357px);width:calc(100cqw * var(--crop, 1));height:100cqh }
 /* The creature's eyes follow the finger over the whole tile (CharacterAvatar gazeFrom, T23). The browser keeps the touch
    for that instead of starting a scroll or a zoom, which cancels the pointer after its first move. This is the
    reference's #preview { touch-action:none }. The cost: no scroll or pinch can start on the stage. */
