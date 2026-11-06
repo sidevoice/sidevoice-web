@@ -30,3 +30,13 @@ test("a text wrapped to the limit is placed after the cap: it fills the creature
   const lopsided = { left: 10, right: 50 };
   expect(voiceShift(Math.min(300, voiceMax(160, lopsided)!), 160, lopsided)).toBe(20);
 });
+
+test("odd widths keep their fractions: the text never reaches past an edge by rounding", () => {
+  // Overhang 34.5 a side with 0 on the left and 69 on the right: only a shift of exactly 34.5 fits.
+  const shift = voiceShift(230, 161, { left: 0, right: 69 });
+  expect(shift).toBe(34.5);
+  const over = (230 - 161) / 2;
+  expect(over - shift).toBeLessThanOrEqual(0);
+  expect(over + shift).toBeLessThanOrEqual(69);
+  expect(voiceShift(230, 161, { left: 69, right: 0 })).toBe(-34.5);
+});

@@ -147,8 +147,9 @@ export async function openCard(context, { state = "listening", format = "pip", s
   await installHarness(room, { participants: { first: people } });
   await room.goto("/voice/");
   await choose(room);
-  await room.evaluate(applyState, { id: state });
-  const call = await room.evaluate(() => window.sidevoiceUI.store.getState().callCard);
+  // The state is set and read in one go: some of them end on the room's own timers (the person's turn, the reply), so a read in a
+  // second round trip, on a busy machine, could find the state already over.
+  const call = await room.evaluate(`(${applyState})({ id: ${JSON.stringify(state)} }), window.sidevoiceUI.store.getState().callCard`);
   await room.close();
   const page = await context.newPage();
   await page.addInitScript(probe);

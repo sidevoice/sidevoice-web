@@ -18,5 +18,5 @@ export function voiceShift(voice: number, figure: number, room?: VoiceRoom | nul
   const least = over - Math.max(0, room.left);
   const most = Math.max(0, room.right) - over;
   if (least <= 0 && most >= 0) return 0;
-  return Math.round(least > most ? (least + most) / 2 : Math.min(Math.max(0, least), most));
+  return least > most ? (least + most) / 2 : Math.min(Math.max(0, least), most);
 }
