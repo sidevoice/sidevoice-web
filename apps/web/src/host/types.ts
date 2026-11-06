@@ -19,6 +19,8 @@ export interface AppBuild {
   version: string;
   commit?: string | null;
   date?: string | null;
+  /** false: this host has no keys of the page's own to offer (a phone). Absent: it has, as ever. */
+  inApp?: boolean;
 }
 
 /* The page never asks which system it runs on (sidevoice-desktop#289, D-HOST-OS). What a system decides about the page's
@@ -326,13 +328,20 @@ export interface HeadsetStatus {
   /** null: this headset cannot send a double press. */
   doublePress: HeadsetPress | null;
   outsideCall: "leave" | "join";
+  /** The system's call holds the headset (CallKit, Telecom): the system mutes, and the choices are not the app's to make; the page
+   *  shows the rows read-only. Absent: they are. */
+  managedBySystem?: boolean;
 }
 export interface ShortcutsStatus {
-  shortcuts: Record<ShortcutAction, GlobalShortcut>;
+  /** The global shortcuts this host offers, by action. An action it does not offer is absent, and none at all (`{}`) is no group:
+   *  a phone, whose only shortcuts are the headset's presses. */
+  shortcuts: Partial<Record<ShortcutAction, GlobalShortcut>>;
   /** What the system must allow for single keys (`inputMonitoring`, macOS) or for the shortcuts at all (`portal`, Linux). */
   permission: { kind: "inputMonitoring" | "portal"; state: "granted" | "notAsked" | "denied" } | null;
   /** null: no headset path on this host. */
   headset: HeadsetStatus | null;
+  /** false: this host has no keys of the page's own to offer (a phone). Absent: it has, as ever. */
+  inApp?: boolean;
 }
 export interface ShortcutsBridge {
   get(): Promise<ShortcutsStatus>;

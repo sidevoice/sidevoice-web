@@ -281,6 +281,53 @@ test("headset buttons only where the host reports a headset; double press only w
   expect(groups()).toContain("Headset buttons");
 });
 
+/* A phone: the host (the mobile app) reports the headset alone. The page checks no platform; it renders what is reported. */
+const phone = (headset: NonNullable<ShortcutsStatus["headset"]>): ShortcutsStatus => ({ shortcuts: {}, permission: null, headset, inApp: false });
+
+test("a host that reports only the headset shows only the headset rows, even where a keyboard is likely", async () => {
+  keyboard(true);
+  const setHeadset = vi.fn(async () => phone({ press: "mute", doublePress: "oneTurn", outsideCall: "leave" }));
+  inApp({ shortcuts: bridge(phone({ press: "mute", doublePress: "none", outsideCall: "leave" }), { setHeadset }).bridge });
+  render(<ShortcutsSettings t={en} />);
+  expect(await screen.findByRole("combobox", { name: "Single press" })).toHaveTextContent("Mute or unmute");
+  expect(screen.getByRole("combobox", { name: "Double press" })).toHaveTextContent("Nothing");
+  expect(groups()).toEqual(["Headset buttons"]);
+  expect(screen.getByText(en("settings.shortcuts.descriptionHeadset"))).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /^(Hold to talk|Mute or unmute|Say one thing|Skip what is playing):/ })).toBeNull();
+  expect(document.querySelector(".shortcut-tip-note")).toBeNull();
+  fireEvent.click(screen.getByRole("combobox", { name: "Double press" }));
+  await act(async () => { fireEvent.click(screen.getByRole("option", { name: "Say one thing" })); });
+  expect(setHeadset).toHaveBeenCalledExactlyOnceWith({ doublePress: "oneTurn" });
+});
+
+test("the keys of the page's own wait for the host to say, and show unless it says it has none", async () => {
+  keyboard(true);
+  inApp({ shortcuts: bridge(status()).bridge });
+  render(<ShortcutsSettings t={en} />);
+  expect(groups()).toEqual([]);
+  await screen.findByRole("button", { name: /^Mute or unmute: Ctrl\+Alt\+Shift/ });
+  expect(groups()).toEqual(["Anywhere on your computer", "In Sidevoice"]);
+});
+
+test("a global shortcut the host does not report is not offered, and the others are", async () => {
+  const mute = global({ accelerator: "Ctrl+Alt+Shift+M", label: "Ctrl+Alt+Shift+M", state: "on" });
+  inApp({ shortcuts: bridge({ shortcuts: { mute }, permission: null, headset: null }).bridge });
+  render(<ShortcutsSettings t={en} />);
+  await screen.findByRole("button", { name: /^Mute or unmute: Ctrl\+Alt\+Shift/ });
+  expect(groups()).toEqual(["Anywhere on your computer", "In Sidevoice"]);
+  expect(within(document.querySelector(".ui-group")!).queryByRole("button", { name: /^(Hold to talk|Say one thing):/ })).toBeNull();
+});
+
+test("while the system's call holds the headset the rows stay, read-only, and say the system mutes", async () => {
+  const setHeadset = vi.fn(async () => status());
+  inApp({ shortcuts: bridge(phone({ press: "skip", doublePress: "oneTurn", outsideCall: "leave", managedBySystem: true }), { setHeadset }).bridge });
+  render(<ShortcutsSettings t={en} />);
+  expect(await screen.findByRole("combobox", { name: "Single press" })).toBeDisabled();
+  expect(screen.getByRole("combobox", { name: "Double press" })).toBeDisabled();
+  expect(screen.getByText(en("settings.shortcuts.headsetSystem"))).toBeTruthy();
+  expect(setHeadset).not.toHaveBeenCalled();
+});
+
 test("an app with only the older mute shortcut shows its mute row alone", async () => {
   inApp({ muteShortcut: {
     get: async () => global({ accelerator: "Ctrl+Alt+M", label: "⌃⌥M", state: "on" }),
