@@ -328,6 +328,17 @@ test("while the system's call holds the headset the rows stay, read-only, and sa
   expect(setHeadset).not.toHaveBeenCalled();
 });
 
+test("a host that says another choice adds a playback card says so in the headset group, and not while the system holds it", async () => {
+  inApp({ shortcuts: bridge(phone({ press: "mute", doublePress: "none", outsideCall: "leave", nonDefaultAddsCard: true })).bridge });
+  const view = render(<ShortcutsSettings t={en} />);
+  expect(await screen.findByText(en("settings.shortcuts.headsetCard"))).toBeTruthy();
+  view.unmount();
+  inApp({ shortcuts: bridge(phone({ press: "mute", doublePress: "none", outsideCall: "leave", nonDefaultAddsCard: true, managedBySystem: true })).bridge });
+  render(<ShortcutsSettings t={en} />);
+  await screen.findByText(en("settings.shortcuts.headsetSystem"));
+  expect(screen.queryByText(en("settings.shortcuts.headsetCard"))).toBeNull();
+});
+
 test("an app with only the older mute shortcut shows its mute row alone", async () => {
   inApp({ muteShortcut: {
     get: async () => global({ accelerator: "Ctrl+Alt+M", label: "⌃⌥M", state: "on" }),

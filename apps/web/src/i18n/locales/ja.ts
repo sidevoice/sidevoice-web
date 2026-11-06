@@ -997,6 +997,7 @@ export const messages: Messages = {
   "settings.shortcuts.headsetSkip": "再生中のものをスキップ",
   "settings.shortcuts.headsetNone": "何もしない",
   "settings.shortcuts.headsetSystem": "通話中はシステムがヘッドセットのボタンを扱い、ミュートします。ここでの選択は適用されません。",
+  "settings.shortcuts.headsetCard": "初期設定では、ヘッドセットのボタンはシステム経由でミュートします。他の操作を選ぶと、ロック画面に再生カードが追加されます。",
   "settings.shortcuts.record": "ショートカットを記録",
   "settings.shortcuts.recording": "キーを押すか、1 つタップ",
   "settings.shortcuts.recordingInApp": "キーを押してください…",

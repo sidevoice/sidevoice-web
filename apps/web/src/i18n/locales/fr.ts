@@ -996,6 +996,7 @@ export const messages: Messages = {
   "settings.shortcuts.headsetSkip": "Passer ce qui est en cours de lecture",
   "settings.shortcuts.headsetNone": "Rien",
   "settings.shortcuts.headsetSystem": "Le système gère les boutons du casque pendant un appel : il coupe le micro, et ces choix ne s'appliquent pas.",
+  "settings.shortcuts.headsetCard": "Avec les réglages par défaut, le bouton du casque coupe le micro via le système. Choisir d'autres actions ajoute une carte de lecture sur l'écran de verrouillage.",
   "settings.shortcuts.record": "Enregistrer un raccourci",
   "settings.shortcuts.recording": "Appuyez sur des touches, ou sur une seule",
   "settings.shortcuts.recordingInApp": "Appuyez sur les touches…",

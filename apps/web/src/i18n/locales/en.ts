@@ -1023,6 +1023,7 @@ export const messages = {
   "settings.shortcuts.headsetSkip": "Skip what is playing",
   "settings.shortcuts.headsetNone": "Nothing",
   "settings.shortcuts.headsetSystem": "The system handles the headset's buttons during a call: it mutes, and these choices do not apply.",
+  "settings.shortcuts.headsetCard": "With the defaults, the headset's press mutes through the system. Choosing other actions adds a playback card on the lock screen.",
   "settings.shortcuts.record": "Record shortcut",
   "settings.shortcuts.recording": "Press keys, or tap one",
   "settings.shortcuts.recordingInApp": "Press keys…",

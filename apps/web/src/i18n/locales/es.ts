@@ -1010,6 +1010,7 @@ export const messages: Messages = {
   "settings.shortcuts.headsetSkip": "Saltar lo que está sonando",
   "settings.shortcuts.headsetNone": "Nada",
   "settings.shortcuts.headsetSystem": "El sistema gestiona los botones del auricular durante una llamada: silencia, y estas opciones no se aplican.",
+  "settings.shortcuts.headsetCard": "Con los valores por defecto, el botón del auricular silencia a través del sistema. Elegir otras acciones añade una tarjeta de reproducción en la pantalla de bloqueo.",
   "settings.shortcuts.record": "Grabar atajo",
   "settings.shortcuts.recording": "Pulsa teclas, o toca una",
   "settings.shortcuts.recordingInApp": "Pulsa las teclas…",

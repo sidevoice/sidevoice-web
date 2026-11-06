@@ -331,6 +331,8 @@ export interface HeadsetStatus {
   /** The system's call holds the headset (CallKit, Telecom): the system mutes, and the choices are not the app's to make; the page
    *  shows the rows read-only. Absent: they are. */
   managedBySystem?: boolean;
+  /** Choosing anything but the defaults adds a playback card to the lock screen (iOS, beside the Live Activity); the page says so. */
+  nonDefaultAddsCard?: boolean;
 }
 export interface ShortcutsStatus {
   /** The global shortcuts this host offers, by action. An action it does not offer is absent, and none at all (`{}`) is no group:

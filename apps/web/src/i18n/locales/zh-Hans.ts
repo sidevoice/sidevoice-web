@@ -996,6 +996,7 @@ export const messages: Messages = {
   "settings.shortcuts.headsetSkip": "跳过正在播放的内容",
   "settings.shortcuts.headsetNone": "无",
   "settings.shortcuts.headsetSystem": "通话期间由系统接管耳机按键：它会静音，此处的选择不会生效。",
+  "settings.shortcuts.headsetCard": "默认设置下,耳机按键通过系统静音。选择其他操作会在锁屏上增加一张播放卡片。",
   "settings.shortcuts.record": "录制快捷键",
   "settings.shortcuts.recording": "按下按键,或轻按单个按键",
   "settings.shortcuts.recordingInApp": "按下按键…",

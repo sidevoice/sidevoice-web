@@ -999,6 +999,7 @@ export const messages: Messages = {
   "settings.shortcuts.headsetSkip": "Überspringen, was gerade läuft",
   "settings.shortcuts.headsetNone": "Nichts",
   "settings.shortcuts.headsetSystem": "Das System übernimmt die Tasten des Headsets während eines Anrufs: Es schaltet stumm, und diese Auswahl gilt nicht.",
+  "settings.shortcuts.headsetCard": "Mit den Standardwerten schaltet die Headset-Taste über das System stumm. Andere Aktionen fügen dem Sperrbildschirm eine Wiedergabekarte hinzu.",
   "settings.shortcuts.record": "Kurzbefehl aufnehmen",
   "settings.shortcuts.recording": "Tasten drücken oder eine antippen",
   "settings.shortcuts.recordingInApp": "Tasten drücken…",

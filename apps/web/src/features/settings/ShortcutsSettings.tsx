@@ -301,6 +301,7 @@ function HeadsetGroup({ t, global, headset }: { t: Translate; global: Global; he
         onValueChange={(value) => change({ doublePress: value as HeadsetPress })} />
     </Row>}
     {headset.managedBySystem && <Alert tone="accent" className="shortcut-note">{t("settings.shortcuts.headsetSystem")}</Alert>}
+    {headset.nonDefaultAddsCard && !headset.managedBySystem && <Alert tone="accent" className="shortcut-note">{t("settings.shortcuts.headsetCard")}</Alert>}
   </Group>;
 }
 

@@ -276,7 +276,7 @@ export const JOURNEYS: Journey[] = [
         permission: { kind: "inputMonitoring", state: "notAsked" }, headset: { press: "mute", doublePress: "skip", outsideCall: "leave" } },
       after: openSettings("shortcuts") },
     { id: "s-shortcuts-phone", caption: "Shortcuts on a phone: the host (the mobile app) reports the headset alone, so only Single press and Double press show; no keys of the page's own, whatever the device.", views: ["phone"],
-      shortcuts: { shortcuts: {}, permission: null, inApp: false, headset: { press: "mute", doublePress: "oneTurn", outsideCall: "leave" } },
+      shortcuts: { shortcuts: {}, permission: null, inApp: false, headset: { press: "mute", doublePress: "oneTurn", outsideCall: "leave", nonDefaultAddsCard: true } },
       after: openSettings("shortcuts") },
     { id: "s-shortcuts-phone-system", caption: "Shortcuts on a phone while the system's call holds the headset: the rows stay, read-only, and say the system mutes.", views: ["phone"],
       shortcuts: { shortcuts: {}, permission: null, inApp: false, headset: { press: "mute", doublePress: "none", outsideCall: "leave", managedBySystem: true } },
