@@ -227,15 +227,23 @@ test("card look: transcribing keeps the pill's bars, pulsing and wordless, annou
   const { to } = cardTurn();
   to(listening());
   const bars = pill()!.querySelector(".voice-wave, .voice-bars")!;
+  // The announcer is there, empty, while they speak: it is the same node whose text then changes (a live region announces that).
+  const before = pill()!.querySelector("[role=status]")!;
+  expect(before).toHaveTextContent("");
   to({ ...listening(), pendingPhase: "transcribing" });
+  expect(pill()!.querySelector("[role=status]")).toBe(before);
   expect(pill()).toHaveAttribute("data-phase", "transcribing");
   // The same waveform, not a new one: it keeps the turn's last frame.
   expect(pill()!.querySelector(".voice-wave, .voice-bars")).toBe(bars);
   expect(bars).toHaveAttribute("data-phase", "transcribing");
   expect(pill()!.querySelector(".tlabel, .ell")).toBeNull();
-  expect(pill()!.textContent).toBe("");
-  // One status, the bars' own, once; the microphone is gone.
+  // No visible word: the only text is the announcer's, hidden, and it is the one live region (the bars are labelled, not live).
+  const announcer = pill()!.querySelector("[role=status]")!;
   expect(pill()!.querySelectorAll("[role=status]")).toHaveLength(1);
+  expect(announcer).toHaveAttribute("data-turn-announcer");
+  expect(announcer).toHaveTextContent("Transcribing what you said");
+  expect(pill()!.textContent).toBe(announcer.textContent);
+  expect(bars).toHaveAttribute("role", "img");
   expect(bars).toHaveAccessibleName("Transcribing what you said");
   expect(pill()!.querySelector(".lead > svg")).toBeNull();
   expect(pill()!.querySelector("button.cancel")).toHaveAccessibleName("Cancel sending");

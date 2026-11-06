@@ -105,12 +105,33 @@ for (const format of ["card", "avatar"]) {
     const turn = transcribing.locator(".docked-voice .vcap.card.person.pill");
     await expect(turn).toHaveAttribute("data-phase", "transcribing");
     await expect(turn.locator("[data-phase=transcribing]")).toHaveCount(1);
+    // One live announcer, hidden, with the text; the bars are labelled, not live.
     await expect(turn.getByRole("status")).toHaveCount(1);
-    await expect(turn.getByRole("status")).toHaveAccessibleName("Transcribing what you said");
-    expect((await turn.innerText()).trim()).toBe("");
+    await expect(turn.getByRole("status")).toHaveText("Transcribing what you said");
+    expect(await turn.getByRole("status").evaluate((node) => node.getBoundingClientRect().width)).toBeLessThanOrEqual(1);
+    await expect(turn.getByRole("img", { name: "Transcribing what you said" })).toHaveCount(1);
+    // The bars pulse by opacity alone (no layout, no repaint of geometry), and the animation is running.
+    const pulse = await turn.locator(".voice-wave-bars").evaluate((node) => {
+      const [animation] = node.getAnimations();
+      return { name: getComputedStyle(node).animationName, state: animation?.playState,
+        props: [...new Set(animation.effect.getKeyframes().flatMap((frame) => Object.keys(frame)))].filter((key) => !["offset", "easing", "composite", "computedOffset"].includes(key)) };
+    });
+    expect(pulse).toEqual({ name: "voice-wave-rest", state: "running", props: ["opacity"] });
     await expect(turn.getByRole("button", { name: "Cancel sending" })).toBeVisible();
   });
 }
+
+test.describe("reduced motion", () => {
+test.use({ reducedMotion: "reduce" });
+test("the transcribing pill's bars are still and dimmer, not animated", async ({ context }) => {
+  const page = await openCard(context, { state: "transcribing", format: "card", size: "m" });
+  const bars = page.locator(".docked-voice .vcap.card.person.pill .voice-bars, .docked-voice .vcap.card.person.pill .voice-wave-bars");
+  await expect(bars).toHaveCount(1);
+  const look = await bars.evaluate((node) => ({ animations: node.getAnimations({ subtree: true }).length, opacity: getComputedStyle(node.matches(".voice-bars") ? node.querySelector("i") : node).opacity }));
+  expect(look.animations).toBe(0);
+  expect(Number(look.opacity)).toBeLessThan(1);
+});
+});
 
 test("the picture-in-picture keeps its voice text under the creature, in the stage's tile", async ({ context }) => {
   const page = await openCard(context, { state: "agent-speaking", format: "pip", size: "m" });

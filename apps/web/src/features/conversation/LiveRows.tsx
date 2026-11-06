@@ -21,14 +21,14 @@ export function WorkingRow({ position }: { position: BubblePosition }) {
 
 /** The person's open turn without STT streaming, as today (T36: the icon sits where the words will come): a pill with the
  *  microphone and its bars while they speak, the same bars, pulsing, and no word while it is transcribed (a screen reader hears
- *  "Transcribing" once, from the bars' status), and the round × that takes it back while that can be done. The words
+ *  "Transcribing" once, from the stage's announcer: these bars are labelled, not live), and the round × that takes it back while that can be done. The words
  *  come as the message, once sent. */
 export function TurnPill({ phase, cancellable }: { phase: "listening" | "transcribing"; cancellable: boolean }) {
   const t = translator();
   return <div className="chat-bubble turn-pill" data-role="user" data-phase={phase} translate="no">
     <span className="turn-lead">{phase === "transcribing"
-      ? <span className="turn-bars" data-phase="transcribing" role="status" aria-label={t("wave.transcribing")}><i /><i /><i /><i /><i /></span>
-      : <><TurnMicIcon className="state-glyph state-glyph-listening" /><span className="turn-bars" role="status" aria-label={t("wave.listening")}><i /><i /><i /><i /><i /></span></>}</span>
+      ? <span className="turn-bars" data-phase="transcribing" role="img" aria-label={t("wave.transcribing")}><i /><i /><i /><i /><i /></span>
+      : <><TurnMicIcon className="state-glyph state-glyph-listening" /><span className="turn-bars" role="img" aria-label={t("wave.listening")}><i /><i /><i /><i /><i /></span></>}</span>
     {cancellable && <CancelTurn />}
   </div>;
 }

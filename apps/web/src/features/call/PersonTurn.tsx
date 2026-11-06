@@ -9,6 +9,7 @@ import { DeliveryMark, TranscriptReceipt } from "../conversation/MessageBubble";
 import { receiptView } from "../../state/room-session-state.js";
 import { PAGE_MS } from "./PagedText";
 import { SENT_LEAVING_MS, useSentTurns, type SentTurn } from "./speech-reading";
+import { TurnAnnouncer } from "./TurnAnnouncer";
 import { VoiceWaveform } from "../conversation/VoiceWaveform";
 import { CancelGlyph, MicIcon } from "./StageVoice";
 
@@ -100,9 +101,10 @@ export function PersonTurn({ conversation, t, look = "balloon", cut: over = fals
         delivery={conversation.messages.find((message) => message.role === "user" && (message.segment ?? String(message.time)) === turn.key)?.delivery} cut={pending || over} under={false} away={turn.thread !== conversation.thread} from={null} />)}
       {(pending || taken.leaving) && (
         <div key={"live-" + taken.round} className="vcap card person pill" data-phase={transcribing ? "transcribing" : "listening"} data-leaving={taken.leaving || undefined} translate="no">
-          {/* One waveform in both phases: it keeps the turn's last frame and pulses while transcribed; its own status
-              label says "Transcribing" to a screen reader, once. No visible word. */}
-          <span className="lead">{!transcribing && <MicIcon />}<VoiceWaveform phase={transcribing ? "transcribing" : "listening"} /></span>
+          {/* One waveform in both phases: it keeps the turn's last frame and pulses while transcribed; the announcer beside it says
+              "Transcribing" to a screen reader, once. No visible word. */}
+          <span className="lead">{!transcribing && <MicIcon />}<VoiceWaveform phase={transcribing ? "transcribing" : "listening"} announce={false} /></span>
+          <TurnAnnouncer phase={conversation.pendingPhase} />
           {(conversation.pendingCancellable || taken.leaving) && <Tooltip action content={t("stage.cancelTurn")}>
             <button type="button" className="cancel" aria-label={t("stage.cancelTurn")} disabled={taken.leaving}
               onClick={() => { taken.take(); void window.sidevoiceActions?.cancelInput(); }}><CancelGlyph /></button>
@@ -118,6 +120,7 @@ export function PersonTurn({ conversation, t, look = "balloon", cut: over = fals
       {turns.map((turn) => <SentBubble key={turn.key} turn={turn} onDone={done} look="balloon"
         delivery={conversation.messages.find((message) => message.role === "user" && (message.segment ?? String(message.time)) === turn.key)?.delivery}
         cut={pending} under={pending} away={turn.thread !== conversation.thread} from={!pending && turn.key === newest ? footprint.current : null} />)}
+      {pending && <TurnAnnouncer phase={conversation.pendingPhase} />}
       {pending && (
         <LiveVoiceBalloon key="live" balloonRef={live} phase={conversation.pendingPhase === "transcribing" ? "transcribing" : "listening"}>
           {conversation.pendingCancellable && <Tooltip action content={t("stage.cancelTurn")}>

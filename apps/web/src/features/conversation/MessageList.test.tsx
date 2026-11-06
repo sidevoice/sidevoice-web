@@ -169,7 +169,9 @@ test("the open turn, without streaming, is a pill: the microphone, its bars and 
   expect(pill?.querySelectorAll(".turn-bars i")).toHaveLength(5);
   // Its microphone wears the colour of listening (the state's icon); the word is never tinted.
   expect(pill?.querySelector(".turn-lead > svg")).toHaveClass("state-glyph-listening");
-  expect(screen.getByRole("status")).toHaveAttribute("aria-label", "Listening");
+  // The bars are labelled, not live: the turn is announced once, by the stage (TurnAnnouncer).
+  expect(screen.getByRole("img", { name: "Listening" })).toBeInTheDocument();
+  expect(screen.queryByRole("status")).toBeNull();
   const cancel = screen.getByRole("button", { name: "Cancel sending" });
   expect(cancel).toHaveClass("turn-cancel");
   expect(cancel.textContent).toBe("");
@@ -184,9 +186,8 @@ test("transcribing keeps one pill: the bars pulse, no word, announced once", () 
   // The bars stay (marked transcribing, which pulses them), the microphone and the word go.
   expect(container.querySelector(".turn-bars")).toHaveAttribute("data-phase", "transcribing");
   expect(container.querySelector(".turn-lead > svg")).toBeNull();
-  expect(screen.getAllByRole("status")).toHaveLength(1);
-  expect(screen.getByRole("status")).toHaveAttribute("aria-label", "Transcribing what you said");
-  expect(screen.getByRole("status").textContent).toBe("");
+  expect(screen.queryByRole("status")).toBeNull();
+  expect(screen.getByRole("img", { name: "Transcribing what you said" })).toBe(container.querySelector(".turn-bars"));
   expect(container.querySelector(".turn-pill")).not.toHaveTextContent(/\S/);
 });
 

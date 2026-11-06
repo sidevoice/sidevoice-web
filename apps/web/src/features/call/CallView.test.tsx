@@ -182,8 +182,16 @@ test("while the person speaks and while it is transcribed, their bubble holds on
   expect(personBubble()).not.toHaveClass("sent");
   patch(store, { userLive: false, pendingPhase: "transcribing" });
   expect(personBubble()).toHaveAttribute("data-phase", "transcribing");
-  expect(personBubble()).not.toHaveTextContent(/\S/);
-  expect(personBubble()!.querySelector("[role=status]")).toHaveAccessibleName("Transcribing what you said");
+  // Heard once: one announcer for the turn in the whole room (the stage's), the bars on the stage and in the transcript labelled
+  // but not live.
+  const announcers = [...document.querySelectorAll("[data-turn-announcer]")];
+  expect(announcers).toHaveLength(1);
+  expect(announcers[0]).toHaveAttribute("role", "status");
+  expect(announcers[0]).toHaveTextContent("Transcribing what you said");
+  const bars = [...document.querySelectorAll("[data-phase=transcribing]:is(.voice-wave, .voice-bars, .turn-bars)")];
+  expect(bars.length).toBeGreaterThan(0);
+  for (const bar of bars) expect(bar).toHaveAttribute("role", "img");
+  expect(personBubble()!.textContent).toBe("Transcribing what you said");
   expect(personBubble()).not.toHaveTextContent("Split it");
 }, WHOLE_APP_MS);
 

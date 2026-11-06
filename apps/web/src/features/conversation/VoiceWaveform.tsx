@@ -87,7 +87,9 @@ function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
-export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: () => number }) {
+/** `announce`: whether the bars are a live region of their own (the default). A caller that announces the turn itself
+ *  (TurnAnnouncer) passes false: the bars keep their label (an image's) and are no longer live. */
+export function VoiceWaveform({ phase, level, announce = true }: { phase: WaveformPhase; level?: () => number; announce?: boolean }) {
   const reduced = usePrefersReducedMotion();
   const bars = useRef<HTMLSpanElement>(null);
   const columns = useRef<number[]>([]);
@@ -197,6 +199,7 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
 
   const t = translator();
   const label = { aria: t(LABELS[phase].aria), title: t(LABELS[phase].title) };
-  if (reduced) return <span className="voice-bars" data-phase={phase} role="status" aria-label={label.aria} title={label.title}><i /><i /><i /><i /><i /></span>;
-  return <span className="voice-wave" data-phase={phase} role="status" aria-label={label.aria} title={label.title}><span ref={bars} className="voice-wave-bars" aria-hidden="true" /></span>;
+  const role = announce ? "status" : "img";
+  if (reduced) return <span className="voice-bars" data-phase={phase} role={role} aria-label={label.aria} title={label.title}><i /><i /><i /><i /><i /></span>;
+  return <span className="voice-wave" data-phase={phase} role={role} aria-label={label.aria} title={label.title}><span ref={bars} className="voice-wave-bars" aria-hidden="true" /></span>;
 }
