@@ -183,10 +183,12 @@ describe("capCentre finds the reference's step with fewer trial renders", () => 
   });
 });
 
-test("a desktop is a fine pointer or the desktop app, never a handset: a phone on its side, or a touch screen past the phone rule, is none", () => {
-  expect(desktopDevice({ handset: true, finePointer: false, app: false })).toBe(false); // 844 x 390, coarse
-  expect(desktopDevice({ handset: false, finePointer: false, app: false })).toBe(false); // 932 x 430, coarse: wide for the phone rule
-  expect(desktopDevice({ handset: false, finePointer: true, app: false })).toBe(true);
-  expect(desktopDevice({ handset: false, finePointer: false, app: true })).toBe(true); // the app on a touch laptop
-  expect(desktopDevice({ handset: true, finePointer: true, app: true })).toBe(false); // (a narrow window is a phone's layout)
+test("a desktop is a fine pointer with no coarse one, or the desktop app, never a handset: a phone on its side (with a mouse too), or a touch screen past the phone rule, is none", () => {
+  expect(desktopDevice({ handset: true, finePointer: false, anyCoarse: true, app: false })).toBe(false); // 844 x 390, coarse
+  expect(desktopDevice({ handset: false, finePointer: false, anyCoarse: true, app: false })).toBe(false); // 932 x 430, coarse: wide for the phone rule
+  expect(desktopDevice({ handset: false, finePointer: true, anyCoarse: false, app: false })).toBe(true);
+  expect(desktopDevice({ handset: false, finePointer: false, anyCoarse: true, app: true })).toBe(true); // the app on a touch laptop
+  expect(desktopDevice({ handset: true, finePointer: true, anyCoarse: false, app: true })).toBe(false); // (a narrow window is a phone's layout)
+  expect(desktopDevice({ handset: false, finePointer: true, anyCoarse: true, app: false })).toBe(false); // a wide phone with a mouse, a touch laptop in a browser: a phone's fill
+  expect(desktopDevice({ handset: false, finePointer: true, anyCoarse: true, app: true })).toBe(true); // the app stays a desktop
 });

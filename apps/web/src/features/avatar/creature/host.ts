@@ -249,8 +249,15 @@ export function placeFigure(stage: RigStage, c: Creature3D, aspect: number, { gr
 // holds the drawings still there).
 const lives = new Set<LiveCreature>();
 const governor = new Governor();
-// What a step costs is judged on the pixels the stage draws at each rung: the biggest scene on the page (sceneSize, as it fits).
-governor.measureBy((scale) => { let most = 0; for (const live of lives) most = Math.max(most, live.areaAt(scale)); return most; });
+/** The pixels a frame fills at a scale: every scene the loop draws in it (sceneSize, as each fits), summed, since a frame draws them
+ *  all (the stage and a picture-in-picture, the floating card: its sharp canvas, the same at every rung). A scene not drawn (held still, the poster, out of the page) adds none. */
+export function drawnFill(scale: number): number {
+  let sum = 0;
+  for (const live of lives) if (live.drawsFrames()) sum += live.areaAt(scale);
+  return sum;
+}
+// What a step costs is judged on the pixels the stage draws at each rung.
+governor.measureBy(drawnFill);
 /** Whether the governor has been started (on the first frame of motion: the first frames, which compile programs, are not judged). */
 let judging = false;
 /** For diagnostics and tests: the creature's quality rung now, or fixed at one (null: judged again). */
@@ -628,10 +635,15 @@ export class LiveCreature {
 
   /** The pixels its scene is drawn with at `scale` of the full size (0: not a scene). */
   areaAt(scale: number): number {
+    // The floating card's creature (a sharp live face) is drawn at its box's pixels whatever the rung: its fill is constant.
+    if (this.slot === "card") return this.opts.canvas.width * this.opts.canvas.height;
     if (this.slot !== "scene") return 0;
     const { width, height } = sceneSize(this.css.w, this.css.h, globalThis.devicePixelRatio || 1, scale, this.desktop());
     return width * height;
   }
+
+  /** It is a scene or a floating card the loop draws frames of now: in motion, with a box on the page, its renderer there. */
+  drawsFrames(): boolean { return (this.slot === "scene" || this.slot === "card") && this.animates() && !this.hidden && !seats[this.slot].lost; }
 
   /** Its frames are motion (it moves, and is not the poster), so the governor judges what they cost. */
   animates(): boolean { return this.moving && !MODES[this.mood].poster; }
