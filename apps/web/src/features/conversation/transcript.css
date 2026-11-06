@@ -222,7 +222,7 @@
  * "Transcribing…", and the round × that takes it back, until it is sent. */
 .chat-bubble.turn-pill { display: flex; align-items: center; border-radius: 999px; padding: 5px 6px 5px 13px; white-space: nowrap; }
 .turn-lead { display: inline-flex; align-items: center; gap: 6px; }
-.turn-bars { display: inline-flex; align-items: center; gap: 2px; height: 14px; color: var(--sv-state-listening); }
+.turn-bars { display: inline-flex; align-items: center; gap: 2px; height: 14px; color: var(--sv-accent); }
 .turn-bars i { display: block; width: 3px; height: 5px; border-radius: 2px; background: currentColor; animation: turn-bar .9s ease-in-out infinite; }
 .turn-bars i:nth-child(2) { height: 11px; animation-delay: -.3s; }
 .turn-bars i:nth-child(3) { height: 8px; animation-delay: -.6s; }
