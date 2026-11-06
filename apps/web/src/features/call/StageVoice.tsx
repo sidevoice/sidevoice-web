@@ -32,7 +32,7 @@ export function CancelGlyph() {
   return <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>;
 }
 
-/** The layer: `turn`, whose turn the agent's state says it is (null between turns: a desktop then stands closer while no
+/** The layer: `turn`, whose turn the agent's state says it is (null between turns: a desktop then keeps its framing while no
  *  card shows), `phone` for the phone's framing (one for all states). */
 export function StageVoice({ frame, turn, phone, onGround, children }: { frame: StageFrame; turn: "listening" | "speaking" | null; phone: boolean;
   /** Where the creature's feet stand once a framing change settles, a share of the scene's height (null: no creature drawn):

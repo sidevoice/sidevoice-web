@@ -5,9 +5,9 @@
  * included, to the lowest, its shadow included) at the tile's optical centre, OPTIC from the top, the same on every turn.
  * It steps back (smaller: the camera's distance times `zk`) only when the largest card of either turn would not fit under
  * or over it; where even the furthest step leaves no room there, it rises off the optical centre rather than let a card
- * touch it. A card keeps a gap to it, always: max(14px, 3.5% of the tile's height). On a desktop at rest (idle, working,
- * present: nothing said) it stands closer, REST_ZK, with less headroom kept over it (REST_HEAD), and eases back for a
- * turn's card as far as the card needs; a phone keeps one framing for all. Framing changes ease at FRAME_EASE a frame.
+ * touch it. A card keeps a gap to it, always: max(14px, 3.5% of the tile's height). The creature is as large at rest (idle,
+ * working, present: nothing said) as during a turn, whenever no card needs it to step back; a phone keeps one framing for
+ * all. Framing changes ease at FRAME_EASE a frame.
  *
  * What is drawn is measured on the pixels (`FrameProbe`, the creature host renders a trial framing and reads its rows):
  * seen from above, a body's front bulge, its ink and its shadow come lower than its centre's foot, and a hat higher than
@@ -15,11 +15,8 @@
 
 /** Where the creature's drawn middle sits: a little over the tile's middle, where a centred thing looks centred (T28). */
 export const OPTIC = 0.46;
-/** The desktop's closer stand at rest (T43): the camera's distance factor it starts from while nothing is said. */
-export const REST_ZK = 0.6;
-/** The headroom kept over the creature at rest, a share of its drawn height (less than a turn's: nothing is said over it). */
-export const REST_HEAD = 0.16;
-/** The headroom kept over it during a turn: the marks the moods draw over the head (the "!", the rain cloud). */
+/** The headroom kept over the creature, a share of its drawn height: the marks the moods draw over the head (the "!", the
+ *  rain cloud). */
 export const TURN_HEAD = 1 / 3;
 /** How far the framing moves toward its target each frame drawn. */
 export const FRAME_EASE = 0.22;
@@ -62,17 +59,16 @@ export function voiceType(w: number, h: number) {
   return { u, agent, agentLine: Math.round(agent * 1.375), person, personLine: Math.round(person * 1.4286) };
 }
 
-/** The framing that stands the creature's drawn middle at the optical centre, stepped back from `zk0` only as far as the
+/** The framing that stands the creature's drawn middle at the optical centre, stepped back from zk 1 only as far as the
  *  cards need: `hBot` px under it (the largest card below, its gap counted once), `hTop` over it, within `ceil`..`floor`
  *  of a tile `vh` tall; `xa`..`xb` the cards' columns (the creature's lowest row is taken there). Where no step back fits
  *  at the centre, it rises off it: its lowest row a gap over the card below at its largest (T33).
  *
- *  The answer is the reference's: the first step of ZK_STEP from `zk0` at which the cards fit. It is found without trying
+ *  The answer is the reference's: the first step of ZK_STEP from zk 1 at which the cards fit. It is found without trying
  *  every step (each try is a few trial renders of the creature): the drawn height scales as 1/zk, so the step that fits is
  *  predicted from the first try, then confirmed (it fits, the step before it does not). */
-export function capCentre(probe: FrameProbe, hTop: number, hBot: number, vh: number, ceil: number, floor: number, gap: number, xa: number, xb: number,
-  zk0 = 1, headK = TURN_HEAD): FrameTarget {
-  return finish(capCentreSteps(probe, hTop, hBot, vh, ceil, floor, gap, xa, xb, zk0, headK));
+export function capCentre(probe: FrameProbe, hTop: number, hBot: number, vh: number, ceil: number, floor: number, gap: number, xa: number, xb: number): FrameTarget {
+  return finish(capCentreSteps(probe, hTop, hBot, vh, ceil, floor, gap, xa, xb));
 }
 
 /** Runs a solver to its answer at once. */
@@ -82,9 +78,8 @@ export function finish<T>(steps: Generator<void, T>): T {
 
 /** capCentre a trial render at a time: it yields before each (a host draws them between frames, so the page never waits
  *  on all of them at once). */
-export function* capCentreSteps(probe: FrameProbe, hTop: number, hBot: number, vh: number, ceil: number, floor: number, gap: number, xa: number, xb: number,
-  zk0 = 1, headK = TURN_HEAD): Generator<void, FrameTarget> {
-  const want = vh * OPTIC, mid = (m: Rows) => (m.top + m.lowAny) / 2, last = Math.floor((ZK_MAX - zk0) / ZK_STEP + 1e-6);
+export function* capCentreSteps(probe: FrameProbe, hTop: number, hBot: number, vh: number, ceil: number, floor: number, gap: number, xa: number, xb: number): Generator<void, FrameTarget> {
+  const zk0 = 1, headK = TURN_HEAD, want = vh * OPTIC, mid = (m: Rows) => (m.top + m.lowAny) / 2, last = Math.floor((ZK_MAX - zk0) / ZK_STEP + 1e-6);
   const tried = new Map<number, { f: FrameTarget; fits: boolean }>();
   const at = function* (i: number): Generator<void, { f: FrameTarget; fits: boolean }> {
     const seen = tried.get(i);
@@ -134,7 +129,7 @@ export interface FrameCards { below: number; above: number; xa: number; xb: numb
 
 /** What the stage asks of the framing: the tile's inner size, where the creature's canvas sits in it (`dx`, `dy`: its
  *  top left corner, css px from the tile's inner top left: the scene it is drawn in may overhang the tile's border),
- *  whether it is a phone, whether nothing is said (a desktop at rest stands closer), and the cards measured (none yet:
+ *  whether it is a phone, whether nothing is said (a desktop then needs no cards measured), and the cards measured (none yet:
  *  the turn's framing waits for them). Everything the stage reads back is in the tile's inner px too. */
 export interface FrameAsk { w: number; h: number; dx: number; dy: number; phone: boolean;
   /** Whether the device is a desktop's (a fine pointer, or the desktop app's window), not a handset: a phone on its side asks
