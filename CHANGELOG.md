@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.1](https://github.com/sidevoice/sidevoice-web/compare/v0.25.0...v0.25.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* **settings:** a phone's Shortcuts section shows (the host's shortcuts need no global set) ([#532](https://github.com/sidevoice/sidevoice-web/issues/532)) ([524a93a](https://github.com/sidevoice/sidevoice-web/commit/524a93a29f08fdf0cc3acce63320d02e31fc4f72))
+
 ## [0.25.0](https://github.com/sidevoice/sidevoice-web/compare/v0.24.0...v0.25.0) (2026-11-06)
 
 
