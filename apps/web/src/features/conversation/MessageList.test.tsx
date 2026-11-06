@@ -177,15 +177,17 @@ test("the open turn, without streaming, is a pill: the microphone, its bars and 
   expect(container.querySelector(".messages-empty")).toBeNull();
 });
 
-test("transcribing keeps one pill and says so, so both phases stay apart", () => {
+test("transcribing keeps one pill: the bars pulse, no word, announced once", () => {
   const { container } = render(<MessageList conversation={{ messages: [], pendingText: "", pendingCancellable: true, pendingPhase: "transcribing" }} />);
   expect(container.querySelectorAll(".turn-pill")).toHaveLength(1);
   expect(container.querySelector(".turn-pill")?.getAttribute("data-phase")).toBe("transcribing");
-  expect(container.querySelector(".turn-bars")).toBeNull();
-  // Transcribing is the voice mark's bars, in the same colour as listening.
-  expect(container.querySelector(".turn-lead > svg")).toHaveClass("state-glyph-transcribing");
+  // The bars stay (marked transcribing, which pulses them), the microphone and the word go.
+  expect(container.querySelector(".turn-bars")).toHaveAttribute("data-phase", "transcribing");
+  expect(container.querySelector(".turn-lead > svg")).toBeNull();
+  expect(screen.getAllByRole("status")).toHaveLength(1);
   expect(screen.getByRole("status")).toHaveAttribute("aria-label", "Transcribing what you said");
-  expect(screen.getByRole("status").textContent).toBe("Transcribing...");
+  expect(screen.getByRole("status").textContent).toBe("");
+  expect(container.querySelector(".turn-pill")).not.toHaveTextContent(/\S/);
 });
 
 test("once the transcript arrives the bubble becomes the text and the waveform goes", () => {

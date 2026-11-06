@@ -166,14 +166,17 @@ test("the title card: a press on its voice text drags the card, as a press anywh
   expect(host.drag).toHaveBeenCalledWith("start");
 });
 
-test.each(["card", "avatar"])("%s: transcribing says so in the pill, and what was sent pops out of it as a white card for 3s, then leaves", (format) => {
+test.each(["card", "avatar"])("%s: transcribing is the pill's bars, pulsing, without a word, and what was sent pops out of it as a white card for 3s, then leaves", (format) => {
   vi.useFakeTimers();
   const host = page(format, {}, { botLive: false, karaokeState: null, history: [] });
   host.say(speaks);
   host.say(transcribes);
   const pill = document.querySelector(".docked-voice .vcap.card.person.pill")!;
   expect(pill).toHaveAttribute("data-phase", "transcribing");
-  expect(pill.querySelector(".tlabel")).toHaveTextContent("Transcribing");
+  expect(pill.querySelector(".voice-wave, .voice-bars")).toHaveAttribute("data-phase", "transcribing");
+  expect(pill).toHaveTextContent("");
+  expect(pill.querySelectorAll("[role=status]")).toHaveLength(1);
+  expect(pill.querySelector("[role=status]")).toHaveAccessibleName("Transcribing what you said");
   host.say(sends);
   expect(document.querySelector(".docked-voice .vcap.pill")).toBeNull();
   const sent = document.querySelector<HTMLElement>(".docked-voice .vcap.card.person.sent")!;

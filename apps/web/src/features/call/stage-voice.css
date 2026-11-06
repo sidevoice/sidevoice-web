@@ -48,9 +48,8 @@
 .vcap.sent .vcap-said { display: block; padding-top: calc(var(--lh) * .55); margin-top: calc(var(--lh) * -.55); }
 .vcap.sent .vcap-said > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
 
-/* The icon pill: the microphone and the voice's bars, or the voice mark's bars and "Transcribing" while it is, where the words will
- * come. The icons and the live bars wear the colour of listening and transcribing (one state's, the person's turn: tokens.css); the word
- * is never tinted. */
+/* The icon pill: the microphone and the voice's bars, then the bars alone (pulsing, no word) while it is transcribed, where the words will
+ * come. The icons and the live bars wear the colour of listening and transcribing (one state's, the person's turn: tokens.css). */
 .vcap.card.pill { padding: 6px 13px; border-radius: 999px; }
 .vcap .lead { display: inline-flex; gap: 6px; align-items: center; margin-right: 7px; vertical-align: -1px; }
 .vcap.pill .lead { margin: 0; }
@@ -64,12 +63,8 @@
 .vcap .lead .voice-bars i:nth-child(2) { height: 11px; }
 .vcap .lead .voice-bars i:nth-child(3) { height: 8px; }
 .vcap .lead .voice-bars i:nth-child(4) { height: 13px; }
-.vcap .tlabel { font-size: calc(var(--fs) * .78); font-weight: 550; letter-spacing: .01em; white-space: nowrap; }
-.vcap .ell i { font-style: normal; animation: vcap-ell 1.2s ease-in-out infinite; }
-.vcap .ell i:nth-child(2) { animation-delay: .2s; }
-.vcap .ell i:nth-child(3) { animation-delay: .4s; }
-@keyframes vcap-ell { 0%, 100% { opacity: .2; } 40% { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .vcap .ell i { animation: none; opacity: 1; } }
+/* Transcribing: the same bars; they pulse (transcript.css), and stay still and dimmer under reduced motion. */
+.vcap .lead .voice-bars[data-phase="transcribing"] i { opacity: .8; }
 
 /* Taking the turn back (T27): a round 24 px ×, on the pill while it is recorded and while it is transcribed. */
 .vcap .cancel { pointer-events: auto; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; margin-left: 9px; width: 24px; height: 24px;

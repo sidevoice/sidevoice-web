@@ -93,13 +93,22 @@ test("avatar: the reply's card hangs under the creature in the upper half, over 
 });
 
 for (const format of ["card", "avatar"]) {
-  test(`${format}: the person's turn is the stage's pill, and transcribing says so, with the × to take it back`, async ({ context }) => {
+  test(`${format}: the person's turn is the stage's pill, and transcribing is its bars pulsing, with no word, with the × to take it back`, async ({ context }) => {
     const speaking = await openCard(context, { state: "person-speaking", format, size: "m" });
     const pill = speaking.locator(".docked-voice .vcap.card.person.pill");
     await expect(pill).toBeVisible();
     await expect(pill).toHaveAttribute("data-phase", "listening");
     await expect(pill.getByRole("button", { name: "Cancel sending" })).toBeVisible();
     expect(await pill.evaluate((node) => getComputedStyle(node).borderTopLeftRadius)).toBe("999px");
+    // Transcribing: the bars are marked and announced once, there is no visible word, and the × stays.
+    const transcribing = await openCard(context, { state: "transcribing", format, size: "m" });
+    const turn = transcribing.locator(".docked-voice .vcap.card.person.pill");
+    await expect(turn).toHaveAttribute("data-phase", "transcribing");
+    await expect(turn.locator("[data-phase=transcribing]")).toHaveCount(1);
+    await expect(turn.getByRole("status")).toHaveCount(1);
+    await expect(turn.getByRole("status")).toHaveAccessibleName("Transcribing what you said");
+    expect((await turn.innerText()).trim()).toBe("");
+    await expect(turn.getByRole("button", { name: "Cancel sending" })).toBeVisible();
   });
 }
 

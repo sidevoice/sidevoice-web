@@ -223,16 +223,21 @@ test("card look: while they speak, the icon pill (the microphone, the voice's ba
   expect(document.querySelector(".person-bubble, .balloon-tail")).toBeNull();
 });
 
-test("card look: transcribing shows in the pill, as words with a running ellipsis, the × still on it", () => {
+test("card look: transcribing keeps the pill's bars, pulsing and wordless, announced once, the × still on it", () => {
   const { to } = cardTurn();
+  to(listening());
+  const bars = pill()!.querySelector(".voice-wave, .voice-bars")!;
   to({ ...listening(), pendingPhase: "transcribing" });
   expect(pill()).toHaveAttribute("data-phase", "transcribing");
-  expect(pill()!.querySelector(".tlabel")).toHaveTextContent("Transcribing...");
-  expect(pill()!.querySelector(".tlabel")).toHaveAttribute("role", "status");
-  expect(pill()!.querySelector(".voice-wave, .voice-bars")).toBeNull();
-  // Transcribing is the voice mark's bars (the microphone's rect is gone), beside the word, which is not an icon.
-  expect(pill()!.querySelector(".lead > svg rect")).toBeNull();
-  expect(pill()!.querySelector(".lead > svg path")!.getAttribute("d")!.match(/M/g)).toHaveLength(5);
+  // The same waveform, not a new one: it keeps the turn's last frame.
+  expect(pill()!.querySelector(".voice-wave, .voice-bars")).toBe(bars);
+  expect(bars).toHaveAttribute("data-phase", "transcribing");
+  expect(pill()!.querySelector(".tlabel, .ell")).toBeNull();
+  expect(pill()!.textContent).toBe("");
+  // One status, the bars' own, once; the microphone is gone.
+  expect(pill()!.querySelectorAll("[role=status]")).toHaveLength(1);
+  expect(bars).toHaveAccessibleName("Transcribing what you said");
+  expect(pill()!.querySelector(".lead > svg")).toBeNull();
   expect(pill()!.querySelector("button.cancel")).toHaveAccessibleName("Cancel sending");
 });
 

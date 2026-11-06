@@ -10,7 +10,6 @@ import { receiptView } from "../../state/room-session-state.js";
 import { PAGE_MS } from "./PagedText";
 import { SENT_LEAVING_MS, useSentTurns, type SentTurn } from "./speech-reading";
 import { VoiceWaveform } from "../conversation/VoiceWaveform";
-import { VoiceBarsIcon } from "../../components/ui/Icons";
 import { CancelGlyph, MicIcon } from "./StageVoice";
 
 /* The person's balloon at the tile's foot, drawn as the agent's is (call-view.css), its tail out of the tile's corner
@@ -101,9 +100,9 @@ export function PersonTurn({ conversation, t, look = "balloon", cut: over = fals
         delivery={conversation.messages.find((message) => message.role === "user" && (message.segment ?? String(message.time)) === turn.key)?.delivery} cut={pending || over} under={false} away={turn.thread !== conversation.thread} from={null} />)}
       {(pending || taken.leaving) && (
         <div key={"live-" + taken.round} className="vcap card person pill" data-phase={transcribing ? "transcribing" : "listening"} data-leaving={taken.leaving || undefined} translate="no">
-          <span className="lead">{transcribing ? <VoiceBarsIcon size={13} /> : <MicIcon />}{transcribing
-            ? <span className="tlabel" role="status">{t("stage.transcribing")}<span className="ell" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span></span>
-            : <VoiceWaveform phase="listening" />}</span>
+          {/* One waveform in both phases: it keeps the turn's last frame and pulses while transcribed; its own status
+              label says "Transcribing" to a screen reader, once. No visible word. */}
+          <span className="lead">{!transcribing && <MicIcon />}<VoiceWaveform phase={transcribing ? "transcribing" : "listening"} /></span>
           {(conversation.pendingCancellable || taken.leaving) && <Tooltip action content={t("stage.cancelTurn")}>
             <button type="button" className="cancel" aria-label={t("stage.cancelTurn")} disabled={taken.leaving}
               onClick={() => { taken.take(); void window.sidevoiceActions?.cancelInput(); }}><CancelGlyph /></button>

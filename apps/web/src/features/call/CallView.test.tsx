@@ -182,7 +182,8 @@ test("while the person speaks and while it is transcribed, their bubble holds on
   expect(personBubble()).not.toHaveClass("sent");
   patch(store, { userLive: false, pendingPhase: "transcribing" });
   expect(personBubble()).toHaveAttribute("data-phase", "transcribing");
-  expect(personBubble()).toHaveTextContent("Transcribing");
+  expect(personBubble()).not.toHaveTextContent(/\S/);
+  expect(personBubble()!.querySelector("[role=status]")).toHaveAccessibleName("Transcribing what you said");
   expect(personBubble()).not.toHaveTextContent("Split it");
 }, WHOLE_APP_MS);
 
