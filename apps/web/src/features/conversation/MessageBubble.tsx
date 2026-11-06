@@ -24,13 +24,14 @@ export function DeliveryMark({ state }: { state: string }) {
 }
 
 /** The transcript's delivery mark (T42): read, the two ticks in the accent; delivered, one in the time's grey; on its
- *  way, the clock; failed or in doubt, the warning. A status this version does not know (sidevoice-core#112) has none. */
-function TranscriptReceipt({ state }: { state: string }) {
+ *  way, the clock; failed or in doubt, the warning. A status this version does not know (sidevoice-core#112) has none.
+ *  The sent turn's card on the stage and on the floating card wears the same (operator, 2026-11-05). */
+export function TranscriptReceipt({ state, className = "chat-receipt delivery" }: { state: string; className?: string }) {
   const { label } = receiptView(state);
   const mark = state === "read" ? <ReadTicksIcon /> : state === "delivered" || state === "unconfirmed" ? <SentTickIcon />
     : state === "pending" || state === "sending" ? <PendingIcon size={12} /> : state === "uncertain" || state === "not_sent" ? <UncertainIcon size={12} /> : null;
   if (!mark) return null;
-  return <span className="chat-receipt delivery" data-state={state} title={label} aria-label={label}>{mark}</span>;
+  return <span className={className} data-state={state} title={label} aria-label={label}>{mark}</span>;
 }
 
 /** A message's time, as the interface's language writes it. */

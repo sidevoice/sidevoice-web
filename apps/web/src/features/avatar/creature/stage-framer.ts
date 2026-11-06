@@ -14,6 +14,10 @@ import { capCentre, capCentreSteps, FRAME_EASE, REST_HEAD, REST_ZK, stageBands, 
 
 /** The reference's desktop stage distance (creator.js VIEWS.desktop). */
 const DESKTOP_ZOOM = 1.32;
+/** The creature's size on the stage, a share of what the framing alone gives (operator, 2026-11-05): half on a desktop;
+ *  on a phone, whose creature is framed to the screen's width and its scene to its height, a little more, so the two keep
+ *  the same proportion as on a desktop. */
+const CREATURE_SIZE = { desktop: 0.5, phone: 0.65 };
 /** The phone's framing until measured, and its side margin and centre (creator.js PHONE). */
 const PHONE = { side: 0.05, mid: 0.5, zoom: 2.6 };
 
@@ -215,7 +219,8 @@ export class StageFramer {
   /** The camera for a framing (creator.js viewCam, zoomOf, baseLook). The desktop at no lift and no step back keeps the
    *  rig's own look height, as the reference draws it. */
   private camera(v: View, f: Framing): { zoom: number; lookY: number | undefined } {
-    const zoom = v.zoom * f.zk;
+    // A phone's view comes with its look height (phoneFit); a desktop's does not.
+    const zoom = (v.zoom * f.zk) / (v.lookY != null ? CREATURE_SIZE.phone : CREATURE_SIZE.desktop);
     if (v.lookY == null && f.lift === 0 && f.zk === 1) return { zoom, lookY: undefined };
     return { zoom, lookY: (v.lookY != null ? v.lookY : 0.3 - (zoom - 1) * 0.55) - f.lift };
   }

@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ContextMenu, ContextMenuItem } from "./ContextMenu";
 
 afterEach(cleanup);
@@ -29,5 +29,6 @@ test("from the keyboard (Shift+F10 or the menu key reach the row's button as a c
   expect(screen.getByRole("menu")).toBeInTheDocument();
   await act(async () => { fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" }); });
   expect(screen.queryByRole("menu")).toBeNull();
-  expect(button).toHaveFocus();
+  // The menu hands focus back once it has closed, a frame later: on a loaded runner that is after the line above.
+  await waitFor(() => expect(button).toHaveFocus());
 });
