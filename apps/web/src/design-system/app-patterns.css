@@ -141,7 +141,7 @@
 .pt-tooltip { max-width: 280px; padding: 6px 10px; border-radius: var(--sv-radius-sm); background: var(--sv-tooltip-bg); color: var(--sv-tooltip-text); font-size: var(--sv-font-sm); line-height: 1.25rem; }
 .pt-status { display: flex; align-items: center; gap: var(--sv-space-1-5); margin: 0; font-size: var(--sv-font-sm); color: var(--sv-positive); }
 .pt-status[data-tone="muted"] { color: var(--sv-text-muted); }
-.pt-toast { justify-self: start; display: flex; align-items: center; gap: var(--sv-space-3); padding: var(--sv-space-2) var(--sv-space-2) var(--sv-space-2) var(--sv-space-4); border-radius: var(--sv-radius-lg); background: var(--sv-tooltip-bg); color: var(--sv-tooltip-text); box-shadow: var(--sv-shadow-lg); }
+.pt-toast { justify-self: start; display: flex; align-items: center; gap: var(--sv-space-3); padding: var(--sv-space-2) var(--sv-space-2) var(--sv-space-2) var(--sv-space-4); border-radius: var(--sv-radius-lg); background: var(--sv-toast-bg); color: var(--sv-toast-text); box-shadow: var(--sv-shadow-lg); }
 .pt-toast > svg { color: var(--sv-positive); }
 [data-theme="dark"] .pt-toast > svg { color: #1d6b45; }
 .pt-toast .ui-button { color: inherit; }

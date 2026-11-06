@@ -250,7 +250,7 @@ export function micView(s) {
         return { enabled, label: say('session.mic.choose'), pressed: !enabled, disabled: true, holding: false,
             title: say('session.mic.chooseTitle') };
     return { enabled, label, pressed: !enabled, disabled: false, holding: !!s.holding,
-        title: say('session.mic.title', { label }) };
+        title: label };
 }
 /** The call button: joining and leaving are the same button, and it says which one it is now. */
 export function callView(s) {

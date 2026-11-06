@@ -363,7 +363,7 @@
 .ui-copy-live { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 
 /* ----- Tooltip: a few words more about what it points at, on hover or focus; never what one must know to act. */
-.ui-tooltip { z-index: 70; max-width: 300px; padding: 6px 10px; border-radius: var(--sv-radius-sm); background: var(--sv-tooltip-bg); color: var(--sv-tooltip-text); font: var(--sv-weight-regular) var(--sv-font-sm) / 1.25rem var(--sv-font-sans); box-shadow: var(--sv-shadow-md); }
+.ui-tooltip { z-index: 70; max-width: 300px; padding: 6px 10px; border-radius: var(--sv-radius-sm); background: var(--sv-tooltip-bg); color: var(--sv-tooltip-text); border: 1px solid var(--sv-tooltip-border); font: var(--sv-weight-regular) var(--sv-font-sm) / 1.25rem var(--sv-font-sans); box-shadow: var(--sv-tooltip-shadow); }
 .ui-tooltip-arrow { fill: var(--sv-tooltip-bg); }
 .ui-infotip { width: 24px; height: 24px; color: var(--sv-text-subtle); vertical-align: middle; }
 .ui-infotip svg { width: 16px; height: 16px; }

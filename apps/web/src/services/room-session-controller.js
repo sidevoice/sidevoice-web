@@ -24,7 +24,7 @@ import {replyEligibility} from './reply-eligibility.js';
 import {playbackHearing,writtenReplyHearing} from './reply-hearing-policy.js';
 import {refusalError,shouldRejoin,DEVICE_ABSENT} from './refusals.js';
 import {followWorking} from './working-clock.ts';
-import {shortcut} from '../state/shortcuts.ts';
+import {holdPressed} from '../state/shortcuts.ts';
 import {watchAudioDeviceRefresh} from './audio-device-refresh.ts';
 import {createMicrophoneAccess} from './microphone-access.ts';
 import {audioDiagnostics} from './audio-diagnostics.ts';
@@ -549,6 +549,11 @@ function storedTicket(fp){
 }
 window.sidevoiceSessionId=()=>state.sessionId;
 let holding=false,spaceDown=false;
+// The key that is down for hold to talk (its release is looked for by it, whatever the key is bound to by then), and the host's
+// own hold (the global shortcut), which the page losing focus does not release: the person is in another app.
+let heldKey=null,hostHold=false;
+// Say one thing: the microphone opened for exactly one turn; null when it is not. `spoke`: a turn began since.
+let oneTurnOpen=null;
 // How long a call may go without a sign of a person before it asks, and then leaves.
 var IDLE_MS=15*60*1000,IDLE_WARN_MS=60*1000,lastPersonSignal=Date.now(),idleWarned=false,idleTimer=null;
 let screenHeld=false,wakeRequest=null,wakeEpoch=0,wakeRetries=0,stopWatchingLock=null;
@@ -856,7 +861,7 @@ function add(role, text, segment, thread = targetId(), metadata = {}) { // threa
 // What this page keeps of each machine's conversations: its newest rows, so a busy machine never pushes another's out.
 const HISTORY_PER_MACHINE=1000;
 function capHistory(){const kept=newestPerMachine(state.history,HISTORY_PER_MACHINE);if(kept!==state.history)state.history=kept}
-function cancelCurrentInput(){if(!state.userTurn||state.cancelledInput)return;conversationCalls.get(state.userTurn.thread)?.call.cancelInput();cancelDraft(state.userTurn)}
+function cancelCurrentInput(){if(!state.userTurn||state.cancelledInput)return;conversationCalls.get(state.userTurn.thread)?.call.cancelInput();cancelDraft(state.userTurn);if(oneTurnOpen)closeOneTurn()}
 
 function cancelDraft(turn){state.cancelledInput=true;state.history=state.history.filter(r=>!(r.segment===turn.segment&&r.thread===turn.thread));save();partial('');markHistorySeen()}
 function partial(text){state.pendingUserText=text||''}
@@ -933,7 +938,7 @@ let composerBox=$('text-message');
 onUiLanguage(updateComposer);
 new MutationObserver(()=>{const box=$('text-message');if(box===composerBox)return;composerBox=box;updateComposer()}).observe(document.body,{childList:true,subtree:true});
 function updateMic(){updateComposer()}
-function setMic(enabled){personSignal();state.micEnabled=enabled;applyMicState();updateMic();syncNowPlaying();if(enabled)void askMicrophone()}
+function setMic(enabled,{keepOneTurn=false}={}){if(!keepOneTurn)oneTurnOpen=null;personSignal();state.micEnabled=enabled;applyMicState();updateMic();syncNowPlaying();if(enabled)void askMicrophone()}
 function setSpeechOutput(next){
  if(next===speechOutput)return;
  speechOutput=next;state.speechOutput=next;
@@ -942,7 +947,40 @@ function setSpeechOutput(next){
  if(next!=='on')acknowledgeDisplayedHistory();
  if(next==='on')drainReplies();
 }
-function releaseHold(){spaceDown=false;state.holding=false;if(holding){holding=false;setMic(false)}}
+function releaseHold(){spaceDown=false;heldKey=null;state.holding=false;if(holding){holding=false;setMic(false)}}
+// ----- the host's global hold to talk, and Say one thing -----
+// The desktop app calls these from its global shortcuts and the headset's buttons (window.sidevoiceActions), whatever the page
+// has focus on. Hold to talk is the Space key's hold, kept down by the host and not let go of by the page losing focus.
+function holdStart(){
+ if(!voice||hostHold)return;
+ hostHold=true;personSignal();
+ if(!state.micEnabled){holding=true;setMic(true);state.holding=true}
+}
+function holdEnd(){if(!hostHold)return;hostHold=false;releaseHold()}
+// Say one thing: the microphone opens for one turn, and mutes again when that turn is told or taken back. A second press while
+// it is open ends it (what was said is sent; nothing said, the microphone is muted at once). With the microphone already open,
+// a press changes nothing: it was opened by the person, who closes it.
+function oneTurn(){
+ if(!voice)return;
+ if(oneTurnOpen){
+  if(state.userTurn){for(const entry of conversationCalls.values())void entry.call.endInput?.()}
+  else closeOneTurn();
+  return;
+ }
+ if(state.micEnabled)return;
+ holding=false;oneTurnOpen={spoke:false,key:targetId(),generation:callGeneration,call:conversationCalls.get(targetId())?.call.id??'local',turn:null};setMic(true,{keepOneTurn:true});
+}
+function closeOneTurn(){if(!oneTurnOpen)return;oneTurnOpen=null;setMic(false)}
+// The voice's turns, as they begin and end: the one turn is the first that starts in the conversation and the call it was
+// opened for, and it is over when that very turn is told (sent) or cancelled. A turn of another conversation, or of another
+// call (a late one of a call since replaced), is not it: the call is the instance the key was pressed on, by its own id: it neither takes it nor ends it.
+function oneTurnSeen(event,source){
+ const open=oneTurnOpen;
+ if(!open||source.generation!==open.generation||open.generation!==callGeneration||conversationKey(source.node,source.thread_id)!==open.key||source.call.id!==open.call)return;
+ const id=source.call.id+'\0'+event.turn_id;
+ if(event.phase==='started'){if(!open.turn){open.turn=id;open.spoke=true}}
+ else if(open.turn===id)closeOneTurn();
+}
 
 document.addEventListener('click',event=>{for(const menu of document.querySelectorAll('.participant-menu[open],.call-menu[open]'))if(!menu.contains(event.target))menu.open=false});
 document.addEventListener('keydown',event=>{if(event.key==='Escape')for(const menu of document.querySelectorAll('.participant-menu[open],.call-menu[open]'))menu.open=false});
@@ -1996,6 +2034,7 @@ let turnSend=Promise.resolve();
 let turnSendPending=0;
 function voiceTurn(event,entry=null){
  const source=entry??{call:{id:'local'},node:state.callNode,thread_id:targetThread(),binding_id:state.roomBinding?.binding_id,generation:callGeneration};
+ oneTurnSeen(event,source);
  const key=source.call.id+'\0'+event.turn_id;
  if(event.phase==='started'){
   let id=event.turn_id;
@@ -2203,7 +2242,9 @@ function disconnect() {
     // 1000 is a hang-up: any other close the room takes for a drop, and parks the call for its return.
     socket?.close(1000);
     state.sessionId = null;
-    state.userLive = state.botLive = holding = spaceDown = false;
+    state.userLive = state.botLive = holding = spaceDown = hostHold = false;
+    heldKey = null;
+    oneTurnOpen = null;
     state.userTurn = null;
     state.pendingPhase = '';
     state.voiceState = null;
@@ -2870,6 +2911,9 @@ window.sidevoiceActions={
  loadVoiceCatalogue,
  replayReply,
  toggleMic,
+ holdStart,
+ holdEnd,
+ oneTurn,
  toggleCall,
  // A sign of the person: the desktop card's Keep on the idle warning (its `keep-alive`).
  keepVoiceOn:()=>personSignal(),
@@ -2967,22 +3011,22 @@ function applyLockScreen(on){
  stopRemote=remote.onCommand(remoteCommand);
  syncNowPlaying();
 }
-function toggleMic(){holding=false;setMic(!state.micEnabled)}
+function toggleMic(){holding=false;hostHold=false;setMic(!state.micEnabled)}
 function typing(e){return e.target instanceof Element&&!!e.target.closest('input,textarea,select,[contenteditable=true],[role=menu],[role=menuitem],[data-radix-popper-content-wrapper]')}
 // The room's other keys (mute, skip, cancel, the call, the panels) are the key handler's, in React (use-room-shortcuts.ts):
-// only the held one is here, for its release. Its key is the table's (state/shortcuts.ts).
-const HOLD_KEY=shortcut('holdToTalk').code;
+// only the held one is here, for its release. Its key is the table's (state/shortcuts.ts), read as it is pressed: the person may change it.
 window.addEventListener('keydown',e=>{personSignal();
  if(typing(e)||e.altKey)return;
- if(voice&&e.code===HOLD_KEY&&!e.ctrlKey&&!e.metaKey&&!e.target.closest('summary')){
+ if(voice&&holdPressed(e)&&!e.target.closest('summary')){
   e.preventDefault();
   if(spaceDown)return;
-  spaceDown=true;
+  spaceDown=true;heldKey=e.code;
   if(!state.micEnabled){holding=true;setMic(true);state.holding=true}
  }
 },true);
-window.addEventListener('keyup',e=>{if(e.code===HOLD_KEY&&spaceDown){e.preventDefault();releaseHold()}},true);
-window.addEventListener('blur',releaseHold);document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseHold()});
+window.addEventListener('keyup',e=>{if(spaceDown&&e.code===heldKey){e.preventDefault();releaseHold()}},true);
+// Leaving the page lets go of a held key, not of the host's hold: its person is in another app by then, talking.
+window.addEventListener('blur',()=>{if(!hostHold)releaseHold()});document.addEventListener('visibilitychange',()=>{if(document.hidden&&!hostHold)releaseHold()});
 // A page going away is not a hang-up: its call is parked, and the ticket kept here lets the next load take it back.
 window.addEventListener('pagehide',()=>keepTicket(true));
 window.addEventListener('beforeunload',()=>{keepTicket(true);state.ws?.close();void voice?.stop().catch(()=>{})});updateMic();

@@ -30,6 +30,8 @@ export interface Shot {
   variants?: Record<string, string>;
   /** The desktop app's updater (a release's), where it has one: its status and its mode. */
   updater?: { status: UpdaterStatus; mode?: UpdateMode };
+  /** The desktop app's global shortcuts and headset (`host.shortcuts`'s status), where the shot shows them. */
+  shortcuts?: Record<string, unknown>;
   /** The desktop app's floating card settings (CallControlsBridge), where the shot shows them. */
   floatingCard?: boolean;
   /** A pairing code's redemption, for the pairing shots: its refusal, in the controller's words; the addresses the code
@@ -265,6 +267,14 @@ export const JOURNEYS: Journey[] = [
     { id: "s-voice", caption: "Voice.", after: openSettings("voice") },
     { id: "s-call", caption: "Call: end of turn and patience (with their timings), the thinking sound, the screen.", after: openSettings("call") },
     { id: "s-floating-card", caption: "Floating card (the desktop app): its style with a still preview of each, its starting size, its first corner, the controls always shown, and a reset.", floatingCard: true, views: ["desktop"], after: openSettings("floating-card") },
+    { id: "s-shortcuts", caption: "Shortcuts in a browser with a keyboard: only the keys inside Sidevoice, each recorded in the same field.", views: ["desktop"], after: openSettings("shortcuts") },
+    { id: "s-shortcuts-desktop", caption: "Shortcuts in the desktop app: anywhere on the computer (with a single key and its permission), the headset's buttons, and inside Sidevoice.", views: ["desktop"],
+      shortcuts: { shortcuts: {
+        holdToTalk: { accelerator: "Fn:hold", label: "Fn", state: "needsPermission", alternatives: [], voiceOver: false },
+        mute: { accelerator: "Ctrl+Alt+Shift+M", label: "Ctrl+Alt+Shift+M", state: "on", alternatives: [], voiceOver: false },
+        oneTurn: { accelerator: null, label: null, state: "off", alternatives: [], voiceOver: false } },
+        permission: { kind: "inputMonitoring", state: "notAsked" }, headset: { press: "mute", doublePress: "skip", outsideCall: "leave" } },
+      after: openSettings("shortcuts") },
     { id: "s-providers-none", caption: "Providers: none connected.", facts: { providerKeys: { elevenlabs: false, openai: false } }, after: openSettings("providers") },
     { id: "s-providers", caption: "Providers: one connected, one to connect.", after: openSettings("providers") },
     { id: "s-providers-error", caption: "Providers: a key the provider refused, in its words.", facts: { voiceCatalogue: { state: "ready", error: "", catalogs: CATALOGS.map((c) => c.id === "elevenlabs" ? { ...c, status: { stale: false, reason: { code: "credential-rejected" }, detail: "invalid_api_key" } } : c) } }, after: openSettings("providers") },

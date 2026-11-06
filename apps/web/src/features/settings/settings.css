@@ -239,8 +239,8 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
 /* Each key its own cap, as macOS menus and keyboards draw them: a small raised tile (a thicker bottom edge), the
    system font, centred; the caps of one shortcut side by side. */
 .shortcut-keys { display: inline-flex; align-items: center; gap: 4px; font: inherit; }
-.shortcut-key { display: inline-grid; place-items: center; min-width: 1.75rem; height: 1.75rem; padding: 0 var(--sv-space-2); border: 1px solid var(--sv-border); border-bottom-width: 2px; border-radius: 6px; background: var(--sv-surface-raised); font: 500 var(--sv-font-sm) / 1 var(--sv-font-sans, inherit); color: var(--sv-text); white-space: nowrap; }
-.shortcut-keys[data-state="refused"] .shortcut-key { border-color: var(--sv-warning); }
+.shortcut-key { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 7px; border: 1px solid var(--sv-border-strong); border-bottom-width: 2px; border-radius: 7px; background: var(--sv-surface); font: 600 12.5px / 1 var(--sv-font-sans); color: var(--sv-text); white-space: nowrap; }
+
 .desktop-shortcut-refused { display: grid; gap: var(--sv-space-2); color: var(--sv-text); }
 .desktop-shortcut-alternatives { display: flex; flex-wrap: wrap; gap: var(--sv-space-2); }
 .desktop-shortcut-note { color: var(--sv-text-muted); }
@@ -294,9 +294,15 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
   /* and a tag too long for a narrow phone ends in an ellipsis inside the row, never past it. */
   .downloaded-model-title > :not(.downloaded-model-name):not(.ui-infotip) { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
-/* A tooltip that says its shortcut: the label, then its key caps, small, on the tooltip's own ground. */
-.shortcut-tip { display: inline-flex; align-items: center; gap: var(--sv-space-2); }
-.ui-tooltip .shortcut-key { min-width: 1.25rem; height: 1.25rem; padding: 0 var(--sv-space-1); font-size: var(--sv-font-xs, 0.75rem); background: transparent; color: inherit; border-color: currentColor; opacity: 0.85; }
+/* A tooltip that says its shortcut: the label, then its key caps, on the tooltip's own ground. The caps are the Shortcuts
+   screen's, adapted to the lavender tooltip. The mic's has a second, lighter line: what holding a key does. */
+.shortcut-tip { display: inline-flex; align-items: center; gap: 8px; }
+.shortcut-tip-stack { display: grid; gap: 2px; }
+.shortcut-tip-label { font-weight: var(--sv-weight-semibold); }
+.shortcut-tip-hint { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; opacity: .8; }
+.shortcut-tip-hint .shortcut-keys { vertical-align: middle; }
+.ui-tooltip .shortcut-keys { gap: 3px; }
+.ui-tooltip .shortcut-key { min-width: 20px; height: 20px; padding: 0 5px; border: 1px solid color-mix(in srgb, var(--sv-accent) 35%, transparent); border-bottom-width: 2px; border-radius: 6px; background: var(--sv-surface); color: var(--sv-accent-text); font: 600 11.5px / 1 var(--sv-font-sans); opacity: 1; }
 
 /* Settings → Floating card (FloatingCardSettings.tsx): the three styles, each with a still, simplified picture of it on
  * a corner of a screen in the page's theme; the four corners a card first appears in. */
@@ -368,6 +374,40 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
 /* Developer options (DeveloperOptions): a row's how-to, a line each. */
 .developer-howto { display: block; }
 .developer-howto + .developer-howto { margin-top: var(--sv-space-1); }
+
+/* The shortcut field (components/ui/ShortcutField.tsx): the whole field is the button; the keys as caps, a Default button
+   and a round quiet x inside it, a clear margin from its right edge. */
+.shortcut-item + .shortcut-item { border-top: 1px solid var(--sv-border); }
+.shortcut-item > .ui-row { padding-bottom: 14px; }
+.shortcut-item > .ui-row + .ui-row { border-top: 0; }
+.shortcut-note { margin: 0 var(--sv-space-5) 14px; }
+.shortcut-managed { margin: -6px var(--sv-space-5) 12px; font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+.ui-group-card > .shortcut-note { margin-top: 0; }
+.shortcut-tip-note { margin: 0 0 var(--sv-space-1); align-items: center; }
+.shortcut-tip-note .shortcut-key { height: 20px; min-width: 20px; padding: 0 5px; font-size: 11.5px; vertical-align: 1px; }
+.ui-shortcut-wrap { display: grid; justify-items: end; gap: 5px; min-width: 0; }
+.ui-shortcut { display: inline-flex; align-items: stretch; width: 240px; max-width: 100%; height: 34px; border: 1px solid var(--sv-border-strong); border-radius: 10px; background: var(--sv-surface); transition: border-color .15s, box-shadow .15s, background-color .15s; }
+@media (hover: hover) { .ui-shortcut:hover { border-color: var(--sv-accent); } }
+.ui-shortcut[data-state="recording"] { border-color: var(--sv-accent); background: var(--sv-accent-soft); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-accent) 22%, transparent); }
+.ui-shortcut[data-invalid] { border-color: var(--sv-danger); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-danger) 18%, transparent); }
+.ui-shortcut-field { display: inline-flex; flex: 1; min-width: 0; align-items: center; gap: 6px; padding: 0 10px; border: 0; border-radius: 10px 0 0 10px; background: none; color: inherit; font: inherit; cursor: pointer; text-align: start; }
+.ui-shortcut-field:only-child, .ui-shortcut-field:last-child { border-radius: 10px; }
+.ui-shortcut-field:focus-visible, .ui-shortcut-clear:focus-visible, .ui-shortcut-default:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
+.ui-shortcut .shortcut-key { height: 22px; min-width: 22px; padding: 0 6px; font-size: 12px; }
+.shortcut-how { margin-left: 2px; font: 600 11.5px / 1 var(--sv-font-sans); color: var(--sv-text-muted); }
+.ui-shortcut-placeholder { font: 500 13px var(--sv-font-sans); color: var(--sv-text-subtle); }
+.ui-shortcut-rec { display: inline-flex; align-items: center; gap: 6px; font: 600 13px var(--sv-font-sans); color: var(--sv-accent-text); white-space: nowrap; }
+.ui-shortcut-rec i { width: 8px; height: 8px; border-radius: 50%; background: var(--sv-danger); }
+.ui-shortcut-esc { margin-left: auto; padding: 2px 5px; border: 1px solid var(--sv-border-strong); border-radius: 5px; font: 600 10.5px var(--sv-font-sans); color: var(--sv-text-muted); }
+.ui-shortcut-clear { align-self: center; display: grid; place-items: center; flex: none; width: 20px; height: 20px; margin: 0 8px 0 4px; padding: 0; border: 0; border-radius: 50%; background: color-mix(in srgb, var(--sv-text) 9%, transparent); color: var(--sv-text-muted); cursor: pointer; opacity: .75; transition: opacity .15s, background-color .15s; }
+@media (hover: hover) {
+  .ui-shortcut:hover .ui-shortcut-clear { opacity: 1; }
+  .ui-shortcut-clear:hover { background: color-mix(in srgb, var(--sv-text) 16%, transparent); color: var(--sv-text); }
+  .ui-shortcut-default:hover { color: var(--sv-text); }
+}
+.ui-shortcut-default { align-self: center; flex: none; margin: 0 2px 0 4px; padding: 3px 7px; border: 0; border-radius: 6px; background: color-mix(in srgb, var(--sv-text) 8%, transparent); font: 600 11px var(--sv-font-sans); color: var(--sv-text-muted); cursor: pointer; }
+.ui-shortcut > .ui-shortcut-default:last-child { margin-right: 8px; }
+.ui-shortcut-error { max-width: 240px; text-align: start; }
 
 /* Call › Other apps' media: what the choice lacks, in the group's card under the row (amber), or, allowed and waiting for a
  * restart, Restart now (accent). The margins are the rows' own padding. */
