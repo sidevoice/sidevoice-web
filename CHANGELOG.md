@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.24.0](https://github.com/sidevoice/sidevoice-web/compare/v0.23.0...v0.24.0) (2026-11-06)
+
+
+### Features
+
+* **permissions:** Restart now when System Audio Recording is allowed but needs a restart ([#502](https://github.com/sidevoice/sidevoice-web/issues/502)) ([d6cad84](https://github.com/sidevoice/sidevoice-web/commit/d6cad84f597de8bd83175ebaa563b38bfa01c63f))
+* **settings:** Shortcuts section, configurable keys, Say one thing, tooltip restyle ([#510](https://github.com/sidevoice/sidevoice-web/issues/510)) ([a285871](https://github.com/sidevoice/sidevoice-web/commit/a2858718f8c4dc4fac4cd4b3b3b7c082e6270867))
+* **sidebar:** compact conversation cards, the creature smaller than the title ([#501](https://github.com/sidevoice/sidevoice-web/issues/501)) ([f02d3c7](https://github.com/sidevoice/sidevoice-web/commit/f02d3c73c5981aa00469389436347f687c77e706))
+* **stage:** delivery ticks on the sent card, a sliding transcript, a lighter title card ([#504](https://github.com/sidevoice/sidevoice-web/issues/504)) ([088236f](https://github.com/sidevoice/sidevoice-web/commit/088236f31c6f515ab2bc590dee23ae84d6457a87))
+* **stage:** the stage takes the room there is, and a smaller creature ([#503](https://github.com/sidevoice/sidevoice-web/issues/503)) ([3bf32c4](https://github.com/sidevoice/sidevoice-web/commit/3bf32c4ba94bac3c9cb009fbbdfddb0a2bcdd501))
+* **ui:** scheme E and the hand-drawn icons across the app ([#498](https://github.com/sidevoice/sidevoice-web/issues/498)) ([6c66ca2](https://github.com/sidevoice/sidevoice-web/commit/6c66ca2b65858fdceb7e6e8e668b298682464651))
+
+
+### Bug Fixes
+
+* **room:** rejoin when the machine no longer has this device in the call ([#505](https://github.com/sidevoice/sidevoice-web/issues/505)) ([711d23f](https://github.com/sidevoice/sidevoice-web/commit/711d23f80a7764ad1fa36fbf84dae4650e189af5))
+* **stage:** draw the creature at the screen's pixels on a desktop stage ([#512](https://github.com/sidevoice/sidevoice-web/issues/512)) ([6922d8c](https://github.com/sidevoice/sidevoice-web/commit/6922d8cc9cb9fb7baf393e630a7a540908965a60))
+* **stage:** no card on the creature in a short tile; e2e green again after the redesign ([#500](https://github.com/sidevoice/sidevoice-web/issues/500)) ([730083b](https://github.com/sidevoice/sidevoice-web/commit/730083beb91b45995dedde3053e9e4d705dd29a4))
+
 ## [0.23.0](https://github.com/sidevoice/sidevoice-web/compare/v0.22.1...v0.23.0) (2026-11-05)
 
 
