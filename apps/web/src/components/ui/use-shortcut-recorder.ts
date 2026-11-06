@@ -26,6 +26,9 @@ export interface RecorderOptions {
   onClear(): void;
   /** What stopped it from taking the key: said under the field, until the next key. */
   onRefused(message: string | null): void;
+  /** A modifier or Fn pressed and let go alone, which this recording ignores while it waits for a real key (a system that
+   *  gives the app no way to hear one): said under the field. Not called for an in-app shortcut, where it is part of a chord. */
+  onLoneIgnored?(): void;
 }
 
 export function useShortcutRecorder(active: boolean, options: RecorderOptions) {
@@ -34,6 +37,8 @@ export function useShortcutRecorder(active: boolean, options: RecorderOptions) {
   useEffect(() => {
     if (!active) return;
     let lone: string | null = null;
+    // A modifier (or Fn) pressed on its own, ignored by a recording that cannot take one: it is only a lone press if nothing came between.
+    let ignored: string | null = null;
     let lastTap: { key: string; at: number } | null = null;
     let timer: number | undefined;
     let finished = false;
@@ -51,8 +56,16 @@ export function useShortcutRecorder(active: boolean, options: RecorderOptions) {
       event.stopImmediatePropagation();
       if (event.isComposing || event.key === "Process") return;
       const alone = LONE_CODES[event.code];
-      if (alone) { if (!event.repeat && latest.current.singles.length) lone = event.code; return; }
-      if (["Shift", "Control", "Alt", "Meta", "OS", "AltGraph", "CapsLock", "Fn"].includes(event.key)) return;
+      if (alone) {
+        if (!event.repeat && latest.current.singles.length) lone = event.code;
+        else if (!event.repeat && latest.current.onLoneIgnored) ignored = event.code;
+        return;
+      }
+      if (["Shift", "Control", "Alt", "Meta", "OS", "AltGraph", "CapsLock", "Fn"].includes(event.key)) {
+        if (event.key === "Fn" && latest.current.onLoneIgnored) ignored = "Fn";
+        return;
+      }
+      ignored = null;
       settle();
       if (event.key === "Escape") { latest.current.onCancel(); return; }
       if (event.key === "Backspace" || event.key === "Delete") { latest.current.onClear(); return; }
@@ -62,6 +75,7 @@ export function useShortcutRecorder(active: boolean, options: RecorderOptions) {
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
+      if (ignored && (event.code === ignored || (ignored === "Fn" && event.key === "Fn"))) { ignored = null; latest.current.onLoneIgnored?.(); return; }
       if (!lone || event.code !== lone) return;
       const key = LONE_CODES[event.code];
       const { singles } = latest.current;

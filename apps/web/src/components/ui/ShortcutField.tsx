@@ -1,11 +1,12 @@
 import { useEffect } from "react";
 import { recordingShortcut } from "../../state/shortcuts";
 import { Keys } from "./Keycaps";
-import { WarningIcon } from "./Icons";
+import { RestoreIcon, WarningIcon } from "./Icons";
+import { Tooltip } from "./Tooltip";
 
 /* The field a shortcut is recorded in. The whole field is the button: a click starts recording (it turns accent and says
- * what to press; Esc, or another click, stops it). Set, it holds the keys as caps, a Default button that restores the
- * default when it is not the one, and a round quiet × that clears it; empty, it says "Record shortcut". A refused key is
+ * what to press; Esc, or another click, stops it). Set, it holds the keys as caps, a ↺ icon button (with a tooltip that says
+ * which keys it brings back) when the shortcut is not on its default, and a round quiet × that clears it; empty, it says "Record shortcut". A refused key is
  * the standard field error: a red border and the reason under the field. While it records, no key is the room's own
  * (state/shortcuts.ts `recordingShortcut`). */
 
@@ -27,15 +28,15 @@ export interface ShortcutFieldProps {
   /** Clears it; no × without. */
   onClear?(): void;
   clearLabel: string;
-  /** Restores the default; no Default button without (the caller offers it only when the shortcut is not the default). */
-  onDefault?(): void;
-  defaultLabel: string;
-  defaultTitle?: string;
+  /** Puts it back on its default; no ↺ without (the caller offers it only when the shortcut is not on its default). */
+  onRestore?(): void;
+  /** What ↺ says, as its tooltip and its name: "Restore default: ⌃⌥M". */
+  restoreLabel?: string;
   escLabel: string;
   disabled?: boolean;
 }
 
-export function ShortcutField({ label, combo, how, recording, recordingText, placeholder, error, errorId, onToggle, onClear, clearLabel, onDefault, defaultLabel, defaultTitle, escLabel, disabled }: ShortcutFieldProps) {
+export function ShortcutField({ label, combo, how, recording, recordingText, placeholder, error, errorId, onToggle, onClear, clearLabel, onRestore, restoreLabel, escLabel, disabled }: ShortcutFieldProps) {
   useEffect(() => {
     if (!recording) return;
     recordingShortcut(true);
@@ -50,7 +51,9 @@ export function ShortcutField({ label, combo, how, recording, recordingText, pla
           ? <><span className="ui-shortcut-rec"><i aria-hidden />{recordingText}</span><span className="ui-shortcut-esc" aria-hidden>{escLabel}</span></>
           : combo ? <Keys combo={combo} how={how} /> : <span className="ui-shortcut-placeholder">{placeholder}</span>}
       </button>
-      {!recording && onDefault && <button type="button" className="ui-shortcut-default" title={defaultTitle} onClick={onDefault}>{defaultLabel}</button>}
+      {!recording && onRestore && <Tooltip action content={restoreLabel}>
+        <button type="button" className="ui-shortcut-restore" aria-label={restoreLabel} onClick={onRestore}><RestoreIcon size={12} /></button>
+      </Tooltip>}
       {!recording && combo && onClear && <button type="button" className="ui-shortcut-clear" aria-label={clearLabel} title={clearLabel} onClick={onClear}>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6 6 18" /></svg>
       </button>}

@@ -5,7 +5,7 @@ import { Group, Row, Section } from "../../components/ui/Card";
 import { Select } from "../../components/ui/Select";
 import { ShortcutField } from "../../components/ui/ShortcutField";
 import { useShortcutRecorder, type Captured } from "../../components/ui/use-shortcut-recorder";
-import { host, type GlobalShortcut, type HeadsetPress, type HeadsetStatus, type ShortcutAction, type ShortcutsStatus } from "../../host";
+import { host, type GlobalShortcut, type HeadsetPress, type HeadsetStatus, type RecordHint, type ShortcutAction, type ShortcutsStatus } from "../../host";
 import { uiLanguage, type MessageKey, type Translate } from "../../i18n/translator";
 import {
   composeAccelerator, acceleratorKey, globalAllowed, isFnKey, isSingle, parseAccelerator, readAccelerator, sameAccelerator, setLayoutMap, singleAccelerator,
@@ -58,7 +58,8 @@ interface Global {
   set(action: ShortcutAction, accelerator: string | null): Promise<GlobalShortcut>;
   request?(): Promise<void>;
   setHeadset?(partial: Partial<HeadsetStatus>): Promise<void>;
-  record?(action: ShortcutAction): Promise<string | null>;
+  restore?(action: ShortcutAction): Promise<GlobalShortcut>;
+  record?(action: ShortcutAction, onHint?: (hint: RecordHint) => void): Promise<string | null>;
 }
 
 /** The host's global shortcuts and the headset, following what it reports; null where it has none. An app with only the
@@ -89,9 +90,10 @@ function useGlobal(): Global | null {
   if (bridge) return {
     status, actions: ["holdToTalk", "mute", "oneTurn"],
     set: async (action, accelerator) => { const value = await bridge.set(action, accelerator); merge(action, value); return value; },
+    restore: bridge.restore ? async (action) => { const value = await bridge.restore!(action); merge(action, value); return value; } : undefined,
     request: bridge.request ? async () => { const next = await bridge.request!(status?.permission?.kind ?? "inputMonitoring"); setStatus(next); } : undefined,
     setHeadset: bridge.setHeadset ? async (partial) => { const next = await bridge.setHeadset!(partial); setStatus(next); } : undefined,
-    record: bridge.record ? (action) => bridge.record!(action) : undefined,
+    record: bridge.record ? (action, onHint) => bridge.record!(action, onHint) : undefined,
   };
   return {
     status, actions: ["mute"],
@@ -105,8 +107,8 @@ function useWords(t: Translate): Words {
 }
 
 /** What the system's own mute shortcut is by default: ⌃⌥M on a Mac, Ctrl+Alt+Shift+M elsewhere (Ctrl+Shift+M is Teams' and
- *  Discord's, and Ctrl+Alt+letter is AltGr on many layouts). The app owns the default it registers; this is the one the
- *  Default button restores. */
+ *  Discord's, and Ctrl+Alt+letter is AltGr on many layouts). The app owns the default it registers and reports it
+ *  (`GlobalShortcut.default`); this is the one an older app, which reports none, is taken to have. */
 export function defaultGlobalMute(mac: boolean) {
   return mac ? "Ctrl+Alt+M" : "Ctrl+Alt+Shift+M";
 }
@@ -147,7 +149,7 @@ function GlobalGroup({ t, global, words }: { t: Translate; global: Global; words
   const value = (action: ShortcutAction) => status?.shortcuts[action] ?? EMPTY_SHORTCUT;
   const tip = rich(t("settings.shortcuts.tip", { combo: "{combo}", single: "{single}" }), {
     combo: <Caps keys={words.mac ? ["⌃", "⌥", "M"] : ["Ctrl", "Alt", "M"]} />,
-    single: <Caps keys={[words.mac ? "Fn" : "F13"]} />,
+    single: <Caps keys={[words.mac ? "Fn" : "F9"]} />,
   });
   const reads = (accelerator: string) => { const read = readAccelerator(accelerator, words); return read.combo; };
   const clashOf = (action: ShortcutAction): Clash | null => {
@@ -157,6 +159,11 @@ function GlobalGroup({ t, global, words }: { t: Translate; global: Global; words
     const used = (alternative: string) => rows.some((other) => sameAccelerator(value(other.action).accelerator, alternative));
     const alternative = shortcut.alternatives.find((candidate) => !used(candidate) && !sameAccelerator(candidate, accelerator)) ?? null;
     const keys = reads(accelerator);
+    if (shortcut.state === "refused" && shortcut.refusal?.reason === "duplicate") {
+      const holding = shortcut.refusal.action;
+      const holder = ACTIONS.find((entry) => entry.action === holding);
+      if (holder) return { message: t("settings.shortcuts.clashUsed", { action: t(holder.label) }), alternative };
+    }
     if (shortcut.state === "refused") return { message: shortcut.conflictWith ? t("settings.shortcuts.clashTakenBy", { keys, app: shortcut.conflictWith }) : t("settings.shortcuts.clashTaken", { keys }), alternative };
     if (shortcut.state === "unavailable") return { message: t("settings.shortcuts.clashUnavailable", { keys }), alternative: null };
     const other = rows.find((entry) => entry.action !== action && sameAccelerator(value(entry.action).accelerator, accelerator));
@@ -195,7 +202,12 @@ function GlobalRow({ t, global, words, entry, shortcut, clash }: { t: Translate;
   const read = accelerator ? readAccelerator(accelerator, words) : null;
   const combo = accelerator ? (!read!.single && shortcut.label ? shortcut.label : read!.combo) : null;
   const how = read?.trigger ? t(`settings.shortcuts.trigger${read.trigger[0].toUpperCase()}${read.trigger.slice(1)}` as MessageKey) : undefined;
-  const fallback = defaultGlobalMute(words.mac);
+  // The default the host reports; an older host reports none, and has only the mute one.
+  const defaultKeys = shortcut.default !== undefined ? shortcut.default : action === "mute" ? defaultGlobalMute(words.mac) : null;
+  const onDefault = shortcut.isDefault !== undefined ? shortcut.isDefault : defaultKeys === null || sameAccelerator(accelerator, defaultKeys);
+  const [hint, setHint] = useState<string | null>(null);
+  const hintOf = (hint: RecordHint) => t(hint === "leftModifier" ? "settings.shortcuts.hintLeftModifier" : "settings.shortcuts.hintLoneModifier");
+  const failure = (failed: unknown) => (failed as { key?: string } | null)?.key === "record_timeout" ? t("settings.shortcuts.recordTimeout") : t("settings.shortcuts.recordFailed");
   /** Sets it; the reason it could not be, or null. */
   const apply = async (next: string | null): Promise<string | null> => {
     try { await global.set(action, next); setError(null); return null; }
@@ -216,21 +228,28 @@ function GlobalRow({ t, global, words, entry, shortcut, clash }: { t: Translate;
     if (!refused) setRecording(false);
     return refused;
   };
+  // The page hears no modifier or Fn on its own where the app does not record for it: it waits for a real key and says why.
   useShortcutRecorder(recording && !native, {
-    singles: entry.singles, onCaptured, onRefused: setError,
-    onCancel: () => { setRecording(false); setError(null); },
-    onClear: () => { setRecording(false); setError(null); void apply(null).then(setError); },
+    singles: [], onCaptured, onRefused: setError, onLoneIgnored: () => setHint(hintOf("loneModifier")),
+    onCancel: () => { setRecording(false); setError(null); setHint(null); },
+    onClear: () => { setRecording(false); setError(null); setHint(null); void apply(null).then(setError); },
   });
   const toggle = () => {
     setError(null);
+    setHint(null);
     if (!native) { setRecording(!recording); return; }
     if (recording) return;
     setRecording(true);
-    // The app captures the next key itself, Fn included: null is Esc.
-    void global.record!(action).then(async (next) => {
+    // The app captures the next key itself, Fn included: null is Esc. A rejection is shown, the timeout as such.
+    void global.record!(action, (heard) => setHint(hintOf(heard))).then(async (next) => {
       setRecording(false);
+      setHint(null);
       if (next) setError(await apply(next));
-    }).catch(() => setRecording(false));
+    }).catch((failed) => { setRecording(false); setHint(null); setError(failure(failed)); });
+  };
+  const restore = () => {
+    setError(null);
+    void (global.restore ? global.restore(action).then(() => null, () => t("settings.shortcuts.failed")) : apply(defaultKeys)).then(setError);
   };
   const alternative = clash?.alternative ?? null;
   return <div className="shortcut-item">
@@ -238,9 +257,11 @@ function GlobalRow({ t, global, words, entry, shortcut, clash }: { t: Translate;
       <ShortcutField label={t(entry.label)} combo={combo} how={how} recording={recording} recordingText={t("settings.shortcuts.recording")} placeholder={t("settings.shortcuts.record")}
         error={error} errorId={`shortcut-${action}-error`} escLabel={t("settings.shortcuts.escape")}
         onToggle={toggle} clearLabel={t("settings.shortcuts.clear")} onClear={accelerator ? () => { setError(null); void apply(null).then(setError); } : undefined}
-        defaultLabel={t("settings.shortcuts.default")} defaultTitle={t("settings.shortcuts.defaultTitle", { keys: readAccelerator(fallback, words).combo })}
-        onDefault={action === "mute" && !sameAccelerator(accelerator, fallback) ? () => { setError(null); void apply(fallback).then(setError); } : undefined} />
+        restoreLabel={defaultKeys ? t("settings.shortcuts.restore", { keys: readAccelerator(defaultKeys, words).combo }) : undefined}
+        onRestore={!onDefault && defaultKeys ? restore : undefined} />
     </Row>
+    {recording && native && words.mac && <Alert tone="accent" className="shortcut-note">{t("settings.shortcuts.recordFnHint")}</Alert>}
+    {recording && hint && <Alert tone="warning" className="shortcut-note" live>{hint}</Alert>}
     {shortcut.managedBySystem && <p className="shortcut-managed">{t("settings.shortcuts.managed")}</p>}
     {clash && <Alert tone="warning" className="shortcut-note" action={alternative && <Button size="sm" variant="ghost" onClick={() => void apply(alternative).then(setError)}>{t("settings.shortcuts.use", { keys: readAccelerator(alternative, words).combo })}</Button>}>
       {clash.message}
@@ -304,12 +325,12 @@ function InAppGroup({ t, words }: { t: Translate; words: Words }) {
         hint={t(entry.id === "holdToTalk" ? "settings.shortcuts.holdToTalkHint" : "settings.shortcuts.inAppHint")}
         combo={bound ? bindingCombo(bound, modifier, words.space) : null}
         clash={clash ? t("settings.shortcuts.clashUsed", { action: t(clash.label as MessageKey) }) : risk(bound)}
-        defaultKeys={bindingCombo(entry.default, modifier, words.space)} />;
+        defaultKeys={entry.default ? bindingCombo(entry.default, modifier, words.space) : null} />;
     })}
   </Group>;
 }
 
-function InAppRow({ t, words, id, label, hint, combo, clash, defaultKeys }: { t: Translate; words: Words; id: ShortcutId; label: string; hint: string; combo: string | null; clash: string | null; defaultKeys: string }) {
+function InAppRow({ t, words, id, label, hint, combo, clash, defaultKeys }: { t: Translate; words: Words; id: ShortcutId; label: string; hint: string; combo: string | null; clash: string | null; defaultKeys: string | null }) {
   const [recording, setRecording] = useState(false);
   useShortcutRecorder(recording, {
     singles: [],
@@ -323,8 +344,8 @@ function InAppRow({ t, words, id, label, hint, combo, clash, defaultKeys }: { t:
       <ShortcutField label={label} combo={combo} recording={recording} recordingText={t("settings.shortcuts.recordingInApp")} placeholder={t("settings.shortcuts.record")}
         escLabel={t("settings.shortcuts.escape")} onToggle={() => setRecording(!recording)}
         clearLabel={t("settings.shortcuts.clear")} onClear={combo ? () => setBinding(id, null) : undefined}
-        defaultLabel={t("settings.shortcuts.default")} defaultTitle={t("settings.shortcuts.defaultTitle", { keys: defaultKeys })}
-        onDefault={isDefault(id) ? undefined : () => resetBinding(id)} />
+        restoreLabel={defaultKeys ? t("settings.shortcuts.restore", { keys: defaultKeys }) : undefined}
+        onRestore={defaultKeys && !isDefault(id) ? () => resetBinding(id) : undefined} />
     </Row>
     {clash && <Alert tone="warning" className="shortcut-note">{clash}</Alert>}
   </div>;

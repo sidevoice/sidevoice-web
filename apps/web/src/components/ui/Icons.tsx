@@ -6,7 +6,7 @@
  * The exceptions are below: a product's own mark and the logos of other people's products are not
  * generic icons and are drawn here. */
 import {
-  Download, Trash2, Activity, Check, CheckCheck, ChevronDown, ChevronUp, Clock3, Copy, Keyboard, KeyRound,
+  Download, RotateCcw, Trash2, Activity, Check, CheckCheck, ChevronDown, ChevronUp, Clock3, Copy, Keyboard, KeyRound,
   Monitor, Plus, Plug, RefreshCw, SlidersHorizontal, Wrench, X,
   Box, AudioWaveform, ArrowLeft, ArrowRight, RefreshCcwDot, Pencil, Laptop, Server,
   Timer, Link, Unlink, Search, ChevronLeft, ChevronRight, Eye, EyeOff, Sparkle, ShieldCheck, PictureInPicture2, Terminal,
@@ -64,6 +64,8 @@ const HAND = {
 };
 
 // ----- the room
+/** Puts a setting back to what it was before a person chose. */
+export const RestoreIcon = mark(RotateCcw, 12);
 export const ConversationsIcon = drawn(HAND.chats, "0 0 24 24", 16, false, STROKE);
 export const MachinesIcon = mark(Monitor, 16);
 /** This computer, wherever a machine is shown (the setup's choice, Settings › Machines, the recap): a laptop. */
