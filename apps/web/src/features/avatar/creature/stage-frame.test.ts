@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { capCentre, desktopDevice, easeFraming, FRAME_EASE, OPTIC, REST_HEAD, REST_ZK, StageFrame, stageBands, TURN_HEAD, voiceType, type FrameProbe } from "./stage-frame";
+import { capCentre, desktopDevice, easeFraming, FRAME_EASE, OPTIC, StageFrame, stageBands, TURN_HEAD, voiceType, type FrameProbe } from "./stage-frame";
 
 /* The stage's framing (the design reference's fitFrame and capCentre: T21, T24d, T28, T33, T43), on a creature modelled
  * as a camera sees it: `tall` px tall at the nearest step (zk 1), smaller as it steps back (1/zk), its drawn middle
@@ -91,16 +91,19 @@ describe("capCentre", () => {
     }
   });
 
-  test("at rest on a desktop it stands closer (REST_ZK) with less headroom (REST_HEAD), stepping back only as far as the tile needs", () => {
+  test("at rest on a desktop it stands as large as a turn's framing of the same creature with no card, stepping back only as far as the tile needs", () => {
     const { probe, calls } = creature({ tall: 240 });
-    const f = capCentre(probe, 0, 0, vh, ceil, floor, gap, 0, 1118, REST_ZK, REST_HEAD);
-    expect(calls[0][1]).toBe(REST_ZK);
-    expect(f.head).toBeCloseTo((f.low - f.top) * REST_HEAD, 6);
+    const f = capCentre(probe, 0, 0, vh, ceil, floor, gap, 0, 1118);
+    expect(calls[0][1]).toBe(1);
+    expect(f.zk).toBe(1);
+    expect(f.head).toBeCloseTo((f.low - f.top) * TURN_HEAD, 6);
     near((f.top + f.low) / 2, vh * OPTIC);
-    // closer than a turn's framing of the same creature with the agent's card under it
+    // the turn's framing with a card under it that fits is the same size; one that does not fit steps back from it
     const turn = capCentre(creature({ tall: 240 }).probe, 0, 144, vh, ceil, floor, gap, 0, 1118);
-    expect(f.zk).toBeLessThan(turn.zk);
-    expect(f.low - f.top).toBeGreaterThan(turn.low - turn.top);
+    expect(turn.zk).toBe(f.zk);
+    expect(turn.low - turn.top).toBeCloseTo(f.low - f.top, 6);
+    const big = capCentre(creature({ tall: 480 }).probe, 0, 300, vh, ceil, floor, gap, 0, 1118);
+    expect(big.zk).toBeGreaterThan(1);
   });
 });
 
@@ -155,8 +158,9 @@ describe("the channel", () => {
 });
 
 describe("capCentre finds the reference's step with fewer trial renders", () => {
-  /** The reference's search (creator.js capCentre), step by step from zk0. */
-  function scan(probe: FrameProbe, hTop: number, hBot: number, vh: number, ceil: number, floor: number, gap: number, zk0: number, headK: number) {
+  /** The reference's search (creator.js capCentre), step by step from zk 1. */
+  function scan(probe: FrameProbe, hTop: number, hBot: number, vh: number, ceil: number, floor: number, gap: number) {
+    const zk0 = 1, headK = TURN_HEAD;
     const want = vh * OPTIC, mid = (m: { top: number; lowAny: number }) => (m.top + m.lowAny) / 2;
     let best = { zk: zk0, lift: 0, low: 0 }, fits = false;
     for (let zk = zk0; zk <= 3.4001; zk += 0.08) {
@@ -167,12 +171,11 @@ describe("capCentre finds the reference's step with fewer trial renders", () => 
     }
     return { ...best, fits };
   }
-  test.each([[300, 0, 1, TURN_HEAD], [300, 200, 1, TURN_HEAD], [420, 144, 1, TURN_HEAD], [520, 260, 1, TURN_HEAD], [600, 420, 1, TURN_HEAD],
-    [360, 0, REST_ZK, REST_HEAD], [520, 0, REST_ZK, REST_HEAD], [900, 0, REST_ZK, REST_HEAD]])("a creature %d px tall, a card %d px, from zk %d", (tall, card, zk0, headK) => {
+  test.each([[300, 0], [300, 200], [420, 144], [520, 260], [600, 420], [360, 0], [520, 0], [900, 0]])("a creature %d px tall, a card %d px", (tall, card) => {
     for (const vh of [538, 628, 655]) {
       const { floor, ceil, gap } = stageBands(vh, vh === 655);
       const a = creature({ tall, mid0: vh * 0.55 }), b = creature({ tall, mid0: vh * 0.55 });
-      const fast = capCentre(a.probe, 0, card, vh, ceil, floor, gap, 0, 1, zk0, headK), ref = scan(b.probe, 0, card, vh, ceil, floor, gap, zk0, headK);
+      const fast = capCentre(a.probe, 0, card, vh, ceil, floor, gap, 0, 1), ref = scan(b.probe, 0, card, vh, ceil, floor, gap);
       expect(fast.zk).toBeCloseTo(ref.zk, 9);
       if (ref.fits) expect(fast.lift).toBeCloseTo(ref.lift, 6);
       expect(a.calls.length).toBeLessThanOrEqual(b.calls.length);

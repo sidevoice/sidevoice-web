@@ -283,10 +283,10 @@ test.describe("desktop", () => {
     });
   }
 
-  // At rest a desktop's creature stands closer; the first card after it comes in while it steps back: never over it, the
+  // The first card after rest comes in while the framing settles for it (a step back where it needs one): never over it, the
   // gap kept, from the card's first visible frame to the framing settled.
   for (const state of ["speaking", "listening"]) {
-    test(`the first card after rest (${state}) keeps clear of the creature while it steps back for it`, async ({ page }) => {
+    test(`the first card after rest (${state}) keeps clear of the creature while the framing settles for it`, async ({ page }) => {
       // The framing for the turn is solved on the pixels before its card comes (a software GL: seconds), and then watched.
       test.setTimeout(90_000);
       await onStage(page, "light", "idle");

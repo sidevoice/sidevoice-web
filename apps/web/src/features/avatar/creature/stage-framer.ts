@@ -1,5 +1,5 @@
 import { ACTS, type RigCamera, type RigVector, type Stage, type StageItem } from "./rig.js";
-import { capCentre, capCentreSteps, FRAME_EASE, REST_HEAD, REST_ZK, stageBands, type FrameAsk, type FrameMotion, type FrameProbe, type FrameSolved, type Framing, type FrameTarget, type Rows,
+import { capCentre, capCentreSteps, FRAME_EASE, stageBands, type FrameAsk, type FrameMotion, type FrameProbe, type FrameSolved, type Framing, type FrameTarget, type Rows,
   type StageFrame } from "./stage-frame";
 
 /* The creature host's side of the stage's framing (stage-frame.ts): it draws trial framings of the creature into its own
@@ -310,7 +310,7 @@ export class StageFramer {
     return ((1 - new V(0, c.minY, 0).project(cam).y) / 2) * vh;
   }
 
-  /** Solves what the stage asks, if it changed (creator.js fitFrame): at rest on a desktop, closer, with less headroom;
+  /** Solves what the stage asks, if it changed (creator.js fitFrame): at rest on a desktop, as large as a turn's;
    *  for a turn, stepped back as far as its largest card needs. The pixels' answer where it is known (solved now for the
    *  first framing, within FIRST_BUDGET_MS); else at once an estimate from the creature's projected bounds, the pixels'
    *  answer worked out in the page's idle time and taken when it comes. Then says where the cards go. */
@@ -387,7 +387,7 @@ export class StageFramer {
       return queued;
     }
     const { floor, ceil, gap } = stageBands(ask.h, ask.phone), probe = this.probe(v, pose);
-    const steps = rest ? capCentreSteps(probe, 0, 0, ask.h, ceil, floor, gap, 0, ask.w, REST_ZK, REST_HEAD) : this.turnSteps(v, probe, pose, ask.cards!, ask.h, ceil, floor, gap);
+    const steps = rest ? capCentreSteps(probe, 0, 0, ask.h, ceil, floor, gap, 0, ask.w) : this.turnSteps(v, probe, pose, ask.cards!, ask.h, ceil, floor, gap);
     const job: Job = { key, steps, wanted: !!then, done: (t) => { this.solved.set(key, t); if (this.solved.size > 8) this.solved.delete(this.solved.keys().next().value!); then?.(); } };
     if (ahead) this.jobs.push(job); else this.jobs.unshift(job);
     this.run();
@@ -410,7 +410,7 @@ export class StageFramer {
     const { floor, ceil, gap } = stageBands(ask.h, ask.phone);
     const probe: FrameProbe = { rows: (lift, zk) => this.estimate(v, { lift, zk }) ?? { top: 0, low: 0, lowAny: 0 }, slope: (zk) => this.slope(v, zk) };
     void pose;
-    return rest ? capCentre(probe, 0, 0, ask.h, ceil, floor, gap, 0, ask.w, REST_ZK, REST_HEAD)
+    return rest ? capCentre(probe, 0, 0, ask.h, ceil, floor, gap, 0, ask.w)
       : capCentre(probe, Math.max(0, ask.cards!.above), ask.cards!.below, ask.h, ceil, floor, gap, ask.cards!.xa, ask.cards!.xb);
   }
 

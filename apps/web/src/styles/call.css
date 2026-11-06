@@ -99,8 +99,8 @@
 .stage-tile[data-mood=offline] .stage-agent { opacity:0 }
 /* Offline the agent is not shown (the poster is up): nothing in it runs unseen (its rig draws nothing either). */
 .stage-tile[data-mood=offline] .stage-agent, .stage-tile[data-mood=offline] .stage-agent * { animation:none !important }
-/* Where it stands and how large is the stage's framing (creature/stage-frame.ts: the optical centre, closer at rest on a
-   desktop, stepping back for a turn's card), eased by its camera: the box itself never scales or moves (the reference has
+/* Where it stands and how large is the stage's framing (creature/stage-frame.ts: the optical centre, the same size at rest and in a
+   turn, stepping back only for a card that needs it), eased by its camera: the box itself never scales or moves (the reference has
    no idle scale; scaled, the box also skewed the area its eyes follow the pointer over). */
 /* The creatures and their scene stay still (web#272): WebKit repaints a moving SVG on the CPU every frame, so an idle
    room with a few conversations kept the app's GPU process and page busy and the fans on (desktop#149). The state
