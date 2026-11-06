@@ -249,6 +249,8 @@ export function placeFigure(stage: RigStage, c: Creature3D, aspect: number, { gr
 // holds the drawings still there).
 const lives = new Set<LiveCreature>();
 const governor = new Governor();
+// What a step costs is judged on the pixels the stage draws at each rung: the biggest scene on the page (sceneSize, as it fits).
+governor.measureBy((scale) => { let most = 0; for (const live of lives) most = Math.max(most, live.areaAt(scale)); return most; });
 /** Whether the governor has been started (on the first frame of motion: the first frames, which compile programs, are not judged). */
 let judging = false;
 /** For diagnostics and tests: the creature's quality rung now, or fixed at one (null: judged again). */
@@ -364,8 +366,8 @@ export class LiveCreature {
     this.slot = slotOf(opts);
     const face = opts.framing === "face";
     this.item = stage.add(rigSpec(opts.choice ?? creatureFromSeed(opts.seed)), opts.canvas, face ? { ...FACE, off: 0 } : { turn: 0, off: 0 });
+    this.moving = opts.moving ?? true; // (before the first fit: a held creature is sized at a phone's pixels)
     this.fit();
-    this.moving = opts.moving ?? true;
     if (opts.frame && !face) {
       this.framer = new StageFramer({ stage, item: this.item, canvas: opts.canvas, poke: () => this.poke(),
         render: (zoom, lookY, state, into) => { const shown = this.item.canvas; this.item.canvas = into; try { this.draw(nowS(), true, { zoom, lookY, state }); } finally { this.item.canvas = shown; } },
@@ -397,9 +399,10 @@ export class LiveCreature {
     wake();
   }
 
-  /** Whether the stage this scene is drawn for is a desktop's: its framing (the stage's ask, the layout's phone rule) says it is
-   *  not a phone. A scene with no framing, or not asked yet, is held to the phone's ceilings. */
-  private desktop(): boolean { return this.opts.frame?.request?.phone === false; }
+  /** Whether this scene is drawn at a desktop's ceilings: its stage's framing says the device is a desktop (a fine pointer or the
+   *  desktop app, never a handset in any orientation: FrameAsk.desktop) and it is drawn moving. A scene with no framing, not asked
+   *  yet, held still (reduced motion, a renderer with no GPU: one draw, at the floor's size) or a handset's keeps the phone's. */
+  private desktop(): boolean { return this.moving && this.opts.frame?.request?.desktop === true; }
 
   /** The canvas takes its box's shape, so nothing is stretched, and as many pixels as the box shows (quality.ts sceneSize, at
    *  the governor's scale), up to the creator's 960 px tall. `measure`: the box is read again (a layout), else it is as last read. */
@@ -566,7 +569,12 @@ export class LiveCreature {
   }
 
   /** Moving, or holding still in its key pose (reduced motion, no GPU). */
-  setMoving(moving: boolean) { if (moving !== this.moving) { this.moving = moving; this.framer?.hold(!moving); this.poke(); } }
+  setMoving(moving: boolean) {
+    if (moving === this.moving) return;
+    this.moving = moving; this.framer?.hold(!moving);
+    if (this.fit(false)) this.framer?.invalidate(); // (a held creature is drawn at a phone's pixels: desktop())
+    this.poke();
+  }
 
   /** The governor moved to another rung: a creature in motion has this canvas sized to it by its next frame (in the task that
    *  draws it, so it is never shown cleared), and drawn then. One held still (reduced motion, a key pose) is left as it is: it
@@ -583,6 +591,13 @@ export class LiveCreature {
   private active(): boolean {
     const M = MODES[this.mood];
     return !M.poster && (!!this.ix.gaze || this.ix.w > 0 || !!this.react || this.moving || this.easing);
+  }
+
+  /** The pixels its scene is drawn with at `scale` of the full size (0: not a scene). */
+  areaAt(scale: number): number {
+    if (this.slot !== "scene") return 0;
+    const { width, height } = sceneSize(this.css.w, this.css.h, globalThis.devicePixelRatio || 1, scale, this.desktop());
+    return width * height;
   }
 
   /** Its frames are motion (it moves, and is not the poster), so the governor judges what they cost. */

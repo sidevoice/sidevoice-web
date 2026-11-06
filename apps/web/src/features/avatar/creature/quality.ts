@@ -87,6 +87,7 @@ export class Governor {
   private calmFrom = -Infinity;
   private upAt = -Infinity;
   private pinned: number | null = null;
+  private area: ((scale: number) => number) | null = null;
 
   constructor(private tiers: readonly Tier[] = TIERS, private budget = BUDGET_MS) {}
 
@@ -94,9 +95,19 @@ export class Governor {
   get scale(): number { return this.tiers[this.tier].scale; }
   /** What a frame may cost on rung `index` (ms): the budget's share of the thread, at that rung's rate. */
   private limit(index: number): number { return this.budget * 30 / this.tiers[index].fps; }
-  /** By how much a frame is expected to cost more on rung `index` than on the one below it: the pixels it fills, which go with the
-   *  square of the scale (a frame's other costs do not, so this is the high estimate: a step up it allows is one that holds). */
-  private growth(index: number): number { const r = this.tiers[index].scale / this.tiers[index + 1].scale; return r * r; }
+  /** The pixels the scene is drawn with at a scale (what sceneSize makes of the tile there): where known, the cost of a step is
+   *  judged on them, whatever way the ceilings bend between rungs. */
+  measureBy(area: ((scale: number) => number) | null) { this.area = area; }
+  /** By how much a frame is expected to cost more on rung `index` than on the one below it: the pixels it fills (the real ones,
+   *  or where they are not known the square of the scale); a frame's other costs do not grow with them, so this is the high
+   *  estimate: a step up it allows is one that holds). */
+  private growth(index: number): number {
+    const up = this.tiers[index].scale, down = this.tiers[index + 1].scale;
+    const a = this.area?.(up), b = this.area?.(down);
+    if (a && b && a >= b) return a / b;
+    const r = up / down;
+    return r * r;
+  }
   /** The frames' spacing now (ms). On the last rung, a frame that still costs more than a sixth of the thread's time is spaced
    *  out until it does not (to 500 ms): a renderer with no GPU gets a slow creature, not a frozen page. */
   get every(): number {

@@ -136,9 +136,19 @@ export interface FrameCards { below: number; above: number; xa: number; xb: numb
  *  top left corner, css px from the tile's inner top left: the scene it is drawn in may overhang the tile's border),
  *  whether it is a phone, whether nothing is said (a desktop at rest stands closer), and the cards measured (none yet:
  *  the turn's framing waits for them). Everything the stage reads back is in the tile's inner px too. */
-export interface FrameAsk { w: number; h: number; dx: number; dy: number; phone: boolean; rest: boolean; cards: FrameCards | null;
+export interface FrameAsk { w: number; h: number; dx: number; dy: number; phone: boolean;
+  /** Whether the device is a desktop's (a fine pointer, or the desktop app's window), not a handset: a phone on its side asks
+   *  `phone: false` (its framing has no landscape) but is not a desktop, and keeps a phone's fill. */
+  desktop: boolean; rest: boolean; cards: FrameCards | null;
   /** Whose turn the agent's state says it is (the pose a turn opened by it is fitted on); null: none (a card up while it works). */
   opener: "listening" | "speaking" | null }
+
+/** Whether the device is a desktop's, for what the creature is drawn with (FrameAsk.desktop): never a handset (the layout's phone
+ *  rule, in whatever orientation), and a fine pointer or the desktop app's own window. A touch screen too wide for the phone rule
+ *  (a phone's landscape past 900 px) is neither, so it keeps a phone's fill. */
+export function desktopDevice({ handset, finePointer, app }: { handset: boolean; finePointer: boolean; app: boolean }): boolean {
+  return !handset && (finePointer || app);
+}
 
 /** What the stage reads back: the framing's target, where it puts the cards (`below`: the top of a card under the
  *  creature), and where the creature's feet are drawn now (eased), css px from the tile's top. */
@@ -170,7 +180,7 @@ export class StageFrame {
   /** The stage's ask, from the DOM side; the host is told when it changed. */
   ask(next: FrameAsk) {
     const was = this.asked;
-    if (was && was.w === next.w && was.h === next.h && was.dx === next.dx && was.dy === next.dy && was.phone === next.phone && was.rest === next.rest
+    if (was && was.w === next.w && was.h === next.h && was.dx === next.dx && was.dy === next.dy && was.phone === next.phone && was.desktop === next.desktop && was.rest === next.rest
       && was.opener === next.opener && sameCards(was.cards, next.cards)) return;
     this.asked = next;
     for (const fn of this.onAsk) fn();

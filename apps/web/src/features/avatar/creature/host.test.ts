@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import type { StageFrame } from "./stage-frame";
+import { StageFrame } from "./stage-frame";
 
 /* Where WebGL is missing, refused or taken away, the host says so (creaturesDrawable, onCreaturesChange) instead of
  * leaving canvases empty for the rest of the page's life. It tries again on a later mount, and when a lost context comes
@@ -48,6 +48,9 @@ vi.mock("./rig.js", () => {
   }
   return { Stage, ACTS: {} };
 });
+// The framer solves a framing on the pixels it renders (a 2D readback this DOM does not have): here it answers nothing, and the
+// host's own part of the stage's ask (its pixels) is what is tested.
+vi.mock("./stage-framer", () => ({ StageFramer: class { hold() {} invalidate() {} step() { return null; } dispose() {} } }));
 vi.mock("./accessories.js", () => ({}));
 vi.mock("./acts.js", () => ({}));
 
@@ -291,20 +294,59 @@ test("the stage's canvas holds the pixels its tile shows (the pixel ratio to 2, 
   expect([scene.w, scene.h]).toEqual([1118, 628]);
 });
 
-test("a stage whose framing says it is a desktop's is drawn at the screen's pixels past the phone's 900 k; a phone's, or none, keeps it", () => {
+/** A framing that has been asked, as the stage asks it. */
+const asked = (ask: Partial<{ phone: boolean; desktop: boolean }>) => { const frame = new StageFrame(); frame.ask({ w: 1598, h: 876, dx: 0, dy: 0, phone: false, desktop: false, rest: true, cards: null, opener: null, ...ask }); return frame; };
+
+test("a moving stage whose framing says it is a desktop's is drawn at the screen's pixels past the phone's 900 k; a phone's, or none, keeps it", () => {
   webgl();
   vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(2);
-  // (a framing that has been asked as a desktop's: the framer's solves need pixels this DOM has none of, so none is asked of it here)
-  const asked = (phone: boolean) => ({ request: { w: 1598, h: 876, dx: 0, dy: 0, phone, rest: true, cards: null, opener: null }, listen: () => () => {}, feet() {}, motion() {} }) as unknown as StageFrame;
   const desk = tile(1598, 876);
-  mount({ ...onStage, canvas: desk, frame: asked(false) });
+  mount({ ...onStage, moving: true, canvas: desk, frame: asked({ desktop: true }) });
   expect([desk.width, desk.height]).toEqual([3196, 1752]); // 2 device px to a css px
   const phone = tile(1598, 876);
-  mount({ ...onStage, canvas: phone, frame: asked(true) });
+  mount({ ...onStage, moving: true, canvas: phone, frame: asked({ phone: true }) });
   expect([phone.width, phone.height]).toEqual([1281, 702]);
   const none = tile(1598, 876);
-  mount({ ...onStage, canvas: none });
+  mount({ ...onStage, moving: true, canvas: none });
   expect([none.width, none.height]).toEqual([1281, 702]);
+});
+
+test("a phone on its side (the framing asks phone: false, the device is no desktop) keeps the phone's 900 k at any pixel ratio", () => {
+  webgl();
+  vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(2);
+  const side = tile(844, 390);
+  mount({ ...onStage, moving: true, canvas: side, frame: asked({ phone: false, desktop: false }) });
+  expect(side.width * side.height).toBeLessThanOrEqual(900_000);
+  expect([side.width, side.height]).toEqual([1394, 644]); // (not the 1688 x 780 the desktop's ceilings would give)
+});
+
+test("a held-still stage (reduced motion, no GPU) is drawn once at the phone's pixels, and at the desktop's when it moves", () => {
+  webgl();
+  vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(2);
+  const element = tile(1598, 876);
+  const live = mount({ ...onStage, moving: false, canvas: element, frame: asked({ desktop: true }) })!;
+  expect([element.width, element.height]).toEqual([1281, 702]);
+  live.setMoving(true);
+  expect([element.width, element.height]).toEqual([3196, 1752]);
+  live.setMoving(false);
+  expect([element.width, element.height]).toEqual([1281, 702]);
+});
+
+test("the scene's ceilings follow what the stage asks, as it asks", () => {
+  webgl();
+  {
+    vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(2);
+    const element = tile(1598, 876);
+    const frame = new StageFrame();
+    mount({ ...onStage, moving: true, canvas: element, frame });
+    expect([element.width, element.height]).toEqual([1281, 702]); // not asked yet: the phone's ceilings
+    frame.ask({ w: 1598, h: 876, dx: 0, dy: 0, phone: false, desktop: true, rest: true, cards: null, opener: null });
+    expect([element.width, element.height]).toEqual([3196, 1752]);
+    frame.ask({ w: 1598, h: 876, dx: 0, dy: 0, phone: false, desktop: false, rest: true, cards: null, opener: null }); // turned on its side
+    expect([element.width, element.height]).toEqual([1281, 702]);
+    frame.ask({ w: 1598, h: 876, dx: 0, dy: 0, phone: false, desktop: true, rest: true, cards: null, opener: null });
+    expect([element.width, element.height]).toEqual([3196, 1752]);
+  }
 });
 
 test("when the governor steps down, the canvas takes fewer pixels in the very task that draws it, so it is never shown cleared", () => {

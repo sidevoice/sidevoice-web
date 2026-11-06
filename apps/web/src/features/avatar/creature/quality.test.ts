@@ -86,6 +86,36 @@ describe("sceneSize on a desktop stage: the screen's own pixels, up to a 4K fram
   });
 });
 
+describe("a desktop's rungs: the areas, and what the governor makes of them", () => {
+  const areas = (w: number, h: number) => TIERS.map((t) => { const s = sceneSize(w, h, 2, t.scale, true); return s.width * s.height; });
+  it("pins what each rung draws at 1598 x 876 (a 1920 x 1080 window) at pixel ratio 2", () => {
+    expect(areas(1598, 876)).toEqual([5_599_392, 3_159_716, 1_208_790, 429_225, 429_225, 224_640, 224_640]);
+  });
+  /** The rate's own cost: a frame costs this many ms a million pixels (a stand-in for a GPU's fill). */
+  const climb = (g: Governor, msPerMpx: number, seconds: number) => {
+    let at = 0, moves = 0;
+    g.start(2, at);
+    for (let i = 0; i < seconds * 30; i++, at += 1000 / 30) {
+      const area = areas(1598, 876)[g.tier];
+      if (g.observe(at, msPerMpx * area / 1e6, g.every)) moves++;
+    }
+    return { moves, tier: g.tier };
+  };
+  it("does not step up to a rung whose real area (not its scale squared) would not hold, so it does not oscillate", () => {
+    // 3 ms a million px: rung 2 (1.2 M px) costs 3.6 ms and holds; rung 1 (3.2 M px) costs 9.5 ms and does not.
+    const g = new Governor();
+    g.measureBy((scale) => { const s = sceneSize(1598, 876, 2, scale, true); return s.width * s.height; });
+    expect(climb(g, 3, 600)).toEqual({ moves: 0, tier: 2 });
+    // (the estimate by the scale alone, 1.39 for that step, tried it and failed, again after every back-off)
+    expect(climb(new Governor(), 3, 600).moves).toBeGreaterThan(2);
+  });
+  it("still steps up where the real areas leave room", () => {
+    const g = new Governor();
+    g.measureBy((scale) => { const s = sceneSize(1598, 876, 2, scale, true); return s.width * s.height; });
+    expect(climb(g, 0.5, 600).tier).toBe(0); // rung 0 (5.6 M px) costs 2.8 ms
+  });
+});
+
 /** Feeds `frames` frames of `took` ms, `gap` ms apart, from `at`; returns the time after and the rungs it moved to. */
 function run(g: Governor, at: number, frames: number, took: number, gap = 1000 / 30) {
   const moves: number[] = [];
