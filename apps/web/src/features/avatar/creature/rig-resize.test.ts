@@ -1,8 +1,9 @@
 import { expect, it, vi } from "vitest";
 
-/* A trial framing is drawn into a smaller canvas (a pixel to the css px) of nearly the visible canvas's shape: its sides are
- * whole pixels, so its aspect is off by up to a pixel's worth. That must not resize the stage's renderer (the big backing store)
- * to the trial's shape and back: only a canvas of another shape does. The real Stage runs, with a renderer that draws nothing. */
+/* The scene host builds its Stage fixed (host.ts MAKE): it sizes the renderer itself (setRenderSize, from the canvas it shows, sizeStage)
+ * and then draws. A trial framing is drawn into a smaller canvas (a pixel to the css px) that may be of nearly the visible canvas's
+ * shape or of any other: draw() must never resize the stage's renderer (the big backing store) to a trial's shape and back; only
+ * setRenderSize, with the visible canvas, does. The real Stage runs, with a renderer that draws nothing. */
 
 const sizes: Array<[number, number]> = [];
 vi.mock("three", async (importOriginal) => {
@@ -27,19 +28,21 @@ HTMLCanvasElement.prototype.getContext = (() => context()) as never;
 
 const canvas = (w: number, h: number) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
 
-it("a trial canvas a pixel off the visible shape draws without resizing the renderer; another shape does", () => {
-  const stage = new Stage("paint", 768);
+it("a fixed stage is sized by the host from the canvas it shows, and a trial canvas of any shape draws without resizing it", () => {
+  const stage = new Stage("paint", 768, "wide", { fixed: true }); // as the scene host makes it
   const shown = canvas(3196, 1752), item = stage.add({ body: "blob", state: "idle" }, shown, { turn: 0, off: 0 });
   stage.camera.aspect = 3196 / 1752;
-  stage.setRenderSize(3196, 1752);
   sizes.length = 0;
-  for (const [w, h] of [[1598, 876], [1597, 876], [1598, 877], [959, 526], [958, 525]]) {
+  stage.setRenderSize(shown.width, shown.height); // the host's sizeStage
+  expect(sizes).toEqual([[3196, 1752]]);
+  sizes.length = 0;
+  for (const [w, h] of [[1598, 876], [1597, 876], [1598, 877], [959, 526], [958, 525], [1000, 1000]]) {
     item.canvas = canvas(w, h);
-    stage.camera.aspect = 3196 / 1752;
     stage.draw(item, 0, 0, true);
   }
+  expect(sizes).toEqual([]); // not even for a canvas of another shape
+  stage.setRenderSize(shown.width, shown.height); // the same canvas: nothing to do
   expect(sizes).toEqual([]);
-  item.canvas = canvas(1000, 1000); // a canvas of another shape: the renderer follows it
-  stage.draw(item, 0, 0, true);
-  expect(sizes).toHaveLength(1);
+  stage.setRenderSize(1118, 628); // the visible canvas changed
+  expect(sizes).toEqual([[1118, 628]]);
 });

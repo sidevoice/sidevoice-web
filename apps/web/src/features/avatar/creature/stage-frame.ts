@@ -139,10 +139,12 @@ export interface FrameAsk { w: number; h: number; dx: number; dy: number; phone:
   opener: "listening" | "speaking" | null }
 
 /** Whether the device is a desktop's, for what the creature is drawn with (FrameAsk.desktop): never a handset (the layout's phone
- *  rule, in whatever orientation), and a fine pointer or the desktop app's own window. A touch screen too wide for the phone rule
- *  (a phone's landscape past 900 px) is neither, so it keeps a phone's fill. */
-export function desktopDevice({ handset, finePointer, app }: { handset: boolean; finePointer: boolean; app: boolean }): boolean {
-  return !handset && (finePointer || app);
+ *  rule, in whatever orientation), and the desktop app's own window, or a fine pointer with no coarse one present anywhere
+ *  (`anyCoarse`: any-pointer: coarse). A phone with a mouse matches (pointer: fine) but has a touch screen, so it is not a desktop;
+ *  neither is a touch laptop in a browser (it keeps the phone's fill, and the Governor judges it from there). A touch screen too
+ *  wide for the phone rule (a phone's landscape past 900 px) is neither, so it keeps a phone's fill. */
+export function desktopDevice({ handset, finePointer, anyCoarse, app }: { handset: boolean; finePointer: boolean; anyCoarse: boolean; app: boolean }): boolean {
+  return !handset && (app || (finePointer && !anyCoarse));
 }
 
 /** What the stage reads back: the framing's target, where it puts the cards (`below`: the top of a card under the

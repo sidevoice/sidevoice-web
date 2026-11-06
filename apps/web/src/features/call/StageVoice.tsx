@@ -89,6 +89,7 @@ export function StageVoice({ frame, turn, phone, onGround, children }: { frame: 
   // A desktop is a fine pointer, or the desktop app's own window (the tile's data-app): never a handset, in any orientation,
   // nor a touch screen too wide for the layout's phone rule. The framing says so (FrameAsk.desktop); the creature's pixels follow it.
   const fine = useMedia("(pointer: fine)");
+  const anyCoarse = useMedia("(any-pointer: coarse)");
   // Each card at its largest (the agent's: always three lines; the person's pill; what was sent, three lines), measured on
   // the tile with its type, again once the stage's face (DM Sans) has loaded (measured in a fallback face, the framing left
   // too little room and a card could sit on the creature: T33).
@@ -120,9 +121,9 @@ export function StageVoice({ frame, turn, phone, onGround, children }: { frame: 
 
   const rest = !turn && !up;
   useLayoutEffect(() => {
-    const desktop = desktopDevice({ handset, finePointer: fine, app: !!layer.current?.closest(".stage-tile[data-app]") });
+    const desktop = desktopDevice({ handset, finePointer: fine, anyCoarse, app: !!layer.current?.closest(".stage-tile[data-app]") });
     if (size) frame.ask({ w: size.w, h: size.h, dx: size.dx, dy: size.dy, phone, desktop, rest, cards: cards && { below: cards.below, above: cards.above, xa: cards.xa, xb: cards.xb }, opener: turn });
-  }, [frame, size, phone, handset, fine, rest, cards, turn]);
+  }, [frame, size, phone, handset, fine, anyCoarse, rest, cards, turn]);
 
   const { solved, pending } = useSyncExternalStore(frame.subscribe, frame.snapshot);
   // Under the creature, a gap below its lowest drawn row, and nowhere else: a card that cannot be there and inside the tile

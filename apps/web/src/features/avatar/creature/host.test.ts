@@ -408,6 +408,29 @@ test("a retier resizes and redraws only the creatures in motion: one held still 
   expect(drawnInto).toEqual([movingCanvas, heldCanvas]);
 });
 
+test("the governor's step estimate sums the scenes drawn in a frame, and counts none that is held still", () => {
+  webgl();
+  vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(1);
+  const stage = mount({ ...onStage, canvas: tile(600, 400), moving: true })!;
+  const alone = host.drawnFill(1);
+  expect(alone).toBe(stage.areaAt(1));
+  expect(alone).toBeGreaterThan(0);
+  // A second scene drawn in the same frame (a picture-in-picture, the floating card): the frame fills both, at both rungs.
+  const pip = mount({ ...onStage, canvas: tile(300, 200), moving: true })!;
+  expect(host.drawnFill(1)).toBe(stage.areaAt(1) + pip.areaAt(1));
+  expect(host.drawnFill(0.6)).toBe(stage.areaAt(0.6) + pip.areaAt(0.6));
+  expect(host.drawnFill(0.6)).toBeGreaterThan(Math.max(stage.areaAt(0.6), pip.areaAt(0.6)));
+  // A large scene held still is not drawn: it adds nothing (the largest alone skewed the estimate).
+  const held = mount({ ...onStage, canvas: tile(1600, 900), moving: false })!;
+  expect(held.areaAt(1)).toBeGreaterThan(stage.areaAt(1));
+  expect(host.drawnFill(1)).toBe(stage.areaAt(1) + pip.areaAt(1));
+  held.setMoving(true);
+  expect(host.drawnFill(1)).toBe(stage.areaAt(1) + pip.areaAt(1) + held.areaAt(1));
+  held.setMoving(false);
+  pip.dispose();
+  expect(host.drawnFill(1)).toBe(stage.areaAt(1));
+});
+
 test("only a creature that moves is judged by the governor: held still, or the poster, its frames are not motion", () => {
   webgl();
   expect(mount({ ...onStage, canvas: tile(364, 655), moving: false })!.animates()).toBe(false);
