@@ -125,3 +125,5 @@
 }
 /* The address's disclosure and, beside it, when it is worth using. */
 .pairing-address-head { display: inline-flex; align-items: center; gap: var(--sv-space-1); justify-self: start; max-width: 100%; margin-top: calc(-1 * var(--sv-space-2)); }
+/* On touch a field is 16px (`ui.css`), or iOS zooms in on it; this one's own size is more specific than that rule. */
+@media (any-pointer: coarse) { .ui-textarea.pairing-code { font-size: max(1rem, calc(1rem * var(--sv-text-scale, 1))); } }

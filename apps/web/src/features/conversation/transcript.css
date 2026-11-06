@@ -265,7 +265,7 @@
 .text-composer .composer-field .ui-textarea::placeholder { color: var(--tr-field-ink); }
 /* A touch screen keeps the field's text at 16px (ui.css), or Safari zooms the page in as it is focused: the field stays
  * 44px tall all the same. */
-@media (pointer: coarse) { .text-composer .composer-field .ui-textarea { padding-block: 4.64px; font-size: max(16px, calc(16px * var(--sv-text-scale, 1))); } }
+@media (any-pointer: coarse) { .text-composer .composer-field .ui-textarea { padding-block: 4.64px; font-size: max(16px, calc(16px * var(--sv-text-scale, 1))); } }
 .text-composer .composer-field .ui-textarea:focus, .text-composer .composer-field .ui-textarea:focus-visible { outline: none; }
 .text-composer .composer-field .ui-textarea:disabled { background: transparent; }
 .text-composer .composer-send { flex: none; align-self: flex-end; width: 32px; height: 32px; border-radius: 50%; background: var(--sv-accent); color: var(--sv-on-accent); }

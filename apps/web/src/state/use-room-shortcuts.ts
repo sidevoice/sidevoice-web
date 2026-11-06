@@ -12,6 +12,7 @@ export function useRoomShortcuts() {
   useEffect(() => {
     const act: Record<Exclude<ShortcutId, "holdToTalk">, () => void> = {
       mute: () => window.sidevoiceActions?.toggleMic(),
+      oneTurn: () => window.sidevoiceActions?.oneTurn?.(),
       skip: () => window.sidevoiceActions?.skipReply(),
     };
     const press = (event: KeyboardEvent) => {

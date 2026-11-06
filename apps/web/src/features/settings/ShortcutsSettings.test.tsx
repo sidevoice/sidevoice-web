@@ -2,8 +2,8 @@ import { afterEach, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, renderHook, screen, within } from "@testing-library/react";
 import { KEYBOARD_QUERY, ShortcutsSettings, bindingOf, defaultGlobalMute, useShortcutsSection } from "./ShortcutsSettings";
 import { translator } from "../../i18n/translator";
-import { SHORTCUTS, binding, resetBinding } from "../../state/shortcuts";
-import type { GlobalShortcut, ShortcutAction, ShortcutsBridge, ShortcutsStatus } from "../../host";
+import { SHORTCUTS, binding, isDefault, resetBinding } from "../../state/shortcuts";
+import type { GlobalShortcut, RecordHint, ShortcutAction, ShortcutsBridge, ShortcutsStatus } from "../../host";
 
 /* Shortcuts, by where they work: the desktop app's global shortcuts and the headset's buttons, where it offers them; the
  * keys the room answers while it is in front, wherever there is a keyboard. All set in the one field. */
@@ -58,25 +58,47 @@ test("the section shows in the desktop app and where a keyboard is likely, never
   expect(renderHook(() => useShortcutsSection()).result.current).toBe(true);
 });
 
-test("outside the app: only In Sidevoice, three rows with their defaults, nothing to restore", () => {
+test("outside the app: only In Sidevoice, four rows (Say one thing has no key), nothing to restore", () => {
   render(<ShortcutsSettings t={en} />);
   expect(groups()).toEqual(["In Sidevoice"]);
   expect(fieldOf("Hold to talk")).toHaveAccessibleName("Hold to talk: Space");
   expect(fieldOf("Mute or unmute")).toHaveAccessibleName("Mute or unmute: Ctrl+D");
   expect(fieldOf("Skip what is playing")).toHaveAccessibleName("Skip what is playing: Ctrl+S");
-  expect(screen.queryByText("Default")).toBeNull();
+  expect(fieldOf("Say one thing")).toHaveAccessibleName("Say one thing: Record shortcut");
+  expect([...document.querySelectorAll(".ui-row")].map((row) => row.querySelector(".ui-row-label, .ui-row-title")?.textContent).filter(Boolean).slice(0, 4)).toEqual(["Hold to talk", "Mute or unmute", "Say one thing", "Skip what is playing"]);
+  expect(screen.queryByRole("button", { name: /^Restore default/ })).toBeNull();
 });
 
-test("an in-app key is recorded in the field, kept in the table, and Default restores it", () => {
+test("Say one thing in the app: recorded, kept as itself, answered by the room, cleared with the ×, and it never has a ↺", () => {
+  render(<ShortcutsSettings t={en} />);
+  fireEvent.click(fieldOf("Say one thing"));
+  press({ code: "KeyJ", ctrlKey: true, shiftKey: true });
+  expect(binding("oneTurn")).toEqual({ code: "KeyJ", key: "J", shift: true, mod: true });
+  expect(fieldOf("Say one thing")).toHaveAccessibleName("Say one thing: Ctrl+Shift+J");
+  expect(screen.queryByRole("button", { name: /^Restore default/ })).toBeNull();
+  fireEvent.click(within(fieldOf("Say one thing").closest(".ui-row")!).getByRole("button", { name: "Clear" }));
+  expect(binding("oneTurn")).toBeNull();
+});
+
+test("an in-app key is recorded in the field, kept in the table, and ↺ restores the default", () => {
   render(<ShortcutsSettings t={en} />);
   fireEvent.click(fieldOf("Mute or unmute"));
   expect(screen.getByText("Press keys…")).toBeInTheDocument();
   press({ code: "KeyK", ctrlKey: true, shiftKey: true });
   expect(binding("mute")).toEqual({ code: "KeyK", key: "K", shift: true, mod: true });
   expect(fieldOf("Mute or unmute")).toHaveAccessibleName("Mute or unmute: Ctrl+Shift+K");
-  fireEvent.click(screen.getByRole("button", { name: "Default" }));
+  fireEvent.click(screen.getByRole("button", { name: "Restore default: Ctrl+D" }));
   expect(binding("mute")).toMatchObject({ code: "KeyD", mod: true });
-  expect(screen.queryByRole("button", { name: "Default" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /^Restore default/ })).toBeNull();
+});
+
+test("recording the default's own keys is a choice: kept as itself, so ↺ shows until it is restored", () => {
+  render(<ShortcutsSettings t={en} />);
+  fireEvent.click(fieldOf("Mute or unmute"));
+  press({ code: "KeyD", ctrlKey: true });
+  expect(isDefault("mute")).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Restore default: Ctrl+D" }));
+  expect(isDefault("mute")).toBe(true);
 });
 
 test("an in-app key may be a lone key, Esc cancels, the × clears, and recording blocks the room's own keys", () => {
@@ -96,7 +118,7 @@ test("the same combination on two in-app actions is an amber warning naming the 
   render(<ShortcutsSettings t={en} />);
   fireEvent.click(fieldOf("Skip what is playing"));
   press({ code: "KeyD", ctrlKey: true });
-    expect(screen.getByText("Already used for “Mute or unmute” here.")).toBeInTheDocument();
+    expect(screen.getByText("Already used by Mute or unmute.")).toBeInTheDocument();
 });
 
 test("bindingOf: the system's main modifier is the shortcut's mod, any other is literal", () => {
@@ -112,7 +134,7 @@ test("in the app: global shortcuts first, with the tip, then In Sidevoice; Windo
   render(<ShortcutsSettings t={en} />);
   await screen.findByRole("button", { name: "Mute or unmute: Ctrl+Alt+Shift+M" });
   expect(groups()).toEqual(["Anywhere on your computer", "In Sidevoice"]);
-  expect(document.querySelector(".shortcut-tip-note")).toHaveTextContent("A combination like CtrlAltM, or a single key like F13: tap it once or twice.");
+  expect(document.querySelector(".shortcut-tip-note")).toHaveTextContent("A combination like CtrlAltM, or a single key like F9: tap it once or twice.");
   expect(document.querySelector(".shortcut-tip-note b")).toHaveTextContent("tap it once or twice");
   expect(screen.getAllByRole("button", { name: /^Hold to talk:/ })).toHaveLength(2);
   expect(defaultGlobalMute(true)).toBe("Ctrl+Alt+M");
@@ -146,60 +168,46 @@ test("an F-key alone is allowed globally", async () => {
   expect(b.set).toHaveBeenCalledWith("holdToTalk", "F9");
 });
 
-test("a lone modifier tapped is a single key: tap for mute, hold for hold to talk", async () => {
+test("where the page records, a modifier on its own is ignored: recording goes on and an amber note says why", async () => {
   const { bridge: b } = bridge(status());
   inApp({ shortcuts: b });
   render(<ShortcutsSettings t={en} />);
   await screen.findByRole("button", { name: /^Mute or unmute: Ctrl\+Alt/ });
-  fireEvent.click(screen.getAllByRole("button", { name: /^Hold to talk:/ })[0]);
+  const field = screen.getAllByRole("button", { name: /^Hold to talk:/ })[0];
+  fireEvent.click(field);
   fireEvent.keyDown(window, { key: "Alt", code: "AltRight" });
   await act(async () => { fireEvent.keyUp(window, { key: "Alt", code: "AltRight" }); });
-  expect(b.set).toHaveBeenCalledWith("holdToTalk", "RightAlt:hold");
-  fireEvent.click(screen.getAllByRole("button", { name: /^Mute or unmute:/ })[0]);
-  fireEvent.keyDown(window, { key: "Control", code: "ControlRight" });
-  await act(async () => { fireEvent.keyUp(window, { key: "Control", code: "ControlRight" }); });
-  expect(b.set).toHaveBeenCalledWith("mute", "RightControl:tap");
-});
-
-test("two quick taps are a double press where the action allows it", async () => {
-  vi.useFakeTimers();
-  try {
-    const { bridge: b } = bridge(status());
-    inApp({ shortcuts: b });
-    render(<ShortcutsSettings t={en} />);
-    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
-    fireEvent.click(screen.getAllByRole("button", { name: /^Say one thing:/ })[0]);
-    for (let tap = 0; tap < 2; tap++) {
-      fireEvent.keyDown(window, { key: "Alt", code: "AltRight" });
-      fireEvent.keyUp(window, { key: "Alt", code: "AltRight" });
-      await act(async () => { await vi.advanceTimersByTimeAsync(100); });
-    }
-    expect(b.set).toHaveBeenCalledWith("oneTurn", "RightAlt:double");
-  } finally { vi.useRealTimers(); }
+  expect(b.set).not.toHaveBeenCalled();
+  expect(field).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByText(/A key on its own like Right Shift can't be a shortcut on this computer/)).toBeInTheDocument();
+  // A chord that starts with a modifier is not a lone press: no new note, and the combination is taken.
+  await act(async () => { press({ code: "KeyK", ctrlKey: true, altKey: true }); });
+  expect(b.set).toHaveBeenCalledWith("holdToTalk", "Ctrl+Alt+K");
+  expect(screen.queryByText(/A key on its own/)).toBeNull();
 });
 
 test("where the host records natively (Fn included) the field records through it, and null is Esc", async () => {
-  const record = vi.fn<(action: ShortcutAction) => Promise<string | null>>().mockResolvedValueOnce("Fn:hold").mockResolvedValueOnce(null);
+  const record = vi.fn<(action: ShortcutAction, onHint?: (hint: RecordHint) => void) => Promise<string | null>>().mockResolvedValueOnce("Fn:hold").mockResolvedValueOnce(null);
   const { bridge: b } = bridge(status(), { record });
   inApp({ shortcuts: b });
   render(<ShortcutsSettings t={en} />);
   await screen.findByRole("button", { name: /^Mute or unmute: Ctrl\+Alt/ });
   const field = () => screen.getAllByRole("button", { name: /^Hold to talk:/ })[0];
   await act(async () => { fireEvent.click(field()); });
-  expect(record).toHaveBeenCalledWith("holdToTalk");
+  expect(record).toHaveBeenCalledWith("holdToTalk", expect.any(Function));
   expect(b.set).toHaveBeenCalledWith("holdToTalk", "Fn:hold");
   expect(field()).toHaveAccessibleName("Hold to talk: Fn (hold)");
   await act(async () => { fireEvent.click(field()); });
   expect(b.set).toHaveBeenCalledTimes(1);
 });
 
-test("global mute: Default restores the system's default and the × clears it", async () => {
+test("global mute (an older host, which reports no default): ↺ sets the system's default and the × clears it", async () => {
   const { bridge: b } = bridge(status({ mute: global({ accelerator: "Ctrl+Alt+K", label: "Ctrl+Alt+K", state: "on" }) }));
   inApp({ shortcuts: b });
   render(<ShortcutsSettings t={en} />);
   await screen.findByRole("button", { name: "Mute or unmute: Ctrl+Alt+K" });
   const row = screen.getAllByRole("button", { name: /^Mute or unmute:/ })[0].closest(".ui-row") as HTMLElement;
-  await act(async () => { fireEvent.click(within(row).getByRole("button", { name: "Default" })); });
+  await act(async () => { fireEvent.click(within(row).getByRole("button", { name: "Restore default: Ctrl+Alt+Shift+M" })); });
   expect(b.set).toHaveBeenCalledWith("mute", "Ctrl+Alt+Shift+M");
   await act(async () => { fireEvent.click(within(row).getByRole("button", { name: "Clear" })); });
   expect(b.set).toHaveBeenLastCalledWith("mute", null);
@@ -221,7 +229,7 @@ test("two of our actions on one combination, and Ctrl+Alt+letter off a Mac, are 
     holdToTalk: global({ accelerator: "Ctrl+Alt+J", label: "Ctrl+Alt+J", state: "on" }),
   })).bridge });
   render(<ShortcutsSettings t={en} />);
-  expect(await screen.findAllByText(/Already used for/)).toHaveLength(2);
+  expect(await screen.findAllByText(/Already used by/)).toHaveLength(2);
   expect(screen.getAllByText("Ctrl+Alt+J is AltGr+J on many keyboards and may type a character instead.")).toHaveLength(1);
 });
 
@@ -280,7 +288,8 @@ test("an app with only the older mute shortcut shows its mute row alone", async 
   } });
   render(<ShortcutsSettings t={en} />);
   await screen.findByRole("button", { name: "Mute or unmute: ⌃⌥M" });
-  expect(screen.getAllByRole("button", { name: /^(Hold to talk|Say one thing):/ })).toHaveLength(1);
+  // Only the in-app rows are left of the other two.
+  expect(screen.getAllByRole("button", { name: /^(Hold to talk|Say one thing):/ })).toHaveLength(2);
   expect(groups()).toEqual(["Anywhere on your computer", "In Sidevoice"]);
 });
 
@@ -343,4 +352,72 @@ test("a key the host registers by the layout (Linux punctuation) is an amber war
   inApp({ shortcuts: bridge(status({ holdToTalk: global({ accelerator: "Ctrl+Alt+BracketRight", label: "Ctrl+Alt+BracketRight", state: "on", layoutBound: true }) })).bridge });
   render(<ShortcutsSettings t={en} />);
   expect(await screen.findByText(/follows the keyboard layout on Linux/)).toBeInTheDocument();
+});
+
+test("a host that reports defaults: ↺ only off the default, says the keys, and asks the host to restore", async () => {
+  mac();
+  const restore = vi.fn(async () => global({ accelerator: "Ctrl+Alt+M", label: "⌃⌥M", state: "on", isDefault: true, default: "Ctrl+Alt+M" }));
+  const { bridge: b } = bridge(status({
+    mute: global({ accelerator: "Ctrl+Alt+K", label: "⌃⌥K", state: "on", isDefault: false, default: "Ctrl+Alt+M" }),
+    holdToTalk: global({ accelerator: "F10", label: "F10", state: "on", isDefault: false, default: null }),
+    oneTurn: global({ accelerator: "F11", label: "F11", state: "on", isDefault: false, default: null }),
+  }), { restore });
+  inApp({ shortcuts: b });
+  render(<ShortcutsSettings t={en} />);
+  const row = (await screen.findAllByRole("button", { name: /^Mute or unmute:/ }))[0].closest(".ui-row") as HTMLElement;
+  // The ↺ is named for the default the host reports, with this system's keys; an action with no default has none.
+  expect(screen.getAllByRole("button", { name: /^Restore default/ })).toHaveLength(1);
+  await act(async () => { fireEvent.click(within(row).getByRole("button", { name: "Restore default: ⌃⌥M" })); });
+  expect(restore).toHaveBeenCalledWith("mute");
+  expect(b.set).not.toHaveBeenCalled();
+});
+
+test("a host that reports a key as chosen even when it equals the default shows the ↺; one on its default does not", async () => {
+  const { bridge: b } = bridge(status({
+    mute: global({ accelerator: "Ctrl+Alt+Shift+M", label: "Ctrl+Alt+Shift+M", state: "on", isDefault: false, default: "Ctrl+Alt+Shift+M" }),
+  }));
+  inApp({ shortcuts: b });
+  render(<ShortcutsSettings t={en} />);
+  expect(await screen.findByRole("button", { name: "Restore default: Ctrl+Alt+Shift+M" })).toBeInTheDocument();
+  cleanup();
+  inApp({ shortcuts: bridge(status({ mute: global({ accelerator: "Ctrl+Alt+Shift+M", label: "Ctrl+Alt+Shift+M", state: "on", isDefault: true, default: "Ctrl+Alt+Shift+M" }) })).bridge });
+  render(<ShortcutsSettings t={en} />);
+  await screen.findByRole("button", { name: "Mute or unmute: Ctrl+Alt+Shift+M" });
+  expect(screen.queryByRole("button", { name: /^Restore default/ })).toBeNull();
+});
+
+test("a refusal the host says is another action's names it; one the system or another app holds says another app", async () => {
+  inApp({ shortcuts: bridge(status({
+    oneTurn: global({ accelerator: "F9", label: "F9", state: "refused", refusal: { reason: "duplicate", action: "mute" } }),
+    mute: global({ accelerator: "Ctrl+Alt+Shift+M", label: "Ctrl+Alt+Shift+M", state: "on" }),
+    holdToTalk: global({ accelerator: "Ctrl+Shift+M", label: "Ctrl+Shift+M", state: "refused", refusal: { reason: "taken" } }),
+  })).bridge });
+  render(<ShortcutsSettings t={en} />);
+  expect(await screen.findByText("Already used by Mute or unmute.")).toBeInTheDocument();
+  expect(screen.getByText("Ctrl+Shift+M is already used by another app.")).toBeInTheDocument();
+});
+
+test("recording through the host: a rejection is shown, the timeout as such; the Mac says about the Globe key and the left modifier while it records", async () => {
+  mac();
+  let hint: ((hint: RecordHint) => void) | undefined;
+  const record = vi.fn<(action: ShortcutAction, onHint?: (hint: RecordHint) => void) => Promise<string | null>>()
+    .mockImplementationOnce((_action, onHint) => { hint = onHint; return new Promise(() => {}); })
+    .mockRejectedValueOnce({ key: "record_timeout" })
+    .mockRejectedValueOnce(new Error("boom"));
+  const { bridge: b } = bridge(status(), { record });
+  inApp({ shortcuts: b });
+  render(<ShortcutsSettings t={en} />);
+  await screen.findAllByRole("button", { name: /^Mute or unmute:/ });
+  const field = () => screen.getAllByRole("button", { name: /^Hold to talk:/ })[0];
+  await act(async () => { fireEvent.click(field()); });
+  expect(screen.getByText(/Set the Globe key to “Do nothing” in Keyboard settings first/)).toBeInTheDocument();
+  act(() => hint!("leftModifier"));
+  expect(screen.getByText("Only the right-hand ⌘ ⌥ ⌃ ⇧ work as a key on their own.")).toBeInTheDocument();
+  cleanup();
+  render(<ShortcutsSettings t={en} />);
+  await screen.findAllByRole("button", { name: /^Mute or unmute:/ });
+  await act(async () => { fireEvent.click(screen.getAllByRole("button", { name: /^Mute or unmute:/ })[0]); });
+  expect(screen.getByText("No key was pressed. Try again.")).toBeInTheDocument();
+  await act(async () => { fireEvent.click(screen.getAllByRole("button", { name: /^Say one thing:/ })[0]); });
+  expect(screen.getByText("Couldn't record the key. Try again.")).toBeInTheDocument();
 });

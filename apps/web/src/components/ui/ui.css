@@ -98,7 +98,7 @@
 .ui-control--sm { min-height: var(--sv-control-sm); padding-inline-start: 10px; font-size: var(--sv-font-sm); }
 .ui-select.ui-control--sm { padding-inline-end: var(--sv-space-2); gap: var(--sv-space-1-5); }
 /* 16px is the floor of an input on iOS: below it, focusing it zooms the page. */
-@media (pointer: coarse) { .ui-input, .ui-select, .ui-textarea { font-size: max(1rem, calc(1rem * var(--sv-text-scale, 1))); } }
+@media (any-pointer: coarse) { .ui-input, .ui-select, .ui-textarea { font-size: max(1rem, calc(1rem * var(--sv-text-scale, 1))); } }
 
 /* ----- Card, choice card, Section, Row, inline alert. */
 .ui-card { min-width: 0; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-surface); box-shadow: var(--sv-shadow-sm); color: var(--sv-text); }

@@ -392,7 +392,7 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
 .ui-shortcut[data-invalid] { border-color: var(--sv-danger); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-danger) 18%, transparent); }
 .ui-shortcut-field { display: inline-flex; flex: 1; min-width: 0; align-items: center; gap: 6px; padding: 0 10px; border: 0; border-radius: 10px 0 0 10px; background: none; color: inherit; font: inherit; cursor: pointer; text-align: start; }
 .ui-shortcut-field:only-child, .ui-shortcut-field:last-child { border-radius: 10px; }
-.ui-shortcut-field:focus-visible, .ui-shortcut-clear:focus-visible, .ui-shortcut-default:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
+.ui-shortcut-field:focus-visible, .ui-shortcut-clear:focus-visible, .ui-shortcut-restore:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
 .ui-shortcut .shortcut-key { min-height: 22px; min-width: 22px; padding: 0 6px; font-size: calc(12px * var(--sv-text-scale, 1)); }
 .shortcut-how { margin-left: 2px; font: 600 calc(11.5px * var(--sv-text-scale, 1)) / 1 var(--sv-font-sans); color: var(--sv-text-muted); }
 .ui-shortcut-placeholder { font: 500 calc(13px * var(--sv-text-scale, 1)) var(--sv-font-sans); color: var(--sv-text-subtle); }
@@ -403,10 +403,12 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
 @media (hover: hover) {
   .ui-shortcut:hover .ui-shortcut-clear { opacity: 1; }
   .ui-shortcut-clear:hover { background: color-mix(in srgb, var(--sv-text) 16%, transparent); color: var(--sv-text); }
-  .ui-shortcut-default:hover { color: var(--sv-text); }
+  .ui-shortcut:hover .ui-shortcut-restore { opacity: 1; }
+  .ui-shortcut-restore:hover { background: color-mix(in srgb, var(--sv-text) 16%, transparent); color: var(--sv-text); }
 }
-.ui-shortcut-default { align-self: center; flex: none; margin: 0 2px 0 4px; padding: 3px 7px; border: 0; border-radius: 6px; background: color-mix(in srgb, var(--sv-text) 8%, transparent); font: 600 calc(11px * var(--sv-text-scale, 1)) var(--sv-font-sans); color: var(--sv-text-muted); cursor: pointer; }
-.ui-shortcut > .ui-shortcut-default:last-child { margin-right: 8px; }
+/* ↺ is the × 's size and look, beside it; alone (no × without keys) it takes the × 's right margin. */
+.ui-shortcut-restore { align-self: center; display: grid; place-items: center; flex: none; width: 20px; height: 20px; margin: 0 0 0 4px; padding: 0; border: 0; border-radius: 50%; background: color-mix(in srgb, var(--sv-text) 9%, transparent); color: var(--sv-text-muted); cursor: pointer; opacity: .75; transition: opacity .15s, background-color .15s; }
+.ui-shortcut > .ui-shortcut-restore:last-child { margin-right: 8px; }
 .ui-shortcut-error { max-width: 240px; text-align: start; }
 
 /* Call › Other apps' media: what the choice lacks, in the group's card under the row (amber), or, allowed and waiting for a

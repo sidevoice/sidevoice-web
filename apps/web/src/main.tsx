@@ -18,6 +18,7 @@ import { startPageTheme } from "./lib/theme";
 import { startMotion } from "./lib/motion";
 import { startTextScale } from "./lib/text-scale";
 import { forgetVariant } from "./lib/variants";
+import { applyViewport, host } from "./host";
 
 // Uncaught errors are reported to the room before anything else is loaded: the controller owns the
 // socket, so until it exists the reports wait here.
@@ -32,6 +33,9 @@ window.addEventListener("unhandledrejection", (event) => {
   const reason = event.reason as { message?: string; stack?: string } | undefined;
   report("unhandled-rejection", String(reason?.message ?? event.reason), reason?.stack);
 });
+
+// What the page may zoom: the native phone app not at all, iOS Safari not by focusing a field (host/viewport.ts).
+applyViewport(document, host().identity.build !== null);
 
 // The theme this device chose in Settings, else the system's (lib/theme.ts).
 startPageTheme();
