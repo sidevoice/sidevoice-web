@@ -24,14 +24,22 @@ const reply = (text: string, extra: Partial<ChatMessage> = {}, minutes = 0): Cha
 const person = (text: string, minutes: number): ChatMessage => ({ ...reply(text, {}, minutes), role: "user", name: "You" });
 const heardOf = (text: string, chars: number) => ({ hearing: "partial" as const, heard_chars: chars, interrupted: true, audio: "interrupted", audio_reason: "user_interrupted" as const, text });
 
+/** Words in a run of text, for a message of a known length: ~N lines at the lab's widths (the fold is at ten). */
+const words = (count: number) => Array.from({ length: count }, (_, i) => ["steady", "the", "migration", "ran", "clean", "again", "tonight"][i % 7]).join(" ");
 const STATES = [
-  ["never", "Never played"], ["cut", "Cut part-way"], ["whole", "Fully heard"], ["playing", "Playing (karaoke)"], ["several", "Several in a row"],
+  ["lengths", "Lengths (fold)"], ["never", "Never played"], ["cut", "Cut part-way"], ["whole", "Fully heard"], ["playing", "Playing (karaoke)"], ["several", "Several in a row"],
 ] as const;
 type StateId = (typeof STATES)[number][0];
 
 function scenario(id: StateId, at: number, settled: "playing" | "heard" | "cut"): ChatMessage[] {
   n = 0;
   switch (id) {
+    case "lengths": return [
+      person("Give me a short one, a medium one and a very long one.", 1),
+      reply(words(Number(params.get("w5")) || 17), { hearing: "heard", heard_chars: 1 }, 2),
+      reply(words(Number(params.get("w9")) || 32), { hearing: "heard", heard_chars: 1 }, 3),
+      reply(words(Number(params.get("w30")) || 108), { hearing: "heard", heard_chars: 1 }, 4),
+    ];
     case "never": return [
       person("Can you check why the nightly failed?", 1),
       reply(LONG, { hearing: "not_heard", heard_chars: 0, audio: "text_only", audio_reason: "voice_off" }, 2),

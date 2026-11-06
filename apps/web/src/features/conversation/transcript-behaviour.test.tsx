@@ -2,11 +2,12 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { ChatMessage, ConversationView } from "../../state/room-types";
 import { translator } from "../../i18n/translator";
+import { FOLD_LINES } from "./FoldedText";
 import { JUMP_SETTLE_MS, MessageList, PIN_MS } from "./MessageList";
 import { transcriptBlocks } from "./transcript-blocks";
 
 /* The transcript's behaviour (the creature redesign's T31, T38, T40): following the newest only at the foot, the way
- * back and its dot, the jump pinned to the foot, a long message folded at six lines, and only what changed drawn again. */
+ * back and its dot, the jump pinned to the foot, a long message folded at ten lines, and only what changed drawn again. */
 
 const base = new Date(2026, 10, 4, 10, 38).getTime();
 const message = (overrides: Partial<ChatMessage>): ChatMessage => ({ segment: crypto.randomUUID(), thread: "fp|one", session: "call", role: "assistant", text: "Hola", name: "Agente", time: base, ...overrides });
@@ -131,10 +132,10 @@ function layOut() {
   });
 }
 
-test("a message past six lines folds to six with See more, and See less once open; one of six lines is whole", () => {
+test("a message past ten lines folds to ten with See more, and See less once open; one of ten lines is whole", () => {
   layOut();
-  const six = "x".repeat(240), seven = "y".repeat(241);
-  render(<MessageList conversation={view([message({ segment: "six", text: six }), message({ segment: "seven", text: seven, time: base + 1_000 })])} />);
+  const ten = "x".repeat(400), eleven = "y".repeat(401);
+  render(<MessageList conversation={view([message({ segment: "ten", text: ten }), message({ segment: "eleven", text: eleven, time: base + 1_000 })])} />);
   const [first, second] = document.querySelectorAll<HTMLElement>(".chat-text");
   expect(first).not.toHaveAttribute("data-fold");
   expect(second).toHaveAttribute("data-fold", "folded");
@@ -148,15 +149,25 @@ test("a message past six lines folds to six with See more, and See less once ope
   expect(second.parentElement!.querySelector(".see-more + .chat-meta")).not.toBeNull();
 });
 
+test("a 9-line message shows no See more, a 30-line one does, folded to the one value", () => {
+  layOut();
+  render(<MessageList conversation={view([message({ segment: "nine", text: "a".repeat(360) }), message({ segment: "thirty", text: "b".repeat(1200), time: base + 1_000 })])} />);
+  const [nine, thirty] = document.querySelectorAll<HTMLElement>(".chat-text");
+  expect(nine).not.toHaveAttribute("data-fold");
+  expect(thirty).toHaveAttribute("data-fold", "folded");
+  expect(thirty.style.getPropertyValue("--fold-lines")).toBe(String(FOLD_LINES));
+  expect(screen.getAllByRole("button", { name: "See more" })).toHaveLength(1);
+});
+
 test("a long reply is whole while it is said, its words lit as it goes, and folds once it is over", () => {
   layOut();
-  const long = "z".repeat(400);
+  const long = "z".repeat(600);
   const { rerender } = render(<MessageList conversation={view([message({ segment: "now", text: long, playback: "playing", karaoke: { from: 0, to: 120 } })])} />);
   expect(document.querySelector(".chat-text")).not.toHaveAttribute("data-fold");
   expect(screen.queryByRole("button", { name: "See more" })).toBeNull();
   // Said, it has no time yet; over, it has its time and folds.
   expect(document.querySelector(".chat-meta")).toBeNull();
-  rerender(<MessageList conversation={view([message({ segment: "now", text: long, playback: "complete", hearing: "heard", heard_chars: 400 })])} />);
+  rerender(<MessageList conversation={view([message({ segment: "now", text: long, playback: "complete", hearing: "heard", heard_chars: 600 })])} />);
   expect(document.querySelector(".chat-text")).toHaveAttribute("data-fold", "folded");
   expect(document.querySelector(".chat-meta time")).not.toBeNull();
 });
