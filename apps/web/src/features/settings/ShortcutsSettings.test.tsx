@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, renderHook, screen, within } from "@te
 import { KEYBOARD_QUERY, ShortcutsSettings, bindingOf, defaultGlobalMute, useShortcutsSection } from "./ShortcutsSettings";
 import { translator } from "../../i18n/translator";
 import { SHORTCUTS, binding, isDefault, resetBinding } from "../../state/shortcuts";
+import { host } from "../../host";
 import type { GlobalShortcut, RecordHint, ShortcutAction, ShortcutsBridge, ShortcutsStatus } from "../../host";
 
 /* Shortcuts, by where they work: the desktop app's global shortcuts and the headset's buttons, where it offers them; the
@@ -478,4 +479,16 @@ test("recording through the host: a rejection is shown, the timeout as such; the
   expect(screen.getByText("No key was pressed. Try again.")).toBeInTheDocument();
   await act(async () => { fireEvent.click(screen.getAllByRole("button", { name: /^Say one thing:/ })[0]); });
   expect(screen.getByText("Couldn't record the key. Try again.")).toBeInTheDocument();
+});
+
+test("a phone's bridge ({ get, subscribe, setHeadset }, no set) still gives a shortcuts host, and the section shows the headset group alone", async () => {
+  keyboard(false);
+  const setHeadset = vi.fn(async () => phone({ press: "mute", doublePress: "none", outsideCall: "leave" }));
+  const mobile = { get: vi.fn(async () => phone({ press: "mute", doublePress: "none", outsideCall: "leave" })), subscribe: vi.fn(() => () => {}), setHeadset };
+  inApp({ shortcuts: mobile });
+  expect(host().shortcuts).not.toBeNull();
+  expect(renderHook(() => useShortcutsSection()).result.current).toBe(true);
+  render(<ShortcutsSettings t={en} />);
+  expect(await screen.findByRole("combobox", { name: "Single press" })).toHaveTextContent("Mute or unmute");
+  expect(groups()).toEqual(["Headset buttons"]);
 });

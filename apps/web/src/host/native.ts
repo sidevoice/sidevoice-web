@@ -95,7 +95,7 @@ export function nativeHost(): NativeHost {
     localHost: member<LocalHostBridge>(app, "localHost", ["state", "subscribe", "pairing"]),
     reset: member<ResetBridge>(app, "reset", ["deleteAll", "resetReport"]),
     muteShortcut: member<MuteShortcutBridge>(app, "muteShortcut", ["get", "set"]),
-    shortcuts: member<ShortcutsBridge>(app, "shortcuts", ["get", "set"]),
+    shortcuts: member<ShortcutsBridge>(app, "shortcuts", ["get"]),
     mediaDuck: member<MediaDuckBridge>(app, "mediaDuck", ["get", "set"]),
     textScale: member<TextScaleBridge>(app, "textScale", ["get"]),
     callControls: member<CallControlsBridge>(app, "callControls", ["settings", "setAlwaysShown"]),

@@ -348,7 +348,7 @@ export interface ShortcutsStatus {
 export interface ShortcutsBridge {
   get(): Promise<ShortcutsStatus>;
   /** Rejects `{ key: "shortcut_invalid" }` for an accelerator the app cannot register. */
-  set(action: ShortcutAction, accelerator: string | null): Promise<GlobalShortcut>;
+  set?(action: ShortcutAction, accelerator: string | null): Promise<GlobalShortcut>;
   /** Back to this system's default, as if never chosen. Absent on an older host. */
   restore?(action: ShortcutAction): Promise<GlobalShortcut>;
   subscribe?(listener: (status: ShortcutsStatus) => void): () => void;
