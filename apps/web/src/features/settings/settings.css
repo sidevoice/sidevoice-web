@@ -368,3 +368,12 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
 /* Developer options (DeveloperOptions): a row's how-to, a line each. */
 .developer-howto { display: block; }
 .developer-howto + .developer-howto { margin-top: var(--sv-space-1); }
+
+/* Call › Other apps' media: what the choice lacks, in the group's card under the row (amber), or, allowed and waiting for a
+ * restart, Restart now (accent). The margins are the rows' own padding. */
+.media-need { display: flex; align-items: center; gap: var(--sv-space-3); margin: 0 var(--sv-space-5) 14px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--sv-state-attention) 12%, transparent); }
+.media-need[data-kind="restart"] { background: color-mix(in srgb, var(--sv-accent) 10%, transparent); }
+.media-need-icon { display: inline-flex; flex: none; color: color-mix(in srgb, var(--sv-state-attention) 70%, #000); }
+.media-need[data-kind="restart"] .media-need-icon { color: var(--sv-accent-text, var(--sv-accent)); }
+.media-need-text { flex: 1; min-width: 0; margin: 0; font-size: var(--sv-font-md); color: var(--sv-text); }
+.media-need-action { flex: none; display: inline-flex; }
