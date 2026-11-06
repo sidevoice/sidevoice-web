@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { capCentre, easeFraming, FRAME_EASE, OPTIC, REST_HEAD, REST_ZK, StageFrame, stageBands, TURN_HEAD, voiceType, type FrameProbe } from "./stage-frame";
+import { capCentre, desktopDevice, easeFraming, FRAME_EASE, OPTIC, REST_HEAD, REST_ZK, StageFrame, stageBands, TURN_HEAD, voiceType, type FrameProbe } from "./stage-frame";
 
 /* The stage's framing (the design reference's fitFrame and capCentre: T21, T24d, T28, T33, T43), on a creature modelled
  * as a camera sees it: `tall` px tall at the nearest step (zk 1), smaller as it steps back (1/zk), its drawn middle
@@ -121,7 +121,7 @@ describe("easing", () => {
 });
 
 describe("the channel", () => {
-  const ask = { w: 1118, h: 628, dx: 0, dy: 0, phone: false, rest: true, cards: { below: 144, above: 0, xa: 209, xb: 909 }, opener: null };
+  const ask = { w: 1118, h: 628, dx: 0, dy: 0, phone: false, desktop: true, rest: true, cards: { below: 144, above: 0, xa: 209, xb: 909 }, opener: null };
 
   test("an ask the same as the last is not passed on; a changed one is", () => {
     const frame = new StageFrame(), heard = vi.fn();
@@ -178,4 +178,12 @@ describe("capCentre finds the reference's step with fewer trial renders", () => 
       expect(a.calls.length).toBeLessThanOrEqual(b.calls.length);
     }
   });
+});
+
+test("a desktop is a fine pointer or the desktop app, never a handset: a phone on its side, or a touch screen past the phone rule, is none", () => {
+  expect(desktopDevice({ handset: true, finePointer: false, app: false })).toBe(false); // 844 x 390, coarse
+  expect(desktopDevice({ handset: false, finePointer: false, app: false })).toBe(false); // 932 x 430, coarse: wide for the phone rule
+  expect(desktopDevice({ handset: false, finePointer: true, app: false })).toBe(true);
+  expect(desktopDevice({ handset: false, finePointer: false, app: true })).toBe(true); // the app on a touch laptop
+  expect(desktopDevice({ handset: true, finePointer: true, app: true })).toBe(false); // (a narrow window is a phone's layout)
 });

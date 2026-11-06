@@ -1015,7 +1015,7 @@ export class Stage {
   draw(item, t, lvl, isStatic) {
     const { c, spec, canvas, opts } = item;
     // the camera's aspect and the renderer's size follow the canvas: a creature is never stretched, whatever it is drawn into
-    if (!this.cine && !this.fixed) { const ar = canvas.width / canvas.height; if (Math.abs(ar - this.camera.aspect) > 1e-3) { this.camera.aspect = ar; this.camera.updateProjectionMatrix(); this.w = Math.round(this.h * ar); this.renderer.setSize(this.w, this.h); } }
+    if (!this.cine && !this.fixed) { const ar = canvas.width / canvas.height; if (Math.abs(ar - this.camera.aspect) > Math.max(1e-3, 2 / Math.min(canvas.width, canvas.height))) { this.camera.aspect = ar; this.camera.updateProjectionMatrix(); this.w = Math.round(this.h * ar); this.renderer.setSize(this.w, this.h); } }
     let st = {};
     if (spec.state) { const [kt, kl] = KEY[spec.state] || [0, 0]; st = STATES3D[spec.state](isStatic ? kt : t + item.off, isStatic ? kl : lvl); }
     if (spec.state === 'speaking') st.voice = true; // the mouth follows the voice whatever mood plays over it

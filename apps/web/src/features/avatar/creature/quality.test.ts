@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUDGET_MS, Governor, SCENE_MAX_AREA, SCENE_MAX_H, SCENE_MIN_H, TIERS, sceneSize } from "./quality";
+import { BUDGET_MS, DESKTOP_MAX_AREA, DESKTOP_MAX_H, Governor, SCENE_MAX_AREA, SCENE_MAX_H, SCENE_MIN_H, TIERS, sceneSize } from "./quality";
 
 describe("sceneSize: as many pixels as the tile shows", () => {
   it("a phone's tall tile at pixel ratio 3 is drawn for 2, up to the creator's 960 px", () => {
@@ -49,6 +49,70 @@ describe("sceneSize: as many pixels as the tile shows", () => {
   it("a tile with no box yet is 3:2", () => {
     const s = sceneSize(0, 0, 2);
     expect(s.width / s.height).toBeCloseTo(1.5, 2);
+  });
+});
+
+describe("sceneSize on a desktop stage: the screen's own pixels, up to a 4K frame", () => {
+  it("is drawn at the pixel ratio (2) where a phone's ceilings left it below 1 device px per css px", () => {
+    for (const [w, h] of [[958, 596], [1278, 796], [1598, 876]] as const) {
+      const s = sceneSize(w, h, 2, 1, true);
+      expect(s.height).toBe(Math.round(h * 2));
+      expect(s.width / w).toBeCloseTo(2, 1);
+      expect(sceneSize(w, h, 2).width * sceneSize(w, h, 2).height).toBeLessThanOrEqual(SCENE_MAX_AREA); // (the phone's, unchanged)
+    }
+  });
+  it("never passes a 4K frame, whatever the window", () => {
+    for (const [w, h] of [[2238, 1236], [3400, 1900], [5000, 2800], [2000, 100]] as const) {
+      const s = sceneSize(w, h, 2, 1, true);
+      expect(s.height).toBeLessThanOrEqual(DESKTOP_MAX_H);
+      expect(s.width * s.height).toBeLessThanOrEqual(DESKTOP_MAX_AREA);
+    }
+    const big = sceneSize(2238, 1236, 2, 1, true);
+    expect(big.width / 2238).toBeGreaterThan(1.7);
+  });
+  it("the ladder steps down to the phone's own floor: its last rung draws what it always did", () => {
+    for (const [w, h] of [[958, 596], [1598, 876], [2238, 1236]] as const) {
+      expect(sceneSize(w, h, 2, 0.5, true)).toEqual(sceneSize(w, h, 2, 0.5));
+      let above = Infinity; // (down the ladder, no rung draws more than the one above it)
+      for (const t of TIERS) {
+        const s = sceneSize(w, h, 2, t.scale, true), area = s.width * s.height;
+        expect(area).toBeLessThanOrEqual(above);
+        above = area;
+      }
+    }
+  });
+  it("a phone (or anything not asked as a desktop) keeps the 900 k ceiling", () => {
+    expect(sceneSize(364, 655, 3, 1, false)).toEqual({ width: 533, height: 960 });
+  });
+});
+
+describe("a desktop's rungs: the areas, and what the governor makes of them", () => {
+  const areas = (w: number, h: number) => TIERS.map((t) => { const s = sceneSize(w, h, 2, t.scale, true); return s.width * s.height; });
+  it("pins what each rung draws at 1598 x 876 (a 1920 x 1080 window) at pixel ratio 2", () => {
+    expect(areas(1598, 876)).toEqual([5_599_392, 3_159_716, 1_208_790, 429_225, 429_225, 224_640, 224_640]);
+  });
+  /** The rate's own cost: a frame costs this many ms a million pixels (a stand-in for a GPU's fill). */
+  const climb = (g: Governor, msPerMpx: number, seconds: number) => {
+    let at = 0, moves = 0;
+    g.start(2, at);
+    for (let i = 0; i < seconds * 30; i++, at += 1000 / 30) {
+      const area = areas(1598, 876)[g.tier];
+      if (g.observe(at, msPerMpx * area / 1e6, g.every)) moves++;
+    }
+    return { moves, tier: g.tier };
+  };
+  it("does not step up to a rung whose real area (not its scale squared) would not hold, so it does not oscillate", () => {
+    // 3 ms a million px: rung 2 (1.2 M px) costs 3.6 ms and holds; rung 1 (3.2 M px) costs 9.5 ms and does not.
+    const g = new Governor();
+    g.measureBy((scale) => { const s = sceneSize(1598, 876, 2, scale, true); return s.width * s.height; });
+    expect(climb(g, 3, 600)).toEqual({ moves: 0, tier: 2 });
+    // (the estimate by the scale alone, 1.39 for that step, tried it and failed, again after every back-off)
+    expect(climb(new Governor(), 3, 600).moves).toBeGreaterThan(2);
+  });
+  it("still steps up where the real areas leave room", () => {
+    const g = new Governor();
+    g.measureBy((scale) => { const s = sceneSize(1598, 876, 2, scale, true); return s.width * s.height; });
+    expect(climb(g, 0.5, 600).tier).toBe(0); // rung 0 (5.6 M px) costs 2.8 ms
   });
 });
 
