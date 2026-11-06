@@ -37,6 +37,7 @@ import type { Translate } from "../i18n/translator";
 
 export { CARD_MARGIN, CLICK_GUARD_MS, DRAG_THRESHOLD_PX, HIDE_DELAY_MS, PANEL_CLOSE_MS, SHOW_DELAY_MS, WAVE_SAMPLE_MS, duration } from "./card-shell";
 import { CARD_MARGIN } from "./card-shell";
+import { voiceMax, voiceShift } from "./voice-centre";
 
 type Place = NonNullable<CallControlsState["place"]>;
 const UPPER_RIGHT: Place = { vertical: "upper", horizontal: "right" };
@@ -174,6 +175,17 @@ function stateGlyph(mood: CallControlsState["call"]["mood"], muted: boolean, rec
   return mood === "listening" || mood === "speaking" || mood === "working" || mood === "holding" || mood === "offline" ? mood : null;
 }
 
+/** What is happening, in one line, with its icon: you muted, the call reconnecting, else what the agent acts out (an offline agent
+ *  says so, in every format). */
+function StateLine({ state, t }: { state: CallControlsState; t: Translate }) {
+  const call = state.call;
+  const muted = !call.micEnabled;
+  const reconnecting = call.busy;
+  const line = reconnecting ? t("card.reconnecting") : muted ? t("card.youAreMuted") : moodText(call.mood, t);
+  const glyph = stateGlyph(call.mood, muted, reconnecting);
+  return <span className="card-state" data-mood={reconnecting ? "reconnecting" : muted ? "muted" : call.mood}>{glyph ? <StateGlyph kind={glyph} size={14} /> : <i aria-hidden="true" />}{line}</span>;
+}
+
 /** A1's two rows; `compact` (just the avatar's card) keeps A1's first row without the face, the machine, the state and your
  *  wave, over A1's controls row, which is always out. */
 function TitleCard({ state, shell, t, compact = false }: { state: CallControlsState; shell: CardShell; t: Translate; compact?: boolean }) {
@@ -185,10 +197,7 @@ function TitleCard({ state, shell, t, compact = false }: { state: CallControlsSt
   const selected = call.participants.find((participant) => participant.selected);
   const agent = useCardAgent(state);
   const muteLabel = muted ? t("card.unmute") : t("card.mute");
-  // What is happening, in one line: you muted, the call reconnecting, else what the agent acts out.
-  const line = reconnecting ? t("card.reconnecting") : muted ? t("card.youAreMuted") : moodText(call.mood, t);
   const tone = agent.threadId ? avatarColor(agent.spec) : undefined;
-  const glyph = stateGlyph(call.mood, muted, reconnecting);
   return (
     <div ref={compact ? undefined : shell.body} className={"call-card title-card" + (compact ? " compact-card" : "")} data-expanded={expanded || undefined}>
       <div className="card-row">
@@ -204,7 +213,7 @@ function TitleCard({ state, shell, t, compact = false }: { state: CallControlsSt
             selected?.machine && <span key="machine" className="card-machine"><MachinesIcon size={11} /> <span>{selected.machine}</span></span>,
             (selected?.harness || selected?.model) && <span key="harness" className="card-harness">{selected?.harness && <HarnessIcon harness={selected.harness} size={11} />} <span>{[selected?.model, selected?.effort].filter(Boolean).join(" · ")}</span></span>,
           ].filter(Boolean).flatMap((part, i) => (i ? [<span key={"dot" + i} aria-hidden="true">·</span>, part] : [part]))}</span>}
-          {!compact && <span className="card-state" data-mood={reconnecting ? "reconnecting" : muted ? "muted" : call.mood}>{glyph ? <StateGlyph kind={glyph} size={14} /> : <i aria-hidden="true" />}{line}</span>}
+          <StateLine state={state} t={t} />
         </div>
         {!compact && <YourWave level={state.level} muted={muted} still={reconnecting} t={t} />}
       </div>
@@ -253,6 +262,7 @@ function CardHeading({ state, shell, t, panelBelow = false }: { state: CallContr
         <ConversationsButton state={state} shell={shell} t={t} />
       </span>
       {host && <span className="stage-machine"><MachinesIcon size={12} /><span>{host}</span></span>}
+      <StateLine state={state} t={t} />
       <CardActions shell={shell} t={t} />
       {panelBelow && shell.panel && <PanelCard state={state} shell={shell} t={t} />}
     </header>
@@ -328,6 +338,7 @@ function AvatarCard({ state, shell, t }: { state: CallControlsState; shell: Card
   const voice = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
   const { zone } = shell;
+  const room = state.room;
   // What the pointer is on: inside an open card's hull it is on the card; else what is under it.
   const zoneAt = (event: ReactPointerEvent, under: "none" | "creature" | "card") => (shell.expanded && inHull(root.current, event) ? "card" : under);
   // Whether a voice card is out, for the stack to take room only then (the window is the creature's box at rest), and, where
@@ -341,13 +352,19 @@ function AvatarCard({ state, shell, t }: { state: CallControlsState; shell: Card
       setVoiceUp(out);
       const figure = card.querySelector<HTMLElement>(".avatar-figure");
       card.style.setProperty("--voice-reach", out && figure ? node.getBoundingClientRect().bottom - figure.getBoundingClientRect().bottom + "px" : "0px");
+      // Centred on the creature, inside the room it has to the screen's sides; the margins keep the window holding the text.
+      // Where even the whole room is narrower than the text, the text wraps to it (--voice-max) before it is placed.
+      const limit = out && figure ? voiceMax(figure.offsetWidth, room) : null;
+      if (limit === null) card.style.removeProperty("--voice-max"); else card.style.setProperty("--voice-max", limit + "px");
+      const shift = out && figure ? voiceShift(node.offsetWidth, figure.offsetWidth, room) : 0;
+      card.style.setProperty("--voice-shift", shift + "px");
     };
     read();
     const mutations = new MutationObserver(read), sizes = new ResizeObserver(read);
     mutations.observe(node, { childList: true, subtree: true });
     sizes.observe(node);
     return () => { mutations.disconnect(); sizes.disconnect(); };
-  }, [captions]);
+  }, [captions, room?.left, room?.right]);
   // Tab reaching the card (it is there while folded) opens it; Escape, with focus in it or nowhere, folds it and blurs.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

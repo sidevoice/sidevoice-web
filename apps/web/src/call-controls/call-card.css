@@ -247,6 +247,7 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .card-heading-name { display: flex; align-items: center; gap: 4px; min-width: 0; height: 28px; }
 .card-heading-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 15px; font-weight: 650; }
 .card-heading .stage-machine { grid-column: 1; justify-self: start; margin-top: 2px; font-size: 12px; }
+.card-heading .card-state { grid-column: 1; justify-self: start; font-size: 12px; }
 .card-heading .card-actions { grid-column: 2; grid-row: 1; }
 .floating-card .card-heading { --fg: var(--sv-text); --mu: var(--sv-text-muted, var(--sv-muted)); }
 @container picture (max-width: 439px) { .card-heading-title { font-size: 14px; } }
@@ -279,9 +280,10 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .floating-card[data-open=up] .avatar-card { grid-template-areas: "voice" "figure" "compact"; }
 .avatar-figure { grid-area: figure; width: var(--card-w); height: var(--card-w); }
 .avatar-figure .sv-avatar { display: block; width: 100%; height: 100%; }
-.avatar-voice { grid-area: voice; width: max-content; max-width: var(--avatar-col); }
-.floating-card[data-side=left] .avatar-voice { justify-self: start; justify-items: start; }
-.floating-card[data-side=right] .avatar-voice { justify-self: end; }
+/* Centred on the creature (R13), as far as the screen's room allows: --voice-shift (set by the card from the host's `room`) slides it
+ * inward, by margins on the far side so the window still holds it. */
+.avatar-voice { grid-area: voice; width: max-content; max-width: min(var(--avatar-col), var(--voice-max, var(--avatar-col))); justify-self: center; justify-items: center;
+  margin-left: max(0px, calc(2 * var(--voice-shift, 0px))); margin-right: max(0px, calc(-2 * var(--voice-shift, 0px))); }
 /* Close to the creature: its box has room under its feet for its shadow, and over its head for its antics. */
 .floating-card[data-open=down] .avatar-voice { align-self: start; margin-top: 2px; }
 .floating-card[data-open=up] .avatar-voice { margin-bottom: 2px; }
@@ -357,5 +359,7 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 
 /* The compact card never moves the creature sideways: the creature keeps its place in the window and the card sits off-centre toward the
  * screen's middle (the creature's own side stays flush), so the window grows only on the side away from the screen's edge. */
-.floating-card[data-side=left] .avatar-card { justify-items: start; }
-.floating-card[data-side=right] .avatar-card { justify-items: end; }
+/* While the voice text is out it is centred on the creature (R13), so the creature is centred in the column too: the window grows to both
+ * sides of it, and the host keeps the creature where it rests. */
+.floating-card[data-side=left] .avatar-card:not([data-voice]) { justify-items: start; }
+.floating-card[data-side=right] .avatar-card:not([data-voice]) { justify-items: end; }

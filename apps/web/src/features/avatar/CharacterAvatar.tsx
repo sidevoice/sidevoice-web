@@ -131,7 +131,7 @@ function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, 
   // no small face, and a page drawing a few creatures thirty times a second on a GPU-less machine stalls. The one small face
   // that moves is the floating card's (liveFace): live, and sharp at its box's device pixels (host.ts, framing "face").
   // The floating card's creature is the one small face that is drawn live, and sharp (liveFace).
-  const drawn = !!scene || liveFace;
+  const drawn = !!scene || (liveFace && state.mood !== "offline");
   const framing = scene ? "scene" : "face";
   const sharp = liveFace && !scene;
   const slot: Slot = sharp ? "card" : framing;
