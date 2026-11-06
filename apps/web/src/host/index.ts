@@ -5,6 +5,7 @@ import { browserRemote, browserScreenAwake } from "./browser-presence";
 import { beginBrowserAudioActivation, pageVoice } from "./browser-voice.js";
 import { browserReach, reachOfOrigin as reachOfPage } from "./browser-reach";
 import { browserStorage, exclusively } from "./browser-storage";
+import { followKeyboardLayout } from "./browser-keyboard";
 import { browserDeviceName, browserShortcutModifier } from "./identity";
 import { messageOverlay, nativeCardSeam, nativeHost } from "./native";
 import { setMessageOverlay } from "../i18n/translator";
@@ -62,6 +63,7 @@ export function host(): Host {
       // The app's name for the computer; else what this browser is.
       deviceName: () => app.identity.deviceName() ?? browserDeviceName(),
       get shortcutModifier() { return app.identity.shortcutModifier ?? browserShortcutModifier(); },
+      followKeyboardLayout: (onMap) => followKeyboardLayout(onMap),
     },
     microphone: hostMicrophone(app.microphone),
     reach: app.reach ?? browserReach(),

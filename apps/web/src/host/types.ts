@@ -33,6 +33,9 @@ export interface HostIdentity {
   deviceName(): string;
   /** The label of the modifier a shortcut is written with on this host: `⌘` or `Ctrl`. */
   readonly shortcutModifier: string;
+  /** Hands `onMap` what the keyboard layout types on each physical key (`BracketRight` → `+` on a Spanish layout) now and when
+   *  the layout changes, where the browser says (Chromium); nothing elsewhere. Answers how to stop. */
+  followKeyboardLayout(onMap: (map: { get(code: string): string | undefined }) => void): () => void;
 }
 
 /** The page's own microphone and Web Audio, begun in the Join gesture before models or chunks are awaited. */
@@ -280,7 +283,8 @@ export interface ResetBridge {
 
 /** The app's global shortcut to mute the microphone (sidevoice-desktop, after #56): the accelerator set, how it reads,
  *  whether the system took it (`refused`: another app has it), others to pick instead, and whether it clashes with
- *  VoiceOver. `set` rejects `{ key: "shortcut_invalid" }` for one the app cannot register. */
+ *  VoiceOver. `set` rejects `{ key: "shortcut_invalid" }` for one the app cannot read, and `{ key: "shortcut_unsupported" }` for a key
+ *  this system cannot register as itself (the ISO `<>` key; the keypad's `=` and Enter on Windows and Linux). */
 export interface MuteShortcut {
   accelerator: string | null;
   label: string | null;
@@ -303,6 +307,9 @@ export interface MuteShortcutBridge {
 export interface GlobalShortcut extends MuteShortcut {
   managedBySystem?: boolean;
   conflictWith?: string;
+  /** Linux (X11): the key registers by the character the layout types on it, not by its position, so under a non-US layout it
+   *  may be another key, or none. A warning, not a refusal. */
+  layoutBound?: boolean;
 }
 export type ShortcutAction = "mute" | "holdToTalk" | "oneTurn";
 export type HeadsetPress = "mute" | "oneTurn" | "skip" | "none";

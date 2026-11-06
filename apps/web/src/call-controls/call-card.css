@@ -54,7 +54,7 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 @media (prefers-reduced-motion: reduce) { .card-panel .person-state[data-working] .dot { animation: none !important; box-shadow: 0 0 0 2px color-mix(in srgb, var(--sv-state-working) 45%, transparent); } }
 
 .card-who { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
-.call-card .card-title { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; padding: 0 4px 0 0; border-radius: 6px; font-size: calc(13px * var(--sv-text-scale, 1)); font-weight: 600; cursor: inherit; }
+.call-card .card-title { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; padding: 0 4px 0 0; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: inherit; }
 .call-card .card-title:hover { background: var(--btn); }
 .card-title-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The chevron and "open Sidevoice" keep their space at rest and only appear near the pointer: nothing moves. */
@@ -62,7 +62,7 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .call-card[data-expanded] .card-title-chevron { visibility: visible; opacity: 1; }
 .card-unread { width: 6px; height: 6px; border-radius: 50%; background: var(--sv-state-attention); flex: none; margin-left: 2px; }
 .card-title[aria-expanded=true] .card-title-chevron svg { transform: rotate(180deg); }
-.card-sub { font-size: calc(11px * var(--sv-text-scale, 1)); color: var(--mu); display: flex; align-items: center; gap: 5px; white-space: nowrap; overflow: hidden; max-width: 100%; }
+.card-sub { font-size: 11px; color: var(--mu); display: flex; align-items: center; gap: 5px; white-space: nowrap; overflow: hidden; max-width: 100%; }
 .card-sub.reconnecting { color: var(--fg); opacity: .8; }
 /* When room is short (the controls near the pointer), the machine and the harness give way; the clock never does. */
 .card-machine, .card-harness { display: inline-flex; align-items: center; gap: 3px; min-width: 0; overflow: hidden; }
@@ -78,7 +78,7 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 /* A bar is 3px to 16px tall (--h) and fully rounded: a middle that scales and two round ends that slide with it, so
    every moving part is a transform. */
 .your-wave i { --h: 3; position: relative; width: 2.6px; height: 16px; }
-.your-wave i::before, .your-wave i::after, .your-wave b { content: ""; position: absolute; left: 0; top: 50%; width: 2.6px; background: var(--sv-state-listening); transition: transform 70ms linear; will-change: transform; }
+.your-wave i::before, .your-wave i::after, .your-wave b { content: ""; position: absolute; left: 0; top: 50%; width: 2.6px; background: var(--accent); transition: transform 70ms linear; will-change: transform; }
 .your-wave i::before, .your-wave i::after { height: 2.6px; margin-top: -1.3px; border-radius: 50%; }
 .your-wave i::before { transform: translateY(calc((var(--h) - 2.6) * -.5px)); }
 .your-wave i::after { transform: translateY(calc((var(--h) - 2.6) * .5px)); }
@@ -108,7 +108,7 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .card-panel { margin: 10px -4px 0; padding-top: 6px; border-top: 1px solid var(--line); }
 .card-panel.conversations { max-height: 260px; overflow: auto; }
 .card-conversations { display: flex; flex-direction: column; }
-.card-note { margin: 6px 8px 2px; font-size: calc(11.5px * var(--sv-text-scale, 1)); color: var(--mu); }
+.card-note { margin: 6px 8px 2px; font-size: 11.5px; color: var(--mu); }
 .card-panel .person:disabled { opacity: .5; }
 .card-panel .participant-row { display: flex; align-items: center; border: 1px solid transparent; border-radius: 12px; margin: 2px 0; }
 .card-panel .participant-row[data-selected] { border-color: var(--sv-selected-border); background: var(--sv-selected); }
@@ -123,8 +123,8 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .card-panel .person-state[data-state=offline] .dot { background: var(--sv-state-offline); }
 .card-panel .person-state[data-working] .dot { background: var(--sv-state-working); animation: card-think 1.1s ease-in-out infinite; }
 .card-panel .participant-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.card-panel .person-name { font-size: calc(12.5px * var(--sv-text-scale, 1)); font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.card-panel .person-sub { font-size: calc(11px * var(--sv-text-scale, 1)); color: var(--mu); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-panel .person-name { font-size: 12.5px; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-panel .person-sub { font-size: 11px; color: var(--mu); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-panel .person-reach > svg { display: inline-block; margin-inline-end: 3px; vertical-align: -2px; }
 .card-panel .person-machine, .card-panel .person-harness { display: inline-flex; align-items: center; gap: 3px; vertical-align: -1px; }
 .card-panel .person-harness { margin-inline-start: 4px; }
@@ -132,13 +132,13 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
   .card-panel .participant-row[data-selected] { border-color: #8c7eab; background: #f3eefa; }
 }
 
-.call-card .device-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border-radius: 9px; font-size: calc(12.5px * var(--sv-text-scale, 1)); text-align: left; }
+.call-card .device-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border-radius: 9px; font-size: 12.5px; text-align: left; }
 .call-card .device-row:hover { background: var(--btn); }
 .device-row svg { color: var(--mu); flex: none; }
 .device-kind { flex: 1; }
-.device-current { color: var(--mu); font-size: calc(12px * var(--sv-text-scale, 1)); max-width: 165px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.device-current { color: var(--mu); font-size: 12px; max-width: 165px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .device-options { margin: 0 0 4px 25px; display: flex; flex-direction: column; }
-.call-card .device-option { display: flex; align-items: center; gap: 8px; justify-content: flex-start; padding: 5px 8px; border-radius: 8px; font-size: calc(12px * var(--sv-text-scale, 1)); text-align: left; }
+.call-card .device-option { display: flex; align-items: center; gap: 8px; justify-content: flex-start; padding: 5px 8px; border-radius: 8px; font-size: 12px; text-align: left; }
 .call-card .device-option:hover { background: var(--btn); }
 .device-option .check { width: 12px; color: var(--accent); }
 .device-option[aria-selected=true] { font-weight: 600; }
@@ -196,14 +196,14 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .card-face .sv-avatar { position: absolute; inset: 7%; width: 86%; height: 86%; }
 .title-card .card-who { gap: 1px; padding-right: 24px; }
 /* The title is a line, not a button: the conversations control after it opens the list; nothing shades on hover. */
-.title-card .card-title { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; padding: 0; font-size: calc(14px * var(--sv-text-scale, 1)); font-weight: 650; }
+.title-card .card-title { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; padding: 0; font-size: 14px; font-weight: 650; }
 .title-card .card-title:hover { background: none; }
-.floating-card[data-size=l] .title-card .card-title { font-size: calc(15px * var(--sv-text-scale, 1)); }
-.floating-card[data-size=l] .title-card .card-sub { font-size: calc(12px * var(--sv-text-scale, 1)); }
+.floating-card[data-size=l] .title-card .card-title { font-size: 15px; }
+.floating-card[data-size=l] .title-card .card-sub { font-size: 12px; }
 .title-card .card-title-text { min-width: 0; }
 /* What is happening: the state's icon in the state's colour (StateGlyph, ui.css: the `--sv-state-*` tokens), then its words in the card's
    ink, never tinted. Resting, present and reconnecting have no icon: the plain dot, the idle grey. */
-.card-state { display: inline-flex; align-items: center; gap: 5px; margin-top: 2px; font-size: calc(12px * var(--sv-text-scale, 1)); font-weight: 600; white-space: nowrap; }
+.card-state { display: inline-flex; align-items: center; gap: 5px; margin-top: 2px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .card-state i { width: 7px; height: 7px; margin: 0 3.5px; border-radius: 50%; background: var(--sv-state-idle); }
 .card-state > svg { width: 14px; height: 14px; margin: -2px 0; }
 .title-card .your-wave { align-self: center; }
@@ -245,11 +245,12 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 /* The room's title block: the title and the conversations control, the machine on the line under it; × at the right. */
 .card-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; align-items: start; padding: 0 0 0 4px; }
 .card-heading-name { display: flex; align-items: center; gap: 4px; min-width: 0; height: 28px; }
-.card-heading-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: calc(15px * var(--sv-text-scale, 1)); font-weight: 650; }
-.card-heading .stage-machine { grid-column: 1; justify-self: start; margin-top: 2px; font-size: calc(12px * var(--sv-text-scale, 1)); }
+.card-heading-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 15px; font-weight: 650; }
+.card-heading .stage-machine { grid-column: 1; justify-self: start; margin-top: 2px; font-size: 12px; }
+.card-heading .card-state { grid-column: 1; justify-self: start; font-size: 12px; }
 .card-heading .card-actions { grid-column: 2; grid-row: 1; }
 .floating-card .card-heading { --fg: var(--sv-text); --mu: var(--sv-text-muted, var(--sv-muted)); }
-@container picture (max-width: 439px) { .card-heading-title { font-size: calc(14px * var(--sv-text-scale, 1)); } }
+@container picture (max-width: 439px) { .card-heading-title { font-size: 14px; } }
 /* The room's call bar, its tray centred; its buttons a step smaller as the picture is. */
 .floating-card .card-call-bar { grid-template-columns: 1fr; justify-items: center; padding: 0 0 10px; background: none; }
 .floating-card .card-call-bar .controls { grid-column: 1; grid-template-rows: auto; }
@@ -279,9 +280,10 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .floating-card[data-open=up] .avatar-card { grid-template-areas: "voice" "figure" "compact"; }
 .avatar-figure { grid-area: figure; width: var(--card-w); height: var(--card-w); }
 .avatar-figure .sv-avatar { display: block; width: 100%; height: 100%; }
-.avatar-voice { grid-area: voice; width: max-content; max-width: var(--avatar-col); }
-.floating-card[data-side=left] .avatar-voice { justify-self: start; justify-items: start; }
-.floating-card[data-side=right] .avatar-voice { justify-self: end; }
+/* Centred on the creature (R13), as far as the screen's room allows: --voice-shift (set by the card from the host's `room`) slides it
+ * inward, by margins on the far side so the window still holds it. */
+.avatar-voice { grid-area: voice; width: max-content; max-width: min(var(--avatar-col), var(--voice-max, var(--avatar-col))); justify-self: center; justify-items: center;
+  margin-left: max(0px, calc(2 * var(--voice-shift, 0px))); margin-right: max(0px, calc(-2 * var(--voice-shift, 0px))); }
 /* Close to the creature: its box has room under its feet for its shadow, and over its head for its antics. */
 .floating-card[data-open=down] .avatar-voice { align-self: start; margin-top: 2px; }
 .floating-card[data-open=up] .avatar-voice { margin-bottom: 2px; }
@@ -357,5 +359,7 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 
 /* The compact card never moves the creature sideways: the creature keeps its place in the window and the card sits off-centre toward the
  * screen's middle (the creature's own side stays flush), so the window grows only on the side away from the screen's edge. */
-.floating-card[data-side=left] .avatar-card { justify-items: start; }
-.floating-card[data-side=right] .avatar-card { justify-items: end; }
+/* While the voice text is out it is centred on the creature (R13), so the creature is centred in the column too: the window grows to both
+ * sides of it, and the host keeps the creature where it rests. */
+.floating-card[data-side=left] .avatar-card:not([data-voice]) { justify-items: start; }
+.floating-card[data-side=right] .avatar-card:not([data-voice]) { justify-items: end; }

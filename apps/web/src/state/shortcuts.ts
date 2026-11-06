@@ -228,6 +228,7 @@ export function ariaKeyShortcuts(id: ShortcutId): string | undefined {
 const NAMED_KEYS: Record<string, string> = {
   Space: "Space", Enter: "Enter", Backspace: "⌫", Delete: "Del", ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→",
   Minus: "-", Equal: "=", Comma: ",", Period: ".", Slash: "/", Backslash: "\\", Semicolon: ";", Quote: "'", BracketLeft: "[", BracketRight: "]", Backquote: "`",
+  NumpadAdd: "Num +", NumpadSubtract: "Num -", NumpadMultiply: "Num *", NumpadDivide: "Num /", NumpadDecimal: "Num .", NumpadEqual: "Num =", NumpadEnter: "Num Enter",
   PageUp: "PgUp", PageDown: "PgDn", Home: "Home", End: "End", Insert: "Ins",
 };
 

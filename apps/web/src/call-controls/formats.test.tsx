@@ -216,13 +216,14 @@ test("the picture has no working badge over the creature: the stage's working li
 
 const expanded = () => document.querySelector(".floating-card")!.hasAttribute("data-expanded");
 
-test("just the avatar: no handle; the compact card is there for Tab, with A1's first row and controls row only", () => {
+test("just the avatar: no handle; the compact card is there for Tab, with A1's first row, its state line and its controls row only", () => {
   page("avatar");
   expect(document.querySelector(".avatar-handle, .avatar-dock")).toBeNull();
   const card = document.querySelector(".avatar-compact .call-card.title-card.compact-card")!;
   expect(card).not.toBeNull();
   expect(expanded()).toBe(false);
-  expect(card.querySelector(".card-face, .card-sub, .card-state, .your-wave")).toBeNull();
+  expect(card.querySelector(".card-face, .card-sub, .your-wave")).toBeNull();
+  expect(card.querySelector(".card-who > .card-state")).not.toBeNull();
   expect(card.querySelector(".card-row > .card-who > .card-title > .card-title-text")).not.toBeNull();
   expect(card.querySelector(".card-conversations-button")).not.toBeNull();
   expect([...card.querySelectorAll(".card-actions button")].map((button) => button.getAttribute("aria-label"))).toEqual(["Open Sidevoice", "Floating card settings", "Hide for this call"]);
@@ -357,3 +358,89 @@ function overAt(node: Element, clientX: number, clientY: number) {
   Object.defineProperty(event, "clientY", { value: clientY });
   fireEvent(node, event);
 }
+
+// ---------- an offline agent (R3): the creature's still grey face, and the state, in every format ----------
+
+const OFFLINE = { botLive: false, karaokeState: null, history: [],
+  people: [{ thread_id: "t-login", title: "Fix the slow login", available: false, node: "fp-1", reach: { state: "offline" } }] };
+
+test.each(["avatar", "pip", "card"])("%s: an offline agent shows its creature, in its offline look, and says it is offline", (format) => {
+  vi.useFakeTimers();
+  page(format, {}, OFFLINE);
+  const creature = document.querySelector(".floating-card .sv-avatar")!;
+  expect(creature).toHaveAttribute("data-offline");
+  expect(creature).toHaveAttribute("data-avatar-state", "offline");
+  // The state line, with its icon, where the format has it (the avatar's is on its compact card).
+  const line = document.querySelector(".floating-card .card-state")!;
+  expect(line).toHaveAttribute("data-mood", "offline");
+  expect(line).toHaveTextContent(translator("en")("state.offline"));
+  expect(line.querySelector("svg")).not.toBeNull();
+});
+
+test("the other formats' state line is the same for a listening agent", () => {
+  vi.useFakeTimers();
+  page("pip");
+  expect(document.querySelector(".card-heading .card-state")).toHaveAttribute("data-mood", "speaking");
+});
+
+// ---------- the avatar's voice text, centred on the creature (R13) ----------
+
+/** The card's layout in jsdom has no boxes: the creature and the voice text get the widths the test says. */
+function boxes(figure: number, voice: number) {
+  const width = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get");
+  width.mockImplementation(function (this: HTMLElement) {
+    return this.classList.contains("avatar-figure") ? figure : this.classList.contains("avatar-voice") ? voice : 0;
+  });
+  return width;
+}
+
+test.each([["person's pill", speaks], ["agent's balloon", {}]] as const)("just the avatar: the %s is centred on the creature, wider than it and with room all round", (_name, facts) => {
+  vi.useFakeTimers();
+  const width = boxes(160, 300);
+  try {
+    page("avatar", { room: { left: 500, right: 500 } }, facts);
+    const card = document.querySelector<HTMLElement>(".avatar-card")!;
+    expect(card.style.getPropertyValue("--voice-shift")).toBe("0px");
+    expect(document.querySelector(".avatar-voice .vcap")).not.toBeNull();
+  } finally { width.mockRestore(); }
+});
+
+test("just the avatar: with the creature near the left edge the voice text slides in by what is missing; near the right edge, the other way", () => {
+  vi.useFakeTimers();
+  const width = boxes(160, 300);
+  try {
+    // Centred it would reach 70px past the creature on each side; only 20px of room on the left.
+    page("avatar", { room: { left: 20, right: 400 } });
+    expect(document.querySelector<HTMLElement>(".avatar-card")!.style.getPropertyValue("--voice-shift")).toBe("50px");
+    cleanup();
+    page("avatar", { room: { left: 400, right: 0 } });
+    expect(document.querySelector<HTMLElement>(".avatar-card")!.style.getPropertyValue("--voice-shift")).toBe("-70px");
+    cleanup();
+    // A host that cannot say: always centred.
+    page("avatar");
+    expect(document.querySelector<HTMLElement>(".avatar-card")!.style.getPropertyValue("--voice-shift")).toBe("0px");
+  } finally { width.mockRestore(); }
+});
+
+test("just the avatar: where the creature and its room are narrower than the text, the text is capped to that width and placed after the cap", () => {
+  vi.useFakeTimers();
+  // The boxes report the text's width as the cap leaves it: 300px wide, wrapped to what the card set.
+  const width = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get");
+  width.mockImplementation(function (this: HTMLElement) {
+    if (this.classList.contains("avatar-figure")) return 160;
+    if (!this.classList.contains("avatar-voice")) return 0;
+    const cap = parseFloat(this.closest<HTMLElement>(".avatar-card")!.style.getPropertyValue("--voice-max"));
+    return Number.isNaN(cap) ? 300 : Math.min(300, cap);
+  });
+  try {
+    // 20px a side: 200px to be in, so the 300px text wraps to 200 and is centred (nothing left to slide).
+    page("avatar", { room: { left: 20, right: 20 } });
+    const card = document.querySelector<HTMLElement>(".avatar-card")!;
+    expect(card.style.getPropertyValue("--voice-max")).toBe("200px");
+    expect(card.style.getPropertyValue("--voice-shift")).toBe("0px");
+    cleanup();
+    // A host that cannot say: no cap.
+    page("avatar");
+    expect(document.querySelector<HTMLElement>(".avatar-card")!.style.getPropertyValue("--voice-max")).toBe("");
+  } finally { width.mockRestore(); }
+});

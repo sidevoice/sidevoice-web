@@ -79,14 +79,15 @@ test("avatar: the reply's card hangs under the creature in the upper half, over 
   const down = await boxes(page);
   expect(down.card.top).toBeGreaterThanOrEqual(down.figure.bottom);
   expect(down.card.bottom).toBeLessThanOrEqual(down.window.bottom + 0.5);
-  // As wide as its words, up to the compact card's column (300px at this size), toward the creature's own side: the right.
+  // As wide as its words, up to the compact card's column (300px at this size), centred on the creature (R13; card-voice-centre.spec.mjs
+  // covers the screen's edges).
   expect(down.card.width).toBeLessThanOrEqual(300 + 0.5);
-  expect(down.card.right).toBeCloseTo(down.window.right, 0);
+  expect(down.card.left + down.card.width / 2).toBeCloseTo(down.figure.left + down.figure.width / 2, 0);
   await placed(page, { vertical: "lower", horizontal: "left" });
   await expect(page.locator(".floating-card")).toHaveAttribute("data-open", "up");
   const up = await boxes(page);
   expect(up.card.bottom).toBeLessThanOrEqual(up.figure.top);
-  expect(up.card.left).toBeCloseTo(up.window.left, 0);
+  expect(up.card.left + up.card.width / 2).toBeCloseTo(up.figure.left + up.figure.width / 2, 0);
   // The creature is the same size wherever the card is.
   expect(up.figure.width).toBeCloseTo(down.figure.width, 0);
 });

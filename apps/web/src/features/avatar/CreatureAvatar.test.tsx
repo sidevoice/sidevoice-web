@@ -167,6 +167,24 @@ test("the floating card's creature (liveFace) is a live, sharp face on the card 
   expect(live.disposed).toBe(true);
 });
 
+test("the floating card's offline creature (liveFace) is its still grey face: drawn once, no live creature mounted and no frames asked for; back online it is live again", async () => {
+  const frames = vi.spyOn(window, "requestAnimationFrame");
+  const { STILL_EXPR } = await import("./creature/faces");
+  const view = render(<CharacterAvatar spec={spec} state={state("offline")} size="small" live liveFace mouth="playback" />);
+  await settle();
+  expect(host.lives).toHaveLength(0);
+  expect(host.faces).toHaveLength(1);
+  expect(host.faces[0]).toMatchObject({ seed: "t-login", expr: STILL_EXPR.offline, cancelled: false });
+  expect(frames).not.toHaveBeenCalled();
+  expect(view.container.firstElementChild).toHaveAttribute("data-offline");
+  view.rerender(<CharacterAvatar spec={spec} state={state("idle")} size="small" live liveFace mouth="playback" />);
+  await settle();
+  expect(host.faces[0].cancelled).toBe(true);
+  expect(host.lives).toHaveLength(1);
+  view.unmount();
+  frames.mockRestore();
+});
+
 test("the person and the mascot are still the engine's drawings", async () => {
   const { PERSON_AVATAR, SIDEVOICE_MASCOT } = await import("./avatar-spec");
   for (const figure of [PERSON_AVATAR, SIDEVOICE_MASCOT]) {
