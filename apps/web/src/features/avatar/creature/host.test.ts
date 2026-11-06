@@ -555,3 +555,20 @@ test("the creature canvas is allocated again only when its size changes: not by 
   expect(set.height).toBe(once.height + 1);
   expect(element.height).toBeLessThan(1752);
 });
+
+test("a draw that throws leaves the camera's view offset cleared, so the next draw, a trial or the poster is not windowed", () => {
+  webgl();
+  vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(2);
+  rig.reach = 200;
+  const { element } = cropped(1598, 876);
+  const live = mount({ ...onStage, moving: true, canvas: element, frame: asked({ desktop: true }) })!;
+  const scene = stageFor("scene");
+  const draw = scene.draw.bind(scene);
+  scene.draw = () => { throw new Error("a lost context mid-draw"); };
+  rig.views.length = 0;
+  expect(() => live.tick(0)).toThrow("a lost context mid-draw");
+  expect(rig.views.length).toBe(2);
+  expect(rig.views[0]).not.toBe("clear");
+  expect(rig.views.at(-1)).toBe("clear");
+  scene.draw = draw;
+});
