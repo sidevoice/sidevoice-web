@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { openCard } from "./motion-states.mjs";
 
+// Each case opens the room, then the card, two page loads that a software GL and a busy runner take their time over (the first
+// case of a worker, cold, has run past the 30 s default). The checks themselves wait on what they read.
+test.describe.configure({ timeout: 90_000 });
+
 /* The floating card's voice text is the stage's: the white voice card (the design reference's `.vcap.card`), docked over or
  * under the title card and the avatar, in a real browser where the layout is laid out. Its look is read off the page as
  * computed (fill, ink, border, radius, DM Sans 450, the dark theme's black card); where it docks is measured against the
