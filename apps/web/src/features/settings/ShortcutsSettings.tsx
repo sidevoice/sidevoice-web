@@ -60,7 +60,7 @@ interface Global {
   actions: ShortcutAction[];
   /** Whether the keys of the page's own show: a host that reports shortcuts says (`inApp`), and nothing shows before it has. */
   inApp: boolean;
-  set(action: ShortcutAction, accelerator: string | null): Promise<GlobalShortcut>;
+  set?(action: ShortcutAction, accelerator: string | null): Promise<GlobalShortcut>;
   request?(): Promise<void>;
   setHeadset?(partial: Partial<HeadsetStatus>): Promise<void>;
   restore?(action: ShortcutAction): Promise<GlobalShortcut>;
@@ -95,7 +95,7 @@ function useGlobal(): Global | null {
   if (bridge) return {
     status, actions: (["holdToTalk", "mute", "oneTurn"] as ShortcutAction[]).filter((action) => !!status?.shortcuts?.[action]),
     inApp: !!status && status.inApp !== false,
-    set: async (action, accelerator) => { const value = await bridge.set(action, accelerator); merge(action, value); return value; },
+    set: bridge.set ? async (action, accelerator) => { const value = await bridge.set!(action, accelerator); merge(action, value); return value; } : undefined,
     restore: bridge.restore ? async (action) => { const value = await bridge.restore!(action); merge(action, value); return value; } : undefined,
     request: bridge.request ? async () => { const next = await bridge.request!(status?.permission?.kind ?? "inputMonitoring"); setStatus(next); } : undefined,
     setHeadset: bridge.setHeadset ? async (partial) => { const next = await bridge.setHeadset!(partial); setStatus(next); } : undefined,
@@ -218,7 +218,7 @@ function GlobalRow({ t, global, words, entry, shortcut, clash }: { t: Translate;
   const failure = (failed: unknown) => (failed as { key?: string } | null)?.key === "record_timeout" ? t("settings.shortcuts.recordTimeout") : t("settings.shortcuts.recordFailed");
   /** Sets it; the reason it could not be, or null. */
   const apply = async (next: string | null): Promise<string | null> => {
-    try { await global.set(action, next); setError(null); return null; }
+    try { await global.set!(action, next); setError(null); return null; }
     catch (failure) {
       const key = (failure as { key?: string } | null)?.key;
       return key === "shortcut_invalid" ? t("settings.shortcuts.invalid") : key === "shortcut_unsupported" ? t("settings.shortcuts.unsupported") : t("settings.shortcuts.failed");
