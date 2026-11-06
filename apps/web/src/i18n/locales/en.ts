@@ -1001,6 +1001,7 @@ export const messages = {
   // computer, the headset's buttons, in Sidevoice), the field they are recorded in, and what it says when a key will not do.
   "settings.section.shortcuts": "Shortcuts",
   "settings.shortcuts.description": "Keys for the microphone: from anywhere on your computer, from your headset and inside Sidevoice.",
+  "settings.shortcuts.descriptionHeadset": "What the buttons of your headset do during a call.",
   "settings.shortcuts.global": "Anywhere on your computer",
   "settings.shortcuts.headset": "Headset buttons",
   "settings.shortcuts.inApp": "In Sidevoice",
@@ -1021,6 +1022,8 @@ export const messages = {
   "settings.shortcuts.headsetOneTurn": "Say one thing",
   "settings.shortcuts.headsetSkip": "Skip what is playing",
   "settings.shortcuts.headsetNone": "Nothing",
+  "settings.shortcuts.headsetSystem": "The system handles the headset's buttons during a call: it mutes, and these choices do not apply.",
+  "settings.shortcuts.headsetCard": "With the defaults, the headset's press mutes through the system. Choosing other actions adds a playback card on the lock screen.",
   "settings.shortcuts.record": "Record shortcut",
   "settings.shortcuts.recording": "Press keys, or tap one",
   "settings.shortcuts.recordingInApp": "Press keys…",

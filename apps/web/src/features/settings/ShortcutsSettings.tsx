@@ -22,7 +22,9 @@ import { useBindings } from "../../state/use-shortcuts";
  *  - Headset buttons: what a press and a double press of the headset's button do, where the app reports a headset path.
  *  - In Sidevoice: the keys the room answers while it is in front, the same field, kept with the web's settings
  *    (state/shortcuts.ts, which the key handler, the tooltips and these rows all read).
- * A phone has none of them, and no section. */
+ * What shows follows what the host reports (`ShortcutsStatus`) and nothing about the platform: the global group has the actions the host
+ *  offers (none: no group), the headset group shows when it reports a headset, and these keys show unless it says `inApp: false` (a
+ *  phone reports the headset alone). Without a host that reports shortcuts, a keyboard is the one sign (KEYBOARD_QUERY). */
 
 /** A mouse or a trackpad, where a keyboard is all but certain; a phone, or a tablet on its own, has neither, and no key
  *  here would reach the room there. */
@@ -54,7 +56,10 @@ const EMPTY_SHORTCUT: GlobalShortcut = { accelerator: null, label: null, state: 
 
 interface Global {
   status: ShortcutsStatus | null;
+  /** The global actions the host offers, once it has said. */
   actions: ShortcutAction[];
+  /** Whether the keys of the page's own show: a host that reports shortcuts says (`inApp`), and nothing shows before it has. */
+  inApp: boolean;
   set(action: ShortcutAction, accelerator: string | null): Promise<GlobalShortcut>;
   request?(): Promise<void>;
   setHeadset?(partial: Partial<HeadsetStatus>): Promise<void>;
@@ -88,7 +93,8 @@ function useGlobal(): Global | null {
   const merge = useCallback((action: ShortcutAction, value: GlobalShortcut) => setStatus((now) => now && { ...now, shortcuts: { ...now.shortcuts, [action]: value } }), []);
   if (!bridge && !legacy) return null;
   if (bridge) return {
-    status, actions: ["holdToTalk", "mute", "oneTurn"],
+    status, actions: (["holdToTalk", "mute", "oneTurn"] as ShortcutAction[]).filter((action) => !!status?.shortcuts?.[action]),
+    inApp: !!status && status.inApp !== false,
     set: async (action, accelerator) => { const value = await bridge.set(action, accelerator); merge(action, value); return value; },
     restore: bridge.restore ? async (action) => { const value = await bridge.restore!(action); merge(action, value); return value; } : undefined,
     request: bridge.request ? async () => { const next = await bridge.request!(status?.permission?.kind ?? "inputMonitoring"); setStatus(next); } : undefined,
@@ -96,7 +102,7 @@ function useGlobal(): Global | null {
     record: bridge.record ? (action, onHint) => bridge.record!(action, onHint) : undefined,
   };
   return {
-    status, actions: ["mute"],
+    status, actions: ["mute"], inApp: true,
     set: async (action, accelerator) => { const value = await legacy!.set(accelerator); merge(action, value); return value; },
   };
 }
@@ -119,10 +125,12 @@ export function ShortcutsSettings({ t }: { t: Translate }) {
   const [, redraw] = useState(0);
   useEffect(() => host().identity.followKeyboardLayout((map) => { setLayoutMap(map); redraw((n) => n + 1); }), []);
   const words = useWords(t);
-  return <Section id="shortcuts" title={t("settings.section.shortcuts")} description={t("settings.shortcuts.description")}>
-    {global && <GlobalGroup t={t} global={global} words={words} />}
+  // A host that reports the headset alone (a phone) has nothing else to describe.
+  const headsetOnly = !!global?.status?.headset && global.actions.length === 0 && !global.inApp;
+  return <Section id="shortcuts" title={t("settings.section.shortcuts")} description={t(headsetOnly ? "settings.shortcuts.descriptionHeadset" : "settings.shortcuts.description")}>
+    {global && global.actions.length > 0 && <GlobalGroup t={t} global={global} words={words} />}
     {global?.status?.headset && <HeadsetGroup t={t} global={global} headset={global.status.headset} />}
-    <InAppGroup t={t} words={words} />
+    {(!global || global.inApp) && <InAppGroup t={t} words={words} />}
   </Section>;
 }
 
@@ -280,16 +288,20 @@ const HEADSET_CHOICES: { value: HeadsetPress; label: MessageKey }[] = [
 
 function HeadsetGroup({ t, global, headset }: { t: Translate; global: Global; headset: HeadsetStatus }) {
   const options = HEADSET_CHOICES.map((choice) => ({ value: choice.value, label: t(choice.label) }));
+  // The system's call holds the headset: the rows stay, read-only, and say who mutes.
+  const locked = !global.setHeadset || !!headset.managedBySystem;
   const change = (partial: Partial<HeadsetStatus>) => { void global.setHeadset?.(partial).catch(() => {}); };
   return <Group title={t("settings.shortcuts.headset")}>
     <Row label={t("settings.shortcuts.headsetPress")} description={t("settings.shortcuts.headsetPressHint")}>
-      <Select size="sm" aria-label={t("settings.shortcuts.headsetPress")} options={options} value={headset.press} disabled={!global.setHeadset}
+      <Select size="sm" aria-label={t("settings.shortcuts.headsetPress")} options={options} value={headset.press} disabled={locked}
         onValueChange={(value) => change({ press: value as HeadsetPress })} />
     </Row>
     {headset.doublePress !== null && <Row label={t("settings.shortcuts.headsetDouble")} description={t("settings.shortcuts.headsetDoubleHint")}>
-      <Select size="sm" aria-label={t("settings.shortcuts.headsetDouble")} options={options} value={headset.doublePress} disabled={!global.setHeadset}
+      <Select size="sm" aria-label={t("settings.shortcuts.headsetDouble")} options={options} value={headset.doublePress} disabled={locked}
         onValueChange={(value) => change({ doublePress: value as HeadsetPress })} />
     </Row>}
+    {headset.managedBySystem && <Alert tone="accent" className="shortcut-note">{t("settings.shortcuts.headsetSystem")}</Alert>}
+    {headset.nonDefaultAddsCard && !headset.managedBySystem && <Alert tone="accent" className="shortcut-note">{t("settings.shortcuts.headsetCard")}</Alert>}
   </Group>;
 }
 
