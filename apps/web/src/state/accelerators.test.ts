@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { acceleratorKey, canonical, composeAccelerator, parseAccelerator, readAccelerator, sameAccelerator, type Words } from "./accelerators";
+import { acceleratorKey, canonical, composeAccelerator, keycap, parseAccelerator, readAccelerator, sameAccelerator, setLayoutMap, type Words } from "./accelerators";
 
 /* A key is named by the physical key, not by the character it types: a keypad `+` is `NumpadAdd` and never a bare `+`
  * (the accelerator's own separator), whatever the layout. */
@@ -58,4 +58,31 @@ test("accelerators saved before keep working: the old forms read as the same key
     expect(parseAccelerator(old).key, old).toBe(parseAccelerator(now).key);
   }
   expect(sameAccelerator("Cmd+Alt+-", "Cmd+Alt+NumpadSubtract")).toBe(false);
+});
+
+test("the ISO key (the extra <> key beside the left Shift) is a physical key on its own, in any case, and reads as its glyph", () => {
+  expect(acceleratorKey("IntlBackslash", "<")).toBe("IntlBackslash");
+  expect(recorded("IntlBackslash", "<")).toBe("Cmd+Alt+IntlBackslash");
+  expect(parseAccelerator("cmd+alt+intlbackslash").key).toBe("IntlBackslash");
+  expect(sameAccelerator("Cmd+Alt+intlbackslash", "Cmd+Alt+IntlBackslash")).toBe(true);
+  expect(sameAccelerator("Cmd+Alt+IntlBackslash", "Cmd+Alt+Comma")).toBe(false);
+  expect(readAccelerator("Ctrl+IntlBackslash", windows).combo).toBe("Ctrl+<");
+});
+
+test("a keycap shows what the layout types on the key where the browser says, and the US glyph where it does not", () => {
+  const spanish = new Map([["BracketRight", "+"], ["Semicolon", "ñ"], ["IntlBackslash", "<"], ["Minus", "'"], ["KeyA", "a"], ["Quote", ""]]);
+  try {
+    setLayoutMap(spanish);
+    expect(readAccelerator("Ctrl+Alt+BracketRight", windows).combo).toBe("Ctrl+Alt++");
+    expect(readAccelerator("Ctrl+Semicolon", windows).combo).toBe("Ctrl+ñ");
+    expect(readAccelerator("Ctrl+Minus", windows).combo).toBe("Ctrl+'");
+    // Not in the map, or empty: the US glyph. The keypad is never the layout's.
+    expect(readAccelerator("Ctrl+Quote", windows).combo).toBe("Ctrl+'");
+    expect(readAccelerator("Ctrl+BracketLeft", windows).combo).toBe("Ctrl+[");
+    expect(readAccelerator("Ctrl+NumpadAdd", windows).combo).toBe("Ctrl+Num +");
+    expect(keycap("KeyA")).toBe("KeyA");
+  } finally {
+    setLayoutMap(null);
+  }
+  expect(readAccelerator("Ctrl+Alt+BracketRight", windows).combo).toBe("Ctrl+Alt+]");
 });

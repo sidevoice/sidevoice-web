@@ -8,7 +8,7 @@ import { useShortcutRecorder, type Captured } from "../../components/ui/use-shor
 import { host, type GlobalShortcut, type HeadsetPress, type HeadsetStatus, type ShortcutAction, type ShortcutsStatus } from "../../host";
 import { uiLanguage, type MessageKey, type Translate } from "../../i18n/translator";
 import {
-  composeAccelerator, acceleratorKey, globalAllowed, isFnKey, isSingle, parseAccelerator, readAccelerator, sameAccelerator, singleAccelerator,
+  composeAccelerator, acceleratorKey, globalAllowed, isFnKey, isSingle, parseAccelerator, readAccelerator, sameAccelerator, setLayoutMap, singleAccelerator,
   type Trigger, type Words,
 } from "../../state/accelerators";
 import {
@@ -113,6 +113,9 @@ export function defaultGlobalMute(mac: boolean) {
 
 export function ShortcutsSettings({ t }: { t: Translate }) {
   const global = useGlobal();
+  // The keycaps read as the layout writes its keys where the browser says (a Spanish BracketRight is `+`), and again if it changes.
+  const [, redraw] = useState(0);
+  useEffect(() => host().identity.followKeyboardLayout((map) => { setLayoutMap(map); redraw((n) => n + 1); }), []);
   const words = useWords(t);
   return <Section id="shortcuts" title={t("settings.section.shortcuts")} description={t("settings.shortcuts.description")}>
     {global && <GlobalGroup t={t} global={global} words={words} />}
@@ -162,6 +165,7 @@ function GlobalGroup({ t, global, words }: { t: Translate; global: Global; words
     if (!words.mac && !parsed.single && parsed.modifiers.length === 2 && parsed.modifiers.includes("ctrl") && parsed.modifiers.includes("alt") && /^[A-Z]$/.test(parsed.key.toUpperCase()) && parsed.key.length === 1)
       return { message: t("settings.shortcuts.clashAltGr", { keys, letter: parsed.key.toUpperCase() }), alternative };
     if (shortcut.voiceOver) return { message: t("settings.shortcuts.clashVoiceOver", { keys }), alternative: null };
+    if (shortcut.layoutBound) return { message: t("settings.shortcuts.clashLayoutKey", { keys }), alternative: null };
     return null;
   };
   const singleRows = rows.filter((entry) => isSingle(value(entry.action).accelerator));
@@ -195,7 +199,10 @@ function GlobalRow({ t, global, words, entry, shortcut, clash }: { t: Translate;
   /** Sets it; the reason it could not be, or null. */
   const apply = async (next: string | null): Promise<string | null> => {
     try { await global.set(action, next); setError(null); return null; }
-    catch (failure) { return (failure as { key?: string } | null)?.key === "shortcut_invalid" ? t("settings.shortcuts.invalid") : t("settings.shortcuts.failed"); }
+    catch (failure) {
+      const key = (failure as { key?: string } | null)?.key;
+      return key === "shortcut_invalid" ? t("settings.shortcuts.invalid") : key === "shortcut_unsupported" ? t("settings.shortcuts.unsupported") : t("settings.shortcuts.failed");
+    }
   };
   const onCaptured = async (captured: Captured): Promise<string | null> => {
     let next: string;

@@ -80,14 +80,14 @@ const ARROWS: Record<string, string> = { ArrowUp: "Up", ArrowDown: "Down", Arrow
 
 /** The keys named by the physical key and never by the character they type: the main row's punctuation (what a Spanish
  *  layout types on BracketRight is not `+`) and the keypad. These are the names `global-hotkey` knows them by. */
-const PUNCTUATION = ["Minus", "Equal", "Comma", "Period", "Slash", "Backslash", "Semicolon", "Quote", "BracketLeft", "BracketRight", "Backquote"];
+const PUNCTUATION = ["Minus", "Equal", "Comma", "Period", "Slash", "Backslash", "Semicolon", "Quote", "BracketLeft", "BracketRight", "Backquote", "IntlBackslash"];
 const KEYPAD = ["Add", "Subtract", "Multiply", "Divide", "Decimal", "Equal", "Enter", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"].map((name) => "Numpad" + name);
 const PHYSICAL = [...PUNCTUATION, ...KEYPAD];
 const PHYSICAL_BY_LOWER = new Map(PHYSICAL.map((name) => [name.toLowerCase(), name]));
 
-/** What each of them is written on the keycap: `-`, `;`, `Num +`. */
+/** What each of them is written on the keycap: `-`, `;`, `Num +`. `IntlBackslash` is the ISO `<>` key beside the left Shift. */
 const KEYCAPS: Record<string, string> = {
-  Minus: "-", Equal: "=", Comma: ",", Period: ".", Slash: "/", Backslash: "\\", Semicolon: ";", Quote: "'", BracketLeft: "[", BracketRight: "]", Backquote: "`",
+  Minus: "-", Equal: "=", Comma: ",", Period: ".", Slash: "/", Backslash: "\\", Semicolon: ";", Quote: "'", BracketLeft: "[", BracketRight: "]", Backquote: "`", IntlBackslash: "<",
   NumpadAdd: "Num +", NumpadSubtract: "Num -", NumpadMultiply: "Num *", NumpadDivide: "Num /", NumpadDecimal: "Num .", NumpadEqual: "Num =", NumpadEnter: "Num Enter",
   ...Object.fromEntries([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((digit) => ["Numpad" + digit, "Num " + digit])),
 };
@@ -128,9 +128,19 @@ export function acceleratorKey(code: string, key: string): string {
   return code || key;
 }
 
-/** How the key of an accelerator reads on a keycap: `M`, `-`, `Num +`. */
+/** What the keyboard layout types on each physical key, where the browser tells (`navigator.keyboard.getLayoutMap()`, Chromium
+ *  only): a Spanish layout types `+` on BracketRight. Empty until it answers, and everywhere else; the US glyph shows then. */
+let layoutGlyphs: ReadonlyMap<string, string> | null = null;
+
+/** Records the layout's glyphs from a layout map (a `KeyboardLayoutMap`: physical key name to the character it types). */
+export function setLayoutMap(map: { get(code: string): string | undefined } | null) {
+  layoutGlyphs = map ? new Map(PUNCTUATION.flatMap((name) => { const glyph = map.get(name); return glyph && [...glyph].length === 1 ? [[name, glyph] as [string, string]] : []; })) : null;
+}
+
+/** How the key of an accelerator reads on a keycap: `M`, `-`, `Num +`; a punctuation key as the layout writes it when the
+ *  browser says (`+` for a Spanish BracketRight), else as a US keyboard does. */
 export function keycap(key: string): string {
-  return KEYCAPS[key] ?? key;
+  return layoutGlyphs?.get(key) ?? KEYCAPS[key] ?? key;
 }
 
 export const isFunctionKey = (key: string) => /^F\d{1,2}$/.test(key);
