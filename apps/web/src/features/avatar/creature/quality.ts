@@ -2,7 +2,8 @@
  *
  * A phone has a fixed fill rate and a thread shared with the page's layout and input; the stage's creature is drawn by
  * WebGL, whose work (the pixels it fills, the shadow map it renders first) is what a cheap phone cannot keep up with. So
- *  - the canvas holds the pixels the tile shows (sceneSize), no more, within the stage's own 900 k px render;
+ *  - the canvas holds the pixels the tile shows (sceneSize), no more, within the stage's own 900 k px render (a desktop's: a 4K
+ *    frame's, DESKTOP_MAX_AREA);
  *  - a Governor watches what the frames cost and when they arrive, and steps down the resolution the creature is drawn at
  *    (TIERS), then the frame rate, until the frames hold; it steps back up when the rung above is expected to hold with room to
  *    spare, and it did not just fail there.
@@ -12,6 +13,14 @@
 export const SCENE_MAX_H = 960;
 /** The canvas's area at most (px): what the stage's own 1152 × 768 render held, so no tile is drawn at more fill than before. */
 export const SCENE_MAX_AREA = 900_000;
+/** A desktop stage's own ceilings (the stage's framing says it is not a phone: the layout's own rule): the room it takes can be a
+ *  whole 4K screen's, drawn at the screen's pixel ratio instead of below it (900 k px on a 1920 x 1080 window at 2x was 0.78 device
+ *  px to a css px). A desktop has the fill rate and a thread of its own; the governor still steps the scale down when its frames
+ *  do not hold. 8 294 400 is a 3840 x 2160 frame: a 1920 x 1080 stage at 2x is drawn whole, a 2560 x 1440 one at about 1.75. */
+export const DESKTOP_MAX_H = 2160;
+export const DESKTOP_MAX_AREA = 8_294_400;
+/** The scale of the ladder's last rung (TIERS): where a desktop's ceilings are back to a phone's. */
+const LOWEST_SCALE = 0.5;
 /** The canvas's height at least (px): below this the creature's outline and face would smear. SCENE_MAX_AREA wins over it, for
  *  a tile so wide and short (past about 11:1) that its area cap is lower still. */
 export const SCENE_MIN_H = 288;
@@ -20,15 +29,20 @@ export const MAX_DPR = 2;
 
 /** The canvas's size for a tile `cssW` × `cssH` (css px) on a screen of pixel ratio `dpr`, at `scale` of its full resolution
  *  (the governor's): as many device pixels as the tile shows, within SCENE_MAX_H and SCENE_MIN_H, and never over SCENE_MAX_AREA
- *  (that ceiling is the fill the stage was sized for: the minimum height gives way to it). A tile with no box yet is 3:2. */
-export function sceneSize(cssW: number, cssH: number, dpr: number, scale = 1): { width: number; height: number } {
+ *  (that ceiling is the fill the stage was sized for: the minimum height gives way to it). A tile with no box yet is 3:2.
+ *  `desktop`: the desktop stage's ceilings (DESKTOP_MAX_H, DESKTOP_MAX_AREA) instead of the phone's. */
+export function sceneSize(cssW: number, cssH: number, dpr: number, scale = 1, desktop = false): { width: number; height: number } {
+  // A desktop's ceilings are the phone's at the ladder's last scale (0.5) and rise with the square of the scale to their own at 1: the
+  // lowest rungs draw what they always did (a device that gets there keeps its floor), the top ones what the screen shows.
+  const room = desktop ? Math.min(1, Math.max(0, (scale - LOWEST_SCALE) / (1 - LOWEST_SCALE))) ** 2 : 0;
+  const maxH = SCENE_MAX_H + (DESKTOP_MAX_H - SCENE_MAX_H) * room, maxArea = SCENE_MAX_AREA + (DESKTOP_MAX_AREA - SCENE_MAX_AREA) * room;
   const ar = cssW > 0 && cssH > 0 ? cssW / cssH : 1.5;
-  const fits = Math.max(1, Math.floor(Math.sqrt(SCENE_MAX_AREA / ar))); // the tallest this shape may be within the area
+  const fits = Math.max(1, Math.floor(Math.sqrt(maxArea / ar))); // the tallest this shape may be within the area
   let h = cssH > 0 ? cssH * Math.min(Math.max(dpr, 1), MAX_DPR) : 768;
-  h = Math.min(SCENE_MAX_H, h, fits);
+  h = Math.min(maxH, h, fits);
   h = Math.min(fits, Math.max(SCENE_MIN_H, Math.round(h * scale)));
   // (whole pixels: the width is rounded down where rounding it to the shape would pass the ceiling by a few)
-  return { width: Math.max(1, Math.min(Math.round(h * ar), Math.floor(SCENE_MAX_AREA / h))), height: h };
+  return { width: Math.max(1, Math.min(Math.round(h * ar), Math.floor(maxArea / h))), height: h };
 }
 
 /** A rung of the ladder: the share of the full resolution the creature is drawn at, and the frames a second it is drawn at. */

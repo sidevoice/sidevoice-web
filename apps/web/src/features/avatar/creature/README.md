@@ -58,7 +58,7 @@ resizes only the creatures in motion (one held still keeps the size it was drawn
 
 - **The stage** (`<CharacterAvatar scene live …>`, `framing: "scene"`): one canvas over the whole tile, as many pixels
   as the tile shows (CSS size × the pixel ratio, at most 2; refit when the ratio changes under the same CSS box, a window
-  moved to another screen), up to the creator's 960 px tall and 900 k px (`quality.ts` `sceneSize`), and the renderer is sized to that canvas, so a frame is drawn at the pixels it is shown in (the reference
+  moved to another screen), up to the creator's 960 px tall and 900 k px on a phone, and a 4K frame (2160 px, 8.3 M px) on a desktop stage whose framing says it is not a phone (`quality.ts` `sceneSize`; the ladder's last rung is the same on both), and the renderer is sized to that canvas, so a frame is drawn at the pixels it is shown in (the reference
   rendered 1152 × 768 and resampled it, the creator's `viewCam`). The camera
   stands where the stage puts it: by default the reference's desktop distance (`SCENE_ZOOM`, 1.32) with the feet on the
   scene's ground line; a framing `{ zoom, lookY }` (the creator's `item.opts`) replaces it — this is where the stage's

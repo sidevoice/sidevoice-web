@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import type { StageFrame } from "./stage-frame";
 
 /* Where WebGL is missing, refused or taken away, the host says so (creaturesDrawable, onCreaturesChange) instead of
  * leaving canvases empty for the rest of the page's life. It tries again on a later mount, and when a lost context comes
@@ -288,6 +289,22 @@ test("the stage's canvas holds the pixels its tile shows (the pixel ratio to 2, 
   expect([desk.width, desk.height]).toEqual([1118, 628]);
   expect(second.tick(0)).toBe(true);
   expect([scene.w, scene.h]).toEqual([1118, 628]);
+});
+
+test("a stage whose framing says it is a desktop's is drawn at the screen's pixels past the phone's 900 k; a phone's, or none, keeps it", () => {
+  webgl();
+  vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(2);
+  // (a framing that has been asked as a desktop's: the framer's solves need pixels this DOM has none of, so none is asked of it here)
+  const asked = (phone: boolean) => ({ request: { w: 1598, h: 876, dx: 0, dy: 0, phone, rest: true, cards: null, opener: null }, listen: () => () => {}, feet() {}, motion() {} }) as unknown as StageFrame;
+  const desk = tile(1598, 876);
+  mount({ ...onStage, canvas: desk, frame: asked(false) });
+  expect([desk.width, desk.height]).toEqual([3196, 1752]); // 2 device px to a css px
+  const phone = tile(1598, 876);
+  mount({ ...onStage, canvas: phone, frame: asked(true) });
+  expect([phone.width, phone.height]).toEqual([1281, 702]);
+  const none = tile(1598, 876);
+  mount({ ...onStage, canvas: none });
+  expect([none.width, none.height]).toEqual([1281, 702]);
 });
 
 test("when the governor steps down, the canvas takes fewer pixels in the very task that draws it, so it is never shown cleared", () => {

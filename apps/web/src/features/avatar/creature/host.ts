@@ -377,6 +377,8 @@ export class LiveCreature {
     // A sharp face also follows its pixel ratio (a window moved to another screen), where the browser says so.
     if (opts.sharp) { try { box?.observe(opts.canvas, { box: "device-pixel-content-box" }); } catch { box?.observe(opts.canvas); } } else box?.observe(opts.canvas);
     this.off.push(() => box?.disconnect());
+    // The stage's ceilings follow what it says it is (its first ask, a window turned between a phone's rules and a desktop's).
+    if (opts.frame && !face) this.off.push(opts.frame.listen(() => { if (this.fit(false)) { this.framer?.invalidate(); this.poke(); } }));
     // Where the pixels depend on the pixel ratio (the stage's, a sharp face's), the ratio is watched too: a window moved between
     // a 1× and a 2× screen keeps its css box, so no observer above would refit the canvas (blurry on the sharper screen, wasted
     // fill on the other); and not every browser has the device-pixel box the sharp face asks for.
@@ -395,6 +397,10 @@ export class LiveCreature {
     wake();
   }
 
+  /** Whether the stage this scene is drawn for is a desktop's: its framing (the stage's ask, the layout's phone rule) says it is
+   *  not a phone. A scene with no framing, or not asked yet, is held to the phone's ceilings. */
+  private desktop(): boolean { return this.opts.frame?.request?.phone === false; }
+
   /** The canvas takes its box's shape, so nothing is stretched, and as many pixels as the box shows (quality.ts sceneSize, at
    *  the governor's scale), up to the creator's 960 px tall. `measure`: the box is read again (a layout), else it is as last read. */
   private fit(measure = true): boolean {
@@ -408,7 +414,7 @@ export class LiveCreature {
       W = H = this.opts.sharp && (w > 0 || h > 0) ? Math.min(CARD_MAX_PX, Math.max(CARD_MIN_PX, Math.ceil(Math.max(w, h) * (globalThis.devicePixelRatio || 1)))) : FACE_PX;
     } else {
       this.scaled = governor.scale;
-      ({ width: W, height: H } = sceneSize(w, h, globalThis.devicePixelRatio || 1, this.scaled));
+      ({ width: W, height: H } = sceneSize(w, h, globalThis.devicePixelRatio || 1, this.scaled, this.desktop()));
     }
     const key = W + "x" + H;
     if (key === this.sized) return false;
