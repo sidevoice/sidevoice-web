@@ -415,7 +415,7 @@ test("the governor's step estimate sums the scenes drawn in a frame, and counts 
   const alone = host.drawnFill(1);
   expect(alone).toBe(stage.areaAt(1));
   expect(alone).toBeGreaterThan(0);
-  // A second scene drawn in the same frame (a picture-in-picture, the floating card): the frame fills both, at both rungs.
+  // A second scene drawn in the same frame (a picture-in-picture): the frame fills both, at both rungs.
   const pip = mount({ ...onStage, canvas: tile(300, 200), moving: true })!;
   expect(host.drawnFill(1)).toBe(stage.areaAt(1) + pip.areaAt(1));
   expect(host.drawnFill(0.6)).toBe(stage.areaAt(0.6) + pip.areaAt(0.6));
@@ -429,6 +429,22 @@ test("the governor's step estimate sums the scenes drawn in a frame, and counts 
   held.setMoving(false);
   pip.dispose();
   expect(host.drawnFill(1)).toBe(stage.areaAt(1));
+  // The floating card's creature (a sharp live face, the "card" stage) is drawn in the frame too, at its canvas's pixels at every rung.
+  const cardCanvas = tile(200, 200);
+  const card = mount({ seed: "t3", canvas: cardCanvas, framing: "face", sharp: true, moving: true })!;
+  const cardArea = cardCanvas.width * cardCanvas.height;
+  expect(cardArea).toBeGreaterThan(0);
+  expect(card.areaAt(0.6)).toBe(cardArea);
+  expect(host.drawnFill(1)).toBe(stage.areaAt(1) + cardArea);
+  expect(host.drawnFill(0.6)).toBe(stage.areaAt(0.6) + cardArea);
+  // Held still, or offline (the poster), it is not drawn in motion: it adds none.
+  card.setMoving(false);
+  expect(host.drawnFill(1)).toBe(stage.areaAt(1));
+  card.setMoving(true);
+  card.setMood("offline");
+  expect(host.drawnFill(1)).toBe(stage.areaAt(1));
+  const still = mount({ seed: "t4", canvas: tile(200, 200), framing: "face", sharp: true, moving: false })!;
+  expect(still.areaAt(1) > 0 && host.drawnFill(1) === stage.areaAt(1)).toBe(true);
 });
 
 test("only a creature that moves is judged by the governor: held still, or the poster, its frames are not motion", () => {
