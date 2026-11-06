@@ -240,6 +240,7 @@ export const JOURNEYS: Journey[] = [
     { id: "working", caption: "The agent working, for longer than the 3 s Working waits before it shows.", facts: { harness: { "fp-nuc|t-web": true }, workingSince: { "fp-nuc|t-web": 0 }, now: WORKING_SHOWN_AFTER_MS } },
     { id: "working-soon", caption: "The agent busy for less than 3 s: nothing says Working yet, so a quick back-and-forth never flashes it.", facts: { harness: { "fp-nuc|t-web": true }, workingSince: { "fp-nuc|t-web": 0 }, now: WORKING_SHOWN_AFTER_MS - 1000 } },
     { id: "listening", caption: "You speaking: your turn, as it is heard.", facts: { userLive: true, userTurn: { id: "u", segment: "u", thread: "fp-nuc|t-web" }, pendingPhase: "listening" } },
+    { id: "transcribing", caption: "Your turn being transcribed: the bars hold their shape and pulse, no word.", facts: { userLive: false, userTurn: { id: "u", segment: "u", thread: "fp-nuc|t-web" }, pendingPhase: "transcribing" } },
     { id: "transcript", caption: "The transcript open.", after: press("transcript-toggle") },
     { id: "transcript-listening", caption: "You speaking, in the transcript: the stage's balloon at the column's width, its bars as they are heard.",
       facts: { userLive: true, userTurn: { id: "u", segment: "u", thread: "fp-nuc|t-web" }, pendingPhase: "listening" }, after: press("transcript-toggle") },

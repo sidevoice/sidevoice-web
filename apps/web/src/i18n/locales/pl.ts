@@ -60,7 +60,6 @@ export const messages: Messages = {
   "stage.empty": "Wybierz rozmowę, aby porozmawiać.",
   "stage.chooseConversation": "Wybierz rozmowę",
   "stage.cancelTurn": "Anuluj wysyłanie",
-  "stage.transcribing": "Transkrypcja",
   "stage.sent": "Wysłano",
   "stage.poster.title": "WANTED",
   "stage.poster.status": "ŻYWY LUB W PAUZIE",
@@ -217,7 +216,6 @@ export const messages: Messages = {
   "messages.seeMore": "Pokaż więcej",
   "messages.seeLess": "Pokaż mniej",
   "messages.working": "Pracuje",
-  "messages.transcribing": "Transkrypcja",
 
   "wave.listening": "Słucham",
   "wave.listeningTitle": "Słucham…",
