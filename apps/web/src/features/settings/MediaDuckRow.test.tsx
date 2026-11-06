@@ -213,3 +213,23 @@ test("a read another screen sent before the choice, answering late, does not und
   expect(screen.getByRole("radio", { name: "Pause" })).toHaveAttribute("aria-checked", "true");
   expect(screen.getByTestId("elsewhere")).toHaveTextContent("pause");
 });
+
+test("a restart that fails or is refused is said in the note and in a polite live region", async () => {
+  const waiting = status({ lower: "some-apps", pause: "some-apps", capture: "restart" });
+  const failing = vi.fn(async () => { throw new Error("nope"); });
+  inApp({ mediaDuck: { ...bridge(waiting), restart: failing } });
+  const view = render(<MediaDuckRow t={en} openPermissions={() => undefined} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Restart now" }));
+  const failed = en("perm.capture.restartFailed");
+  expect(await screen.findByText(failed, { selector: ".media-need-text" })).toBeInTheDocument();
+  const live = screen.getByText(failed, { selector: ".sr-only" });
+  expect(live).toHaveAttribute("role", "status");
+  expect(live).toHaveAttribute("aria-live", "polite");
+  view.unmount();
+  const refuse = vi.fn(async () => { throw { key: "media_duck.restart-in-call" }; });
+  inApp({ mediaDuck: { ...bridge(waiting), restart: refuse } });
+  render(<MediaDuckRow t={en} openPermissions={() => undefined} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Restart now" }));
+  expect(await screen.findByText(en("perm.capture.restartInCall"), { selector: ".sr-only" })).toBeInTheDocument();
+  expect(screen.getByText(en("settings.call.mediaNeed.restartInCall"), { selector: ".media-need-text" })).toBeInTheDocument();
+});

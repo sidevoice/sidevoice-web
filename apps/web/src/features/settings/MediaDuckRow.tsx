@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { RefreshIcon, WarningIcon } from "../../components/ui/Icons";
 import { Group, Row } from "../../components/ui/Card";
@@ -16,7 +17,9 @@ const LEVELS: MediaDuckLevel[] = ["half", "quarter", "mute"];
  * Permissions otherwise (operator, 2026-11-05). Nothing asks by itself: Allow is the person's own press. */
 export function MediaDuckRow({ t, openPermissions }: { t: Translate; openPermissions(): void }) {
   const { bridge, status, setStatus, run } = useMediaDuck();
-  const { inCall, asking, allow, restart, restarting } = useMediaActions(bridge, run, t);
+  // What a refused restart came to, said in a live region of its own (as the list of permissions does).
+  const [said, setSaid] = useState("");
+  const { inCall, asking, allow, restart, restarting, refused } = useMediaActions(bridge, run, t, setSaid);
   if (!bridge || !status) return null;
   const choose = (mode: MediaDuckMode) => {
     const before = status;
@@ -49,23 +52,25 @@ export function MediaDuckRow({ t, openPermissions }: { t: Translate; openPermiss
       { value: "off", label: t("settings.call.media.off") },
     ]} />
   </Row>
-  {needed && <MediaNeed t={t} needed={needed} capture={status.capture} inCall={inCall} asking={!!asking.capture} restarting={restarting}
+  {needed && <MediaNeed t={t} needed={needed} capture={status.capture} inCall={inCall} asking={!!asking.capture} restarting={restarting} refused={refused}
     onAllow={allow ? () => allow("capture") : null} onRestart={restart} openPermissions={openPermissions} />}
   {levelShown && <Row label={t("settings.call.media.level")} description={t("settings.call.media.levelHint")}>
     <Segmented size="sm" label={t("settings.call.media.level")} value={level} onChange={chooseLevel}
       items={LEVELS.map((value) => ({ value, label: t(`settings.call.media.level.${value}`) }))} />
   </Row>}
+  <p className="sr-only" role="status" aria-live="polite">{said}</p>
   </Group>;
 }
 
 /** The note under the row: what the choice lacks, and what to do (amber), or, once System Audio Recording is allowed and only a
  *  restart applies it, Restart now (accent). */
-function MediaNeed({ t, needed, capture, inCall, asking, restarting, onAllow, onRestart, openPermissions }: {
+function MediaNeed({ t, needed, capture, inCall, asking, restarting, refused, onAllow, onRestart, openPermissions }: {
   t: Translate; needed: "capture" | "automation"; capture: MediaDuckStatus["capture"]; inCall: boolean; asking: boolean; restarting: boolean;
+  refused: MessageKey | null;
   onAllow: (() => void) | null; onRestart: (() => void) | null; openPermissions(): void;
 }) {
   const waiting = needed === "capture" && capture === "restart";
-  const text: MessageKey = waiting ? (inCall ? "settings.call.mediaNeed.restartInCall" : "settings.call.mediaNeed.restart")
+  const text: MessageKey = waiting ? (refused === "perm.capture.restartFailed" ? refused : inCall || refused === "perm.capture.restartInCall" ? "settings.call.mediaNeed.restartInCall" : "settings.call.mediaNeed.restart")
     : needed === "capture" ? "settings.call.mediaNeed.capture" : "settings.call.mediaNeed.automation";
   const link = <Button type="button" variant="ghost" size="sm" onClick={openPermissions}>{t("settings.call.openPermissionsLink")}</Button>;
   return <div className="media-need" data-kind={waiting ? "restart" : "missing"}>
