@@ -239,6 +239,24 @@ test("on a Mac a single key asks for Input Monitoring once, and only Allow asks 
   expect(screen.queryByText(/uses a single key/)).toBeNull();
 });
 
+test("keypad operators with Cmd+Alt are different shortcuts: recorded as their keys, shown as keypad keys, and not reported as duplicates", async () => {
+  mac();
+  const { bridge: b } = bridge(status({
+    mute: global({ accelerator: "Cmd+Alt+NumpadAdd", label: "⌘⌥Num +", state: "on" }),
+    holdToTalk: global({ accelerator: "Cmd+Alt+NumpadSubtract", label: "⌘⌥Num -", state: "on" }),
+    oneTurn: global({ accelerator: "Cmd+Alt+NumpadMultiply", label: "⌘⌥Num *", state: "on" }),
+  }));
+  inApp({ shortcuts: b });
+  render(<ShortcutsSettings t={en} />);
+  await screen.findByRole("button", { name: "Mute or unmute: ⌘⌥Num +" });
+  expect(screen.getByRole("button", { name: "Hold to talk: ⌘⌥Num -" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Say one thing: ⌘⌥Num *" })).toBeTruthy();
+  expect(document.querySelector(".shortcut-note")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Say one thing: ⌘⌥Num *" }));
+  await act(async () => { press({ code: "NumpadDivide", key: "/", metaKey: true, altKey: true }); });
+  expect(b.set).toHaveBeenCalledExactlyOnceWith("oneTurn", "Cmd+Alt+NumpadDivide");
+});
+
 test("headset buttons only where the host reports a headset; double press only where it can send it", async () => {
   const setHeadset = vi.fn(async () => status());
   inApp({ shortcuts: bridge(status({}, { headset: { press: "mute", doublePress: null, outsideCall: "leave" } }), { setHeadset }).bridge });
