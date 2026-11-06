@@ -109,6 +109,9 @@
   --sv-disabled-text: #85818f;
   --sv-scrim: rgb(27 18 40 / 45%);
   /* Soft brand: the accent's lavender, its text on it, a hairline of the accent and a soft violet shadow. */
+  /* The toast keeps what the tooltip had before it took the soft brand look: a dark card. */
+  --sv-toast-bg: #2a1a40;
+  --sv-toast-text: #ffffff;
   --sv-tooltip-bg: var(--sv-accent-soft);
   --sv-tooltip-text: var(--sv-text);
   --sv-tooltip-border: color-mix(in srgb, var(--sv-accent) 28%, transparent);
@@ -147,7 +150,7 @@
   --sv-danger: #ffb4ab; --sv-danger-soft: #3a1a18; --sv-danger-fill: #d0382d; --sv-danger-fill-hover: #b52e25; --sv-on-danger-fill: #ffffff;
   --sv-voice: #e0a82e; --sv-on-voice: #2a1a40; --sv-voice-soft: #2d2412; --sv-voice-text: #ecbe5c;
   --sv-disabled-bg: #26262b; --sv-disabled-text: #73737c;
-  --sv-scrim: rgb(0 0 0 / 70%); --sv-tooltip-bg: var(--sv-accent-soft); --sv-tooltip-text: var(--sv-text); --sv-tooltip-border: color-mix(in srgb, var(--sv-accent) 28%, transparent); --sv-tooltip-shadow: 0 6px 18px rgb(0 0 0 / 40%);
+  --sv-scrim: rgb(0 0 0 / 70%); --sv-toast-bg: #fafafa; --sv-toast-text: #18181b; --sv-tooltip-bg: var(--sv-accent-soft); --sv-tooltip-text: var(--sv-text); --sv-tooltip-border: color-mix(in srgb, var(--sv-accent) 28%, transparent); --sv-tooltip-shadow: 0 6px 18px rgb(0 0 0 / 40%);
   /* 15.4 and 5.3 on the agent's fill; 10.5 and 7.0 on the person's (a failure 6.2, an unconfirmed mark 4.6). */
   --sv-bubble-edge: #4b4756; --sv-bubble-shadow: 0 12px 32px rgb(0 0 0 / 60%);
   --sv-chat-agent-bg: #212125; --sv-chat-agent-fg: #fafafa; --sv-chat-agent-subtle: #93939c;

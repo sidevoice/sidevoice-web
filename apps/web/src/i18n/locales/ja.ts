@@ -1018,6 +1018,7 @@ export const messages: Messages = {
   "settings.shortcuts.clashTaken": "{keys} はすでに別のアプリが使っています。",
   "settings.shortcuts.clashTakenBy": "{keys} は使用中です:{app}。",
   "settings.shortcuts.clashAltGr": "{keys} は多くのキーボードで AltGr+{letter} にあたり、代わりに文字が入力されることがあります。",
+  "settings.shortcuts.clashReserved": "{keys} はブラウザまたはシステムのショートカットで、Sidevoice に届く前に取られることがあります。",
   "settings.shortcuts.clashVoiceOver": "{keys} は VoiceOver のコマンドでもあります。VoiceOver がオンだと Sidevoice に届かないことがあります。",
   "settings.shortcuts.clashUnavailable": "{keys} はこのコンピュータでは使えません。",
   "settings.shortcuts.managed": "システム設定で設定されています。",

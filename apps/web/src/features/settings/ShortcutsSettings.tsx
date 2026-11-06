@@ -12,7 +12,7 @@ import {
   type Trigger, type Words,
 } from "../../state/accelerators";
 import {
-  SHORTCUTS, bindingCombo, isDefault, keyName, macModifier, resetBinding, sameBinding, setBinding, type Binding, type ShortcutId,
+  SHORTCUTS, bindingClash, bindingCombo, isDefault, keyName, macModifier, resetBinding, sameBinding, setBinding, type Binding, type ShortcutId,
 } from "../../state/shortcuts";
 import { useBindings } from "../../state/use-shortcuts";
 
@@ -70,14 +70,17 @@ function useGlobal(): Global | null {
   useEffect(() => {
     let gone = false;
     if (bridge) {
-      void bridge.get().then((value) => { if (!gone) setStatus(value); }).catch(() => {});
-      const stop = bridge.subscribe?.((value) => setStatus(value));
+      // A snapshot older than the last event must not win: an event that arrives while `get` is in flight is newer.
+      let heard = false;
+      void bridge.get().then((value) => { if (!gone && !heard) setStatus(value); }).catch(() => {});
+      const stop = bridge.subscribe?.((value) => { heard = true; setStatus(value); });
       return () => { gone = true; stop?.(); };
     }
     if (legacy) {
       const only = (mute: GlobalShortcut): ShortcutsStatus => ({ shortcuts: { mute, holdToTalk: EMPTY_SHORTCUT, oneTurn: EMPTY_SHORTCUT }, permission: null, headset: null });
-      void legacy.get().then((value) => { if (!gone) setStatus(only(value)); }).catch(() => {});
-      const stop = legacy.subscribe?.((value) => setStatus(only(value)));
+      let heard = false;
+      void legacy.get().then((value) => { if (!gone && !heard) setStatus(only(value)); }).catch(() => {});
+      const stop = legacy.subscribe?.((value) => { heard = true; setStatus(only(value)); });
       return () => { gone = true; stop?.(); };
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -278,6 +281,14 @@ export function bindingOf(pressed: NonNullable<Captured["combo"]>, mac: boolean)
 function InAppGroup({ t, words }: { t: Translate; words: Words }) {
   const table = useBindings();
   const modifier = host().identity.shortcutModifier;
+  // Warned, never blocked: the person may still keep the key.
+  const risk = (bound: Binding | null | undefined) => {
+    if (!bound) return null;
+    const found = bindingClash(bound, words.mac);
+    const keys = bindingCombo(bound, modifier, words.space);
+    return found === "altgr" ? t("settings.shortcuts.clashAltGr", { keys, letter: bound.key.toUpperCase() })
+      : found === "reserved" ? t("settings.shortcuts.clashReserved", { keys }) : null;
+  };
   return <Group title={t("settings.shortcuts.inApp")}>
     {SHORTCUTS.map((entry) => {
       const bound = table[entry.id];
@@ -285,7 +296,7 @@ function InAppGroup({ t, words }: { t: Translate; words: Words }) {
       return <InAppRow key={entry.id} t={t} words={words} id={entry.id} label={t(entry.label as MessageKey)}
         hint={t(entry.id === "holdToTalk" ? "settings.shortcuts.holdToTalkHint" : "settings.shortcuts.inAppHint")}
         combo={bound ? bindingCombo(bound, modifier, words.space) : null}
-        clash={clash ? t("settings.shortcuts.clashUsed", { action: t(clash.label as MessageKey) }) : null}
+        clash={clash ? t("settings.shortcuts.clashUsed", { action: t(clash.label as MessageKey) }) : risk(bound)}
         defaultKeys={bindingCombo(entry.default, modifier, words.space)} />;
     })}
   </Group>;

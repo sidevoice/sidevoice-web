@@ -82,13 +82,15 @@ export function MuteButton() {
   // What holding the microphone open says, with the key now chosen for it: nothing about a hold when none is.
   const holdKey = shortcutCombo("holdToTalk", host().identity.shortcutModifier, t("settings.shortcuts.space"));
   const text = silent ?? mic.title;
+  // The keys that work this button: mute's, and the one held to talk where the hold is offered (as the tooltip says it).
+  const keyShortcuts = [ariaKeyShortcuts("mute"), holdKey && !mic.disabled ? ariaKeyShortcuts("holdToTalk") : undefined].filter(Boolean).join(" ") || undefined;
   // Under it, what holding the microphone open says, with the key now chosen for it as a cap: nothing when none is.
   const hint = !silent && !mic.disabled && holdKey ? t("session.mic.holdHint", { key: "\u0000" }).split("\u0000").flatMap((part, index) => index ? [<Keys key="k" combo={holdKey} />, part] : [part]) : undefined;
   return (
     <Tooltip action content={shortcutTip(text, "mute", hint)}>
       <Button id="mute" variant="ghost" className={cn("call-button", mic.holding && "holding")} aria-label={mic.label}
         aria-description={silent ?? undefined} data-silent={silent ? true : undefined}
-        aria-pressed={mic.pressed} disabled={mic.disabled} aria-keyshortcuts={ariaKeyShortcuts("mute")}
+        aria-pressed={mic.pressed} disabled={mic.disabled} aria-keyshortcuts={keyShortcuts}
         onClick={() => window.sidevoiceActions?.toggleMic()}>
         {mic.pressed ? <MicrophoneOffIcon size={22} /> : <MicrophoneIcon size={22} />}
       </Button>

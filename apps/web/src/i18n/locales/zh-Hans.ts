@@ -1017,6 +1017,7 @@ export const messages: Messages = {
   "settings.shortcuts.clashTaken": "{keys} 已被其他应用使用。",
   "settings.shortcuts.clashTakenBy": "{keys} 已被占用:{app}。",
   "settings.shortcuts.clashAltGr": "在许多键盘上,{keys} 是 AltGr+{letter},可能会输入一个字符。",
+  "settings.shortcuts.clashReserved": "{keys} 是浏览器或系统的快捷键,可能在 Sidevoice 收到之前就被占用。",
   "settings.shortcuts.clashVoiceOver": "{keys} 也是 VoiceOver 的命令;开启 VoiceOver 时可能无法传到 Sidevoice。",
   "settings.shortcuts.clashUnavailable": "{keys} 在这台电脑上不可用。",
   "settings.shortcuts.managed": "在系统设置中设置。",

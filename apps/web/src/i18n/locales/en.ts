@@ -1044,6 +1044,7 @@ export const messages = {
   "settings.shortcuts.clashTaken": "{keys} is already used by another app.",
   "settings.shortcuts.clashTakenBy": "{keys} is taken: {app}.",
   "settings.shortcuts.clashAltGr": "{keys} is AltGr+{letter} on many keyboards and may type a character instead.",
+  "settings.shortcuts.clashReserved": "{keys} is a browser or system shortcut, so the browser or system may take it before Sidevoice sees it.",
   "settings.shortcuts.clashVoiceOver": "{keys} is also a VoiceOver command; with VoiceOver on, it may not reach Sidevoice.",
   "settings.shortcuts.clashUnavailable": "{keys} isn't available on this computer.",
   "settings.shortcuts.managed": "Set in your system's settings.",

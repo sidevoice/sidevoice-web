@@ -31,5 +31,16 @@ test("the call buttons' aria-keyshortcuts follow the table", () => {
   act(() => setBinding("skip", null));
   expect(skip.hasAttribute("aria-keyshortcuts")).toBe(false);
   act(() => setBinding("mute", { code: "KeyM", key: "M", shift: true, mod: true }));
-  expect(view.container.querySelector("#mute")!.getAttribute("aria-keyshortcuts")).toBe("Meta+Shift+M Control+Shift+M");
+  expect(view.container.querySelector("#mute")!.getAttribute("aria-keyshortcuts")).toBe("Meta+Shift+M Control+Shift+M Space");
+});
+
+test("the mute button exposes the configured hold key too, while the hold is offered, and none once it is cleared", () => {
+  const store = createRoomStore();
+  const view = render(<RoomProvider store={store}><MuteButton /></RoomProvider>);
+  const mute = () => view.container.querySelector("#mute")!;
+  expect(mute().getAttribute("aria-keyshortcuts")).toBe("Meta+D Control+D Space");
+  act(() => setBinding("holdToTalk", { code: "KeyT", key: "T" }));
+  expect(mute().getAttribute("aria-keyshortcuts")).toBe("Meta+D Control+D T");
+  act(() => setBinding("holdToTalk", null));
+  expect(mute().getAttribute("aria-keyshortcuts")).toBe("Meta+D Control+D");
 });

@@ -4715,6 +4715,22 @@ test('Muting by hand during Say one thing leaves the turn alone: it is not muted
  s.run('toggleMic()');turn('started');turn('finished');
  assert.equal(s.run('micEnabled'),true,'the person opened it: it stays open');
 });
+test('Say one thing is its conversation\'s turn and its call\'s: another conversation\'s turn, live or late, neither takes it nor ends it',()=>{
+ const {s,mutes,turn}=inCall();
+ s.run('window.sidevoiceActions.oneTurn()');
+ const other=generation=>"{call:{id:'other'},node:null,thread_id:'elsewhere',generation:"+generation+"}";
+ const say=(phase,id,entry)=>s.run("voiceTurn({turn_id:'"+id+"',phase:'"+phase+"',started_at:1,text:'hi',ended_at:2},"+entry+")");
+ // A turn of another conversation starts and ends: the microphone stays open for the person.
+ say('started','o1',other('callGeneration'));say('finished','o1',other('callGeneration'));
+ assert.equal(s.run('micEnabled'),true,'another conversation\'s turn did not end it');
+ // A late turn of an earlier call.
+ say('started','o2',other('callGeneration-1'));say('finished','o2',other('callGeneration-1'));
+ assert.equal(s.run('micEnabled'),true,'a late turn of an older call did not end it');
+ // Its own conversation: a turn that starts is the one; another turn ending in between does not close it.
+ turn('started');say('finished','o1',other('callGeneration'));
+ assert.equal(s.run('micEnabled'),true,'open while its own turn goes on');
+ turn('finished');assert.equal(s.run('micEnabled'),false);assert.equal(mutes().at(-1),true);
+});
 test('The host holds to talk: it opens like Space, closes on holdEnd, and the page losing focus does not let go',()=>{
  const {s,mutes}=inCall();
  s.run('window.sidevoiceActions.holdStart()');assert.equal(s.run('micEnabled'),true);

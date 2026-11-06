@@ -282,3 +282,28 @@ test("in Spanish", async () => {
   expect(screen.getByRole("button", { name: "Mantener para hablar: Espacio" })).toBeInTheDocument();
   expect(es("settings.shortcuts.recording")).toBe("Pulsa teclas, o toca una");
 });
+
+test("an in-app key that AltGr or the browser would take is warned about, and kept all the same", () => {
+  render(<ShortcutsSettings t={en} />);
+  fireEvent.click(fieldOf("Mute or unmute"));
+  press({ code: "KeyM", ctrlKey: true, altKey: true });
+  expect(binding("mute")).toMatchObject({ code: "KeyM", alt: true });
+  expect(screen.getByText(/is AltGr\+M on many keyboards/)).toBeInTheDocument();
+  fireEvent.click(fieldOf("Mute or unmute"));
+  press({ code: "KeyW", ctrlKey: true });
+  expect(binding("mute")).toMatchObject({ code: "KeyW", mod: true });
+  expect(screen.getByText(/is a browser or system shortcut/)).toBeInTheDocument();
+  expect(screen.queryByText(/AltGr/)).toBeNull();
+});
+
+test("a host event that arrives while get is in flight is not overwritten by the older snapshot", async () => {
+  keyboard(true);
+  const initial = status();
+  let resolveGet: (value: ShortcutsStatus) => void = () => {};
+  const { bridge: host, emit } = bridge(initial, { get: vi.fn(() => new Promise<ShortcutsStatus>((resolve) => { resolveGet = resolve; })) });
+  inApp({ shortcuts: host });
+  render(<ShortcutsSettings t={en} />);
+  act(() => emit(status({ mute: global({ accelerator: "Ctrl+Alt+Shift+K", label: "Ctrl+Alt+Shift+K", state: "on" }) })));
+  await act(async () => { resolveGet(initial); });
+  expect(await screen.findByRole("button", { name: /^Mute or unmute: Ctrl\+Alt\+Shift\+K/ })).toBeInTheDocument();
+});

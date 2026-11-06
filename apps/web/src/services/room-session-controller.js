@@ -968,14 +968,18 @@ function oneTurn(){
   return;
  }
  if(state.micEnabled)return;
- holding=false;oneTurnOpen={spoke:false};setMic(true,{keepOneTurn:true});
+ holding=false;oneTurnOpen={spoke:false,key:targetId(),generation:callGeneration,turn:null};setMic(true,{keepOneTurn:true});
 }
 function closeOneTurn(){if(!oneTurnOpen)return;oneTurnOpen=null;setMic(false)}
-// The voice's turns, as they begin and end: the one turn is over when its turn is told (sent) or cancelled.
-function oneTurnSeen(phase){
- if(!oneTurnOpen)return;
- if(phase==='started')oneTurnOpen.spoke=true;
- else if(oneTurnOpen.spoke)closeOneTurn();
+// The voice's turns, as they begin and end: the one turn is the first that starts in the conversation and the call it was
+// opened for, and it is over when that very turn is told (sent) or cancelled. A turn of another conversation, or of another
+// call (a late one of a call since replaced), is not it: it neither takes it nor ends it.
+function oneTurnSeen(event,source){
+ const open=oneTurnOpen;
+ if(!open||source.generation!==open.generation||open.generation!==callGeneration||conversationKey(source.node,source.thread_id)!==open.key)return;
+ const id=source.call.id+'\0'+event.turn_id;
+ if(event.phase==='started'){if(!open.turn){open.turn=id;open.spoke=true}}
+ else if(open.turn===id)closeOneTurn();
 }
 
 document.addEventListener('click',event=>{for(const menu of document.querySelectorAll('.participant-menu[open],.call-menu[open]'))if(!menu.contains(event.target))menu.open=false});
@@ -2029,8 +2033,8 @@ async function forgetConversation(entry){
 let turnSend=Promise.resolve();
 let turnSendPending=0;
 function voiceTurn(event,entry=null){
- oneTurnSeen(event.phase);
  const source=entry??{call:{id:'local'},node:state.callNode,thread_id:targetThread(),binding_id:state.roomBinding?.binding_id,generation:callGeneration};
+ oneTurnSeen(event,source);
  const key=source.call.id+'\0'+event.turn_id;
  if(event.phase==='started'){
   let id=event.turn_id;

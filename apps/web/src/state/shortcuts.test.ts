@@ -75,3 +75,17 @@ test("another page's change reaches this one through the storage event; a damage
   expect(binding("mute")?.code).toBe("KeyD");
   stop();
 });
+
+test("a key of the room is warned about where AltGr or the browser or the system would take it", async () => {
+  const { bindingClash } = await import("./shortcuts");
+  expect(bindingClash({ code: "KeyM", key: "M", ctrl: true, alt: true }, false)).toBe("altgr");
+  expect(bindingClash({ code: "KeyM", key: "M", mod: true, alt: true }, false)).toBe("altgr");
+  expect(bindingClash({ code: "KeyM", key: "M", ctrl: true, alt: true }, true)).toBeNull();
+  for (const code of ["KeyW", "KeyT", "KeyN", "KeyQ", "KeyR", "KeyL", "Tab"]) {
+    expect(bindingClash({ code, key: code, mod: true }, false)).toBe("reserved");
+    expect(bindingClash({ code, key: code, meta: true }, true)).toBe("reserved");
+  }
+  expect(bindingClash({ code: "Tab", key: "Tab", alt: true }, false)).toBe("reserved");
+  expect(bindingClash({ code: "KeyD", key: "D", mod: true }, false)).toBeNull();
+  expect(bindingClash({ code: "Space", key: "Space" }, false)).toBeNull();
+});

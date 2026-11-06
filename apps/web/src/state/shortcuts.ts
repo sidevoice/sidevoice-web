@@ -240,3 +240,15 @@ export function keyName(code: string, key = ""): string {
   if (/^F\d+$/.test(code)) return code;
   return key.length === 1 ? key.toUpperCase() : key || code;
 }
+
+/** What is wrong with keeping `bound` as a key of the room, if anything (a warning: the person may still keep it): on
+ *  Windows and Linux Ctrl+Alt+letter is AltGr+letter on many layouts and types a character; and the browser or the system
+ *  takes some keys before the page sees them (Cmd/Ctrl+W, T, N, Q, R, L, Tab; Alt+Tab, Alt+F4). */
+export function bindingClash(bound: Binding, mac: boolean): "altgr" | "reserved" | null {
+  const control = !!(bound.mod || bound.ctrl) && !mac;
+  if (control && bound.alt && !bound.meta && !bound.shift && /^Key[A-Z]$/.test(bound.code)) return "altgr";
+  const primary = !!(bound.mod || bound.ctrl || bound.meta);
+  if (primary && !bound.alt && ["KeyW", "KeyT", "KeyN", "KeyQ", "KeyR", "KeyL", "Tab"].includes(bound.code)) return "reserved";
+  if (bound.alt && !primary && (bound.code === "Tab" || (!mac && bound.code === "F4"))) return "reserved";
+  return null;
+}
