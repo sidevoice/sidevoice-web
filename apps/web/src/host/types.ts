@@ -310,7 +310,15 @@ export interface GlobalShortcut extends MuteShortcut {
   /** Linux (X11): the key registers by the character the layout types on it, not by its position, so under a non-US layout it
    *  may be another key, or none. A warning, not a refusal. */
   layoutBound?: boolean;
+  /** Never chosen (or restored): it follows this system's default. Absent on an older host. */
+  isDefault?: boolean;
+  /** This system's default accelerator for the action; null: it has none. Absent on an older host. */
+  default?: string | null;
+  /** `state: "refused"`: another Sidevoice action holds the keys, or the system or another app does. Absent on an older host. */
+  refusal?: { reason: "duplicate"; action: ShortcutAction } | { reason: "taken" } | null;
 }
+/** Why a key pressed while recording was not taken: a left-hand modifier alone (macOS), or a modifier or Fn alone (Windows, Linux). */
+export type RecordHint = "leftModifier" | "loneModifier";
 export type ShortcutAction = "mute" | "holdToTalk" | "oneTurn";
 export type HeadsetPress = "mute" | "oneTurn" | "skip" | "none";
 export interface HeadsetStatus {
@@ -330,12 +338,15 @@ export interface ShortcutsBridge {
   get(): Promise<ShortcutsStatus>;
   /** Rejects `{ key: "shortcut_invalid" }` for an accelerator the app cannot register. */
   set(action: ShortcutAction, accelerator: string | null): Promise<GlobalShortcut>;
+  /** Back to this system's default, as if never chosen. Absent on an older host. */
+  restore?(action: ShortcutAction): Promise<GlobalShortcut>;
   subscribe?(listener: (status: ShortcutsStatus) => void): () => void;
   /** Asks the system for the permission, only now. */
   request?(permission: "inputMonitoring" | "portal"): Promise<ShortcutsStatus>;
   setHeadset?(partial: Partial<HeadsetStatus>): Promise<ShortcutsStatus>;
-  /** The app captures the next key itself (Fn included, which a page cannot see): resolves with the accelerator, null on Esc. */
-  record?(action: ShortcutAction): Promise<string | null>;
+  /** The app captures the next key itself (Fn included, which a page cannot see): resolves with the accelerator, null on Esc;
+   *  rejects `{ key: "record_timeout" }` after 15 s with no key. `onHint` says why a key was ignored while it goes on. */
+  record?(action: ShortcutAction, onHint?: (hint: RecordHint) => void): Promise<string | null>;
 }
 
 /** What the app does to other apps' media while the microphone is open or the agent is speaking in a call (sidevoice-desktop

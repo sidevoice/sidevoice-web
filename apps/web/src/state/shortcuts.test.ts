@@ -7,9 +7,44 @@ const free = { typing: false };
 
 afterEach(() => { localStorage.clear(); for (const entry of SHORTCUTS) resetBinding(entry.id); });
 
-test("the table holds hold to talk, mute and skip, by default Space, Cmd/Ctrl+D and Cmd/Ctrl+S", () => {
-  expect(SHORTCUTS.map((s) => s.id)).toEqual(["holdToTalk", "mute", "skip"]);
-  expect(SHORTCUTS.map((s) => [s.default.code, !!s.default.mod])).toEqual([["Space", false], ["KeyD", true], ["KeyS", true]]);
+test("the table holds hold to talk, mute, say one thing and skip, by default Space, Cmd/Ctrl+D, none and Cmd/Ctrl+S", () => {
+  expect(SHORTCUTS.map((s) => s.id)).toEqual(["holdToTalk", "mute", "oneTurn", "skip"]);
+  expect(SHORTCUTS.map((s) => s.default && [s.default.code, !!s.default.mod])).toEqual([["Space", false], ["KeyD", true], null, ["KeyS", true]]);
+  expect(binding("oneTurn")).toBeNull();
+  expect(ariaKeyShortcuts("oneTurn")).toBeUndefined();
+});
+
+test("a chosen key is kept as itself even when it is the default's, and only restoring puts the shortcut back on its default", () => {
+  setBinding("mute", { code: "KeyD", key: "D", mod: true });
+  expect(isDefault("mute")).toBe(false);
+  expect(JSON.parse(localStorage.getItem(SHORTCUTS_KEY)!).mute.code).toBe("KeyD");
+  resetBinding("mute");
+  expect(isDefault("mute")).toBe(true);
+  expect(localStorage.getItem(SHORTCUTS_KEY)).toBeNull();
+});
+
+test("a shortcut with no default: a key is a choice, clearing it is being on the default again", () => {
+  expect(isDefault("oneTurn")).toBe(true);
+  setBinding("oneTurn", { code: "KeyJ", key: "J", mod: true });
+  expect(isDefault("oneTurn")).toBe(false);
+  expect(shortcutOf(press("KeyJ", { ctrlKey: true }), free)?.id).toBe("oneTurn");
+  setBinding("oneTurn", null);
+  expect(isDefault("oneTurn")).toBe(true);
+  expect(binding("oneTurn")).toBeNull();
+});
+
+test("once, an override equal to its default becomes the default; later choices of the same keys stay", async () => {
+  vi.resetModules();
+  localStorage.clear();
+  localStorage.setItem(SHORTCUTS_KEY, JSON.stringify({ mute: { code: "KeyD", key: "D", mod: true }, skip: { code: "KeyJ", key: "J" }, oneTurn: null }));
+  const fresh = await import("./shortcuts");
+  expect(fresh.isDefault("mute")).toBe(true);
+  expect(fresh.isDefault("oneTurn")).toBe(true);
+  expect(fresh.isDefault("skip")).toBe(false);
+  expect(Object.keys(JSON.parse(localStorage.getItem(SHORTCUTS_KEY)!))).toEqual(["skip"]);
+  fresh.setBinding("mute", { code: "KeyD", key: "D", mod: true });
+  expect(fresh.isDefault("mute")).toBe(false);
+  expect(fresh.SHORTCUTS_SENTINEL_KEY && localStorage.getItem(fresh.SHORTCUTS_SENTINEL_KEY)).toBe("1");
 });
 
 test("a mod key answers to Cmd or Ctrl, only with its own modifiers, never while typing", () => {

@@ -1,9 +1,10 @@
 /* The room's keyboard shortcuts: the one table. The key handler (use-room-shortcuts.ts, and the runtime's hold-to-talk),
  * Settings > Shortcuts, every button's tooltip and every `aria-keyshortcuts` read it; no key is written anywhere else.
  *
- * Each shortcut has a default and the person may change or clear it (Settings > Shortcuts > In Sidevoice). What was
- * chosen is kept with the web's settings on this device (localStorage, `sidevoice.shortcuts`: only what differs from the
- * default; `null` is a shortcut cleared), and a change reaches every reader at once: this page's through `subscribe`,
+ * Each shortcut has a default (or none: Say one thing) and the person may change or clear it (Settings > Shortcuts > In
+ * Sidevoice). What was chosen is kept with the web's settings on this device (localStorage, `sidevoice.shortcuts`: only what
+ * a person chose, as itself even when it is the default's keys; `null` is a shortcut cleared; a shortcut not there is on its
+ * default, and follows it if it changes), and a change reaches every reader at once: this page's through `subscribe`,
  * another page's of the same origin (the desktop card) through the storage event. No import: the runtime loads this file
  * on its own.
  *
@@ -13,7 +14,7 @@
  *    the page has focus, except while typing. Skip is Cmd/Ctrl+S: the handler cancels the browser's Save for it.
  *  - A combination the person records is literal: the modifiers it was pressed with, nothing implied. */
 
-export type ShortcutId = "mute" | "holdToTalk" | "skip";
+export type ShortcutId = "mute" | "holdToTalk" | "oneTurn" | "skip";
 
 /** A key and its modifiers. */
 export interface Binding {
@@ -39,16 +40,22 @@ export interface ShortcutDefinition {
   hold?: boolean;
   /** Its text in Settings: a message key. */
   label: string;
-  default: Binding;
+  /** The keys it has until a person chooses: null when it has none. */
+  default: Binding | null;
 }
 
 export const SHORTCUTS: readonly ShortcutDefinition[] = [
   { id: "holdToTalk", hold: true, label: "settings.shortcuts.holdToTalk", default: { code: "Space", key: "Space" } },
   { id: "mute", label: "settings.shortcuts.mute", default: { code: "KeyD", key: "D", mod: true } },
+  // No default: Cmd/Ctrl+Shift+Space is the candidate, and ChromeOS takes Ctrl+Shift+Space for the previous input method and other IMEs bind it too.
+  { id: "oneTurn", label: "settings.shortcuts.oneTurn", default: null },
   { id: "skip", label: "toolbar.skip", default: { code: "KeyS", key: "S", mod: true } },
 ];
 
 export const SHORTCUTS_KEY = "sidevoice.shortcuts";
+/** Set once the overrides have been through the move to "a chosen key is stored as itself" (an override equal to the default
+ *  was the default then, and is dropped once). */
+export const SHORTCUTS_SENTINEL_KEY = "sidevoice.shortcuts.chosen";
 
 export function definition(id: ShortcutId): ShortcutDefinition {
   return SHORTCUTS.find((entry) => entry.id === id)!;
@@ -71,7 +78,29 @@ function validBinding(value: unknown): value is Binding {
   return !!binding && typeof binding === "object" && typeof binding.code === "string" && !!binding.code && typeof binding.key === "string" && !!binding.key;
 }
 
+function migrate() {
+  try {
+    const storage = globalThis.localStorage;
+    if (!storage || storage.getItem(SHORTCUTS_SENTINEL_KEY)) return;
+    const raw = storage.getItem(SHORTCUTS_KEY);
+    storage.setItem(SHORTCUTS_SENTINEL_KEY, "1");
+    if (raw) {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      let changed = false;
+      for (const entry of SHORTCUTS) {
+        const value = parsed[entry.id];
+        // What equals the default was the default; a cleared shortcut with no default is on its default too.
+        if (entry.id in parsed && (value === null ? entry.default === null : validBinding(value) && sameBinding(value, entry.default))) { delete parsed[entry.id]; changed = true; }
+      }
+      if (changed) {
+        if (Object.keys(parsed).length) storage.setItem(SHORTCUTS_KEY, JSON.stringify(parsed)); else storage.removeItem(SHORTCUTS_KEY);
+      }
+    }
+  } catch { /* Nothing kept: nothing to move. */ }
+}
+
 function readRaw(): string | null {
+  migrate();
   try { return globalThis.localStorage?.getItem(SHORTCUTS_KEY) ?? null; } catch { return null; }
 }
 
@@ -116,11 +145,12 @@ function write(next: Stored) {
   for (const listener of listeners) listener();
 }
 
-/** Binds `id` to `next`, or clears it with null. A binding the same as the default is the default. */
+/** Binds `id` to `next`, or clears it with null. A chosen key is kept as itself, even when it is the default's; clearing
+ *  a shortcut that has no default is being on its default. */
 export function setBinding(id: ShortcutId, next: Binding | null) {
   bindings();
   const rest: Stored = { ...stored };
-  if (next && sameBinding(next, definition(id).default)) delete rest[id];
+  if (next === null && definition(id).default === null) delete rest[id];
   else rest[id] = next;
   write(rest);
 }
@@ -132,9 +162,10 @@ export function resetBinding(id: ShortcutId) {
   write(rest);
 }
 
+/** Whether `id` is on its default: never chosen, or restored. Not whether its keys are the default's. */
 export function isDefault(id: ShortcutId): boolean {
-  const bound = binding(id);
-  return !!bound && sameBinding(bound, definition(id).default);
+  bindings();
+  return !(id in stored);
 }
 
 export function sameBinding(a: Binding | null, b: Binding | null): boolean {
