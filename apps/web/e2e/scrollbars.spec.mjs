@@ -20,14 +20,33 @@ async function openList(page, theme = "light", list = people) {
   await page.evaluate(() => document.fonts.ready);
 }
 
+// The sidebar's layout (phone, compact desktop, desktop) is React state fed by media queries, and it lags setViewportSize by
+// a frame or more, much more while the creature's software GL holds the thread. A layout that changes puts the open list
+// away, so a list seen open just after the resize may be the old layout's, about to close. Wait for the new layout to have
+// taken over: nothing open, and the compact one at its rail.
+const layoutAt = (width) => (width < 560 ? "phone" : width < 900 ? "compact" : "desktop");
+let layoutNow = "desktop";
+async function resize(page, width) {
+  await page.setViewportSize({ width, height: 700 });
+  const layout = layoutAt(width);
+  if (layout !== layoutNow) {
+    layoutNow = layout;
+    await page.waitForFunction((layout) => {
+      const aside = document.querySelector("#conversations");
+      return !aside.hasAttribute("data-open") && (layout !== "compact" || aside.hasAttribute("data-collapsed"));
+    }, layout, { timeout: 30_000 });
+  }
+}
+
 async function expand(page) {
   const sidebar = page.locator("#conversations");
-  if (await sidebar.getAttribute("data-collapsed")) {
-    await page.locator(".sidebar-collapse").click();
-  } else if (await page.getByRole("button", { name: /^All conversations/ }).isVisible()) {
-    await page.getByRole("button", { name: /^All conversations/ }).click();
-  }
-  await expect(sidebar.locator(".participant-copy").first()).toBeVisible();
+  // Retried as a whole, but a toggle is pressed only while it says the list is closed: a second press on a list that is
+  // already opening would close it again.
+  await expect(async () => {
+    const closed = page.locator('[aria-controls="conversations"][aria-expanded="false"]:visible');
+    if (await closed.count()) await closed.first().click({ timeout: 2_000 });
+    await expect(sidebar.locator(".participant-copy").first()).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
 }
 
 const geometry = (page) => page.locator("#participants").evaluate((el) => {
@@ -41,14 +60,15 @@ for (const theme of ["light", "dark"]) {
   test(`${theme}: expanded cards leave room for the scrollbar through window resizes`, async ({ page }, testInfo) => {
     // Six sizes, each with a screenshot, and each resize has the stage solve its framing again on the pixels: the creature's
     // trial renders (about 70 ms a frame in a software GL) share the thread this spec reads the list's geometry on.
-    test.setTimeout(120_000);
+    test.setTimeout(240_000);
+    layoutNow = "desktop";
     await page.setViewportSize({ width: 1100, height: 700 });
     await openList(page, theme);
     for (const width of [1440, 1100, 900, 899, 700, 390]) {
-      await page.setViewportSize({ width, height: 700 });
+      await resize(page, width);
       await expand(page);
       const list = page.locator("#participants");
-      await expect.poll(async () => (await geometry(page)).gap).toBeGreaterThanOrEqual(16);
+      await expect.poll(async () => (await geometry(page)).gap, { timeout: 30_000 }).toBeGreaterThanOrEqual(16);
       expect((await geometry(page)).horizontalOverflow).toBe(0);
       for (const fraction of [0, 0.5, 1]) {
         await list.evaluate((el, fraction) => { el.scrollTop = (el.scrollHeight - el.clientHeight) * fraction; }, fraction);
