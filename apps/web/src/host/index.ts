@@ -7,12 +7,14 @@ import { browserReach, reachOfOrigin as reachOfPage } from "./browser-reach";
 import { browserStorage, exclusively } from "./browser-storage";
 import { followKeyboardLayout } from "./browser-keyboard";
 import { browserDeviceName, browserShortcutModifier } from "./identity";
+import { applyViewport as applyViewportOf } from "./viewport";
 import { messageOverlay, nativeCardSeam, nativeHost } from "./native";
 import { setMessageOverlay } from "../i18n/translator";
 
 export type * from "./types";
 export type { PageAnswer, PageMicrophone, PermissionView } from "./browser-microphone";
-export { applyViewport } from "./viewport";
+/** Sets the page's viewport for this host and system (viewport.ts). */
+export const applyViewport = applyViewportOf;
 
 /** The browser's side of the microphone: the mechanisms only, for `MicrophoneAccess` to build the states a person sees on. */
 export const pageMicrophone = microphoneOfPage;
