@@ -239,6 +239,24 @@ test("on a Mac a single key asks for Input Monitoring once, and only Allow asks 
   expect(screen.queryByText(/uses a single key/)).toBeNull();
 });
 
+test("keypad operators with Cmd+Alt are different shortcuts: recorded as their keys, shown as keypad keys, and not reported as duplicates", async () => {
+  mac();
+  const { bridge: b } = bridge(status({
+    mute: global({ accelerator: "Cmd+Alt+NumpadAdd", label: "⌘⌥Num +", state: "on" }),
+    holdToTalk: global({ accelerator: "Cmd+Alt+NumpadSubtract", label: "⌘⌥Num -", state: "on" }),
+    oneTurn: global({ accelerator: "Cmd+Alt+NumpadMultiply", label: "⌘⌥Num *", state: "on" }),
+  }));
+  inApp({ shortcuts: b });
+  render(<ShortcutsSettings t={en} />);
+  await screen.findByRole("button", { name: "Mute or unmute: ⌘⌥Num +" });
+  expect(screen.getByRole("button", { name: "Hold to talk: ⌘⌥Num -" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Say one thing: ⌘⌥Num *" })).toBeTruthy();
+  expect(document.querySelector(".shortcut-note")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Say one thing: ⌘⌥Num *" }));
+  await act(async () => { press({ code: "NumpadDivide", key: "/", metaKey: true, altKey: true }); });
+  expect(b.set).toHaveBeenCalledExactlyOnceWith("oneTurn", "Cmd+Alt+NumpadDivide");
+});
+
 test("headset buttons only where the host reports a headset; double press only where it can send it", async () => {
   const setHeadset = vi.fn(async () => status());
   inApp({ shortcuts: bridge(status({}, { headset: { press: "mute", doublePress: null, outsideCall: "leave" } }), { setHeadset }).bridge });
@@ -306,4 +324,23 @@ test("a host event that arrives while get is in flight is not overwritten by the
   act(() => emit(status({ mute: global({ accelerator: "Ctrl+Alt+Shift+K", label: "Ctrl+Alt+Shift+K", state: "on" }) })));
   await act(async () => { resolveGet(initial); });
   expect(await screen.findByRole("button", { name: /^Mute or unmute: Ctrl\+Alt\+Shift\+K/ })).toBeInTheDocument();
+});
+
+test("a key this system cannot register is refused under the field with its own reason, and nothing is bound in its place", async () => {
+  const { bridge: b } = bridge(status(), {
+    set: vi.fn(async () => { throw { key: "shortcut_unsupported", message: "This system cannot register that key" }; }),
+  });
+  inApp({ shortcuts: b });
+  render(<ShortcutsSettings t={en} />);
+  await screen.findByRole("button", { name: /^Mute or unmute: Ctrl\+Alt/ });
+  fireEvent.click(screen.getAllByRole("button", { name: /^Say one thing:/ })[0]);
+  await act(async () => { press({ code: "IntlBackslash", key: "<", ctrlKey: true }); });
+  expect(b.set).toHaveBeenCalledExactlyOnceWith("oneTurn", "Ctrl+IntlBackslash");
+  expect(await screen.findByRole("alert")).toHaveTextContent("That key can't be a global shortcut on this computer. Try another one.");
+});
+
+test("a key the host registers by the layout (Linux punctuation) is an amber warning, not a block", async () => {
+  inApp({ shortcuts: bridge(status({ holdToTalk: global({ accelerator: "Ctrl+Alt+BracketRight", label: "Ctrl+Alt+BracketRight", state: "on", layoutBound: true }) })).bridge });
+  render(<ShortcutsSettings t={en} />);
+  expect(await screen.findByText(/follows the keyboard layout on Linux/)).toBeInTheDocument();
 });
