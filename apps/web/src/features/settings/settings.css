@@ -408,3 +408,12 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
 .ui-shortcut-default { align-self: center; flex: none; margin: 0 2px 0 4px; padding: 3px 7px; border: 0; border-radius: 6px; background: color-mix(in srgb, var(--sv-text) 8%, transparent); font: 600 11px var(--sv-font-sans); color: var(--sv-text-muted); cursor: pointer; }
 .ui-shortcut > .ui-shortcut-default:last-child { margin-right: 8px; }
 .ui-shortcut-error { max-width: 240px; text-align: start; }
+
+/* Call › Other apps' media: what the choice lacks, in the group's card under the row (amber), or, allowed and waiting for a
+ * restart, Restart now (accent). The margins are the rows' own padding. */
+.media-need { display: flex; align-items: center; gap: var(--sv-space-3); margin: 0 var(--sv-space-5) 14px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--sv-state-attention) 12%, transparent); }
+.media-need[data-kind="restart"] { background: color-mix(in srgb, var(--sv-accent) 10%, transparent); }
+.media-need-icon { display: inline-flex; flex: none; color: color-mix(in srgb, var(--sv-state-attention) 70%, #000); }
+.media-need[data-kind="restart"] .media-need-icon { color: var(--sv-accent-text, var(--sv-accent)); }
+.media-need-text { flex: 1; min-width: 0; margin: 0; font-size: var(--sv-font-md); color: var(--sv-text); }
+.media-need-action { flex: none; display: inline-flex; }

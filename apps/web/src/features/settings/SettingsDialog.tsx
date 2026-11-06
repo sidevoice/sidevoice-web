@@ -361,7 +361,7 @@ export function SettingsDialog() {
   const mediaBlocked = neededPermission(media.status) !== null;
   const attention = (id: string): MessageKey | null => (id === "transcription" && waits.stt) || (id === "voice" && waits.tts) || (id === "call" && waits.turn)
     ? "settings.section.waiting" : id === "permissions" && micBlocked ? "settings.call.micNotAllowed"
-      : id === "permissions" && mediaBlocked ? "settings.call.mediaPermissionMissing" : null;
+      : id === "permissions" && mediaBlocked ? (media.status?.capture === "restart" ? "settings.call.mediaRestartPending" : "settings.call.mediaPermissionMissing") : null;
   const badge = (id: string) => { const why = attention(id); return why && <Tooltip content={t(why)}><span className="ui-nav-badge settings-attention" role="img" aria-label={t(why)} /></Tooltip>; };
   // A phone's header says where the person is: Settings on the list, the section on its page, the machine on its own.
   const shownMachine = useRoomStore((state) => state.machines.find((entry) => entry.id === machine) ?? null);

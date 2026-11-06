@@ -341,7 +341,8 @@ export type MediaDuckLevel = "half" | "quarter" | "mute";
 /** The permissions the status reports, as the page asks for one: `capture` (macOS System Audio Recording, lowering any
  *  app) and `automation` (macOS Automation, controlling Music and Spotify). */
 export type MediaDuckPermission = "capture" | "automation";
-export type MediaDuckAccess = "granted" | "denied" | "undetermined" | "unknown";
+/** `restart` (System Audio Recording only): allowed, but the running app cannot see it until it is restarted. */
+export type MediaDuckAccess = "granted" | "denied" | "undetermined" | "unknown" | "restart";
 export interface MediaDuckStatus {
   mode: MediaDuckMode;
   /** How far Lower goes; absent from an app that has no level to choose. */
@@ -353,7 +354,7 @@ export interface MediaDuckStatus {
    *  one of the apps open, and none is. */
   access?: MediaDuckAccess;
   /** Whether the system lets the app lower any app on its own (macOS 14.4 and later: System Audio Recording); absent where
-   *  there is no such permission. `unknown`: the app could not ask. */
+   *  there is no such permission. `unknown`: the app could not ask. `restart`: allowed, applied by `restart()`. */
   capture?: MediaDuckAccess;
 }
 export interface MediaDuckBridge {
@@ -363,6 +364,10 @@ export interface MediaDuckBridge {
   allow?(permission: MediaDuckPermission): Promise<MediaDuckStatus>;
   /** The system's page where the person turns `permission` back on (macOS). */
   openSettings?(permission: MediaDuckPermission): Promise<MediaDuckStatus>;
+  /** Quits and reopens the app so an allowed permission applies (`capture` is `restart`). Rejects with the key
+   *  `media_duck.restart-in-call` while a call is joined, `media_duck.restart-not-needed` when none is due. Absent from
+   *  an app that cannot: the page then only says to restart. */
+  restart?(): Promise<MediaDuckStatus>;
   set(mode: MediaDuckMode): Promise<MediaDuckStatus>;
   /** How far Lower goes; applied at once while lowered. Absent from an app that has no level to choose. */
   setLevel?(level: MediaDuckLevel): Promise<MediaDuckStatus>;
