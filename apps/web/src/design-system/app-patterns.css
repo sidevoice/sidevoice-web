@@ -276,3 +276,4 @@
 /* The microphone and the speaker's bar (the call's AudioDevices). */
 .pt-devices { display: grid; gap: var(--sv-space-3); width: min(18rem, 100%); padding: var(--sv-space-3) var(--sv-space-4) var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-surface-raised); box-shadow: var(--sv-shadow-md); }
 .pt-devices-lost { display: flex; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); }
+@media (pointer: coarse) { .ui-textarea.pt-mono { font-size: 1rem; } }
