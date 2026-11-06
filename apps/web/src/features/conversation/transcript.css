@@ -141,9 +141,9 @@
 /* Taking a written draft back: the person's round ×, its own line, at the end. */
 .chat-bubble[data-draft] > .turn-cancel { float: right; margin: 0 -6px 0 9px; }
 
-/* A long message (T31): six lines, then "See more" in the accent; "See less" once open. */
+/* A long message (T31): ten lines (FOLD_LINES, via --fold-lines), then "See more" in the accent; "See less" once open. */
 .chat-text[data-fold] { display: block; }
-.chat-text[data-fold="folded"] { white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+.chat-text[data-fold="folded"] { white-space: pre-line; display: -webkit-box; -webkit-line-clamp: var(--fold-lines, 10); -webkit-box-orient: vertical; overflow: hidden; }
 .see-more {
   appearance: none; display: inline-block; margin: 5px 0 0; padding: 0; border: 0; background: none; cursor: pointer;
   font: inherit; font-size: 14px; font-weight: 600; letter-spacing: inherit; color: var(--tr-accent);
