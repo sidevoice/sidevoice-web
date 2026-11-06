@@ -78,7 +78,7 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 /* A bar is 3px to 16px tall (--h) and fully rounded: a middle that scales and two round ends that slide with it, so
    every moving part is a transform. */
 .your-wave i { --h: 3; position: relative; width: 2.6px; height: 16px; }
-.your-wave i::before, .your-wave i::after, .your-wave b { content: ""; position: absolute; left: 0; top: 50%; width: 2.6px; background: var(--sv-state-listening); transition: transform 70ms linear; will-change: transform; }
+.your-wave i::before, .your-wave i::after, .your-wave b { content: ""; position: absolute; left: 0; top: 50%; width: 2.6px; background: var(--accent); transition: transform 70ms linear; will-change: transform; }
 .your-wave i::before, .your-wave i::after { height: 2.6px; margin-top: -1.3px; border-radius: 50%; }
 .your-wave i::before { transform: translateY(calc((var(--h) - 2.6) * -.5px)); }
 .your-wave i::after { transform: translateY(calc((var(--h) - 2.6) * .5px)); }
