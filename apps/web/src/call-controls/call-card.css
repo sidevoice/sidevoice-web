@@ -279,12 +279,14 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), var(--
 .avatar-card { position: relative; display: grid; grid-template-columns: auto; justify-items: center; align-items: center; }
 .floating-card[data-open=down] .avatar-card { grid-template-areas: "figure" "voice" "compact"; }
 .floating-card[data-open=up] .avatar-card { grid-template-areas: "voice" "figure" "compact"; }
-.avatar-figure { grid-area: figure; width: var(--card-w); height: var(--card-w); }
+.avatar-figure { grid-area: figure; width: var(--card-w); height: var(--card-w); margin-left: var(--figure-x, auto); margin-right: auto; }
 .avatar-figure .sv-avatar { display: block; width: 100%; height: 100%; }
-/* Centred on the creature (R13), as far as the screen's room allows: --voice-shift (set by the card from the host's `room`) slides it
- * inward, by margins on the far side so the window still holds it. */
-.avatar-voice { grid-area: voice; width: max-content; max-width: min(var(--avatar-col), var(--voice-max, var(--avatar-col))); justify-self: center; justify-items: center;
-  margin-left: max(0px, calc(2 * var(--voice-shift, 0px))); margin-right: max(0px, calc(-2 * var(--voice-shift, 0px))); }
+/* Each piece's place across the column is the card's (CallCard.tsx, voice-centre.ts avatarColumn: from the host's `room`): the creature
+ * (--figure-x) where the window reaches no further past it on a side than the screen's room there, so the app never moves the window in
+ * and the creature with it; the voice text (--voice-x, R13) and the compact card (--compact-x) centred on it as far as the column allows,
+ * off-centre only at an edge. A left margin from the column's edge, the rest of the row an auto margin; not measured yet, centred. */
+.avatar-voice { grid-area: voice; width: max-content; max-width: min(var(--avatar-col), var(--voice-max, var(--avatar-col))); justify-items: center;
+  margin-left: var(--voice-x, auto); margin-right: auto; }
 /* Close to the creature: its box has room under its feet for its shadow, and over its head for its antics. */
 .floating-card[data-open=down] .avatar-voice { align-self: start; margin-top: 2px; }
 .floating-card[data-open=up] .avatar-voice { margin-bottom: 2px; }
@@ -298,7 +300,7 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), var(--
  * below, the window counts its whole room (--voice-zone) while the card is out, and the card goes just past the card showing
  * (--voice-reach, set by the card), gliding as one grows or goes: a voice card never moves the creature. */
 .avatar-compact { grid-area: compact; position: absolute; inset: 0; overflow: clip; opacity: 0; pointer-events: none; transition: opacity .15s linear; }
-.floating-card[data-flow] .avatar-compact { position: relative; inset: auto; overflow: visible; margin-top: 6px; }
+.floating-card[data-flow] .avatar-compact { position: relative; inset: auto; overflow: visible; margin-top: 6px; margin-left: var(--compact-x, auto); margin-right: auto; }
 .floating-card[data-flow][data-open=down] .avatar-card { grid-template-rows: auto minmax(var(--voice-zone), auto) auto; }
 .floating-card[data-flow][data-open=down] .avatar-compact { translate: 0 min(0px, calc(var(--voice-reach, 0px) - var(--voice-zone))); transition: opacity .15s linear, translate .2s ease; }
 .floating-card[data-expanded] .avatar-compact, .avatar-compact:has(:focus-visible) { opacity: 1; pointer-events: auto; }
@@ -358,9 +360,3 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), var(--
 .avatar-compact .card-panel-card { box-sizing: border-box; width: 100%; margin-top: 6px; }
 .floating-card[data-open=up] .avatar-compact .card-panel-card { position: absolute; left: 0; bottom: 100%; margin: 0 0 6px; }
 
-/* The compact card never moves the creature sideways: the creature keeps its place in the window and the card sits off-centre toward the
- * screen's middle (the creature's own side stays flush), so the window grows only on the side away from the screen's edge. */
-/* While the voice text is out it is centred on the creature (R13), so the creature is centred in the column too: the window grows to both
- * sides of it, and the host keeps the creature where it rests. */
-.floating-card[data-side=left] .avatar-card:not([data-voice]) { justify-items: start; }
-.floating-card[data-side=right] .avatar-card:not([data-voice]) { justify-items: end; }
