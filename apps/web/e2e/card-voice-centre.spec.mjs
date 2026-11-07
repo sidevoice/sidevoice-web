@@ -70,3 +70,42 @@ for (const [state, name] of [["transcribing", "the person's pill"], ["agent-spea
     });
   });
 }
+
+/* The window is what the app places (call_controls_layout): it keeps the creature's box where the person left it and moves the whole
+ * window in only where the window reaches past the work area. So however the card lays out round the creature, its window may reach no
+ * further past the creature on a side than the room the app said there is: else the app moves it in, and the creature with it. Read off
+ * what the card asks of its window (its size, and the creature's box in it), as the app reads it. */
+
+/** The window's reach past the creature's box (its shadow margin included, as the app's anchor is) on each side, once it has settled. */
+const reach = (page) => page.evaluate(() => {
+  const last = window.__layouts?.at(-1);
+  if (!last?.card) return null;
+  const MARGIN = 12;
+  return { left: last.card.x - MARGIN, right: last.width - (last.card.x + last.card.width + MARGIN) };
+});
+
+for (const [state, name] of [["transcribing", "the person's pill"], ["agent-speaking", "the agent's balloon"]]) {
+  for (const expanded of [false, true]) {
+    test.describe(`${name}${expanded ? ", with the compact card out" : ""}: the creature stays where it rests`, () => {
+      for (const room of [{ left: 600, right: 0 }, { left: 0, right: 600 }, { left: 600, right: 30 }]) {
+        test(`room ${room.left} left, ${room.right} right: the window reaches no further past the creature than that`, async ({ context }) => {
+          const page = await openCard(context, { state, format: "avatar", size: "m", expanded });
+          if (state === "agent-speaking") await holdReply(page);
+          await told(page, room);
+          await page.locator(".avatar-voice .vcap.card").waitFor();
+          if (expanded) await page.locator(".avatar-compact .compact-card").waitFor();
+          await boxes(page);
+          await expect.poll(() => reach(page)).not.toBeNull();
+          await expect.poll(async () => (await reach(page)).right).toBeLessThanOrEqual(room.right);
+          await expect.poll(async () => (await reach(page)).left).toBeLessThanOrEqual(room.left);
+          // Still centred where there is room for it: the text on the creature, inside the window.
+          const { figure, voice } = await boxes(page);
+          const window = await page.evaluate(() => { const r = document.querySelector(".floating-card").getBoundingClientRect(); return { left: r.left, right: r.right }; });
+          expect(voice.left).toBeGreaterThanOrEqual(window.left - 0.5);
+          expect(voice.right).toBeLessThanOrEqual(window.right + 0.5);
+          if (room.left >= 300 && room.right >= 300) expect(Math.abs(voice.centre - figure.centre)).toBeLessThanOrEqual(1);
+        });
+      }
+    });
+  }
+}

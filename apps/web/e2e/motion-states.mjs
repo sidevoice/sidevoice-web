@@ -161,7 +161,8 @@ export async function openCard(context, { state = "listening", format = "pip", s
     window.__cardState = state;
     window.__sidevoiceHost = { host: { callControls: {
       subscribe(listener) { window.__cardListener = listener; listener(window.__cardState); return () => {}; },
-      run() {}, layout() {}, drag() {}, resize() {},
+      // What the card asks of its window, as the app would size and place it (window.__layouts, the latest last).
+      run() {}, layout(size) { (window.__layouts ??= []).push(size); }, drag() {}, resize() {},
     } } };
   }, { call, format, size, mode, level, expanded });
   await page.goto("/voice/call-controls.html");

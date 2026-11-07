@@ -41,9 +41,11 @@ export interface CallControlsState {
    *  Absent: upper right. */
   place?: { vertical: "upper" | "lower"; horizontal: "left" | "right" };
   /** The room the avatar's creature has to each side before the screen's work area ends (CSS pixels, from its box's edges, less the
-   *  window's shadow margin). The avatar's voice text is centred on the creature and slides inward by what is missing on a side;
-   *  where the creature and both sides together are narrower than the text, the text wraps to that width. Absent where the host
-   *  cannot tell: always centred, as wide as its words. */
+   *  window's shadow margin). The avatar's window reaches no further past the creature on a side than this (the host keeps the
+   *  creature where it rests and moves the window in only where it would reach past the work area, the creature with it): its voice
+   *  text and compact card are centred on the creature and slide inward by what is missing on a side, the window growing away from
+   *  the edge; where the creature and both sides together are narrower than the text, the text wraps to that width (voice-centre.ts).
+   *  Absent where the host cannot tell: always centred, as wide as its words. */
   room?: { left: number; right: number };
   /** The picture-in-picture's window, as the person last resized it (CSS pixels, its margin included); null or absent at
    *  a preset size, which the card lays out itself (`layout`). */
