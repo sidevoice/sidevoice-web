@@ -19,28 +19,35 @@ The person sees one mark per row, driven by core's receipts: pending, sending, d
 
 ## Hop 1: page to machine
 
-**Today.** Every turn message and every report on a reply is an entry in the outbox, keyed by `client_msg_id`: persistent in
-IndexedDB per tab, ordered by (created, order), bounded at 200, never expired by time. Core remembers the last 256 ids per
+**Today.** Every turn message and every report on a reply is an entry in the outbox, keyed by `client_msg_id`: kept in
+IndexedDB per tab (in memory only where there is none, a private window say, and then not across a reload), ordered by (created, order),
+bounded at 200 (past it the **oldest entry is deleted**, `outbox.js:29`), never expired by time. Core remembers the last 256 ids per
 device (`resume.rs:23`), so a resend is acknowledged and not applied twice. Texts take a different path (HTTP POST to
 `/api/presentation/text`, one at a time, stopping at the first failure, `flushTexts`).
 
 **When it retries.** Only when the socket changes: `flushOutbox` skips an entry already `sentOn` the current socket
-(`room-session-controller.js:672`), and sends the whole outbox again on each new socket (`:2094`, `:2503`). Reconnection
+(`room-session-controller.js:672`), and sends the outbox again on each new socket (`:2094`, `:2503`); the pass skips texts, and lets go of entries for another machine or
+for a session the room no longer has. Reconnection
 itself retries at 1 s, 2 s, then every 5 s (`RECONNECT_DELAYS_MS`, `:2414`), each attempt with a 35 s deadline. So an entry
 sent on a socket that is half-dead (no close event yet), or one whose ack was lost, waits for the socket to be declared dead.
 There is no timer on the entry.
 
 **Where the order can break.**
-- The page pipelines the whole outbox on one socket and trusts TCP order; a resend after a new socket is also in order. Safe.
+- The page pipelines the non-text outbox on one socket and trusts TCP order; a resend after a new socket is also in order.
+  Not safe across a reload: sending is not gated on `outbox.ready` (`:654`, `:660`), so a message said while IndexedDB is still
+  loading can go before an older one the store is about to give back, and with a timestamp tie it can sort before it.
 - A turn's `started` belongs to the session that sent it. If the room replaced the session, the stale start is dropped
   and the turn's words go as "words said while away" (`turn-relay.js`, `offline` rows). Those rows are created in the
   journal when they **arrive**, not when they were said (`input.rs:110`), so they sort by arrival. With the FIFO outbox
   that equals the order said, but another device's message can slot between.
 - A start refused with `room.turns_full` is held, and its words wait. It is said again as a **new** message after another
-  turn ends, so a later turn's start can overtake the held one (`turn-relay.js` header; `flushOutbox` `route.hold`).
+  turn ends, so a later turn's start can overtake the held one (`turn-relay.js` header; `flushOutbox` `route.hold`). The relay keeps only the
+  last 64 of each of `sent`, `starts`, `held` and `ends` (`turn-relay.js:16`, `:23`): past that a held turn is evicted and its
+  start and words can no longer be said again.
 - Texts and turns are two queues with no order between them. A text queued while offline can go before or after a turn said
   earlier.
-- `disconnect()` calls `outbox.clear()` (`:2213`): a hang-up, a refusal of the browser, or a move of the call drops what was never
+- `disconnect()` calls `outbox.clear()` (`:2213`), without marking the rows of the cleared turns not sent (only queued texts get that mark
+  in `failTexts`), so a voice turn's row can stay pending for ever: a hang-up, a refusal of the browser, or a move of the call drops what was never
   acknowledged. A network loss alone does not end the call: reconnection insists for as long as it takes. Moving the conversation to another machine drains for a short time and then drops the rest (`drainOutbox`).
   A reload keeps the outbox, but it is sent only once a call reaches a session again.
 
@@ -89,21 +96,28 @@ holds inside the connector. It keeps the last 64 pending ids (`:916`). The adapt
    as long as it takes. A new socket resets the schedule and sends at once.
 4. **What the UI shows,** consistent with today's marks: pending (the page has it, the machine has not acknowledged it),
    delivered to the machine (acknowledged by hop 1, shown as sending), delivered to the agent (`delivered`), read
-   (`read`), and not sent only when the person gave up or hung up.
+   (`read`), and not sent only when the person gave up. Today a hang-up leaves voice-turn rows pending (gap 3); the change must mark them.
 
 ## Gaps, ranked
 
+As of `main` before #538, which closes gaps 3, 4 and 6 (backoff timer, the outbox gated on its reload, one order for texts and turns).
+
 1. **core: input expires at 10 s** (`journal.rs:14`, `:84`, `:252`, `pull.rs:fetch_pull`). The older message is dropped while later ones go. Replace the clock by head-of-line blocking
-   with the backoff, and keep an explicit bound only by count and by hang-up. Highest: it loses messages and reorders.
-2. **web: no timer on an unacknowledged entry** (`room-session-controller.js:672`, `flushOutbox`). Add the backoff
+   with the backoff, and keep an explicit bound only by count of the journal and by the person's own cancel. Highest: it loses messages and reorders.
+2. **web: the outbox bound of 200 deletes the oldest pending entry** (`outbox.js:29`), so a later message can arrive after one that was
+   silently dropped. A bound must refuse the newest (and say so) instead of dropping the oldest, or stop at a far larger count.
+   Ranked high: it breaks never-overtake without any failure showing.
+3. **web: no timer on an unacknowledged entry** (`room-session-controller.js:672`, `flushOutbox`). Add the backoff
    resend on the same socket. This is the web change in phase 2 of the night shift.
-3. **web: `disconnect()` drops the outbox** (`:2213`), on a hang-up, a refusal or a move (`drainOutbox` gives it a short
+4. **web: sending is not gated on `outbox.ready`** (`:654`, `:660`): after a reload a new message can pass the restored older ones.
+5. **web: `disconnect()` drops the outbox** (`:2213`), on a hang-up, a refusal or a move (`drainOutbox` gives it a short
    grace). A person who hangs up with messages pending loses them, with only the not-sent mark left. Keep them
    across the hang-up (or ask) instead.
-4. **web: texts and turns are two queues** (`flushTexts` and `flushOutbox`): no order between them.
-5. **core + web: a start held for `room.turns_full` is said again as a new message,** which can be overtaken.
-6. **connector: `unknown` is final** (`claude.rs:326`, `push.rs:115`): the agent may not have the message and nothing resends.
-7. **core: offline rows take the journal position of their arrival,** not of the words (`input.rs:110`).
-8. **connector: pending list of 64 and no memory across restarts** (`daemon.rs:916`).
-9. **several devices on one conversation:** each device has its own outbox and ordering, and the journal orders by arrival;
+6. **web: texts and turns are two queues** (`flushTexts` and `flushOutbox`): no order between them.
+7. **core + web: a start held for `room.turns_full` is said again as a new message,** which can be overtaken, and the relay's 64-entry
+   caps (`turn-relay.js:16`, `:23`) evict held turns.
+8. **connector: `unknown` is final** (`claude.rs:326`, `push.rs:115`): the agent may not have the message and nothing resends.
+9. **core: offline rows take the journal position of their arrival,** not of the words (`input.rs:110`).
+10. **connector: pending list of 64 and no memory across restarts** (`daemon.rs:916`).
+11. **several devices on one conversation:** each device has its own outbox and ordering, and the journal orders by arrival;
    there is no cross-device "said" order. Out of scope here.
