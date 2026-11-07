@@ -53,6 +53,8 @@ test("the level maps to the five bars: silence keeps part of the shape, full is 
   // Out-of-range levels are held to 0..1; a short history reuses its oldest.
   expect(turnBarScales([5])).toEqual(turnBarScales([1]));
   expect(turnBarScales([-1])).toEqual(turnBarScales([0]));
+  // A reading that is not a number (an analyser with no samples yet) is silence, never NaN.
+  expect(turnBarScales([Number.NaN, Number.NaN, Number.NaN])).toEqual(turnBarScales([0, 0, 0]));
 });
 
 test("while listening the bars follow the level they are given, by transform", async () => {

@@ -28,7 +28,7 @@ const SILENCE = 0.04;
 export function turnBarScales(history: readonly number[]): number[] {
   return TURN_BAR_SHAPE.map((shape, bar) => {
     const level = history[Math.min(Math.abs(bar - 2), history.length - 1)] ?? 0;
-    const clamped = Math.max(0, Math.min(1, level));
+    const clamped = Number.isFinite(level) ? Math.max(0, Math.min(1, level)) : 0;
     return Math.round(shape * (REST + (1 - REST) * clamped) * 100) / 100;
   });
 }
