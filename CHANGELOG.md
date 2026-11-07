@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.27.0](https://github.com/sidevoice/sidevoice-web/compare/v0.26.0...v0.27.0) (2026-11-07)
+
+
+### Features
+
+* **i18n:** Portuguese (Brazil), Korean and Hindi interface languages ([#543](https://github.com/sidevoice/sidevoice-web/issues/543)) ([ec017bf](https://github.com/sidevoice/sidevoice-web/commit/ec017bf6c8307167387f61e94e664d9651a5069a))
+* **outbox:** resend unacknowledged messages on a backoff, oldest first ([#538](https://github.com/sidevoice/sidevoice-web/issues/538)) ([ac627cd](https://github.com/sidevoice/sidevoice-web/commit/ac627cd8e2d917375da5ebbd9166d84e6ef6b220))
+
 ## [0.26.0](https://github.com/sidevoice/sidevoice-web/compare/v0.25.1...v0.26.0) (2026-11-07)
 
 
