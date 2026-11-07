@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.27.1](https://github.com/sidevoice/sidevoice-web/compare/v0.27.0...v0.27.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **call:** the pill's bars move on their own while listening ([#546](https://github.com/sidevoice/sidevoice-web/issues/546)) ([7253f32](https://github.com/sidevoice/sidevoice-web/commit/7253f328318bfbdaaf959d43f243a31ec199f51d))
+* **card:** the avatar's creature stays where it rests; no act cut at its box's edge ([#554](https://github.com/sidevoice/sidevoice-web/issues/554)) ([152b1f0](https://github.com/sidevoice/sidevoice-web/commit/152b1f0565f178c818df998d642b7b9fe7322af9))
+* **outbox:** resend fast at first, then every 15 s ([#552](https://github.com/sidevoice/sidevoice-web/issues/552)) ([5d263c5](https://github.com/sidevoice/sidevoice-web/commit/5d263c5efcdfc694a50b5a4abbba025882aa19cf))
+* **settings:** an iPhone's single press is the usual headset row, disabled, with a note why ([#547](https://github.com/sidevoice/sidevoice-web/issues/547)) ([fea67fd](https://github.com/sidevoice/sidevoice-web/commit/fea67fd72daa8db780b9f342452ba25dda511bdb))
+* **shortcuts:** an F-key recorded alone for hold to talk is held, as a right-hand modifier is ([#553](https://github.com/sidevoice/sidevoice-web/issues/553)) ([de1f718](https://github.com/sidevoice/sidevoice-web/commit/de1f718efc0466b73c372e041f748bea4c8801fd))
+* **transcript:** a message folds past 25 lines, not 10 ([#549](https://github.com/sidevoice/sidevoice-web/issues/549)) ([b4c6928](https://github.com/sidevoice/sidevoice-web/commit/b4c69280aba5df1a5b048acc3002fa8570cc2854))
+* **transcript:** the Working row is led by the status dot, with one static ellipsis ([#551](https://github.com/sidevoice/sidevoice-web/issues/551)) ([b6b02f9](https://github.com/sidevoice/sidevoice-web/commit/b6b02f931d2113f45789b61cc1f839572f131469))
+
 ## [0.27.0](https://github.com/sidevoice/sidevoice-web/compare/v0.26.0...v0.27.0) (2026-11-07)
 
 
