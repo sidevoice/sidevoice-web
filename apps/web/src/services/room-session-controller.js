@@ -646,8 +646,8 @@ const post=(path,body,fp=state.callNode)=>api(path,{method:'POST',headers:{'Cont
 /* ----- what the call owes its machine: the outbox (`outbox.js`) -----
  * A turn of the person's and what became of a reply are each one message with its own `client_msg_id`, which the machine
  * remembers: sent twice it is taken once and acknowledged either way. So each waits here until acknowledged, and is
- * said again on every socket the call gets until then, and on the same socket after a backoff (`resendDelay`: 5 s, 10 s,
- * 20 s, 40 s, then every minute) while it stays unacknowledged. Per tab: another tab's call is another call. */
+ * said again on every socket the call gets until then, and on the same socket after a backoff (`resendDelay`: 1 s, 2 s, 5 s, 10 s,
+ * then every 15 s) while it stays unacknowledged. Per tab: another tab's call is another call. */
 const OUTBOX_SCOPE_KEY='sidevoice.outbox-scope';
 function outboxScope(){try{let scope=sessionStorage.getItem(OUTBOX_SCOPE_KEY);if(!scope){scope=crypto.randomUUID();sessionStorage.setItem(OUTBOX_SCOPE_KEY,scope)}return scope}catch{return 'page'}}
 const outbox=createOutbox({scope:outboxScope()});

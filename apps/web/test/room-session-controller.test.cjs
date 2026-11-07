@@ -4856,7 +4856,7 @@ test('Turns said with no signal reach the machine in the order said, all of them
  assert.equal(s.run('outbox.size'),0);
  s.run('disconnect()');
 });
-test('A message nobody acknowledges is said again on the same socket after 5 s, 10 s, 20 s, 40 s and then every minute, oldest first',async()=>{
+test('A message nobody acknowledges is said again on the same socket after 1 s, 2 s, 5 s, 10 s and then every 15 s, oldest first',async()=>{
  const fake=new Map();
  const c=await callOnRoom({timers:(fn,ms,...rest)=>{if(ms>60000)return setTimeout(fn,ms,...rest);const handle={ms};fake.set(handle,fn);return handle},clearTimers:fake});
  const {s,voice,first}=c;
@@ -4866,19 +4866,19 @@ test('A message nobody acknowledges is said again on the same socket after 5 s, 
  const baseline=fake.size;
  voice.emit('turn',started('t1'));voice.emit('turn',finished('t1','first'));
  const armed=()=>s.run('resendTimer')?.ms;
- assert.equal(armed(),5000,'the first wait');
+ assert.equal(armed(),1000,'the first wait');
  voice.emit('turn',started('t2'));voice.emit('turn',finished('t2','second'));
  const count=()=>sentOf(c,first,'voice-user-turn').length;
  assert.equal(count(),4);
  // The timer is not early: woken before the delay is up, nothing is said again.
- at(4999);s.run('flushOutbox()');assert.equal(count(),4,'not before its time');
+ at(999);s.run('flushOutbox()');assert.equal(count(),4,'not before its time');
  assert.equal(fake.size-baseline,1,'one timer for the whole outbox, however many entries wait');
- at(1);wake();assert.equal(count(),8,'5 s: said again, the four of them');
+ at(1);wake();assert.equal(count(),8,'1 s: said again, the four of them');
  assert.equal(fake.size-baseline,1,'and still one');
  // The wait the page armed after each time it said them again: the schedule.
  const waits=[];
  for(let i=0;i<5;i++){const wait=armed();waits.push(wait);at(wait);wake()}
- assert.deepEqual(plain(waits),[10000,20000,40000,60000,60000],'then 10 s, 20 s, 40 s, and every minute');
+ assert.deepEqual(plain(waits),[2000,5000,10000,15000,15000],'then 2 s, 5 s, 10 s, and every 15 s');
  assert.equal(count(),28,'each time the four of them');
  const sent=sentOf(c,first,'voice-user-turn').map(d=>d.phase[0]+d.turn_id);
  assert.deepEqual(plain(sent.slice(0,4)),['st1','ft1','st2','ft2']);
@@ -5069,5 +5069,28 @@ test('An entry that is due again but held behind its start does not make the ret
  const next=s.run('resendTimer');
  assert.ok(next&&next.ms>=100,'armed, and not for nothing at once');
  assert.ok(s.run('outbox.list().every(e=>e.resendAt>'+now+')'),'every entry waits its next backoff');
+ s.run('disconnect()');
+});
+test('The text retry waits 1 s, 2 s, 5 s, 10 s and then 15 s each time, and a new socket starts it again at 1 s',async()=>{
+ const c=await callOnRoom();const {s}=c;
+ let calls=0;
+ s.context.__deliver=()=>{calls++;return Promise.resolve('later')};
+ s.run("deliverText=__deliver;refreshHistory=async()=>{}");
+ let now=7_000_000;const clock=()=>s.run('resendClock=()=>'+now);clock();
+ const tick=async()=>{s.run('flushOutbox()');await settleSoon();await settleSoon()};
+ s.run("keepMessage('text','text',{thread:'a',text:'later'})");
+ const waits=[];
+ for(let i=0;i<6;i++){
+  await tick();
+  assert.equal(calls,i+1,'tried');
+  const wait=s.run('textDue')-now;waits.push(wait);
+  now+=wait-1;clock();await tick();
+  assert.equal(calls,i+1,'not a millisecond early');
+  now+=1;clock();
+ }
+ assert.deepEqual(plain(waits),[1000,2000,5000,10000,15000,15000]);
+ s.run('resetTextBackoff()');
+ await tick();
+ assert.equal(s.run('textDue')-now,1000,'a new socket starts again at 1 s');
  s.run('disconnect()');
 });
