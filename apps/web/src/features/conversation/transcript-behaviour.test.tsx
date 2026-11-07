@@ -132,9 +132,9 @@ function layOut() {
   });
 }
 
-test("a message past ten lines folds to ten with See more, and See less once open; one of ten lines is whole", () => {
+test("a message past 25 lines folds to 25 with See more, and See less once open; one of 25 lines is whole", () => {
   layOut();
-  const ten = "x".repeat(400), eleven = "y".repeat(401);
+  const ten = "x".repeat(1000), eleven = "y".repeat(1001);
   render(<MessageList conversation={view([message({ segment: "ten", text: ten }), message({ segment: "eleven", text: eleven, time: base + 1_000 })])} />);
   const [first, second] = document.querySelectorAll<HTMLElement>(".chat-text");
   expect(first).not.toHaveAttribute("data-fold");
@@ -149,9 +149,9 @@ test("a message past ten lines folds to ten with See more, and See less once ope
   expect(second.parentElement!.querySelector(".see-more + .chat-meta")).not.toBeNull();
 });
 
-test("a 9-line message shows no See more, a 30-line one does, folded to the one value", () => {
+test("a 24-line message shows no See more, a 30-line one does, folded to the one value", () => {
   layOut();
-  render(<MessageList conversation={view([message({ segment: "nine", text: "a".repeat(360) }), message({ segment: "thirty", text: "b".repeat(1200), time: base + 1_000 })])} />);
+  render(<MessageList conversation={view([message({ segment: "nine", text: "a".repeat(960) }), message({ segment: "thirty", text: "b".repeat(1200), time: base + 1_000 })])} />);
   const [nine, thirty] = document.querySelectorAll<HTMLElement>(".chat-text");
   expect(nine).not.toHaveAttribute("data-fold");
   expect(thirty).toHaveAttribute("data-fold", "folded");
@@ -161,13 +161,13 @@ test("a 9-line message shows no See more, a 30-line one does, folded to the one 
 
 test("a long reply is whole while it is said, its words lit as it goes, and folds once it is over", () => {
   layOut();
-  const long = "z".repeat(600);
+  const long = "z".repeat(1200);
   const { rerender } = render(<MessageList conversation={view([message({ segment: "now", text: long, playback: "playing", karaoke: { from: 0, to: 120 } })])} />);
   expect(document.querySelector(".chat-text")).not.toHaveAttribute("data-fold");
   expect(screen.queryByRole("button", { name: "See more" })).toBeNull();
   // Said, it has no time yet; over, it has its time and folds.
   expect(document.querySelector(".chat-meta")).toBeNull();
-  rerender(<MessageList conversation={view([message({ segment: "now", text: long, playback: "complete", hearing: "heard", heard_chars: 600 })])} />);
+  rerender(<MessageList conversation={view([message({ segment: "now", text: long, playback: "complete", hearing: "heard", heard_chars: 1200 })])} />);
   expect(document.querySelector(".chat-text")).toHaveAttribute("data-fold", "folded");
   expect(document.querySelector(".chat-meta time")).not.toBeNull();
 });

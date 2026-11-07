@@ -1,9 +1,9 @@
 import { createContext, useContext, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { translator } from "../../i18n/translator";
 
-/** Past this many lines a message folds to them, with "See more" (T31; six, then ten at the operator's word). The one
+/** Past this many lines a message folds to them, with "See more" (T31; six, then ten, then 25 at the operator's word: See more only when it is really needed, web#520). The one
  *  value: the stylesheet takes it from the message's `--fold-lines`. */
-export const FOLD_LINES = 10;
+export const FOLD_LINES = 25;
 
 /** What the transcript's text is laid out at: its width, and a count bumped when the face has loaded (a line counted in
  *  the fallback face can come out wrong). A message counts its lines again when either changes. 0 while it has no box. */
@@ -16,7 +16,7 @@ export function lineCount(node: HTMLElement): number {
   return tops.size;
 }
 
-/** A message's words, folded past ten lines: the ten, then "See more" in the accent, "See less" once open. Its lines are
+/** A message's words, folded past 25 lines: the 25, then "See more" in the accent, "See less" once open. Its lines are
  *  counted where it is drawn, as it is drawn (inline, so the time can sit on its last line), each time its words or the
  *  transcript's width change; a message that fits never shows the link. Held whole (`whole`) while it is said, so the
  *  words lit as the voice goes never fall behind the fold. */
