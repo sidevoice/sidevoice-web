@@ -1,21 +1,15 @@
-import { StateGlyph } from "../../components/ui/Icons";
 import { TurnPill } from "./TurnPill";
 import { translator } from "../../i18n/translator";
 import { CancelTurn, type BubblePosition } from "./MessageBubble";
 
-/** A running ellipsis after a live row's word: drawn, so a language writes only the word. */
-function Ellipsis() {
-  return <span className="transcript-ell" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span>;
-}
-
 /** The conversation working on the person's turn ('label', T51, T52): a quiet row in the agent's run, "Working…", led by the
- *  working glyph (three dots, in the working state's colour, blinking 1.2 s: as the conversations' dot says it everywhere
- *  else; StateGlyph), in place of the thinking dots. */
+ *  conversations' own working dot (`.state-dot`, room.css: the purple one that replaces the green, blinking 1.2 s, still under reduced
+ *  motion with its halo), then the word and one static ellipsis, in place of the thinking dots. */
 export function WorkingRow({ position }: { position: BubblePosition }) {
   const t = translator();
   return <div className="chat-bubble working" data-role="assistant" data-position={position} role="status" aria-label={t("messages.thinking")}>
     <span className="working-label" aria-hidden="true">
-      <StateGlyph kind="working" /><span>{t("messages.working")}<Ellipsis /></span>
+      <span className="state-dot" data-kind="working" aria-hidden="true" /><span>{t("messages.working")}…</span>
     </span>
   </div>;
 }

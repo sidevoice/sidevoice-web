@@ -60,14 +60,14 @@ test("a working card has no light along its foot, and its type is the Live Activ
   assert.ok(outside.some((rule) => rule.selector === ".sidebar-rows .person" && /font-family: var\(--sv-font-sans\)/.test(rule.body)), "DM Sans on the card's button");
 });
 
-test("the transcript's Working row wears the working colour and blinks like the conversations' dot: its glyph is the state's, from one place", () => {
-  // The three dots are StateGlyph's working icon: its colour and its 1.2 s blink are the state glyph's (components/ui/ui.css), the
-  // same wherever a state is shown as an icon, and held still where motion is reduced.
-  const ui = read("components/ui/ui.css");
-  assert.match(ui, /\.state-glyph-working \{ color: var\(--sv-state-working\); animation: state-glyph-blink 1\.2s ease-in-out infinite; \}/);
-  assert.match(ui, /@keyframes state-glyph-blink \{ 50% \{ opacity: \.25; \} \}/);
-  assert.match(ui, /prefers-reduced-motion: reduce\) \{ \.state-glyph-working \{ animation: none; \} \}/);
+test("the transcript's Working row is led by the conversations' own working dot, from one place, and has no animated dots", () => {
+  // The dot is `.state-dot` (room.css): its working colour, its 1.2 s blink and its halo where motion is reduced are the room's.
+  const room = read("features/room/room.css");
+  assert.match(room, /\.state-dot\[data-kind="working"\] \{ background: var\(--sv-state-working\); animation: state-dot-blink 1\.2s ease-in-out infinite; \}/);
+  assert.match(room, /@keyframes state-dot-blink \{ 0%, 100% \{ opacity: 1; \} 50% \{ opacity: \.25; \} \}/);
+  assert.match(room, /prefers-reduced-motion: reduce\) \{\s*\.state-dot\[data-kind="working"\] \{ animation: none !important;/);
   const transcript = read("features/conversation/transcript.css");
-  assert.doesNotMatch(transcript, /\.working-label > svg \{[^}]*(color|animation):/, "the row adds nothing of its own to the glyph's colour or blink");
-  assert.match(fs.readFileSync(__dirname + "/../src/features/conversation/LiveRows.tsx", "utf8"), /<StateGlyph kind="working" \/>/);
+  assert.doesNotMatch(transcript, /\.working-label \.state-dot \{[^}]*(background|animation):/, "the row adds nothing of its own to the dot's colour or blink");
+  assert.doesNotMatch(transcript, /transcript-ell/, "no animated three dots");
+  assert.match(fs.readFileSync(__dirname + "/../src/features/conversation/LiveRows.tsx", "utf8"), /<span className="state-dot" data-kind="working"/);
 });
