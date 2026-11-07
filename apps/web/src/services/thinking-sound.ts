@@ -1,3 +1,6 @@
+import { host } from "../host";
+import type { CueBridge } from "../host/types";
+
 /* The thinking sound's player: a soft breath (a filtered noise breathing slowly, quiet), drawn in the page's Web Audio.
  * When it plays is not its business (features/call/PresenceSound.tsx decides, by Settings → Call and the screen).
  *
@@ -5,7 +8,10 @@
  * for good, and the breath starts when the agent starts working, never in a gesture (sidevoice-web#439). So the page's
  * one context for it is begun in the Join tap (`primeThinkingSound`, beside the lock screen's element), and every breath
  * of the call plays in it; where the page made none in a gesture (an app's webview, which lets a page start its audio
- * at any time), it is made when the first breath plays. */
+ * at any time), it is made when the first breath plays.
+ *
+ * An app that plays the cue itself (`host.cue`: the phone's native call holds the audio session, and a webview's Web Audio
+ * is not sure to come out through it) is asked to, and the page's context is never made. */
 
 const LEVEL = 0.035;
 const BREATH_SECONDS = 3.2;
@@ -63,8 +69,22 @@ function startBreath(context: AudioContext): () => void {
   };
 }
 
+/** The host's own breath, started and stopped as the page's would be. A host that throws plays nothing: a cue is never
+ *  worth a call's failing. */
+function playInHost(cue: CueBridge): () => void {
+  try { cue.start("thinking"); } catch { return () => undefined; }
+  let stopped = false;
+  return () => {
+    if (stopped) return;
+    stopped = true;
+    try { cue.stop("thinking"); } catch { /* Nothing to stop. */ }
+  };
+}
+
 /** Plays the breath until the returned function stops it. Nothing where the page has no Web Audio. */
 export function playThinkingSound(): () => void {
+  const cue = host().cue;
+  if (cue) return playInHost(cue);
   const made = audioContext();
   if (!made) return () => undefined;
   playing++;

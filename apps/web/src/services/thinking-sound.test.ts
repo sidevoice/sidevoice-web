@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, onTestFinished, test, vi } from "vitest";
 import { playThinkingSound, primeThinkingSound, resetThinkingSoundForTests } from "./thinking-sound";
 
 /* The player keeps one context for the page: begun in the Join tap (prime), and every breath plays in that one, so a
@@ -67,4 +67,35 @@ test("a page without Web Audio plays nothing and does not fail", () => {
   vi.stubGlobal("AudioContext", undefined);
   primeThinkingSound();
   expect(() => playThinkingSound()()).not.toThrow();
+});
+
+/* An app that plays the cue itself (host.cue) is asked to, and the page makes no Web Audio of its own. */
+function withCue(cue: unknown) {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { cue } } });
+  onTestFinished(() => { Reflect.deleteProperty(window, "__sidevoiceHost"); });
+}
+
+test("a host with its own cue plays the breath, once, and the page makes no context", () => {
+  const cue = { start: vi.fn(), stop: vi.fn() };
+  withCue(cue);
+  const stop = playThinkingSound();
+  expect(cue.start).toHaveBeenCalledWith("thinking");
+  expect(FakeContext.made).toHaveLength(0);
+  stop(); stop();
+  expect(cue.stop).toHaveBeenCalledTimes(1);
+  expect(cue.stop).toHaveBeenCalledWith("thinking");
+});
+
+test("a host cue that throws plays nothing and breaks nothing", () => {
+  withCue({ start: () => { throw new Error("no audio"); }, stop: vi.fn() });
+  expect(() => playThinkingSound()()).not.toThrow();
+  expect(FakeContext.made).toHaveLength(0);
+});
+
+test("a host without the cue's functions leaves the breath to the page's Web Audio", async () => {
+  withCue({ start: vi.fn() });
+  const stop = playThinkingSound();
+  expect(FakeContext.made).toHaveLength(1);
+  stop();
+  await vi.runAllTimersAsync();
 });
