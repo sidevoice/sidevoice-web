@@ -59,7 +59,7 @@ const fits = (pane) => {
   return { out, paneFits: pane.scrollWidth <= pane.clientWidth + 1, pageFits: document.documentElement.scrollWidth <= width + 1 };
 };
 
-for (const language of ["en", "es", "fr", "it", "de", "ja", "zh-Hans", "pl"]) {
+for (const language of ["en", "es", "fr", "it", "de", "ja", "zh-Hans", "pl", "pt-BR", "ko", "hi"]) {
   test(`Updates fits 320px in ${language}: the app's row and its action, whatever its state`, async ({ page }) => {
     await installHarness(page);
     await withUpdater(page, language, STATES[1]);
