@@ -122,6 +122,8 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
     if (crowded) closeTranscript();
   };
   const unread = (row: ParticipantView) => hasUnread(row, onStage);
+  // The conversations' icon with their number: one face in the list's heading and on the rail's expand button.
+  const chip = <span className="conversations-chip" aria-hidden="true"><ConversationsIcon size={14} /><span className="conversations-count">{participants.length}</span></span>;
 
   return (
     <>
@@ -132,13 +134,13 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
         <div className="sidebar-head">
           {/* Icon and count are one face, as the call card's switcher wears them (call-card.css .card-conversations-button);
               no chevron: the list is already open here. */}
-          <h2>{blocked ? <ConversationsIcon /> : <span className="conversations-chip" aria-hidden="true"><ConversationsIcon size={14} /><span className="conversations-count">{participants.length}</span></span>}{t("sidebar.title")}</h2>
+          <h2>{blocked ? <ConversationsIcon /> : chip}{t("sidebar.title")}</h2>
           <Tooltip action content={rail ? t("sidebar.expand") : t("sidebar.collapse")}>
             <Button variant="ghost" tone="neutral" size="icon-sm" className="sidebar-collapse" aria-controls="conversations" aria-expanded={!rail}
               aria-label={rail ? t("sidebar.expand") : t("sidebar.collapse")}
               onClick={toggle}>
-              {/* The rail has no second button: the conversations' icon is the one that expands it, with their number as its badge. */}
-              {rail ? <><ConversationsIcon size={20} />{!blocked && participants.length > 0 && <span className="sidebar-count-badge" aria-hidden="true">{participants.length}</span>}</> : <SidebarCollapseIcon />}
+              {/* The rail has no second button: the list's own chip is the one that expands it, at the same size (operator, 2026-11-07). */}
+              {rail ? (blocked ? <ConversationsIcon /> : chip) : <SidebarCollapseIcon />}
             </Button>
           </Tooltip>
           <Button variant="ghost" tone="neutral" size="icon-sm" className="sidebar-close" aria-label={t("sidebar.close")} title={t("sidebar.close")} onClick={close}>
@@ -154,7 +156,7 @@ export function ConversationSidebar({ blocked = false }: { blocked?: boolean } =
             return (
               <section className="sidebar-group" key={group.key} aria-label={state ? machineEntryName(machine, state, false, t) : machine}>
                 <h3 className="sidebar-group-label" aria-hidden={rail || undefined} title={state ? machineEntryTitle(machine, state) : undefined}>
-                  <StateOnIcon icon={view?.local ? <ThisComputerIcon size={14} /> : <OtherMachineIcon size={14} />} status={state} /><span translate="no">{machine}</span></h3>
+                  <StateOnIcon icon={view?.local ? <ThisComputerIcon size={16} /> : <OtherMachineIcon size={16} />} status={state} /><span translate="no">{machine}</span></h3>
                 <ConversationRows
                   className="sidebar-rows"
                   rows={group.rows.map((row) => row.threadId === onStage && !row.selected ? { ...row, selected: true } : row)}

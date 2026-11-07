@@ -62,10 +62,11 @@
 .sidebar-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-2); flex: none; min-height: 32px; padding-inline-start: var(--sv-space-2); }
 .sidebar-head h2 { display: flex; align-items: center; gap: var(--sv-space-2); flex: 1; min-width: 0; overflow: hidden; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); white-space: nowrap; text-overflow: ellipsis; }
 .sidebar-head h2 svg { flex: none; width: 16px; height: 16px; }
-/* The number of conversations, as the call card's switcher says it (call-card.css .card-conversations-button): tabular, in the muted weight. */
-.sidebar-head h2 .conversations-chip { display: inline-flex; align-items: center; gap: 3px; flex: none; min-height: 20px; padding: 0 6px; border-radius: 8px;
+/* The number of conversations, as the call card's switcher says it (call-card.css .card-conversations-button): tabular, in the muted weight.
+   One face in the list and in the rail (operator, 2026-11-07): the rail's expand button wears this same chip, at this size. */
+.sidebar-head .conversations-chip { display: inline-flex; align-items: center; gap: 3px; flex: none; min-height: 20px; padding: 0 6px; border-radius: 8px;
   background: color-mix(in srgb, var(--sv-text) 8%, transparent); color: var(--sv-text-muted); font: 600 calc(12.5px * var(--sv-text-scale, 1)) / 1 var(--sv-font-sans, inherit); font-variant-numeric: tabular-nums; }
-.sidebar-head h2 .conversations-chip svg { width: 14px; height: 14px; }
+.sidebar-head .conversations-chip svg { width: 14px; height: 14px; }
 .conversations-chip .conversations-count { font: inherit; color: inherit; }
 .conversations-count { flex: none; font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); font-variant-numeric: tabular-nums; }
 .conversation-sidebar .sidebar-close { display: none; }
@@ -115,16 +116,13 @@
 
 /* The rail: the same cards' creatures in a narrow column, and only the width changes: every row keeps the height it has
    in the list (the machine's row by its icon alone, a card with the same padding), so what is where does not jump. Its
-   header is one button, the conversations' icon with their number as its badge: it expands the list. A card has no white
+   header is one button, the same conversations chip the list wears (icon and number, the same size): it expands the list. A card has no white
    card and no border there: just the creature; the chosen one has a soft lilac rounded background and a hovered one a very
    faint tint; one that needs the person says so by its burst alone. */
-.sidebar-count-badge { position: absolute; top: -5px; right: -7px; display: grid; place-items: center; min-width: 16px; min-height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px;
-  background: var(--sv-accent); color: var(--sv-on-accent); box-shadow: 0 0 0 2px var(--sv-bg-subtle); font: 700 calc(10.5px * var(--sv-text-scale, 1)) / 1 var(--sv-font-sans, inherit); font-variant-numeric: tabular-nums; pointer-events: none; }
 @media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
   .conversation-sidebar[data-collapsed] { width: 84px; padding-inline: 6px; }
   .conversation-sidebar[data-collapsed] .sidebar-head { justify-content: center; padding: 0; }
-  .conversation-sidebar[data-collapsed] .sidebar-collapse { position: relative; }
-  .conversation-sidebar[data-collapsed] .sidebar-collapse svg { width: 20px; height: 20px; }
+  .conversation-sidebar[data-collapsed] .sidebar-collapse { width: auto; min-width: 32px; padding-inline: var(--sv-space-1); }
   .conversation-sidebar[data-collapsed] :is(.sidebar-head h2, .participant-copy, .participant-more, .sidebar-empty) { display: none; }
   .conversation-sidebar[data-collapsed] .sidebar-group-label { justify-content: center; padding-inline-start: 0; }
   .conversation-sidebar[data-collapsed] .sidebar-group-label > span[translate] { display: none; }
@@ -133,7 +131,8 @@
   .conversation-sidebar[data-collapsed] .participant-row, .conversation-sidebar[data-collapsed] .participant-row:has(.conversation-avatar[data-attention]) { border-color: transparent; background: none; box-shadow: none; }
   .conversation-sidebar[data-collapsed] .participant-row[data-selected] { background: var(--sv-accent-soft); }
   @media (hover: hover) { .conversation-sidebar[data-collapsed] .participant-row:not([data-selected]):hover { border-color: transparent; background: color-mix(in srgb, var(--sv-accent) 6%, transparent); } }
-  .conversation-sidebar[data-collapsed] .person { flex: none; justify-content: center; padding: 16px 4px 8px; }
+  /* The list's own vertical padding: each creature stays where it was in the list. */
+  .conversation-sidebar[data-collapsed] .person { flex: none; justify-content: center; padding-inline: var(--sv-space-1); }
 }
 
 /* ----- a row's options menu (components/ui/DropdownMenu.tsx: only these rows use it) */
