@@ -5071,3 +5071,26 @@ test('An entry that is due again but held behind its start does not make the ret
  assert.ok(s.run('outbox.list().every(e=>e.resendAt>'+now+')'),'every entry waits its next backoff');
  s.run('disconnect()');
 });
+test('The text retry waits 1 s, 2 s, 5 s, 10 s and then 15 s each time, and a new socket starts it again at 1 s',async()=>{
+ const c=await callOnRoom();const {s}=c;
+ let calls=0;
+ s.context.__deliver=()=>{calls++;return Promise.resolve('later')};
+ s.run("deliverText=__deliver;refreshHistory=async()=>{}");
+ let now=7_000_000;const clock=()=>s.run('resendClock=()=>'+now);clock();
+ const tick=async()=>{s.run('flushOutbox()');await settleSoon();await settleSoon()};
+ s.run("keepMessage('text','text',{thread:'a',text:'later'})");
+ const waits=[];
+ for(let i=0;i<6;i++){
+  await tick();
+  assert.equal(calls,i+1,'tried');
+  const wait=s.run('textDue')-now;waits.push(wait);
+  now+=wait-1;clock();await tick();
+  assert.equal(calls,i+1,'not a millisecond early');
+  now+=1;clock();
+ }
+ assert.deepEqual(plain(waits),[1000,2000,5000,10000,15000,15000]);
+ s.run('resetTextBackoff()');
+ await tick();
+ assert.equal(s.run('textDue')-now,1000,'a new socket starts again at 1 s');
+ s.run('disconnect()');
+});
