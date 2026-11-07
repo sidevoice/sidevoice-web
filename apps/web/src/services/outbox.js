@@ -18,6 +18,7 @@ export function createOutbox({ scope = 'page', indexedDB = globalThis.indexedDB,
     const readOrder = () => { try { return Number(orderStore?.getItem(orderKey)) || 0; } catch { return 0; } };
     const keepOrder = (value) => { try { orderStore?.setItem(orderKey, String(value)); } catch { /* the read of the store sets it right */ } };
     const entries = new Map(), forgotten = new Set();
+    const orderTrusted = readOrder() > 0;
     let db = null, loading = true, order = readOrder();
     // What is stored: the entry's own fields, never whatever its sender keeps on it in memory.
     const record = (entry) => ({ id: entry.id, scope, kind: entry.kind, session_id: entry.session_id, node: entry.node, payload: entry.payload, created: entry.created, order: entry.order });
@@ -55,7 +56,8 @@ export function createOutbox({ scope = 'page', indexedDB = globalThis.indexedDB,
                 // none is ever stored under an order that restarted at 1 and sorts before an older stored one after a crash.
                 const opened = request.result;
                 // With the order kept apart, an entry added meanwhile is final and may be stored now.
-                if (orderStore) db = opened;
+                // Only where the counter has a value: without one (first use, or cleared) the order is only known after the read.
+                if (orderTrusted) db = opened;
                 let read;
                 try { read = opened.transaction(STORE, 'readonly').objectStore(STORE).getAll(); } catch { db = opened; done(); return; }
                 read.onerror = () => { db = opened; done(); };

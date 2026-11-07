@@ -5013,7 +5013,7 @@ test('A turn let go of an older one that waited for another machine lets the tex
  assert.deepEqual(plain(delivered),['after'],'and the text is not stuck behind it');
  s.run('disconnect()');
 });
-test('A text posted straight to the room that hangs does not hold the turns for ever: its time is up, and a hang-up lets go of it',async()=>{
+test('A text posted straight to the room that hangs is stopped and retried from the queue, ahead of what was said after it; a hang-up lets go of it',async()=>{
  const fake=new Map();
  const c=await callOnRoom({timers:(fn,ms,...rest)=>{if(ms>60000)return setTimeout(fn,ms,...rest);const handle={ms};fake.set(handle,fn);return handle},clearTimers:fake});
  const {s,voice,first}=c;
@@ -5025,9 +5025,13 @@ test('A text posted straight to the room that hangs does not hold the turns for 
  assert.equal(s.run('directBarrier.size'),1);
  voice.emit('turn',started('w'));voice.emit('turn',finished('w','spoken'));
  assert.equal(sentOf(c,first,'voice-user-turn').length,0,'behind the text');
- const limit=s.run('DIRECT_TEXT_MS');
+ const limit=s.run('DIRECT_TEXT_MS'),grace=s.run('DIRECT_ABORT_GRACE_MS');
  const [handle,fn]=[...fake].find(([h])=>h.ms===limit);fake.delete(handle);fn();
- assert.equal(sentOf(c,first,'voice-user-turn').length,2,'its time is up: the turn goes');
+ // A request that ignores the abort: the barrier is let go a moment later all the same.
+ const [again,release]=[...fake].find(([h])=>h.ms===grace);fake.delete(again);release();
+ assert.equal(s.run('directBarrier.size'),0,'its request is let go');
+ assert.equal(sentOf(c,first,'voice-user-turn').length,0,'the turn still waits behind the text, which is the older message');
+ assert.equal(s.run("queuedTexts().length"),1,'and the text is kept to be tried again');
  s.run("directBarrier.add({})");
  s.run('disconnect()');
  assert.equal(s.run('directBarrier.size'),0,'a hang-up lets go of them all');
@@ -5085,7 +5089,7 @@ test('A hang-up marks the rows of the turns it could not deliver as not sent, an
  assert.equal(s.run('outbox.size'),2000,'nothing was let go to make room');
  assert.equal(s.run('outbox.list()[0].id'),oldest);
  s.run('disconnect()');
- assert.equal(s.run("history.find(r=>r.turn_id==='gone').delivery"),'not_sent','the hang-up says what did not arrive');
+ assert.equal(s.run("history.find(r=>r.turn_id==='gone').delivery"),'uncertain','said on a socket and never acknowledged: the room may have it');
 });
 test('A direct text that hangs is stopped after its time and kept in the queue under the id it had',async()=>{
  const fake=new Map();

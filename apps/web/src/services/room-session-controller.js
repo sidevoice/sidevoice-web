@@ -662,7 +662,7 @@ let outboxHold=null;
 let resendClock=()=>Date.now(),resendTimer=null,textTimer=null,textTries=0;
 // A text posted straight to the room, still on its way: it is a text ahead of every turn said meanwhile.
 // Each is bounded: a request that hangs lets go after DIRECT_TEXT_MS, and a hang-up or a move lets go of all of them.
-const directBarrier=new Set();let DIRECT_TEXT_MS=30000;
+const directBarrier=new Set();let DIRECT_TEXT_MS=30000,DIRECT_ABORT_GRACE_MS=2000;
 // When the texts' backoff is up, and a count that makes a request of an earlier session or socket ignored when it answers.
 let textDue=0,textGen=0;
 function armResend(socket){
@@ -926,13 +926,18 @@ function queueText(viewed,text,id=crypto.randomUUID()){
 }
 // The rows of turns whose words never reached the machine say so (`not_sent`), as a text's bubble does: a hang-up or a move
 // lets go of them, and they would otherwise stay pending for ever.
-function failTurnRows(turns){
+// `not_sent` for a turn never put on a socket, `uncertain` for one that was but never acknowledged (the room may have it).
+function failTurnRows(turns,mark='not_sent'){
  const ids=new Set(turns);if(!ids.size)return;
- state.history=state.history.map(r=>r.turn_id&&ids.has(r.turn_id)&&(r.delivery==='pending'||r.delivery==null)?{...r,delivery:'not_sent'}:r);save();
+ state.history=state.history.map(r=>r.turn_id&&ids.has(r.turn_id)&&(r.delivery==='pending'||r.delivery==null)?{...r,delivery:mark}:r);save();
 }
 const unsentTurns=which=>outbox.list().filter(entry=>entry.kind==='user-turn'&&entry.payload.data.phase==='finished'&&which(entry)).map(entry=>entry.payload.data.turn_id);
+function markLetGoTurns(which){
+ failTurnRows(unsentTurns(entry=>which(entry)&&!entry.sentOn));
+ failTurnRows(unsentTurns(entry=>which(entry)&&!!entry.sentOn),'uncertain');
+}
 // The text backoff belongs to the texts that wait: with none left, or on a new socket, it starts again.
-function clearDirectTexts(){for(const direct of directBarrier){clearTimeout(direct.timer);try{direct.abort?.abort()}catch{}}directBarrier.clear()}
+function clearDirectTexts(){for(const direct of directBarrier){clearTimeout(direct.timer);clearTimeout(direct.fallback);try{direct.abort?.abort()}catch{}}directBarrier.clear()}
 function resetTextBackoff(){clearTimeout(textTimer);textTimer=null;textTries=0;textDue=0;textGen++}
 function failTexts(which=()=>true){
  const gone=queuedTexts().filter(which);
@@ -949,8 +954,12 @@ async function deliverText(entry){
  syncRemovals();
  if(removing(entry.node,thread))return 'refused';
  try{
-  const r=await request('/api/presentation/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,thread_id:thread,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:entry.id})},entry.node);
-  return r.ok?'sent':r.status>=500||[408,409,429].includes(r.status)?'later':'refused';
+  // A request that hangs is stopped after DIRECT_TEXT_MS and tried again under the same id (the room takes each once).
+  const abort=new AbortController(),timer=setTimeout(()=>{try{abort.abort()}catch{}},DIRECT_TEXT_MS);
+  try{
+   const r=await request('/api/presentation/text',{method:'POST',headers:{'Content-Type':'application/json'},signal:abort.signal,body:JSON.stringify({text,thread_id:thread,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:entry.id})},entry.node);
+   return r.ok?'sent':r.status>=500||[408,409,429].includes(r.status)?'later':'refused';
+  }finally{clearTimeout(timer)}
  }catch{return 'later'}
 }
 // Oldest first, one at a time, and only on the conversation each was written for, once the call is on the room with it chosen.
@@ -987,12 +996,17 @@ async function flushTexts(){
  if(!queuedTexts().length)resetTextBackoff();
  if(sent||failed)flushOutbox();
 }
-async function sendText(){personSignal();const input=$('text-message'),text=input?.value;if(text==null)return;let viewed=composerFor();if(state.textSending||!text.trim()||!viewed)return;syncRemovals();if(removalsOpen(conversationOf(viewed).node)){state.textSending=true;updateComposer();try{await removalGate(conversationOf(viewed).node)}finally{state.textSending=false}if(composerFor()!==viewed||input.value!==text){updateComposer();return}}if(removing(conversationOf(viewed).node,conversationOf(viewed).thread)){updateComposer();return}if(!takesTextNow(viewed)){queueText(viewed,text);input.value='';updateComposer();return}const destination=targetThread(),key=JSON.stringify([state.sessionId,targetId(),text]);if(textAttempt?.key!==key)textAttempt={key,id:crypto.randomUUID()};const attempt=textAttempt;state.textSending=true;const direct={abort:new AbortController()};directBarrier.add(direct);direct.timer=setTimeout(()=>{if(directBarrier.delete(direct)){direct.timedOut=true;try{direct.abort.abort()}catch{}flushOutbox()}},DIRECT_TEXT_MS);updateComposer();setRoomError('');try{await post('/api/presentation/text',{text,thread_id:destination,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:attempt.id},state.callNode,direct.abort.signal);if(input.value===text)input.value='';if(textAttempt===attempt)textAttempt=null;await refreshHistory(state.callNode)}catch(e){
+async function sendText(){personSignal();const input=$('text-message'),text=input?.value;if(text==null)return;let viewed=composerFor();if(state.textSending||!text.trim()||!viewed)return;syncRemovals();if(removalsOpen(conversationOf(viewed).node)){state.textSending=true;updateComposer();try{await removalGate(conversationOf(viewed).node)}finally{state.textSending=false}if(composerFor()!==viewed||input.value!==text){updateComposer();return}}if(removing(conversationOf(viewed).node,conversationOf(viewed).thread)){updateComposer();return}if(!takesTextNow(viewed)){queueText(viewed,text);input.value='';updateComposer();return}const destination=targetThread(),key=JSON.stringify([state.sessionId,targetId(),text]);if(textAttempt?.key!==key)textAttempt={key,id:crypto.randomUUID()};const attempt=textAttempt;state.textSending=true;// It has its place in the outbox from the start (under the id it goes with), so what is said after it waits behind it, and a hung request leaves it there.
+const kept=keepMessage('text','text',{thread:conversationOf(viewed).thread,text},attempt.id);
+if(!kept){state.textSending=false;updateComposer();setRoomError(bundled('room.failure.textNotSent').text);return}
+const direct={id:attempt.id,abort:new AbortController()};directBarrier.add(direct);direct.timer=setTimeout(()=>{direct.timedOut=true;try{direct.abort.abort()}catch{}
+ // Should the request ignore the abort, the barrier is let go all the same a moment later.
+ direct.fallback=setTimeout(()=>{if(directBarrier.delete(direct))flushOutbox()},DIRECT_ABORT_GRACE_MS)},DIRECT_TEXT_MS);updateComposer();setRoomError('');try{await post('/api/presentation/text',{text,thread_id:destination,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:attempt.id},state.callNode,direct.abort.signal);if(input.value===text)input.value='';outbox.remove(attempt.id);if(textAttempt===attempt)textAttempt=null;await refreshHistory(state.callNode)}catch(e){
  // A request that hung past its time is stopped and the text kept: it goes from the queue under the very id it had (the room
  // takes each once), in its place, and its bubble waits as a queued text's does.
- if(direct.timedOut&&state.ws&&composerFor()===viewed){queueText(viewed,text,attempt.id);if(textAttempt===attempt)textAttempt=null;if(input.value===text)input.value=''}
- else setRoomError(roomError(e,'room',bundled('room.failure.textNotSent').text))
-}finally{state.textSending=false;clearTimeout(direct.timer);directBarrier.delete(direct);updateComposer();flushOutbox()}}
+ if(direct.timedOut&&outbox.get(attempt.id)){add('user',text,null,viewed,{history_id:'queued:'+attempt.id,draft:false,delivery:'pending'});if(textAttempt===attempt)textAttempt=null;if(input.value===text)input.value=''}
+ else{outbox.remove(attempt.id);setRoomError(roomError(e,'room',bundled('room.failure.textNotSent').text))}
+}finally{state.textSending=false;clearTimeout(direct.timer);clearTimeout(direct.fallback);directBarrier.delete(direct);updateComposer();flushOutbox()}}
 // Taken where they bubble to, not on the box itself, so a box mounted after this runs sends too.
 document.addEventListener('submit',event=>{if(event.target?.id!=='text-composer')return;event.preventDefault();return sendText()});
 document.addEventListener('keydown',event=>{if(event.target?.id==='text-message'&&event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();$('text-composer')?.requestSubmit()}});
@@ -2277,7 +2291,7 @@ function disconnect() {
     for(const said of replies.values())if(!said.terminal){if(said.action!=='user_skipped')said.action='call_ended';reportHearing(said,{status:'unplayed'})}
     // A hang-up ends what the call still owed its session; text that never reached it is left as unsent.
     failTexts();
-    failTurnRows(unsentTurns(()=>true));
+    markLetGoTurns(()=>true);
     outbox.clear();
     clearTimeout(resendTimer);resendTimer=null;resetTextBackoff();clearDirectTexts();
     writtenHearing.clear();
@@ -2631,7 +2645,7 @@ async function drainOutbox(node,ms,mine){
  if(!mine())return;
  failTexts(entry=>entry.node===node);
  const left=outbox.list().filter(entry=>entry.node===node);
- failTurnRows(unsentTurns(entry=>entry.node===node));
+ markLetGoTurns(entry=>entry.node===node);
  for(const entry of left)outbox.remove(entry.id);
  armResend(state.ws);
  if(left.length)reportClientError({kind:'move',message:'unacknowledged '+left.map(entry=>entry.kind).join(',')});
