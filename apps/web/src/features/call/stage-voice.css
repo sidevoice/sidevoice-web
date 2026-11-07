@@ -48,23 +48,9 @@
 .vcap.sent .vcap-said { display: block; padding-top: calc(var(--lh) * .55); margin-top: calc(var(--lh) * -.55); }
 .vcap.sent .vcap-said > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
 
-/* The icon pill: the microphone and the voice's bars, then the bars alone (pulsing, no word) while it is transcribed, where the words will
- * come. The icons and the live bars wear the colour of listening and transcribing (one state's, the person's turn: tokens.css). */
-.vcap.card.pill { padding: 6px 13px; border-radius: 999px; }
-.vcap .lead { display: inline-flex; gap: 6px; align-items: center; margin-right: 7px; vertical-align: -1px; }
-.vcap.pill .lead { margin: 0; }
-.vcap .lead > svg { width: calc(var(--fs) * .85); height: calc(var(--fs) * .85); }
-/* The voice's bars (VoiceWaveform: the microphone's own level, five columns; still, at the reference's rest heights). */
-.vcap .lead .voice-wave { display: inline-block; width: 23px; height: 14px; vertical-align: -2px; color: inherit; }
-.vcap.pill .lead > svg { color: var(--sv-state-listening); }
-.vcap.pill .lead .voice-wave, .vcap.pill .lead .voice-bars { color: var(--sv-accent); }
-.vcap .lead .voice-bars { display: inline-flex; gap: 2px; align-items: center; height: 14px; padding: 0; vertical-align: -2px; }
-.vcap .lead .voice-bars i { width: 3px; height: 5px; border-radius: 2px; opacity: 1; }
-.vcap .lead .voice-bars i:nth-child(2) { height: 11px; }
-.vcap .lead .voice-bars i:nth-child(3) { height: 8px; }
-.vcap .lead .voice-bars i:nth-child(4) { height: 13px; }
-/* Transcribing: the same bars; they pulse (transcript.css), and stay still and dimmer under reduced motion. */
-.vcap .lead .voice-bars[data-phase="transcribing"] i { opacity: .8; }
+/* The person's pill (TurnPill, the one the transcript and the card share): its size, padding and inside are its own (conversation/turn-pill.css,
+ * components/ui/pill.css); the frame here only keeps the card's padding off it. */
+.vcap.card.pill { padding: var(--pill-pad); border-radius: var(--sv-radius-pill, 999px); }
 
 /* The turn's spoken announcement (TurnAnnouncer): text for a screen reader only. Its own rule, because the floating card's page does
  * not load the room's `.sr-only`. */

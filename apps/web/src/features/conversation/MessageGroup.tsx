@@ -5,7 +5,7 @@ import { stillAvatar } from "../avatar/avatar-state";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
 import { translator } from "../../i18n/translator";
 import { speakerName } from "./group-messages";
-import { DraftBubble, TurnPill, WorkingRow } from "./LiveRows";
+import { DraftBubble, OpenTurn, WorkingRow } from "./LiveRows";
 import { MessageBubble, type BubblePosition } from "./MessageBubble";
 import { UnheardMark } from "./UnheardMark";
 import { hearingOf } from "./UnheardReply";
@@ -24,7 +24,7 @@ function RunFace({ name, thread }: { name: string; thread: string | null }) {
 
 function LiveRowView({ row, position }: { row: LiveRow; position: BubblePosition }) {
   if (row.kind === "working") return <WorkingRow position={position} />;
-  if (row.kind === "turn") return <TurnPill phase={row.phase} cancellable={row.cancellable} />;
+  if (row.kind === "turn") return <OpenTurn phase={row.phase} cancellable={row.cancellable} />;
   return <DraftBubble text={row.text} cancellable={row.cancellable} />;
 }
 

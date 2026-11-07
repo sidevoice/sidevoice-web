@@ -155,7 +155,7 @@ test("the person has no picture on the stage, only a bubble of their own while t
   patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening", pendingUserText: "Split it into two commits." });
   // What they say is not on the stage while they say it: only the voice's bars (the transcript has the words).
   expect(document.querySelector(".stage-voice .vcap.person:not(.meas)")).not.toHaveTextContent("Split it into two commits.");
-  expect(document.querySelector(".stage-voice .vcap.pill:not(.meas) .voice-wave")).toHaveAttribute("data-phase", "listening");
+  expect(document.querySelector(".stage-voice .vcap.pill:not(.meas) .turn-bars")).toHaveAttribute("data-phase", "listening");
   // The agent listens to the person meanwhile, and goes on listening while it is transcribed.
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "listening");
   expect(stageAgent()).toHaveAttribute("data-mood", "listening");
@@ -177,7 +177,7 @@ const tick = (ms: number) => act(() => { vi.advanceTimersByTime(ms); });
 test("while the person speaks and while it is transcribed, their bubble holds only the voice's bars", () => {
   const store = room();
   patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening", pendingUserText: "Split it" });
-  expect(personBubble()!.querySelector(".voice-wave")).toHaveAttribute("data-phase", "listening");
+  expect(personBubble()!.querySelector(".turn-bars")).toHaveAttribute("data-phase", "listening");
   expect(personBubble()).not.toHaveTextContent("Split it");
   expect(personBubble()).not.toHaveClass("sent");
   patch(store, { userLive: false, pendingPhase: "transcribing" });
@@ -203,7 +203,7 @@ test("what a spoken turn sent stays a moment, then leaves, then is gone", () => 
   patch(store, { pendingPhase: "", userTurn: null, history: [...store.getState().facts.history, said("u-1", "Split it into two commits.", 2)] } as Partial<SessionFacts>);
   expect(personBubble()).toHaveClass("sent");
   expect(personBubble()).toHaveTextContent("Split it into two commits.");
-  expect(personBubble()!.querySelector(".voice-wave")).toBeNull();
+  expect(personBubble()!.querySelector(".turn-bars")).toBeNull();
   expect(personBubble()).not.toHaveAttribute("data-leaving");
   tick(PAGE_MS - 1);
   expect(personBubble()).not.toHaveAttribute("data-leaving");
@@ -236,11 +236,11 @@ test("the person's balloon belongs to the conversation they spoke to: another on
   vi.useFakeTimers();
   // While they speak.
   spokenTo(store, "u-1", "", 2, "speaking");
-  expect(personBubble()!.querySelector(".voice-wave")).not.toBeNull();
+  expect(personBubble()!.querySelector(".turn-bars")).not.toBeNull();
   patch(store, { viewedThread: "fp-2|t-backup" });
   expect(personBubble()).toBeNull();
   patch(store, { viewedThread: "fp-1|t-login" });
-  expect(personBubble()!.querySelector(".voice-wave")).not.toBeNull();
+  expect(personBubble()!.querySelector(".turn-bars")).not.toBeNull();
   // Once sent: its moment is its own, whichever conversation is on the stage.
   spokenTo(store, "u-1", "Split it into two commits.", 2, "sent");
   expect(personBubble()).toHaveTextContent("Split it into two commits.");
@@ -293,7 +293,7 @@ test("a second spoken turn arriving while the first leaves starts over cleanly, 
   // its moment.
   patch(store, { userLive: true, userTurn: { id: "u-2", segment: "turn:u-2", thread: "fp-1|t-login" }, pendingPhase: "listening" });
   const live = () => document.querySelector<HTMLElement>(".stage-voice .vcap.pill:not(.meas)");
-  expect(live()!.querySelector(".voice-wave")).not.toBeNull();
+  expect(live()!.querySelector(".turn-bars")).not.toBeNull();
   expect(live()).not.toHaveAttribute("data-leaving");
   expect(document.querySelector(".stage-voice .vcap.sent:not(.meas)")).toHaveAttribute("data-leaving");
   tick(SENT_LEAVING_MS);

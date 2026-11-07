@@ -1,4 +1,5 @@
-import { StateGlyph, TurnMicIcon } from "../../components/ui/Icons";
+import { StateGlyph } from "../../components/ui/Icons";
+import { TurnPill } from "./TurnPill";
 import { translator } from "../../i18n/translator";
 import { CancelTurn, type BubblePosition } from "./MessageBubble";
 
@@ -23,14 +24,8 @@ export function WorkingRow({ position }: { position: BubblePosition }) {
  *  microphone and its bars while they speak, the same bars, pulsing, and no word while it is transcribed (a screen reader hears
  *  "Transcribing" once, from the stage's announcer: these bars are labelled, not live), and the round × that takes it back while that can be done. The words
  *  come as the message, once sent. */
-export function TurnPill({ phase, cancellable }: { phase: "listening" | "transcribing"; cancellable: boolean }) {
-  const t = translator();
-  return <div className="chat-bubble turn-pill" data-role="user" data-phase={phase} translate="no">
-    <span className="turn-lead">{phase === "transcribing"
-      ? <span className="turn-bars" data-phase="transcribing" role="img" aria-label={t("wave.transcribing")}><i /><i /><i /><i /><i /></span>
-      : <><TurnMicIcon className="state-glyph state-glyph-listening" /><span className="turn-bars" role="img" aria-label={t("wave.listening")}><i /><i /><i /><i /><i /></span></>}</span>
-    {cancellable && <CancelTurn />}
-  </div>;
+export function OpenTurn({ phase, cancellable }: { phase: "listening" | "transcribing"; cancellable: boolean }) {
+  return <TurnPill className="chat-bubble" data-role="user" phase={phase} action={cancellable && <CancelTurn />} />;
 }
 
 /** What the person is saying, still open, before it is sent: their words in a draft bubble, and the × while it can be

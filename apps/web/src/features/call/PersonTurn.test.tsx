@@ -213,9 +213,9 @@ test("card look: while they speak, the icon pill (the microphone, the voice's ba
   cardTurn();
   expect(pill()).toHaveAttribute("data-phase", "listening");
   expect(pill()!.querySelector("svg")).not.toBeNull();
-  expect(pill()!.querySelector(".voice-wave, .voice-bars")).not.toBeNull();
+  expect(pill()!.querySelector(".turn-bars")).not.toBeNull();
   // The microphone: five bars of the voice mark are transcribing's, not listening's.
-  expect(pill()!.querySelector(".lead > svg rect")).not.toBeNull();
+  expect(pill()!.querySelector(".ui-pill-lead > svg rect")).not.toBeNull();
   expect(pill()).not.toHaveTextContent(LONG.slice(0, 10));
   const cancel = pill()!.querySelector("button.cancel")!;
   expect(cancel).toHaveAccessibleName("Cancel sending");
@@ -226,7 +226,7 @@ test("card look: while they speak, the icon pill (the microphone, the voice's ba
 test("card look: transcribing keeps the pill's bars, pulsing and wordless, announced once, the × still on it", () => {
   const { to } = cardTurn();
   to(listening());
-  const bars = pill()!.querySelector(".voice-wave, .voice-bars")!;
+  const bars = pill()!.querySelector(".turn-bars")!;
   // The announcer is there, empty, while they speak: it is the same node whose text then changes (a live region announces that).
   const before = pill()!.querySelector("[role=status]")!;
   expect(before).toHaveTextContent("");
@@ -234,7 +234,7 @@ test("card look: transcribing keeps the pill's bars, pulsing and wordless, annou
   expect(pill()!.querySelector("[role=status]")).toBe(before);
   expect(pill()).toHaveAttribute("data-phase", "transcribing");
   // The same waveform, not a new one: it keeps the turn's last frame.
-  expect(pill()!.querySelector(".voice-wave, .voice-bars")).toBe(bars);
+  expect(pill()!.querySelector(".turn-bars")).toBe(bars);
   expect(bars).toHaveAttribute("data-phase", "transcribing");
   expect(pill()!.querySelector(".tlabel, .ell")).toBeNull();
   // No visible word: the only text is the announcer's, hidden, and it is the one live region (the bars are labelled, not live).
@@ -245,7 +245,7 @@ test("card look: transcribing keeps the pill's bars, pulsing and wordless, annou
   expect(pill()!.textContent).toBe(announcer.textContent);
   expect(bars).toHaveAttribute("role", "img");
   expect(bars).toHaveAccessibleName("Transcribing what you said");
-  expect(pill()!.querySelector(".lead > svg")).toBeNull();
+  expect(pill()!.querySelector(".ui-pill-lead > svg")).toBeNull();
   expect(pill()!.querySelector("button.cancel")).toHaveAccessibleName("Cancel sending");
 });
 
