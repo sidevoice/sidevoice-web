@@ -13,7 +13,8 @@ export function createOutbox({ scope = 'page', indexedDB = globalThis.indexedDB,
     let db = null, loading = true, order = 0;
     // What is stored: the entry's own fields, never whatever its sender keeps on it in memory.
     const record = (entry) => ({ id: entry.id, scope, kind: entry.kind, session_id: entry.session_id, node: entry.node, payload: entry.payload, created: entry.created, order: entry.order });
-    const sorted = () => [...entries.values()].sort((a, b) => a.created - b.created || a.order - b.order);
+    // `order` alone ranks: it only grows, also across reloads (the stored maximum is read back), so a clock that moved back never reorders.
+    const sorted = () => [...entries.values()].sort((a, b) => a.order - b.order);
     function write(change) {
         if (!db) return;
         try { change(db.transaction(STORE, 'readwrite').objectStore(STORE)); } catch { /* memory still holds it */ }
@@ -45,12 +46,15 @@ export function createOutbox({ scope = 'page', indexedDB = globalThis.indexedDB,
             request.onupgradeneeded = () => { try { request.result.createObjectStore(STORE, { keyPath: 'id' }); } catch { /* already there */ } };
             request.onerror = () => done();
             request.onsuccess = () => {
-                db = request.result;
+                // `db` is set only once the stored maximum of `order` is known (below): an entry added before that stays in memory, so
+                // none is ever stored under an order that restarted at 1 and sorts before an older stored one after a crash.
+                const opened = request.result;
                 let read;
-                try { read = db.transaction(STORE, 'readonly').objectStore(STORE).getAll(); } catch { done(); return; }
-                read.onerror = () => done();
+                try { read = opened.transaction(STORE, 'readonly').objectStore(STORE).getAll(); } catch { db = opened; done(); return; }
+                read.onerror = () => { db = opened; done(); };
                 read.onsuccess = () => {
-                    const others = [];
+                    db = opened;
+                    const others = [], earlier = new Set(entries.keys());
                     for (const stored of read.result || []) {
                         if (stored?.id == null) continue;
                         if (stored.scope !== scope) { others.push(stored); continue; }
@@ -59,6 +63,9 @@ export function createOutbox({ scope = 'page', indexedDB = globalThis.indexedDB,
                         entries.set(stored.id, { ...stored });
                         order = Math.max(order, stored.order || 0);
                     }
+                    // What was said while the store was still loading came after everything it kept: it keeps its place behind it.
+                    const early = [...entries.values()].filter((entry) => earlier.has(entry.id)).sort((a, b) => a.created - b.created || a.order - b.order);
+                    for (const entry of early) entry.order = ++order;
                     others.sort((a, b) => a.created - b.created || a.order - b.order);
                     for (const stored of others.slice(0, Math.max(0, others.length - limit))) write((store) => store.delete(stored.id));
                     // What was added before the database opened is stored now.
@@ -81,4 +88,13 @@ export function createOutbox({ scope = 'page', indexedDB = globalThis.indexedDB,
         clear(which = () => true) { for (const entry of sorted()) if (which(entry)) remove(entry.id); },
         get size() { return entries.size; },
     };
+}
+
+/* How long a message waits for its acknowledgement on an open socket before the page says it again, by how many times it
+ * has gone on that socket: 5 s, 10 s, 20 s, 40 s, then every minute for as long as it takes. A new socket starts the
+ * count again and sends at once. Saying it again is safe (the machine takes each `client_msg_id` once), and what is said
+ * again goes in the order it was kept, from the oldest unacknowledged entry on: nothing newer is ever said before it. */
+export const RESEND_BACKOFF_MS = [5000, 10000, 20000, 40000, 60000];
+export function resendDelay(sent) {
+    return RESEND_BACKOFF_MS[Math.min(Math.max(1, sent | 0), RESEND_BACKOFF_MS.length) - 1];
 }
