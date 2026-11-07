@@ -5,7 +5,8 @@ export interface OutboxEntry {
 }
 export interface Outbox {
   ready: Promise<void>;
-  add(entry: { id: string; kind: OutboxEntry['kind']; session_id?: string | null; node?: string | null; payload: unknown }): OutboxEntry;
+  /** Null when the outbox is full: the newest is refused, never an older one let go. */
+  add(entry: { id: string; kind: OutboxEntry['kind']; session_id?: string | null; node?: string | null; payload: unknown }): OutboxEntry | null;
   remove(id: string): boolean;
   get(id: string): OutboxEntry | null;
   list(): OutboxEntry[];
@@ -14,6 +15,7 @@ export interface Outbox {
 }
 export function createOutbox(options?: {
   scope?: string; indexedDB?: IDBFactory | null; now?(): number; limit?: number;
+  orderStore?: { getItem(key: string): string | null; setItem(key: string, value: string): void } | null;
 }): Outbox;
 export const RESEND_BACKOFF_MS: number[];
 export function resendDelay(sent: number): number;
