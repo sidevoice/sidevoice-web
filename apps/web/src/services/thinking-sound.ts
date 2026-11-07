@@ -32,6 +32,7 @@ function audioContext(): AudioContext | null {
 /** Begins the page's context for the breath, inside the Join gesture: resumed there, it may resume again later. Quiet
  *  until a breath plays: it is suspended again once the gesture's resume is through. */
 export function primeThinkingSound(): void {
+  if (host().cue) return;
   const made = audioContext();
   if (!made) return;
   made.resume().then(() => { if (!playing && made.state === "running") void made.suspend().catch(() => undefined); }, () => undefined);
@@ -69,10 +70,11 @@ function startBreath(context: AudioContext): () => void {
   };
 }
 
-/** The host's own breath, started and stopped as the page's would be. A host that throws plays nothing: a cue is never
- *  worth a call's failing. */
+/** The host's own breath, started and stopped as the page's would be. A host that throws is not worth a call's failing, and
+ *  is still asked to stop. */
 function playInHost(cue: CueBridge): () => void {
-  try { cue.start("thinking"); } catch { return () => undefined; }
+  // A start that throws may have begun to play: its cleanup still asks the host to stop.
+  try { cue.start("thinking"); } catch { /* Stopped below. */ }
   let stopped = false;
   return () => {
     if (stopped) return;

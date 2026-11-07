@@ -86,9 +86,17 @@ test("a host with its own cue plays the breath, once, and the page makes no cont
   expect(cue.stop).toHaveBeenCalledWith("thinking");
 });
 
-test("a host cue that throws plays nothing and breaks nothing", () => {
-  withCue({ start: () => { throw new Error("no audio"); }, stop: vi.fn() });
+test("a host cue that throws on start breaks nothing, and is still told to stop", () => {
+  const cue = { start: () => { throw new Error("no audio"); }, stop: vi.fn() };
+  withCue(cue);
   expect(() => playThinkingSound()()).not.toThrow();
+  expect(cue.stop).toHaveBeenCalledWith("thinking");
+  expect(FakeContext.made).toHaveLength(0);
+});
+
+test("the Join tap makes no page context where the host plays the cue", () => {
+  withCue({ start: vi.fn(), stop: vi.fn() });
+  primeThinkingSound();
   expect(FakeContext.made).toHaveLength(0);
 });
 
