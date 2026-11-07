@@ -11,7 +11,10 @@ import { BACKDROPS, frameOf } from './backdrops.js';
 // Aged, stained paper; WANTED in a heavy display serif; the creature's photo framed against a sea scene; the status in
 // the name line's place; the bounty with the token sign in the bounty's heavy number style; the fine print and the
 // issuer in the footer, as the marine's posters set them. The words are the product's (i18n/locales/en.ts).
-const SERIF = '"Times New Roman", "Bodoni 72", "DejaVu Serif", Georgia, serif', SERIF_C = '"Times New Roman", "DejaVu Serif Condensed", "DejaVu Serif", Georgia, serif';
+// product: the poster's words are translated and Canvas takes no CSS variable, so the faces the page names for scripts the
+// Latin ones lack (theme.css --sv-font-cjk and --sv-font-indic: Han, Kana, Hangul, Devanagari) follow the Latin ones.
+const SCRIPTS = '"PingFang SC", "Hiragino Sans", "Apple SD Gothic Neo", "Malgun Gothic", "Microsoft YaHei", "Yu Gothic", "Noto Sans CJK SC", "Noto Sans CJK JP", "Noto Sans CJK KR", "Noto Sans KR", "Kohinoor Devanagari", "Devanagari Sangam MN", "Nirmala UI", "Noto Sans Devanagari", "Mangal"';
+const SERIF = `"Times New Roman", "Bodoni 72", "DejaVu Serif", Georgia, ${SCRIPTS}, serif`, SERIF_C = `"Times New Roman", "DejaVu Serif Condensed", "DejaVu Serif", Georgia, ${SCRIPTS}, serif`;
 export function seedNum(str) { let h = 2166136261; for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 function fitText(g, text, x, y, width, font, align = 'center', heavy = 0) {
   g.font = font; const w = g.measureText(text).width; g.save(); g.translate(x, y); g.scale(Math.min(1, width / w), 1); g.textAlign = align;
@@ -131,7 +134,7 @@ export function posterArt(pic, pk, seed, words, bounty) {
     t.letterSpacing = '2px'; fitText(t, bounty, 146, byy, pw - 190, `bold 84px ${SERIF_C}`, 'left', 3); t.letterSpacing = '0px';
     t.lineWidth = 2; t.beginPath(); t.moveTo(70, byy + 22); t.lineTo(pw - 70, byy + 22); t.stroke();
     // footer: the fine print at the left, the issuer at the right
-    POSTER.fine.forEach((line, i) => fitText(t, line, 40, ph - 76 + i * 17, 300, `bold 13px "DejaVu Sans", Arial, sans-serif`, 'left'));
+    POSTER.fine.forEach((line, i) => fitText(t, line, 40, ph - 76 + i * 17, 300, `bold 13px "DejaVu Sans", Arial, ${SCRIPTS}, sans-serif`, 'left'));
     // The issuer is the product's name, which is not translated.
     t.letterSpacing = '2px'; fitText(t, 'SIDEVOICE', pw - 40, ph - 42, 200, `bold 44px ${SERIF}`, 'right', 2); t.letterSpacing = '0px';
   }, r, pw, ph);
