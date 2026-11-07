@@ -4,7 +4,7 @@ import { KEYBOARD_QUERY, ShortcutsSettings, bindingOf, defaultGlobalMute, useSho
 import { translator } from "../../i18n/translator";
 import { SHORTCUTS, binding, isDefault, resetBinding } from "../../state/shortcuts";
 import { host } from "../../host";
-import type { GlobalShortcut, RecordHint, ShortcutAction, ShortcutsBridge, ShortcutsStatus } from "../../host";
+import type { GlobalShortcut, HeadsetStatus, RecordHint, ShortcutAction, ShortcutsBridge, ShortcutsStatus } from "../../host";
 
 /* Shortcuts, by where they work: the desktop app's global shortcuts and the headset's buttons, where it offers them; the
  * keys the room answers while it is in front, wherever there is a keyboard. All set in the one field. */
@@ -491,4 +491,89 @@ test("a phone's bridge ({ get, subscribe, setHeadset }, no set) still gives a sh
   render(<ShortcutsSettings t={en} />);
   expect(await screen.findByRole("combobox", { name: "Single press" })).toHaveTextContent("Mute or unmute");
   expect(groups()).toEqual(["Headset buttons"]);
+});
+
+/* Granular headset capabilities (desktop#464): the host says what each press can do (`headset.actions`), and the page draws only
+ * that. An iPhone without CallKit: no double press reaches the app, and the single press is the system's mute alone. */
+const EVERY = ["mute", "oneTurn", "skip", "none"] as const;
+
+test("an iPhone that reports the single press as the system's mute alone shows it as a line, and no double press row", async () => {
+  keyboard(false);
+  const setHeadset = vi.fn(async () => phone({ press: "mute", doublePress: null, outsideCall: "leave", actions: { press: ["mute"] } }));
+  inApp({ shortcuts: { get: vi.fn(async () => phone({ press: "mute", doublePress: null, outsideCall: "leave", actions: { press: ["mute"] } })), subscribe: vi.fn(() => () => {}), setHeadset } });
+  render(<ShortcutsSettings t={en} />);
+  const line = await screen.findByText("Mute or unmute");
+  expect(line).toHaveClass("shortcut-fixed");
+  expect(screen.getByText("Single press")).toBeTruthy();
+  expect(screen.getByText(en("settings.shortcuts.headsetFixed"))).toBeTruthy();
+  expect(screen.queryAllByRole("combobox")).toEqual([]);
+  expect(screen.queryByText("Double press")).toBeNull();
+  expect(groups()).toEqual(["Headset buttons"]);
+  expect(setHeadset).not.toHaveBeenCalled();
+});
+
+test("an Android phone that reports every action keeps both rows, each with every choice", async () => {
+  keyboard(false);
+  const reported = phone({ press: "mute", doublePress: "none", outsideCall: "leave", actions: { press: [...EVERY], doublePress: [...EVERY] } });
+  const setHeadset = vi.fn(async () => ({ ...reported, headset: { ...reported.headset!, doublePress: "oneTurn" as const } }));
+  inApp({ shortcuts: { get: vi.fn(async () => reported), subscribe: vi.fn(() => () => {}), setHeadset } });
+  render(<ShortcutsSettings t={en} />);
+  expect(await screen.findByRole("combobox", { name: "Single press" })).toHaveTextContent("Mute or unmute");
+  expect(screen.getByRole("combobox", { name: "Double press" })).toHaveTextContent("Nothing");
+  fireEvent.click(screen.getByRole("combobox", { name: "Double press" }));
+  expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(["Mute or unmute", "Say one thing", "Skip what is playing", "Nothing"]);
+  await act(async () => { fireEvent.click(screen.getByRole("option", { name: "Say one thing" })); });
+  expect(setHeadset).toHaveBeenCalledExactlyOnceWith({ doublePress: "oneTurn" });
+  expect(screen.getByRole("combobox", { name: "Double press" })).toHaveTextContent("Say one thing");
+  expect(document.querySelector(".shortcut-fixed")).toBeNull();
+});
+
+test("a press offers only the actions the host reports for it, in the usual order", async () => {
+  keyboard(false);
+  inApp({ shortcuts: bridge(phone({ press: "oneTurn", doublePress: "none", outsideCall: "leave", actions: { press: ["oneTurn", "mute"], doublePress: ["none"] } }), { setHeadset: vi.fn() }).bridge });
+  render(<ShortcutsSettings t={en} />);
+  fireEvent.click(await screen.findByRole("combobox", { name: "Single press" }));
+  expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(["Mute or unmute", "Say one thing"]);
+  // One action: a line, not a select.
+  expect(screen.queryByRole("combobox", { name: "Double press" })).toBeNull();
+  expect(document.querySelector(".shortcut-fixed[data-press=doublePress]")).toHaveTextContent("Nothing");
+});
+
+test("the desktop app's headset, which reports no actions, is drawn as before: two selects with every choice", async () => {
+  inApp({ shortcuts: bridge(status({}, { headset: { press: "mute", doublePress: "skip", outsideCall: "leave" } }), { setHeadset: vi.fn() }).bridge });
+  render(<ShortcutsSettings t={en} />);
+  expect(await screen.findByRole("combobox", { name: "Double press" })).toHaveTextContent("Skip what is playing");
+  fireEvent.click(screen.getByRole("combobox", { name: "Single press" }));
+  expect(screen.getAllByRole("option")).toHaveLength(4);
+  expect(document.querySelector(".shortcut-fixed")).toBeNull();
+});
+
+/* desktop#464: the double press set, another setting changed, and it read Nothing. Settings is one form; a reset of it (or the
+ * hidden select Radix keeps there) put back the value the row was drawn with. Only the person's pick reaches the host. */
+test("in Settings' form, the headset's choice is written only when the person picks it, never back by the form", async () => {
+  keyboard(false);
+  let kept: HeadsetStatus = { press: "mute", doublePress: "none", outsideCall: "leave" };
+  const setHeadset = vi.fn(async (change: Partial<HeadsetStatus>) => { kept = { ...kept, ...change }; return phone(kept); });
+  inApp({ shortcuts: { get: vi.fn(async () => phone(kept)), subscribe: vi.fn(() => () => {}), setHeadset } });
+  render(<form id="language-form"><ShortcutsSettings t={en} /></form>);
+  fireEvent.click(await screen.findByRole("combobox", { name: "Double press" }));
+  await act(async () => { fireEvent.click(screen.getByRole("option", { name: "Say one thing" })); });
+  await act(async () => { (document.getElementById("language-form") as HTMLFormElement).reset(); });
+  expect(setHeadset.mock.calls).toEqual([[{ doublePress: "oneTurn" }]]);
+  expect(kept.doublePress).toBe("oneTurn");
+  expect(screen.getByRole("combobox", { name: "Double press" })).toHaveTextContent("Say one thing");
+});
+
+/* N6 (follow-up of web#532): a host that can read global shortcuts but not set them has no editable global rows. */
+test("a get-only host that reports a global shortcut gets no global rows: nothing there could set it", async () => {
+  keyboard(true);
+  const getOnly = { get: vi.fn(async () => status({}, { headset: { press: "mute", doublePress: "none", outsideCall: "leave" } })), subscribe: vi.fn(() => () => {}) };
+  inApp({ shortcuts: getOnly });
+  render(<ShortcutsSettings t={en} />);
+  await screen.findByText("Headset buttons");
+  expect(groups()).toEqual(["Headset buttons", "In Sidevoice"]);
+  expect(screen.queryByText("Anywhere on your computer")).toBeNull();
+  expect(document.querySelector(".shortcut-tip-note")).toBeNull();
+  // The in-app keys are the page's own and still record; the host's mute shortcut has no field.
+  expect(screen.getAllByRole("button", { name: /^Mute or unmute:/ })).toHaveLength(1);
 });

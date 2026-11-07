@@ -331,8 +331,13 @@ export interface HeadsetStatus {
   /** The system's call holds the headset (CallKit, Telecom): the system mutes, and the choices are not the app's to make; the page
    *  shows the rows read-only. Absent: they are. */
   managedBySystem?: boolean;
-  /** Choosing anything but the defaults adds a playback card to the lock screen (iOS, beside the Live Activity); the page says so. */
+  /** Choosing anything but the defaults adds a playback card to the lock screen (iOS, beside the Live Activity); the page says so.
+   *  Reported by older iOS builds only. */
   nonDefaultAddsCard?: boolean;
+  /** What each press can do on this host: the page offers only these, and a press with one action is a line, not a choice (an
+   *  iPhone: the system's mute alone). Absent, or a press absent from it: every action, as an older host reports. Whether the double
+   *  press reaches the app at all is `doublePress` (`null`: no row). */
+  actions?: { press?: HeadsetPress[]; doublePress?: HeadsetPress[] };
 }
 export interface ShortcutsStatus {
   /** The global shortcuts this host offers, by action. An action it does not offer is absent, and none at all (`{}`) is no group:

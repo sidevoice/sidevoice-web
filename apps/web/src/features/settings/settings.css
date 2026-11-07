@@ -382,6 +382,8 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
 .shortcut-item > .ui-row + .ui-row { border-top: 0; }
 .shortcut-note { margin: 0 var(--sv-space-5) 14px; }
 .shortcut-managed { margin: -6px var(--sv-space-5) 12px; font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+/* A headset press with one action here (an iPhone's single press: the system's mute): what it does, as plain text where a select would be. */
+.shortcut-fixed { font-size: var(--sv-font-sm); color: var(--sv-text); text-align: end; }
 .ui-group-card > .shortcut-note { margin-top: 0; }
 .shortcut-tip-note { margin: 0 0 var(--sv-space-1); align-items: center; }
 .shortcut-tip-note .shortcut-key { min-height: 20px; min-width: 20px; padding: 0 5px; font-size: calc(11.5px * var(--sv-text-scale, 1)); vertical-align: 1px; }
