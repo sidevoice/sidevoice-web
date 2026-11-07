@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.26.0](https://github.com/sidevoice/sidevoice-web/compare/v0.25.1...v0.26.0) (2026-11-07)
+
+
+### Features
+
+* **call:** one transcribing pill, five bars always, blinking while transcribing ([#537](https://github.com/sidevoice/sidevoice-web/issues/537)) ([1d07d5d](https://github.com/sidevoice/sidevoice-web/commit/1d07d5d1d0bb9811492fc79be0825ff783896766))
+
+
+### Bug Fixes
+
+* **call:** the thinking sound plays through the app's own player when the host has one ([#439](https://github.com/sidevoice/sidevoice-web/issues/439)) ([#540](https://github.com/sidevoice/sidevoice-web/issues/540)) ([5d8e919](https://github.com/sidevoice/sidevoice-web/commit/5d8e91969cf0410fdcdd417986558bbe4212e054))
+* **settings:** headset rows show only what the host's presses can do; a pick, not the form, writes the choice ([#541](https://github.com/sidevoice/sidevoice-web/issues/541)) ([2b786b6](https://github.com/sidevoice/sidevoice-web/commit/2b786b65e971e1301978f1bb6a094c92e220de50))
+
 ## [0.25.1](https://github.com/sidevoice/sidevoice-web/compare/v0.25.0...v0.25.1) (2026-11-06)
 
 
