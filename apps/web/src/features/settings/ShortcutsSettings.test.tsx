@@ -159,14 +159,24 @@ test("a global combination is recorded and set; one without a modifier is refuse
   expect(field()).toHaveAttribute("aria-pressed", "false");
 });
 
-test("an F-key alone is allowed globally", async () => {
+test("an F-key alone is allowed globally: held for hold to talk, as a right-hand modifier is; at once for the others", async () => {
   const { bridge: b } = bridge(status());
   inApp({ shortcuts: b });
   render(<ShortcutsSettings t={en} />);
   await screen.findByRole("button", { name: /^Mute or unmute: Ctrl\+Alt/ });
   fireEvent.click(screen.getAllByRole("button", { name: /^Hold to talk:/ })[0]);
+  await act(async () => { press({ code: "F10", key: "F10" }); });
+  expect(b.set).toHaveBeenLastCalledWith("holdToTalk", "F10:hold");
+  // Shown as the right-hand modifiers are: the key, and how it is pressed.
+  expect(screen.getAllByRole("button", { name: /^Hold to talk:/ })[0].closest(".shortcut-item")).toHaveTextContent(en("settings.shortcuts.triggerHold"));
+  // With a modifier it is a combination, held all the same.
+  fireEvent.click(screen.getAllByRole("button", { name: /^Hold to talk:/ })[0]);
+  await act(async () => { press({ code: "F10", key: "F10", ctrlKey: true }); });
+  expect(b.set).toHaveBeenLastCalledWith("holdToTalk", "Ctrl+F10");
+  // Mute acts when the key goes down: a combination.
+  fireEvent.click(screen.getAllByRole("button", { name: /^Mute or unmute:/ })[0]);
   await act(async () => { press({ code: "F9", key: "F9" }); });
-  expect(b.set).toHaveBeenCalledWith("holdToTalk", "F9");
+  expect(b.set).toHaveBeenLastCalledWith("mute", "F9");
 });
 
 test("where the page records, a modifier on its own is ignored: recording goes on and an amber note says why", async () => {
