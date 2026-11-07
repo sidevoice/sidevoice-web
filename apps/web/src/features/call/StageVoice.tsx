@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { StageFrame, desktopDevice, voiceType, type FrameCards } from "../avatar/creature/stage-frame";
 import { useMedia } from "../../state/call-layout";
+import { TurnPill } from "../conversation/TurnPill";
 import "./stage-voice.css";
 
 /* What is said on the stage, laid under the creature as the design reference lays it (T21–T24, T28, T33, T36, T43): the
@@ -17,15 +18,6 @@ export function useStageFrame(): StageFrame {
 
 /** Text that measures as three lines of a card at its widest: never shown (visibility hidden), so never read. */
 const FILL = Array.from({ length: 90 }, () => "mmmm").join(" ");
-
-/** The microphone, as the reference's pill draws it. */
-export function MicIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
-      <rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-    </svg>
-  );
-}
 
 /** The ×, as the reference's cancel draws it. */
 export function CancelGlyph() {
@@ -185,9 +177,7 @@ export function StageVoice({ frame, turn, phone, onGround, children }: { frame: 
   return (
     <div ref={layer} className="stage-voice" data-phone={phone || undefined} data-framed={solved && !pending ? "" : undefined} style={style}>
       <div ref={agent} className="vcap card agent meas" aria-hidden="true"><span className="paged-text"><span className="paged-text-run">{FILL}</span></span></div>
-      <div ref={pill} className="vcap card person pill meas" aria-hidden="true">
-        <span className="lead"><MicIcon /><span className="voice-bars"><i /><i /><i /><i /><i /></span></span><span className="cancel"><CancelGlyph /></span>
-      </div>
+      <TurnPill ref={pill} className="vcap card person pill meas" size="stage" phase="listening" frozen aria-hidden="true" action={<span className="cancel"><CancelGlyph /></span>} />
       <div ref={sent} className="vcap card person sent meas" aria-hidden="true"><span className="vcap-said"><span>{FILL}</span></span></div>
       {children}
     </div>

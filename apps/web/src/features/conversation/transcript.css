@@ -219,19 +219,8 @@
 @keyframes transcript-ell { 0%, 100% { opacity: .2; } 40% { opacity: 1; } }
 
 /* ----- the person's open turn, without STT streaming (today): a pill with the microphone and its bars, then
- * the same bars pulsing while it is transcribed, and the round × that takes it back, until it is sent. */
-.chat-bubble.turn-pill { display: flex; align-items: center; border-radius: 999px; padding: 5px 6px 5px 13px; white-space: nowrap; }
-.turn-lead { display: inline-flex; align-items: center; gap: 6px; }
-.turn-bars { display: inline-flex; align-items: center; gap: 2px; height: 14px; color: var(--sv-accent); }
-.turn-bars i { display: block; width: 3px; height: 5px; border-radius: 2px; background: currentColor; animation: turn-bar .9s ease-in-out infinite; }
-.turn-bars i:nth-child(2) { height: 11px; animation-delay: -.3s; }
-.turn-bars i:nth-child(3) { height: 8px; animation-delay: -.6s; }
-.turn-bars i:nth-child(4) { height: 13px; animation-delay: -.15s; }
-.turn-bars i:nth-child(5) { animation-delay: -.45s; }
-@keyframes turn-bar { 50% { transform: scaleY(.35); } }
-/* Transcribing: the bars at rest, breathing as the waveform's do (voice-wave-rest); still and dimmer under reduced motion. */
-.turn-bars[data-phase="transcribing"] { animation: voice-wave-rest 1.9s ease-in-out infinite; }
-.turn-bars[data-phase="transcribing"] i { animation: none; }
+ * the same five bars blinking while it is transcribed (TurnPill), and the round × that takes it back, until it is sent. */
+.chat-bubble.turn-pill { display: flex; padding: var(--pill-pad); border-radius: var(--sv-radius-pill, 999px); }
 .turn-cancel {
   appearance: none; position: relative; display: inline-flex; flex: none; align-items: center; justify-content: center; width: 24px; height: 24px; margin-left: 9px;
   padding: 0; border: 0; border-radius: 50%; background: var(--tr-cancel-bg); color: inherit; cursor: pointer;
@@ -318,8 +307,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .transcript-ell i, .turn-bars i { animation: none; }
-  .turn-bars[data-phase="transcribing"] { animation: none; opacity: .8; }
+  .transcript-ell i { animation: none; }
   .transcript-ell i { opacity: 1; }
 }
 

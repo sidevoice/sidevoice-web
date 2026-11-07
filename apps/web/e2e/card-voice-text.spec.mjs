@@ -114,13 +114,17 @@ for (const format of ["card", "avatar"]) {
     await expect(turn.getByRole("status")).toHaveText("Transcribing what you said");
     expect(await turn.getByRole("status").evaluate((node) => node.getBoundingClientRect().width)).toBeLessThanOrEqual(1);
     await expect(turn.getByRole("img", { name: "Transcribing what you said" })).toHaveCount(1);
-    // The bars pulse by opacity alone (no layout, no repaint of geometry), and the animation is running.
-    const pulse = await turn.locator(".voice-wave-bars").evaluate((node) => {
+    // Five bars, the brand mark's shape, blinking visibly: each bar's own animation runs, by transform and opacity alone (no layout,
+    // no repaint of geometry), and the bar really changes between the frames (not the old 1 -> .8).
+    await expect(turn.locator(".turn-bars > i")).toHaveCount(5);
+    const blink = await turn.locator(".turn-bars > i").evaluateAll((nodes) => nodes.map((node) => {
       const [animation] = node.getAnimations();
+      const frames = animation.effect.getKeyframes();
       return { name: getComputedStyle(node).animationName, state: animation?.playState,
-        props: [...new Set(animation.effect.getKeyframes().flatMap((frame) => Object.keys(frame)))].filter((key) => !["offset", "easing", "composite", "computedOffset"].includes(key)) };
-    });
-    expect(pulse).toEqual({ name: "voice-wave-rest", state: "running", props: ["opacity"] });
+        props: [...new Set(frames.flatMap((frame) => Object.keys(frame)))].filter((key) => !["offset", "easing", "composite", "computedOffset"].includes(key)).sort(),
+        lowestOpacity: Math.min(...frames.map((frame) => Number(frame.opacity))) };
+    }));
+    for (const bar of blink) expect(bar).toMatchObject({ name: "turn-bar-blink", state: "running", props: ["opacity", "transform"], lowestOpacity: 0.4 });
     await expect(turn.getByRole("button", { name: "Cancel sending" })).toBeVisible();
   });
 }
@@ -129,11 +133,18 @@ test.describe("reduced motion", () => {
 test.use({ reducedMotion: "reduce" });
 test("the transcribing pill's bars are still and dimmer, not animated", async ({ context }) => {
   const page = await openCard(context, { state: "transcribing", format: "card", size: "m" });
-  const bars = page.locator(".docked-voice .vcap.card.person.pill .voice-bars, .docked-voice .vcap.card.person.pill .voice-wave-bars");
+  const bars = page.locator(".docked-voice .vcap.card.person.pill .turn-bars");
   await expect(bars).toHaveCount(1);
-  const look = await bars.evaluate((node) => ({ animations: node.getAnimations({ subtree: true }).length, opacity: getComputedStyle(node.matches(".voice-bars") ? node.querySelector("i") : node).opacity }));
+  await expect(bars.locator("> i")).toHaveCount(5);
+  const look = await bars.evaluate((node) => ({ animations: node.getAnimations({ subtree: true }).length, opacity: getComputedStyle(node.querySelector("i")).opacity,
+    heights: [...node.querySelectorAll("i")].map((bar) => Math.round(bar.getBoundingClientRect().height * 10) / 10) }));
   expect(look.animations).toBe(0);
   expect(Number(look.opacity)).toBeLessThan(1);
+  // Still, at the brand mark's shape: 6 : 12 : 21 : 12 : 6.
+  const [a, b, c, d, e] = look.heights;
+  expect(d).toBe(b); expect(e).toBe(a);
+  expect(b / c).toBeCloseTo(12 / 21, 1);
+  expect(a / c).toBeCloseTo(6 / 21, 1);
 });
 });
 

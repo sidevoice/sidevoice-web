@@ -10,8 +10,8 @@ import { receiptView } from "../../state/room-session-state.js";
 import { PAGE_MS } from "./PagedText";
 import { SENT_LEAVING_MS, useSentTurns, type SentTurn } from "./speech-reading";
 import { TurnAnnouncer } from "./TurnAnnouncer";
-import { VoiceWaveform } from "../conversation/VoiceWaveform";
-import { CancelGlyph, MicIcon } from "./StageVoice";
+import { TurnPill } from "../conversation/TurnPill";
+import { CancelGlyph } from "./StageVoice";
 
 /* The person's balloon at the tile's foot, drawn as the agent's is (call-view.css), its tail out of the tile's corner
  * toward whoever is speaking. While they speak, and while it is transcribed, it keeps one size: the voice's bars, long
@@ -100,16 +100,15 @@ export function PersonTurn({ conversation, t, look = "balloon", cut: over = fals
       {turns.map((turn) => <SentBubble key={turn.key} turn={turn} onDone={done} look="card"
         delivery={conversation.messages.find((message) => message.role === "user" && (message.segment ?? String(message.time)) === turn.key)?.delivery} cut={pending || over} under={false} away={turn.thread !== conversation.thread} from={null} />)}
       {(pending || taken.leaving) && (
-        <div key={"live-" + taken.round} className="vcap card person pill" data-phase={transcribing ? "transcribing" : "listening"} data-leaving={taken.leaving || undefined} translate="no">
-          {/* One waveform in both phases: it keeps the turn's last frame and pulses while transcribed; the announcer beside it says
-              "Transcribing" to a screen reader, once. No visible word. */}
-          <span className="lead">{!transcribing && <MicIcon />}<VoiceWaveform phase={transcribing ? "transcribing" : "listening"} announce={false} /></span>
-          <TurnAnnouncer phase={conversation.pendingPhase} />
-          {(conversation.pendingCancellable || taken.leaving) && <Tooltip action content={t("stage.cancelTurn")}>
+        // The one TurnPill (the transcript's is the same): five bars that follow the voice, and blink while transcribed; the announcer
+        // beside them says "Transcribing" to a screen reader, once. No visible word.
+        <TurnPill key={"live-" + taken.round} className="vcap card person pill" size="stage" phase={transcribing ? "transcribing" : "listening"} data-leaving={taken.leaving || undefined}
+          action={(conversation.pendingCancellable || taken.leaving) && <Tooltip action content={t("stage.cancelTurn")}>
             <button type="button" className="cancel" aria-label={t("stage.cancelTurn")} disabled={taken.leaving}
               onClick={() => { taken.take(); void window.sidevoiceActions?.cancelInput(); }}><CancelGlyph /></button>
-          </Tooltip>}
-        </div>
+          </Tooltip>}>
+          <TurnAnnouncer phase={conversation.pendingPhase} />
+        </TurnPill>
       )}
     </>;
   }

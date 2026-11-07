@@ -136,7 +136,7 @@ test.each(["card", "avatar"])("%s: the person's turn is the stage's pill, then \
   host.say(speaks);
   const pill = column().querySelector(".vcap.card.person.pill")!;
   expect(pill).toHaveAttribute("data-phase", "listening");
-  expect(pill.querySelector(".voice-bars, .voice-wave")).not.toBeNull();
+  expect(pill.querySelector(".turn-bars")).not.toBeNull();
   expect(reply()).toHaveAttribute("data-leaving");
   // Cancel sending: the card's command, from the pill's ×.
   fireEvent.click(screen.getByRole("button", { name: "Cancel sending" }));
@@ -173,11 +173,11 @@ test.each(["card", "avatar"])("%s: transcribing is the pill's bars, pulsing, wit
   host.say(transcribes);
   const pill = document.querySelector(".docked-voice .vcap.card.person.pill")!;
   expect(pill).toHaveAttribute("data-phase", "transcribing");
-  expect(pill.querySelector(".voice-wave, .voice-bars")).toHaveAttribute("data-phase", "transcribing");
+  expect(pill.querySelector(".turn-bars")).toHaveAttribute("data-phase", "transcribing");
   // One announcer, a live region with the text; the bars are labelled and not live.
   expect(pill.querySelectorAll("[role=status]")).toHaveLength(1);
   expect(pill.querySelector("[role=status]")).toHaveTextContent("Transcribing what you said");
-  expect(pill.querySelector(".voice-wave, .voice-bars")).toHaveAttribute("role", "img");
+  expect(pill.querySelector(".turn-bars")).toHaveAttribute("role", "img");
   expect(pill.textContent).toBe("Transcribing what you said");
   host.say(sends);
   expect(document.querySelector(".docked-voice .vcap.pill")).toBeNull();
