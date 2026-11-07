@@ -210,13 +210,9 @@
 /* ----- the conversation working on the person's turn ('label', T51): a quiet row, its dot in the creature's accent */
 .chat-bubble.working { display: flex; align-items: center; gap: 8px; width: 82%; border-color: transparent; background: none; box-shadow: none; }
 .working-label { display: inline-flex; align-items: center; gap: 7px; font-size: calc(13.5px * var(--sv-text-scale, 1)); color: var(--tr-tag-ink); }
-/* The working glyph (StateGlyph): three dots in the working state's colour, blinking as the conversations' dot does (ui.css). */
-.working-label > svg { width: 16px; height: 16px; }
-/* A running ellipsis after a live row's word. */
-.transcript-ell i { font-style: normal; animation: transcript-ell 1.2s ease-in-out infinite; }
-.transcript-ell i:nth-child(2) { animation-delay: .2s; }
-.transcript-ell i:nth-child(3) { animation-delay: .4s; }
-@keyframes transcript-ell { 0%, 100% { opacity: .2; } 40% { opacity: 1; } }
+/* The working dot is the conversations' own (`.state-dot`, room.css: its colour, its blink, its halo under reduced motion), here in the
+ * row's flow instead of at an avatar's corner, and with no ring. */
+.working-label .state-dot { position: static; flex: none; --dot-ring: transparent; }
 
 /* ----- the person's open turn, without STT streaming (today): a pill with the microphone and its bars, then
  * the same five bars blinking while it is transcribed (TurnPill), and the round × that takes it back, until it is sent. */
@@ -306,10 +302,6 @@
   .call-layout > .transcript:not([data-open]) * { animation: none !important; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .transcript-ell i { animation: none; }
-  .transcript-ell i { opacity: 1; }
-}
 
 /* ----- the conversation's pieces the call's stage shows too, at its own size and colour */
 /* The person's balloon on the call's stage (call-view.css .person-bubble, PersonTurn): the chat's person colours, and an

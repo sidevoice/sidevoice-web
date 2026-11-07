@@ -238,6 +238,7 @@ export const JOURNEYS: Journey[] = [
       facts: { botLive: true, karaokeState: { segment: "h-3", from: 160, to: 200 }, history: [...(BASE_FACTS.history as unknown[]),
         { segment: "h-3", thread: "fp-nuc|t-web", role: "assistant", text: LONG_REPLY, name: "sidevoice-web", time: Date.now() - 5_000, session: "s1", seq: 3, audio: "playing" }] } },
     { id: "working", caption: "The agent working, for longer than the 3 s Working waits before it shows.", facts: { harness: { "fp-nuc|t-web": true }, workingSince: { "fp-nuc|t-web": 0 }, now: WORKING_SHOWN_AFTER_MS } },
+    { id: "working-transcript", caption: "The agent working, in the transcript: its status dot (purple, blinking), then Working and one static ellipsis.", facts: { harness: { "fp-nuc|t-web": true }, workingSince: { "fp-nuc|t-web": 0 }, now: WORKING_SHOWN_AFTER_MS }, after: press("transcript-toggle") },
     { id: "working-soon", caption: "The agent busy for less than 3 s: nothing says Working yet, so a quick back-and-forth never flashes it.", facts: { harness: { "fp-nuc|t-web": true }, workingSince: { "fp-nuc|t-web": 0 }, now: WORKING_SHOWN_AFTER_MS - 1000 } },
     { id: "listening", caption: "You speaking: your turn, as it is heard.", facts: { userLive: true, userTurn: { id: "u", segment: "u", thread: "fp-nuc|t-web" }, pendingPhase: "listening" } },
     { id: "transcribing", caption: "Your turn being transcribed: the same five bars blink, no word.", facts: { userLive: false, userTurn: { id: "u", segment: "u", thread: "fp-nuc|t-web" }, pendingPhase: "transcribing" } },

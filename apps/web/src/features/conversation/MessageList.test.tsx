@@ -53,10 +53,11 @@ test("working is a quiet row starting the agent's next run, wearing its face, in
   const { container } = render(<MessageList conversation={{ ...view([message({ segment: "u", role: "user", name: "Tú", text: "¿Y ahora?" })]), working: true }} />);
   const working = container.querySelector(".chat-bubble.working")!;
   expect(working).toHaveAccessibleName("The conversation is working on your message");
-  expect(working.textContent).toBe("Working...");
-  // Led by the working glyph (three dots), as the conversations' state says it, not by a dot of the creature's accent.
-  expect(working.querySelector(".working-label > svg")).toHaveClass("state-glyph", "state-glyph-working");
-  expect(working.querySelector(".working-label > i")).toBeNull();
+  expect(working.textContent).toBe("Working…");
+  // Led by the conversations' own working dot (the status row's, which blinks), the word, one static ellipsis after it: no animated dots.
+  expect(working.querySelector(".working-label > .state-dot")).toHaveAttribute("data-kind", "working");
+  expect(working.querySelector(".working-label > .state-dot")!.nextElementSibling).toHaveTextContent("Working…");
+  expect(working.querySelector(".transcript-ell, svg")).toBeNull();
   const run = working.closest(".message-group")!;
   expect(run).toHaveAttribute("data-role", "assistant");
   expect(run.querySelector(":scope > .chat-face")).not.toBeNull();
