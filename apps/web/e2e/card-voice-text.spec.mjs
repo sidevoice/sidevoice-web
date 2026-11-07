@@ -112,7 +112,8 @@ for (const format of ["card", "avatar"]) {
     // One live announcer, hidden, with the text; the bars are labelled, not live.
     await expect(turn.getByRole("status")).toHaveCount(1);
     await expect(turn.getByRole("status")).toHaveText("Transcribing what you said");
-    expect(await turn.getByRole("status").evaluate((node) => node.getBoundingClientRect().width)).toBeLessThanOrEqual(1);
+    // Visually hidden: a 1px box. WebKit can measure it a hair over 1 (1.0014 seen in CI), so allow subpixel rounding.
+    expect(await turn.getByRole("status").evaluate((node) => node.getBoundingClientRect().width)).toBeLessThan(1.5);
     await expect(turn.getByRole("img", { name: "Transcribing what you said" })).toHaveCount(1);
     // Five bars, the brand mark's shape, blinking visibly: each bar's own animation runs, by transform and opacity alone (no layout,
     // no repaint of geometry), and the bar really changes between the frames (not the old 1 -> .8).
