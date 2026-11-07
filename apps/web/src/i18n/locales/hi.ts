@@ -986,7 +986,7 @@ export const messages: Messages = {
   "settings.shortcuts.headsetOneTurn": "एक बात कहें",
   "settings.shortcuts.headsetSkip": "जो चल रहा है उसे छोड़ें",
   "settings.shortcuts.headsetNone": "कुछ नहीं",
-  "settings.shortcuts.headsetFixed": "कॉल के दौरान आपके हेडसेट का बटन, जहाँ हेडसेट इसे सपोर्ट करता है। इस डिवाइस पर वह सिर्फ़ यही करता है।",
+  "settings.shortcuts.headsetFixed": "इस डिवाइस पर आपका हेडसेट सिर्फ़ यही कर सकता है, इसलिए इसे बदला नहीं जा सकता।",
   "settings.shortcuts.headsetSystem": "कॉल के दौरान हेडसेट के बटन सिस्टम संभालता है: वह म्यूट करता है, और ये विकल्प लागू नहीं होते।",
   "settings.shortcuts.headsetCard": "डिफ़ॉल्ट के साथ, हेडसेट का बटन दबाने पर सिस्टम म्यूट करता है। दूसरी क्रियाएँ चुनने पर लॉक स्क्रीन पर एक प्लेबैक कार्ड जुड़ जाता है।",
   "settings.shortcuts.record": "शॉर्टकट रिकॉर्ड करें",

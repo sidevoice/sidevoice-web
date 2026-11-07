@@ -1022,7 +1022,7 @@ export const messages = {
   "settings.shortcuts.headsetNone": "Nothing",
   "settings.shortcuts.headsetSystem": "The system handles the headset's buttons during a call: it mutes, and these choices do not apply.",
   "settings.shortcuts.headsetCard": "With the defaults, the headset's press mutes through the system. Choosing other actions adds a playback card on the lock screen.",
-  "settings.shortcuts.headsetFixed": "Your headset's button, during a call, where the headset supports it. On this device it does only this.",
+  "settings.shortcuts.headsetFixed": "On this device your headset can only do this, so it can't be changed.",
   "settings.shortcuts.record": "Record shortcut",
   "settings.shortcuts.recording": "Press keys, or tap one",
   "settings.shortcuts.recordingInApp": "Press keys…",
