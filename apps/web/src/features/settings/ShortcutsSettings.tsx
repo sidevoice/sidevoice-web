@@ -8,7 +8,7 @@ import { useShortcutRecorder, type Captured } from "../../components/ui/use-shor
 import { host, type GlobalShortcut, type HeadsetPress, type HeadsetStatus, type RecordHint, type ShortcutAction, type ShortcutsStatus } from "../../host";
 import { uiLanguage, type MessageKey, type Translate } from "../../i18n/translator";
 import {
-  composeAccelerator, acceleratorKey, globalAllowed, isFnKey, isSingle, parseAccelerator, readAccelerator, sameAccelerator, setLayoutMap, singleAccelerator,
+  composeAccelerator, acceleratorKey, globalAllowed, isFnKey, isFunctionKey, isSingle, parseAccelerator, readAccelerator, sameAccelerator, setLayoutMap, singleAccelerator,
   type Trigger, type Words,
 } from "../../state/accelerators";
 import {
@@ -238,8 +238,15 @@ function GlobalRow({ t, global, set, words, entry, shortcut, clash }: { t: Trans
     if (captured.single) next = singleAccelerator(captured.single.key, captured.single.trigger);
     else {
       const { combo: pressed } = captured;
-      next = composeAccelerator({ meta: pressed!.meta, ctrl: pressed!.ctrl, alt: pressed!.alt, shift: pressed!.shift }, acceleratorKey(pressed!.code, pressed!.key));
-      if (!globalAllowed(next)) return t(words.mac ? "settings.shortcuts.needsModifierMac" : "settings.shortcuts.needsModifier", { key: keyName(pressed!.code, pressed!.key) });
+      const key = acceleratorKey(pressed!.code, pressed!.key);
+      const alone = !pressed!.meta && !pressed!.ctrl && !pressed!.alt && !pressed!.shift;
+      // An F-key on its own, for hold to talk, is a single key held (`F10:hold`), as a right-hand modifier is and as the app records
+      // it: its hot key reports the release on every system that has one. For the others it stays a combination, acting at once.
+      if (alone && isFunctionKey(key) && entry.singles.includes("hold")) next = singleAccelerator(key, "hold");
+      else {
+        next = composeAccelerator({ meta: pressed!.meta, ctrl: pressed!.ctrl, alt: pressed!.alt, shift: pressed!.shift }, key);
+        if (!globalAllowed(next)) return t(words.mac ? "settings.shortcuts.needsModifierMac" : "settings.shortcuts.needsModifier", { key: keyName(pressed!.code, pressed!.key) });
+      }
     }
     const refused = await apply(next);
     if (!refused) setRecording(false);
