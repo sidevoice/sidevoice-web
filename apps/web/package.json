@@ -9,7 +9,9 @@
     "build": "tsc -b && vite build",
     "test": "node --test test/*.cjs && vitest run",
     "lint": "eslint --quiet src",
-    "e2e": "playwright test -c playwright.config.mjs"
+    "e2e": "playwright test -c playwright.config.mjs",
+    "catalogue": "storybook dev --port 5560 --no-open",
+    "catalogue:build": "storybook build -o storybook-static"
   },
   "dependencies": {
     "@noble/hashes": "^2.4.0",
@@ -32,6 +34,9 @@
   },
   "devDependencies": {
     "@playwright/test": "1.64.0",
+    "@storybook/addon-a11y": "^10.6.6",
+    "@storybook/addon-docs": "^10.6.6",
+    "@storybook/react-vite": "^10.6.6",
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",
     "@types/react": "^19.1.10",
@@ -39,6 +44,7 @@
     "@vitejs/plugin-react": "^5.0.2",
     "eslint": "^10.14.0",
     "jsdom": "^26.1.0",
+    "storybook": "^10.6.6",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.72.1",
     "vite": "^7.1.3",
