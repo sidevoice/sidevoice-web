@@ -45,6 +45,7 @@
     "eslint": "^10.14.0",
     "jsdom": "^26.1.0",
     "storybook": "^10.6.6",
+    "storybook-addon-pseudo-states": "^10.6.6",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.72.1",
     "vite": "^7.1.3",

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { ComponentProps } from "react";
 import { fn } from "storybook/test";
 import { Button } from "./Button";
 import { AddIcon, CloseIcon, CopyIcon, SettingsIcon } from "./Icons";
@@ -63,6 +64,36 @@ export const States: Story = {
         <span id="why-blocked" className="muted">The reason, which the button reads as its description.</span>
       </div>
       <Button variant="primary" block>Block: fills its column</Button>
+    </div>
+  ),
+};
+
+/* Every look of the button in every interaction state, side by side: at rest, hovered, pressed, focused from the keyboard,
+ * disabled. Hover, press and focus are forced by storybook-addon-pseudo-states on the cells that name them, so what shows
+ * is the stylesheet's own :hover, :active and :focus-visible. */
+const LOOKS: { name: string; props: Partial<ComponentProps<typeof Button>> }[] = [
+  { name: "primary", props: { variant: "primary" } },
+  { name: "secondary", props: { variant: "secondary" } },
+  { name: "ghost", props: { variant: "ghost" } },
+  { name: "ghost neutral", props: { variant: "ghost", tone: "neutral" } },
+  { name: "ghost danger", props: { variant: "ghost", tone: "danger" } },
+  { name: "danger", props: { variant: "danger" } },
+];
+const INTERACTIONS = ["rest", "hover", "press", "focus", "disabled"] as const;
+
+export const InteractionStates: Story = {
+  name: "Hover, press, focus",
+  parameters: { pseudo: { hover: [".is-hover"], active: [".is-press"], focusVisible: [".is-focus"] } },
+  render: () => (
+    <div style={{ display: "grid", gridTemplateColumns: `max-content repeat(${INTERACTIONS.length}, max-content)`, gap: "12px 16px", alignItems: "center" }}>
+      <span />
+      {INTERACTIONS.map((state) => <p key={state} className="catalogue-label" style={{ margin: 0 }}>{state}</p>)}
+      {LOOKS.map(({ name, props }) => <div key={name} style={{ display: "contents" }}>
+        <p className="catalogue-label" style={{ margin: 0 }}>{name}</p>
+        {INTERACTIONS.map((state) => <span key={state}>
+          <Button {...props} size="sm" className={`is-${state}`} disabled={state === "disabled"}><AddIcon />Connect</Button>
+        </span>)}
+      </div>)}
     </div>
   ),
 };

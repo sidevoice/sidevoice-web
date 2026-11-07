@@ -17,7 +17,9 @@ const hosts = (process.env.SIDEVOICE_CATALOGUE_HOSTS ?? "").split(",").map((host
 const config: StorybookConfig = {
   framework: { name: "@storybook/react-vite", options: {} },
   stories: ["../src/**/*.mdx", "../src/**/*.stories.@(ts|tsx)"],
-  addons: ["@storybook/addon-docs", "@storybook/addon-a11y"],
+  // pseudo-states: a story can show a control hovered, pressed or focused at rest (the States stories), and the toolbar can
+  // force those states on any story.
+  addons: ["@storybook/addon-docs", "@storybook/addon-a11y", "storybook-addon-pseudo-states"],
   // The app's fonts and images live under /voice/ (public/), and its CSS names them there.
   staticDirs: [{ from: "../public", to: "/voice" }],
   core: { disableTelemetry: true, disableWhatsNewNotifications: true, ...(hosts.length ? { allowedHosts: ["localhost", "127.0.0.1", ...hosts] } : {}) },

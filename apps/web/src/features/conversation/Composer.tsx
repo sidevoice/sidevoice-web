@@ -35,7 +35,7 @@ export function Composer({ narrow }: { narrow: boolean }) {
       <div className="composer-field">
         <Textarea id="text-message" minRows={1} maxRows={narrow ? 5 : 8} maxLength={12000} aria-label={t("transcript.message")}
           placeholder={t("transcript.placeholder")} disabled onInput={(event) => setEmpty(!event.currentTarget.value.trim())} />
-        <Button id="text-send" type="submit" variant="ghost" size="icon-sm" className="composer-send" disabled aria-disabled={empty || undefined}
+        <Button id="text-send" type="submit" variant="primary" size="icon-sm" className="composer-send" disabled aria-disabled={empty || undefined}
           data-empty={empty || undefined} aria-label={t("transcript.sendLabel")} title={t("transcript.sendLabel")}><SendIcon /></Button>
       </div>
     </form>

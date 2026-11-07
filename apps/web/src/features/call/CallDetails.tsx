@@ -53,7 +53,7 @@ export function CallDetails({ stage, rows, t }: { stage: StageConversation; rows
 export function StageHeading({ stage, voice }: { stage: StageConversation; voice: { rows: VoiceModelRow[]; attention: boolean } }) {
   const t = translator();
   const trigger = (
-    <button type="button" className="stage-heading" aria-haspopup="dialog">
+    <button type="button" className="stage-heading ui-state" aria-haspopup="dialog">
       <span className="stage-heading-name">
         <span title={stage.title}>{stage.title}</span>
         {voice.attention && <i className="stage-attention" aria-hidden="true" />}
