@@ -1,4 +1,5 @@
 import type { StorybookConfig } from "@storybook/react-vite";
+import { fileURLToPath } from "node:url";
 import { CREATE_NEW_STORYFILE_REQUEST, FILE_COMPONENT_SEARCH_REQUEST, GHOST_STORIES_REQUEST, OPEN_IN_EDITOR_REQUEST, SAVE_STORY_REQUEST } from "storybook/internal/core-events";
 
 /* The catalogue is meant to be looked at through a tunnel (a public URL), and Storybook's dev server lets whoever opens
@@ -30,6 +31,8 @@ const config: StorybookConfig = {
     // The props tables read the TypeScript types themselves (cva variants, unions), not only the defaults.
     reactDocgen: "react-docgen-typescript",
     reactDocgenTypescriptOptions: {
+      // The app's project (tsconfig.json only references it), so the types of src/ are read.
+      tsconfigPath: fileURLToPath(new URL("../tsconfig.app.json", import.meta.url)),
       shouldExtractLiteralValuesFromEnum: true,
       shouldRemoveUndefinedFromOptional: true,
       // Our own props only: not the hundreds every element inherits from the DOM.
