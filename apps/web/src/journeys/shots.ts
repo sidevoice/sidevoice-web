@@ -280,7 +280,7 @@ export const JOURNEYS: Journey[] = [
       shortcuts: { shortcuts: {}, permission: null, inApp: false, headset: { press: "mute", doublePress: "oneTurn", outsideCall: "leave",
         actions: { press: ["mute", "oneTurn", "skip", "none"], doublePress: ["mute", "oneTurn", "skip", "none"] } } },
       after: openSettings("shortcuts") },
-    { id: "s-shortcuts-iphone", caption: "Shortcuts on an iPhone (no CallKit): no double press reaches the app, and the single press is the system's Press to Mute alone, so it is a line, not a choice.", views: ["phone"],
+    { id: "s-shortcuts-iphone", caption: "Shortcuts on an iPhone (no CallKit): no double press reaches the app, and the single press is the system's Press to Mute alone: its usual row, disabled on Mute, with a note saying why.", views: ["phone"],
       shortcuts: { shortcuts: {}, permission: null, inApp: false, headset: { press: "mute", doublePress: null, outsideCall: "leave", actions: { press: ["mute"] } } },
       after: openSettings("shortcuts") },
     { id: "s-shortcuts-phone-older", caption: "Shortcuts on a phone whose app predates the granular report (iOS TestFlight 61): both rows with every action, and the note on the playback card, as before.", views: ["phone"],

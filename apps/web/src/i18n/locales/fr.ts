@@ -995,7 +995,7 @@ export const messages: Messages = {
   "settings.shortcuts.headsetNone": "Rien",
   "settings.shortcuts.headsetSystem": "Le système gère les boutons du casque pendant un appel : il coupe le micro, et ces choix ne s'appliquent pas.",
   "settings.shortcuts.headsetCard": "Avec les réglages par défaut, le bouton du casque coupe le micro via le système. Choisir d'autres actions ajoute une carte de lecture sur l'écran de verrouillage.",
-  "settings.shortcuts.headsetFixed": "Le bouton de votre casque, pendant un appel, si le casque le permet. Sur cet appareil, il ne fait que cela.",
+  "settings.shortcuts.headsetFixed": "Sur cet appareil, votre casque ne peut faire que cela : ce réglage ne peut donc pas être modifié.",
   "settings.shortcuts.record": "Enregistrer un raccourci",
   "settings.shortcuts.recording": "Appuyez sur des touches, ou sur une seule",
   "settings.shortcuts.recordingInApp": "Appuyez sur les touches…",

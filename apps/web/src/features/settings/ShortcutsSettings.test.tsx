@@ -497,16 +497,21 @@ test("a phone's bridge ({ get, subscribe, setHeadset }, no set) still gives a sh
  * that. An iPhone without CallKit: no double press reaches the app, and the single press is the system's mute alone. */
 const EVERY = ["mute", "oneTurn", "skip", "none"] as const;
 
-test("an iPhone that reports the single press as the system's mute alone shows it as a line, and no double press row", async () => {
+test("an iPhone that reports the single press as the system's mute alone shows its usual row, disabled on mute with a note why, and no double press row", async () => {
   keyboard(false);
   const setHeadset = vi.fn(async () => phone({ press: "mute", doublePress: null, outsideCall: "leave", actions: { press: ["mute"] } }));
   inApp({ shortcuts: { get: vi.fn(async () => phone({ press: "mute", doublePress: null, outsideCall: "leave", actions: { press: ["mute"] } })), subscribe: vi.fn(() => () => {}), setHeadset } });
   render(<ShortcutsSettings t={en} />);
-  const line = await screen.findByText("Mute or unmute");
-  expect(line).toHaveClass("shortcut-fixed");
-  expect(screen.getByText("Single press")).toBeTruthy();
-  expect(screen.getByText(en("settings.shortcuts.headsetFixed"))).toBeTruthy();
-  expect(screen.queryAllByRole("combobox")).toEqual([]);
+  const single = await screen.findByRole("combobox", { name: "Single press" });
+  expect(single).toHaveTextContent("Mute or unmute");
+  expect(single).toBeDisabled();
+  // A screen reader says why it is disabled: the note describes the select.
+  expect(single).toHaveAccessibleDescription(en("settings.shortcuts.headsetFixed"));
+  expect(screen.getByText(en("settings.shortcuts.headsetPressHint"))).toBeTruthy();
+  expect(screen.getByText(en("settings.shortcuts.headsetFixed"))).toHaveClass("shortcut-managed");
+  fireEvent.click(single);
+  expect(screen.queryAllByRole("option")).toEqual([]);
+  expect(screen.queryAllByRole("combobox")).toHaveLength(1);
   expect(screen.queryByText("Double press")).toBeNull();
   expect(groups()).toEqual(["Headset buttons"]);
   expect(setHeadset).not.toHaveBeenCalled();
@@ -525,7 +530,7 @@ test("an Android phone that reports every action keeps both rows, each with ever
   await act(async () => { fireEvent.click(screen.getByRole("option", { name: "Say one thing" })); });
   expect(setHeadset).toHaveBeenCalledExactlyOnceWith({ doublePress: "oneTurn" });
   expect(screen.getByRole("combobox", { name: "Double press" })).toHaveTextContent("Say one thing");
-  expect(document.querySelector(".shortcut-fixed")).toBeNull();
+  expect(screen.queryByText(en("settings.shortcuts.headsetFixed"))).toBeNull();
 });
 
 test("a press offers only the actions the host reports for it, in the usual order", async () => {
@@ -534,9 +539,14 @@ test("a press offers only the actions the host reports for it, in the usual orde
   render(<ShortcutsSettings t={en} />);
   fireEvent.click(await screen.findByRole("combobox", { name: "Single press" }));
   expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(["Mute or unmute", "Say one thing"]);
-  // One action: a line, not a select.
-  expect(screen.queryByRole("combobox", { name: "Double press" })).toBeNull();
-  expect(document.querySelector(".shortcut-fixed[data-press=doublePress]")).toHaveTextContent("Nothing");
+  fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+  // One action: the same row, its select disabled on it, with the note.
+  expect(screen.getByRole("combobox", { name: "Double press" })).toHaveTextContent("Nothing");
+  expect(screen.getByRole("combobox", { name: "Double press" })).toBeDisabled();
+  expect(screen.getByRole("combobox", { name: "Double press" })).toHaveAccessibleDescription(en("settings.shortcuts.headsetFixed"));
+  expect(screen.getByRole("combobox", { name: "Single press" })).not.toHaveAttribute("aria-describedby");
+  expect(screen.getByRole("combobox", { name: "Single press" })).toBeEnabled();
+  expect(screen.getAllByText(en("settings.shortcuts.headsetFixed"))).toHaveLength(1);
 });
 
 test("the desktop app's headset, which reports no actions, is drawn as before: two selects with every choice", async () => {
@@ -545,7 +555,7 @@ test("the desktop app's headset, which reports no actions, is drawn as before: t
   expect(await screen.findByRole("combobox", { name: "Double press" })).toHaveTextContent("Skip what is playing");
   fireEvent.click(screen.getByRole("combobox", { name: "Single press" }));
   expect(screen.getAllByRole("option")).toHaveLength(4);
-  expect(document.querySelector(".shortcut-fixed")).toBeNull();
+  expect(screen.queryByText(en("settings.shortcuts.headsetFixed"))).toBeNull();
 });
 
 /* desktop#464: the double press set, another setting changed, and it read Nothing. Settings is one form; a reset of it (or the
@@ -602,14 +612,17 @@ test("a value the host reports outside a press's actions is shown as it is, disa
   expect(screen.getAllByRole("option").map((option) => [option.textContent, option.getAttribute("aria-disabled") === "true"]))
     .toEqual([["Mute or unmute", false], ["Say one thing", false], ["Skip what is playing", true]]);
   view.unmount();
-  // One action, the reported value another: not a line saying the one action, but the value, with the action to pick.
+  // One action, the reported value another: not the one action shown as if chosen, but the value, with the action to pick.
   const setHeadset = vi.fn(async () => phone({ press: "mute", doublePress: null, outsideCall: "leave", actions: { press: ["mute"] } }));
   inApp({ shortcuts: bridge(phone({ press: "oneTurn", doublePress: null, outsideCall: "leave", actions: { press: ["mute"] } }), { setHeadset }).bridge });
   render(<ShortcutsSettings t={en} />);
   expect(await screen.findByRole("combobox", { name: "Single press" })).toHaveTextContent("Say one thing");
-  expect(document.querySelector(".shortcut-fixed")).toBeNull();
+  expect(screen.getByRole("combobox", { name: "Single press" })).toBeEnabled();
+  expect(screen.queryByText(en("settings.shortcuts.headsetFixed"))).toBeNull();
   fireEvent.click(screen.getByRole("combobox", { name: "Single press" }));
   await act(async () => { fireEvent.click(screen.getByRole("option", { name: "Mute or unmute" })); });
   expect(setHeadset).toHaveBeenCalledExactlyOnceWith({ press: "mute" });
-  expect(document.querySelector(".shortcut-fixed")).toHaveTextContent("Mute or unmute");
+  expect(screen.getByRole("combobox", { name: "Single press" })).toHaveTextContent("Mute or unmute");
+  expect(screen.getByRole("combobox", { name: "Single press" })).toBeDisabled();
+  expect(screen.getByText(en("settings.shortcuts.headsetFixed"))).toBeTruthy();
 });

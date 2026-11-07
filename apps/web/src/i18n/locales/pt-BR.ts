@@ -986,7 +986,7 @@ export const messages: Messages = {
   "settings.shortcuts.headsetOneTurn": "Dizer uma coisa",
   "settings.shortcuts.headsetSkip": "Pular o que está tocando",
   "settings.shortcuts.headsetNone": "Nada",
-  "settings.shortcuts.headsetFixed": "O botão do seu fone de ouvido, durante uma chamada, quando o fone oferece suporte. Neste dispositivo, ele faz só isso.",
+  "settings.shortcuts.headsetFixed": "Neste dispositivo, seu fone de ouvido só pode fazer isso, então não dá para mudar.",
   "settings.shortcuts.headsetSystem": "O sistema controla os botões do fone de ouvido durante uma chamada: ele silencia o microfone, e estas opções não se aplicam.",
   "settings.shortcuts.headsetCard": "Com os padrões, o botão do fone de ouvido silencia o microfone pelo sistema. Escolher outras ações adiciona um cartão de reprodução na tela de bloqueio.",
   "settings.shortcuts.record": "Gravar atalho",

@@ -1009,7 +1009,7 @@ export const messages: Messages = {
   "settings.shortcuts.headsetNone": "Nic",
   "settings.shortcuts.headsetSystem": "Podczas połączenia przyciskami zestawu słuchawkowego zarządza system: wycisza mikrofon, a te ustawienia nie działają.",
   "settings.shortcuts.headsetCard": "Przy ustawieniach domyślnych przycisk zestawu słuchawkowego wycisza mikrofon przez system. Wybranie innych działań dodaje kartę odtwarzania na ekranie blokady.",
-  "settings.shortcuts.headsetFixed": "Przycisk zestawu słuchawkowego, podczas rozmowy, jeśli zestaw to obsługuje. Na tym urządzeniu robi tylko to.",
+  "settings.shortcuts.headsetFixed": "Na tym urządzeniu zestaw słuchawkowy może robić tylko to, więc nie da się tego zmienić.",
   "settings.shortcuts.record": "Nagraj skrót",
   "settings.shortcuts.recording": "Naciśnij klawisze lub stuknij jeden",
   "settings.shortcuts.recordingInApp": "Naciśnij klawisze…",

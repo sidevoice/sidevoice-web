@@ -296,8 +296,9 @@ const HEADSET_CHOICES: { value: HeadsetPress; label: MessageKey }[] = [
 ];
 
 /** The headset group: each press the host reports, with only the actions it says that press can do (`actions`; none said: every
- *  one). A press with a single action has nothing to choose, so it is a line saying what it does (an iPhone's single press, the
- *  system's mute), not a select; a press with none, or a double press the host reports `null`, has no row. A value the host reports
+ *  one). A press with a single action has nothing to choose: its row is drawn as the others, its select disabled on that action, and
+ *  a note under it says why (an iPhone's single press, the system's mute); a press with none, or a double press the host reports
+ *  `null`, has no row. A value the host reports
  *  outside the press's actions is shown as it is, never as another one: a select with it there, disabled, beside what can be picked. */
 function HeadsetGroup({ t, global, headset }: { t: Translate; global: Global; headset: HeadsetStatus }) {
   // The system's call holds the headset: the rows stay, read-only, and say who mutes.
@@ -314,13 +315,15 @@ function HeadsetGroup({ t, global, headset }: { t: Translate; global: Global; he
       if (!HEADSET_CHOICES.some((choice) => allowed(choice.value))) return null;
       const options = HEADSET_CHOICES.filter((choice) => allowed(choice.value) || choice.value === value)
         .map((choice) => ({ value: choice.value, label: t(choice.label), disabled: !allowed(choice.value) }));
-      if (options.length === 1) return <Row key={key} label={t(label)} description={t("settings.shortcuts.headsetFixed")}>
-        <span className="shortcut-fixed" data-press={key} data-value={options[0].value}>{options[0].label}</span>
-      </Row>;
-      return <Row key={key} label={t(label)} description={t(hint)}>
-        <Select size="sm" aria-label={t(label)} options={options} value={value} disabled={locked}
-          onValueChange={(next) => { if (next !== value) change({ [key]: next as HeadsetPress }); }} />
-      </Row>;
+      const fixed = options.length === 1;
+      return <div key={key} className="shortcut-item">
+        <Row label={t(label)} description={t(hint)}>
+          <Select size="sm" aria-label={t(label)} options={options} value={value} disabled={locked || fixed}
+            aria-describedby={fixed ? `headset-${key}-fixed` : undefined}
+            onValueChange={(next) => { if (next !== value) change({ [key]: next as HeadsetPress }); }} />
+        </Row>
+        {fixed && <p className="shortcut-managed" id={`headset-${key}-fixed`}>{t("settings.shortcuts.headsetFixed")}</p>}
+      </div>;
     })}
     {headset.managedBySystem && <Alert tone="accent" className="shortcut-note">{t("settings.shortcuts.headsetSystem")}</Alert>}
     {headset.nonDefaultAddsCard && !headset.managedBySystem && <Alert tone="accent" className="shortcut-note">{t("settings.shortcuts.headsetCard")}</Alert>}
