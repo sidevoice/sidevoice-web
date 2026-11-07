@@ -12,7 +12,7 @@ Line numbers refer to `sidevoice-web`, `sidevoice-core` and `sidevoice-connector
 |---|---|---|---|---|
 | 1. page to machine | the page's outbox (`outbox.js`) | core's call session over one WebSocket | `voice-ack` carrying the `client_msg_id` (`session.rs:311`). Sent after the message is applied, or when it was already taken (`once`, `client_frames.rs:42`). It says "the room has it", not "the agent has it". | the page |
 | 2. machine to agent session | core's room journal (`push.rs`, `pull.rs`) | the connector, then the harness | push: the connector answers `accepted` (`settle_delivery`, `push.rs:85`). Pull: the agent fetched it with `get_messages` (state `delivered`), and acked it with `ack_ids` (state `read`). | core |
-| 3. connector to harness | the connector (`daemon.rs:884`) | Claude, Codex, Cursor, HTTP | adapter-specific. Claude's inbox often gives no answer in 1.5 s, which is `unknown` (`claude.rs:326`) and later `unconfirmed`. | nobody |
+| 3. connector to harness | the connector (`daemon.rs:884`) | Claude, Codex, Cursor, HTTP | adapter-specific. A Claude inbox that keeps the connection open gives no answer in 1.5 s, which is `unknown` (`claude.rs:326`) and later `unconfirmed`. | nobody |
 
 The person sees one mark per row, driven by core's receipts: pending, sending, delivered, read, unconfirmed, not sent
 (`room-session-state.js:329`).
@@ -40,8 +40,8 @@ There is no timer on the entry.
   turn ends, so a later turn's start can overtake the held one (`turn-relay.js` header; `flushOutbox` `route.hold`).
 - Texts and turns are two queues with no order between them. A text queued while offline can go before or after a turn said
   earlier.
-- `disconnect()` calls `outbox.clear()` (`:2213`): a hang-up, or a failed or refused reconnection, drops what was never
-  acknowledged. Moving the conversation to another machine drains for a short time and then drops the rest (`drainOutbox`).
+- `disconnect()` calls `outbox.clear()` (`:2213`): a hang-up, a refusal of the browser, or a move of the call drops what was never
+  acknowledged. A network loss alone does not end the call: reconnection insists for as long as it takes. Moving the conversation to another machine drains for a short time and then drops the rest (`drainOutbox`).
   A reload keeps the outbox, but it is sent only once a call reaches a session again.
 
 ## Hop 2: machine to agent session
@@ -71,7 +71,7 @@ holds inside the connector. It keeps the last 64 pending ids (`:916`). The adapt
 `unsupported`, `failed` or an error; core treats a failure as "try again", an unknown as a final unconfirmed.
 
 **Where it breaks.**
-- Claude Code's inbox answers rarely within 1.5 s, so delivery is `unknown` and then `unconfirmed`: the row shows a check,
+- A Claude Code inbox that keeps the connection open gives no answer within 1.5 s, so delivery is `unknown` and then `unconfirmed`: the row shows a check,
   yet the agent may not have it, and nothing resends. The transcript read is meant to confirm it, with no follow-up when it
   does not.
 - A closed harness is `failed` (a refused connection) and is retried by core, until the 10 s expiry.
@@ -97,8 +97,9 @@ holds inside the connector. It keeps the last 64 pending ids (`:916`). The adapt
    with the backoff, and keep an explicit bound only by count and by hang-up. Highest: it loses messages and reorders.
 2. **web: no timer on an unacknowledged entry** (`room-session-controller.js:672`, `flushOutbox`). Add the backoff
    resend on the same socket. This is the web change in phase 2 of the night shift.
-3. **web: `disconnect()` drops the outbox** (`:2213`), and a failed reconnection ends the call and drops it. Messages said
-   in a garage that outlast the 35 s attempts and the refusal handling are lost.
+3. **web: `disconnect()` drops the outbox** (`:2213`), on a hang-up, a refusal or a move (`drainOutbox` gives it a short
+   grace). A person who hangs up with messages pending loses them, with only the not-sent mark left. Keep them
+   across the hang-up (or ask) instead.
 4. **web: texts and turns are two queues** (`flushTexts` and `flushOutbox`): no order between them.
 5. **core + web: a start held for `room.turns_full` is said again as a new message,** which can be overtaken.
 6. **connector: `unknown` is final** (`claude.rs:326`, `push.rs:115`): the agent may not have the message and nothing resends.
