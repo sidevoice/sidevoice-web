@@ -297,7 +297,8 @@ const HEADSET_CHOICES: { value: HeadsetPress; label: MessageKey }[] = [
 
 /** The headset group: each press the host reports, with only the actions it says that press can do (`actions`; none said: every
  *  one). A press with a single action has nothing to choose, so it is a line saying what it does (an iPhone's single press, the
- *  system's mute), not a select; a press with none, or a double press the host reports `null`, has no row. */
+ *  system's mute), not a select; a press with none, or a double press the host reports `null`, has no row. A value the host reports
+ *  outside the press's actions is shown as it is, never as another one: a select with it there, disabled, beside what can be picked. */
 function HeadsetGroup({ t, global, headset }: { t: Translate; global: Global; headset: HeadsetStatus }) {
   // The system's call holds the headset: the rows stay, read-only, and say who mutes.
   const locked = !global.setHeadset || !!headset.managedBySystem;
@@ -309,8 +310,10 @@ function HeadsetGroup({ t, global, headset }: { t: Translate; global: Global; he
   return <Group title={t("settings.shortcuts.headset")}>
     {presses.map(({ key, value, actions, label, hint }) => {
       if (value === null) return null;
-      const options = HEADSET_CHOICES.filter((choice) => !actions || actions.includes(choice.value)).map((choice) => ({ value: choice.value, label: t(choice.label) }));
-      if (options.length === 0) return null;
+      const allowed = (choice: HeadsetPress) => !actions || actions.includes(choice);
+      if (!HEADSET_CHOICES.some((choice) => allowed(choice.value))) return null;
+      const options = HEADSET_CHOICES.filter((choice) => allowed(choice.value) || choice.value === value)
+        .map((choice) => ({ value: choice.value, label: t(choice.label), disabled: !allowed(choice.value) }));
       if (options.length === 1) return <Row key={key} label={t(label)} description={t("settings.shortcuts.headsetFixed")}>
         <span className="shortcut-fixed" data-press={key} data-value={options[0].value}>{options[0].label}</span>
       </Row>;

@@ -577,3 +577,39 @@ test("a get-only host that reports a global shortcut gets no global rows: nothin
   // The in-app keys are the page's own and still record; the host's mute shortcut has no field.
   expect(screen.getAllByRole("button", { name: /^Mute or unmute:/ })).toHaveLength(1);
 });
+
+test("a press the host reports with no action has no row, and a press absent from actions offers every action", async () => {
+  keyboard(false);
+  inApp({ shortcuts: bridge(phone({ press: "mute", doublePress: "skip", outsideCall: "leave", actions: { press: [] } }), { setHeadset: vi.fn() }).bridge });
+  const view = render(<ShortcutsSettings t={en} />);
+  fireEvent.click(await screen.findByRole("combobox", { name: "Double press" }));
+  expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(["Mute or unmute", "Say one thing", "Skip what is playing", "Nothing"]);
+  expect(screen.queryByText("Single press")).toBeNull();
+  view.unmount();
+  inApp({ shortcuts: bridge(phone({ press: "skip", doublePress: "none", outsideCall: "leave", actions: { doublePress: [] } }), { setHeadset: vi.fn() }).bridge });
+  render(<ShortcutsSettings t={en} />);
+  expect(await screen.findByRole("combobox", { name: "Single press" })).toHaveTextContent("Skip what is playing");
+  expect(screen.queryByText("Double press")).toBeNull();
+});
+
+test("a value the host reports outside a press's actions is shown as it is, disabled, never as another action", async () => {
+  keyboard(false);
+  // Several actions, the reported value not among them: shown, not blank.
+  inApp({ shortcuts: bridge(phone({ press: "skip", doublePress: "none", outsideCall: "leave", actions: { press: ["mute", "oneTurn"], doublePress: ["none"] } }), { setHeadset: vi.fn() }).bridge });
+  const view = render(<ShortcutsSettings t={en} />);
+  expect(await screen.findByRole("combobox", { name: "Single press" })).toHaveTextContent("Skip what is playing");
+  fireEvent.click(screen.getByRole("combobox", { name: "Single press" }));
+  expect(screen.getAllByRole("option").map((option) => [option.textContent, option.getAttribute("aria-disabled") === "true"]))
+    .toEqual([["Mute or unmute", false], ["Say one thing", false], ["Skip what is playing", true]]);
+  view.unmount();
+  // One action, the reported value another: not a line saying the one action, but the value, with the action to pick.
+  const setHeadset = vi.fn(async () => phone({ press: "mute", doublePress: null, outsideCall: "leave", actions: { press: ["mute"] } }));
+  inApp({ shortcuts: bridge(phone({ press: "oneTurn", doublePress: null, outsideCall: "leave", actions: { press: ["mute"] } }), { setHeadset }).bridge });
+  render(<ShortcutsSettings t={en} />);
+  expect(await screen.findByRole("combobox", { name: "Single press" })).toHaveTextContent("Say one thing");
+  expect(document.querySelector(".shortcut-fixed")).toBeNull();
+  fireEvent.click(screen.getByRole("combobox", { name: "Single press" }));
+  await act(async () => { fireEvent.click(screen.getByRole("option", { name: "Mute or unmute" })); });
+  expect(setHeadset).toHaveBeenCalledExactlyOnceWith({ press: "mute" });
+  expect(document.querySelector(".shortcut-fixed")).toHaveTextContent("Mute or unmute");
+});
