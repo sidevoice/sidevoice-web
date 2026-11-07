@@ -82,3 +82,12 @@ export function createOutbox({ scope = 'page', indexedDB = globalThis.indexedDB,
         get size() { return entries.size; },
     };
 }
+
+/* How long a message waits for its acknowledgement on an open socket before the page says it again, by how many times it
+ * has gone on that socket: 5 s, 10 s, 20 s, 40 s, then every minute for as long as it takes. A new socket starts the
+ * count again and sends at once. Saying it again is safe (the machine takes each `client_msg_id` once), and what is said
+ * again goes in the order it was kept, from the oldest unacknowledged entry on: nothing newer is ever said before it. */
+export const RESEND_BACKOFF_MS = [5000, 10000, 20000, 40000, 60000];
+export function resendDelay(sent) {
+    return RESEND_BACKOFF_MS[Math.min(Math.max(1, sent | 0), RESEND_BACKOFF_MS.length) - 1];
+}

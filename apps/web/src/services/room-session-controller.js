@@ -12,7 +12,7 @@ import {failureCode} from './failure-code.js';
 import {probeSiteStorage} from './site-storage.js';
 import {tryTranscription,tryVoice,tryEndOfTurn} from './voice-trial.js';
 import {systemLanguage,SPEECH_LANGUAGES} from './system-language.js';
-import {createOutbox} from './outbox.js';
+import {createOutbox,resendDelay} from './outbox.js';
 import {readCallPreferences} from './call-preferences.ts';
 import {primeThinkingSound} from './thinking-sound.ts';
 import {clampDeviceName,deviceNameProblem} from './device-name-rules.js';
@@ -646,8 +646,8 @@ const post=(path,body,fp=state.callNode)=>api(path,{method:'POST',headers:{'Cont
 /* ----- what the call owes its machine: the outbox (`outbox.js`) -----
  * A turn of the person's and what became of a reply are each one message with its own `client_msg_id`, which the machine
  * remembers: sent twice it is taken once and acknowledged either way. So each waits here until acknowledged, and is
- * said again on every socket the call gets until then — never twice on the same one. Per tab: another tab's call is
- * another call. */
+ * said again on every socket the call gets until then, and on the same socket after a backoff (`resendDelay`: 5 s, 10 s,
+ * 20 s, 40 s, then every minute) while it stays unacknowledged. Per tab: another tab's call is another call. */
 const OUTBOX_SCOPE_KEY='sidevoice.outbox-scope';
 function outboxScope(){try{let scope=sessionStorage.getItem(OUTBOX_SCOPE_KEY);if(!scope){scope=crypto.randomUUID();sessionStorage.setItem(OUTBOX_SCOPE_KEY,scope)}return scope}catch{return 'page'}}
 const outbox=createOutbox({scope:outboxScope()});
@@ -656,20 +656,32 @@ const outbox=createOutbox({scope:outboxScope()});
 outbox.ready.then(()=>{hideAllRemoved();flushOutbox()},()=>{});
 // While a new session's room has not said which conversation this browser is on, nothing goes on its socket.
 let outboxHold=null;
+// The page's clock for the resend backoff, and the one timer that wakes the outbox when its oldest entry is due again.
+let resendClock=()=>Date.now(),resendTimer=null,textTimer=null,textTries=0;
+function armResend(socket){
+ clearTimeout(resendTimer);resendTimer=null;
+ const head=outbox.list().find(entry=>entry.kind!=='text');
+ if(!head||head.sentOn!==socket)return;
+ resendTimer=setTimeout(()=>{resendTimer=null;flushOutbox()},Math.max(0,head.resendAt-resendClock()));
+}
 // A message for the room, kept under the `client_msg_id` the page gives it.
 function keepMessage(kind,type,data,id=crypto.randomUUID()){return outbox.add({id,kind,session_id:state.sessionId,node:state.callNode,payload:{type,data}})}
 /* Everything waiting, in order, on the socket the call has now, under the session it has now. A turn belongs to the
  * conversation, not to the session that heard it: the room knows it by its `turn_id` on the session that took its start,
  * and as words said while away when this session never took that start (`turn-relay.js`). One socket keeps them in
- * order, so nothing waits for the room's answers. Anything for another machine is let go. */
+ * order, so nothing waits for the room's answers. An entry still unacknowledged on this socket when its backoff is up is
+ * said again, and with it every entry after it, in order: the oldest unacknowledged one is never passed. Anything for
+ * another machine is let go. */
 function flushOutbox(socket=state.ws){
  // A socket carries nothing until the room has answered its hello with the session it speaks for.
  if(outboxHold||!socket||socket.readyState!==WebSocket.OPEN||!state.sessionId||socket.session!==state.sessionId)return;
  void flushTexts();
+ const first=outbox.list().find(entry=>entry.kind!=='text');
+ const redo=!!first&&first.sentOn===socket&&resendClock()>=first.resendAt,gone=new Set();
  for(let again=true;again;){
   again=false;
   for(const entry of outbox.list()){
-   if(entry.sentOn===socket||entry.kind==='text')continue;
+   if(entry.kind==='text'||gone.has(entry.id)||(entry.sentOn===socket&&!redo))continue;
    if(entry.node!==state.callNode){outbox.remove(entry.id);continue}
    // What a reply of another call became is that call's. A reply of an earlier session of this call is reported on: the
    // room counts what this device says for the earlier session it was sent to.
@@ -686,8 +698,11 @@ function flushOutbox(socket=state.ws){
     if(data.offline)nameOfflineRow(data.turn_id,state.sessionId+':user-turn:'+data.turn_id);
    }
    try{socket.send(JSON.stringify({type:entry.payload.type,data:{...data,session_id:state.sessionId,client_msg_id:entry.id}}))}catch{return}
-   entry.sentOn=socket;
-   if(entry.kind!=='user-turn')continue;
+   // Said again on the same socket: the relay knows it already, and a start it held was said as a message of its own.
+   const again_=entry.sentOn===socket;
+   entry.sentOn=socket;gone.add(entry.id);
+   entry.sends=again_?(entry.sends||1)+1:1;entry.resendAt=resendClock()+resendDelay(entry.sends);
+   if(again_||entry.kind!=='user-turn')continue;
    // A held turn's start went: its words, earlier in the outbox, go on the next pass.
    if(data.phase==='started'){if(relay.sent(data.turn_id,entry.id,data))again=true;continue}
    // A turn of this session ended: a start the room had no room for is said again, after it, as a new message.
@@ -695,6 +710,7 @@ function flushOutbox(socket=state.ws){
    if(retry){keepMessage('user-turn','voice-user-turn',retry);again=true;break}
   }
  }
+ armResend(socket);
 }
 // Words said while away become the room's own row: the bubble takes that row's id, so history and receipts find it.
 function nameOfflineRow(turnId,id){
@@ -918,7 +934,8 @@ async function flushTexts(){
    if(removalFlights.has(entry.node))break;
    if(outboxHold||!socket||socket.readyState!==WebSocket.OPEN||socket.session!==state.sessionId||state.roomBinding?.thread_id!==entry.payload.data.thread)break;
    const answer=await deliverText(entry);
-   if(answer==='later')break;
+   if(answer==='later'){clearTimeout(textTimer);textTimer=setTimeout(()=>{textTimer=null;flushOutbox()},resendDelay(++textTries));break}
+   textTries=0;
    if(answer==='refused'){failTexts(item=>item===entry);continue}
    outbox.remove(entry.id);sent=true;
    // Its bubble gives way to the room's own row, which the history brings.
@@ -1829,6 +1846,7 @@ function recordMessage(raw, socket) {
     }
     if (t === 'voice-ack') {
         outbox.remove(d.client_msg_id);
+        armResend(socket||state.ws);
         // Core acknowledges transport before it can accept or refuse the start.
         return;
     }
@@ -2211,6 +2229,7 @@ function disconnect() {
     // A hang-up ends what the call still owed its session; text that never reached it is left as unsent.
     failTexts();
     outbox.clear();
+    clearTimeout(resendTimer);clearTimeout(textTimer);resendTimer=textTimer=null;textTries=0;
     writtenHearing.clear();
     clearTurnLifecycle();
     resumeToken = null;

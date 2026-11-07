@@ -4837,3 +4837,84 @@ test('A message refused as absent from the call rejoins, keeping its words for t
  assert.equal(s.run('state.joinFailure'),'');
  s.run('disconnect()');
 });
+
+// ----- ordered delivery with a backoff (web#534): the person's words reach the machine in order, all of them -----
+const said=(c,socket)=>sentOf(c,socket,'voice-user-turn').filter(d=>d.phase==='finished').map(d=>d.text);
+test('Turns said with no signal reach the machine in the order said, all of them, once the signal is back',async()=>{
+ const c=await callOnRoom();const {s,voice}=c;
+ c.drop(c.first);
+ await c.until(()=>c.sockets.length===2,'a reconnection socket');
+ // The garage: three turns, the last started after the second ended, none of them can go anywhere.
+ for(const [id,text] of [['g1','one'],['g2','two'],['g3','three']]){voice.emit('turn',started(id));voice.emit('turn',finished(id,text))}
+ assert.equal(s.run('outbox.list().length'),6,'all of them wait');
+ const {socket}=await c.answer({session_id:'s1',resume:{token:'new'},resumed:true});
+ await c.until(()=>!s.run('state.reconnecting'),'resumed');await settleSoon();
+ assert.deepEqual(plain(said(c,socket)),['one','two','three'],'in the order said');
+ assert.deepEqual(plain(sentOf(c,socket,'voice-user-turn').map(d=>d.phase[0]+d.turn_id)),['sg1','fg1','sg2','fg2','sg3','fg3'],'each start before its end, none overtaking');
+ for(const d of sentOf(c,socket,'voice-user-turn'))c.push(socket,{type:'voice-ack',data:{client_msg_id:d.client_msg_id}});
+ assert.equal(s.run('outbox.size'),0);
+ s.run('disconnect()');
+});
+test('A message nobody acknowledges is said again on the same socket after 5 s, 10 s, 20 s, 40 s and then every minute, oldest first',async()=>{
+ const fake=new Map();
+ const c=await callOnRoom({timers:(fn,ms,...rest)=>{if(ms>60000)return setTimeout(fn,ms,...rest);const handle={ms};fake.set(handle,fn);return handle}});
+ const {s,voice,first}=c;
+ let now=1_000_000;s.run('resendClock=()=>'+now);
+ const at=ms=>{now+=ms;s.run('resendClock=()=>'+now)};
+ const wake=()=>{const handle=s.run('resendTimer');assert.ok(handle,'a timer is armed');const fn=fake.get(handle);fake.delete(handle);fn()};
+ voice.emit('turn',started('t1'));voice.emit('turn',finished('t1','first'));
+ const armed=()=>s.run('resendTimer')?.ms;
+ assert.equal(armed(),5000,'the first wait');
+ voice.emit('turn',started('t2'));voice.emit('turn',finished('t2','second'));
+ const count=()=>sentOf(c,first,'voice-user-turn').length;
+ assert.equal(count(),4);
+ // The timer is not early: woken before the delay is up, nothing is said again.
+ at(4999);s.run('flushOutbox()');assert.equal(count(),4,'not before its time');
+ at(1);wake();assert.equal(count(),8,'5 s: said again, the four of them');
+ // The wait the page armed after each time it said them again: the schedule.
+ const waits=[];
+ for(let i=0;i<5;i++){const wait=armed();waits.push(wait);at(wait);wake()}
+ assert.deepEqual(plain(waits),[10000,20000,40000,60000,60000],'then 10 s, 20 s, 40 s, and every minute');
+ assert.equal(count(),28,'each time the four of them');
+ const sent=sentOf(c,first,'voice-user-turn').map(d=>d.phase[0]+d.turn_id);
+ assert.deepEqual(plain(sent.slice(0,4)),['st1','ft1','st2','ft2']);
+ assert.deepEqual(plain(sent.slice(4,8)),['st1','ft1','st2','ft2'],'said again from the oldest, in order');
+ assert.deepEqual(plain(sent.slice(24,28)),['st1','ft1','st2','ft2'],'and still in order at the end');
+ assert.equal(new Set(sentOf(c,first,'voice-user-turn').map(d=>d.client_msg_id)).size,4,'the same four messages, so the machine takes each once');
+ // An acknowledgement of the oldest lets go of it alone; the other keeps its turn.
+ const ids=sentOf(c,first,'voice-user-turn').slice(0,4).map(d=>d.client_msg_id);
+ c.push(first,{type:'voice-ack',data:{client_msg_id:ids[0]}});c.push(first,{type:'voice-ack',data:{client_msg_id:ids[1]}});
+ const before=count();at(60000);wake();
+ assert.deepEqual(plain(sentOf(c,first,'voice-user-turn').slice(before).map(d=>d.phase[0]+d.turn_id)),['st2','ft2'],'only what is still owed');
+ for(const id of ids.slice(2))c.push(first,{type:'voice-ack',data:{client_msg_id:id}});
+ assert.equal(s.run('outbox.size'),0);
+ assert.equal(s.run('resendTimer'),null,'nothing left to wake for');
+ s.run('disconnect()');
+});
+test('A new socket sends what waits at once, without any backoff, and starts the count again',async()=>{
+ const c=await callOnRoom();const {s,voice,first}=c;
+ let now=5_000_000;s.run('resendClock=()=>'+now);
+ voice.emit('turn',started('h1'));voice.emit('turn',finished('h1','words'));
+ c.drop(first);
+ await c.until(()=>c.sockets.length===2,'a reconnection socket');
+ const {socket}=await c.answer({session_id:'s1',resume:{token:'new'},resumed:true});
+ await c.until(()=>!s.run('state.reconnecting'),'resumed');await settleSoon();
+ assert.equal(turnSent(c,socket,'h1','started').length,1,'at once on the new socket, without waiting for any backoff');
+ assert.equal(s.run('outbox.get(outbox.list()[0].id).sends'),1,'the count started again');
+ s.run('disconnect()');
+});
+test('A reload in the middle keeps what was said and sends it in order once the call is back',async()=>{
+ const rows=['k1','k2','k3'].map((id,i)=>({id:'kept-'+id,scope:'tab-1',kind:'user-turn',session_id:'old',node:PAIRED.fp,created:10+i,order:1+i,
+  payload:{type:'voice-user-turn',data:{turn_id:id,phase:'finished',text:'said '+id,started_at:1,ended_at:2,merged:false,timings_ms:{}}}}));
+ // Stored out of order: the outbox puts them back in the order said.
+ const kept=[rows[2],rows[0],rows[1]];
+ const store={put(){},delete(){},getAll(){const request={};setTimeout(()=>{request.result=kept;request.onsuccess?.()},0);return request}};
+ const db={createObjectStore(){},transaction:()=>({objectStore:()=>store})};
+ const indexedDB={open(){const request={};setTimeout(()=>{request.result=db;request.onsuccess?.()},0);return request}};
+ const c=await callOnRoom({indexedDB,outboxScope:'tab-1'});
+ await settleSoon();await settleSoon();
+ const turns=sentOf(c,c.first,'voice-user-turn');
+ assert.deepEqual(plain(turns.map(d=>d.text)),['said k1','said k2','said k3'],'in the order said, all of them');
+ assert.ok(turns.every(d=>d.offline===true),'as words said while away, the call that heard them being gone');
+ c.s.run('disconnect()');
+});

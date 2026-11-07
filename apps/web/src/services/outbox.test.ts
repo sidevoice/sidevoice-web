@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { createOutbox, OUTBOX_LIMIT } from "./outbox.js";
+import { createOutbox, OUTBOX_LIMIT, RESEND_BACKOFF_MS, resendDelay } from "./outbox.js";
 
 /* The outbox: entries kept in order until their acknowledgement, bounded by count (never by age), and kept across a
  * reload of the same tab. */
@@ -117,4 +117,10 @@ test("a database that cannot be opened leaves the outbox working in memory", asy
   await other.ready;
   other.add(entry("b"));
   expect(other.size).toBe(1);
+});
+
+test("a message unacknowledged on an open socket waits 5 s, 10 s, 20 s, 40 s and then a minute before it is said again", () => {
+  expect(RESEND_BACKOFF_MS).toEqual([5000, 10000, 20000, 40000, 60000]);
+  expect([1, 2, 3, 4, 5, 6, 50].map(resendDelay)).toEqual([5000, 10000, 20000, 40000, 60000, 60000, 60000]);
+  expect(resendDelay(0)).toBe(5000);
 });
