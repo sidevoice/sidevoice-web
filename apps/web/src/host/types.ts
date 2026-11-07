@@ -331,8 +331,13 @@ export interface HeadsetStatus {
   /** The system's call holds the headset (CallKit, Telecom): the system mutes, and the choices are not the app's to make; the page
    *  shows the rows read-only. Absent: they are. */
   managedBySystem?: boolean;
-  /** Choosing anything but the defaults adds a playback card to the lock screen (iOS, beside the Live Activity); the page says so. */
+  /** Choosing anything but the defaults adds a playback card to the lock screen (iOS, beside the Live Activity); the page says so.
+   *  Reported by older iOS builds only. */
   nonDefaultAddsCard?: boolean;
+  /** What each press can do on this host: the page offers only these, and a press with one action is a line, not a choice (an
+   *  iPhone: the system's mute alone). Absent, or a press absent from it: every action, as an older host reports. Whether the double
+   *  press reaches the app at all is `doublePress` (`null`: no row). */
+  actions?: { press?: HeadsetPress[]; doublePress?: HeadsetPress[] };
 }
 export interface ShortcutsStatus {
   /** The global shortcuts this host offers, by action. An action it does not offer is absent, and none at all (`{}`) is no group:
@@ -496,6 +501,16 @@ export interface CallSurfaceBridge {
   forget(ids: string[]): void;
 }
 
+/** The app's own sound for the cues the page decides on (`host.cue`): the page says when, the app plays it through the
+ *  audio session its call already owns, where a webview's Web Audio is not sure to come out (a phone's native call session,
+ *  sidevoice-web#439). `thinking` is the soft breath that says the agent works. `start` and `stop` are idempotent. An app
+ *  without it leaves the page to play the cue in its own Web Audio. */
+export type CueName = "thinking";
+export interface CueBridge {
+  start(cue: CueName): void;
+  stop(cue: CueName): void;
+}
+
 export interface Host {
   identity: HostIdentity;
   /** The host's overlay for `language` (a tag: `es`, `zh-Hans`) exactly: nothing from its primary subtag or English, which
@@ -522,6 +537,8 @@ export interface Host {
   textScale: TextScaleBridge | null;
   callControls: CallControlsBridge | null;
   callSurface: CallSurfaceBridge | null;
+  /** The app's own player for the page's cues; null where the page plays them itself. */
+  cue: CueBridge | null;
   updater: AppUpdater | null;
   debug: HostDebugBridge | null;
 }

@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
+import { useState } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { Select, type SelectItems } from "./Select";
 import { Field } from "./Field";
@@ -113,4 +114,29 @@ test("in a form, a value and the options that hold it, changed together, are not
   expect(change).not.toHaveBeenCalled();
   chooseOption("voice", "em_alex");
   expect(change).toHaveBeenLastCalledWith("em_alex");
+});
+
+/* desktop#464: a headset's double press read Nothing again after another setting changed. Every Settings select is in a form,
+ * where Radix keeps a hidden native select that echoes each value back and puts back the first value on a form reset; neither is
+ * the person's choice, and neither may reach whatever keeps the value. A pick from the list, and a name typed on the box, are. */
+test("in a form, only what the person picks is a choice: not the hidden select's echo, not a reset of the form", async () => {
+  const change = vi.fn();
+  function Kept() {
+    const [value, setValue] = useState("en");
+    return <form id="settings"><Select id="lang" aria-label="Language" value={value} onValueChange={(next) => { change(next); setValue(next); }} options={LANGUAGES} /></form>;
+  }
+  render(<Kept />);
+  chooseOption("lang", "fr");
+  expect(change.mock.calls).toEqual([["fr"]]);
+  expect(selectedValue("lang")).toBe("fr");
+  // The hidden select, as Radix dispatches its echo or a person reaches it: a value nobody picked from the list.
+  const hidden = document.querySelector<HTMLSelectElement>("#settings select[aria-hidden]")!;
+  expect(hidden).toBeTruthy();
+  await act(async () => { hidden.value = "es"; hidden.dispatchEvent(new Event("change", { bubbles: true })); });
+  await act(async () => { (document.getElementById("settings") as HTMLFormElement).reset(); });
+  expect(change.mock.calls).toEqual([["fr"]]);
+  expect(selectedValue("lang")).toBe("fr");
+  // A name typed on the closed box jumps to its option, as on a native select.
+  fireEvent.keyDown(screen.getByRole("combobox"), { key: "e" });
+  expect(change.mock.calls.at(-1)).toEqual(["en"]);
 });

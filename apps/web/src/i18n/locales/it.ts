@@ -1009,6 +1009,7 @@ export const messages: Messages = {
   "settings.shortcuts.headsetNone": "Niente",
   "settings.shortcuts.headsetSystem": "Durante una chiamata il sistema gestisce i pulsanti delle cuffie: disattiva il microfono e queste scelte non si applicano.",
   "settings.shortcuts.headsetCard": "Con le impostazioni predefinite, il pulsante delle cuffie disattiva il microfono tramite il sistema. Scegliere altre azioni aggiunge una scheda di riproduzione nella schermata di blocco.",
+  "settings.shortcuts.headsetFixed": "Il pulsante delle cuffie, durante una chiamata, se le cuffie lo supportano. Su questo dispositivo fa solo questo.",
   "settings.shortcuts.record": "Registra scorciatoia",
   "settings.shortcuts.recording": "Premi dei tasti, o toccane uno",
   "settings.shortcuts.recordingInApp": "Premi i tasti…",
