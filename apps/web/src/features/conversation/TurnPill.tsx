@@ -9,27 +9,31 @@ import "./turn-pill.css";
  * transcript (LiveRows) and on the floating card's avatar and pip formats (the stage's pill again). A change here is a change
  * everywhere.
  *
- * Five bars always, in the brand mark's shape (6 : 12 : 21 : 12 : 6 on a 24 grid, SidevoiceMark). While the person speaks they
- * follow the microphone's level; while it is transcribed they blink, a gentle wave across the five (no word: a screen reader is
+ * Five bars always, in the brand mark's shape at rest (6 : 12 : 21 : 12 : 6 on a 24 grid, SidevoiceMark). While the person speaks they
+ * follow the microphone, each bar its own reading, scrolling right to left as the old waveform did; while it is transcribed they blink, a gentle wave across the five (no word: a screen reader is
  * told by the one TurnAnnouncer, and the bars are an image). A device that asks for less motion sees them still, at the shape,
  * dimmer. The bars move only by transform and opacity. */
 
 /** The bars' heights as a share of the tallest: the brand mark's. */
 export const TURN_BAR_SHAPE = [6, 12, 21, 12, 6].map((height) => height / 21);
-/** How much of its shape a bar keeps in silence; the rest is the level's. */
+/** How much of its shape a bar keeps where there is no reading to show (before the voice, and through silence): near the mark's. */
 const REST = 0.45;
-const TICK_MS = 50;
+/** One column of history per tick, as the waveform it replaced did (~55 ms): the bars scroll with time, newest at the right. */
+const TICK_MS = 55;
 /** Below this level the microphone hears silence (as VoiceWaveform's). */
 const SILENCE = 0.04;
 
-/** The five bars' vertical scales for the levels read lately (`history[0]` the newest): the middle bar follows the newest
- *  level and the ones either side of it the earlier ones, so a voice ripples out from the middle. At level 0 the bars keep
- *  `REST` of their shape; at level 1 they are the mark's. */
-export function turnBarScales(history: readonly number[]): number[] {
+/** The five bars' vertical scales for the readings so far (`columns`, oldest first), as the waveform this pill had before drew them:
+ *  each bar is its own reading, the newest at the right, the others the ones before it, so a voice scrolls through the five.
+ *  A bar with no reading yet rests at `REST` of its place in the mark's shape; a reading is the bar's height, 0 to 1. */
+export function turnBarScales(columns: readonly number[]): number[] {
+  const shown = columns.slice(-TURN_BAR_SHAPE.length);
+  const first = TURN_BAR_SHAPE.length - shown.length;
   return TURN_BAR_SHAPE.map((shape, bar) => {
-    const level = history[Math.min(Math.abs(bar - 2), history.length - 1)] ?? 0;
-    const clamped = Number.isFinite(level) ? Math.max(0, Math.min(1, level)) : 0;
-    return Math.round(shape * (REST + (1 - REST) * clamped) * 100) / 100;
+    const rest = shape * REST;
+    const reading = shown[bar - first];
+    const level = reading === undefined || !Number.isFinite(reading) ? 0 : Math.max(0, Math.min(1, reading));
+    return Math.round(Math.max(rest, level) * 100) / 100;
   });
 }
 
@@ -47,10 +51,10 @@ function TurnBars({ phase, level, live }: { phase: Phase; level?: () => number; 
     const node = root.current;
     if (!node || !live || reduced || phase !== "listening") return;
     const bars = [...node.children] as HTMLElement[];
-    const history: number[] = [0, 0, 0];
+    const columns: number[] = [];
     const drawn: number[] = [];
     let timer = 0;
-    const paint = () => turnBarScales(history).forEach((scale, bar) => {
+    const paint = () => turnBarScales(columns).forEach((scale, bar) => {
       if (scale === drawn[bar]) return;
       drawn[bar] = scale;
       bars[bar].style.setProperty("transform", `scaleY(${scale})`);
@@ -60,9 +64,8 @@ function TurnBars({ phase, level, live }: { phase: Phase; level?: () => number; 
       const own = ownLevel.current ?? window.sidevoiceAudio?.level?.bind(window.sidevoiceAudio);
       const samples = own ? null : window.sidevoiceAudio?.readWaveform() ?? null;
       const read = own ? Math.max(0, Math.min(1, own() || 0)) : samples ? waveColumn(samples) : 0;
-      history.unshift(read < SILENCE ? 0 : read);
-      history.length = 3;
-      paint();
+      // Silence adds no column: what was said holds its shape through the pauses (as the waveform's did).
+      if (read >= SILENCE) { columns.push(read); if (columns.length > TURN_BAR_SHAPE.length) columns.shift(); paint(); }
       timer = window.setTimeout(tick, TICK_MS);
     };
     // Only while it can be seen: a pill mounted out of sight (a hidden tab) reads and schedules nothing (desktop#149).
