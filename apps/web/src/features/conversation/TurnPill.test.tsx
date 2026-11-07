@@ -52,8 +52,13 @@ test("each bar is its own reading, the newest at the right: the bars are not one
   // The ratio between two bars changes with the readings (it is not the mark's 12:21 every time).
   const ratio = (columns: number[]) => { const scales = turnBarScales(columns); return scales[1] / scales[2]; };
   expect(new Set([ratio([0.5, 0.5, 0.5, 0.5, 0.5]), ratio([0.4, 0.9, 0.5, 0.5, 0.6]), ratio([0.8, 0.5, 0.9, 0.1, 0.4])]).size).toBe(3);
-  // Out-of-range readings are held to 0..1; one that is not a number is silence, never NaN.
-  expect(turnBarScales([5, -1, Number.NaN, 0.5, 1])).toEqual([1, rest[1], rest[2], 0.5, 1]);
+  // Quiet speech (above silence, below the mark's rests) is its own readings from one floor, not the mark's ratios.
+  const quiet = turnBarScales([0.05, 0.06, 0.07, 0.08, 0.09]);
+  expect(quiet).toEqual([0.15, 0.15, 0.15, 0.15, 0.15]);
+  expect(quiet).not.toEqual(rest);
+  expect(turnBarScales([0.05, 0.2, 0.1, 0.3, 0.09])).toEqual([0.15, 0.2, 0.15, 0.3, 0.15]);
+  // Out-of-range readings are held to 0..1; one that is not a number rests, never NaN.
+  expect(turnBarScales([5, -1, Number.NaN, 0.5, 1])).toEqual([1, 0.15, rest[2], 0.5, 1]);
 });
 
 test("while listening the bars follow the level they are given, by transform", async () => {

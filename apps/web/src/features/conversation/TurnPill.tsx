@@ -18,6 +18,8 @@ import "./turn-pill.css";
 export const TURN_BAR_SHAPE = [6, 12, 21, 12, 6].map((height) => height / 21);
 /** How much of its shape a bar keeps where there is no reading to show (before the voice, and through silence): near the mark's. */
 const REST = 0.45;
+/** The least a bar shows for a reading: the same for every bar, so the pill never collapses and quiet speech is not the mark. */
+const READING_FLOOR = 0.15;
 /** One column of history per tick, as the waveform it replaced did (~55 ms): the bars scroll with time, newest at the right. */
 const TICK_MS = 55;
 /** Below this level the microphone hears silence (as VoiceWaveform's). */
@@ -30,10 +32,11 @@ export function turnBarScales(columns: readonly number[]): number[] {
   const shown = columns.slice(-TURN_BAR_SHAPE.length);
   const first = TURN_BAR_SHAPE.length - shown.length;
   return TURN_BAR_SHAPE.map((shape, bar) => {
-    const rest = shape * REST;
     const reading = shown[bar - first];
-    const level = reading === undefined || !Number.isFinite(reading) ? 0 : Math.max(0, Math.min(1, reading));
-    return Math.round(Math.max(rest, level) * 100) / 100;
+    // No reading yet (or not a number): the bar rests near its place in the mark's shape. A reading drives its bar from one small
+    // floor, the same for all, never from the bar's shape: quiet speech must not draw the mark again.
+    if (reading === undefined || !Number.isFinite(reading)) return Math.round(shape * REST * 100) / 100;
+    return Math.round(Math.max(READING_FLOOR, Math.min(1, reading)) * 100) / 100;
   });
 }
 
