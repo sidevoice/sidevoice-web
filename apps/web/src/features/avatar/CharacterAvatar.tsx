@@ -76,8 +76,10 @@ export interface CharacterAvatarProps {
   live?: boolean;
   /** The creature is drawn live and sharp even as a small face (the floating card's): one canvas of its box's size in device
    *  pixels, on the page's card stage (creature/host.ts `sharp`), moving with `live` and in its key pose when it holds
-   *  still. Every other small copy is a still face. */
-  liveFace?: boolean;
+   *  still. Every other small copy is a still face. "whole": a creature on nothing (the floating card's avatar), framed so that
+   *  everything it acts out (a prop beside it, its antics overhead, their shadows) is inside its box, as the stage's crop holds it;
+   *  true frames it as a portrait (the title card's face, in its chip). */
+  liveFace?: boolean | "whole";
   /** Drawn on the stage's scene (a creature): the canvas is the whole tile, the creature standing on its ground, its eyes
    *  following the pointer over the tile. */
   scene?: boolean;
@@ -133,7 +135,8 @@ function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, 
   // The floating card's creature is the one small face that is drawn live, and sharp (liveFace).
   const drawn = !!scene || (liveFace && state.mood !== "offline");
   const framing = scene ? "scene" : "face";
-  const sharp = liveFace && !scene;
+  const sharp = !!liveFace && !scene;
+  const whole = sharp && liveFace === "whole";
   const slot: Slot = sharp ? "card" : framing;
   const voice = useRef(0), heard = useRef(0);
   useEffect(() => {
@@ -176,7 +179,7 @@ function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, 
     const element = canvas.current;
     if (!drawn || !element || !host) return;
     // Mounted even where the page last found it could not draw: a mount is what tries again (null until it can).
-    const live = host.mountCreature({ seed, canvas: element, framing, sharp, mood: now.current.mood, step: now.current.step, moving: now.current.moving, scene: () => {
+    const live = host.mountCreature({ seed, canvas: element, framing, sharp, whole, mood: now.current.mood, step: now.current.step, moving: now.current.moving, scene: () => {
       // its feet on the figure's, the top of its body at the figure's crown, in the scene's own pixels
       const figure = root.current, sceneBox = figure?.parentElement;
       if (!figure || !sceneBox?.offsetHeight || !figure.offsetHeight) return null;
@@ -189,7 +192,7 @@ function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, 
     return () => { live?.dispose(); creature.current = null; };
     // Its mood, what it has on the go and whether it moves are applied below without building the creature again. It is
     // built again when the page can draw creatures again (canDraw).
-  }, [drawn, seed, framing, sharp, scene, host, canDraw, frame]);
+  }, [drawn, seed, framing, sharp, whole, scene, host, canDraw, frame]);
   useEffect(() => { creature.current?.setMood(mood, { step }); }, [mood, step, drawn, seed, framing, sharp]);
   useEffect(() => { creature.current?.setMoving(moving); }, [moving, drawn, seed, framing, sharp]);
   // A still face: its state's expression (the card's states row, T34), surprised while it has something unread.

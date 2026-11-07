@@ -388,42 +388,60 @@ test("the other formats' state line is the same for a listening agent", () => {
   expect(document.querySelector(".card-heading .card-state")).toHaveAttribute("data-mood", "speaking");
 });
 
-// ---------- the avatar's voice text, centred on the creature (R13) ----------
+// ---------- the avatar's column: its voice text centred on the creature (R13), the creature where it rests ----------
 
-/** The card's layout in jsdom has no boxes: the creature and the voice text get the widths the test says. */
-function boxes(figure: number, voice: number) {
+/** The card's layout in jsdom has no boxes: the creature, the voice text and the compact card get the widths the test says. */
+function boxes(figure: number, voice: number, compact = 300) {
   const width = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get");
   width.mockImplementation(function (this: HTMLElement) {
-    return this.classList.contains("avatar-figure") ? figure : this.classList.contains("avatar-voice") ? voice : 0;
+    return this.classList.contains("avatar-figure") ? figure : this.classList.contains("avatar-voice") ? voice : this.classList.contains("avatar-compact") ? compact : 0;
   });
   return width;
 }
+const column = () => {
+  const card = document.querySelector<HTMLElement>(".avatar-card")!;
+  return { figure: card.style.getPropertyValue("--figure-x"), voice: card.style.getPropertyValue("--voice-x"), compact: card.style.getPropertyValue("--compact-x") };
+};
 
 test.each([["person's pill", speaks], ["agent's balloon", {}]] as const)("just the avatar: the %s is centred on the creature, wider than it and with room all round", (_name, facts) => {
   vi.useFakeTimers();
   const width = boxes(160, 300);
   try {
     page("avatar", { room: { left: 500, right: 500 } }, facts);
-    const card = document.querySelector<HTMLElement>(".avatar-card")!;
-    expect(card.style.getPropertyValue("--voice-shift")).toBe("0px");
+    expect(column()).toEqual({ figure: "70px", voice: "0px", compact: "" });
     expect(document.querySelector(".avatar-voice .vcap")).not.toBeNull();
   } finally { width.mockRestore(); }
 });
 
-test("just the avatar: with the creature near the left edge the voice text slides in by what is missing; near the right edge, the other way", () => {
+test("just the avatar: near an edge the creature keeps its place and the voice text slides in by what is missing; a host that cannot say centres it", () => {
   vi.useFakeTimers();
   const width = boxes(160, 300);
   try {
-    // Centred it would reach 70px past the creature on each side; only 20px of room on the left.
+    // Centred it would reach 70px past the creature on each side; only 20px of room on the left: the window reaches 20 there.
     page("avatar", { room: { left: 20, right: 400 } });
-    expect(document.querySelector<HTMLElement>(".avatar-card")!.style.getPropertyValue("--voice-shift")).toBe("50px");
+    expect(column()).toMatchObject({ figure: "20px", voice: "0px" });
     cleanup();
+    // Against the right edge: nothing past the creature on the right (the app would move the window in, and the creature with it).
     page("avatar", { room: { left: 400, right: 0 } });
-    expect(document.querySelector<HTMLElement>(".avatar-card")!.style.getPropertyValue("--voice-shift")).toBe("-70px");
+    expect(column()).toMatchObject({ figure: "140px", voice: "0px" });
     cleanup();
-    // A host that cannot say: always centred.
     page("avatar");
-    expect(document.querySelector<HTMLElement>(".avatar-card")!.style.getPropertyValue("--voice-shift")).toBe("0px");
+    expect(column()).toMatchObject({ figure: "70px", voice: "0px" });
+  } finally { width.mockRestore(); }
+});
+
+test("just the avatar: the compact card coming out against the right edge sits beside the creature, never moving it", () => {
+  // The operator's report (2026-11-07): docked right, the call's card came out and the creature moved.
+  vi.useFakeTimers();
+  const width = boxes(160, 100);
+  try {
+    page("avatar", { room: { left: 600, right: 0 }, alwaysExpanded: true });
+    expect(expanded()).toBe(true);
+    // The voice text (100px here) centred on the creature, the 300px card flush with its right side: the window grows only to the left.
+    expect(column()).toEqual({ figure: "140px", voice: "170px", compact: "0px" });
+    cleanup();
+    page("avatar", { room: { left: 600, right: 600 }, alwaysExpanded: true });
+    expect(column()).toMatchObject({ figure: "70px", compact: "0px" });
   } finally { width.mockRestore(); }
 });
 
@@ -442,7 +460,7 @@ test("just the avatar: where the creature and its room are narrower than the tex
     page("avatar", { room: { left: 20, right: 20 } });
     const card = document.querySelector<HTMLElement>(".avatar-card")!;
     expect(card.style.getPropertyValue("--voice-max")).toBe("200px");
-    expect(card.style.getPropertyValue("--voice-shift")).toBe("0px");
+    expect(column()).toMatchObject({ figure: "20px", voice: "0px" });
     cleanup();
     // A host that cannot say: no cap.
     page("avatar");

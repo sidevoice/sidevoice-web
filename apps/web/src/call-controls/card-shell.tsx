@@ -106,6 +106,9 @@ export interface CardShell {
   zone: { aim(zone: "none" | "creature" | "card"): void; fold(): void; focusWithin(within: boolean): void };
   /** Runs a command unless the click guard holds it. */
   run(command: CallCommand): void;
+  /** Tells the app again what the card shows, if that changed: for a body that moved inside a window that kept its size (the avatar's
+   *  creature, placed across its column), which no size observer sees. */
+  relayout(): void;
   handlers: {
     onPointerEnter(): void; onPointerLeave(): void;
     onPointerDown(event: ReactPointerEvent<HTMLDivElement>): void; onPointerMove(event: ReactPointerEvent<HTMLDivElement>): void;
@@ -185,6 +188,7 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState, r
 
   // The window is the card's size, margin included: the app sizes (and may move) it to what is shown, so every change
   // of size re-arms the click guard.
+  const relayout = useRef<() => void>(() => {});
   useEffect(() => {
     const element = card.current;
     if (!element) return;
@@ -204,10 +208,11 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState, r
       host.layout({ ...size, ...(cardBox ? { card: cardBox } : {}), ...(resizable ? { resizable } : {}) });
     };
     report();
+    relayout.current = report;
     const observer = new ResizeObserver(report);
     observer.observe(element);
     if (body.current && body.current !== element) observer.observe(body.current);
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); relayout.current = () => {}; };
   }, [host, resizeRule]); // eslint-disable-line react-hooks/exhaustive-deps
   // Appearing is a change too (the pointer may have just come onto the card).
   useEffect(() => { if (expanded) guardUntil.current = Math.max(guardUntil.current, Date.now() + CLICK_GUARD_MS); }, [expanded]);
@@ -272,7 +277,8 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState, r
       if (dragged.current) { event.stopPropagation(); event.preventDefault(); dragged.current = false; }
     },
   };
-  return { card, body, panel, setPanel, expanded, flow, dragging, zone, run, handlers };
+  const relayoutNow = useCallback(() => relayout.current(), []);
+  return { card, body, panel, setPanel, expanded, flow, dragging, zone, run, relayout: relayoutNow, handlers };
 }
 
 /** A device as the card words it: a real device keeps its own name; the system's choice, an unnamed device and a

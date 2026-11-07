@@ -7,7 +7,7 @@ import { JUMP_SETTLE_MS, MessageList, PIN_MS } from "./MessageList";
 import { transcriptBlocks } from "./transcript-blocks";
 
 /* The transcript's behaviour (the creature redesign's T31, T38, T40): following the newest only at the foot, the way
- * back and its dot, the jump pinned to the foot, a long message folded at ten lines, and only what changed drawn again. */
+ * back and its dot, the jump pinned to the foot, a long message folded at 25 lines, and only what changed drawn again. */
 
 const base = new Date(2026, 10, 4, 10, 38).getTime();
 const message = (overrides: Partial<ChatMessage>): ChatMessage => ({ segment: crypto.randomUUID(), thread: "fp|one", session: "call", role: "assistant", text: "Hola", name: "Agente", time: base, ...overrides });
@@ -120,21 +120,24 @@ test("a jump still under way is let go of when the transcript closes: reopened a
 });
 
 /** Lays the transcript out: 300px wide, and each message's text on one line per 40 characters. */
+/** Characters per line of the laid-out text; a test lowers it to stand for a larger text scale. */
+let perLine = 40;
 function layOut() {
+  perLine = 40;
   vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(300);
   const own = HTMLElement.prototype.getClientRects;
   vi.spyOn(HTMLElement.prototype, "getClientRects").mockImplementation(function (this: HTMLElement) {
     if (!this.classList.contains("chat-text")) return own.call(this);
     // Counted unfolded: the fold is lifted while it counts.
     expect(this.hasAttribute("data-fold")).toBe(false);
-    const lines = Math.ceil((this.textContent ?? "").length / 40);
+    const lines = Math.ceil((this.textContent ?? "").length / perLine);
     return Array.from({ length: lines }, (_, i) => ({ top: i * 22, width: 200, height: 22 })) as unknown as DOMRectList;
   });
 }
 
-test("a message past ten lines folds to ten with See more, and See less once open; one of ten lines is whole", () => {
+test("a message past 25 lines folds to 25 with See more, and See less once open; one of 25 lines is whole", () => {
   layOut();
-  const ten = "x".repeat(400), eleven = "y".repeat(401);
+  const ten = "x".repeat(1000), eleven = "y".repeat(1001);
   render(<MessageList conversation={view([message({ segment: "ten", text: ten }), message({ segment: "eleven", text: eleven, time: base + 1_000 })])} />);
   const [first, second] = document.querySelectorAll<HTMLElement>(".chat-text");
   expect(first).not.toHaveAttribute("data-fold");
@@ -149,9 +152,9 @@ test("a message past ten lines folds to ten with See more, and See less once ope
   expect(second.parentElement!.querySelector(".see-more + .chat-meta")).not.toBeNull();
 });
 
-test("a 9-line message shows no See more, a 30-line one does, folded to the one value", () => {
+test("a 24-line message shows no See more, a 30-line one does, folded to the one value", () => {
   layOut();
-  render(<MessageList conversation={view([message({ segment: "nine", text: "a".repeat(360) }), message({ segment: "thirty", text: "b".repeat(1200), time: base + 1_000 })])} />);
+  render(<MessageList conversation={view([message({ segment: "nine", text: "a".repeat(960) }), message({ segment: "thirty", text: "b".repeat(1200), time: base + 1_000 })])} />);
   const [nine, thirty] = document.querySelectorAll<HTMLElement>(".chat-text");
   expect(nine).not.toHaveAttribute("data-fold");
   expect(thirty).toHaveAttribute("data-fold", "folded");
@@ -159,15 +162,36 @@ test("a 9-line message shows no See more, a 30-line one does, folded to the one 
   expect(screen.getAllByRole("button", { name: "See more" })).toHaveLength(1);
 });
 
+test("a text scale change (no new text, no new width) counts the lines again: a 24-line message folds at 2x and unfolds when scaled back", () => {
+  layOut();
+  const observers: Array<() => void> = [];
+  vi.stubGlobal("ResizeObserver", class { constructor(callback: () => void) { observers.push(callback); } observe() {} disconnect() {} unobserve() {} });
+  render(<MessageList conversation={view([message({ segment: "scaled", text: "s".repeat(960) })])} />);
+  const text = () => document.querySelector<HTMLElement>(".chat-text")!;
+  expect(text()).not.toHaveAttribute("data-fold");
+  expect(screen.queryByRole("button", { name: "See more" })).toBeNull();
+  // Text twice the size: half the characters to a line, 48 lines. Only the box resized.
+  perLine = 20;
+  act(() => observers.forEach((callback) => callback()));
+  expect(text()).toHaveAttribute("data-fold", "folded");
+  expect(screen.getByRole("button", { name: "See more" })).toBeInTheDocument();
+  // Scaled back down: 24 lines again, no fold.
+  perLine = 40;
+  act(() => observers.forEach((callback) => callback()));
+  expect(text()).not.toHaveAttribute("data-fold");
+  expect(screen.queryByRole("button", { name: "See more" })).toBeNull();
+  vi.unstubAllGlobals();
+});
+
 test("a long reply is whole while it is said, its words lit as it goes, and folds once it is over", () => {
   layOut();
-  const long = "z".repeat(600);
+  const long = "z".repeat(1200);
   const { rerender } = render(<MessageList conversation={view([message({ segment: "now", text: long, playback: "playing", karaoke: { from: 0, to: 120 } })])} />);
   expect(document.querySelector(".chat-text")).not.toHaveAttribute("data-fold");
   expect(screen.queryByRole("button", { name: "See more" })).toBeNull();
   // Said, it has no time yet; over, it has its time and folds.
   expect(document.querySelector(".chat-meta")).toBeNull();
-  rerender(<MessageList conversation={view([message({ segment: "now", text: long, playback: "complete", hearing: "heard", heard_chars: 600 })])} />);
+  rerender(<MessageList conversation={view([message({ segment: "now", text: long, playback: "complete", hearing: "heard", heard_chars: 1200 })])} />);
   expect(document.querySelector(".chat-text")).toHaveAttribute("data-fold", "folded");
   expect(document.querySelector(".chat-meta time")).not.toBeNull();
 });

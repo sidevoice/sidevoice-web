@@ -16,7 +16,7 @@
  * (state/captions.ts, shared with the room's call bar). What opens from the card (captions, lists) opens toward the
  * screen's middle (`place`). The room's components draw on the card's own store (card-room.ts); the host's state and the
  * plumbing are card-shell.tsx. */
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { CaptionsIcon, CaptionsOffIcon, ChevronIcon, CloseIcon, ConversationsIcon, HangupIcon, HarnessIcon, MachinesIcon, MicrophoneIcon,
   MicrophoneOffIcon, OpenAppIcon, SettingsIcon, SkipIcon, StateGlyph, type StateGlyphKind } from "../components/ui/Icons";
 import { ConversationPicker, DevicePicker, useCardShell, useHostState, useWave, type CardShell } from "./card-shell";
@@ -37,7 +37,7 @@ import type { Translate } from "../i18n/translator";
 
 export { CARD_MARGIN, CLICK_GUARD_MS, DRAG_THRESHOLD_PX, HIDE_DELAY_MS, PANEL_CLOSE_MS, SHOW_DELAY_MS, WAVE_SAMPLE_MS, duration } from "./card-shell";
 import { CARD_MARGIN } from "./card-shell";
-import { voiceMax, voiceShift } from "./voice-centre";
+import { avatarColumn, voiceMax } from "./voice-centre";
 
 type Place = NonNullable<CallControlsState["place"]>;
 const UPPER_RIGHT: Place = { vertical: "upper", horizontal: "right" };
@@ -148,7 +148,8 @@ function CardFigure({ state, size, label }: { state: CallControlsState; size: "s
   const avatars = useConversationAvatars();
   const avatar = useConversationAvatar(agent.threadId);
   useMovingCopy(agent.threadId);
-  return <CharacterAvatar spec={agent.spec} state={avatar} size={size} mouth="playback" label={label} live liveFace
+  // The avatar's creature stands on nothing: framed whole, so no act it plays is cut at its box's edge. The title card's is a face in its chip.
+  return <CharacterAvatar spec={agent.spec} state={avatar} size={size} mouth="playback" label={label} live liveFace={size === "stage" ? "whole" : true}
     mouthLevel={agent.threadId ? avatars.mouth(agent.threadId) : undefined} />;
 }
 
@@ -332,6 +333,10 @@ function inHull(root: HTMLElement | null, event: { clientX: number; clientY: num
     && event.clientY >= Math.min(...boxes.map((box) => box.top)) - HULL_PX && event.clientY <= Math.max(...boxes.map((box) => box.bottom)) + HULL_PX;
 }
 
+/** A box's laid-out width, its fractions kept (a text is rarely whole pixels wide); its offsetWidth where nothing is laid out (a test's
+ *  DOM). Never a transform's: the voice cards pop in scaled, the boxes round them do not. */
+const widthOf = (element: HTMLElement) => parseFloat(getComputedStyle(element).width) || element.offsetWidth;
+
 function AvatarCard({ state, shell, t }: { state: CallControlsState; shell: CardShell; t: Translate }) {
   const captions = useCaptions();
   const [voiceUp, setVoiceUp] = useState(false);
@@ -344,27 +349,38 @@ function AvatarCard({ state, shell, t }: { state: CallControlsState; shell: Card
   // Whether a voice card is out, for the stack to take room only then (the window is the creature's box at rest), and, where
   // the voice text opens below, how far it reaches (--voice-reach, from the creature's feet): the compact card goes just past
   // it while the window counts its whole room (call-card.css), so a card coming or going never moves the creature.
-  useEffect(() => {
+  // And where each piece sits across the column (avatarColumn): the creature where the window reaches no further past it on a side than
+  // the room the app says there is, so the app never has to move the window in, and the creature with it; the voice text and the
+  // compact card centred on it as far as the column allows. Laid out before paint, so no frame shows them elsewhere.
+  const { flow, relayout } = shell;
+  useLayoutEffect(() => {
     const node = voice.current, card = root.current;
-    if (!node || !card) return;
+    const figure = card?.querySelector<HTMLElement>(".avatar-figure"), compact = card?.querySelector<HTMLElement>(".avatar-compact");
+    if (!card || !figure) return;
     const read = () => {
-      const out = !!node.querySelector(".vcap");
+      const out = !!node?.querySelector(".vcap");
       setVoiceUp(out);
-      const figure = card.querySelector<HTMLElement>(".avatar-figure");
-      card.style.setProperty("--voice-reach", out && figure ? node.getBoundingClientRect().bottom - figure.getBoundingClientRect().bottom + "px" : "0px");
-      // Centred on the creature, inside the room it has to the screen's sides; the margins keep the window holding the text.
-      // Where even the whole room is narrower than the text, the text wraps to it (--voice-max) before it is placed.
-      const limit = out && figure ? voiceMax(figure.offsetWidth, room) : null;
+      card.style.setProperty("--voice-reach", out && node ? node.getBoundingClientRect().bottom - figure.getBoundingClientRect().bottom + "px" : "0px");
+      // Where even the whole room is narrower than the text, the text wraps to it (--voice-max) before it is measured and placed.
+      const limit = out ? voiceMax(figure.offsetWidth, room) : null;
       if (limit === null) card.style.removeProperty("--voice-max"); else card.style.setProperty("--voice-max", limit + "px");
-      const shift = out && figure ? voiceShift(node.offsetWidth, figure.offsetWidth, room) : 0;
-      card.style.setProperty("--voice-shift", shift + "px");
+      const pieces: Array<[HTMLElement, string]> = [];
+      if (out && node) pieces.push([node, "--voice-x"]);
+      // The compact card counts only while it is in the window's flow (folded, it is clipped inside the creature's box).
+      if (flow && compact) pieces.push([compact, "--compact-x"]);
+      const column = avatarColumn(widthOf(figure), pieces.map(([piece]) => widthOf(piece)), room);
+      card.style.setProperty("--figure-x", column.figure + "px");
+      pieces.forEach(([, name], i) => card.style.setProperty(name, column.pieces[i] + "px"));
+      for (const name of ["--voice-x", "--compact-x"]) if (!pieces.some(([, piece]) => piece === name)) card.style.removeProperty(name);
+      // The creature may have moved across a window that kept its size: the app is told where it is now.
+      relayout();
     };
     read();
     const mutations = new MutationObserver(read), sizes = new ResizeObserver(read);
-    mutations.observe(node, { childList: true, subtree: true });
-    sizes.observe(node);
+    if (node) mutations.observe(node, { childList: true, subtree: true });
+    for (const piece of [node, figure, compact]) if (piece) sizes.observe(piece);
     return () => { mutations.disconnect(); sizes.disconnect(); };
-  }, [captions, room?.left, room?.right]);
+  }, [captions, room?.left, room?.right, flow, relayout]);
   // Tab reaching the card (it is there while folded) opens it; Escape, with focus in it or nowhere, folds it and blurs.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

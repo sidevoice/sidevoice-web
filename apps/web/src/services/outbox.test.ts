@@ -122,10 +122,10 @@ test("a database that cannot be opened leaves the outbox working in memory", asy
   expect(other.size).toBe(1);
 });
 
-test("a message unacknowledged on an open socket waits 5 s, 10 s, 20 s, 40 s and then a minute before it is said again", () => {
-  expect(RESEND_BACKOFF_MS).toEqual([5000, 10000, 20000, 40000, 60000]);
-  expect([1, 2, 3, 4, 5, 6, 50].map(resendDelay)).toEqual([5000, 10000, 20000, 40000, 60000, 60000, 60000]);
-  expect(resendDelay(0)).toBe(5000);
+test("a message unacknowledged on an open socket waits 1 s, 2 s, 5 s, 10 s and then 15 s, steadily, before it is said again", () => {
+  expect(RESEND_BACKOFF_MS).toEqual([1000, 2000, 5000, 10000, 15000]);
+  expect([1, 2, 3, 4, 5, 6, 50].map(resendDelay)).toEqual([1000, 2000, 5000, 10000, 15000, 15000, 15000]);
+  expect(resendDelay(0)).toBe(1000);
 });
 
 test("what is added while the store loads goes after what it kept, even in the same millisecond", async () => {

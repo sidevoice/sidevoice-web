@@ -74,6 +74,11 @@ const STARTLE = { expr: "surprised", hop: 1.1, secs: 0.55 } as const;
 export const SCENE_ZOOM = 1.32;
 /** The face render (creator.js renderFace): fitted, stepped back and aimed a little higher, so a hat or ears fit. */
 const FACE = { fit: true, zoom: 1.5, lookY: 0.22 } as const;
+/** A sharp face that stands on nothing (the floating card's avatar, `whole`): the face render stepped back further and aimed higher,
+ *  so that every act it plays, its props beside it on the floor, its antics overhead and the shadows they cast, is inside its square.
+ *  The acts keep inside the reference creator's frame (acts.js ZOOM), which is wider than the face render's: at FACE a boombox, a
+ *  splash or the busy cogs reach past the canvas's edges (acts-fit.test.ts measures every act's widest frame against both). */
+export const WHOLE_FACE = { fit: true, zoom: 1.8, lookY: 0.4 } as const;
 /** The face canvas's height, as the creator's. The stage's canvas is as large as the tile shows (quality.ts sceneSize). */
 const FACE_PX = 144;
 /** A sharp live face's canvas: its box in device pixels, within these (the stage draws exactly as many pixels as it shows). */
@@ -297,6 +302,11 @@ const clamp = (v: number) => Math.max(-1, Math.min(1, v));
 /** The scene canvas's crop (cropFor): the creature's reach is taken at CROP_MARGIN of its measure, plus CROP_PAD_PX css px, in whole
  *  1/CROP_STEPS of the tile's width; a crop that would be more than CROP_WHOLE of it is the whole tile. */
 const CROP_MARGIN = 1.1, CROP_PAD_PX = 14, CROP_STEPS = 64, CROP_WHOLE = 0.9;
+/** The share of a tile `fullW` css px wide that the scene canvas takes for a creature reaching `reach` css px from its middle (cropFor). */
+export function cropShare(reach: number, fullW: number): number {
+  const share = Math.ceil((2 * (reach * CROP_MARGIN + CROP_PAD_PX) / fullW) * CROP_STEPS) / CROP_STEPS;
+  return share > CROP_WHOLE ? 1 : share;
+}
 const GAZE_IN = 0.35, GAZE_HOLD = 0.4, GAZE_OUT = 0.8;
 
 export interface LiveOptions {
@@ -323,6 +333,8 @@ export interface LiveOptions {
   moving?: boolean;
   /** A face drawn sharp: on the "card" stage, its canvas as many device pixels as its box (the floating card's creature). */
   sharp?: boolean;
+  /** A sharp face framed whole (WHOLE_FACE): everything it acts out inside its square, not cut as a portrait's is. */
+  whole?: boolean;
 }
 
 const slotOf = ({ framing, sharp }: Pick<LiveOptions, "framing" | "sharp">): Slot => (framing === "face" && sharp ? "card" : framing);
@@ -377,7 +389,7 @@ export class LiveCreature {
     this.stage = stage;
     this.slot = slotOf(opts);
     const face = opts.framing === "face";
-    this.item = stage.add(rigSpec(opts.choice ?? creatureFromSeed(opts.seed)), opts.canvas, face ? { ...FACE, off: 0 } : { turn: 0, off: 0 });
+    this.item = stage.add(rigSpec(opts.choice ?? creatureFromSeed(opts.seed)), opts.canvas, face ? { ...(opts.sharp && opts.whole ? WHOLE_FACE : FACE), off: 0 } : { turn: 0, off: 0 });
     this.moving = opts.moving ?? true; // (before the first fit: a held creature is sized at a phone's pixels)
     this.fit();
     if (opts.frame && !face) {
@@ -448,9 +460,7 @@ export class LiveCreature {
   private cropFor(fullW: number, h: number): number {
     if (!this.framer || !this.desktop() || !(fullW > 0 && h > 0)) return 1;
     const reach = this.framer.reach(fullW, h); // css px from the middle, or null while it is being measured
-    if (reach == null) return 1;
-    const share = Math.ceil((2 * (reach * CROP_MARGIN + CROP_PAD_PX) / fullW) * CROP_STEPS) / CROP_STEPS;
-    return share > CROP_WHOLE ? 1 : share;
+    return reach == null ? 1 : cropShare(reach, fullW);
   }
 
   /** Lays the canvas out at the share cropFor says (a custom property styles/call.css reads); whether that changed. */

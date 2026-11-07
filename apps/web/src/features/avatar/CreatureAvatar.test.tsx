@@ -152,7 +152,7 @@ test("the floating card's creature (liveFace) is a live, sharp face on the card 
   expect(host.faces).toHaveLength(0);
   expect(host.lives).toHaveLength(1);
   const [live] = host.lives;
-  expect(live.opts).toMatchObject({ seed: "t-login", framing: "face", sharp: true, mood: "working", moving: true, step: { work: "hammer" } });
+  expect(live.opts).toMatchObject({ seed: "t-login", framing: "face", sharp: true, whole: false, mood: "working", moving: true, step: { work: "hammer" } });
   expect(view.container.firstElementChild).toHaveAttribute("data-framing", "face");
   view.rerender(<CharacterAvatar spec={spec} state={state("speaking")} size="small" live liveFace mouth="playback" />);
   await settle();
@@ -165,6 +165,13 @@ test("the floating card's creature (liveFace) is a live, sharp face on the card 
   expect(host.faces).toHaveLength(0);
   view.unmount();
   expect(live.disposed).toBe(true);
+});
+
+test("the floating card's avatar (liveFace \"whole\") is framed whole: every act it plays inside its box (host.ts WHOLE_FACE); the title card's face is a portrait", async () => {
+  const view = render(<CharacterAvatar spec={spec} state={state("idle")} size="stage" live liveFace="whole" mouth="playback" />);
+  await settle();
+  expect(host.lives.at(-1)!.opts).toMatchObject({ framing: "face", sharp: true, whole: true });
+  view.unmount();
 });
 
 test("the floating card's offline creature (liveFace) is its still grey face: drawn once, no live creature mounted and no frames asked for; back online it is live again", async () => {
