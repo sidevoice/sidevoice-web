@@ -986,6 +986,7 @@ export const messages: Messages = {
   "settings.shortcuts.headsetOneTurn": "한 마디 하기",
   "settings.shortcuts.headsetSkip": "재생 중인 내용 건너뛰기",
   "settings.shortcuts.headsetNone": "없음",
+  "settings.shortcuts.headsetFixed": "통화 중 헤드셋 버튼이에요(헤드셋이 지원하는 경우). 이 기기에서는 이 동작만 해요.",
   "settings.shortcuts.headsetSystem": "통화 중에는 시스템이 헤드셋 버튼을 처리해서 음소거해요. 이 선택은 적용되지 않아요.",
   "settings.shortcuts.headsetCard": "기본값에서는 헤드셋 버튼이 시스템을 통해 음소거해요. 다른 동작을 선택하면 잠금 화면에 재생 카드가 추가돼요.",
   "settings.shortcuts.record": "단축키 기록",
