@@ -143,7 +143,8 @@ export function keycap(key: string): string {
   return layoutGlyphs?.get(key) ?? KEYCAPS[key] ?? key;
 }
 
-export const isFunctionKey = (key: string) => /^F\d{1,2}$/.test(key);
+/** F1 to F24, the F-keys the app registers (a Mac has F1 to F20; the others it never sends). */
+export const isFunctionKey = (key: string) => /^F([1-9]|1\d|2[0-4])$/.test(key);
 
 /** Whether a combination may be a global shortcut: a modifier, or an F-key. A key on its own would be taken from every app. */
 export function globalAllowed(accelerator: string): boolean {
