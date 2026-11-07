@@ -7,6 +7,7 @@ import { PersonTurn } from "../call/PersonTurn";
 import { voiceType } from "../avatar/creature/stage-frame";
 import type { ConversationView } from "../../state/room-types";
 import { translator } from "../../i18n/translator";
+import { CancelTurn } from "./MessageBubble";
 
 /* The person's open turn, one component (TurnPill) at every place that shows it. The stage's copy is drawn by PersonTurn
  * (the stage's card look), the transcript's by MessageGroup's live row (OpenTurn): both rendered here as the app renders
@@ -55,9 +56,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** TurnPill on the transcript's surface (the class OpenTurn gives it), fed a level so its bars follow it. */
+/** TurnPill as the transcript draws it (OpenTurn: its class, and the × that takes the turn back), fed a level so its bars
+ *  follow it. The transcript's column is 320px wide, and the pill keeps to its content inside it. */
 export const Playground: Story = {
-  render: (args) => <div className="transcript"><TurnPill {...args} className="chat-bubble" data-role="user" level={speech} /></div>,
+  args: { cancellable: true } as never,
+  argTypes: { cancellable: { control: "boolean", description: "Catalogue only: whether the × (CancelTurn) is given as `action`." } } as never,
+  render: ({ cancellable, ...args }: Parameters<typeof TurnPill>[0] & { cancellable?: boolean }) => (
+    <div className="transcript" style={{ width: 320, display: "grid", justifyItems: "end" }}>
+      <TurnPill {...args} className="chat-bubble" data-role="user" level={speech} action={cancellable ? <CancelTurn /> : undefined} />
+    </div>
+  ),
 };
 
 /** The two copies the audit flagged (DUPLICATES §1), now one component: the stage's pill and the transcript's, in each phase,

@@ -1,5 +1,8 @@
 /* The catalogue's own frame, not the product's: a column per theme, each painted with its own tokens. */
-body { margin: 0; }
+/* The app's page is a fixed shell that never scrolls (app.css: body overflow hidden, #root 100dvh); a story page scrolls. */
+html, body { height: auto; overflow: auto; }
+body { margin: 0; -webkit-user-select: text; user-select: text; }
+#storybook-root, #storybook-docs { height: auto; max-height: none; overflow: visible; }
 .catalogue-column { min-height: 100%; padding: 16px; background: var(--sv-bg); color: var(--sv-text); font-family: var(--sv-font-sans); }
 .catalogue-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); min-height: 100vh; }
 .sb-show-main.sb-main-padded { padding: 0; }

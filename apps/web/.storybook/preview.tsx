@@ -76,7 +76,7 @@ const preview: Preview = {
     backgrounds: { disable: true },
     a11y: { test: "todo" },
     options: {
-      storySort: { order: ["Foundations", ["Colour", "Type", "Spacing", "Radii", "Icons", "Motion"], "Primitives", "Product"] },
+      storySort: { order: ["Overview", "Foundations", ["Colour", "Type", "Spacing", "Radii", "Icons", "Motion"], "Primitives", "Product"] },
     },
   },
   tags: ["autodocs"],
