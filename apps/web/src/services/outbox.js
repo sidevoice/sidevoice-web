@@ -46,11 +46,14 @@ export function createOutbox({ scope = 'page', indexedDB = globalThis.indexedDB,
             request.onupgradeneeded = () => { try { request.result.createObjectStore(STORE, { keyPath: 'id' }); } catch { /* already there */ } };
             request.onerror = () => done();
             request.onsuccess = () => {
-                db = request.result;
+                // `db` is set only once the stored maximum of `order` is known (below): an entry added before that stays in memory, so
+                // none is ever stored under an order that restarted at 1 and sorts before an older stored one after a crash.
+                const opened = request.result;
                 let read;
-                try { read = db.transaction(STORE, 'readonly').objectStore(STORE).getAll(); } catch { done(); return; }
-                read.onerror = () => done();
+                try { read = opened.transaction(STORE, 'readonly').objectStore(STORE).getAll(); } catch { db = opened; done(); return; }
+                read.onerror = () => { db = opened; done(); };
                 read.onsuccess = () => {
+                    db = opened;
                     const others = [], earlier = new Set(entries.keys());
                     for (const stored of read.result || []) {
                         if (stored?.id == null) continue;

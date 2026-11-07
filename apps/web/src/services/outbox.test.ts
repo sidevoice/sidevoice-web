@@ -145,3 +145,24 @@ test("order alone ranks entries: a clock that moved back never puts a new one be
   box.add(entry("new"));
   expect(box.list().map((e) => e.id)).toEqual(["kept", "new"]);
 });
+
+test("nothing is stored under an order that restarted: an entry added before the stored maximum is read stays in memory", async () => {
+  const puts: Array<{ id: string; order: number }> = [];
+  let release = () => {};
+  const old = { id: "old", scope: "page", kind: "user-turn", session_id: "s", node: "mac", payload: {}, created: 1, order: 5 };
+  const store = {
+    put(value: { id: string; order: number }) { puts.push({ id: value.id, order: value.order }); },
+    delete() {},
+    getAll() { const request: { result?: unknown[]; onsuccess?: () => void } = {}; release = () => { request.result = [old]; request.onsuccess?.(); }; return request; },
+  };
+  const db = { createObjectStore() {}, transaction: () => ({ objectStore: () => store }) };
+  const factory = { open() { const request: { result?: unknown; onsuccess?: () => void } = {}; setTimeout(() => { request.result = db; request.onsuccess?.(); }, 0); return request; } } as unknown as IDBFactory;
+  const box = createOutbox({ indexedDB: factory, now: () => 1000 });
+  await new Promise((resolve) => setTimeout(resolve, 5));   // the database is open, the stored entries are not read yet
+  box.add(entry("new"));
+  expect(puts).toEqual([]);   // a crash here must not leave "new" stored under order 1
+  release();
+  await box.ready;
+  expect(box.list().map((e) => e.id)).toEqual(["old", "new"]);
+  expect(puts.find((put) => put.id === "new")!.order).toBeGreaterThan(5);
+});

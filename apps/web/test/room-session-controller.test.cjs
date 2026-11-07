@@ -5013,3 +5013,46 @@ test('A turn let go of an older one that waited for another machine lets the tex
  assert.deepEqual(plain(delivered),['after'],'and the text is not stuck behind it');
  s.run('disconnect()');
 });
+test('A text posted straight to the room that hangs does not hold the turns for ever: its time is up, and a hang-up lets go of it',async()=>{
+ const fake=new Map();
+ const c=await callOnRoom({timers:(fn,ms,...rest)=>{if(ms>60000)return setTimeout(fn,ms,...rest);const handle={ms};fake.set(handle,fn);return handle},clearTimers:fake});
+ const {s,voice,first}=c;
+ s.context.fetch=async(path,options)=>{if(options?.method==='POST'&&path.includes('/api/presentation/text'))await new Promise(()=>{});return {ok:true,status:200,json:async()=>({messages:[],participants:[]})}};
+ s.run("outboxReady=true");
+ s.run("$('text-message').value='hello'");
+ void s.dispatch('submit',{target:s.run("$('text-composer')")});
+ await settleSoon();
+ assert.equal(s.run('directBarrier.size'),1);
+ voice.emit('turn',started('w'));voice.emit('turn',finished('w','spoken'));
+ assert.equal(sentOf(c,first,'voice-user-turn').length,0,'behind the text');
+ const limit=s.run('DIRECT_TEXT_MS');
+ const [handle,fn]=[...fake].find(([h])=>h.ms===limit);fake.delete(handle);fn();
+ assert.equal(sentOf(c,first,'voice-user-turn').length,2,'its time is up: the turn goes');
+ s.run("directBarrier.add({})");
+ s.run('disconnect()');
+ assert.equal(s.run('directBarrier.size'),0,'a hang-up lets go of them all');
+});
+test('A text the room did not take waits for its backoff, and an answer of an earlier socket arms nothing',async()=>{
+ const c=await callOnRoom();const {s}=c;
+ let calls=0,answer='later',hold=null;
+ s.context.__deliver=entry=>{calls++;return hold?new Promise(resolve=>{hold=resolve}):Promise.resolve(answer)};
+ s.run("deliverText=__deliver;refreshHistory=async()=>{}");
+ let now=9_000_000;s.run('resendClock=()=>'+now);
+ s.run("keepMessage('text','text',{thread:'a',text:'later'});flushOutbox()");
+ await settleSoon();await settleSoon();
+ assert.equal(calls,1);
+ s.run('flushOutbox()');s.run('flushOutbox()');await settleSoon();
+ assert.equal(calls,1,'any other flush before the backoff is up does not try again');
+ now+=5000;s.run('resendClock=()=>'+now);
+ s.run('flushOutbox()');await settleSoon();await settleSoon();
+ assert.equal(calls,2,'once it is up, it does');
+ // An answer that arrives after a new socket (or a leave) arms no timer of the old call.
+ s.run('resetTextBackoff()');hold=true;now+=60000;s.run('resendClock=()=>'+now);
+ s.run('flushOutbox()');await settleSoon();
+ assert.equal(calls,3,'in flight');
+ s.run('resetTextBackoff()');
+ hold("later");hold=null;
+ await settleSoon();
+ assert.equal(s.run('textTimer'),null,'nothing armed by the old answer');
+ s.run('disconnect()');
+});

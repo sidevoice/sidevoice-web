@@ -661,7 +661,10 @@ let outboxHold=null;
 // The page's clock for the resend backoff, and the one timer that wakes the outbox when its oldest entry is due again.
 let resendClock=()=>Date.now(),resendTimer=null,textTimer=null,textTries=0;
 // A text posted straight to the room, still on its way: it is a text ahead of every turn said meanwhile.
-let directTexts=0;
+// Each is bounded: a request that hangs lets go after DIRECT_TEXT_MS, and a hang-up or a move lets go of all of them.
+const directBarrier=new Set();let DIRECT_TEXT_MS=30000;
+// When the texts' backoff is up, and a count that makes a request of an earlier session or socket ignored when it answers.
+let textDue=0,textGen=0;
 function armResend(socket){
  clearTimeout(resendTimer);resendTimer=null;
  // The oldest entry said on this socket: one still held (a turn the room had no room for) never keeps a later one from its retry.
@@ -686,7 +689,7 @@ function flushOutbox(socket=state.ws){
  for(let again=true;again;){
   again=false;
   // A text and the turns are one order: a turn written after a text waits until the text is taken (it is kept until then).
-  let textAhead=directTexts>0;
+  let textAhead=directBarrier.size>0;
   for(const entry of outbox.list()){
    if(entry.kind==='text'){textAhead=true;continue}
    if(textAhead&&entry.kind==='user-turn')continue;
@@ -911,7 +914,8 @@ function queueText(viewed,text){
  add('user',text,null,viewed,{history_id:'queued:'+entry.id,draft:false,delivery:'pending'});
 }
 // The text backoff belongs to the texts that wait: with none left, or on a new socket, it starts again.
-function resetTextBackoff(){clearTimeout(textTimer);textTimer=null;textTries=0}
+function clearDirectTexts(){for(const direct of directBarrier)clearTimeout(direct.timer);directBarrier.clear()}
+function resetTextBackoff(){clearTimeout(textTimer);textTimer=null;textTries=0;textDue=0;textGen++}
 function failTexts(which=()=>true){
  const gone=queuedTexts().filter(which);
  for(const entry of gone)outbox.remove(entry.id);
@@ -934,7 +938,7 @@ async function deliverText(entry){
 // Oldest first, one at a time, and only on the conversation each was written for, once the call is on the room with it chosen.
 let flushingTexts=false;
 async function flushTexts(){
- if(flushingTexts||directTexts>0||!queuedTexts().length)return;
+ if(flushingTexts||directBarrier.size>0||!queuedTexts().length||resendClock()<textDue)return;
  flushingTexts=true;
  let sent=false,failed=false;
  try{
@@ -949,8 +953,11 @@ async function flushTexts(){
    // A turn said before this text goes first, and is taken (acknowledged) before the text follows it.
    {const kept=outbox.list();if(kept.some((other,at)=>other.kind==='user-turn'&&at<kept.indexOf(entry)))break}
    if(outboxHold||!socket||socket.readyState!==WebSocket.OPEN||socket.session!==state.sessionId||state.roomBinding?.thread_id!==entry.payload.data.thread)break;
-   const answer=await deliverText(entry);
-   if(answer==='later'){clearTimeout(textTimer);textTimer=setTimeout(()=>{textTimer=null;flushOutbox()},resendDelay(++textTries));break}
+   const gen=textGen,answer=await deliverText(entry);
+   if(answer==='later'){
+    // An answer of an earlier session or socket (a hang-up, a move, a new socket meanwhile) arms nothing.
+    if(gen!==textGen)break;
+    clearTimeout(textTimer);const wait=resendDelay(++textTries);textDue=resendClock()+wait;textTimer=setTimeout(()=>{textTimer=null;flushOutbox()},wait);break}
    textTries=0;
    if(answer==='refused'){failTexts(item=>item===entry);failed=true;continue}
    outbox.remove(entry.id);sent=true;
@@ -962,7 +969,7 @@ async function flushTexts(){
  if(!queuedTexts().length)resetTextBackoff();
  if(sent||failed)flushOutbox();
 }
-async function sendText(){personSignal();const input=$('text-message'),text=input?.value;if(text==null)return;let viewed=composerFor();if(state.textSending||!text.trim()||!viewed)return;syncRemovals();if(removalsOpen(conversationOf(viewed).node)){state.textSending=true;updateComposer();try{await removalGate(conversationOf(viewed).node)}finally{state.textSending=false}if(composerFor()!==viewed||input.value!==text){updateComposer();return}}if(removing(conversationOf(viewed).node,conversationOf(viewed).thread)){updateComposer();return}if(!takesTextNow(viewed)){queueText(viewed,text);input.value='';updateComposer();return}const destination=targetThread(),key=JSON.stringify([state.sessionId,targetId(),text]);if(textAttempt?.key!==key)textAttempt={key,id:crypto.randomUUID()};const attempt=textAttempt;state.textSending=true;directTexts++;updateComposer();setRoomError('');try{await post('/api/presentation/text',{text,thread_id:destination,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:attempt.id});if(input.value===text)input.value='';if(textAttempt===attempt)textAttempt=null;await refreshHistory(state.callNode)}catch(e){setRoomError(roomError(e,'room',bundled('room.failure.textNotSent').text))}finally{state.textSending=false;directTexts--;updateComposer();flushOutbox()}}
+async function sendText(){personSignal();const input=$('text-message'),text=input?.value;if(text==null)return;let viewed=composerFor();if(state.textSending||!text.trim()||!viewed)return;syncRemovals();if(removalsOpen(conversationOf(viewed).node)){state.textSending=true;updateComposer();try{await removalGate(conversationOf(viewed).node)}finally{state.textSending=false}if(composerFor()!==viewed||input.value!==text){updateComposer();return}}if(removing(conversationOf(viewed).node,conversationOf(viewed).thread)){updateComposer();return}if(!takesTextNow(viewed)){queueText(viewed,text);input.value='';updateComposer();return}const destination=targetThread(),key=JSON.stringify([state.sessionId,targetId(),text]);if(textAttempt?.key!==key)textAttempt={key,id:crypto.randomUUID()};const attempt=textAttempt;state.textSending=true;const direct={};directBarrier.add(direct);direct.timer=setTimeout(()=>{if(directBarrier.delete(direct))flushOutbox()},DIRECT_TEXT_MS);updateComposer();setRoomError('');try{await post('/api/presentation/text',{text,thread_id:destination,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:attempt.id});if(input.value===text)input.value='';if(textAttempt===attempt)textAttempt=null;await refreshHistory(state.callNode)}catch(e){setRoomError(roomError(e,'room',bundled('room.failure.textNotSent').text))}finally{state.textSending=false;clearTimeout(direct.timer);directBarrier.delete(direct);updateComposer();flushOutbox()}}
 // Taken where they bubble to, not on the box itself, so a box mounted after this runs sends too.
 document.addEventListener('submit',event=>{if(event.target?.id!=='text-composer')return;event.preventDefault();return sendText()});
 document.addEventListener('keydown',event=>{if(event.target?.id==='text-message'&&event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();$('text-composer')?.requestSubmit()}});
@@ -2247,7 +2254,7 @@ function disconnect() {
     // A hang-up ends what the call still owed its session; text that never reached it is left as unsent.
     failTexts();
     outbox.clear();
-    clearTimeout(resendTimer);resendTimer=null;resetTextBackoff();
+    clearTimeout(resendTimer);resendTimer=null;resetTextBackoff();clearDirectTexts();
     writtenHearing.clear();
     clearTurnLifecycle();
     resumeToken = null;
@@ -2605,7 +2612,7 @@ async function drainOutbox(node,ms,mine){
 }
 // The call's session ends, its voice does not: the socket is closed as a hang-up, and nothing of that session stays.
 function leaveSession(){
- clearTimeout(resendTimer);resendTimer=null;resetTextBackoff();
+ clearTimeout(resendTimer);resendTimer=null;resetTextBackoff();clearDirectTexts();
  clearLeaving();
  // A select on its way is the session left's: the move owns `switching` now.
  pick.op=null;
