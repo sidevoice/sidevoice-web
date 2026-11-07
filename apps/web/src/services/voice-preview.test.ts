@@ -49,8 +49,8 @@ test("speech languages without a full interface bundle still use matching exampl
   });
 });
 
-test("a Korean-only voice never receives an English fallback sample or an unsupported English locale", () => {
-  expect(voicePreview(settings, catalogs(["ko"], []), "en")).toEqual({ language: "ko", sample: "" });
+test("a voice in a language with no catalogue never receives an English fallback sample or an unsupported English locale", () => {
+  expect(voicePreview(settings, catalogs(["vi"], []), "en")).toEqual({ language: "vi", sample: "" });
 });
 
 test("the interface language's sample is the default when the voice speaks it, else the voice's own language", () => {
@@ -62,4 +62,12 @@ test("the interface language's sample is the default when the voice speaks it, e
   expect(voicePreview(chosen, multi, "en", "de").language).toBe("en");
   const dora = { ...chosen, tts: { ...chosen.tts, voice: "ef_dora" } };
   expect(voicePreview(dora, catalogs(["es"], [{ id: "ef_dora", languages: ["es"] }]), "en", "fr").language).toBe("es");
+});
+
+test("a voice in Portuguese, Korean or Hindi is previewed with that language's own sample", () => {
+  for (const [tag, ui] of [["pt", "pt-BR"], ["pt-PT", "pt-BR"], ["ko", "ko"], ["hi", "hi"]]) {
+    const preview = voicePreview(settings, catalogs([tag], []), "en", "en");
+    expect(preview.sample, tag).toBe(translator(ui)("wizard.sampleText"));
+    expect(preview.sample, tag).not.toBe(translator("en")("wizard.sampleText"));
+  }
 });

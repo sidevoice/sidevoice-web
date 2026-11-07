@@ -394,9 +394,11 @@ test("the card speaks the language this device's settings chose, else the system
   expect(cardLanguage(["es-ES"])).toBe("es");
   expect(cardLanguage(["de-DE"])).toBe("de");
   expect(cardLanguage(["zh-CN"])).toBe("zh-Hans");
-  expect(cardLanguage(["ko-KR"])).toBe("en");
+  expect(cardLanguage(["ko-KR"])).toBe("ko");
+  expect(cardLanguage(["pt-PT"])).toBe("pt-BR");
+  expect(cardLanguage(["vi-VN"])).toBe("en");
   expect(translator("es")("card.hangUp")).toBe("Colgar");
-  expect(translator("ko")("card.hangUp")).toBe("Hang up");
+  expect(translator("vi")("card.hangUp")).toBe("Hang up");
   localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "pl" }));
   try {
     expect(cardLanguage()).toBe("pl");

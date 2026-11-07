@@ -1,10 +1,7 @@
 import type { CatalogView } from "./model-catalogs.js";
 import type { DeviceVoiceSettings } from "./voice-settings.js";
 import { hasTranslation, translator, UI_LANGUAGES } from "../i18n/translator";
-import { messages as pt } from "../i18n/speech-samples/pt";
-import { messages as hi } from "../i18n/speech-samples/hi";
-
-const extraSamples: Record<string, string> = { pt: pt["wizard.sampleText"], hi: hi["wizard.sampleText"] };
+import { supportedLanguage } from "./system-language.js";
 
 /** The preview describes the selected speaker; the interface language is the first choice when the voice speaks it,
  * then the transcription and device languages, then the voice's own. For an automatic voice, the engine uses
@@ -23,9 +20,7 @@ export function voicePreview(settings: DeviceVoiceSettings, catalogs: CatalogVie
   const language = preferred.map(matching).find(Boolean) ?? languages[0] ?? preferred[0] ?? "en";
   // A missing bundle must not supply the translator's English fallback while keeping a different speech language.
   // The person can enter their own phrase; never claim that an English example is suitable for an unknown voice.
-  const locale = primary(language) === "zh" ? "zh-Hans" : primary(language);
-  const sample = extraSamples[locale]
-    ?? (UI_LANGUAGES.includes(locale) && hasTranslation(locale, "wizard.sampleText")
-      ? translator(locale)("wizard.sampleText") : "");
+  const locale = primary(language) === "zh" ? "zh-Hans" : supportedLanguage(UI_LANGUAGES, language);
+  const sample = locale && hasTranslation(locale, "wizard.sampleText") ? translator(locale)("wizard.sampleText") : "";
   return { language, sample };
 }

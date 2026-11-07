@@ -11,6 +11,10 @@ test("the forms by language: one, few (Polish's 2–4) and the rest", () => {
   expect([1, 2, 5, 12, 14, 22, 24, 112].map((n) => pluralKey("x", n, "pl"))).toEqual(["x.one", "x.few", "x.other", "x.other", "x.other", "x.few", "x.few", "x.other"]);
   expect([1, 2, 5, 22].map((n) => pluralKey("x", n, "en"))).toEqual(["x.one", "x.other", "x.other", "x.other"]);
   expect([1, 2].map((n) => pluralKey("x", n, "zh-Hans"))).toEqual(["x.other", "x.other"]);
+  expect([0, 1, 2, 5].map((n) => pluralKey("x", n, "ko"))).toEqual(["x.other", "x.other", "x.other", "x.other"]);
+  // Hindi and Brazilian Portuguese count 0 and 1 as one; the rest is other (Portuguese's "many" is millions, so it joins other).
+  expect([0, 1, 2, 5].map((n) => pluralKey("x", n, "hi"))).toEqual(["x.one", "x.one", "x.other", "x.other"]);
+  expect([0, 1, 2, 5].map((n) => pluralKey("x", n, "pt-BR"))).toEqual(["x.one", "x.one", "x.other", "x.other"]);
 });
 
 test("Spanish and English say '+1 idioma más' / '+1 more language' and the plural for the rest", () => {
@@ -39,6 +43,12 @@ test("the singular forms of the other languages", () => {
   expect(label("it", 3)).toBe("+3 altre lingue");
   expect(label("ja", 1)).toBe("他 1 言語");
   expect(label("ja", 3)).toBe("他 3 言語");
+  expect(label("pt-BR", 1)).toBe("+1 idioma a mais");
+  expect(label("pt-BR", 3)).toBe("+3 idiomas a mais");
+  expect(label("ko", 1)).toBe("+1개 언어 더");
+  expect(label("ko", 3)).toBe("+3개 언어 더");
+  expect(label("hi", 1)).toBe("+1 और भाषा");
+  expect(label("hi", 3)).toBe("+3 और भाषाएँ");
 });
 
 test.each(UI_LANGUAGES)("%s: the accessible name of '+N more' contains its visible text, for every count (WCAG 2.5.3)", (language) => {

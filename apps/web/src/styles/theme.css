@@ -8,10 +8,12 @@
 
 :root {
   /* Type: DM Sans, as the landing; a 15px body on a desktop (17px on a phone, below), a tool's density. 12px is the floor on a desktop. */
-  --sv-font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, var(--sv-font-cjk), sans-serif;
-  /* DM Sans has no Chinese or Japanese: the system's own faces, never a webfont, in the page language's order (below)
-   * so Han characters take that language's forms; after the Latin ones, which keep Latin text in them. */
-  --sv-font-cjk: "PingFang SC", "Hiragino Sans", "Noto Sans CJK SC", "Noto Sans CJK JP", "Microsoft YaHei", "Yu Gothic", "Meiryo";
+  --sv-font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, var(--sv-font-cjk), var(--sv-font-indic), sans-serif;
+  /* DM Sans has no Chinese, Japanese, Korean or Hindi: the system's own faces, never a webfont, in the page language's order
+   * (below) so Han characters take that language's forms; after the Latin ones, which keep Latin text in them. Hangul has
+   * its faces in the same list, and Devanagari (Hindi) its own. */
+  --sv-font-cjk: "PingFang SC", "Hiragino Sans", "Noto Sans CJK SC", "Noto Sans CJK JP", "Microsoft YaHei", "Yu Gothic", "Meiryo", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR";
+  --sv-font-indic: "Kohinoor Devanagari", "Devanagari Sangam MN", "Nirmala UI", "Noto Sans Devanagari", "Mangal";
   --sv-font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace, var(--sv-font-cjk);
   /* Each is its base size times the phone's own text scale (--sv-text-scale, lib/text-scale.ts: 1 on a desktop, and wherever
    * the person has not changed it). Only type scales: spacing, icons and the stage keep their size. The bases are in rem,
@@ -83,6 +85,7 @@
 }
 :root:lang(ja) { --sv-font-cjk: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", "Yu Gothic", "Meiryo", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei"; }
 :root:lang(zh) { --sv-font-cjk: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", "Hiragino Sans", "Noto Sans CJK JP", "Yu Gothic", "Meiryo"; }
+:root:lang(ko) { --sv-font-cjk: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR", "Noto Sans KR", "PingFang SC", "Hiragino Sans", "Noto Sans CJK SC", "Microsoft YaHei"; }
 @media (pointer: coarse) { :root { --sv-control-sm: 36px; --sv-control-md: 44px; --sv-call-button: 56px; } }
 @media (max-width: 767px) { :root { --sv-header-height: 56px; } }
 /* A phone (a touch screen that is narrow, or short in landscape) reads at arm's length: the body is iOS's own 17px, the

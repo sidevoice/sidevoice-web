@@ -199,19 +199,19 @@ test("changing voices updates the default sample but keeps a sentence the person
 test("a voice without a localized example waits for a custom sentence in its own language", async () => {
   setUiLanguage("en");
   const koCatalogs = [{ ...catalogs[0], models: [...catalogs[0].models,
-    local("korean-only", "supertonic", ["tts"], { languages: ["ko"] })] }, ...catalogs.slice(1)] as CatalogView[];
-  const settings = { ...defaultVoiceSettings(), tts: { catalog: "local", model: "korean-only", voice: null, speed: 1 } };
+    local("vietnamese-only", "supertonic", ["tts"], { languages: ["vi"] })] }, ...catalogs.slice(1)] as CatalogView[];
+  const settings = { ...defaultVoiceSettings(), tts: { catalog: "local", model: "vietnamese-only", voice: null, speed: 1 } };
   const { actions } = renderPane({ voiceSettings: settings, speechLanguage: "en",
     voiceCatalogue: { state: "ready", catalogs: koCatalogs, error: "" } });
   expect(document.querySelector("#tts-try-block button.tts-try-said")).toHaveTextContent(/^$/);
   expect(document.getElementById("tts-try")).toHaveAttribute("aria-disabled", "true");
   expect(document.getElementById("tts-try")).toHaveAccessibleDescription("Write a sentence to try the voice.");
   fireEvent.click(document.querySelector("#tts-try-block button.tts-try-said")!);
-  fireEvent.change(document.getElementById("tts-sentence")!, { target: { value: "안녕하세요." } });
+  fireEvent.change(document.getElementById("tts-sentence")!, { target: { value: "Xin chào." } });
   expect(document.getElementById("tts-try")).not.toHaveAttribute("aria-disabled", "true");
   await act(async () => { fireEvent.click(document.getElementById("tts-try")!); });
   expect(actions.tryVoiceSettings).toHaveBeenCalledWith("tts", expect.objectContaining({
-    text: "안녕하세요.", language: "ko", keep: false,
+    text: "Xin chào.", language: "vi", keep: false,
   }));
 });
 

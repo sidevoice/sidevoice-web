@@ -437,7 +437,7 @@ test("a download that cannot be cancelled says so in its line and in the room's 
   expect(within(appRow()!).getByRole("progressbar")).toBeInTheDocument();
 });
 
-test.each(["en", "es", "de", "fr", "it", "pl", "ja", "zh-Hans"])("Cancel's accessible name is its visible label, described by the line (%s)", async (language) => {
+test.each(["en", "es", "de", "fr", "it", "pl", "ja", "zh-Hans", "pt-BR", "ko", "hi"])("Cancel's accessible name is its visible label, described by the line (%s)", async (language) => {
   localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: language }));
   onTestFinished(() => localStorage.removeItem("sidevoice.settings"));
   open({ section: "updates", updater: { mode: "manual", status: { state: "downloading", version: "0.10.0", progress: 0.4 } } });
