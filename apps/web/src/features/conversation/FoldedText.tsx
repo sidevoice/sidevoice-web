@@ -9,10 +9,14 @@ export const FOLD_LINES = 25;
  *  the fallback face can come out wrong). A message counts its lines again when either changes. 0 while it has no box. */
 export const TextLayoutContext = createContext(0);
 
-/** The lines `node`'s text is laid out on, counted as an inline run: one box per line it spans. */
-export function lineCount(node: HTMLElement): number {
+/** The lines `node`'s text is laid out on, counted as an inline run: one box per line it spans. It only has to tell `FOLD_LINES`
+ *  from one more, so it stops at the line after: a long reply is not walked to its end. */
+export function lineCount(node: HTMLElement, stopAfter = FOLD_LINES + 1): number {
   const tops = new Set<number>();
-  for (const box of node.getClientRects()) if (box.width > 0 || box.height > 0) tops.add(Math.round(box.top));
+  for (const box of node.getClientRects()) {
+    if (box.width > 0 || box.height > 0) tops.add(Math.round(box.top));
+    if (tops.size >= stopAfter) break;
+  }
   return tops.size;
 }
 
@@ -29,12 +33,22 @@ export function FoldedText({ text, whole = false, children }: { text: string; wh
   useLayoutEffect(() => {
     const element = node.current;
     if (!element || whole || !layout) return;
-    // Counted unfolded (inline), then put back as it was, before anything is painted.
-    const fold = element.getAttribute("data-fold");
-    element.removeAttribute("data-fold");
-    const lines = lineCount(element);
-    if (fold) element.setAttribute("data-fold", fold);
-    setLong(lines > FOLD_LINES);
+    const measure = () => {
+      // Counted unfolded (inline), then put back as it was, before anything is painted.
+      const fold = element.getAttribute("data-fold");
+      element.removeAttribute("data-fold");
+      const lines = lineCount(element);
+      if (fold) element.setAttribute("data-fold", fold);
+      setLong(lines > FOLD_LINES);
+    };
+    measure();
+    // The text's size can change with no new text or width (the phone's text scale, up to 2x, is a root custom property): the
+    // message's box (its bubble) then changes height, and the lines are counted again. An inline run has no box of its own to watch.
+    const box = element.parentElement;
+    if (!box || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(box);
+    return () => observer.disconnect();
   }, [text, whole, layout]);
   const folds = long && !whole;
   return <>

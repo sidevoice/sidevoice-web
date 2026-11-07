@@ -24,7 +24,7 @@ const reply = (text: string, extra: Partial<ChatMessage> = {}, minutes = 0): Cha
 const person = (text: string, minutes: number): ChatMessage => ({ ...reply(text, {}, minutes), role: "user", name: "You" });
 const heardOf = (text: string, chars: number) => ({ hearing: "partial" as const, heard_chars: chars, interrupted: true, audio: "interrupted", audio_reason: "user_interrupted" as const, text });
 
-/** Words in a run of text, for a message of a known length: ~N lines at the lab's widths (the fold is at ten). */
+/** Words in a run of text, for a message of a known length: ~N lines at the lab's widths (the fold is at 25). */
 const words = (count: number) => Array.from({ length: count }, (_, i) => ["steady", "the", "migration", "ran", "clean", "again", "tonight"][i % 7]).join(" ");
 const STATES = [
   ["lengths", "Lengths (fold)"], ["never", "Never played"], ["cut", "Cut part-way"], ["whole", "Fully heard"], ["playing", "Playing (karaoke)"], ["several", "Several in a row"],
