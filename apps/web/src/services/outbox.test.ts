@@ -135,3 +135,13 @@ test("what is added while the store loads goes after what it kept, even in the s
   expect(box.list().map((e) => e.id)).toEqual(["old", "new"]);
   expect(box.add(entry("later")).order).toBeGreaterThan(box.get("new")!.order);
 });
+
+test("order alone ranks entries: a clock that moved back never puts a new one before a kept one", async () => {
+  let now = 5000;
+  const box = createOutbox({ indexedDB: null, now: () => now });
+  await box.ready;
+  box.add(entry("kept"));
+  now = 10;
+  box.add(entry("new"));
+  expect(box.list().map((e) => e.id)).toEqual(["kept", "new"]);
+});

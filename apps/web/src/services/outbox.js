@@ -13,7 +13,8 @@ export function createOutbox({ scope = 'page', indexedDB = globalThis.indexedDB,
     let db = null, loading = true, order = 0;
     // What is stored: the entry's own fields, never whatever its sender keeps on it in memory.
     const record = (entry) => ({ id: entry.id, scope, kind: entry.kind, session_id: entry.session_id, node: entry.node, payload: entry.payload, created: entry.created, order: entry.order });
-    const sorted = () => [...entries.values()].sort((a, b) => a.created - b.created || a.order - b.order);
+    // `order` alone ranks: it only grows, also across reloads (the stored maximum is read back), so a clock that moved back never reorders.
+    const sorted = () => [...entries.values()].sort((a, b) => a.order - b.order);
     function write(change) {
         if (!db) return;
         try { change(db.transaction(STORE, 'readwrite').objectStore(STORE)); } catch { /* memory still holds it */ }

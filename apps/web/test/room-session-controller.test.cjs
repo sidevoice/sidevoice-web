@@ -4976,3 +4976,40 @@ test('Nothing goes before the outbox is back from the reload: what was said now 
  assert.deepEqual(plain(sentOf(c,c.first,'voice-user-turn').filter(d=>d.phase==='finished').map(d=>d.text)),['before the reload','after the reload'],'in the order said');
  c.s.run('disconnect()');
 });
+test('A text posted straight to the room, still on its way, is ahead of a turn said meanwhile',async()=>{
+ const c=await callOnRoom();const {s,voice,first}=c;
+ let finish=null;
+  s.context.fetch=async(path,options)=>{if(options?.method==='POST'&&path.includes('/api/presentation/text'))await new Promise(resolve=>{finish=resolve});return {ok:true,status:200,json:async()=>({messages:[],participants:[]})}};
+ s.run("outboxReady=true");
+ s.run("$('text-message').value='hello'");
+ const sending=s.dispatch('submit',{target:s.run("$('text-composer')")});
+ await settleSoon();
+ assert.ok(finish,'the text is on its way');
+ voice.emit('turn',started('meanwhile'));voice.emit('turn',finished('meanwhile','spoken'));
+ assert.equal(sentOf(c,first,'voice-user-turn').length,0,'the turn waits behind it');
+ finish();await sending;await settleSoon();
+ assert.deepEqual(plain(sentOf(c,first,'voice-user-turn').map(d=>d.phase)),['started','finished'],'and goes once the text is taken');
+ s.run('disconnect()');
+});
+test('A text the room refuses lets the turns behind it go at once',async()=>{
+ const c=await callOnRoom();const {s,voice,first}=c;
+ s.run("deliverText=async()=>'refused'");
+ s.run("keepMessage('text','text',{thread:'a',text:'no'})");
+ voice.emit('turn',started('behind'));voice.emit('turn',finished('behind','spoken'));
+ assert.equal(sentOf(c,first,'voice-user-turn').length,0,'behind the text');
+ s.run('flushOutbox()');await settleSoon();await settleSoon();
+ assert.deepEqual(plain(sentOf(c,first,'voice-user-turn').map(d=>d.phase)),['started','finished'],'the refused text is not a barrier any more');
+ s.run('disconnect()');
+});
+test('A turn let go of an older one that waited for another machine lets the text behind it go',async()=>{
+ const c=await callOnRoom();const {s}=c;
+ const delivered=[];
+ s.context.__deliver=async entry=>{delivered.push(entry.payload.data.text);return 'sent'};
+ s.run("deliverText=__deliver;refreshHistory=async()=>{}");
+ s.run("keepMessage('user-turn','voice-user-turn',{turn_id:'old',phase:'finished',text:'x',started_at:1,ended_at:2,merged:false,timings_ms:{}});outbox.list()[0].node='another-machine'");
+ s.run("keepMessage('text','text',{thread:'a',text:'after'})");
+ s.run('flushOutbox()');await settleSoon();await settleSoon();
+ assert.equal(s.run('outbox.list().some(e=>e.kind===\'user-turn\')'),false,'the stale turn is let go');
+ assert.deepEqual(plain(delivered),['after'],'and the text is not stuck behind it');
+ s.run('disconnect()');
+});
