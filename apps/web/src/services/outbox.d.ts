@@ -15,3 +15,5 @@ export interface Outbox {
 export function createOutbox(options?: {
   scope?: string; indexedDB?: IDBFactory | null; now?(): number; limit?: number;
 }): Outbox;
+export const RESEND_BACKOFF_MS: number[];
+export function resendDelay(sent: number): number;
