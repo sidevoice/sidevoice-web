@@ -5071,3 +5071,40 @@ test('An entry that is due again but held behind its start does not make the ret
  assert.ok(s.run('outbox.list().every(e=>e.resendAt>'+now+')'),'every entry waits its next backoff');
  s.run('disconnect()');
 });
+// ----- web#539: nothing silently lost, nothing left pending for ever -----
+test('A hang-up marks the rows of the turns it could not deliver as not sent, and a full outbox refuses the newest with the same mark',async()=>{
+ const c=await callOnRoom();const {s,voice}=c;
+ voice.emit('turn',started('gone'));voice.emit('turn',finished('gone','never arrived'));
+ assert.equal(s.run("history.find(r=>r.turn_id==='gone').delivery"),'pending');
+ // The outbox is full: a new text is refused, not an older message let go; its bubble says so.
+ s.run("for(let i=0;i<OUTBOX_LIMIT_FOR_TEST;i++)outbox.add({id:'fill'+i,kind:'playback',session_id:'s1',node:state.callNode,payload:{type:'voice-playback',data:{}}})".replace('OUTBOX_LIMIT_FOR_TEST',String(2000-s.run('outbox.size'))));
+ assert.equal(s.run('outbox.size'),2000);
+ const oldest=s.run('outbox.list()[0].id');
+ s.run("queueText('fp-mac|a','refused text')");
+ assert.equal(s.run("history.find(r=>r.text==='refused text').delivery"),'not_sent');
+ assert.equal(s.run('outbox.size'),2000,'nothing was let go to make room');
+ assert.equal(s.run('outbox.list()[0].id'),oldest);
+ s.run('disconnect()');
+ assert.equal(s.run("history.find(r=>r.turn_id==='gone').delivery"),'not_sent','the hang-up says what did not arrive');
+});
+test('A direct text that hangs is stopped after its time and kept in the queue under the id it had',async()=>{
+ const fake=new Map();
+ const c=await callOnRoom({timers:(fn,ms,...rest)=>{if(ms>60000)return setTimeout(fn,ms,...rest);const handle={ms};fake.set(handle,fn);return handle},clearTimers:fake});
+ const {s}=c;
+ let posted=null,aborted=false;
+ s.context.fetch=(path,options)=>{
+  if(options?.method==='POST'&&path.includes('/api/presentation/text')){posted=JSON.parse(options.body);return new Promise((_,reject)=>options.signal?.addEventListener('abort',()=>{aborted=true;reject(Object.assign(new Error('aborted'),{name:'AbortError'}))}))}
+  return Promise.resolve({ok:true,status:200,json:async()=>({messages:[],participants:[]})});
+ };
+ s.run("outboxReady=true");
+ s.run("$('text-message').value='slow words'");
+ const sending=s.dispatch('submit',{target:s.run("$('text-composer')")});
+ await settleSoon();
+ assert.ok(posted,'on its way');
+ const limit=s.run('DIRECT_TEXT_MS');
+ const [handle,fn]=[...fake].find(([h])=>h.ms===limit);fake.delete(handle);fn();
+ await sending;await settleSoon();
+ assert.equal(aborted,true,'the request was stopped');
+ assert.deepEqual(plain(s.run('queuedTexts().map(e=>[e.id,e.payload.data.text])')),[[posted.message_id,'slow words']],'queued under the same id, which the room takes once');
+ s.run('disconnect()');
+});
