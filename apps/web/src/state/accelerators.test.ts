@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { acceleratorKey, canonical, composeAccelerator, keycap, parseAccelerator, readAccelerator, sameAccelerator, setLayoutMap, type Words } from "./accelerators";
+import { acceleratorKey, canonical, composeAccelerator, globalAllowed, isFunctionKey, keycap, parseAccelerator, readAccelerator, sameAccelerator, setLayoutMap, type Words } from "./accelerators";
 
 /* A key is named by the physical key, not by the character it types: a keypad `+` is `NumpadAdd` and never a bare `+`
  * (the accelerator's own separator), whatever the layout. */
@@ -85,4 +85,12 @@ test("a keycap shows what the layout types on the key where the browser says, an
     setLayoutMap(null);
   }
   expect(readAccelerator("Ctrl+Alt+BracketRight", windows).combo).toBe("Ctrl+Alt+]");
+});
+
+test("an F-key is F1 to F24, the keys the app registers; F0 and F25 on are not, nor can they be global alone", () => {
+  for (const key of ["F1", "F9", "F10", "F19", "F20", "F24"]) expect(isFunctionKey(key), key).toBe(true);
+  for (const key of ["F0", "F25", "F99", "F013", "F", "Fn", "f5"]) expect(isFunctionKey(key), key).toBe(false);
+  expect(globalAllowed("F24")).toBe(true);
+  expect(globalAllowed("F25")).toBe(false);
+  expect(globalAllowed("Ctrl+F25")).toBe(true);
 });
