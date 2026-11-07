@@ -124,3 +124,14 @@ test("a message unacknowledged on an open socket waits 5 s, 10 s, 20 s, 40 s and
   expect([1, 2, 3, 4, 5, 6, 50].map(resendDelay)).toEqual([5000, 10000, 20000, 40000, 60000, 60000, 60000]);
   expect(resendDelay(0)).toBe(5000);
 });
+
+test("what is added while the store loads goes after what it kept, even in the same millisecond", async () => {
+  const disk = new Map<string, unknown>();
+  disk.set("old", { id: "old", scope: "page", kind: "user-turn", session_id: "s", node: "mac", payload: {}, created: 1000, order: 5 });
+  const { factory } = fakeIndexedDB(disk);
+  const box = createOutbox({ indexedDB: factory, now: () => 1000 });
+  box.add(entry("new"));
+  await box.ready;
+  expect(box.list().map((e) => e.id)).toEqual(["old", "new"]);
+  expect(box.add(entry("later")).order).toBeGreaterThan(box.get("new")!.order);
+});

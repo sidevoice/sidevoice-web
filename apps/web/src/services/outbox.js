@@ -50,7 +50,7 @@ export function createOutbox({ scope = 'page', indexedDB = globalThis.indexedDB,
                 try { read = db.transaction(STORE, 'readonly').objectStore(STORE).getAll(); } catch { done(); return; }
                 read.onerror = () => done();
                 read.onsuccess = () => {
-                    const others = [];
+                    const others = [], earlier = new Set(entries.keys());
                     for (const stored of read.result || []) {
                         if (stored?.id == null) continue;
                         if (stored.scope !== scope) { others.push(stored); continue; }
@@ -59,6 +59,9 @@ export function createOutbox({ scope = 'page', indexedDB = globalThis.indexedDB,
                         entries.set(stored.id, { ...stored });
                         order = Math.max(order, stored.order || 0);
                     }
+                    // What was said while the store was still loading came after everything it kept: it keeps its place behind it.
+                    const early = [...entries.values()].filter((entry) => earlier.has(entry.id)).sort((a, b) => a.created - b.created || a.order - b.order);
+                    for (const entry of early) entry.order = ++order;
                     others.sort((a, b) => a.created - b.created || a.order - b.order);
                     for (const stored of others.slice(0, Math.max(0, others.length - limit))) write((store) => store.delete(stored.id));
                     // What was added before the database opened is stored now.

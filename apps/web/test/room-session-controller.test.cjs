@@ -313,7 +313,7 @@ test('Final messages use send timestamps, even when answering an older turn',()=
 
 test('Text submission freezes its destination and clears only the submitted draft',async()=>{
  const s=setup(),sent=[];s.context.crypto={randomUUID:()=> 'test-message'};
- s.run("ws={};$('text-message').value='Un mensaje escrito';roomBinding.binding_id='binding-a'");
+ s.run("outboxReady=true;ws={};$('text-message').value='Un mensaje escrito';roomBinding.binding_id='binding-a'");
  s.context.fetch=async(path,options)=>{if(options){sent.push(JSON.parse(options.body));s.run("$('text-message').value='Ya escribiendo el siguiente'");return {ok:true,json:async()=>({accepted:true})}}return {ok:true,json:async()=>({messages:[]})}};
  await s.dispatch('submit',{target:s.run("$('text-composer')")});
  assert.equal(sent[0].thread_id,'a');assert.equal(sent[0].text,'Un mensaje escrito');
@@ -1608,13 +1608,14 @@ function joining(s,{admission={admitted:true,reason:null,message:null,clients:1,
  return {sockets,voice,tap:()=>s.run('toggleCall')()};
 }
 // `microphone`: what the platform says of the microphone when the call is joined (microphone-access.ts), where a test says.
-async function callOnRoom({timers=null,indexedDB=null,outboxScope=null,stored=undefined,readingMode=false,microphone=null,voice:given=null}={}){
+async function callOnRoom({timers=null,clearTimers=null,indexedDB=null,outboxScope=null,stored=undefined,readingMode=false,microphone=null,voice:given=null}={}){
  const s=setup({indexedDB,outboxScope,readingMode,...(stored?{stored}:{})});const sockets=socketsOf(s);let ids=0;
  if(microphone)s.run(`microphone.getSnapshot=()=>({state:'${microphone}'})`);
  s.context.crypto={randomUUID:()=>'id-'+(++ids)};
  s.context.window.sidevoiceUI=new Proxy({},{get:()=>()=>{}});
  const store={'sidevoice.selected':'fp-mac|a'};s.context.sessionStorage=storageOf(store);
  if(timers)s.context.setTimeout=timers;
+ if(clearTimers)s.context.clearTimeout=handle=>{if(!clearTimers.delete(handle))clearTimeout(handle)};
  const voice=withVoice(s,given??fakeVoice());
  s.context.fetch=async path=>({ok:true,status:200,json:async()=>path.includes('/participants')
   ?{participants:[{thread_id:'a',title:'A',available:true,reach:{state:'listening'},epoch:0}]}
@@ -3137,7 +3138,7 @@ test('Nothing goes on a new socket before the room answers its hello, and then i
 });
 test('A start of a replaced session is not sent again: its words go as said while away',()=>{
  const s=setup();
- s.run("var __sent=[];ws={readyState:1,session:'s',send(m){__sent.push(JSON.parse(m))}};voiceTurn({turn_id:'a',phase:'started',started_at:1});voiceTurn({turn_id:'a',phase:'finished',text:'words',started_at:1,ended_at:2,merged:false,timings:{}});__sent.length=0;sessionId='new';relay.reset();ws={readyState:1,session:'new',send(m){__sent.push(JSON.parse(m))}};flushOutbox()");
+ s.run("outboxReady=true;var __sent=[];ws={readyState:1,session:'s',send(m){__sent.push(JSON.parse(m))}};voiceTurn({turn_id:'a',phase:'started',started_at:1});voiceTurn({turn_id:'a',phase:'finished',text:'words',started_at:1,ended_at:2,merged:false,timings:{}});__sent.length=0;sessionId='new';relay.reset();ws={readyState:1,session:'new',send(m){__sent.push(JSON.parse(m))}};flushOutbox()");
  assert.deepEqual(plain(s.run("__sent.map(m=>[m.data.phase,m.data.offline,m.data.session_id])")),[['finished',true,'new']]);
  assert.equal(s.run("outbox.list().some(entry=>entry.payload.data.phase==='started')"),false);
 });
@@ -4857,11 +4858,12 @@ test('Turns said with no signal reach the machine in the order said, all of them
 });
 test('A message nobody acknowledges is said again on the same socket after 5 s, 10 s, 20 s, 40 s and then every minute, oldest first',async()=>{
  const fake=new Map();
- const c=await callOnRoom({timers:(fn,ms,...rest)=>{if(ms>60000)return setTimeout(fn,ms,...rest);const handle={ms};fake.set(handle,fn);return handle}});
+ const c=await callOnRoom({timers:(fn,ms,...rest)=>{if(ms>60000)return setTimeout(fn,ms,...rest);const handle={ms};fake.set(handle,fn);return handle},clearTimers:fake});
  const {s,voice,first}=c;
  let now=1_000_000;s.run('resendClock=()=>'+now);
  const at=ms=>{now+=ms;s.run('resendClock=()=>'+now)};
  const wake=()=>{const handle=s.run('resendTimer');assert.ok(handle,'a timer is armed');const fn=fake.get(handle);fake.delete(handle);fn()};
+ const baseline=fake.size;
  voice.emit('turn',started('t1'));voice.emit('turn',finished('t1','first'));
  const armed=()=>s.run('resendTimer')?.ms;
  assert.equal(armed(),5000,'the first wait');
@@ -4870,7 +4872,9 @@ test('A message nobody acknowledges is said again on the same socket after 5 s, 
  assert.equal(count(),4);
  // The timer is not early: woken before the delay is up, nothing is said again.
  at(4999);s.run('flushOutbox()');assert.equal(count(),4,'not before its time');
+ assert.equal(fake.size-baseline,1,'one timer for the whole outbox, however many entries wait');
  at(1);wake();assert.equal(count(),8,'5 s: said again, the four of them');
+ assert.equal(fake.size-baseline,1,'and still one');
  // The wait the page armed after each time it said them again: the schedule.
  const waits=[];
  for(let i=0;i<5;i++){const wait=armed();waits.push(wait);at(wait);wake()}
@@ -4889,6 +4893,7 @@ test('A message nobody acknowledges is said again on the same socket after 5 s, 
  for(const id of ids.slice(2))c.push(first,{type:'voice-ack',data:{client_msg_id:id}});
  assert.equal(s.run('outbox.size'),0);
  assert.equal(s.run('resendTimer'),null,'nothing left to wake for');
+ assert.equal(fake.size-baseline,0,'and none left armed');
  s.run('disconnect()');
 });
 test('A new socket sends what waits at once, without any backoff, and starts the count again',async()=>{
@@ -4916,5 +4921,58 @@ test('A reload in the middle keeps what was said and sends it in order once the 
  const turns=sentOf(c,c.first,'voice-user-turn');
  assert.deepEqual(plain(turns.map(d=>d.text)),['said k1','said k2','said k3'],'in the order said, all of them');
  assert.ok(turns.every(d=>d.offline===true),'as words said while away, the call that heard them being gone');
+ c.s.run('disconnect()');
+});
+
+test('An entry still held at the head does not keep a later one that was said from its retry',async()=>{
+ const fake=new Map();
+ const c=await callOnRoom({timers:(fn,ms,...rest)=>{if(ms>60000)return setTimeout(fn,ms,...rest);const handle={ms};fake.set(handle,fn);return handle},clearTimers:fake});
+ const {s,voice,first}=c;
+ let now=2_000_000;s.run('resendClock=()=>'+now);
+ s.run("relay.route=d=>d.turn_id==='held'&&d.phase==='finished'?{hold:true}:{send:d}");
+ voice.emit('turn',started('held'));voice.emit('turn',finished('held','words'));
+ voice.emit('turn',started('later'));
+ assert.equal(turnSent(c,first,'held','finished').length,0,'held, unsent');
+ assert.equal(turnSent(c,first,'later','started').length,1);
+ const handle=s.run('resendTimer');assert.ok(handle,'a timer is armed for the one that was said');
+ now+=5000;s.run('resendClock=()=>'+now);fake.get(handle)();
+ assert.equal(turnSent(c,first,'later','started').length,2,'and it is said again');
+ s.run('disconnect()');
+});
+test('A text and the turns are one order: a turn said after a text waits for it, and a text after a turn waits for its acknowledgement',async()=>{
+ const c=await callOnRoom();const {s,voice,first}=c;
+ const delivered=[];let release=null;
+ s.context.__deliver=entry=>{delivered.push(entry.payload.data.text);return new Promise(resolve=>{release=()=>resolve('sent')})};
+ s.run("deliverText=__deliver;refreshHistory=async()=>{}");
+ // A text first, still on its way (in flight); a turn said after it must not go over the socket meanwhile.
+ s.run("keepMessage('text','text',{thread:'a',text:'one'});flushOutbox()");
+ await settleSoon();
+ assert.deepEqual(plain(delivered),['one']);
+ voice.emit('turn',started('after'));voice.emit('turn',finished('after','spoken'));
+ assert.equal(sentOf(c,first,'voice-user-turn').length,0,'the turn waits behind the text');
+ release();await settleSoon();await settleSoon();
+ assert.deepEqual(plain(sentOf(c,first,'voice-user-turn').map(d=>d.phase)),['started','finished'],'once the text is taken, the turn goes');
+ // A text written after a turn that has not been acknowledged waits for the acknowledgement.
+ s.run("keepMessage('text','text',{thread:'a',text:'two'});flushOutbox()");
+ await settleSoon();
+ assert.deepEqual(plain(delivered),['one'],'not yet');
+ for(const d of sentOf(c,first,'voice-user-turn'))c.push(first,{type:'voice-ack',data:{client_msg_id:d.client_msg_id}});
+ await settleSoon();
+ assert.deepEqual(plain(delivered),['one','two'],'after the turns it follows');
+ release();await settleSoon();
+ s.run('disconnect()');
+});
+test('Nothing goes before the outbox is back from the reload: what was said now follows what was kept',async()=>{
+ let release=()=>{};
+ const kept={id:'kept-1',scope:'tab-1',kind:'user-turn',session_id:'old',node:PAIRED.fp,created:1,order:1,
+  payload:{type:'voice-user-turn',data:{turn_id:'k',phase:'finished',text:'before the reload',started_at:1,ended_at:2,merged:false,timings_ms:{}}}};
+ const store={put(){},delete(){},getAll(){const request={};release=()=>{request.result=[kept];request.onsuccess?.()};return request}};
+ const db={createObjectStore(){},transaction:()=>({objectStore:()=>store})};
+ const indexedDB={open(){const request={};setTimeout(()=>{request.result=db;request.onsuccess?.()},0);return request}};
+ const c=await callOnRoom({indexedDB,outboxScope:'tab-1'});
+ c.voice.emit('turn',started('now'));c.voice.emit('turn',finished('now','after the reload'));
+ assert.equal(sentOf(c,c.first,'voice-user-turn').length,0,'held until the kept ones are back');
+ release();await settleSoon();await settleSoon();
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-user-turn').filter(d=>d.phase==='finished').map(d=>d.text)),['before the reload','after the reload'],'in the order said');
  c.s.run('disconnect()');
 });
