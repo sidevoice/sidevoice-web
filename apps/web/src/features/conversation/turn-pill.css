@@ -1,7 +1,8 @@
 /* TurnPill (TurnPill.tsx): the person's open turn, the same at every place that shows it. Sized in `em` of the pill's `--pill-fs`
  * (components/ui/pill.css), so the stage's and the transcript's differ by a size step and nothing else. */
 .turn-pill .ui-pill-lead { gap: .5em; }
-.turn-pill .turn-mic { width: 1.3em; height: 1.3em; flex: none; color: var(--sv-state-listening); }
+/* The microphone wears the pill's own text colour (the card's ink, the bubble's), light and dark: no state colour, nothing to draw the eye. */
+.turn-pill .turn-mic { width: 1.3em; height: 1.3em; flex: none; color: inherit; }
 /* The bars: the brand mark's shape, each a share of the tallest (`--s`), drawn by a transform alone. */
 .turn-bars { display: inline-flex; align-items: center; gap: .13em; height: 1.2em; color: var(--sv-accent); }
 .turn-bars i { display: block; width: .22em; height: 100%; border-radius: .11em; background: currentColor; transform: scaleY(var(--s)); }

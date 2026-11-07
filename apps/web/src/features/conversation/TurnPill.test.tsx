@@ -40,34 +40,41 @@ test("the microphone shows while they speak and goes while it is transcribed; th
   expect(container.querySelector("[role=status]")).toBeNull();
 });
 
-test("the level maps to the five bars: silence keeps part of the shape, full is the mark's, the middle follows the newest level", () => {
-  expect(turnBarScales([0, 0, 0])).toEqual(TURN_BAR_SHAPE.map((share) => Math.round(share * 0.45 * 100) / 100));
-  expect(turnBarScales([1, 1, 1])).toEqual(TURN_BAR_SHAPE.map((share) => Math.round(share * 100) / 100));
-  // A voice that has just come in: the middle bar is up first, the ones either side of it a step behind, the outer ones two.
-  const [a, b, middle, d, e] = turnBarScales([1, 0, 0]);
-  expect(middle).toBe(1);
-  expect(b).toBeCloseTo(TURN_BAR_SHAPE[1] * 0.45, 2);
-  expect(d).toBe(b);
-  expect(a).toBeCloseTo(TURN_BAR_SHAPE[0] * 0.45, 2);
-  expect(e).toBe(a);
-  // Out-of-range levels are held to 0..1; a short history reuses its oldest.
-  expect(turnBarScales([5])).toEqual(turnBarScales([1]));
-  expect(turnBarScales([-1])).toEqual(turnBarScales([0]));
-  // A reading that is not a number (an analyser with no samples yet) is silence, never NaN.
-  expect(turnBarScales([Number.NaN, Number.NaN, Number.NaN])).toEqual(turnBarScales([0, 0, 0]));
+test("each bar is its own reading, the newest at the right: the bars are not one shape scaled by one level", () => {
+  const rest = TURN_BAR_SHAPE.map((share) => Math.round(share * 0.45 * 100) / 100);
+  expect(turnBarScales([])).toEqual(rest);
+  // One reading: only the right bar has it; the others rest.
+  expect(turnBarScales([0.8])).toEqual([...rest.slice(0, 4), 0.8]);
+  // Five readings: each bar its own, in order, whatever the mark's shape.
+  expect(turnBarScales([0.9, 0.4, 0.7, 0.5, 0.6])).toEqual([0.9, 0.4, 0.7, 0.5, 0.6]);
+  // Scrolling: a new reading enters at the right and the oldest goes.
+  expect(turnBarScales([0.9, 0.4, 0.7, 0.5, 0.6, 0.8])).toEqual([0.4, 0.7, 0.5, 0.6, 0.8]);
+  // The ratio between two bars changes with the readings (it is not the mark's 12:21 every time).
+  const ratio = (columns: number[]) => { const scales = turnBarScales(columns); return scales[1] / scales[2]; };
+  expect(new Set([ratio([0.5, 0.5, 0.5, 0.5, 0.5]), ratio([0.4, 0.9, 0.5, 0.5, 0.6]), ratio([0.8, 0.5, 0.9, 0.1, 0.4])]).size).toBe(3);
+  // Quiet speech (above silence, below the mark's rests) is its own readings from one floor, not the mark's ratios.
+  const quiet = turnBarScales([0.05, 0.06, 0.07, 0.08, 0.09]);
+  expect(quiet).toEqual([0.15, 0.15, 0.15, 0.15, 0.15]);
+  expect(quiet).not.toEqual(rest);
+  expect(turnBarScales([0.05, 0.2, 0.1, 0.3, 0.09])).toEqual([0.15, 0.2, 0.15, 0.3, 0.15]);
+  // Out-of-range readings are held to 0..1; one that is not a number rests, never NaN.
+  expect(turnBarScales([5, -1, Number.NaN, 0.5, 1])).toEqual([1, 0.15, rest[2], 0.5, 1]);
 });
 
 test("while listening the bars follow the level they are given, by transform", async () => {
-  let level = 0.9;
-  const { container } = render(<TurnPill phase="listening" level={() => level} />);
-  await act(() => wait(120));
-  const loud = bars(container).map((bar) => bar.style.transform);
-  expect(loud[2]).toBe(`scaleY(${turnBarScales([0.9])[2]})`);
+  // One reading per tick, from a sequence: each lands in the right bar and scrolls left as the next comes.
+  const readings = [0.9, 0.5, 0.7, 0.6, 0.8, 0.4];
+  let at = 0, level = 0.4;
+  const { container } = render(<TurnPill phase="listening" level={() => { level = readings[at] ?? 0; at += 1; return level; }} />);
+  await act(() => wait(500));
+  const moved = bars(container).map((bar) => bar.style.transform);
+  expect(moved).toEqual(["0.5", "0.7", "0.6", "0.8", "0.4"].map((value) => `scaleY(${value})`));
+  // Each bar its own reading, not the mark's shape scaled.
+  expect(new Set(moved).size).toBe(5);
+  // Silence adds no column: the shape holds.
   level = 0;
-  await act(() => wait(260));
-  const quiet = bars(container).map((bar) => bar.style.transform);
-  expect(quiet[2]).toBe(`scaleY(${turnBarScales([0])[2]})`);
-  expect(quiet).not.toEqual(loud);
+  await act(() => wait(200));
+  expect(bars(container).map((bar) => bar.style.transform)).toEqual(moved);
 });
 
 test("while listening with no level given, it reads the call's microphone", async () => {
