@@ -40,7 +40,9 @@ const config: StorybookConfig = {
     // The app is served under /voice/; the catalogue from its own root. Behind the tunnel (hosts named), the hot-reload
     // socket is told it arrives over TLS on 443, as the app's own dev server is (vite.config.ts); locally, Storybook's own.
     const hmr = hosts.length ? { ...(typeof config.server?.hmr === "object" ? config.server.hmr : {}), clientPort: 443, protocol: "wss" } : undefined;
-    return { ...config, base: "/", server: { ...config.server, ...(hmr ? { hmr } : {}) } };
+    // The app's own dependencies optimised up front: found one by one as stories open, each would reload the page.
+    const include = ["@radix-ui/react-context-menu", "@radix-ui/react-dropdown-menu", "@radix-ui/react-popover", "@radix-ui/react-select", "@radix-ui/react-tooltip", "class-variance-authority", "clsx", "cmdk", "lucide-react", "zustand"];
+    return { ...config, base: "/", server: { ...config.server, ...(hmr ? { hmr } : {}) }, optimizeDeps: { ...config.optimizeDeps, include: [...(config.optimizeDeps?.include ?? []), ...include] } };
   },
 };
 
