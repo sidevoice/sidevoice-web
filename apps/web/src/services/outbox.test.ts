@@ -46,14 +46,17 @@ test("without IndexedDB it keeps entries in memory, oldest first, until each is 
   expect(box.size).toBe(0);
 });
 
-test("it is bounded in count, the oldest going first, and nothing expires with time", async () => {
+test("it is bounded in count by refusing the newest, never by dropping an older one, and nothing expires with time", async () => {
   let now = 0;
   const box = createOutbox({ indexedDB: null, now: () => now, limit: 3 });
-  for (const id of ["a", "b", "c", "d"]) { box.add(entry(id)); now += 100; }
-  expect(box.list().map((e) => e.id)).toEqual(["b", "c", "d"]);
+  for (const id of ["a", "b", "c"]) { expect(box.add(entry(id))).not.toBeNull(); now += 100; }
+  expect(box.add(entry("d"))).toBeNull();
+  expect(box.list().map((e) => e.id)).toEqual(["a", "b", "c"]);
+  box.remove("a");
+  expect(box.add(entry("d"))).not.toBeNull();
   now += 365 * 24 * 3600 * 1000;
   expect(box.list().map((e) => e.id)).toEqual(["b", "c", "d"]);
-  expect(OUTBOX_LIMIT).toBe(200);
+  expect(OUTBOX_LIMIT).toBe(2000);
 });
 
 test("a reload of the same tab finds what was not acknowledged, and nothing of another tab's", async () => {
@@ -133,7 +136,7 @@ test("what is added while the store loads goes after what it kept, even in the s
   box.add(entry("new"));
   await box.ready;
   expect(box.list().map((e) => e.id)).toEqual(["old", "new"]);
-  expect(box.add(entry("later")).order).toBeGreaterThan(box.get("new")!.order);
+  expect(box.add(entry("later"))!.order).toBeGreaterThan(box.get("new")!.order);
 });
 
 test("order alone ranks entries: a clock that moved back never puts a new one before a kept one", async () => {
@@ -165,4 +168,27 @@ test("nothing is stored under an order that restarted: an entry added before the
   await box.ready;
   expect(box.list().map((e) => e.id)).toEqual(["old", "new"]);
   expect(puts.find((put) => put.id === "new")!.order).toBeGreaterThan(5);
+});
+
+test("with the order kept apart, an entry added while the store loads is stored at once, in its final place", async () => {
+  const puts: Array<{ id: string; order: number }> = [];
+  let release = () => {};
+  const old = { id: "old", scope: "page", kind: "user-turn", session_id: "s", node: "mac", payload: {}, created: 1, order: 5 };
+  const store = {
+    put(value: { id: string; order: number }) { puts.push({ id: value.id, order: value.order }); },
+    delete() {},
+    getAll() { const request: { result?: unknown[]; onsuccess?: () => void } = {}; release = () => { request.result = [old]; request.onsuccess?.(); }; return request; },
+  };
+  const db = { createObjectStore() {}, transaction: () => ({ objectStore: () => store }) };
+  const factory = { open() { const request: { result?: unknown; onsuccess?: () => void } = {}; setTimeout(() => { request.result = db; request.onsuccess?.(); }, 0); return request; } } as unknown as IDBFactory;
+  const kept = new Map<string, string>([["sidevoice.outbox-order.page", "5"]]);
+  const orderStore = { getItem: (key: string) => kept.get(key) ?? null, setItem: (key: string, value: string) => { kept.set(key, value); } };
+  const box = createOutbox({ indexedDB: factory, now: () => 1000, orderStore });
+  await new Promise((resolve) => setTimeout(resolve, 5));   // the database is open, the stored entries are not read yet
+  box.add(entry("new"));
+  expect(puts).toEqual([{ id: "new", order: 6 }]);   // durable now, already behind what is stored
+  release();
+  await box.ready;
+  expect(box.list().map((e) => e.id)).toEqual(["old", "new"]);
+  expect(puts.filter((put) => put.id === "new").every((put) => put.order === 6)).toBe(true);
 });

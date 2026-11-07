@@ -13,7 +13,7 @@
  * A turn's end may go before the refusal of its start arrives; the room then refuses the end too (`room.input_ended`).
  * Its words are not lost: the end is queued again, as a new message, and goes as the turn's start now allows (held, or
  * as said while away). */
-const KEPT = 64;
+const KEPT = 512;   // far more than turns can be in play; a start refused long after (and so held) is still found
 
 export function createTurnRelay() {
   const sent = new Map(); // turn → the message its start went as
