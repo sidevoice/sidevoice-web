@@ -505,6 +505,8 @@ test("an iPhone that reports the single press as the system's mute alone shows i
   const single = await screen.findByRole("combobox", { name: "Single press" });
   expect(single).toHaveTextContent("Mute or unmute");
   expect(single).toBeDisabled();
+  // A screen reader says why it is disabled: the note describes the select.
+  expect(single).toHaveAccessibleDescription(en("settings.shortcuts.headsetFixed"));
   expect(screen.getByText(en("settings.shortcuts.headsetPressHint"))).toBeTruthy();
   expect(screen.getByText(en("settings.shortcuts.headsetFixed"))).toHaveClass("shortcut-managed");
   fireEvent.click(single);
@@ -541,6 +543,8 @@ test("a press offers only the actions the host reports for it, in the usual orde
   // One action: the same row, its select disabled on it, with the note.
   expect(screen.getByRole("combobox", { name: "Double press" })).toHaveTextContent("Nothing");
   expect(screen.getByRole("combobox", { name: "Double press" })).toBeDisabled();
+  expect(screen.getByRole("combobox", { name: "Double press" })).toHaveAccessibleDescription(en("settings.shortcuts.headsetFixed"));
+  expect(screen.getByRole("combobox", { name: "Single press" })).not.toHaveAttribute("aria-describedby");
   expect(screen.getByRole("combobox", { name: "Single press" })).toBeEnabled();
   expect(screen.getAllByText(en("settings.shortcuts.headsetFixed"))).toHaveLength(1);
 });

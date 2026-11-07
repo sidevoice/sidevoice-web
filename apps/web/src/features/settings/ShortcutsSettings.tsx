@@ -319,9 +319,10 @@ function HeadsetGroup({ t, global, headset }: { t: Translate; global: Global; he
       return <div key={key} className="shortcut-item">
         <Row label={t(label)} description={t(hint)}>
           <Select size="sm" aria-label={t(label)} options={options} value={value} disabled={locked || fixed}
+            aria-describedby={fixed ? `headset-${key}-fixed` : undefined}
             onValueChange={(next) => { if (next !== value) change({ [key]: next as HeadsetPress }); }} />
         </Row>
-        {fixed && <p className="shortcut-managed">{t("settings.shortcuts.headsetFixed")}</p>}
+        {fixed && <p className="shortcut-managed" id={`headset-${key}-fixed`}>{t("settings.shortcuts.headsetFixed")}</p>}
       </div>;
     })}
     {headset.managedBySystem && <Alert tone="accent" className="shortcut-note">{t("settings.shortcuts.headsetSystem")}</Alert>}
