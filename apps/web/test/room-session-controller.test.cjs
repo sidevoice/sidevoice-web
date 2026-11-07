@@ -5056,3 +5056,18 @@ test('A text the room did not take waits for its backoff, and an answer of an ea
  assert.equal(s.run('textTimer'),null,'nothing armed by the old answer');
  s.run('disconnect()');
 });
+test('An entry that is due again but held behind its start does not make the retry timer spin',async()=>{
+ const fake=new Map();
+ const c=await callOnRoom({timers:(fn,ms,...rest)=>{if(ms>60000)return setTimeout(fn,ms,...rest);const handle={ms};fake.set(handle,fn);return handle},clearTimers:fake});
+ const {s,voice}=c;
+ let now=3_000_000;s.run('resendClock=()=>'+now);
+ voice.emit('turn',started('held'));voice.emit('turn',finished('held','words'));
+ // Said once; its start is then held by the room, so a resend cannot say its end.
+ s.run("relay.route=d=>d.turn_id==='held'&&d.phase==='finished'?{hold:true}:{send:d}");
+ now+=5000;s.run('resendClock=()=>'+now);
+ const handle=s.run('resendTimer');fake.get(handle)();
+ const next=s.run('resendTimer');
+ assert.ok(next&&next.ms>=100,'armed, and not for nothing at once');
+ assert.ok(s.run('outbox.list().every(e=>e.resendAt>'+now+')'),'every entry waits its next backoff');
+ s.run('disconnect()');
+});

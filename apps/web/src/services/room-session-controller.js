@@ -670,7 +670,10 @@ function armResend(socket){
  // The oldest entry said on this socket: one still held (a turn the room had no room for) never keeps a later one from its retry.
  const head=outbox.list().find(entry=>entry.sentOn===socket);
  if(!head)return;
- resendTimer=setTimeout(()=>{resendTimer=null;flushOutbox()},Math.max(0,head.resendAt-resendClock()));
+ // Never sooner than a beat: a timer re-arming at once with nothing to say would spin.
+ resendTimer=setTimeout(()=>{resendTimer=null;flushOutbox()},Math.max(100,head.resendAt-resendClock()));
+ // A retry never keeps a process alive by itself (a browser's timer has no such method; node's, under test, does).
+ resendTimer?.unref?.();
 }
 // A message for the room, kept under the `client_msg_id` the page gives it.
 function keepMessage(kind,type,data,id=crypto.randomUUID()){return outbox.add({id,kind,session_id:state.sessionId,node:state.callNode,payload:{type,data}})}
@@ -722,6 +725,8 @@ function flushOutbox(socket=state.ws){
    if(retry){keepMessage('user-turn','voice-user-turn',retry);again=true;break}
   }
  }
+ // An entry that was due but did not go (one held behind its start, say) waits its next backoff like the others.
+ if(redo)for(const entry of outbox.list())if(entry.sentOn===socket&&!gone.has(entry.id))entry.resendAt=resendClock()+resendDelay(entry.sends||1);
  armResend(socket);
  // A turn let go above may have been what an older-turn text was waiting behind.
  if(queuedTexts().length)void flushTexts();
@@ -957,7 +962,7 @@ async function flushTexts(){
    if(answer==='later'){
     // An answer of an earlier session or socket (a hang-up, a move, a new socket meanwhile) arms nothing.
     if(gen!==textGen)break;
-    clearTimeout(textTimer);const wait=resendDelay(++textTries);textDue=resendClock()+wait;textTimer=setTimeout(()=>{textTimer=null;flushOutbox()},wait);break}
+    clearTimeout(textTimer);const wait=resendDelay(++textTries);textDue=resendClock()+wait;textTimer=setTimeout(()=>{textTimer=null;flushOutbox()},wait);textTimer?.unref?.();break}
    textTries=0;
    if(answer==='refused'){failTexts(item=>item===entry);failed=true;continue}
    outbox.remove(entry.id);sent=true;
