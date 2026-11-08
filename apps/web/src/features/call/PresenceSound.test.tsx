@@ -1,7 +1,7 @@
-import { beforeEach, expect, test, vi } from "vitest";
+import { beforeEach, expect, onTestFinished, test, vi } from "vitest";
 import { render } from "@testing-library/react";
 import { act } from "react";
-import { PresenceSound, breathPlays } from "./PresenceSound";
+import { PresenceSound, SCREEN_POLL_MS, breathPlays } from "./PresenceSound";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import { writeCallPreferences, type PresenceSound as PresenceChoice } from "../../services/call-preferences";
@@ -106,4 +106,68 @@ test("another sound chosen while it plays starts that one; another volume applie
   expect(player.plays).toBe(2);
   expect(player.playing).toBe(1);
   expect(player.choices.at(-1)).toEqual({ sound: "single-beat", gainDb: 4 });
+});
+
+/* The desktop app shows the call in its floating card while its window is hidden or minimised: a hidden page is not the
+ * screen off there. The app says whether the screen is locked (host.screen); an app before it never counts as off. */
+function asApp(members: Record<string, unknown>) {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: members } });
+  onTestFinished(() => { Reflect.deleteProperty(window, "__sidevoiceHost"); });
+}
+const callControls = { settings: async () => ({ alwaysShown: false }), setAlwaysShown: async () => ({ alwaysShown: false }) };
+
+test("desktop, the floating card in view: the window hidden is not the screen off, and the sound does not play", () => {
+  asApp({ callControls });
+  const { work } = inCall("hidden");
+  work(true);
+  act(() => setHidden(true));
+  expect(player.plays).toBe(0);
+  // "Always" is as it was: it plays, shown or hidden.
+  act(() => { writeCallPreferences({ presence: "always" }); });
+  expect(player.playing).toBe(1);
+});
+
+test("desktop, an app that says the screen is locked: the sound plays while it is, whatever the window, and is asked only while it matters", async () => {
+  vi.useFakeTimers();
+  onTestFinished(() => { vi.useRealTimers(); });
+  let locked = false;
+  const screen = { locked: vi.fn(async () => locked) };
+  asApp({ callControls, screen });
+  const { work } = inCall("hidden");
+  // Not working yet: nothing to ask.
+  await act(async () => { await vi.advanceTimersByTimeAsync(SCREEN_POLL_MS * 2); });
+  expect(screen.locked).not.toHaveBeenCalled();
+  work(true);
+  act(() => setHidden(true));
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  expect(player.playing).toBe(0);
+  locked = true;
+  await act(async () => { await vi.advanceTimersByTimeAsync(SCREEN_POLL_MS); });
+  expect(player.playing).toBe(1);
+  locked = false;
+  await act(async () => { await vi.advanceTimersByTimeAsync(SCREEN_POLL_MS); });
+  expect(player.playing).toBe(0);
+  // Done working: no more asking.
+  work(false);
+  const asked = screen.locked.mock.calls.length;
+  await act(async () => { await vi.advanceTimersByTimeAsync(SCREEN_POLL_MS * 3); });
+  expect(screen.locked).toHaveBeenCalledTimes(asked);
+});
+
+test("desktop, an app whose answer fails: the screen counts as on", async () => {
+  vi.useFakeTimers();
+  onTestFinished(() => { vi.useRealTimers(); });
+  asApp({ callControls, screen: { locked: async () => { throw new Error("no session"); } } });
+  const { work } = inCall("hidden");
+  work(true);
+  await act(async () => { await vi.advanceTimersByTimeAsync(SCREEN_POLL_MS); });
+  expect(player.plays).toBe(0);
+});
+
+test("a phone or a browser (no floating card): the page in the background is the screen off, as before", () => {
+  asApp({ callSurface: { active: () => true, still() {}, forget() {} } });
+  const { work } = inCall("hidden");
+  work(true);
+  act(() => setHidden(true));
+  expect(player.playing).toBe(1);
 });
