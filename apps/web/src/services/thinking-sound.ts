@@ -90,7 +90,7 @@ export interface ThinkingSoundLoop {
 
 /** `sound` playing in `made` at its cadence, through its own gain and limiter. Each next play is put on the audio clock one
  *  play ahead, when the one before it starts: a timer the browser delays (a page in the background) delays nothing heard. */
-function startLoop(made: AudioContext, sound: ThinkingSound, gainDb: number, random: () => number): ThinkingSoundLoop {
+function startLoop(made: AudioContext, sound: ThinkingSound, gainDb: number, random: () => number, unplayable: () => void): ThinkingSoundLoop {
   const gain = made.createGain();
   gain.gain.value = dbToGain(gainDb);
   const limiter = made.createDynamicsCompressor();
@@ -114,12 +114,20 @@ function startLoop(made: AudioContext, sound: ThinkingSound, gainDb: number, ran
     wake(buffer, at, at + buffer.duration + nextGapSeconds(sound, random));
   };
   // When the play at `at` begins, the one at `next` is put on the clock. A clock that has not got there (a context still
-  // suspended, a timer early) is waited for: never more than one play ahead.
+  // suspended, a timer early) is waited for: never more than one play ahead. A timer so late that `next` has gone by (a page
+  // long in the background) plays it now, and the cadence goes on from there: never a burst of the plays it missed.
   const wake = (buffer: AudioBuffer, at: number, next: number) => {
-    timer = setTimeout(() => { if (made.currentTime < at) wake(buffer, at, next); else play(buffer, next); },
+    timer = setTimeout(() => { if (made.currentTime < at) wake(buffer, at, next); else play(buffer, Math.max(next, made.currentTime)); },
       Math.max(0, (at - made.currentTime) * 1000));
   };
-  void decode(made, sound).then((buffer) => { if (buffer) play(buffer, made.currentTime); });
+  const release = () => { gain.disconnect(); limiter.disconnect(); };
+  // Neither format playable (offline, a file missing): nothing to hold the audio for until the loop is stopped.
+  void decode(made, sound).then((buffer) => {
+    if (stopped) return;
+    if (buffer) { play(buffer, made.currentTime); return; }
+    release();
+    unplayable();
+  });
   return {
     setGain(next) {
       if (stopped) return;
@@ -133,7 +141,7 @@ function startLoop(made: AudioContext, sound: ThinkingSound, gainDb: number, ran
       gain.gain.cancelScheduledValues(now);
       gain.gain.setTargetAtTime(0, now, TAIL_SECONDS / 3);
       for (const source of sources) { try { source.stop(now + TAIL_SECONDS); } catch { /* Already stopped. */ } }
-      setTimeout(() => { for (const source of sources) source.disconnect(); sources.clear(); gain.disconnect(); limiter.disconnect(); }, RELEASE_MS);
+      setTimeout(() => { for (const source of sources) source.disconnect(); sources.clear(); release(); }, RELEASE_MS);
     },
   };
 }
@@ -165,7 +173,16 @@ function playInPage(choice: ThinkingSoundChoice, random: () => number): Thinking
   if (!made) return null;
   playing++;
   void made.resume().catch(() => undefined);
-  const loop = startLoop(made, thinkingSound(choice.sound), choice.gainDb, random);
+  let counted = true;
+  // Out of the count once it plays nothing more (stopped, or nothing it could play); quiet between sounds: the context holds
+  // no output device while nothing plays.
+  const done = () => {
+    if (!counted) return;
+    counted = false;
+    playing--;
+    setTimeout(() => { if (!playing && made.state === "running") void made.suspend().catch(() => undefined); }, RELEASE_MS);
+  };
+  const loop = startLoop(made, thinkingSound(choice.sound), choice.gainDb, random, done);
   let stopped = false;
   return {
     setGain: (gainDb) => loop.setGain(gainDb),
@@ -173,9 +190,7 @@ function playInPage(choice: ThinkingSoundChoice, random: () => number): Thinking
       if (stopped) return;
       stopped = true;
       loop.stop();
-      playing--;
-      // Quiet between sounds: the context holds no output device while nothing plays.
-      setTimeout(() => { if (!playing && made.state === "running") void made.suspend().catch(() => undefined); }, RELEASE_MS);
+      done();
     },
   };
 }

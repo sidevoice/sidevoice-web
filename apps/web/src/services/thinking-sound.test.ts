@@ -26,10 +26,13 @@ class FakeContext {
   static made: FakeContext[] = [];
   static decodes: ArrayBuffer[] = [];
   static failDecodeOf: string | null = null;
+  static failAll = false;
   state: AudioContextState = "suspended";
   frozen = false;
+  /** Seconds the audio clock is ahead of the timers: a page whose timers were held back in the background. */
+  skew = 0;
   private origin = Date.now();
-  get currentTime() { return this.frozen ? 0 : (Date.now() - this.origin) / 1000; }
+  get currentTime() { return this.frozen ? 0 : (Date.now() - this.origin) / 1000 + this.skew; }
   destination = { destination: true };
   resume = vi.fn(async () => { this.state = "running"; });
   suspend = vi.fn(async () => { this.state = "suspended"; });
@@ -48,7 +51,7 @@ class FakeContext {
   async decodeAudioData(data: ArrayBuffer) {
     FakeContext.decodes.push(data);
     const name = new TextDecoder().decode(data);
-    if (FakeContext.failDecodeOf && name.endsWith(FakeContext.failDecodeOf)) throw new Error("cannot decode");
+    if (FakeContext.failAll || (FakeContext.failDecodeOf && name.endsWith(FakeContext.failDecodeOf))) throw new Error("cannot decode");
     return { duration: 0.6, name };
   }
 }
@@ -59,7 +62,7 @@ let opus = "";
 
 beforeEach(() => {
   vi.useFakeTimers();
-  FakeContext.made = []; FakeContext.decodes = []; FakeContext.failDecodeOf = null;
+  FakeContext.made = []; FakeContext.decodes = []; FakeContext.failDecodeOf = null; FakeContext.failAll = false;
   fetched = []; opus = "";
   vi.stubGlobal("AudioContext", FakeContext);
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
@@ -154,6 +157,43 @@ test("a clock that does not run yet holds one play ahead, never a pile of them",
   loop.stop();
 });
 
+test("timers held back past the next play (a page long in the background): it plays now and the cadence goes on, never a burst", async () => {
+  const loop = playThinkingSound(SOFT, () => 0);
+  await vi.advanceTimersByTimeAsync(0);
+  const [context] = FakeContext.made;
+  const [min] = thinkingSound(DEFAULT_THINKING_SOUND).interval;
+  expect(context.sources.map((source) => source.starts[0])).toEqual([0, 0.6 + min]);
+  context.skew = 60;
+  await vi.advanceTimersByTimeAsync((0.6 + min) * 1000 + 10);
+  const late = context.sources.slice(2).map((source) => source.starts[0]);
+  // The one it missed now, then the next a whole play and gap after it: two plays, not the dozen it missed.
+  expect(late).toHaveLength(2);
+  expect(late[0]).toBeCloseTo(60 + 0.6 + min, 3);
+  expect(late[1] - late[0]).toBeCloseTo(0.6 + min, 3);
+  loop.stop();
+});
+
+test("a sound neither format of which plays holds no audio for the rest of the turn", async () => {
+  FakeContext.failAll = true;
+  const loop = playThinkingSound(SOFT);
+  await vi.advanceTimersByTimeAsync(0);
+  const [context] = FakeContext.made;
+  expect(fetched).toEqual([`${DEFAULT_THINKING_SOUND}.m4a`, `${DEFAULT_THINKING_SOUND}.webm`]);
+  expect(context.sources).toHaveLength(0);
+  expect(context.gains[0].disconnect).toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(context.state).toBe("suspended");
+  loop.stop();
+  // Counted once: the next sound that plays keeps the context running, and its stop lets it rest.
+  FakeContext.failAll = false;
+  const next = playThinkingSound({ sound: "single-beat", gainDb: 0 });
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(context.state).toBe("running");
+  next.stop();
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(context.state).toBe("suspended");
+});
+
 test("the offset gains what plays, clamped to its range; a change applies at once", async () => {
   const loop = playThinkingSound({ sound: DEFAULT_THINKING_SOUND, gainDb: -6 });
   await vi.advanceTimersByTimeAsync(0);
@@ -237,7 +277,7 @@ test("an app that takes the sound plays the chosen one at the offset, once, and 
   expect(cue.start).toHaveBeenLastCalledWith("thinking", { sound: DEFAULT_THINKING_SOUND, gainDb: 10 });
 });
 
-test("an app whose cue takes no options (before the sounds): the page plays the chosen sound, and the Join tap begins its audio", async () => {
+test("an app whose cue takes no options (before the sounds): the page plays the chosen sound, and priming begins its audio", async () => {
   const cue = { start: vi.fn(), stop: vi.fn() };
   withCue(cue);
   primeThinkingSound();
