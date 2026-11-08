@@ -212,7 +212,7 @@ function Copyables() {
   return <div className="ds-stack">
     {COPY_STATES.map(({ name, feedback }) => <div className="ds-state" key={name}><code>{name}</code>
       <Snippet text={CONNECTOR_INSTALL} label={t("noMachine.copyCommand")} feedback={feedback} />
-      <Quote text={t("sidebar.newPhrase")} label={t("sidebar.newCopy")} feedback={feedback} />
+      <Quote text={t("connect.phrase")} label={t("sidebar.newCopy")} feedback={feedback} />
     </div>)}
     <div className="ds-state"><code>a file's lines</code><Snippet text={CONFIG} /></div>
   </div>;

@@ -2,8 +2,7 @@ import type { ReactNode, Ref } from "react";
 import { CheckIcon, EndOfTurnIcon, MachinesIcon, MicrophoneIcon, OtherMachineIcon, SidevoiceMark, ThisComputerIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { useRoomStore } from "../../state/room-store";
 import { currentDeviceName } from "../../state/device-name";
-import { ConnectYourAgent, PANEL_VARIANTS } from "../room/ConnectYourAgent";
-import { useVariant } from "../../lib/variants";
+import { ConnectYourAgent } from "../room/ConnectYourAgent";
 import { useModelState } from "../settings/ModelSetup";
 import { useVoiceModels } from "../call/VoiceModels";
 import type { Translate } from "../../i18n/translator";
@@ -33,7 +32,6 @@ function RecapRow({ icon, label, value, detail, state = "done" }: { icon: ReactN
 export function ReadyStep({ path, machineName, title, t, live, microphoneNone = false }: {
   path: "agents" | "remote" | null; machineName: string; title: Ref<HTMLHeadingElement>; t: Translate; live: { machine: boolean; microphone: boolean }; microphoneNone?: boolean;
 }) {
-  const panel = useVariant("new-conversation-panel", PANEL_VARIANTS);
   const models = useVoiceModels().rows;
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
@@ -85,7 +83,6 @@ export function ReadyStep({ path, machineName, title, t, live, microphoneNone = 
       </dl>
       <p className="wizard-recap-note">{t("wizard.recap.note")}</p>
     </div>
-    {/* What New conversation shows, as the panel's variant draws it (an open decision, sidevoice-web#463). */}
-    <div className="wizard-ready-connect"><ConnectYourAgent titleAs="h3" variant={panel} /></div>
+    <div className="wizard-ready-connect"><ConnectYourAgent titleAs="h3" /></div>
   </section>;
 }

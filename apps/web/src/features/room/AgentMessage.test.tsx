@@ -8,7 +8,7 @@ import { COPY_FEEDBACK_MS } from "../../components/ui/Snippet";
 
 /* The phrase to say to an agent on one line (the landing's message for the agent): the mark, the phrase, its copy button. */
 
-const PHRASE = "Connect to Sidevoice (use its voice_connect tool)";
+const PHRASE = "Connect this conversation to Sidevoice.";
 const previousClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => {
@@ -51,7 +51,8 @@ test("it shows the Sidevoice mark at its start, then the phrase, quoted as it is
   expect(mark).toHaveAttribute("aria-hidden", "true");
   expect([...mark.querySelectorAll("rect")].some((bar) => bar.getAttribute("style")?.includes("--sv-voice"))).toBe(true);
   expect(box.querySelector(".agent-message-text")).toHaveTextContent(PHRASE);
-  expect(box).toHaveTextContent(new RegExp("^" + PHRASE.replace(/[()]/g, "\\$&") + "$"));
+  // The mark says nothing: the box's text is the phrase alone.
+  expect(box.textContent).toBe(PHRASE);
 });
 
 test("its button copies the phrase, turns into a check and says Copied out of sight, then is the copy button again", async () => {

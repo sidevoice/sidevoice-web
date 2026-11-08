@@ -136,15 +136,6 @@ const openNewConversation = (doc: Document) => {
   });
   shown?.click();
 };
-/** The conversations folded into the rail (a desktop's). */
-const toRail = (doc: Document) => { doc.querySelector<HTMLElement>(".sidebar-collapse")?.click(); };
-/** The open decisions on New conversation (sidevoice-web#463): the panel's variants and the button's options, each
- *  beside today's. */
-const PANEL = ["current", "a", "b", "c"] as const;
-const PANEL_CAPTION = { current: "today's: a title, a line, the phrase between guillemets", a: "A, the same few lines, shorter, the phrase on one line",
-  b: "B, the landing's three steps, the phrase on one line under the second", c: "C, centred, a creature waiting behind the phrase on one line" };
-const BUTTON_CAPTION = { current: "today's: a secondary button, a ghost +, a dashed circle", a: "A, an empty card: the next conversation's, its creature's place empty",
-  b: "B, the accent's soft fill", c: "C, a quiet row, no edge or fill until pointed at" };
 /** A reply of the agent's arriving once the page is drawn, after the transcript has marked the rest seen. */
 const arrives = (text: string) => (doc: Document) => {
   const history = BASE_FACTS.history as Record<string, unknown>[];
@@ -249,6 +240,7 @@ export const JOURNEYS: Journey[] = [
         person("t-release", "Codex — release notes for 0.3 (gpt-6-astra)", { harness: "codex", engine: { model: "gpt-6-astra", effort: "medium" } }),
         person("t-review", "\"Review of PR #109: every language and the end-of-turn try\"", { harness: "claude-code" }), person("t-notes", "notes (Cursor)", { harness: "cursor", reach: { state: "holding" } })] } },
     { id: "conversations", caption: "A conversation on the stage; the others beside it (a phone: from the header).", facts: {} },
+    { id: "new-conversation", caption: "New conversation: the page cannot start one, so it says what to tell the agent, the phrase on one line to copy.", after: openNewConversation },
     { id: "speaking", caption: "The agent speaking: its words as they are said.", facts: { botLive: true, karaokeState: { segment: "h-2", from: 0, to: 58 }, history: [
       ...(BASE_FACTS.history as unknown[]).slice(0, 1), { ...(BASE_FACTS.history as Record<string, unknown>[])[1], audio: "playing" }] } },
     { id: "speaking-long", caption: "A long reply: three lines at a time, its pages following the voice, the end of the page before fading above.",
@@ -278,11 +270,6 @@ export const JOURNEYS: Journey[] = [
         { segment: "turn-disconnected", thread: "fp-nuc|t-web", role: "assistant", text: "The result arrived while your call was away.", name: "sidevoice-web", time: Date.now(), session: "s1", seq: 4, audio: "text_only", audio_reason: "disconnected", hearing: "not_heard", globally_heard: false, replayable: true }] },
       after: press("transcript-toggle") },
     { id: "transcript-unread", caption: "A reply arrived while the transcript was closed: a dot on its button.", after: arrives("Both tests pass now. Shall I push the fix?") },
-  ] },
-  { id: "new-conversation", title: "New conversation (open decision, #463)", note: "The panel New conversation opens, with the phrase to say on one line, and the button itself in the list, the rail and a phone's header: today's beside each option. Nothing here is chosen.", shots: [
-    ...PANEL.map((variant) => ({ id: "nc-panel-" + variant, caption: "The panel, " + PANEL_CAPTION[variant] + ".", variants: { "new-conversation-panel": variant }, after: openNewConversation })),
-    ...PANEL.map((variant) => ({ id: "nc-button-" + variant, caption: "The button, " + BUTTON_CAPTION[variant] + ".", variants: { "new-conversation-button": variant } })),
-    ...PANEL.map((variant) => ({ id: "nc-rail-" + variant, caption: "The button in the rail, " + BUTTON_CAPTION[variant] + ".", variants: { "new-conversation-button": variant }, views: ["desktop" as const], after: toRail })),
   ] },
   { id: "settings", title: "Settings", note: "Each section, applied as it changes (no Save).", shots: [
     { id: "s-general", caption: "General: language and appearance.", after: openSettings("general") },
