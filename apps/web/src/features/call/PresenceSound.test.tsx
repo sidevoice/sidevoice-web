@@ -157,11 +157,41 @@ test("desktop, an app that says the screen is locked: the sound plays while it i
 test("desktop, an app whose answer fails: the screen counts as on", async () => {
   vi.useFakeTimers();
   onTestFinished(() => { vi.useRealTimers(); });
-  asApp({ callControls, screen: { locked: async () => { throw new Error("no session"); } } });
+  let fails = false;
+  const screen = { locked: vi.fn(async () => { if (fails) throw new Error("no session"); return true; }) };
+  asApp({ callControls, screen });
   const { work } = inCall("hidden");
   work(true);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  expect(player.playing).toBe(1);
+  fails = true;
   await act(async () => { await vi.advanceTimersByTimeAsync(SCREEN_POLL_MS); });
-  expect(player.plays).toBe(0);
+  expect(screen.locked).toHaveBeenCalledTimes(2);
+  expect(player.playing).toBe(0);
+});
+
+test("desktop, an app slow to answer is asked once at a time, and a late answer never overtakes a later one", async () => {
+  vi.useFakeTimers();
+  onTestFinished(() => { vi.useRealTimers(); });
+  const answers: ((locked: boolean) => void)[] = [];
+  const screen = { locked: vi.fn(() => new Promise<boolean>((resolve) => { answers.push(resolve); })) };
+  asApp({ callControls, screen });
+  const { work } = inCall("hidden");
+  work(true);
+  await act(async () => { await vi.advanceTimersByTimeAsync(SCREEN_POLL_MS * 5); });
+  expect(screen.locked).toHaveBeenCalledTimes(1);
+  await act(async () => { answers[0](true); await vi.advanceTimersByTimeAsync(0); });
+  expect(player.playing).toBe(1);
+  await act(async () => { await vi.advanceTimersByTimeAsync(SCREEN_POLL_MS); });
+  expect(screen.locked).toHaveBeenCalledTimes(2);
+  await act(async () => { answers[1](false); await vi.advanceTimersByTimeAsync(0); });
+  expect(player.playing).toBe(0);
+  // Done working while a question is out: its answer changes nothing.
+  await act(async () => { await vi.advanceTimersByTimeAsync(SCREEN_POLL_MS); });
+  work(false);
+  await act(async () => { answers[2](true); await vi.advanceTimersByTimeAsync(SCREEN_POLL_MS * 2); });
+  expect(player.playing).toBe(0);
+  expect(screen.locked).toHaveBeenCalledTimes(3);
 });
 
 test("a phone or a browser (no floating card): the page in the background is the screen off, as before", () => {

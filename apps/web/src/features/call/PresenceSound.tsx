@@ -33,13 +33,21 @@ function useScreenOff(asking: boolean) {
     document.addEventListener("visibilitychange", changed);
     return () => document.removeEventListener("visibilitychange", changed);
   }, []);
+  // One question at a time, the next a while after the answer: an answer never overtakes a later one, and an app that does
+  // not answer is not asked again and again.
   useEffect(() => {
     if (!screen || !asking) { setLocked(false); return; }
     let gone = false;
-    const ask = () => { void screen.locked().then((now) => { if (!gone) setLocked(now === true); }, () => { if (!gone) setLocked(false); }); };
+    let next: ReturnType<typeof setTimeout> | undefined;
+    const ask = () => {
+      void screen.locked().then((now) => now === true, () => false).then((now) => {
+        if (gone) return;
+        setLocked(now);
+        next = setTimeout(ask, SCREEN_POLL_MS);
+      });
+    };
     ask();
-    const every = setInterval(ask, SCREEN_POLL_MS);
-    return () => { gone = true; clearInterval(every); };
+    return () => { gone = true; clearTimeout(next); };
   }, [screen, asking]);
   return screen ? locked : callControls ? false : hidden;
 }
