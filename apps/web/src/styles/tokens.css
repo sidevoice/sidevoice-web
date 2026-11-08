@@ -1,0 +1,44 @@
+:root {
+  --sv-bg: #14171b;
+  --sv-surface: #1c2128;
+  --sv-surface-raised: #252b33;
+  --sv-border: #303742;
+  --sv-text: #e8edf1;
+  --sv-muted: #a1acb9;
+  /* The brand accent (from the Sidevoice brand kit): lila on dark, noche on lila, and mustard for the
+     mark's fourth bar. The rest are the same hue, stepped for text, fills and selection. */
+  --sv-primary: #c9b6ec;
+  --sv-on-primary: #2a1a40;
+  --sv-voice: #e0a82e;
+  --sv-primary-soft: #e4dbf6;
+  --sv-primary-dim: #b7a6d6;
+  --sv-primary-muted: #3a2f52;
+  --sv-selected: #2a2438;
+  --sv-selected-border: #8a76b3;
+  --sv-positive: #75d6ad;
+  --sv-danger: #ea4335;
+  --sv-radius-sm: 10px;
+  --sv-radius-md: 18px;
+  --sv-radius-pill: 999px;
+  --sv-shadow-dialog: 0 24px 80px rgb(0 0 0 / 55%);
+  --sv-header-height: 64px;
+  /* The colour of an agent's state (the same wherever the app shows it as a colour: a conversation's dot and its light, the
+     floating card's), scheme E: green while it listens (and transcribes), blue while it speaks, violet while it works. The
+     operator chose it over the others (decided 2026-11-05; the alternatives were Sidevoice's violet for the voice, iOS system
+     colours and the call apps'). Swapping is these seven lines. A working conversation's dot blinks in its working colour (operator, final). Muted is the microphone's switch over any state, not a state.
+     The dark theme lightens the chromatic ones about 40% toward white (below), the greys as they are: they already read there. */
+  --sv-state-listening: #2fb67c;
+  --sv-state-speaking: #3d8bfd;
+  --sv-state-working: #6b4fd8;
+  --sv-state-attention: #e0a82e;
+  --sv-state-muted: #e5484d;
+  --sv-state-idle: #b9b3c4;
+  --sv-state-offline: #8a8594;
+}
+[data-theme="dark"] {
+  --sv-state-listening: #82d3b0;
+  --sv-state-speaking: #8bb9fe;
+  --sv-state-working: #a695e8;
+  --sv-state-attention: #eccb82;
+  --sv-state-muted: #ef9194;
+}

@@ -1,0 +1,21 @@
+export const OUTBOX_LIMIT: number;
+export interface OutboxEntry {
+  id: string; kind: 'user-turn' | 'playback'; session_id: string | null; node: string | null;
+  payload: unknown; created: number; order: number;
+}
+export interface Outbox {
+  ready: Promise<void>;
+  /** Null when the outbox is full: the newest is refused, never an older one let go. */
+  add(entry: { id: string; kind: OutboxEntry['kind']; session_id?: string | null; node?: string | null; payload: unknown }): OutboxEntry | null;
+  remove(id: string): boolean;
+  get(id: string): OutboxEntry | null;
+  list(): OutboxEntry[];
+  clear(which?: (entry: OutboxEntry) => boolean): void;
+  readonly size: number;
+}
+export function createOutbox(options?: {
+  scope?: string; indexedDB?: IDBFactory | null; now?(): number; limit?: number;
+  orderStore?: { getItem(key: string): string | null; setItem(key: string, value: string): void } | null;
+}): Outbox;
+export const RESEND_BACKOFF_MS: number[];
+export function resendDelay(sent: number): number;

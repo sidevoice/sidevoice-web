@@ -1,0 +1,69 @@
+/* A machine's coding agents (HostAgentsPanel): one row each — its mark, name and version, where it stands, and what can
+ * be done — with the instructions to connect one by hand opening under its row. */
+.host-agents { display: grid; gap: var(--sv-space-3); min-width: 0; }
+.host-agents-heading, .host-agent-main { display: flex; align-items: center; gap: var(--sv-space-3); min-width: 0; }
+.host-agents-heading { gap: var(--sv-space-2); }
+.host-agents-heading h4 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); }
+.host-agents-scanned { flex: 1; min-width: 0; overflow: hidden; font-size: var(--sv-font-xs); color: var(--sv-text-subtle); white-space: nowrap; text-overflow: ellipsis; }
+.host-agent-rows { display: grid; margin: 0; padding: 0; list-style: none; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-surface); box-shadow: var(--sv-shadow-sm); overflow: hidden; }
+.host-agent-row { min-width: 0; }
+.host-agent-row + .host-agent-row { border-top: 1px solid var(--sv-border); }
+.host-agent-main { padding: 14px var(--sv-space-5); }
+.host-agent-icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken); color: var(--sv-text-muted); }
+.host-agent-copy { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.host-agent-name { display: flex; align-items: center; gap: var(--sv-space-1-5); min-width: 0; overflow: hidden; white-space: nowrap; font-weight: 600; }
+.host-agent-name .muted { font-weight: 400; color: var(--sv-text-subtle); }
+/* One line, always: a row keeps its height whatever it says (the whole of it in its title). */
+.host-agent-status { overflow: hidden; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); white-space: nowrap; text-overflow: ellipsis; transition: color var(--sv-dur-fast, .15s) var(--sv-ease, ease); }
+.host-agent-ok { color: var(--sv-positive); }
+.host-agent-error { color: var(--sv-danger); }
+/* Needs attention: the state in the warning colour, its reason after it in the muted one. */
+.host-agent-attention { color: var(--sv-warning); }
+.host-agent-reason { color: var(--sv-text-muted); }
+.host-agent-actions { display: flex; flex: none; align-items: center; justify-content: flex-end; gap: var(--sv-space-1); }
+.host-agent-chevron-up { transform: rotate(180deg); }
+.host-agent-howto { display: grid; gap: var(--sv-space-2); min-width: 0; margin: 0 var(--sv-space-5) var(--sv-space-4); padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.host-agent-howto p { margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); }
+.host-agent-howto-label { font-weight: 600; color: var(--sv-text-muted); }
+/* The way to an agent the list does not show: a quiet link under it, its instructions opening below. */
+.host-agent-other { display: grid; gap: var(--sv-space-2); min-width: 0; }
+.host-agent-other-link { display: inline-flex; align-items: center; gap: var(--sv-space-1); justify-self: start; padding: var(--sv-space-1) 0; border: 0; background: none; color: var(--sv-text-muted); font: inherit; font-size: var(--sv-font-sm); text-decoration: underline; text-decoration-color: var(--sv-border-strong); text-underline-offset: 3px; cursor: pointer; }
+@media (hover: hover) { .host-agent-other-link:hover { color: var(--sv-text); } }
+.host-agent-other-link:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: var(--sv-radius-sm); }
+.host-agent-other .host-agent-howto { margin: 0; }
+.host-agent-problem { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); padding: var(--sv-space-3) 14px; border: 1px solid color-mix(in srgb, var(--sv-danger) 30%, transparent); border-radius: var(--sv-radius-md); background: var(--sv-danger-soft); color: var(--sv-text); }
+.host-agent-problem p { margin: 0; line-height: 1.45; }
+.host-agent-tab-label { display: inline-flex; align-items: center; gap: var(--sv-space-1-5); }
+@media (max-width: 550px) {
+  .host-agent-main { gap: var(--sv-space-2); padding: var(--sv-space-3) var(--sv-space-4); }
+  /* On a phone the name keeps its width: the actions go under it, the whole width, in every row alike. */
+  .host-agent-main { flex-wrap: wrap; }
+  .host-agent-copy { flex: 1 1 calc(100% - 48px); }
+  .host-agent-actions { flex: 1 1 100%; justify-content: flex-end; }
+  .host-agent-problem { align-items: flex-start; flex-direction: column; }
+}
+
+.host-agent-confirm { display: grid; gap: var(--sv-space-2); margin: 0 var(--sv-space-5) var(--sv-space-4); padding: var(--sv-space-3) var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
+.host-agent-confirm p { margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); }
+.host-agent-confirm-actions { display: flex; justify-content: flex-end; gap: var(--sv-space-2); }
+.host-agents-stale { margin: 0; font-size: var(--sv-font-xs); }
+.host-agents-scanned[data-failed] { color: var(--sv-danger); }
+.host-agent-problem-quiet { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); }
+.host-agent-problem-quiet p { margin: 0; }
+.host-agent-status-line { display: flex; align-items: center; gap: var(--sv-space-1); min-width: 0; }
+.host-agent-status-line .host-agent-status { min-width: 0; }
+.host-agent-status-line .ui-infotip { flex: none; }
+.host-agent-steps { display: grid; gap: var(--sv-space-3); margin: 0; padding-inline-start: var(--sv-space-5); }
+.host-agent-steps > li { display: grid; gap: var(--sv-space-1); min-width: 0; }
+
+/* Where a remote machine's steps are run, above them. */
+.host-agent-where { margin: 0 0 var(--sv-space-2); font-weight: 600; }
+
+/* Readiness speaks only when something needs doing: a chip in the status line, its reasons below when opened. */
+.host-agent-readiness-toggle { flex: none; height: auto; padding: 0; }
+.host-agent-readiness-state.ui-badge { height: auto; min-height: 20px; padding-block: 2px; line-height: 1.2; white-space: nowrap; }
+.host-agent-readiness { display: grid; gap: var(--sv-space-2); margin: 0 var(--sv-space-5) var(--sv-space-3); border-top: 1px solid var(--sv-border); padding-top: var(--sv-space-2); min-width: 0; font-size: var(--sv-font-sm); }
+.host-agent-readiness p { margin: 0; line-height: 1.4; overflow-wrap: anywhere; }
+@media (max-width: 550px) {
+  .host-agent-readiness { margin-inline: var(--sv-space-4); }
+}

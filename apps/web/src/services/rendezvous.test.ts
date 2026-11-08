@@ -1,0 +1,101 @@
+import { afterEach, expect, test } from "vitest";
+import { askTarget, callSocketUrl, describeTarget, isNodePath, pageTarget, resolveTarget, routeUrl, targetAnswers } from "./rendezvous.js";
+
+const ORIGIN = "https://room.example";
+
+afterEach(() => { delete window.__SIDEVOICE_TARGET__; });
+
+test("the target is what a shell set, else the page's own origin — never something a link names", () => {
+  expect(resolveTarget({ injected: "https://other.example/", origin: ORIGIN })).toBe("https://other.example");
+  expect(resolveTarget({ injected: undefined, origin: ORIGIN })).toBe("");
+  expect(resolveTarget({})).toBe("");
+  // A link cannot point the room's own page at another server: its microphone and keys would go there.
+  window.history.replaceState(null, "", "/voice/?target=https://attacker.example");
+  expect(pageTarget()).toBe("");
+  window.history.replaceState(null, "", "/");
+});
+
+test("a target that is not an http address is not a target, and the page stays on its own origin", () => {
+  expect(resolveTarget({ injected: "javascript:alert(1)", origin: ORIGIN })).toBe("");
+  expect(resolveTarget({ injected: "   ", origin: ORIGIN })).toBe("");
+  expect(resolveTarget({ injected: 42, origin: ORIGIN })).toBe("");
+});
+
+test("a target keeps its path, loses its query and trailing slash, and the page's own origin reads as relative", () => {
+  expect(resolveTarget({ injected: "https://host.example/sidevoice/?x=1#y", origin: ORIGIN })).toBe("https://host.example/sidevoice");
+  // Pointing a page at the origin that serves it changes nothing: every path stays relative, as before the split.
+  expect(resolveTarget({ injected: "https://room.example/", origin: ORIGIN })).toBe("");
+});
+
+test("the page reads its target from the window a shell writes to, before its own address", () => {
+  expect(pageTarget()).toBe("");
+  window.__SIDEVOICE_TARGET__ = "http://127.0.0.1:8767/";
+  expect(pageTarget()).toBe("http://127.0.0.1:8767");
+});
+
+test("what a target is: a node by its fingerprint, or neither", () => {
+  expect(describeTarget({ kind: "node", fingerprint: "fp-1" })).toEqual({ kind: "node", fingerprint: "fp-1", build: null });
+  // A 404's body, a static server's page, not a node.
+  for (const answer of [null, {}, { binding: null }, { kind: "" }, { kind: 3 }]) expect(describeTarget(answer)).toBeNull();
+});
+
+test("a newer server's rendezvous answer is read for what this version knows of it (core#112)", () => {
+  // Extra fields ignored.
+  expect(describeTarget({ kind: "node", fingerprint: "fp-1", api: 4, features: ["relay"] })).toEqual({ kind: "node", fingerprint: "fp-1", build: null });
+  // Optional fields missing, or of a shape it does not know: none.
+  expect(describeTarget({ kind: "node" })).toEqual({ kind: "node", fingerprint: null, build: null });
+  // A kind it does not know yet: what it says of its fingerprint and build, all the same.
+  expect(describeTarget({ kind: "node+room", fingerprint: "fp-1", web_build: "b2" })).toEqual({ kind: "unknown", fingerprint: "fp-1", build: "b2" });
+  expect(describeTarget({ kind: "other" })).toEqual({ kind: "unknown", fingerprint: null, build: null });
+});
+
+test("asking the target: a failure, or anything that is not a node, is no answer at all", async () => {
+  const asked: string[] = [];
+  const answer = (status: number, body: unknown = {}) => (async (url: string) => { asked.push(url); return new Response(JSON.stringify(body), { status }); }) as unknown as typeof fetch;
+
+  expect(await askTarget("https://node.example", answer(200, { kind: "unknown-kind", web_build: "b2" }))).toMatchObject({ kind: "unknown", build: "b2" });
+  expect(asked.at(-1)).toBe("https://node.example/api/rendezvous");
+  expect(await askTarget("", answer(200, { kind: "node", fingerprint: "fp" }))).toMatchObject({ kind: "node", fingerprint: "fp" });
+  expect(asked.at(-1)).toBe("/api/rendezvous");
+  expect(await askTarget("", answer(404))).toBeNull();
+  expect(await askTarget("", answer(502))).toBeNull();
+  expect(await askTarget("", (async () => { throw new TypeError("Failed to fetch"); }) as unknown as typeof fetch)).toBeNull();
+  expect(await askTarget("", (async () => new Response("<html>", { status: 200 })) as unknown as typeof fetch)).toBeNull();
+  // A target that never answers is no answer, after a while, rather than a page that waits for ever.
+  const hangs = (() => new Promise(() => {})) as unknown as typeof fetch;
+  expect(await askTarget("https://blackhole.example", hangs, 5)).toBeNull();
+});
+
+test("a conversation's request, and this device's pairing, go to the node; the room's own paths to the target", () => {
+  for (const path of ["/api/presentation", "/api/presentation?session_id=s", "/api/presentation/history?session_id=s", "/api/presentation/integrations/openai", "/api/presentation/client-error",
+    "/api/device/identity?nonce=n", "/api/device/devices/d-1", "/api/models/catalog", "/api/host/agents", "/api/host/agents/codex/connect"])
+    expect([path, isNodePath(path)]).toEqual([path, true]);
+  for (const path of ["/api/connectors", "/api/connectors/pairing-code", "/api/connectors/c-1", "/api/presentationx", "/api/devices", "/api/modelsx", "/voice-browser/room-client.js"])
+    expect([path, isNodePath(path)]).toEqual([path, false]);
+
+  expect(routeUrl("/api/presentation/participants?session_id=s", "", "/nodes/mac")).toBe("/nodes/mac/api/presentation/participants?session_id=s");
+  expect(routeUrl("/api/connectors", "", "/nodes/mac")).toBe("/api/connectors");
+  expect(routeUrl("/api/presentation", "https://room.example", "https://room.example/nodes/mac")).toBe("https://room.example/nodes/mac/api/presentation");
+  // A node that serves the page itself keeps every path relative.
+  expect(routeUrl("/api/presentation/select", "", "")).toBe("/api/presentation/select");
+  // No machine: nothing of a node can be asked, while the room's own endpoints still answer.
+  expect(routeUrl("/api/presentation/languages", "", null)).toBeNull();
+  expect(routeUrl("/api/connectors/pairing-code", "", null)).toBe("/api/connectors/pairing-code");
+});
+
+test("the call socket opens on the node base, in the page's scheme or the target's own", () => {
+  const page = { protocol: "https:", host: "room.example" };
+  expect(callSocketUrl("", page)).toBe("wss://room.example/api/presentation/ws");
+  expect(callSocketUrl("/nodes/mac", page)).toBe("wss://room.example/nodes/mac/api/presentation/ws");
+  expect(callSocketUrl("/nodes/mac", { protocol: "http:", host: "127.0.0.1:5173" })).toBe("ws://127.0.0.1:5173/nodes/mac/api/presentation/ws");
+  expect(callSocketUrl("http://node.lan:8767", page)).toBe("ws://node.lan:8767/api/presentation/ws");
+  expect(callSocketUrl("https://room.example/nodes/mac", page)).toBe("wss://room.example/nodes/mac/api/presentation/ws");
+});
+
+test("a target is asked unless it is the page's own origin and a static site's target.js said nothing is there", () => {
+  expect(targetAnswers("https://room.example", null)).toBe(true);
+  expect(targetAnswers("", undefined)).toBe(true);
+  expect(targetAnswers("", null)).toBe(false);
+  window.__SIDEVOICE_TARGET__ = null as unknown as string;
+  expect(targetAnswers(pageTarget())).toBe(false);
+});

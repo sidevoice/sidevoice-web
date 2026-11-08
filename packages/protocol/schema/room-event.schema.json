@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sidevoice.dev/schema/room-event.json",
+  "$comment": "Open to fields this schema does not list (sidevoice/sidevoice-core#112): frames carry `seq`, a hello carries `label` and `id`, and a newer version may add more. Readers ignore what they do not know.",
+  "title": "Sidevoice room event",
+  "type": "object",
+  "required": ["type"],
+  "properties": {
+    "type": { "type": "string", "minLength": 1 },
+    "data": { "type": "object" }
+  },
+  "additionalProperties": true
+}

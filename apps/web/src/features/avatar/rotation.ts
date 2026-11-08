@@ -1,0 +1,100 @@
+import { nextRest, nextWork, spellOf, type RestStep } from "./creature/schedule";
+
+/* What a creature has on the go is the client's, not the rig's: a working style while it works, a resting step while it
+ * rests, by the design reference's rules (creature/schedule.ts: its lists, its timings, its turn-taking). Which one is
+ * showing is a PURE FUNCTION of (seed, time since the sequence began): the steps are drawn from a seeded generator, so
+ * every window that asks the same question gets the same answer, with no owner window and nothing relayed (web#334). The
+ * caller says where the sequence began (the figure's `restStart`); the creature acts out the current pick (the state's
+ * `work` and `idle`, as its base act: creature/host.ts).
+ *
+ *   work  a style when work starts, swapped for another after that style's own spell (hammering comes in short bursts,
+ *         reading files goes on: WORK_DURATION), never the same one twice in a row (nextWork)
+ *   idle  steps: quiet for a few seconds, then one pastime for its own spell (IDLE_DEFS), then quiet again, then another
+ *         pastime (never the last one; the nap half as likely), and so on (nextRest)
+ *
+ * A sequence is generated up to CYCLE_MS and then repeats: a figure that rests for hours costs the same as one that has
+ * rested for ten minutes (`t` is reduced by whole cycles, arithmetically). */
+
+/** A pick, how long it lasts, and what the next pick is made from. */
+interface Step<S> { value: string; ms: number; state: S }
+interface Kind<S> {
+  first(pool: readonly string[], random: () => number): Step<S>;
+  next(state: S, pool: readonly string[], random: () => number): Step<S>;
+}
+/** A spell in whole ms (the reference keeps seconds). */
+const toMs = (seconds: number) => Math.round(seconds * 1000);
+const work: Kind<string> = {
+  first: (pool, random) => workStep(nextWork(null, pool, random), random),
+  next: (prev, pool, random) => workStep(nextWork(prev, pool, random), random),
+};
+const workStep = (value: string, random: () => number): Step<string> => ({ value, ms: toMs(spellOf("work", value, random)), state: value });
+const idle: Kind<RestStep> = {
+  first: (pool, random) => restStep(nextRest(null, pool, random), random),
+  next: (prev, pool, random) => restStep(nextRest(prev, pool, random), random),
+};
+const restStep = (step: RestStep, random: () => number): Step<RestStep> => ({ value: step.rest, ms: toMs(spellOf("rest", step.rest, random)), state: step });
+const KINDS = { work, idle } as Record<"work" | "idle", Kind<unknown>>;
+export type RotationKind = keyof typeof KINDS;
+
+/** How much of a sequence is generated before it repeats (a step that crosses this line is whole). */
+export const CYCLE_MS = 10 * 60_000;
+
+/** A small, well-known seeded generator (mulberry32) over a string seed hashed with FNV-1a. */
+export function seededRandom(seed: string): () => number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 0x01000193);
+  let a = h >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), a | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* The sequence repeats, so its end meets its start: a cycle ends on a pastime (never mid-quiet), and if its last pastime or
+ * style is the same as its first, the last step (with the quiet before it) is dropped, so the cycle ends on the one before
+ * it, which differs from it and so from the first: never the same twice in a row, whatever the pool, wrap included. Only
+ * a pool with a single pastime (or style) has nothing else to play, and repeats it, as nextRest does within a cycle. */
+interface Cycle { values: string[]; ends: number[]; length: number }
+const cycles = new Map<string, Cycle>();
+
+function cycleOf(kind: RotationKind, seed: string, pool: readonly string[]): Cycle {
+  const id = [kind, seed, ...pool].join("\u0000");
+  let cycle = cycles.get(id);
+  if (cycle) return cycle;
+  const random = seededRandom(id);
+  const values: string[] = [], spells: number[] = [];
+  let step = KINDS[kind].first(pool, random), length = 0;
+  for (;;) {
+    values.push(step.value);
+    spells.push(Math.max(1, step.ms));
+    length += spells[spells.length - 1];
+    if (length >= CYCLE_MS && (step.value !== "quiet" || !pool.some((v) => v !== "quiet"))) break;
+    step = KINDS[kind].next(step.state, pool, random);
+  }
+  const first = kind === "idle" ? 1 : 0, last = values.length - 1;
+  if (last > first + 2 && values[first] === values[last] && new Set(pool.filter((v) => v !== "quiet")).size > 1) {
+    const dropped = kind === "idle" ? 2 : 1;
+    values.length -= dropped;
+    spells.length -= dropped;
+  }
+  const ends = spells.map((_, i) => spells.slice(0, i + 1).reduce((a, b) => a + b, 0));
+  length = ends[ends.length - 1];
+  if (cycles.size >= 64) cycles.clear();
+  cycles.set(id, (cycle = { values, ends, length }));
+  return cycle;
+}
+
+/** How long one cycle of the sequence `seed` names is, in ms. */
+export const cycleLength = (kind: RotationKind, seed: string, pool: readonly string[]) => cycleOf(kind, seed, pool).length;
+
+/** The pick showing `t` ms into the sequence `seed` names (t >= 0), and when it began and ends, in ms from the same start. */
+export function rotationAt(kind: RotationKind, seed: string, pool: readonly string[], t: number): { value: string; start: number; end: number } {
+  const cycle = cycleOf(kind, seed, pool);
+  const base = Math.floor(Math.max(0, t) / cycle.length) * cycle.length;
+  const into = Math.max(0, t) - base;
+  let lo = 0, hi = cycle.ends.length - 1;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (cycle.ends[mid] > into) hi = mid; else lo = mid + 1; }
+  return { value: cycle.values[lo], start: base + (lo ? cycle.ends[lo - 1] : 0), end: base + cycle.ends[lo] };
+}

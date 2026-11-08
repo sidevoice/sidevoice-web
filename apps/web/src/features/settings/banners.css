@@ -1,0 +1,5 @@
+/* The room's banners (LocalHostBanner, StorageBlockedBanner): an inline alert stretched into a bar across the page,
+ * under the header or above everything, with only its bottom edge. */
+.room-banner { flex: none; }
+.room-banner > .ui-alert { padding-inline: var(--sv-space-5); border-width: 0 0 1px; border-radius: 0; }
+@media (max-width: 599px) { .room-banner > .ui-alert { padding-inline: var(--sv-space-4); } }

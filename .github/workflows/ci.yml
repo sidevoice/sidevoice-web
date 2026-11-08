@@ -1,0 +1,72 @@
+name: ci
+
+# Every pull request: the build, the tests, and the release packaging exactly as a release builds it
+# (`node scripts/release.mjs dist`), the container image for both platforms, and the browser e2e (apps/web/e2e),
+# publishing nothing. What passes here
+# is what merging publishes (release.yml).
+# RELEASING.md.
+on:
+  pull_request:
+    branches: [main]
+  # release-please.yml dispatches it on the release PR, whose pushes start no workflow.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build, test and package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: ./.github/actions/setup
+      # The page and its packages are built before the suites run, so they test what a deployment serves.
+      - run: npm run build
+      # Only src/host names a host mechanism (apps/web/lint/host-rules.mjs).
+      - run: npm run lint
+      - run: npm test
+      - run: node scripts/release.mjs dist
+
+  image:
+    name: Container image (built, not pushed)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      # Both platforms a release pushes, so a change that breaks either fails here and not after merging.
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/web-static/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: false
+          provenance: false
+          cache-from: type=gha,scope=web-image
+
+  e2e:
+    name: Browser e2e (Chromium, WebKit)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: ./.github/actions/setup
+      # The static site as a deployment serves it, in real browsers: Settings → Machines → a machine's Agents.
+      - run: npm run build
+      - run: node scripts/assemble-static-web.mjs "$RUNNER_TEMP/site"
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run e2e -w @sidevoice/web
+        env:
+          SIDEVOICE_STATIC_SITE: ${{ runner.temp }}/site
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        with:
+          name: browser-e2e
+          path: |
+            apps/web/test-results/playwright/
+            apps/web/playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore

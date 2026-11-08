@@ -1,0 +1,93 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { expect, test } from "vitest";
+import { avatarFor, PERSON_AVATAR, SIDEVOICE_MASCOT } from "./avatar-spec";
+import { avatarColor, avatarRepertoire, drawAvatar, engineSize, withOwnIds } from "./bicho-draw";
+import { creatureFromSeed } from "./creature/catalogue";
+import type { Spec } from "./engine/bichos/kit";
+import { renderSpec } from "./engine/bichos/render";
+import { normalizeSpec } from "./engine/bichos/spec";
+import { HARNESSES, mascot } from "./engine/styles/mascots";
+
+const ids = (html: string) => [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
+const refs = (html: string) => [...html.matchAll(/url\(#([^)]+)\)/g)].map((match) => match[1]);
+
+test("every copy of a drawing has ids of its own, and refers only to its own", () => {
+  const a = drawAvatar(PERSON_AVATAR, "small"), b = drawAvatar(PERSON_AVATAR, "small");
+  expect(ids(a.html).length).toBeGreaterThan(0);
+  expect(ids(a.html).filter((id) => ids(b.html).includes(id))).toEqual([]);
+  for (const copy of [a, b]) expect(refs(copy.html).every((ref) => ids(copy.html).includes(ref))).toBe(true);
+  // Otherwise they are the same drawing.
+  const plain = (html: string) => html.replace(/\b(id="|url\(#)c[0-9a-z]+-/g, "$1");
+  expect(plain(a.html)).toBe(plain(b.html));
+  expect(withOwnIds('<path id="x" fill="url(#x)"/><use href="#x"/>')).toMatch(/^<path id="(c[0-9a-z]+-)x" fill="url\(#\1x\)"\/><use href="#\1x"\/>$/);
+});
+
+test("a conversation's agent is its creature: its tone is the creature's body colour, and it takes every act", () => {
+  expect(avatarColor(avatarFor("7f3c2a91-thread"))).toBe(creatureFromSeed("7f3c2a91-thread").color);
+  expect(avatarColor(avatarFor("7f3c2a91-thread"))).toMatch(/^#[0-9a-f]{6}$/);
+  // Every act works on every creature: every working style, and quiet and every pastime when it rests (creature/schedule.ts).
+  const { works, idles } = avatarRepertoire(avatarFor("7f3c2a91-thread"));
+  expect(works).toEqual(["crank", "hammer", "files", "type", "think"]);
+  expect(idles).toEqual(["quiet", "stretch", "water", "juggle", "soup", "fish", "bubbles", "music", "read", "nap"]);
+  expect(engineSize("stage")).toBe("stage");
+  expect(engineSize("small")).toBe("sidebar");
+  expect(engineSize("pip")).toBe("sidebar");
+});
+
+/** Where in the drawing the body's gloss stroke and each arm's group start, from the figure's fills on. */
+function paintOrder(spec: Spec) {
+  const html = renderSpec(spec, "stage").html;
+  const fills = html.slice(html.indexOf('<g class="fills">'));
+  return { gloss: fills.indexOf('class="shine"'), left: fills.indexOf('class="pg-arm-l"'), right: fills.indexOf('class="pg-arm-r"') };
+}
+
+test("a robot's arm is painted over the body's gloss, so the highlight is never drawn across it, at rest or swinging", () => {
+  // The robots' highlights run where the arms join (a can's down its side, a tv's round its corner): their bodies, with
+  // any arms, and the clamp arm on any body, take the gloss under them.
+  const robots = [...["can", "tv", "orb", "stack", "domehead"].flatMap((body) => ["bot", "nubs"].map((arms) => [body, arms])),
+    ...["box", "pill", "dome", "wide"].map((body) => [body, "bot"])];
+  for (const [body, arms] of robots) {
+    const { gloss, left, right } = paintOrder(normalizeSpec({ body, parts: { eyes: "two", mouth: "smile", arms, legs: "stick" }, shape: "t", name: "robot" }));
+    expect(gloss, `${body} ${arms}`).toBeGreaterThan(-1);
+    expect(left, `${body} ${arms}`).toBeGreaterThan(gloss);
+    expect(right, `${body} ${arms}`).toBeGreaterThan(gloss);
+  }
+  // Every other bicho keeps its gloss on top of its arms, as it always was.
+  const { gloss, left, right } = paintOrder(normalizeSpec({ body: "round", parts: { eyes: "two", mouth: "smile", arms: "nubs", legs: "feet" }, shape: "t", name: "round" }));
+  expect(left).toBeGreaterThan(-1);
+  expect(gloss).toBeGreaterThan(Math.max(left, right));
+});
+
+test("the person is a bicho too, and keeps the old sleep: no working style, no pastime", () => {
+  const drawing = drawAvatar(PERSON_AVATAR, "pip");
+  expect(drawing.html).toContain('data-kind="round"');
+  expect(drawing.works).toEqual([]);
+  expect(drawing.idles).toEqual([]);
+});
+
+test("only the Sidevoice mascot ships, and only by name: a seed that spells a harness is a conversation's creature", () => {
+  expect([...HARNESSES]).toEqual(["sidevoice"]);
+  expect(() => mascot("claude" as never, "x")).toThrow();
+  const sidevoice = drawAvatar(SIDEVOICE_MASCOT, "stage");
+  expect(sidevoice.html).toContain('data-kind="sidevoice"');
+  expect(sidevoice.html).toContain("data-logo");
+  expect(sidevoice.works).toEqual([]);
+  for (const seed of ["sidevoice", "claude", "clawd", "openclaw", "codex", "gemini", "copilot", "cursor", "cline", "ollama", "harness:claude", "Claude"])
+    expect(avatarFor(seed), seed).toEqual({ kind: "bicho", seed });
+});
+
+test("nothing of the lab's third-party mascots or its Beyond batch is in the app", () => {
+  const engine = resolve(process.cwd(), "src/features/avatar/engine");
+  const files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => entry.isDirectory() ? files(join(dir, entry.name)) : [join(dir, entry.name)]);
+  const sources = files(engine).filter((file) => file.endsWith(".ts"));
+  expect(sources.map((file) => file.slice(engine.length + 1))).not.toContain("styles/logos.ts");
+  expect(sources.some((file) => /b16-beyond/.test(file))).toBe(false);
+  for (const file of sources) {
+    const text = readFileSync(file, "utf8");
+    expect(text, file).not.toMatch(/\b(?:CLAUDE|GEMINI|OPENAI|OPENCLAW|XAI|OPENCODE|KIMI|OLLAMA|LMSTUDIO|CURSOR|COPILOT|DEEPSEEK|MISTRAL|QWEN|WINDSURF|CLINE)_(?:24|100)\b/);
+    expect(text, file).not.toMatch(/\bfunction (?:clawd|claude|grok|pi|opencode|cline|copilot|cursor|kimi|ollama|lmstudio|deepseek|mistral|qwen|windsurf)\(/);
+  }
+  const stylesheet = readFileSync(resolve(process.cwd(), "src/styles/bichos.css"), "utf8");
+  expect(stylesheet).not.toMatch(/\.pg-(?:rays|star|wheel)\b|\.pg-(?:gk|pi|oc|cl|cp|cu|km|ol|lm|ds|mi|qw|ws)-/);
+});

@@ -1,0 +1,21 @@
+/* TurnPill (TurnPill.tsx): the person's open turn, the same at every place that shows it. Sized in `em` of the pill's `--pill-fs`
+ * (components/ui/pill.css), so the stage's and the transcript's differ by a size step and nothing else. */
+.turn-pill .ui-pill-lead { gap: .5em; }
+/* The microphone wears the pill's own text colour (the card's ink, the bubble's), light and dark: no state colour, nothing to draw the eye. */
+.turn-pill .turn-mic { width: 1.3em; height: 1.3em; flex: none; color: inherit; }
+/* The bars: the brand mark's shape, each a share of the tallest (`--s`), drawn by a transform alone. */
+.turn-bars { display: inline-flex; align-items: center; gap: .13em; height: 1.2em; color: var(--sv-accent); }
+.turn-bars i { display: block; width: .22em; height: 100%; border-radius: .11em; background: currentColor; transform: scaleY(var(--s)); }
+/* Listening: TurnPill writes each bar's transform at the level (no transition: one restarted on every reading is what the motion guard forbids).
+ * Transcribing: they blink, a wave from the first bar to the last: down to under a third of their height and to .4 of their strength,
+ * and back. Transform and opacity only. */
+.turn-bars[data-phase="transcribing"] i { animation: turn-bar-blink 1.1s ease-in-out infinite; animation-delay: calc(var(--k) * -.14s); }
+@keyframes turn-bar-blink {
+  0%, 100% { transform: scaleY(var(--s)); opacity: 1; }
+  50% { transform: scaleY(calc(var(--s) * .3)); opacity: .4; }
+}
+/* A device that asks for less motion: still, at the shape, dimmer. */
+.turn-bars[data-still] i { animation: none; transform: scaleY(var(--s)); opacity: .55; }
+@media (prefers-reduced-motion: reduce) {
+  .turn-bars[data-phase] i { animation: none; transform: scaleY(var(--s)); opacity: .55; }
+}

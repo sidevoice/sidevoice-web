@@ -1,0 +1,176 @@
+/* A chosen model made ready (ModelPrepare.tsx): the same block in the first-run setup and in Settings. */
+.model-prepare { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sv-space-3); min-width: 0; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); color: var(--sv-text); }
+.model-prepare-pickers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: var(--sv-space-3); }
+.model-prepare-meta { margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
+.model-prepare-pickers + .model-prepare-status, .model-prepare-meta + .model-prepare-status, .model-prepare-notice + .model-prepare-status { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+/* Which languages the model supports (ModelLanguages): the one in use in bold; "+N more" a link in the text that opens
+   all of them in a popover. */
+.model-prepare-meta strong { font-weight: 600; color: var(--sv-text); }
+.model-languages-more { display: inline; padding: 0; border: 0; background: none; color: var(--sv-accent-text); font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.model-languages-more:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: 2px; }
+/* All of them (Whisper has about a hundred): the popover itself scrolls, so the focus in it scrolls it with the keys;
+   two columns where it is wide enough, one on a phone. A shadow at an edge says there is more beyond it: covers in the
+   popover's own colour scroll with the list (local) over shadows that stay at its edges (scroll), so at either end, or
+   with all of it in sight, a cover hides the shadow. Its background colour stays the popover's own. */
+.ui-popover.model-languages-popover { width: min(22rem, calc(100vw - 24px)); max-height: min(24rem, 60vh); overflow-y: auto; overscroll-behavior: contain;
+  background-image: linear-gradient(var(--sv-surface-raised) 30%, transparent), linear-gradient(transparent, var(--sv-surface-raised) 70%),
+    radial-gradient(farthest-side at 50% 0, color-mix(in srgb, var(--sv-text) 22%, transparent), transparent),
+    radial-gradient(farthest-side at 50% 100%, color-mix(in srgb, var(--sv-text) 22%, transparent), transparent);
+  background-size: 100% 2.5rem, 100% 2.5rem, 100% 0.75rem, 100% 0.75rem;
+  background-repeat: no-repeat;
+  background-attachment: local, local, scroll, scroll;
+  background-position: center top, center bottom, center top, center bottom; }
+.model-languages-popover .ui-popover-title { color: var(--sv-text); }
+.model-languages-list { margin: 0; padding: 0; list-style: none; column-width: 9rem; column-gap: var(--sv-space-4); color: var(--sv-text); }
+.model-languages-list li { break-inside: avoid; }
+.model-languages-list strong { font-weight: 600; }
+/* The language in use is not one of the model's: in the warning's colour and with its mark, so not by colour alone. Its
+   region stays in the block, empty while there is nothing to say. */
+.model-prepare-notice { display: flex; align-items: flex-start; gap: var(--sv-space-1-5); margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-warning); }
+.model-prepare-notice:empty { display: none; }
+.model-prepare-notice svg { flex: none; margin-top: 2px; }
+.model-prepare-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sv-space-3); min-height: 48px; min-width: 0; }
+.model-prepare-state { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; }
+.model-prepare-note { white-space: nowrap; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); font-variant-numeric: tabular-nums; }
+/* The hardware as a chip, in the spec sheet: the engine's pick for this device, in the accent's weight. It wraps rather
+   than overflow a narrow block. */
+.ui-badge.model-hardware { flex: 0 1 auto; max-width: 100%; height: auto; min-height: 22px; padding-block: 2px; border: 1px solid transparent; line-height: 1.2; white-space: normal; text-align: start; }
+/* "both": the technical name after the class, lighter. */
+.model-hardware-name { font-weight: var(--sv-weight-regular); color: var(--sv-text-muted); }
+.model-prepare-working { font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text); }
+.model-prepare-state .ui-spinner { color: var(--sv-accent-text); }
+.model-prepare-progress { display: grid; gap: var(--sv-space-2); flex: 1; min-width: 0; }
+.model-prepare-progress-line { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sv-space-3); }
+.model-prepare-progress-line strong { font-size: var(--sv-font-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
+.model-prepare-alert { flex: 1; }
+
+/* A ready model's try (ModelSetup.tsx TryPanel), in its block under the state: getting ready, then the microphone's
+   level or the sentence lit as it is heard, then what was heard and how quick it was. In the try's dialog, the same. */
+.model-prepare > .model-try { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.model-try { display: grid; gap: var(--sv-space-3); min-width: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); }
+.model-try[data-empty] { display: none; }
+.model-try-live { display: grid; gap: var(--sv-space-2); min-width: 0; }
+.model-try-live:empty { display: none; }
+.model-try-hint, .model-try-state { margin: 0; color: var(--sv-text-muted); }
+.model-try-state { display: flex; align-items: center; gap: var(--sv-space-2); }
+.model-try-state .ui-spinner { color: var(--sv-accent-text); }
+.model-try-listening { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-3); min-width: 0; }
+/* How long the take has run, filling to its longest (MAX_TAKE_MS, set as the element's animation-duration, which the fill takes) from
+   when it listens. The fill is a layer scaled from its left edge, by transform: composited, nothing painted again on each frame;
+   the track's round ends clip it. */
+.model-try-take { position: relative; overflow: hidden; flex: 1 0 100%; height: 3px; border-radius: 2px; background-color: var(--sv-bg-sunken); }
+.model-try-take::before { content: ""; position: absolute; inset: 0; background: var(--sv-accent); transform: scaleX(0); transform-origin: 0 50%;
+  animation: model-try-take linear forwards; animation-duration: inherit; }
+@keyframes model-try-take { to { transform: scaleX(1); } }
+/* The take ended (Stop, its longest, a silence): its length stays where it stopped while it is transcribed. */
+.model-try-take[data-ended]::before { animation-play-state: paused; }
+.model-try-wave { display: inline-flex; flex: none; color: var(--sv-accent-text); }
+.model-try .voice-wave { width: min(9rem, 36vw); height: 28px; }
+/* The voice's sentence: what was heard in the text's colour, the rest quieter until it is. */
+.model-try-sentence { margin: 0; font-size: var(--sv-font-md); line-height: calc(1.5rem * var(--sv-line-k, 1)); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--sv-text); }
+.model-try-unsaid { color: var(--sv-text-subtle); }
+/* What was heard, quoted: two lines in the block, the rest behind See all (a Popover); in full in the dialog. */
+.model-try-heard { display: grid; justify-items: start; gap: var(--sv-space-1); margin: 0; min-width: 0; }
+.model-try-heard figcaption { color: var(--sv-text-muted); }
+.model-try-heard blockquote { justify-self: stretch; margin: 0; padding-inline-start: var(--sv-space-3); border-inline-start: 3px solid var(--sv-accent); font-size: var(--sv-font-md); line-height: calc(1.5rem * var(--sv-line-k, 1)); color: var(--sv-text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.model-try-heard blockquote[data-clamped] { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.model-try-heard .model-try-all { margin-inline-start: calc(-1 * var(--sv-space-2)); }
+.ui-popover .model-try-full { max-height: 14rem; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--sv-text); }
+/* With the try in its dialog, the block keeps one line on how the last one went. */
+.model-try-summary { margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--sv-text-muted); }
+.model-try-summary q { color: var(--sv-text); }
+.model-try-summary[data-failed] { color: var(--sv-danger); }
+
+/* How a model runs (ModelRuntime): folded under its block; this device's capabilities, then each build to choose. */
+.model-runtime { margin-top: var(--sv-space-2); }
+.model-runtime-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sv-space-1); min-width: 0; }
+.model-runtime-info { margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
+.model-runtime-toggle { display: inline-flex; align-items: center; gap: var(--sv-space-1-5); max-width: 100%; padding: var(--sv-space-1) var(--sv-space-2) var(--sv-space-1) var(--sv-space-1); border: 0; border-radius: var(--sv-radius-sm); background: none; color: var(--sv-text-muted); font: 600 var(--sv-font-sm) / calc(1.25rem * var(--sv-line-k, 1)) var(--sv-font-sans); cursor: pointer; }
+@media (hover: hover) { .model-runtime-toggle:hover { background: var(--sv-hover); color: var(--sv-text); } }
+.model-runtime-toggle svg { transform: rotate(-90deg); transition: transform var(--sv-dur-fast) var(--sv-ease); }
+.model-runtime-toggle svg.model-runtime-chevron-open { transform: none; }
+.model-runtime-toggle:active { background: var(--sv-pressed); color: var(--sv-text); }
+.model-runtime-summary { min-width: 0; max-width: 100%; overflow: hidden; font-weight: 400; color: var(--sv-text-subtle); white-space: nowrap; text-overflow: ellipsis; }
+.model-runtime-summary:not(:empty)::before { content: "· "; }
+.model-runtime-panel { display: grid; gap: var(--sv-space-3); margin-top: var(--sv-space-2); padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface); }
+.model-runtime-device { margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
+.model-runtime-options { display: grid; gap: var(--sv-space-2); margin: 0; padding: 0; border: 0; min-width: 0; }
+.model-runtime-option { display: flex; align-items: flex-start; gap: var(--sv-space-3); padding: var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); cursor: pointer; }
+@media (hover: hover) { .model-runtime-option:hover { border-color: var(--sv-border-strong); } }
+.model-runtime-option[data-checked] { border-color: var(--sv-accent); box-shadow: inset 0 0 0 1px var(--sv-accent); background: color-mix(in srgb, var(--sv-accent-soft) 50%, transparent); }
+.model-runtime-option[data-disabled] { cursor: not-allowed; opacity: 1; }
+.model-runtime-option:not([data-disabled]):active { background-image: linear-gradient(var(--sv-pressed), var(--sv-pressed)); }
+.model-runtime-option[data-disabled] .model-runtime-title, .model-runtime-option[data-disabled] .model-runtime-detail { color: var(--sv-disabled-text); }
+.model-runtime-option input { margin: 3px 0 0; accent-color: var(--sv-accent); }
+.model-runtime-copy { display: grid; gap: 2px; min-width: 0; }
+.model-runtime-title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); font-size: var(--sv-font-sm); font-weight: 600; }
+.model-runtime-detail, .model-runtime-why { font-size: var(--sv-font-xs); line-height: calc(1rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
+.model-runtime-why { color: var(--sv-warning); }
+
+/* The model in use stays until this one is ready (there is no Save: it switches by itself). */
+.model-prepare-pending { margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
+
+/* The voice's sentence in its try (TtsTry): editable in place, its pencil beside it. */
+.voice-try-text { flex: 1; min-width: 0; }
+.tts-try-sentence { display: flex; align-items: flex-start; gap: var(--sv-space-2); min-width: 0; }
+.tts-try-sentence > :first-child { flex: 1; min-width: 0; }
+.tts-try-said { display: block; width: 100%; padding: 0; border: 0; background: none; text-align: start; font: inherit; font-size: var(--sv-font-md); line-height: calc(1.5rem * var(--sv-line-k, 1)); color: var(--sv-text); cursor: text; }
+.tts-try-said::before { content: "“"; } .tts-try-said::after { content: "”"; }
+
+/* The transcription try (SttTry): the button and the microphone's level on one row, always; under it an area that grows
+   with what it holds — listening and the take's length, then what was heard — and takes no room while empty. */
+.stt-try { display: grid; gap: var(--sv-space-2); min-width: 0; }
+.stt-try-head { display: flex; align-items: center; gap: var(--sv-space-3); min-height: 32px; }
+.stt-try-head .model-try-wave { flex: 1; min-width: 0; }
+/* The level takes the room the button leaves, up to its width elsewhere: a longer label (another language, Play again)
+   narrows it rather than pushing the try past its card. */
+.stt-try-head { min-width: 0; }
+.stt-try-head .voice-wave { width: 100%; max-width: 9rem; }
+/* The try's button keeps one width through its states (Try it, Stop, again): the level or the sentence beside it stays put,
+   and Stop is under the pointer that pressed Try it. */
+.stt-try-head > .ui-button { min-width: 6.5rem; }
+.stt-try-area { display: grid; align-content: start; gap: var(--sv-space-1-5); min-width: 0; }
+.stt-try-area:empty { display: none; }
+.stt-try-area .model-try-take { flex: none; width: 100%; }
+/* The model's own settings (VoiceSettings), in a card of their own between the model and its try, once it is ready. */
+.model-settings-card { display: grid; }
+/* The voice's try: the sentence beside the button, where the transcription try draws the microphone's level. */
+.stt-try-head .tts-try-sentence { flex: 1; min-width: 0; }
+/* The voice try's row: the button and the sentence centred on each other, however many lines the sentence takes,
+   and the sentence reads as a quote — a bar at its start. */
+.tts-try .stt-try-head { align-items: center; }
+.stt-try-head .tts-try-sentence { padding-inline-start: var(--sv-space-3); border-inline-start: 3px solid color-mix(in srgb, var(--sv-accent) 45%, transparent); }
+/* On a phone the try's first row stacks: the button on its line, then the level, the take or the sentence at full width
+   (side by side they leave neither room). */
+@media (max-width: 520px) {
+  .stt-try-head { flex-wrap: wrap; }
+  .stt-try-head > .model-try-wave, .stt-try-head > .try-take, .stt-try-head > .tts-try-sentence { flex-basis: 100%; }
+  .stt-try-head .voice-wave { max-width: none; }
+}
+.model-prepare-stalled { color: var(--sv-warning); }
+/* A model's download size at the end of its name's line in the Model list, quieter than its name. */
+.model-list-size { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-regular); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* The spec sheet (ModelSheet): what the model is in one bordered block, a label column and a value column, tight;
+   on a narrow phone each label above its value. */
+.model-prepare-sheet { padding: var(--sv-space-2) var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-surface); }
+.model-sheet { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: baseline; gap: var(--sv-space-1) var(--sv-space-3); margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); font-variant-numeric: tabular-nums; }
+.model-sheet dt { color: var(--sv-text-muted); }
+.model-sheet dd { margin: 0; min-width: 0; color: var(--sv-text); }
+.model-sheet strong { font-weight: 600; }
+.model-sheet .model-sheet-size { color: var(--sv-text-muted); }
+/* The notice right after the languages, a small chip in the warning's soft tone (with its mark: not by colour alone);
+   under them when both do not fit. */
+.model-sheet .model-sheet-languages { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sv-space-1) var(--sv-space-2); }
+.model-sheet-languages .model-prepare-notice { align-items: center; padding: 0 var(--sv-space-1-5); border-radius: var(--sv-radius-sm); background: var(--sv-warning-soft); }
+.model-sheet-languages .model-prepare-notice svg { margin-top: 0; }
+/* Its state, the last row; what to do about it (download, cancel, retry) at the card's foot, full width on a phone. */
+.model-sheet-state { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); min-height: 22px; }
+.model-sheet-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sv-space-3); margin-top: var(--sv-space-2); padding-top: var(--sv-space-2); border-top: 1px solid var(--sv-border); }
+@media (max-width: 360px) { .model-sheet-footer > .ui-button { flex: 1 1 100%; } }
+@media (max-width: 360px) {
+  .model-sheet { grid-template-columns: minmax(0, 1fr); row-gap: 0; }
+  .model-sheet dd + dt { margin-top: var(--sv-space-1-5); }
+}
+/* A phone's larger text (data-text-large, lib/text-scale.ts) is a narrow phone as well: the label above its value. */
+:root[data-text-large] .model-sheet { grid-template-columns: minmax(0, 1fr); row-gap: 0; }
+:root[data-text-large] .model-sheet dd + dt { margin-top: var(--sv-space-1-5); }

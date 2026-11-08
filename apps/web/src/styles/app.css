@@ -1,0 +1,68 @@
+/* The room's page: the box model, the page itself on the theme's background, and the room's shell — header, the call,
+ * the call bar — filling the screen. Each part styles itself in its own feature's CSS; the tokens and shared components
+ * are styles/theme.css and components/ui/ui.css. */
+
+*, *::before, *::after { box-sizing: border-box; }
+/* The screen's own edges (the notch, the status bar, the home indicator), 0 in a browser window. Named once so the shell pads by them and a test can stand in for a phone's. */
+/* Registered as lengths, so the engine resolves env() when it computes them and a script reads pixels (lib/safe-area.ts);
+ * unregistered, a custom property reads back as its text, "env(safe-area-inset-top, 0px)", which is no number. */
+@property --sv-inset-top { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --sv-inset-right { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --sv-inset-bottom { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --sv-inset-left { syntax: "<length>"; inherits: true; initial-value: 0px; }
+:root { --sv-inset-top: env(safe-area-inset-top, 0px); --sv-inset-right: env(safe-area-inset-right, 0px); --sv-inset-bottom: env(safe-area-inset-bottom, 0px); --sv-inset-left: env(safe-area-inset-left, 0px); }
+[hidden] { display: none !important; }
+html, body, #root { width: 100%; max-width: 100%; min-width: 0; height: 100%; margin: 0; }
+body { overflow: hidden; background: var(--sv-bg); color: var(--sv-text); }
+#root { height: 100dvh; max-height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+button, input, select, textarea { font: inherit; color: inherit; }
+/* A tap is a tap: no wait for a second one (double-tap to zoom) before a control answers, on any engine that still keeps it. */
+html, button, a, summary, label, [role="button"], input, select, textarea { touch-action: manipulation; }
+/* The page is a screen, not a document, under the finger as under the mouse: no grey flash over what is tapped (each
+ * control says it is pressed in its own colours, :active), no rubber band or pull-to-refresh of the whole page behind
+ * its fixed header and call bar (what scrolls inside it contains its own), and no text inflated by the engine when a
+ * phone turns sideways. */
+html { -webkit-tap-highlight-color: transparent; overscroll-behavior: none; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+/* Where nothing hovers (a phone, a tablet), a press holding on a control or a label does not start selecting its text
+ * or bring up the system's link and image menu, as in an app; what is there to read and keep stays selectable: what
+ * is typed, the conversation's words, and what the page offers to copy (a code, a command: they say so themselves). A
+ * mouse selects as it always did. */
+@media (hover: none) and (pointer: coarse) {
+  body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  :is(input, textarea, [contenteditable="true"], [contenteditable=""], .chat-bubble, .ui-error-details pre) { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+  img, svg { -webkit-user-drag: none; }
+}
+h1, h2, h3, h4, h5, p { margin: 0; }
+code, kbd, pre, output { font-family: var(--sv-font-mono); }
+:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+/* The main region holds focus only as where to read on from, once what had it closes (lib/focus-return.ts): no ring
+ * around the whole page. */
+main[tabindex="-1"]:focus { outline: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.muted { color: var(--sv-text-muted); }
+
+/* The room (header, call, call bar) is one box, so the first-run setup can hide it whole. */
+#root > .room-shell { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding-inline: var(--sv-inset-left) var(--sv-inset-right); }
+#root > .room-shell > header { flex: none; }
+#root > .room-shell > main { flex: 1; min-width: 0; min-height: 0; display: flex; overflow: hidden; }
+#root > .room-shell > main.call-layout { position: relative; flex-direction: row; }
+.call-column { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.call-column > .call-bar { flex: none; }
+@media (max-width: 559px), (max-width: 899px) and (pointer: coarse) { #root > .room-shell > main.call-layout { flex-direction: column; } }
+/* A full page (Settings) is opaque and covers the whole room: while it is open, what moves behind it waits (the creatures, the
+ * dots, the poster), and goes on from where it was when the page closes. */
+#root > .room-shell:has(> .ui-dialog[data-layout="page"][open]) > :not(.ui-dialog),
+#root > .room-shell:has(> .ui-dialog[data-layout="page"][open]) > :not(.ui-dialog) * { animation-play-state: paused !important; }
+/* Nor is it styled or laid out: what Settings does (a list opening, a page sliding in) touches the whole document's style
+ * (a modal list sets the body's pointer-events; a focus change matches :has()), and the room behind it, the creatures
+ * most, made each of those cost three times what Settings alone does (a phone took seconds to open a list). Its boxes
+ * keep their sizes (`auto`: the one last drawn), so nothing in it resizes as Settings comes and goes. */
+#root > .room-shell > :not(.ui-dialog) { contain-intrinsic-size: auto none; }
+#root > .room-shell:has(> .ui-dialog[data-layout="page"][open]) > :not(.ui-dialog) { content-visibility: hidden; }
+
+.startup-error { width: min(34rem, calc(100% - 2rem)); min-height: 100dvh; margin: auto; padding: var(--sv-space-8); display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--sv-space-3); }
+.setup-main { flex: 1; display: grid; place-items: center; min-height: 0; padding: var(--sv-space-4); overflow: auto; background: var(--sv-bg-subtle); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}

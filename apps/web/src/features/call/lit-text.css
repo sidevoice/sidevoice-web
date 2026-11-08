@@ -1,0 +1,9 @@
+/* The words lit as the voice says them (LitText.tsx): the text twice, the lit copy seen through windows that only move. */
+.lit-text { position: relative; display: block; white-space: pre-wrap; }
+.lit-base { display: block; }
+.lit-copy { position: absolute; inset: 0; pointer-events: none; }
+.lit-clip { position: absolute; top: 0; left: 0; width: 100%; overflow: hidden; will-change: transform; }
+.lit-above { height: 100%; }
+.lit-words { position: absolute; top: 0; left: 0; width: 100%; will-change: transform; }
+.lit-heard { position: absolute; top: 0; left: 0; width: 0; }
+.lit-heard[hidden] { display: none; }
