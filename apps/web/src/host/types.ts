@@ -518,6 +518,13 @@ export interface CueBridge {
   readonly options?: readonly string[];
 }
 
+/** What the app says of the person's screen (`host.screen`), where the system tells it: whether it is locked now. A page
+ *  without it reads the screen as the browser says it (the page shown or not), except in an app that shows the call in a
+ *  card of its own (`callControls`), where a hidden page is not a screen off. */
+export interface ScreenBridge {
+  locked(): Promise<boolean>;
+}
+
 export interface Host {
   identity: HostIdentity;
   /** The host's overlay for `language` (a tag: `es`, `zh-Hans`) exactly: nothing from its primary subtag or English, which
@@ -546,6 +553,8 @@ export interface Host {
   callSurface: CallSurfaceBridge | null;
   /** The app's own player for the page's cues; null where the page plays them itself. */
   cue: CueBridge | null;
+  /** Whether the person's screen is locked, from the app; null where it does not say. */
+  screen: ScreenBridge | null;
   updater: AppUpdater | null;
   debug: HostDebugBridge | null;
 }
