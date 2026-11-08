@@ -1,9 +1,0 @@
-person - stage 68c1091dd6de2511 35759
-person - sidebar ebb8ddb1c85c48d0 23602
-person - rail c74781d39641b2ac 7402
-person microphone stage 11fcd9df34591a4b 23913
-person microphone sidebar c402c7b36d57f008 15676
-person microphone rail c74781d39641b2ac 7402
-mascot sidevoice stage a1ca3f1ba0629f99 5345
-mascot sidevoice sidebar 73486907e281ee66 4718
-mascot sidevoice rail 0df42f1bf6dbfa61 4705
