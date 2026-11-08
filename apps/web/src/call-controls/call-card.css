@@ -148,6 +148,8 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), var(--
 /* All the card shows, in the window's flow: its body, and what opens from it toward the screen's middle (below it in the
  * upper half, above it in the lower: data-open), kept to the side of the screen it sits on (data-side). */
 .floating-card { display: flex; flex-direction: column; gap: 8px; width: max-content; }
+/* The rest of a pixel the body needs to sit at whole pixels in its window (card-shell.tsx), so the app never moves it by a fraction. */
+.floating-card { padding: var(--body-snap-y, 0px) 0 0 var(--body-snap-x, 0px); }
 .floating-card[data-open=up] { flex-direction: column-reverse; }
 .floating-card[data-side=right] { align-items: flex-end; }
 .floating-card[data-side=left] { align-items: flex-start; }

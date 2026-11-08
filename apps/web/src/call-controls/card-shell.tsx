@@ -194,9 +194,21 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState, r
     if (!element) return;
     let last = "";
     const report = () => {
-      const box = element.getBoundingClientRect();
+      let box = element.getBoundingClientRect();
       if (!box.width || !box.height) return;
-      const inner = body.current?.getBoundingClientRect();
+      let inner = body.current?.getBoundingClientRect();
+      // The body sits at whole pixels in its window: what opens over it (a voice text, captions) is rarely whole pixels tall, and the
+      // app places the window so that the body's box, in whole pixels, stays where it rests. A fraction left over would move the body on
+      // the screen by it each time what is over it came or went; the card is padded by the rest of the pixel instead.
+      if (inner && inner.width && inner.height) {
+        const snap = (name: string, offset: number) => {
+          const was = parseFloat(element.style.getPropertyValue(name)) || 0, raw = offset - was;
+          const pad = Math.ceil(raw - 1e-3) - raw;
+          return Math.abs(pad - was) > 1e-3 ? (element.style.setProperty(name, pad > 1e-3 ? pad + "px" : "0px"), true) : false;
+        };
+        const moved = [snap("--body-snap-x", inner.left - box.left), snap("--body-snap-y", inner.top - box.top)].some(Boolean);
+        if (moved) { box = element.getBoundingClientRect(); inner = body.current!.getBoundingClientRect(); }
+      }
       const cardBox = inner && inner.width && inner.height
         ? { x: Math.round(inner.left - box.left) + CARD_MARGIN, y: Math.round(inner.top - box.top) + CARD_MARGIN, width: Math.ceil(inner.width), height: Math.ceil(inner.height) }
         : undefined;
