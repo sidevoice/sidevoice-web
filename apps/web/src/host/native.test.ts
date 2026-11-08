@@ -19,7 +19,7 @@ describe("a page outside an app", () => {
     expect(outside.voice.runs).toBe("page");
     expect(nativeHost().storage).toBeNull();
     for (const member of [nativeHost().microphone, outside.localHost, outside.reset, outside.muteShortcut, outside.mediaDuck, outside.textScale,
-      outside.callControls, outside.callSurface, outside.cue, outside.updater, outside.debug]) expect(member).toBeNull();
+      outside.callControls, outside.callSurface, outside.cue, outside.screen, outside.updater, outside.debug]) expect(member).toBeNull();
     expect(cardSeam()).toBeNull();
   });
 
@@ -204,8 +204,10 @@ describe("the members an app calls through", () => {
       callControls: { settings: async () => ({}) },
       callSurface: { active: () => true },
       cue: { start() {} },
+      screen: {},
       updater: { cancel: async () => {} },
     });
+    expect(host().screen).toBeNull();
     expect(host().localHost).toBeNull();
     expect(host().muteShortcut).toBeNull();
     expect(host().callControls).toBeNull();
@@ -221,7 +223,9 @@ describe("the members an app calls through", () => {
     const updater = { status: async () => ({}), cancel: async () => {} };
     const callSurface = { active: () => true, still() {}, forget() {} };
     const cue = { start() {}, stop() {} };
-    withHost({ localHost, muteShortcut, callControls, callSurface, cue, updater });
+    const screen = { locked: async () => false };
+    withHost({ localHost, muteShortcut, callControls, callSurface, cue, screen, updater });
+    expect(host().screen).toBe(screen);
     expect(host().callSurface).toBe(callSurface);
     expect(host().cue).toBe(cue);
     expect(host().localHost).toBe(localHost);
