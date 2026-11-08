@@ -60,3 +60,15 @@ test("the floating card's state dot is the idle grey and every other state is an
   expect(rules(card, ".card-state i").join(" ")).toContain("var(--sv-state-idle)");
   expect(card).not.toMatch(/\.card-state\[data-mood=(listening|speaking|working|holding|muted)\] i/);
 });
+
+test("the floating card's muted mark is white on the solid muted colour, 3:1 or more in both themes (not the dark theme's lighter muted)", () => {
+  const solid = tokens.match(/--sv-state-muted-solid: (#[0-9a-f]{6});/)?.[1];
+  expect(solid).toBe("#e5484d");
+  expect(tokens.slice(tokens.indexOf('[data-theme="dark"]'))).not.toContain("--sv-state-muted-solid");
+  const channel = (hex: string, i: number) => { const c = parseInt(hex.slice(1 + 2 * i, 3 + 2 * i), 16) / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  const luminance = (hex: string) => 0.2126 * channel(hex, 0) + 0.7152 * channel(hex, 1) + 0.0722 * channel(hex, 2);
+  expect(1.05 / (luminance(solid!) + 0.05)).toBeGreaterThanOrEqual(3);
+  const mark = sheet("call-card.css").match(/\.avatar-muted \{[^}]*\}/)?.[0] ?? "";
+  expect(mark).toContain("background: var(--sv-state-muted-solid)");
+  expect(mark).toContain("color: #fff");
+});
