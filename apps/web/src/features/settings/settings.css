@@ -107,9 +107,8 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
 .provider-row { display: flex; align-items: flex-start; gap: var(--sv-space-3); min-width: 0; padding: var(--sv-space-3) var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); }
 .provider-row:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
 .provider-row-copy { display: grid; gap: 2px; flex: 1; min-width: 0; min-height: 40px; align-content: center; }
+/* Its pills are Badge tags (ui.css), as an agent's row says where it stands. */
 .provider-row-title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); }
-/* Its pills small and soft: a quiet border in their own colour, as a tag rather than a button. */
-.provider-row-title .ui-badge { min-height: 20px; padding: 0 var(--sv-space-2); font-weight: 500; letter-spacing: .01em; border: 1px solid color-mix(in srgb, currentColor 24%, transparent); }
 .provider-row-line, .provider-card-purpose { font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
 .provider-row-problem { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); margin-top: var(--sv-space-2); font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text); }
 .provider-row-problem > svg { flex: none; color: var(--sv-warning); }
