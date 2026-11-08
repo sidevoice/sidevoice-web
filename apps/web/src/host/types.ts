@@ -503,12 +503,19 @@ export interface CallSurfaceBridge {
 
 /** The app's own sound for the cues the page decides on (`host.cue`): the page says when, the app plays it through the
  *  audio session its call already owns, where a webview's Web Audio is not sure to come out (a phone's native call session,
- *  sidevoice-web#439). `thinking` is the soft breath that says the agent works. `start` and `stop` are idempotent. An app
+ *  sidevoice-web#439). `thinking` is the sound that says the agent works. `start` and `stop` are idempotent. An app
  *  without it leaves the page to play the cue in its own Web Audio. */
 export type CueName = "thinking";
+/** Which thinking sound a start plays and how loud (services/thinking-sounds.ts): `sound`, an id of the manifest the app
+ *  bundles with the web; `gainDb`, the person's offset from its level. Without them, the default sound at its level. */
+export interface CueOptions { sound?: string; gainDb?: number }
 export interface CueBridge {
-  start(cue: CueName): void;
+  /** A start while the cue plays changes nothing with the same options, and plays the new ones instead with others. */
+  start(cue: CueName, options?: CueOptions): void;
   stop(cue: CueName): void;
+  /** The options `start` honours, by name (`sound`, `gainDb`). An app before them has none: its start plays a sound of its
+   *  own, whatever is asked, and the page plays the chosen one itself instead. */
+  readonly options?: readonly string[];
 }
 
 export interface Host {
