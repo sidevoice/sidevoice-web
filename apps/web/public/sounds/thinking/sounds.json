@@ -1,0 +1,21 @@
+{
+  "default": "soft-heartbeat",
+  "sounds": [
+    {"id":"soft-heartbeat","interval":[4,6],"files":{"webm":"soft-heartbeat.webm","m4a":"soft-heartbeat.m4a"}},
+    {"id":"warm-pad-pulse","interval":[6,9],"files":{"webm":"warm-pad-pulse.webm","m4a":"warm-pad-pulse.m4a"}},
+    {"id":"slow-heartbeat","interval":[5,8],"files":{"webm":"slow-heartbeat.webm","m4a":"slow-heartbeat.m4a"}},
+    {"id":"echoing-heartbeat","interval":[6,9],"files":{"webm":"echoing-heartbeat.webm","m4a":"echoing-heartbeat.m4a"}},
+    {"id":"pulsing-hum","interval":[8,12],"files":{"webm":"pulsing-hum.webm","m4a":"pulsing-hum.m4a"}},
+    {"id":"muffled-heartbeat","interval":[6,9],"files":{"webm":"muffled-heartbeat.webm","m4a":"muffled-heartbeat.m4a"}},
+    {"id":"slow-double-beat","interval":[3,4],"files":{"webm":"slow-double-beat.webm","m4a":"slow-double-beat.m4a"}},
+    {"id":"single-beat","interval":[2,3],"files":{"webm":"single-beat.webm","m4a":"single-beat.m4a"}},
+    {"id":"room-heartbeat","interval":[3,4],"files":{"webm":"room-heartbeat.webm","m4a":"room-heartbeat.m4a"}},
+    {"id":"breathing-pad","interval":[5,8],"files":{"webm":"breathing-pad.webm","m4a":"breathing-pad.m4a"}},
+    {"id":"double-pad-pulse","interval":[4,6],"files":{"webm":"double-pad-pulse.webm","m4a":"double-pad-pulse.m4a"}},
+    {"id":"slow-breath","interval":[5,8],"files":{"webm":"slow-breath.webm","m4a":"slow-breath.m4a"}},
+    {"id":"deep-heartbeat","interval":[3,5],"files":{"webm":"deep-heartbeat.webm","m4a":"deep-heartbeat.m4a"}},
+    {"id":"warm-heartbeat","interval":[3,4],"files":{"webm":"warm-heartbeat.webm","m4a":"warm-heartbeat.m4a"}},
+    {"id":"soft-pad-pulse","interval":[5,8],"files":{"webm":"soft-pad-pulse.webm","m4a":"soft-pad-pulse.m4a"}},
+    {"id":"low-breath","interval":[5,8],"files":{"webm":"low-breath.webm","m4a":"low-breath.m4a"}}
+  ]
+}

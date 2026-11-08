@@ -8,6 +8,7 @@ import { LanguagePicker } from "../../components/ui/LanguagePicker";
 import { Group, Row, Section } from "../../components/ui/Card";
 import { Segmented } from "../../components/ui/Tabs";
 import { MediaDuckRow } from "./MediaDuckRow";
+import { ThinkingSoundRows } from "./ThinkingSoundRows";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { readThemePreference, setThemePreference, type ThemePreference } from "../../lib/theme";
 import { MachineList, MachineNav, machineName, ThisComputerSettings, useMachinesSummary } from "../room/MachineList";
@@ -107,8 +108,8 @@ function SlotSection({ id, t }: { id: "transcription" | "voice"; t: Translate })
   </Section>;
 }
 
-/** The call's own behaviour: when your turn ends (kept on Save), the sound while the agent works and the screen during
- *  a call (this device's, applied at once). */
+/** The call's own behaviour: when your turn ends (kept on Save), the sound while the agent works (when, which, how loud,
+ *  and a try of it) and the screen during a call (this device's, applied at once). */
 function CallSettings({ t, microphone }: { t: Translate; microphone: MicrophoneSnapshot | null }) {
   const store = useContext(RoomStoreContext);
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
@@ -136,6 +137,7 @@ function CallSettings({ t, microphone }: { t: Translate; microphone: MicrophoneS
         <Segmented size="sm" label={t("settings.call.presence")} value={prefs.presence} onChange={(value) => set({ presence: value })}
           items={presence.map((option) => ({ value: option.value, label: t(option.label) }))} />
       </Row>
+      <ThinkingSoundRows t={t} sound={prefs.sound} gainDb={prefs.soundGainDb} disabled={prefs.presence === "off"} active={shown} onChange={set} />
     </Group>
     <MediaDuckRow t={t} openPermissions={() => store?.patch({ settingsSection: "permissions", settingsLevel: "page" })} />
     {/* The desktop app keeps its computer awake as any app does; holding the screen on is for a browser or a phone. */}

@@ -200,6 +200,29 @@ test("the thinking sound and the screen are this device's, applied at once", () 
   localStorage.removeItem("sidevoice.call-preferences");
 });
 
+test("while the agent works: when, then which sound, its volume and a try, all off with the sound", () => {
+  localStorage.removeItem("sidevoice.call-preferences");
+  open("whisper-base");
+  fireEvent.click(document.getElementById("settings-call")!);
+  const group = screen.getByText("While the agent works").closest(".ui-group")!;
+  expect([...group.querySelectorAll(".ui-row-label")].map((label) => label.textContent))
+    .toEqual(["Thinking sound", "Sound", "Volume", "Try"]);
+  expect(within(group as HTMLElement).getByText("Only with the screen off.")).toBeInTheDocument();
+  expect(document.getElementById("thinking-sound")).toHaveTextContent("Soft heartbeat");
+  expect(within(group as HTMLElement).getByText("0 dB")).toBeInTheDocument();
+  fireEvent.change(screen.getByRole("slider", { name: "Volume" }), { target: { value: "-3" } });
+  expect(JSON.parse(localStorage.getItem("sidevoice.call-preferences")!)).toMatchObject({ sound: "soft-heartbeat", soundGainDb: -3 });
+  fireEvent.click(screen.getByRole("radio", { name: "Off" }));
+  expect(within(group as HTMLElement).getByText("No sound.")).toBeInTheDocument();
+  expect(document.getElementById("thinking-sound")).toBeDisabled();
+  expect(screen.getByRole("slider", { name: "Volume" })).toBeDisabled();
+  expect(document.getElementById("thinking-sound-try")).toBeDisabled();
+  fireEvent.click(screen.getByRole("radio", { name: "Always" }));
+  expect(within(group as HTMLElement).getByText("Whenever the agent works.")).toBeInTheDocument();
+  expect(document.getElementById("thinking-sound-try")).toBeEnabled();
+  localStorage.removeItem("sidevoice.call-preferences");
+});
+
 /** Each downloaded model listed, in order, with what it is for (its purpose chip, where the layout shows it on the row). */
 const listed = (within: Element | null) => [...(within?.querySelectorAll(".downloaded-model") ?? [])]
   .map((row) => [row.getAttribute("data-model"), row.querySelector(".model-purpose")?.getAttribute("data-purpose") ?? null]);
