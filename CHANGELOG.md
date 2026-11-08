@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.28.0](https://github.com/sidevoice/sidevoice-web/compare/v0.27.1...v0.28.0) (2026-11-08)
+
+
+### Features
+
+* **call:** the chosen thinking sound, its volume and a try, in Settings › Call ([#559](https://github.com/sidevoice/sidevoice-web/issues/559)) ([49172e9](https://github.com/sidevoice/sidevoice-web/commit/49172e9e29c2cca7f558ef5c3267c427f2d6e02b))
+
+
+### Bug Fixes
+
+* **card:** the body sits at whole pixels in its window, so it never moves by a fraction ([#560](https://github.com/sidevoice/sidevoice-web/issues/560)) ([25e1de1](https://github.com/sidevoice/sidevoice-web/commit/25e1de1fcc7d73572fac75ff0bf6e670904ef58e))
+* **outbox:** nothing dropped silently, hang-up marks, durable entries, hung direct text stopped ([#555](https://github.com/sidevoice/sidevoice-web/issues/555)) ([2ec3400](https://github.com/sidevoice/sidevoice-web/commit/2ec3400ab632653cdb720e3035eec7a7507a0fec))
+
 ## [0.27.1](https://github.com/sidevoice/sidevoice-web/compare/v0.27.0...v0.27.1) (2026-11-07)
 
 
