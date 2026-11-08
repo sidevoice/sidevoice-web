@@ -19,6 +19,8 @@ import { installApp, installedMembers } from "../host/testing";
 
 const params = new URLSearchParams(location.search);
 const shotId = params.get("shot");
+// ?variant=<name>:<value>, as many as wanted: an open decision's option over the shot's own, to see any shot in any of them.
+const askedVariants = Object.fromEntries(params.getAll("variant").map((pair) => pair.split(":")).filter((pair) => pair.length === 2));
 const theme = params.get("theme") === "dark" ? "dark" : "light";
 document.documentElement.dataset.theme = theme;
 document.documentElement.style.colorScheme = theme;
@@ -45,7 +47,7 @@ function renderShot(shot: Shot) {
   // The variants this shot shows, read by this frame alone: the frames share one storage, and each shows its own.
   const getItem = Storage.prototype.getItem;
   Storage.prototype.getItem = function (key: string) {
-    return this === localStorage && key === "sidevoice.variants" ? JSON.stringify(shot.variants ?? {}) : getItem.call(this, key);
+    return this === localStorage && key === "sidevoice.variants" ? JSON.stringify({ ...shot.variants, ...askedVariants }) : getItem.call(this, key);
   };
   if (shot.updater) {
     const { status, mode = "automatic" } = shot.updater;

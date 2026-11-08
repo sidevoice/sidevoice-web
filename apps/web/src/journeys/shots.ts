@@ -128,6 +128,23 @@ const openSettings = (section: string) => (doc: Document) => {
   if (dialog && !dialog.open) dialog.showModal();
 };
 const press = (id: string) => (doc: Document) => { doc.getElementById(id)?.click(); };
+/** New conversation pressed, where it shows: at the list's foot on a desktop, in a phone's header. */
+const openNewConversation = (doc: Document) => {
+  const shown = [...doc.querySelectorAll<HTMLElement>(".sidebar-new button, .room-header .header-new")].find((button) => {
+    const box = button.getBoundingClientRect();
+    return box.width > 0 && box.top >= 0 && box.bottom <= (doc.defaultView?.innerHeight ?? 0);
+  });
+  shown?.click();
+};
+/** The conversations folded into the rail (a desktop's). */
+const toRail = (doc: Document) => { doc.querySelector<HTMLElement>(".sidebar-collapse")?.click(); };
+/** The open decisions on New conversation (sidevoice-web#463): the panel's variants and the button's options, each
+ *  beside today's. */
+const PANEL = ["current", "a", "b", "c"] as const;
+const PANEL_CAPTION = { current: "today's: a title, a line, the phrase between guillemets", a: "A, the same few lines, shorter, the phrase on one line",
+  b: "B, the landing's three steps, the phrase on one line under the second", c: "C, centred, a creature waiting behind the phrase on one line" };
+const BUTTON_CAPTION = { current: "today's: a secondary button, a ghost +, a dashed circle", a: "A, an empty card: the next conversation's, its creature's place empty",
+  b: "B, the accent's soft fill", c: "C, a quiet row, no edge or fill until pointed at" };
 /** A reply of the agent's arriving once the page is drawn, after the transcript has marked the rest seen. */
 const arrives = (text: string) => (doc: Document) => {
   const history = BASE_FACTS.history as Record<string, unknown>[];
@@ -261,6 +278,11 @@ export const JOURNEYS: Journey[] = [
         { segment: "turn-disconnected", thread: "fp-nuc|t-web", role: "assistant", text: "The result arrived while your call was away.", name: "sidevoice-web", time: Date.now(), session: "s1", seq: 4, audio: "text_only", audio_reason: "disconnected", hearing: "not_heard", globally_heard: false, replayable: true }] },
       after: press("transcript-toggle") },
     { id: "transcript-unread", caption: "A reply arrived while the transcript was closed: a dot on its button.", after: arrives("Both tests pass now. Shall I push the fix?") },
+  ] },
+  { id: "new-conversation", title: "New conversation (open decision, #463)", note: "The panel New conversation opens, with the phrase to say on one line, and the button itself in the list, the rail and a phone's header: today's beside each option. Nothing here is chosen.", shots: [
+    ...PANEL.map((variant) => ({ id: "nc-panel-" + variant, caption: "The panel, " + PANEL_CAPTION[variant] + ".", variants: { "new-conversation-panel": variant }, after: openNewConversation })),
+    ...PANEL.map((variant) => ({ id: "nc-button-" + variant, caption: "The button, " + BUTTON_CAPTION[variant] + ".", variants: { "new-conversation-button": variant } })),
+    ...PANEL.map((variant) => ({ id: "nc-rail-" + variant, caption: "The button in the rail, " + BUTTON_CAPTION[variant] + ".", variants: { "new-conversation-button": variant }, views: ["desktop" as const], after: toRail })),
   ] },
   { id: "settings", title: "Settings", note: "Each section, applied as it changes (no Save).", shots: [
     { id: "s-general", caption: "General: language and appearance.", after: openSettings("general") },

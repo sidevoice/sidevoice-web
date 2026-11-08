@@ -2,3 +2,39 @@
 .connect-agent { display: grid; gap: var(--sv-space-3); min-width: 0; }
 .connect-agent-title { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); line-height: calc(1.375rem * var(--sv-line-k, 1)); color: var(--sv-text); }
 .connect-agent-body { margin: 0; color: var(--sv-text-muted); }
+
+/* ----- The New conversation panel's variants (ConnectYourAgent A, B, C; sidevoice-web#463): the phrase on one line
+ * (AgentMessage). `current` is the rules above and nothing else. */
+.connect-agent[data-variant] { gap: var(--sv-space-3); }
+/* The title in the text colour, over a popover's muted paragraphs (ui.css .ui-popover p); what the page cannot do yet, the subtle
+   grey, smallest and last. */
+.connect-agent[data-variant] .connect-agent-title { color: var(--sv-text); }
+/* Its ring reaches 5px out of its box: room for it on every side. */
+.connect-agent[data-variant] .agent-message { margin-block: var(--sv-space-1-5); }
+.connect-agent .connect-agent-note { margin: 0; font-size: var(--sv-font-xs); line-height: calc(1rem * var(--sv-line-k, 1)); color: var(--sv-text-subtle); }
+
+/* B: the landing's steps — the number in the accent's disc, what to do beside it, the phrase under the second. */
+.connect-steps { display: grid; gap: var(--sv-space-3); margin: 0; padding: 0; list-style: none; }
+.connect-step { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: start; gap: var(--sv-space-3); }
+.connect-step-n { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--sv-accent); color: var(--sv-on-accent);
+  font-size: var(--sv-font-xs); font-weight: var(--sv-weight-bold); line-height: 1; font-variant-numeric: tabular-nums; }
+.connect-step-body { display: grid; gap: var(--sv-space-2); min-width: 0; padding-top: 2px; color: var(--sv-text); }
+.connect-agent[data-variant="b"] .connect-agent-note { padding-inline-start: 36px; }
+/* A phone's panel is too narrow to indent the phrase as well: under the second step it takes the panel's whole width. */
+@media (max-width: 559px), (max-width: 899px) and (pointer: coarse) {
+  .connect-step:has(.agent-message) .connect-step-body { display: contents; }
+  .connect-step .agent-message { grid-column: 1 / -1; }
+}
+
+/* C: centred, the title a step up, and a creature behind the phrase, in the middle, its head over the line's top edge (as a
+   conversation's creature comes out of its card): the line, raised above it, hides the rest. */
+.connect-agent[data-variant="c"] { justify-items: center; text-align: center; }
+.connect-agent[data-variant="c"] .connect-agent-title { font-size: var(--sv-font-lg); font-weight: var(--sv-weight-bold); letter-spacing: -.01em; }
+.connect-waiting { position: relative; display: grid; justify-items: center; width: 100%; padding-top: var(--sv-space-12); }
+.connect-waiting .agent-message { z-index: 1; }
+.connect-waiting-creature { position: absolute; top: calc(-1 * var(--sv-space-3)); left: 50%; width: 60px; height: 60px; transform: translateX(-50%); pointer-events: none; }
+.connect-waiting-creature, .connect-waiting-creature * { -webkit-user-select: none; user-select: none; }
+.connect-waiting-creature .sv-avatar { position: absolute; inset: 0; overflow: visible; }
+.connect-waiting-creature .sv-avatar[data-style="creature"] canvas { position: absolute; }
+.connect-waiting-creature .sv-avatar[data-pop="fitting"] canvas { visibility: hidden; }
+.connect-waiting-creature .creature-fallback { position: absolute; inset: 0; width: 100%; height: 100%; }
