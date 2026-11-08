@@ -128,6 +128,19 @@ function release(renderer: Stage["renderer"]) {
   renderer.dispose();
 }
 
+/** The stage in `slot` let go of, its renderer and context with it, its seat as if never made: the next creature drawn on it
+ *  makes a new one. For the sharp faces' stage once its last creature goes (a page that shows one only now and then — the
+ *  room's New conversation panel, the setup's last step — does not keep a WebGL context for the rest of its life beside the
+ *  stage's); the stage and the still faces keep theirs. */
+function vacate(slot: Slot) {
+  const seat = seats[slot];
+  if (!seat.stage) return;
+  seat.unwatch?.();
+  clearTimeout(seat.giveUp);
+  release(seat.stage.renderer);
+  seats[slot] = seat0();
+}
+
 /** A new renderer for the stage in `slot`, made as the stage made its own; its scene, camera and creatures are kept.
  *  Throws where no context can be had. */
 function renew(slot: Slot) {
@@ -750,6 +763,8 @@ export class LiveCreature {
     lives.delete(this);
     for (const off of this.off) off();
     dispose(this.item, this.stage);
+    // The last sharp face gone: its stage goes too (vacate).
+    if (this.slot === "card" && ![...lives].some((live) => live.drawnBy(this.stage))) vacate("card");
   }
 }
 

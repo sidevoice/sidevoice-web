@@ -611,3 +611,34 @@ test("a draw that throws leaves the camera's view offset cleared, so the next dr
   expect(rig.views.at(-1)).toBe("clear");
   scene.draw = draw;
 });
+
+test("the sharp faces' stage goes with its last creature, its context let go of, and is made again for the next", () => {
+  webgl();
+  // The stage's creature and a still face: theirs stay whatever the sharp faces do.
+  const scene = mount({ ...onStage, canvas: canvas() })!;
+  const still = mount({ seed: "t2", canvas: canvas(), framing: "face" })!;
+  const before = rig.made.length;
+  // Two sharp faces share one stage of their own.
+  const first = mount({ seed: "t3", canvas: canvas(), framing: "face", sharp: true })!;
+  const second = mount({ seed: "t4", canvas: canvas(), framing: "face", sharp: true })!;
+  expect(rig.made).toHaveLength(before + 1);
+  const card = rig.made[before];
+  const lost = vi.spyOn(card.renderer, "forceContextLoss");
+  // One goes: the other still draws on it.
+  first.dispose();
+  expect(card.renderer.disposed).toBe(false);
+  expect(second.drawnBy(card as never)).toBe(true);
+  // The last goes: the stage's renderer and its context are let go of.
+  second.dispose();
+  expect(lost).toHaveBeenCalledTimes(1);
+  expect(card.renderer.disposed).toBe(true);
+  // The stage's and the still faces' are kept.
+  for (const kept of rig.made.slice(0, before)) expect(kept.renderer.disposed).toBe(false);
+  expect(scene.drawnBy(stageFor("scene") as never)).toBe(true);
+  expect(still.drawnBy(rig.made[before - 1] as never) || still.drawnBy(stageFor("face") as never)).toBe(true);
+  // The next sharp face makes a stage again, and draws on it.
+  const third = mount({ seed: "t5", canvas: canvas(), framing: "face", sharp: true })!;
+  expect(rig.made).toHaveLength(before + 2);
+  expect(third.drawnBy(rig.made[before + 1] as never)).toBe(true);
+  expect(host.creaturesDrawable("face")).toBe(true);
+});
