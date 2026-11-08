@@ -125,6 +125,8 @@
 .ui-row-label { display: block; font-size: var(--sv-font-md); font-weight: 600; line-height: calc(1.375rem * var(--sv-line-k, 1)); color: var(--sv-text); }
 .ui-row-description { margin: 2px 0 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
 .ui-row-control { display: flex; align-items: center; justify-content: flex-end; min-width: 0; }
+/* A row another setting turns off: its words in the disabled ink (its control is disabled by its owner). */
+.ui-row[data-disabled] :is(.ui-row-label, .ui-row-description) { color: var(--sv-disabled-text); }
 .ui-row-control:has(> .ui-select, > .ui-input) { width: 280px; }
 .ui-row-control > .ui-select, .ui-row-control > .ui-input { width: 100%; }
 .ui-row--block { grid-template-columns: minmax(0, 1fr); }
