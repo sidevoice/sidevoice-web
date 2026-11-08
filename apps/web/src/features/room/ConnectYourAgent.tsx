@@ -15,8 +15,8 @@ import "./connect-agent.css";
  * How the New conversation panel draws it is an open decision (sidevoice-web#463): `current` is today's (a title, a line,
  * the phrase between guillemets); A, B and C put the phrase on one line (AgentMessage, the landing's message for the agent)
  * and differ in the rest — A the same few lines, shorter; B the landing's steps; C a creature waiting behind the phrase.
- * The panel's variant (NewConversation) says which; the setup's step is today's until one is chosen. Once one is, the
- * others and the prop go. */
+ * The variant `new-conversation-panel` says which, read by both places that show it (NewConversation, the setup's
+ * ReadyStep). Once one is chosen, the others and the prop go. */
 export const PANEL_VARIANTS = ["current", "a", "b", "c"] as const;
 export type PanelVariant = (typeof PANEL_VARIANTS)[number];
 
