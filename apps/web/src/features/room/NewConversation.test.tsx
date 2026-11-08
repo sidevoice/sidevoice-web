@@ -21,12 +21,12 @@ test("the phrase to say is the landing's, in every language, and names no tool: 
   }
 });
 
-test("the button opens a panel: its title, a creature waiting, where to say it, the phrase on one line with its copy button, and why", () => {
+test("the button opens a panel: its title, a creature waiting, where to say it, the phrase with its copy button, and why", () => {
   render(<NewConversation />);
   fireEvent.click(screen.getByRole("button", { name: "New conversation" }));
   const panel = document.querySelector(".ui-popover") as HTMLElement;
   expect(panel).toHaveAttribute("role", "dialog");
-  // Wide enough for the phrase on one line (new-conversation.css).
+  // Wider than a popover, so the phrase has room (new-conversation.css).
   expect(panel).toHaveClass("connect-popover");
   const order = [...panel.querySelector(".connect-agent")!.children].map((child) => child.className);
   expect(order).toEqual(["connect-agent-title", "connect-waiting-creature", "connect-agent-body", "agent-message", "connect-agent-note"]);

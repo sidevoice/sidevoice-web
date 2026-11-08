@@ -6,7 +6,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { AgentMessage } from "./AgentMessage";
 import { COPY_FEEDBACK_MS } from "../../components/ui/Snippet";
 
-/* The phrase to say to an agent on one line (the landing's message for the agent): the mark, the phrase, its copy button. */
+/* The phrase to say to an agent (the landing's message for the agent): the mark, the phrase, its copy button. */
 
 const PHRASE = "Connect this conversation to Sidevoice.";
 const previousClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
@@ -85,17 +85,36 @@ test("the button is always there, named and in the tab order: pointing at the li
   expect(button).toHaveFocus();
 });
 
-test("faint until pointed at, solid on keyboard focus or while it says how a copy went, stronger on a touch screen: CSS alone", () => {
-  // Nearly transparent at rest, faded and never hidden.
-  expect(rules(".agent-message .ui-copy-button")).toContain("opacity: .28;");
+/** A theme's value of `token` in theme.css: the light one (the root block) or the dark one. */
+const theme = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "../../styles/theme.css"), "utf8");
+function tokenOf(token: string, scheme: "light" | "dark") {
+  const start = scheme === "light" ? theme.indexOf(':root, [data-theme="light"] {') : theme.indexOf('[data-theme="dark"] {\n  color-scheme: dark;');
+  const value = theme.slice(start, theme.indexOf("\n}", start)).match(new RegExp(token + ": (#[0-9a-f]{6})"));
+  expect(value, token + " " + scheme).not.toBeNull();
+  return value![1];
+}
+/** WCAG's contrast ratio of two #rrggbb colours. */
+function contrast(a: string, b: string) {
+  const lum = (hex: string) => {
+    const [r, g, bl] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+test("quiet until pointed at: no fill, its icon in a muted token that still reads 3:1 on the box, light and dark; CSS alone", () => {
+  // Only where something points, so it never sticks after a tap: elsewhere (a touch screen) it keeps its own look.
+  const quiet = rules(".agent-message:not(:hover) .ui-copy-button:not(:focus-visible, [data-state])", block("@media (hover: hover)"));
+  expect(quiet).toEqual(["background-color: transparent; color: var(--sv-border-strong);"]);
+  expect(rules(".agent-message:not(:hover) .ui-copy-button:not(:focus-visible, [data-state])", css.replace(block("@media (hover: hover)"), ""))).toEqual([]);
+  // Faded by nothing, hidden by nothing: the line pointed at, keyboard focus and a copy's feedback give its own look and hover.
+  expect(css).not.toMatch(/opacity/);
   expect(css).not.toMatch(/\.ui-copy-button[^{]*\{[^}]*(display:\s*none|visibility:\s*hidden)/);
-  // Solid with the keyboard's focus (focus-visible, so a click does not leave it solid) and while it says how a copy went.
-  expect(rules(".agent-message .ui-copy-button:is(:focus-visible, [data-state])")).toEqual(["opacity: 1;"]);
-  // Solid while the line is pointed at, only where something points (no hover that sticks after a tap).
-  expect(rules(".agent-message:hover .ui-copy-button", block("@media (hover: hover)"))).toEqual(["opacity: 1;"]);
-  expect(rules(".agent-message:hover .ui-copy-button", css.replace(block("@media (hover: hover)"), ""))).toEqual([]);
-  // A touch screen points at nothing: .7 there, but for focus and feedback, which stay solid.
-  expect(rules(".agent-message .ui-copy-button:not(:focus-visible, [data-state])", block("@media (hover: none)"))).toEqual(["opacity: .7;"]);
+  // A non-text control at 3:1 at least against the box it sits on (WCAG 1.4.11), in both themes.
+  for (const scheme of ["light", "dark"] as const) {
+    expect(contrast(tokenOf("--sv-border-strong", scheme), tokenOf("--sv-surface-raised", scheme)), scheme).toBeGreaterThanOrEqual(3);
+  }
 });
 
 test("its look is the design system's tokens: no colour of its own", () => {

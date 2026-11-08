@@ -10,7 +10,7 @@ import "./new-conversation.css";
 /* A new conversation, from the foot of the conversations: a button, a "+" in the rail, or, in a phone's header, a slot
  * of its row after the avatars — an empty avatar's dashed circle, never the chevron's "+3". The page cannot start one
  * yet — an agent joins the room when asked to in its own session — so it says that, and what to tell the agent, in a panel
- * wide enough for the phrase on one line. */
+ * wider than a popover, so the phrase to copy has room. */
 export function NewConversation({ rail = false, header = false }: { rail?: boolean; header?: boolean }) {
   const t = translator();
   // From the header with the list down, the list goes first.

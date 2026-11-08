@@ -240,7 +240,7 @@ export const JOURNEYS: Journey[] = [
         person("t-release", "Codex — release notes for 0.3 (gpt-6-astra)", { harness: "codex", engine: { model: "gpt-6-astra", effort: "medium" } }),
         person("t-review", "\"Review of PR #109: every language and the end-of-turn try\"", { harness: "claude-code" }), person("t-notes", "notes (Cursor)", { harness: "cursor", reach: { state: "holding" } })] } },
     { id: "conversations", caption: "A conversation on the stage; the others beside it (a phone: from the header).", facts: {} },
-    { id: "new-conversation", caption: "New conversation: the page cannot start one, so it says what to tell the agent, the phrase on one line to copy.", after: openNewConversation },
+    { id: "new-conversation", caption: "New conversation: the page cannot start one, so it says what to tell the agent, the phrase ready to copy.", after: openNewConversation },
     { id: "speaking", caption: "The agent speaking: its words as they are said.", facts: { botLive: true, karaokeState: { segment: "h-2", from: 0, to: 58 }, history: [
       ...(BASE_FACTS.history as unknown[]).slice(0, 1), { ...(BASE_FACTS.history as Record<string, unknown>[])[1], audio: "playing" }] } },
     { id: "speaking-long", caption: "A long reply: three lines at a time, its pages following the voice, the end of the page before fading above.",
