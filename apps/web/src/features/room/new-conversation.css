@@ -1,5 +1,5 @@
 /* The New conversation panel (NewConversation.tsx): wider than a popover's 20rem, so the phrase to say has room (on a desktop
- * a short one stays on one line, a long one balances over two); a phone's, the screen's width less its margins. 28rem: a bit
- * narrower than the 34rem first tried (operator, 2026-11-08). */
-.ui-popover.connect-popover { width: min(28rem, calc(100vw - 24px)); padding: var(--sv-space-5); }
+ * a short one stays on one line, a long one balances over two); a phone's, the screen's width less its margins. 30rem: a bit
+ * narrower than the 34rem first tried, picked live among 34, 30, 28 and 26 (operator, 2026-11-08). */
+.ui-popover.connect-popover { width: min(30rem, calc(100vw - 24px)); padding: var(--sv-space-5); }
 @media (max-width: 559px), (max-width: 899px) and (pointer: coarse) { .ui-popover.connect-popover { padding: var(--sv-space-4); } }
