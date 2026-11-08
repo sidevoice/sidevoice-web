@@ -407,6 +407,21 @@ test("the card speaks the language this device's settings chose, else the system
   }
 });
 
+test("just the avatar: muted puts a crossed-out mic at the creature's feet, without dimming it; unmuted takes it away", () => {
+  localStorage.setItem(FLOATING_CARD_KEY, JSON.stringify({ format: "avatar", size: "m" }));
+  const host = fakeHost();
+  render(<Card host={host} />);
+  const mark = () => document.querySelector(".avatar-figure > .avatar-muted");
+  expect(mark()).toBeNull();
+  host.push({ call: snapshot({ micEnabled: false }) });
+  expect(mark()).not.toBeNull();
+  expect(mark()).toHaveAttribute("aria-hidden", "true");
+  expect(mark()!.querySelector("svg")).not.toBeNull();
+  expect(document.querySelector(".avatar-figure .sv-avatar")?.getAttribute("style") ?? "").not.toMatch(/filter|opacity/);
+  host.push({ call: snapshot({ micEnabled: true }) });
+  expect(mark()).toBeNull();
+});
+
 test("the call's duration reads like a clock", () => {
   expect(duration(1_000, 1_000 + 65_000)).toBe("1:05");
   expect(duration(0, 5_000)).toBe("");
