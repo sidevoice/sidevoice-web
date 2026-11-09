@@ -156,7 +156,8 @@ export interface HostAgentsState {
   value: HostAgentsListing | null;
   error: HostAgentError | null;
   busy: Record<string, "connect" | "disconnect" | "dismiss">;
-  actionErrors: Record<string, { key: string; params?: Record<string, string | number> }>;
+  /** What went wrong with an agent's last action, and which action it was (absent: set before it was recorded). */
+  actionErrors: Record<string, { key: string; params?: Record<string, string | number>; action?: "connect" | "disconnect" | "dismiss" }>;
 }
 
 export interface SettingsAgentRequest {

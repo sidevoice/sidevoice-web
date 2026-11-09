@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { HostAgentsPanel, sidevoiceEntry } from "./HostAgentsPanel";
 import { LinkIcon, UnlinkIcon } from "../../components/ui/Icons";
+import { createHostAgentsController } from "../../services/host-agents";
 import { RoomHeader } from "../room/RoomHeader";
 import { MachineList } from "../room/MachineList";
 import { RoomProvider } from "../../app/RoomProvider";
@@ -322,6 +323,59 @@ test("a row says where it stands in a tag beside its name: connecting reads Conn
     act(() => store.patch({ hostAgents: { fp: ready([notConnected]) } }));
     expect(tagOf(row()).text).toBe("Not connected");
   } finally { vi.useRealTimers(); }
+});
+
+test("a Connect or a Disconnect that fails says so in a danger tag beside the name, as a provider's refused key, the why under it", async () => {
+  const store = createRoomStore();
+  // The real controller, its machine answering every action with Sidevoice not running there.
+  const controller = createHostAgentsController({
+    request: async () => { throw { key: "no-connector" }; }, hasHost: () => true,
+    getState: (fp) => store.getState().facts.hostAgents[fp],
+    setState: (fp, next) => store.patch({ hostAgents: { ...store.getState().facts.hostAgents, [fp]: next } }),
+  });
+  setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction: (fp, id, action) => controller.act(fp, id, action) });
+  act(() => store.patch({ hostAgents: { fp: ready([known("codex")]) } }));
+  render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
+  const row = () => document.querySelector(".host-agent-row") as HTMLElement;
+
+  // Connect fails: Couldn't connect, in danger, its dot; why, as an alert under the name; Connect there to try again.
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Connect Codex to Sidevoice" })); });
+  expect(store.getState().facts.hostAgents.fp.actionErrors.codex).toMatchObject({ key: "no-connector", action: "connect" });
+  expect(tagOf(row())).toEqual({ text: "Couldn’t connect", tone: "danger", dot: true, tag: true });
+  expect(within(row()).getByRole("alert")).toHaveTextContent(/^Sidevoice is not running on this machine\.$/);
+  expect(within(row()).getByRole("button", { name: "Connect Codex to Sidevoice" })).toBeInTheDocument();
+
+  // Disconnect fails (asked first, as ever): Couldn't disconnect, in danger.
+  act(() => store.patch({ hostAgents: { fp: ready([known("codex", { registration: "connected" })]) } }));
+  expect(tagOf(row())).toEqual({ text: "Connected", tone: "positive", dot: false, tag: true });
+  fireEvent.click(screen.getByRole("button", { name: "Disconnect Codex from Sidevoice" }));
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Remove from Codex" })); });
+  expect(store.getState().facts.hostAgents.fp.actionErrors.codex).toMatchObject({ key: "no-connector", action: "disconnect" });
+  expect(tagOf(row())).toEqual({ text: "Couldn’t disconnect", tone: "danger", dot: true, tag: true });
+  expect(within(row()).getByRole("alert")).toHaveTextContent(/^Sidevoice is not running on this machine\.$/);
+  expect(within(row()).getByRole("button", { name: "Disconnect Codex from Sidevoice" })).toBeInTheDocument();
+});
+
+test("a failed Update reads Couldn't update; an error from before actions were recorded, the row's own; a change not checked afterwards, unknown", () => {
+  const store = createRoomStore();
+  setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction: vi.fn(async () => {}) });
+  render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
+  const row = () => document.querySelector(".host-agent-row") as HTMLElement;
+  const failing = (changes: Partial<DetectedAgent>, error: HostAgentsState["actionErrors"][string]) =>
+    act(() => store.patch({ hostAgents: { fp: { ...ready([known("codex", changes)]), actionErrors: { codex: error } } } }));
+  failing({ registration: "outdated", actionable: false }, { key: "connect-failed", action: "connect" });
+  expect(tagOf(row())).toEqual({ text: "Couldn’t update", tone: "danger", dot: true, tag: true });
+  failing({}, { key: "connect-failed" });
+  expect(tagOf(row()).text).toBe("Couldn’t connect");
+  failing({ registration: "connected" }, { key: "action-failed" });
+  expect(tagOf(row()).text).toBe("Couldn’t disconnect");
+  // Applied, but not checked: no failure, and where it stands is unknown until searched again; the line says so.
+  failing({}, { key: "agents.scan-failed-after", params: { agent: "Codex" }, action: "connect" });
+  expect(tagOf(row())).toEqual({ text: "Connection status is unknown", tone: "neutral", dot: true, tag: true });
+  expect(within(row()).getByRole("alert")).toHaveTextContent("The change to Codex was applied");
+  // Trying again: the tag says what it is doing meanwhile.
+  act(() => store.patch({ hostAgents: { fp: { ...ready([known("codex")]), busy: { codex: "connect" } } } }));
+  expect(tagOf(row())).toEqual({ text: "Connecting…", tone: "neutral", dot: false, tag: true });
 });
 
 test("Connect, Update and Disconnect are a provider's buttons: secondary, Connect with its link, Disconnect with the link broken", async () => {

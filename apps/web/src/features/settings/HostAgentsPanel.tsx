@@ -151,11 +151,20 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
   const connected = agent.registration === "connected";
   const outdated = agent.registration === "outdated";
   const unknown = agent.registration === "unknown" || !recognized;
-  // Where it stands, at a glance, as a provider's row says it: a tag beside the name in Providers' tones — Connected,
+  // A Connect, Update or Disconnect that failed (the action the error recorded; else the row's own, from where it
+  // stands). A change made but not checked afterwards did not fail: where it stands is unknown until searched again.
+  const unchecked = error?.key === "agents.scan-failed-after";
+  const failed = error && !unchecked ? error.action ?? (connected ? "disconnect" : "connect") : null;
+  const failedKey = failed === "disconnect" ? "agents.state.disconnectFailed"
+    : failed === "connect" ? (outdated ? "agents.state.updateFailed" : "agents.state.connectFailed") : null;
+  // Where it stands, at a glance, as a provider's row says it: a tag beside the name in Providers' tones — what it is
+  // doing meanwhile (as a provider's Checking…), an action that failed (danger, as a provider's refused key), Connected,
   // Not connected, Needs attention (an entry an older Sidevoice made, another 'sidevoice' entry, settings that can't be
-  // read), unknown, or what it is doing meanwhile (as a provider's Checking…).
+  // read), or unknown.
   const reason = agent.registration === "foreign" ? "agents.foreign" : outdated ? "agents.outdated" : agent.registration === "invalid" ? "agents.invalid" : null;
   const state: { text: string; tone: BadgeTone; dot: boolean } = busy ? { text: t(`agents.busy.${busy}` as MessageKey), tone: "neutral", dot: false }
+    : failedKey ? { text: t(failedKey), tone: "danger", dot: true }
+    : unchecked ? { text: t("agents.unknown"), tone: "neutral", dot: true }
     : connected ? { text: t("agents.state.connected"), tone: "positive", dot: false }
     : reason ? { text: t("agents.state.attention"), tone: "warning", dot: true }
     : unknown ? { text: t("agents.unknown"), tone: "neutral", dot: true }
