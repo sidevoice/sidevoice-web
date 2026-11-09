@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.29.0](https://github.com/sidevoice/sidevoice-web/compare/v0.28.0...v0.29.0) (2026-11-09)
+
+
+### Features
+
+* **agents:** Connect, Disconnect and the agent's state as in Providers ([#562](https://github.com/sidevoice/sidevoice-web/issues/562)) ([bc95cfa](https://github.com/sidevoice/sidevoice-web/commit/bc95cfa2103620243be21080c63cbb5d916f15cb))
+* **call:** a muted mic at the creature's feet in the floating card's avatar format ([#564](https://github.com/sidevoice/sidevoice-web/issues/564)) ([6545c30](https://github.com/sidevoice/sidevoice-web/commit/6545c3077add13b7c542768f1d55c0a733814d03))
+* **conversation:** the new-conversation panel with the one-line agent message ([#558](https://github.com/sidevoice/sidevoice-web/issues/558)) ([6aa97b3](https://github.com/sidevoice/sidevoice-web/commit/6aa97b39adf5763fbf21f7fca6208c8622b34fc7))
+
+
+### Bug Fixes
+
+* **call:** the desktop app's hidden window is not the screen off for the thinking sound ([#561](https://github.com/sidevoice/sidevoice-web/issues/561)) ([33150ba](https://github.com/sidevoice/sidevoice-web/commit/33150ba239e5518f33040f13804b7e6fd1c3135f))
+
 ## [0.28.0](https://github.com/sidevoice/sidevoice-web/compare/v0.27.1...v0.28.0) (2026-11-08)
 
 
