@@ -10,7 +10,7 @@ import { DEFAULT_CALL_PREFERENCES } from "./call-preferences";
 
 const param = (value = 0) => ({ value, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() });
 
-class FakeSource {
+class FakeSource extends EventTarget {
   buffer: { duration: number } | null = null;
   onended: (() => void) | null = null;
   starts: number[] = [];
@@ -23,7 +23,7 @@ class FakeSource {
 }
 
 /** A context whose clock is the test's own (the fake timers' Date), once it runs. */
-class FakeContext {
+class FakeContext extends EventTarget {
   static made: FakeContext[] = [];
   static decodes: ArrayBuffer[] = [];
   static failDecodeOf: string | null = null;
@@ -41,7 +41,7 @@ class FakeContext {
   sources: FakeSource[] = [];
   gains: { gain: ReturnType<typeof param>; connect: (next: unknown) => unknown; disconnect: () => void }[] = [];
   limiters: (Record<"threshold" | "knee" | "ratio" | "attack" | "release", { value: number }> & { connect: (next: unknown) => unknown })[] = [];
-  constructor() { FakeContext.made.push(this); }
+  constructor() { super(); FakeContext.made.push(this); }
   createBufferSource() { const made = new FakeSource(); this.sources.push(made); return made; }
   createGain() { const made = { gain: param(1), connect: vi.fn((next: unknown) => next), disconnect: vi.fn() }; this.gains.push(made); return made; }
   createDynamicsCompressor() {
@@ -414,4 +414,70 @@ test("whileLocked goes only to an app that holds the cue for the lock; one befor
   playThinkingSound({ ...SOFT, whileLocked: true }).stop();
   expect(before.start.mock.calls[0][1]).not.toHaveProperty("whileLocked");
   expect(FakeContext.made).toHaveLength(0);
+});
+
+/** Whether `promise` has settled by now (its callbacks run). */
+async function settled(promise: Promise<void> | void) {
+  let done = false;
+  void Promise.resolve(promise).then(() => { done = true; });
+  await vi.advanceTimersByTimeAsync(0);
+  return done;
+}
+
+test("a stop is through once the play sounding has ended on the audio clock, not by a timer; the one waiting is not waited for", async () => {
+  const loop = playThinkingSound(SOFT, () => 0);
+  await vi.advanceTimersByTimeAsync(0);
+  const [context] = FakeContext.made;
+  const [sounding, waiting] = context.sources;
+  await vi.advanceTimersByTimeAsync(100);
+  const through = loop.stop();
+  expect(through).toBeInstanceOf(Promise);
+  // The sounding one fades out to its end; the waiting one never begins.
+  expect(sounding.stops[0]).toBeCloseTo(0.1 + 0.15, 6);
+  expect(waiting.stops[0]).toBeCloseTo(0.1, 6);
+  // The fade's length by the page's clock is no measure: not through until it has ended.
+  await vi.advanceTimersByTimeAsync(200);
+  expect(await settled(through)).toBe(false);
+  sounding.dispatchEvent(new Event("ended"));
+  expect(await settled(through)).toBe(true);
+  expect(context.gains[0].disconnect).not.toHaveBeenCalled();
+});
+
+test("a context suspended mid-fade (iOS) is cut, and that is the end of the stop; else its nodes let go are", async () => {
+  const loop = playThinkingSound(SOFT, () => 0);
+  await vi.advanceTimersByTimeAsync(0);
+  const [context] = FakeContext.made;
+  const through = loop.stop();
+  context.state = "suspended";
+  context.dispatchEvent(new Event("statechange"));
+  // Cut: nothing of it can come out when the context runs again.
+  expect(context.gains[0].disconnect).toHaveBeenCalled();
+  expect(await settled(through)).toBe(true);
+
+  // A clock that never gets there: through, cut, when the nodes are let go.
+  resetThinkingSoundForTests();
+  const late = playThinkingSound(SOFT, () => 0);
+  await vi.advanceTimersByTimeAsync(0);
+  const next = FakeContext.made.at(-1)!;
+  const lateThrough = late.stop();
+  await vi.advanceTimersByTimeAsync(399);
+  expect(await settled(lateThrough)).toBe(false);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(await settled(lateThrough)).toBe(true);
+  expect(next.gains[0].disconnect).toHaveBeenCalled();
+});
+
+test("a stop with nothing sounding (between plays, a context not running, nothing played yet) is through at once", async () => {
+  const loop = playThinkingSound(SOFT, () => 0);
+  await vi.advanceTimersByTimeAsync(0);
+  const [context] = FakeContext.made;
+  context.sources[0].dispatchEvent(new Event("ended"));
+  context.sources[0].onended?.();
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(await settled(loop.stop())).toBe(true);
+
+  resetThinkingSoundForTests();
+  FakeContext.failAll = true;
+  const none = playThinkingSound(SOFT);
+  expect(none.stop()).toBeUndefined();
 });

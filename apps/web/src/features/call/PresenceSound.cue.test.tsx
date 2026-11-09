@@ -99,17 +99,34 @@ test("an app whose cue does not hold for the lock (before whileLocked): screen o
   } finally { vi.useRealTimers(); }
 });
 
-/** The page's Web Audio, enough to see its copy of the sound start and fade out: each play, and when its stop takes effect
- *  on the audio clock (the clock is the fake timers'). */
+/** The page's Web Audio, enough to see its copy of the sound start and fade out: each play, when its stop takes effect on the
+ *  audio clock, and its `ended` then. The audio clock runs at half the page's pace (iOS holding the audio back): a page's
+ *  timer would say the fade is through long before it is. */
 function fakeWebAudio() {
   const plays: { stops: number; until: number }[] = [];
   const contexts: { currentTime: number }[] = [];
   const origin = Date.now();
+  const clock = () => (Date.now() - origin) / 2000;
   const param = () => ({ value: 1, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() });
-  class Context {
-    constructor() { contexts.push(this); }
+  class Source extends EventTarget {
+    buffer = null;
+    onended: (() => void) | null = null;
+    play = { stops: 0, until: Infinity };
+    private end: ReturnType<typeof setTimeout> | undefined;
+    connect() { return undefined; }
+    disconnect() { return undefined; }
+    start() { plays.push(this.play); }
+    stop(when = 0) {
+      this.play.stops++;
+      this.play.until = Math.min(this.play.until, when);
+      clearTimeout(this.end);
+      this.end = setTimeout(() => { this.onended?.(); this.dispatchEvent(new Event("ended")); }, Math.max(0, (this.play.until - clock()) * 2000));
+    }
+  }
+  class Context extends EventTarget {
+    constructor() { super(); contexts.push(this); }
     state = "running";
-    get currentTime() { return (Date.now() - origin) / 1000; }
+    get currentTime() { return clock(); }
     destination = {};
     resume = async () => undefined;
     suspend = async () => undefined;
@@ -118,11 +135,7 @@ function fakeWebAudio() {
     createDynamicsCompressor() {
       return { threshold: param(), knee: param(), ratio: param(), attack: param(), release: param(), connect: (next: unknown) => next, disconnect: () => undefined };
     }
-    createBufferSource() {
-      const play = { stops: 0, until: Infinity };
-      return { buffer: null, onended: null, connect: () => undefined, disconnect: () => undefined, start: () => { plays.push(play); },
-        stop: (when = 0) => { play.stops++; play.until = Math.min(play.until, when); } };
-    }
+    createBufferSource() { return new Source(); }
     async decodeAudioData() { return { duration: 0.6 }; }
   }
   vi.stubGlobal("AudioContext", Context);
@@ -146,15 +159,17 @@ test("the app's cue offered after a working call is back: the page's copy stops 
     expect(plays.length).toBeGreaterThan(0);
     expect(plays.some((play) => play.stops === 0)).toBe(true);
     // The app answers mid-pulse: its cue is offered, and the page hands the sound over to it. The page's copy fades out
-    // first; the app's cue starts once it has, never over it.
+    // first; the app's cue starts once the pulse has ended on the audio clock, never over it: not when a page's timer of
+    // the fade's length would have said so (150 ms; 300 ms here, the audio clock at half pace).
     let startedAt = -1;
     cue = { start: vi.fn(() => { startedAt = now(); }), stop: vi.fn(), options: ALL };
     await act(async () => { await vi.advanceTimersByTimeAsync(250); });
     expect(plays.every((play) => play.stops > 0)).toBe(true);
     const faded = Math.max(...plays.map((play) => play.until));
     expect(faded).toBeGreaterThan(now());
-    expect(cue.start).not.toHaveBeenCalled();
     await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+    expect(cue.start).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(120); });
     expect(cue.start).toHaveBeenCalledTimes(1);
     expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "soft-heartbeat", gainDb: 0, intervalScale: 1, whileLocked: true });
     expect(startedAt).toBeGreaterThanOrEqual(faded - 1e-9);

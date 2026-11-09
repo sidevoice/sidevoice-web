@@ -25,7 +25,8 @@ import { nextGapSeconds, thinkingSound, thinkingSoundGain, thinkingSoundInterval
 /** Each play goes through the person's offset, then a limiter that keeps a raised sound from clipping (the settings it was
  *  approved with: a threshold just under full scale, a hard knee and a high ratio, quick to act). */
 const LIMITER = { threshold: -2, knee: 0, ratio: 20, attack: 0.003, release: 0.1 } as const;
-/** How long a sound fades out once it is stopped, and when its nodes are let go. */
+/** How long a sound fades out once it is stopped (on the audio clock), and when its nodes are let go (on the page's): the
+ *  latest a stopped sound can be heard, whatever the audio clock does. */
 const TAIL_SECONDS = 0.15;
 const RELEASE_MS = 400;
 
@@ -119,6 +120,8 @@ function startLoop(made: AudioContext, sound: ThinkingSound, gainDb: number, int
   limiter.release.value = LIMITER.release;
   gain.connect(limiter).connect(made.destination);
   const sources = new Set<AudioBufferSourceNode>();
+  /** When each play begins, on the audio clock: a stop tells the one playing from the one still waiting. */
+  const begins = new WeakMap<AudioBufferSourceNode, number>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let stopped = false;
   let scale = thinkingSoundIntervalScale(intervalScale);
@@ -131,6 +134,7 @@ function startLoop(made: AudioContext, sound: ThinkingSound, gainDb: number, int
     source.connect(gain);
     source.onended = () => { sources.delete(source); source.disconnect(); };
     sources.add(source);
+    begins.set(source, at);
     source.start(at);
     last = { source, buffer, at, after };
     wake(buffer, at);
@@ -179,10 +183,26 @@ function startLoop(made: AudioContext, sound: ThinkingSound, gainDb: number, int
       const now = made.currentTime;
       gain.gain.cancelScheduledValues(now);
       gain.gain.setTargetAtTime(0, now, TAIL_SECONDS / 3);
-      for (const source of sources) { try { source.stop(now + TAIL_SECONDS); } catch { /* Already stopped. */ } }
-      setTimeout(() => { for (const source of sources) source.disconnect(); sources.clear(); release(); }, RELEASE_MS);
-      if (!last) return;
-      return new Promise<void>((faded) => { setTimeout(faded, TAIL_SECONDS * 1000); });
+      // The play sounding fades out; the one still waiting never begins.
+      const sounding = [...sources].filter((source) => (begins.get(source) ?? 0) <= now);
+      for (const source of sources) {
+        try { source.stop(sounding.includes(source) ? now + TAIL_SECONDS : now); } catch { /* Already stopped. */ }
+      }
+      // Faded once what sounded has ended, on the audio clock: a page's timer is no measure of it (iOS may hold the audio back
+      // or suspend it, and what follows would start before the fade is through). A context that does not run (suspended,
+      // closed) would play the rest of it when it runs again: the chain is cut there, and that is the end of it, as it is at
+      // the latest when the nodes are let go.
+      let ended = sounding.length;
+      let faded: () => void = () => undefined;
+      const through = new Promise<void>((resolve) => { faded = resolve; });
+      const cut = () => { release(); faded(); };
+      const paused = () => { if (made.state !== "running") cut(); };
+      for (const source of sounding) source.addEventListener("ended", () => { if (--ended === 0) faded(); }, { once: true });
+      made.addEventListener("statechange", paused);
+      void through.then(() => made.removeEventListener("statechange", paused));
+      setTimeout(() => { for (const source of sources) source.disconnect(); sources.clear(); cut(); }, RELEASE_MS);
+      if (!ended || made.state !== "running") cut();
+      return last ? through : undefined;
     },
   };
 }
