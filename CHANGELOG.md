@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.30.0](https://github.com/sidevoice/sidevoice-web/compare/v0.29.0...v0.30.0) (2026-11-09)
+
+
+### Features
+
+* **call:** soft heartbeat every 7–10 s and 5 dB lower; a frequency setting ([#565](https://github.com/sidevoice/sidevoice-web/issues/565)) ([2ab460f](https://github.com/sidevoice/sidevoice-web/commit/2ab460f2db116d0230cc13e899f2f14c62dd7ec0))
+
+
+### Bug Fixes
+
+* **conversations:** a conversation removed from this device does not come back while the call is on it ([#566](https://github.com/sidevoice/sidevoice-web/issues/566)) ([6c55b1d](https://github.com/sidevoice/sidevoice-web/commit/6c55b1dfdb2386a73238ff5891c39b0b1fe55a78))
+
 ## [0.29.0](https://github.com/sidevoice/sidevoice-web/compare/v0.28.0...v0.29.0) (2026-11-09)
 
 
