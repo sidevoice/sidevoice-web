@@ -128,6 +128,14 @@ const openSettings = (section: string) => (doc: Document) => {
   if (dialog && !dialog.open) dialog.showModal();
 };
 const press = (id: string) => (doc: Document) => { doc.getElementById(id)?.click(); };
+/** New conversation pressed, where it shows: at the list's foot on a desktop, in a phone's header. */
+const openNewConversation = (doc: Document) => {
+  const shown = [...doc.querySelectorAll<HTMLElement>(".sidebar-new button, .room-header .header-new")].find((button) => {
+    const box = button.getBoundingClientRect();
+    return box.width > 0 && box.top >= 0 && box.bottom <= (doc.defaultView?.innerHeight ?? 0);
+  });
+  shown?.click();
+};
 /** A reply of the agent's arriving once the page is drawn, after the transcript has marked the rest seen. */
 const arrives = (text: string) => (doc: Document) => {
   const history = BASE_FACTS.history as Record<string, unknown>[];
@@ -232,6 +240,7 @@ export const JOURNEYS: Journey[] = [
         person("t-release", "Codex — release notes for 0.3 (gpt-6-astra)", { harness: "codex", engine: { model: "gpt-6-astra", effort: "medium" } }),
         person("t-review", "\"Review of PR #109: every language and the end-of-turn try\"", { harness: "claude-code" }), person("t-notes", "notes (Cursor)", { harness: "cursor", reach: { state: "holding" } })] } },
     { id: "conversations", caption: "A conversation on the stage; the others beside it (a phone: from the header).", facts: {} },
+    { id: "new-conversation", caption: "New conversation: the page cannot start one, so it says what to tell the agent, the phrase ready to copy.", after: openNewConversation },
     { id: "speaking", caption: "The agent speaking: its words as they are said.", facts: { botLive: true, karaokeState: { segment: "h-2", from: 0, to: 58 }, history: [
       ...(BASE_FACTS.history as unknown[]).slice(0, 1), { ...(BASE_FACTS.history as Record<string, unknown>[])[1], audio: "playing" }] } },
     { id: "speaking-long", caption: "A long reply: three lines at a time, its pages following the voice, the end of the page before fading above.",

@@ -37,10 +37,10 @@ export const messages: Messages = {
   "sidebar.removeConversation": "Usuń z tego urządzenia",
   "sidebar.new": "Nowa rozmowa",
   "sidebar.newTitle": "Połącz agenta, aby z nim rozmawiać",
-  "sidebar.newBody": "Gdy agent się połączy, możesz z nim rozmawiać. Nie można jeszcze rozpocząć rozmowy z tego miejsca. W sesji twojego agenta powiedz:",
-  "sidebar.newPhrase": "Połącz się z Sidevoice (użyj jego narzędzia voice_connect)",
   "sidebar.newCopy": "Kopiuj wiadomość dla agenta",
   "connect.body": "W sesji swojego agenta powiedz:",
+  "connect.phrase": "Połącz tę rozmowę z Sidevoice.",
+  "connect.notYet": "Nie można jeszcze rozpocząć rozmowy z tego miejsca.",
 
   "state.inCall": "W połączeniu",
   "state.working": "Pracuje",

@@ -151,7 +151,7 @@ test("transcription and voice are this device's: trying them is recommended, and
   expect(title()).toHaveTextContent("You’re all set — talk to your agents");
   // What was set up, read from what the steps wrote, and what to tell an agent.
   expect(document.querySelector(".wizard-recap-list")).toHaveTextContent("Transcription");
-  expect(document.querySelector(".wizard-ready .ui-quote blockquote")).toHaveTextContent("voice_connect");
+  expect(document.querySelector(".wizard-ready .agent-message blockquote")).toHaveTextContent(/^Connect this conversation to Sidevoice\.$/);
   expect(wizard().getByRole("button", { name: "Copy the message for your agent" })).toHaveClass("ui-copy-button");
   await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Enter Sidevoice" })); });
   const kept = JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!);

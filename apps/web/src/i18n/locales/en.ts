@@ -37,10 +37,10 @@ export const messages = {
   "sidebar.removeConversation": "Remove from this device",
   "sidebar.new": "New conversation",
   "sidebar.newTitle": "Connect your agent to talk to it",
-  "sidebar.newBody": "Your agent connects, and then you can talk to it. Starting a conversation from here isn't possible yet. In your agent's session, say:",
-  "sidebar.newPhrase": "Connect to Sidevoice (use its voice_connect tool)",
   "sidebar.newCopy": "Copy the message for your agent",
   "connect.body": "In your agent's session, say:",
+  "connect.phrase": "Connect this conversation to Sidevoice.",
+  "connect.notYet": "Starting a conversation from here isn't possible yet.",
 
   "state.inCall": "In call",
   "state.working": "Working",
