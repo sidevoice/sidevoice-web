@@ -134,22 +134,35 @@ let pendingRemovals=readRemovals();
 const removing=(fp,thread)=>pendingRemovals.some(row=>row.node===fp&&row.thread_id===thread);
 // The durable state, as another tab left it: read where a send or a pick is about to be allowed.
 const syncRemovals=()=>{pendingRemovals=readRemovals()};
-/* The conversations of each machine this tab keeps closed for this device because they were removed on it (`link.removed`).
- * Kept with the tab, as the call's resume ticket is: a reload that takes the call back may find the room's focus still on
- * one, and leaves it rather than going back to it. A conversation leaves the set once its machine lists it for this device
- * again (its agent connected anew) or reports it closed for every device; only a machine's newest MAX_REMOVED_HERE stay. */
-const REMOVED_HERE_KEY='sidevoice.removed-here.v1',MAX_REMOVED_HERE=64;
+/* The conversations of each machine this device keeps closed for itself because they were removed on it, also once their
+ * removal is settled; `link.removed` holds them in each tab. Shared by every tab and kept across loads: a call taken back
+ * after a reload, in this tab or another, may find the room's focus still on one, and leaves it rather than going back to
+ * it. A conversation leaves the set once its machine lists it for this device again (its agent connected anew) or reports
+ * it closed for every device; only a machine's newest MAX_REMOVED_HERE stay. Changed under one lock, as the removals are:
+ * each change is applied to what the store holds then, so a tab cannot put back what another took out, or the reverse. */
+const REMOVED_HERE_KEY='sidevoice.removed-here.v1',REMOVED_HERE_LOCK='sidevoice.removed-here',MAX_REMOVED_HERE=64;
 function storedRemovedHere(){
- try{const rows=JSON.parse(sessionStorage.getItem(REMOVED_HERE_KEY)||'{}');return rows&&typeof rows==='object'&&!Array.isArray(rows)?rows:{}}
+ try{const rows=JSON.parse(pageStorage()?.getItem(REMOVED_HERE_KEY)||'{}');return rows&&typeof rows==='object'&&!Array.isArray(rows)?rows:{}}
  catch{return {}}
 }
 function removedHereOf(fp){const rows=storedRemovedHere()[fp];return Array.isArray(rows)?rows.filter(thread=>typeof thread==='string'&&thread).slice(-MAX_REMOVED_HERE):[]}
-function keepRemovedHere(fp,removed){
- while(removed.size>MAX_REMOVED_HERE)removed.delete(removed.values().next().value);
- const rows=storedRemovedHere(),next=removed.size?[...removed]:undefined;
- if(JSON.stringify(rows[fp])===JSON.stringify(next))return;
- if(next)rows[fp]=next;else delete rows[fp];
- try{if(Object.keys(rows).length)sessionStorage.setItem(REMOVED_HERE_KEY,JSON.stringify(rows));else sessionStorage.removeItem(REMOVED_HERE_KEY)}catch{}
+const newestRemoved=set=>{while(set.size>MAX_REMOVED_HERE)set.delete(set.values().next().value);return set};
+function changeRemovedHere(fp,add,drop){
+ if(!add.length&&!drop.length)return Promise.resolve();
+ return pageHost().exclusive(REMOVED_HERE_LOCK,()=>{
+  const store=pageStorage();if(!store)return;
+  const rows=storedRemovedHere(),next=new Set(removedHereOf(fp));
+  for(const thread of drop)next.delete(thread);
+  for(const thread of add){next.delete(thread);next.add(thread)}
+  newestRemoved(next);
+  if(next.size)rows[fp]=[...next];else delete rows[fp];
+  if(Object.keys(rows).length)store.setItem(REMOVED_HERE_KEY,JSON.stringify(rows));else store.removeItem(REMOVED_HERE_KEY);
+ }).catch(()=>{});
+}
+// What any tab of this device keeps closed for it is closed on this tab's link too, at once: a call on one leaves it.
+function takeRemovedHere(fp,link){
+ for(const thread of removedHereOf(fp)){link.removed.add(thread);link.closed.add(thread)}
+ newestRemoved(link.removed);
 }
 // One removal is its machine, its thread and the id it was made under: a later removal of the same conversation is another.
 const sameRemoval=(fp,thread,id)=>row=>row.node===fp&&row.thread_id===thread&&(id===undefined||row.id===id);
@@ -174,7 +187,8 @@ function hideRemoved(fp,thread){
  // Its texts that never left this device never will, under this conversation or a later one: they stay as not sent.
  failTexts(entry=>entry.node===fp&&entry.payload.data.thread===thread);
  const link=links.get(fp);
- if(link){link.closed=new Set([...(link.closed||[]),thread]);link.removed.delete(thread);link.removed.add(thread);keepRemovedHere(fp,link.removed);link.peopleAsked++;link.people=link.people.filter(person=>person.thread_id!==thread);mergePeople()}
+ if(link){link.closed=new Set([...(link.closed||[]),thread]);link.removed.delete(thread);link.removed.add(thread);newestRemoved(link.removed);link.peopleAsked++;link.people=link.people.filter(person=>person.thread_id!==thread);mergePeople()}
+ void changeRemovedHere(fp,[thread],[]);
  return disposeConversation(key).catch(()=>{});
 }
 // Each removal is applied once on a tab, by its id: an event delivered late, about one this tab already applied (and which may
@@ -198,6 +212,7 @@ function hideAllRemoved(){for(const row of pendingRemovals)applyRemoval(row)}
 // A tab that was suspended hears each change in turn: what the event says it was and became is applied, not only what the
 // store holds now, which another tab may have settled and deleted since.
 window.addEventListener('storage',event=>{
+ if(event.key===REMOVED_HERE_KEY){for(const [fp,link] of links)takeRemovedHere(fp,link);return}
  if(event.key!==REMOVALS_KEY)return;
  syncRemovals();
  for(const row of [...parseRemovals(event.oldValue),...parseRemovals(event.newValue)])applyRemoval(row);
@@ -422,8 +437,8 @@ if(!nativeData)subscribeLocalHost();
  * that loses its machine keeps its conversations, shown unreachable, until the machine is forgotten. */
 const MAX_LINKS=6;
 const links=new Map();
-// A new link starts with what this tab kept closed for this device on that machine: its removals still to be taken, and
-// those it kept with the tab (`removedHereOf`), so a call taken back after a reload never lands on one.
+// A new link starts with what this device keeps closed for itself on that machine: its removals still to be taken, and the
+// settled ones (`removedHereOf`), so a call taken back after a reload, in any tab, never lands on one.
 function linkOf(fp){let link=links.get(fp);if(!link){
  const removed=new Set([...removedHereOf(fp),...pendingRemovals.filter(row=>row.node===fp).map(row=>row.thread_id)]);
  link={fp,base:null,reach:'checking',via:'',asked:0,applied:0,doubted:null,removed,closed:new Set(removed),
@@ -444,7 +459,7 @@ function syncLinks(){
  publishLinks();
 }
 function forgetMachineState(fp){
- rememberedCards=rememberedCards.filter(row=>row.node!==fp);saveCards();keepRemovedHere(fp,new Set());
+ rememberedCards=rememberedCards.filter(row=>row.node!==fp);saveCards();void changeRemovedHere(fp,[],removedHereOf(fp));
  // Nothing is left to tell a machine this device no longer pairs with.
  void changeRemovals(list=>list.filter(row=>row.node!==fp));
  for(const key of [...removalBackoff.keys()])if(conversationOf(key)?.node===fp)removalBackoff.delete(key);
@@ -1401,10 +1416,13 @@ async function refreshPeople(fp=state.callNode){
   // open while another device shows it, and leaves this device's call on it. So the call leaves it and never goes back to it
   // (`settleOnOpen`, `pickOn`), until the machine lists it for this device again (its agent connected anew), or
   // closes it for every device, which takes every call off it.
-  const removed=link.removed;
-  for(const thread of removedHere)removed.add(thread);
-  for(const thread of [...removed])if(reported.has(thread)&&!removedHere.has(thread)||listedNow.has(thread)&&(!removedHere.has(thread)||revived.has(thread)))removed.delete(thread);
-  keepRemovedHere(fp,removed);
+  // What another tab kept is read again here, for a tab that missed its event. Only a removal still to be settled is written
+  // from here (it was when it was applied; a write lost then is not lost twice), and only what this answer lets go of is taken out.
+  const removed=link.removed,stored=new Set(removedHereOf(fp)),dropped=[];
+  for(const thread of [...stored,...removedHere])removed.add(thread);
+  for(const thread of [...removed])if(reported.has(thread)&&!removedHere.has(thread)||listedNow.has(thread)&&(!removedHere.has(thread)||revived.has(thread))){removed.delete(thread);dropped.push(thread)}
+  newestRemoved(removed);
+  void changeRemovedHere(fp,[...removedHere].filter(thread=>removed.has(thread)&&!stored.has(thread)),dropped.filter(thread=>stored.has(thread)));
   for(const thread of removed)closed.add(thread);
   link.closed=closed;
   const hidden=thread=>closed.has(thread)||removedHere.has(thread)&&!revived.has(thread);
