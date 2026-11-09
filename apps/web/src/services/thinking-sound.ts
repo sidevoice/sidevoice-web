@@ -100,7 +100,9 @@ export interface ThinkingSoundLoop {
   setGain(gainDb: number): void;
   /** The person's frequency: the play waiting on the clock is moved to where it puts it. */
   setIntervalScale(scale: number): void;
-  stop(): void;
+  /** Stops it. The page's own copy fades out (TAIL_SECONDS) and says when it has: what follows it (the app's cue taking
+   *  over) starts then, never over it. Nothing to wait for where it stops at once (the app's cue, nothing played yet). */
+  stop(): Promise<void> | void;
 }
 
 /** `sound` playing in `made` at its cadence (moved by `intervalScale`), through its own gain and limiter. Each next play is
@@ -179,6 +181,8 @@ function startLoop(made: AudioContext, sound: ThinkingSound, gainDb: number, int
       gain.gain.setTargetAtTime(0, now, TAIL_SECONDS / 3);
       for (const source of sources) { try { source.stop(now + TAIL_SECONDS); } catch { /* Already stopped. */ } }
       setTimeout(() => { for (const source of sources) source.disconnect(); sources.clear(); release(); }, RELEASE_MS);
+      if (!last) return;
+      return new Promise<void>((faded) => { setTimeout(faded, TAIL_SECONDS * 1000); });
     },
   };
 }
@@ -232,8 +236,9 @@ function playInPage(choice: ThinkingSoundChoice, random: () => number): Thinking
     stop() {
       if (stopped) return;
       stopped = true;
-      loop.stop();
+      const faded = loop.stop();
       done();
+      return faded;
     },
   };
 }

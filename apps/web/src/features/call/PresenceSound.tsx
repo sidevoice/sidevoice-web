@@ -75,11 +75,12 @@ export function PresenceSound() {
   const working = useStageConversation().mood === "working";
   const [prefs, setPrefs] = useState(readCallPreferences);
   useEffect(() => subscribeCallPreferences(() => setPrefs(readCallPreferences())), []);
-  // Read as it draws, and drawn again when the app's cue is offered: the app offers it once it has answered whether the phone
-  // has a player, which may be after a working call is back. Then the sound is handed over: the page's own copy stops and the
-  // app's cue is held for the lock (the effect below, by `whileLocked`).
+  // Read as it draws, and drawn again when the app's cue is offered: the phone app offers it once it has answered whether the
+  // phone has a player, which may be after a working call is back. Then the sound is handed over: the page's own copy fades
+  // out and the app's cue is held for the lock (the effect below, by `whileLocked`). Only the phone app grows a cue: the
+  // desktop app (its call controls) and a browser are not watched.
   const [, cueOffered] = useReducer((count: number) => count + 1, 0);
-  useEffect(() => onHostMember("cue", cueOffered), []);
+  useEffect(() => (host().callControls ? undefined : onHostMember("cue", cueOffered)), []);
   const whileLocked = prefs.presence === "hidden" && thinkingSoundHeldForLock();
   const screenOff = useScreenOff(inCall && working && prefs.presence === "hidden" && !whileLocked);
   const plays = whileLocked ? inCall && working : breathPlays({ inCall, working, presence: prefs.presence, screenOff });
@@ -90,11 +91,29 @@ export function PresenceSound() {
   // volume and frequency set.
   useEffect(() => { gainDb.current = prefs.soundGainDb; loop.current?.setGain(prefs.soundGainDb); }, [prefs.soundGainDb]);
   useEffect(() => { intervalScale.current = prefs.soundIntervalScale; loop.current?.setIntervalScale(prefs.soundIntervalScale); }, [prefs.soundIntervalScale]);
+  // What played last, still fading out: the next starts once it has faded, never over it (the page's copy handing over to
+  // the app's cue mid-pulse).
+  const fading = useRef<Promise<void> | null>(null);
   useEffect(() => {
     if (!plays) return;
-    const playing = playThinkingSound({ sound: prefs.sound, gainDb: gainDb.current, intervalScale: intervalScale.current, ...(whileLocked ? { whileLocked } : {}) });
-    loop.current = playing;
-    return () => { playing.stop(); if (loop.current === playing) loop.current = null; };
+    let playing: ThinkingSoundLoop | null = null;
+    let gone = false;
+    const start = () => {
+      if (gone) return;
+      playing = playThinkingSound({ sound: prefs.sound, gainDb: gainDb.current, intervalScale: intervalScale.current, ...(whileLocked ? { whileLocked } : {}) });
+      loop.current = playing;
+    };
+    const before = fading.current;
+    if (before) void before.then(start); else start();
+    return () => {
+      gone = true;
+      if (!playing) return;
+      const faded = playing.stop();
+      if (loop.current === playing) loop.current = null;
+      if (!faded) return;
+      fading.current = faded;
+      void faded.then(() => { if (fading.current === faded) fading.current = null; });
+    };
   }, [plays, prefs.sound, whileLocked]);
   return null;
 }

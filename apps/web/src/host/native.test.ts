@@ -375,15 +375,20 @@ test("a member the app offers late is watched for a while, told once it is there
     expect(arrived).toHaveBeenCalledTimes(1);
     vi.advanceTimersByTime(60_000);
     expect(arrived).toHaveBeenCalledTimes(1);
-    // One that never comes is given up on after half a minute; already there, nothing to watch.
+    // One that never comes is given up on after half a minute.
     cue = null;
     const never = vi.fn();
     watchHostMember("cue", never);
     vi.advanceTimersByTime(30_000);
     expect(vi.getTimerCount()).toBe(timers);
-    cue = {};
-    watchHostMember("cue", never)();
     expect(never).not.toHaveBeenCalled();
+    // Already there when the watch begins (it came between the caller's look and its subscription): told at once, and
+    // nothing left to look for.
+    cue = {};
+    const there = vi.fn();
+    watchHostMember("cue", there);
+    expect(there).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(timers);
   } finally {
     vi.useRealTimers();
     Reflect.deleteProperty(window, "__sidevoiceHost");

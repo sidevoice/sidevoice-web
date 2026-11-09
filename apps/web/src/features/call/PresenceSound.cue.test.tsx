@@ -99,13 +99,17 @@ test("an app whose cue does not hold for the lock (before whileLocked): screen o
   } finally { vi.useRealTimers(); }
 });
 
-/** The page's Web Audio, enough to see its copy of the sound start and stop: each play's start and stops, by source. */
+/** The page's Web Audio, enough to see its copy of the sound start and fade out: each play, and when its stop takes effect
+ *  on the audio clock (the clock is the fake timers'). */
 function fakeWebAudio() {
-  const plays: { stops: number }[] = [];
+  const plays: { stops: number; until: number }[] = [];
+  const contexts: { currentTime: number }[] = [];
+  const origin = Date.now();
   const param = () => ({ value: 1, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() });
   class Context {
+    constructor() { contexts.push(this); }
     state = "running";
-    currentTime = 0;
+    get currentTime() { return (Date.now() - origin) / 1000; }
     destination = {};
     resume = async () => undefined;
     suspend = async () => undefined;
@@ -115,20 +119,21 @@ function fakeWebAudio() {
       return { threshold: param(), knee: param(), ratio: param(), attack: param(), release: param(), connect: (next: unknown) => next, disconnect: () => undefined };
     }
     createBufferSource() {
-      const play = { stops: 0 };
-      return { buffer: null, onended: null, connect: () => undefined, disconnect: () => undefined, start: () => { plays.push(play); }, stop: () => { play.stops++; } };
+      const play = { stops: 0, until: Infinity };
+      return { buffer: null, onended: null, connect: () => undefined, disconnect: () => undefined, start: () => { plays.push(play); },
+        stop: (when = 0) => { play.stops++; play.until = Math.min(play.until, when); } };
     }
     async decodeAudioData() { return { duration: 0.6 }; }
   }
   vi.stubGlobal("AudioContext", Context);
   vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) })));
-  return plays;
+  return { plays, now: () => contexts[0].currentTime };
 }
 
 test("the app's cue offered after a working call is back: the page's copy stops and the cue is held for the lock", async () => {
   vi.useFakeTimers();
   try {
-    const plays = fakeWebAudio();
+    const { plays, now } = fakeWebAudio();
     // An iPhone whose bridge has not had the app's answer yet: no cue, a screen that is locked.
     let cue: { start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn>; options: string[] } | null = null;
     const screen = { locked: vi.fn(async () => true) };
@@ -140,12 +145,19 @@ test("the app's cue offered after a working call is back: the page's copy stops 
     expect(screen.locked).toHaveBeenCalled();
     expect(plays.length).toBeGreaterThan(0);
     expect(plays.some((play) => play.stops === 0)).toBe(true);
-    // The app answers: its cue is offered, and the page hands the sound over to it.
-    cue = { start: vi.fn(), stop: vi.fn(), options: ALL };
-    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    // The app answers mid-pulse: its cue is offered, and the page hands the sound over to it. The page's copy fades out
+    // first; the app's cue starts once it has, never over it.
+    let startedAt = -1;
+    cue = { start: vi.fn(() => { startedAt = now(); }), stop: vi.fn(), options: ALL };
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+    expect(plays.every((play) => play.stops > 0)).toBe(true);
+    const faded = Math.max(...plays.map((play) => play.until));
+    expect(faded).toBeGreaterThan(now());
+    expect(cue.start).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(200); });
     expect(cue.start).toHaveBeenCalledTimes(1);
     expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "soft-heartbeat", gainDb: 0, intervalScale: 1, whileLocked: true });
-    expect(plays.every((play) => play.stops > 0)).toBe(true);
+    expect(startedAt).toBeGreaterThanOrEqual(faded - 1e-9);
     // From then on the app decides by the lock: the screen is not asked, and the page plays nothing of its own.
     const asked = screen.locked.mock.calls.length;
     const played = plays.length;
@@ -155,6 +167,16 @@ test("the app's cue offered after a working call is back: the page's copy stops 
     work(false);
     expect(cue.stop).toHaveBeenCalledWith("thinking");
   } finally { vi.useRealTimers(); }
+});
+
+test("the desktop app (its call controls) is not watched for a cue: only the phone app grows one", () => {
+  const timers = vi.spyOn(globalThis, "setTimeout");
+  const callControls = { settings: async () => ({ alwaysShown: false }), setAlwaysShown: async () => ({ alwaysShown: false }) };
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { callControls } } });
+  const { work } = inCall("hidden");
+  work(true);
+  expect(timers.mock.calls.filter(([, ms]) => ms === 250)).toHaveLength(0);
+  timers.mockRestore();
 });
 
 test("in a browser nothing is watched for: no app, no cue to come", () => {
