@@ -7,7 +7,7 @@ import { selectInCall, useStageConversation } from "./stage-view";
 
 /* While the agent works on your turn in a call, a soft sound says so: for a call that goes on with the screen off — a
  * phone in a pocket, in the car, headphones on — where nothing else would. Settings → Call says when (never, only while
- * the screen is off, or always), which sound and how loud. Who decides when it plays is here; the sound itself is the
+ * the screen is off, or always), which sound, how loud and how often. Who decides when it plays is here; the sound itself is the
  * player's (services/thinking-sound.ts). */
 
 /** Whether the sound plays: in a call, while its agent works, as the person chose (`hidden`: only while the screen is off,
@@ -61,11 +61,14 @@ export function PresenceSound() {
   const plays = breathPlays({ inCall, working, presence: prefs.presence, screenOff });
   const loop = useRef<ThinkingSoundLoop | null>(null);
   const gainDb = useRef(prefs.soundGainDb);
-  // Another volume applies to the sound that plays; another sound chosen while it plays starts that one, at the volume set.
+  const intervalScale = useRef(prefs.soundIntervalScale);
+  // Another volume or frequency applies to the sound that plays; another sound chosen while it plays starts that one, at the
+  // volume and frequency set.
   useEffect(() => { gainDb.current = prefs.soundGainDb; loop.current?.setGain(prefs.soundGainDb); }, [prefs.soundGainDb]);
+  useEffect(() => { intervalScale.current = prefs.soundIntervalScale; loop.current?.setIntervalScale(prefs.soundIntervalScale); }, [prefs.soundIntervalScale]);
   useEffect(() => {
     if (!plays) return;
-    const playing = playThinkingSound({ sound: prefs.sound, gainDb: gainDb.current });
+    const playing = playThinkingSound({ sound: prefs.sound, gainDb: gainDb.current, intervalScale: intervalScale.current });
     loop.current = playing;
     return () => { playing.stop(); if (loop.current === playing) loop.current = null; };
   }, [plays, prefs.sound]);

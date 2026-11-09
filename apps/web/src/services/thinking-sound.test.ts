@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, expect, onTestFinished, test, vi } from "vitest";
 import { playThinkingSound, previewThinkingSound, primeThinkingSound, resetThinkingSoundForTests } from "./thinking-sound";
 import { DEFAULT_THINKING_SOUND, THINKING_SOUNDS, thinkingSound } from "./thinking-sounds";
+import { DEFAULT_CALL_PREFERENCES } from "./call-preferences";
 
 /* The player keeps one context for the page: begun in the Join tap (prime), and every play is in that one, so a browser
  * that starts a page's audio only from a gesture lets it sound (sidevoice-web#439). It plays the chosen sound at the
- * sound's cadence (now, then a gap in its interval after each play ends) through the person's offset and a limiter; an app
- * that plays the chosen sound itself is asked to instead. */
+ * sound's cadence (now, then a gap in its interval, at the person's frequency, after each play ends) through the person's
+ * offset and a limiter; an app that plays the chosen sound itself is asked to instead. */
 
 const param = (value = 0) => ({ value, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() });
 
@@ -307,4 +308,71 @@ test("an app without the cue's functions leaves the sound to the page's Web Audi
   expect(FakeContext.made).toHaveLength(1);
   loop.stop();
   await vi.advanceTimersByTimeAsync(1000);
+});
+
+test("by default the sound plays at its own level, in the page and in the app: the file's level is the default's", async () => {
+  const loop = playThinkingSound({ sound: DEFAULT_CALL_PREFERENCES.sound, gainDb: DEFAULT_CALL_PREFERENCES.soundGainDb });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(FakeContext.made[0].gains[0].gain.value).toBe(1);
+  loop.stop();
+  const cue = { start: vi.fn(), stop: vi.fn(), options: ["sound", "gainDb"] };
+  withCue(cue);
+  playThinkingSound({ sound: DEFAULT_CALL_PREFERENCES.sound, gainDb: DEFAULT_CALL_PREFERENCES.soundGainDb }).stop();
+  expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "soft-heartbeat", gainDb: 0 });
+});
+
+test("the frequency stretches or shortens the gaps the page plays at; none is the sound's own cadence", async () => {
+  const [min, max] = thinkingSound(DEFAULT_THINKING_SOUND).interval;
+  const starts = () => FakeContext.made.at(-1)!.sources.map((source) => source.starts[0]);
+  const twice = playThinkingSound({ ...SOFT, intervalScale: 2 }, () => 0);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(starts()).toEqual([0, 0.6 + 2 * min]);
+  twice.stop();
+  resetThinkingSoundForTests();
+  const half = previewThinkingSound({ ...SOFT, intervalScale: 0.5 }, () => 1);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(starts()).toEqual([0, 0.6 + 0.5 * max]);
+  half.stop();
+  resetThinkingSoundForTests();
+  const own = playThinkingSound(SOFT, () => 0);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(starts()).toEqual([0, 0.6 + min]);
+  own.stop();
+});
+
+test("another frequency moves the play waiting on the clock, from the end of the one before; the next gaps follow it", async () => {
+  const [min] = thinkingSound(DEFAULT_THINKING_SOUND).interval;
+  const loop = playThinkingSound(SOFT, () => 0);
+  await vi.advanceTimersByTimeAsync(0);
+  const [context] = FakeContext.made;
+  const starts = () => context.sources.map((source) => source.starts[0]);
+  expect(starts()).toEqual([0, 0.6 + min]);
+  // In the gap (past where half of it would end), twice as long: the waiting play is stopped before it begins, and put a
+  // gap twice as long after the first.
+  const now = 0.6 + min / 2 + 0.5;
+  await vi.advanceTimersByTimeAsync(now * 1000);
+  loop.setIntervalScale(2);
+  expect(context.sources[1].stops).toHaveLength(1);
+  expect(starts()).toEqual([0, 0.6 + min, 0.6 + 2 * min]);
+  // Then half as long: where that puts it has gone by, so it plays now; the gap after it is drawn at the frequency set.
+  loop.setIntervalScale(0.5);
+  expect(starts()[3]).toBeCloseTo(now, 3);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(starts()[4]).toBeCloseTo(now + 0.6 + min / 2, 3);
+  // Stopped: the plays moved were let go already; nothing more is put on the clock.
+  loop.stop();
+  expect(context.sources.map((source) => source.stops.length)).toEqual([1, 1, 1, 1, 1]);
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(starts()).toHaveLength(5);
+});
+
+test("an app's cue plays the sound's own cadence: its start takes no frequency, and another frequency asks nothing of it", () => {
+  const cue = { start: vi.fn(), stop: vi.fn(), options: ["sound", "gainDb"] };
+  withCue(cue);
+  const loop = playThinkingSound({ sound: "deep-heartbeat", gainDb: -4, intervalScale: 2 });
+  expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "deep-heartbeat", gainDb: -4 });
+  loop.setIntervalScale(0.5);
+  expect(cue.start).toHaveBeenCalledTimes(1);
+  loop.stop();
+  expect(FakeContext.made).toHaveLength(0);
 });

@@ -5,17 +5,21 @@
 //
 //   node scripts/encode-thinking-sounds.mjs <lab>      (<lab>: the lab's folder, with sounds.json and audio/)
 //
-// The files keep the level the lab measured: each one is decoded again and measured (EBU R 128 integrated loudness and
-// momentary maximum), and the script stops if one moves by more than LEVEL_TOLERANCE_DB. The offset the person sets in
-// Settings is applied as the sound plays, never here. Needs ffmpeg (built with libopus) on the PATH, or FFMPEG.
+// The files keep the level the lab measured, or the one a sound was moved to since (SOUNDS): each one is decoded again and
+// measured (EBU R 128 integrated loudness and momentary maximum), and the script stops if one is off by more than
+// LEVEL_TOLERANCE_DB. The offset the person sets in Settings is applied as the sound plays, never here. Needs ffmpeg (built
+// with libopus) on the PATH, or FFMPEG.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** The approved sounds in the order Settings lists them, the first the default: the id the app keeps, and the lab's own. */
+/** The approved sounds in the order Settings lists them, the first the default: the id the app keeps, the lab's own, and
+ *  what the app ships otherwise than the lab approved it, where it does: `interval`, its cadence (the seconds of silence
+ *  after each play, [min, max]), and `levelDb`, its level moved from the lab's (the file is made at that level, and
+ *  measured against it). The soft heartbeat: less often and 5 dB lower than approved (2026-11-09). */
 const SOUNDS = [
-  ['soft-heartbeat', 'G'], ['warm-pad-pulse', 'P'], ['slow-heartbeat', 'U'], ['echoing-heartbeat', 'V'],
+  ['soft-heartbeat', 'G', { interval: [7, 10], levelDb: -5 }], ['warm-pad-pulse', 'P'], ['slow-heartbeat', 'U'], ['echoing-heartbeat', 'V'],
   ['pulsing-hum', 'X'], ['muffled-heartbeat', 'Y'], ['slow-double-beat', 'AA'], ['single-beat', 'AB'],
   ['room-heartbeat', 'AC'], ['breathing-pad', 'AD'], ['double-pad-pulse', 'AE'], ['slow-breath', 'AF'],
   ['deep-heartbeat', 'AG'], ['warm-heartbeat', 'AH'], ['soft-pad-pulse', 'AI'], ['low-breath', 'AJ'],
@@ -48,22 +52,25 @@ rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 const manifest = { default: SOUNDS[0][0], sounds: [] };
 let bytes = 0;
-for (const [id, letter] of SOUNDS) {
+for (const [id, letter, shipped = {}] of SOUNDS) {
   const source = labSounds.get(letter);
   if (!source || !Array.isArray(source.interval)) throw new Error(`the lab has no sound ${letter} played now and then`);
   const wav = path.join(lab, 'audio', source.file);
   const files = { webm: `${id}.webm`, m4a: `${id}.m4a` };
-  const want = levels(wav);
+  const levelDb = shipped.levelDb ?? 0;
+  const approved = levels(wav);
+  const want = { integrated: approved.integrated + levelDb, momentary: approved.momentary + levelDb };
+  const moved = levelDb ? ['-af', `volume=${levelDb}dB`] : [];
   for (const [format, args] of [['webm', OPUS], ['m4a', AAC]]) {
     const file = path.join(out, files[format]);
-    execFileSync(ffmpeg, ['-v', 'error', '-y', '-i', wav, '-ac', '1', ...args, file]);
+    execFileSync(ffmpeg, ['-v', 'error', '-y', '-i', wav, '-ac', '1', ...moved, ...args, file]);
     const got = levels(file);
-    const moved = Math.max(Math.abs(got.integrated - want.integrated), Math.abs(got.momentary - want.momentary));
-    if (moved > LEVEL_TOLERANCE_DB) throw new Error(`${files[format]}: its level moved by ${moved.toFixed(1)} dB`);
+    const off = Math.max(Math.abs(got.integrated - want.integrated), Math.abs(got.momentary - want.momentary));
+    if (off > LEVEL_TOLERANCE_DB) throw new Error(`${files[format]}: its level is off by ${off.toFixed(1)} dB`);
     bytes += statSync(file).size;
-    console.log(`${files[format].padEnd(24)} ${got.integrated.toFixed(1)} LUFS (lab ${want.integrated.toFixed(1)}), M max ${got.momentary.toFixed(1)} (lab ${want.momentary.toFixed(1)})`);
+    console.log(`${files[format].padEnd(24)} ${got.integrated.toFixed(1)} LUFS (want ${want.integrated.toFixed(1)}), M max ${got.momentary.toFixed(1)} (want ${want.momentary.toFixed(1)})${levelDb ? `, ${levelDb} dB from the lab` : ''}`);
   }
-  manifest.sounds.push({ id, interval: source.interval, files });
+  manifest.sounds.push({ id, interval: shipped.interval ?? source.interval, files });
 }
 // One line a sound, as it reads in a review.
 writeFileSync(path.join(out, 'sounds.json'), `{\n  "default": ${JSON.stringify(manifest.default)},\n  "sounds": [\n${manifest.sounds.map((sound) => '    ' + JSON.stringify(sound)).join(',\n')}\n  ]\n}\n`);

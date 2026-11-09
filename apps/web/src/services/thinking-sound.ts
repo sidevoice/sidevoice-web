@@ -1,10 +1,11 @@
 import { host } from "../host";
 import type { CueBridge, CueOptions } from "../host/types";
-import { nextGapSeconds, thinkingSound, thinkingSoundGain, thinkingSoundUrl, type ThinkingSound } from "./thinking-sounds";
+import { nextGapSeconds, thinkingSound, thinkingSoundGain, thinkingSoundIntervalScale, thinkingSoundUrl, type ThinkingSound } from "./thinking-sounds";
 
 /* The thinking sound's player: the sound the person chose (services/thinking-sounds.ts), played now and then at its own
- * cadence and at its level moved by the person's offset, in the page's Web Audio. When it plays is not its business
- * (features/call/PresenceSound.tsx decides, by Settings → Call and the screen); Settings' Try plays it here too.
+ * cadence stretched or shortened by the person's frequency, and at its level moved by the person's offset, in the page's
+ * Web Audio. When it plays is not its business (features/call/PresenceSound.tsx decides, by Settings → Call and the
+ * screen); Settings' Try plays it here too.
  *
  * A browser lets a page start its audio only from a gesture: WebKit keeps an AudioContext made later suspended, silent
  * for good, and the sound starts when the agent starts working, never in a gesture (sidevoice-web#439). So the page's
@@ -14,6 +15,8 @@ import { nextGapSeconds, thinkingSound, thinkingSoundGain, thinkingSoundUrl, typ
  *
  * An app that plays the cue itself (`host.cue`: the phone's native call holds the audio session, and a webview's Web Audio
  * is not sure to come out through it) is asked to, with the sound and the offset, and the page's context is never made.
+ * Its start takes no frequency (sidevoice-desktop docs/BRIDGE.md → "The cues"): the app plays the sound at its own cadence,
+ * whatever the person's frequency, rather than the page playing it where it may not be heard.
  * An app whose `host.cue` does not take them (one before the sounds) would play its own sound, not the chosen one: the
  * page plays the chosen one itself there. */
 
@@ -24,7 +27,8 @@ const LIMITER = { threshold: -2, knee: 0, ratio: 20, attack: 0.003, release: 0.1
 const TAIL_SECONDS = 0.15;
 const RELEASE_MS = 400;
 
-export interface ThinkingSoundChoice { sound: string; gainDb: number }
+/** The sound, the person's offset in dB, and their frequency (a factor on the sound's gaps; none: 1, its own cadence). */
+export interface ThinkingSoundChoice { sound: string; gainDb: number; intervalScale?: number }
 
 let context: AudioContext | null = null;
 let playing = 0;
@@ -85,12 +89,15 @@ function decode(made: AudioContext, sound: ThinkingSound): Promise<AudioBuffer |
 export interface ThinkingSoundLoop {
   /** The person's offset, applied at once to what plays. */
   setGain(gainDb: number): void;
+  /** The person's frequency: the play waiting on the clock is moved to where it puts it. */
+  setIntervalScale(scale: number): void;
   stop(): void;
 }
 
-/** `sound` playing in `made` at its cadence, through its own gain and limiter. Each next play is put on the audio clock one
- *  play ahead, when the one before it starts: a timer the browser delays (a page in the background) delays nothing heard. */
-function startLoop(made: AudioContext, sound: ThinkingSound, gainDb: number, random: () => number, unplayable: () => void): ThinkingSoundLoop {
+/** `sound` playing in `made` at its cadence (moved by `intervalScale`), through its own gain and limiter. Each next play is
+ *  put on the audio clock one play ahead, when the one before it starts: a timer the browser delays (a page in the
+ *  background) delays nothing heard. */
+function startLoop(made: AudioContext, sound: ThinkingSound, gainDb: number, intervalScale: number, random: () => number, unplayable: () => void): ThinkingSoundLoop {
   const gain = made.createGain();
   gain.gain.value = dbToGain(gainDb);
   const limiter = made.createDynamicsCompressor();
@@ -103,7 +110,10 @@ function startLoop(made: AudioContext, sound: ThinkingSound, gainDb: number, ran
   const sources = new Set<AudioBufferSourceNode>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let stopped = false;
-  const play = (buffer: AudioBuffer, at: number) => {
+  let scale = thinkingSoundIntervalScale(intervalScale);
+  /** The play last put on the clock, and when the one before it ends (none for the first): where a new frequency moves it. */
+  let last: { source: AudioBufferSourceNode; buffer: AudioBuffer; at: number; after: number | null } | null = null;
+  const play = (buffer: AudioBuffer, at: number, after: number | null) => {
     if (stopped) return;
     const source = made.createBufferSource();
     source.buffer = buffer;
@@ -111,20 +121,25 @@ function startLoop(made: AudioContext, sound: ThinkingSound, gainDb: number, ran
     source.onended = () => { sources.delete(source); source.disconnect(); };
     sources.add(source);
     source.start(at);
-    wake(buffer, at, at + buffer.duration + nextGapSeconds(sound, random));
+    last = { source, buffer, at, after };
+    wake(buffer, at);
   };
-  // When the play at `at` begins, the one at `next` is put on the clock. A clock that has not got there (a context still
-  // suspended, a timer early) is waited for: never more than one play ahead. A timer so late that `next` has gone by (a page
-  // long in the background) plays it now, and the cadence goes on from there: never a burst of the plays it missed.
-  const wake = (buffer: AudioBuffer, at: number, next: number) => {
-    timer = setTimeout(() => { if (made.currentTime < at) wake(buffer, at, next); else play(buffer, Math.max(next, made.currentTime)); },
-      Math.max(0, (at - made.currentTime) * 1000));
+  // When the play at `at` begins, the next is put on the clock, a gap drawn at the frequency set after this one ends. A clock
+  // that has not got there (a context still suspended, a timer early) is waited for: never more than one play ahead. A timer
+  // so late that the next has gone by (a page long in the background) plays it now, and the cadence goes on from there:
+  // never a burst of the plays it missed.
+  const wake = (buffer: AudioBuffer, at: number) => {
+    timer = setTimeout(() => {
+      if (made.currentTime < at) { wake(buffer, at); return; }
+      const end = at + buffer.duration;
+      play(buffer, Math.max(end + nextGapSeconds(sound, scale, random), made.currentTime), end);
+    }, Math.max(0, (at - made.currentTime) * 1000));
   };
   const release = () => { gain.disconnect(); limiter.disconnect(); };
   // Neither format playable (offline, a file missing): nothing to hold the audio for until the loop is stopped.
   void decode(made, sound).then((buffer) => {
     if (stopped) return;
-    if (buffer) { play(buffer, made.currentTime); return; }
+    if (buffer) { play(buffer, made.currentTime, null); return; }
     release();
     unplayable();
   });
@@ -132,6 +147,19 @@ function startLoop(made: AudioContext, sound: ThinkingSound, gainDb: number, ran
     setGain(next) {
       if (stopped) return;
       gain.gain.setTargetAtTime(dbToGain(next), made.currentTime, 0.02);
+    },
+    setIntervalScale(next) {
+      if (stopped) return;
+      scale = thinkingSoundIntervalScale(next);
+      // The play still waiting is put where the new frequency puts it after the one before it ends (now, if that has gone
+      // by); one already begun plays on, and the gap after it is drawn at the new frequency.
+      const waiting = last;
+      if (!waiting || waiting.after === null || waiting.at <= made.currentTime) return;
+      clearTimeout(timer);
+      sources.delete(waiting.source);
+      try { waiting.source.stop(); } catch { /* Already stopped. */ }
+      waiting.source.disconnect();
+      play(waiting.buffer, Math.max(waiting.after + nextGapSeconds(sound, scale, random), made.currentTime), waiting.after);
     },
     stop() {
       if (stopped) return;
@@ -159,6 +187,8 @@ function playInHost(cue: CueBridge, options: Required<CueOptions>): ThinkingSoun
       current = { ...current, gainDb: thinkingSoundGain(gainDb) };
       try { cue.start("thinking", current); } catch { /* It plays what it played. */ }
     },
+    // The app plays the sound at its own cadence: its start takes no frequency.
+    setIntervalScale: () => undefined,
     stop() {
       if (stopped) return;
       stopped = true;
@@ -182,10 +212,11 @@ function playInPage(choice: ThinkingSoundChoice, random: () => number): Thinking
     playing--;
     setTimeout(() => { if (!playing && made.state === "running") void made.suspend().catch(() => undefined); }, RELEASE_MS);
   };
-  const loop = startLoop(made, thinkingSound(choice.sound), choice.gainDb, random, done);
+  const loop = startLoop(made, thinkingSound(choice.sound), choice.gainDb, choice.intervalScale ?? 1, random, done);
   let stopped = false;
   return {
     setGain: (gainDb) => loop.setGain(gainDb),
+    setIntervalScale: (scale) => loop.setIntervalScale(scale),
     stop() {
       if (stopped) return;
       stopped = true;
@@ -195,7 +226,7 @@ function playInPage(choice: ThinkingSoundChoice, random: () => number): Thinking
   };
 }
 
-const SILENT: ThinkingSoundLoop = { setGain: () => undefined, stop: () => undefined };
+const SILENT: ThinkingSoundLoop = { setGain: () => undefined, setIntervalScale: () => undefined, stop: () => undefined };
 
 /** Plays the chosen sound at its cadence until the returned loop is stopped: in the app where it plays the chosen sound
  *  itself, else in the page. Nothing where the page has no Web Audio. */
@@ -205,8 +236,8 @@ export function playThinkingSound(choice: ThinkingSoundChoice, random: () => num
   return playInPage(choice, random) ?? SILENT;
 }
 
-/** Settings' Try: the chosen sound in the page, at its cadence, started by the person's press (which lets the page's audio
- *  start). Always the page's: the app plays its cue only in a call. */
+/** Settings' Try: the chosen sound in the page, at its cadence and the frequency set, started by the person's press (which
+ *  lets the page's audio start). Always the page's: the app plays its cue only in a call. */
 export function previewThinkingSound(choice: ThinkingSoundChoice, random: () => number = Math.random): ThinkingSoundLoop {
   return playInPage(choice, random) ?? SILENT;
 }

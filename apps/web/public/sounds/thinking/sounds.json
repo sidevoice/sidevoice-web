@@ -1,7 +1,7 @@
 {
   "default": "soft-heartbeat",
   "sounds": [
-    {"id":"soft-heartbeat","interval":[4,6],"files":{"webm":"soft-heartbeat.webm","m4a":"soft-heartbeat.m4a"}},
+    {"id":"soft-heartbeat","interval":[7,10],"files":{"webm":"soft-heartbeat.webm","m4a":"soft-heartbeat.m4a"}},
     {"id":"warm-pad-pulse","interval":[6,9],"files":{"webm":"warm-pad-pulse.webm","m4a":"warm-pad-pulse.m4a"}},
     {"id":"slow-heartbeat","interval":[5,8],"files":{"webm":"slow-heartbeat.webm","m4a":"slow-heartbeat.m4a"}},
     {"id":"echoing-heartbeat","interval":[6,9],"files":{"webm":"echoing-heartbeat.webm","m4a":"echoing-heartbeat.m4a"}},

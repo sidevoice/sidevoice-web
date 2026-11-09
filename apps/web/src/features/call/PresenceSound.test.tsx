@@ -7,12 +7,17 @@ import { createRoomStore } from "../../state/room-store";
 import { writeCallPreferences, type PresenceSound as PresenceChoice } from "../../services/call-preferences";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
-const player = vi.hoisted(() => ({ playing: 0, plays: 0, choices: [] as { sound: string; gainDb: number }[], gains: [] as number[] }));
+type Choice = { sound: string; gainDb: number; intervalScale?: number };
+const player = vi.hoisted(() => ({ playing: 0, plays: 0, choices: [] as Choice[], gains: [] as number[], scales: [] as number[] }));
 vi.mock("../../services/thinking-sound", () => ({
-  playThinkingSound: (choice: { sound: string; gainDb: number }) => {
+  playThinkingSound: (choice: Choice) => {
     player.playing++; player.plays++; player.choices.push(choice);
     let stopped = false;
-    return { setGain: (gainDb: number) => { player.gains.push(gainDb); }, stop: () => { if (!stopped) { stopped = true; player.playing--; } } };
+    return {
+      setGain: (gainDb: number) => { player.gains.push(gainDb); },
+      setIntervalScale: (scale: number) => { player.scales.push(scale); },
+      stop: () => { if (!stopped) { stopped = true; player.playing--; } },
+    };
   },
 }));
 
@@ -35,7 +40,7 @@ function inCall(presence: PresenceChoice) {
   return { store, work };
 }
 
-beforeEach(() => { player.playing = 0; player.plays = 0; player.choices = []; player.gains = []; localStorage.clear(); setHidden(false); });
+beforeEach(() => { player.playing = 0; player.plays = 0; player.choices = []; player.gains = []; player.scales = []; localStorage.clear(); setHidden(false); });
 
 test("when the breath plays, by the choice: never, only with the screen off, always", () => {
   for (const screenOff of [false, true]) {
@@ -88,24 +93,36 @@ test("out of a call, no breath however long the agent works", () => {
   expect(player.playing).toBe(0);
 });
 
-test("it plays the chosen sound at the volume set: the default at its own level until one is chosen", () => {
+test("it plays the chosen sound at the volume and frequency set: the default at its own level and cadence until one is chosen", () => {
   const { work } = inCall("always");
   work(true);
-  expect(player.choices).toEqual([{ sound: "soft-heartbeat", gainDb: 0 }]);
+  expect(player.choices).toEqual([{ sound: "soft-heartbeat", gainDb: 0, intervalScale: 1 }]);
 });
 
 test("another sound chosen while it plays starts that one; another volume applies to the one that plays", () => {
   const { work } = inCall("always");
   act(() => { writeCallPreferences({ sound: "deep-heartbeat", soundGainDb: -3 }); });
   work(true);
-  expect(player.choices).toEqual([{ sound: "deep-heartbeat", gainDb: -3 }]);
+  expect(player.choices).toEqual([{ sound: "deep-heartbeat", gainDb: -3, intervalScale: 1 }]);
   act(() => { writeCallPreferences({ soundGainDb: 4 }); });
   expect(player.gains).toEqual([4]);
   expect(player.plays).toBe(1);
   act(() => { writeCallPreferences({ sound: "single-beat" }); });
   expect(player.plays).toBe(2);
   expect(player.playing).toBe(1);
-  expect(player.choices.at(-1)).toEqual({ sound: "single-beat", gainDb: 4 });
+  expect(player.choices.at(-1)).toEqual({ sound: "single-beat", gainDb: 4, intervalScale: 1 });
+});
+
+test("another frequency applies to the sound that plays, and to the next one chosen", () => {
+  const { work } = inCall("always");
+  act(() => { writeCallPreferences({ soundIntervalScale: 1.5 }); });
+  work(true);
+  expect(player.choices).toEqual([{ sound: "soft-heartbeat", gainDb: 0, intervalScale: 1.5 }]);
+  act(() => { writeCallPreferences({ soundIntervalScale: 0.5 }); });
+  expect(player.scales).toEqual([0.5]);
+  expect(player.plays).toBe(1);
+  act(() => { writeCallPreferences({ sound: "slow-breath" }); });
+  expect(player.choices.at(-1)).toEqual({ sound: "slow-breath", gainDb: 0, intervalScale: 0.5 });
 });
 
 /* The desktop app shows the call in its floating card while its window is hidden or minimised: a hidden page is not the

@@ -41,18 +41,20 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
 .voice-speed { display: flex; align-items: center; gap: var(--sv-space-3); width: 100%; }
 .voice-speed input[type="range"] { flex: 1; min-width: 0; accent-color: var(--sv-accent); }
 .voice-speed output { min-width: 3.5em; font-size: var(--sv-font-sm); font-variant-numeric: tabular-nums; text-align: end; color: var(--sv-text-muted); }
-/* The thinking sound's volume, its value and ↺ (the shortcut field's, here always in place: disabled at 0 dB); its try, the
- * button, then while it plays how far it has got and the seconds left. */
-.thinking-sound-volume, .thinking-sound-try { display: flex; align-items: center; gap: var(--sv-space-3); width: 100%; }
-.ui-row-control:has(> .thinking-sound-volume), .ui-row-control:has(> .thinking-sound-try) { width: 280px; }
-.thinking-sound-volume input[type="range"] { flex: 1; min-width: 0; accent-color: var(--sv-accent); }
-.thinking-sound-volume input[type="range"]:disabled { accent-color: var(--sv-disabled-text); cursor: not-allowed; }
-.thinking-sound-volume output, .thinking-sound-left { font-size: var(--sv-font-sm); font-variant-numeric: tabular-nums; text-align: end; color: var(--sv-text-muted); }
+/* The thinking sound's volume and its frequency, each its value and ↺ (the shortcut field's, here always in place: disabled
+ * at the default); its try, the button, then while it plays how far it has got and the seconds left. The frequency's value
+ * is held wide enough for its longer readings, so that the slider does not resize under the pointer as it is dragged. */
+.thinking-sound-volume, .thinking-sound-frequency, .thinking-sound-try { display: flex; align-items: center; gap: var(--sv-space-3); width: 100%; }
+.ui-row-control:has(> .thinking-sound-volume), .ui-row-control:has(> .thinking-sound-frequency), .ui-row-control:has(> .thinking-sound-try) { width: 280px; }
+:is(.thinking-sound-volume, .thinking-sound-frequency) input[type="range"] { flex: 1; min-width: 0; accent-color: var(--sv-accent); }
+:is(.thinking-sound-volume, .thinking-sound-frequency) input[type="range"]:disabled { accent-color: var(--sv-disabled-text); cursor: not-allowed; }
+:is(.thinking-sound-volume, .thinking-sound-frequency) output, .thinking-sound-left { font-size: var(--sv-font-sm); font-variant-numeric: tabular-nums; text-align: end; color: var(--sv-text-muted); }
 .thinking-sound-volume output { min-width: 4.2em; }
+.thinking-sound-frequency output { min-width: 8.2em; white-space: nowrap; }
 .thinking-sound-left { min-width: 2.6em; }
-.ui-row[data-disabled] .thinking-sound-volume output { color: var(--sv-disabled-text); }
-.thinking-sound-volume .thinking-sound-restore { margin: 0; opacity: 1; }
-.thinking-sound-volume .thinking-sound-restore:disabled { opacity: .4; cursor: not-allowed; background: color-mix(in srgb, var(--sv-text) 9%, transparent); color: var(--sv-text-muted); }
+.ui-row[data-disabled] :is(.thinking-sound-volume, .thinking-sound-frequency) output { color: var(--sv-disabled-text); }
+:is(.thinking-sound-volume, .thinking-sound-frequency) .thinking-sound-restore { margin: 0; opacity: 1; }
+:is(.thinking-sound-volume, .thinking-sound-frequency) .thinking-sound-restore:disabled { opacity: .4; cursor: not-allowed; background: color-mix(in srgb, var(--sv-text) 9%, transparent); color: var(--sv-text-muted); }
 .thinking-sound-try .ui-progress { flex: 1; min-width: 0; }
 .thinking-sound-try .ui-progress-fill { transition: none; }
 
