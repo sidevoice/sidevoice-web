@@ -2,13 +2,13 @@ const fs=require('node:fs'),vm=require('node:vm'),test=require('node:test'),{moc
 // This device's pairing, as the page keeps it, for every test that does not say otherwise: the machine proved itself
 // at the page's own origin a moment ago, so requests go where they always went and carry its token.
 const PAIRED={fp:'fp-mac',public_key:'pk',host:'macbook',urls:['http://127.0.0.1:8768'],device_id:'dev-1',token:'tok-1',paired_at:1};
-function setup({readThrows=null,strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,siteData=null,localHost=null,nativeData=null,indexedDB=null,outboxScope=null,readingMode=false}={}){
+function setup({readThrows=null,strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,siteData=null,localHost=null,nativeData=null,indexedDB=null,outboxScope=null,readingMode=false,session=null}={}){
  const sourceRoot=__dirname+'/../src'; const uiSource=fs.readdirSync(sourceRoot,{recursive:true}).filter(file=>String(file).endsWith('.tsx')).map(file=>fs.readFileSync(sourceRoot+'/'+file,'utf8')).join('\n');
  class Element{constructor(id){this.id=id;this.children=[];this.dataset={};this.style={setProperty(){}};this.classList={add(){},remove(){}};this.parentElement=this;this.listeners={};this.attributes={}}addEventListener(name,fn){this.listeners[name]=fn}showModal(){this.open=true}close(){this.open=false;this.listeners.close?.()}contains(node){return node===this||this.children.includes(node)}removeAttribute(){}closest(){return null}querySelector(){return null}append(...children){this.children.push(...children)}replaceChildren(...children){this.children=[...children]}remove(){}setAttribute(name,value){this.attributes[name]=value}getAttribute(name){return this.attributes[name]}click(){this.onclick?.()}}
  const elements=new Map(),handlers={},documentHandlers={},observers=[];
  if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element(match[1]));for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','stats-recognition','stats-response'])elements.set(id,new Element(id))}
  const saved=siteData??(stored?{'sidevoice.pairings':JSON.stringify(stored)}:{});
- const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>{if(readThrows&&key===readThrows)throw new Error('blocked');return saved[key]??null},setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element(id))}return elements.get(id)},body:new Element('body'),createElement:()=>new Element(),addEventListener:(name,fn)=>(documentHandlers[name]??=[]).push(fn)},window:{addEventListener:(name,fn)=>handlers[name]=fn},MutationObserver:class{constructor(fn){observers.push(fn)}observe(){}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
+ const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>{if(readThrows&&key===readThrows)throw new Error('blocked');return saved[key]??null},setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:session?storageOf(session):{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element(id))}return elements.get(id)},body:new Element('body'),createElement:()=>new Element(),addEventListener:(name,fn)=>(documentHandlers[name]??=[]).push(fn)},window:{addEventListener:(name,fn)=>handlers[name]=fn},MutationObserver:class{constructor(fn){observers.push(fn)}observe(){}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
  if(localHost||nativeData)context.window.__sidevoiceHost={host:{...(localHost?{localHost}:{}),...(nativeData?{pairings:nativeData.pairings}:{})}};
  // The outbox's storage across reloads, and this tab's scope in it.
  if(indexedDB)context.indexedDB=indexedDB;
@@ -4053,6 +4053,53 @@ test('A conversation removed here stays off this device past its removal settlin
  c.s.run('disconnect()');
  assert.deepEqual(removed,{rows:[],target:null,core:undefined,remembered:undefined,removals:0},JSON.stringify(removed));
  assert.deepEqual(revived,['fp-mac|a']);
+});
+test('A reload that takes the call back while the room is still on a conversation removed here leaves it, and does not go back to it',async()=>{
+ const room=showingElsewhere(coreRoom({active:['a','b']}));
+ const fetch=room.fetch,posts=[];let parked=true;
+ // The first page's leave never lands: the page goes away before it does.
+ room.fetch=async(path,options)=>{
+  if(options?.method==='POST'&&path.includes('/presentation/leave')){posts.push(JSON.parse(options.body));if(parked)return new Promise(()=>{})}
+  return fetch(path,options);
+ };
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|a'});
+ await c.s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");await settleSoon();
+ await beats(c,2);
+ assert.equal(c.s.run('readRemovals().length'),0,'the removal is settled');
+ assert.equal(room.targets.get('s1')?.thread_id,'a','and the room\'s call is still on it');
+ c.socket.close=function(){this.readyState=3};c.s.handlers.beforeunload();
+ // The same tab loads again: nothing in memory, the removal settled, and the ticket takes the call back as it was.
+ parked=false;
+ const next=setup({stored:{pairings:[PAIRED]},siteData:c.s.saved,session:c.store}),sockets=socketsOf(next);let ids=0;
+ next.context.crypto={randomUUID:()=>'id2-'+(++ids)};next.context.window.sidevoiceUI=new Proxy({},{get:()=>()=>{}});
+ withVoice(next,fakeVoice());next.context.fetch=room.fetch;
+ next.run("keepScreenAwake=()=>{};roomBinding=null;sessionId=null");
+ const joined=next.run('toggleCall')();
+ for(let i=0;i<500&&!sockets.length;i++)await settleSoon();
+ const socket=sockets[0];socket.readyState=1;socket.onopen();
+ const hello=JSON.parse(socket.sent[0]).data;room.hello(hello,'s1');
+ socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'s1',resume:{token:'tok-b',seconds:60},resumed:true}})});
+ await joined;await settleSoon();
+ await beats({s:next});
+ const seen={resumed:hello.resume?.session_id,rows:listedRows({s:next}),target:next.run('targetId()'),core:room.targets.get('s1')?.thread_id,
+  remembered:c.store['sidevoice.selected'],left:posts.filter(post=>post.session_id==='s1').length};
+ next.run('disconnect()');
+ assert.equal(seen.resumed,'s1',JSON.stringify(seen));
+ assert.ok(!seen.rows.includes('fp-mac|a'),JSON.stringify(seen));
+ assert.notEqual(seen.target,'fp-mac|a',JSON.stringify(seen));
+ assert.notEqual(seen.core,'a','the room\'s call left it: '+JSON.stringify(seen));
+ assert.notEqual(seen.remembered,'fp-mac|a',JSON.stringify(seen));
+});
+test('What a tab keeps closed for this device is bounded, and lets go of a conversation its machine closed for everyone',async()=>{
+ const c=await callOnCoreRoom(showingElsewhere(coreRoom({active:['b']})),{selected:'fp-mac|b'});const {s}=c;
+ s.run("{const link=linkOf('fp-mac');for(let i=0;i<MAX_REMOVED_HERE+10;i++)link.removed.add('old'+i);keepRemovedHere('fp-mac',link.removed)}");
+ assert.equal(s.run("linkOf('fp-mac').removed.size"),s.run('MAX_REMOVED_HERE'));
+ assert.equal(JSON.parse(c.store['sidevoice.removed-here.v1'])['fp-mac'][0],'old10','the newest are kept, with the tab');
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({participants:[],closed_threads:['old20']})});
+ await s.run("refreshPeople('fp-mac')");
+ assert.ok(!JSON.parse(c.store['sidevoice.removed-here.v1'])['fp-mac'].includes('old20'),'closed for every device: nothing to keep');
+ assert.equal(s.run("linkOf('fp-mac').closed.has('old20')"),true,'and still closed, as the machine says');
+ s.run('disconnect()');
 });
 test('A pick the room said yes to is not asked for again on every beat when its binding does not follow',async()=>{
  const room=coreRoom({active:['a','b']});

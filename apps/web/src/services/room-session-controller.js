@@ -134,6 +134,23 @@ let pendingRemovals=readRemovals();
 const removing=(fp,thread)=>pendingRemovals.some(row=>row.node===fp&&row.thread_id===thread);
 // The durable state, as another tab left it: read where a send or a pick is about to be allowed.
 const syncRemovals=()=>{pendingRemovals=readRemovals()};
+/* The conversations of each machine this tab keeps closed for this device because they were removed on it (`link.removed`).
+ * Kept with the tab, as the call's resume ticket is: a reload that takes the call back may find the room's focus still on
+ * one, and leaves it rather than going back to it. A conversation leaves the set once its machine lists it for this device
+ * again (its agent connected anew) or reports it closed for every device; only a machine's newest MAX_REMOVED_HERE stay. */
+const REMOVED_HERE_KEY='sidevoice.removed-here.v1',MAX_REMOVED_HERE=64;
+function storedRemovedHere(){
+ try{const rows=JSON.parse(sessionStorage.getItem(REMOVED_HERE_KEY)||'{}');return rows&&typeof rows==='object'&&!Array.isArray(rows)?rows:{}}
+ catch{return {}}
+}
+function removedHereOf(fp){const rows=storedRemovedHere()[fp];return Array.isArray(rows)?rows.filter(thread=>typeof thread==='string'&&thread).slice(-MAX_REMOVED_HERE):[]}
+function keepRemovedHere(fp,removed){
+ while(removed.size>MAX_REMOVED_HERE)removed.delete(removed.values().next().value);
+ const rows=storedRemovedHere(),next=removed.size?[...removed]:undefined;
+ if(JSON.stringify(rows[fp])===JSON.stringify(next))return;
+ if(next)rows[fp]=next;else delete rows[fp];
+ try{if(Object.keys(rows).length)sessionStorage.setItem(REMOVED_HERE_KEY,JSON.stringify(rows));else sessionStorage.removeItem(REMOVED_HERE_KEY)}catch{}
+}
 // One removal is its machine, its thread and the id it was made under: a later removal of the same conversation is another.
 const sameRemoval=(fp,thread,id)=>row=>row.node===fp&&row.thread_id===thread&&(id===undefined||row.id===id);
 // 'stored' (written and read back), 'refused' (`change` said no) or 'failed' (the browser kept nothing).
@@ -157,7 +174,7 @@ function hideRemoved(fp,thread){
  // Its texts that never left this device never will, under this conversation or a later one: they stay as not sent.
  failTexts(entry=>entry.node===fp&&entry.payload.data.thread===thread);
  const link=links.get(fp);
- if(link){link.closed=new Set([...(link.closed||[]),thread]);(link.removed||(link.removed=new Set())).add(thread);link.peopleAsked++;link.people=link.people.filter(person=>person.thread_id!==thread);mergePeople()}
+ if(link){link.closed=new Set([...(link.closed||[]),thread]);link.removed.delete(thread);link.removed.add(thread);keepRemovedHere(fp,link.removed);link.peopleAsked++;link.people=link.people.filter(person=>person.thread_id!==thread);mergePeople()}
  return disposeConversation(key).catch(()=>{});
 }
 // Each removal is applied once on a tab, by its id: an event delivered late, about one this tab already applied (and which may
@@ -405,7 +422,11 @@ if(!nativeData)subscribeLocalHost();
  * that loses its machine keeps its conversations, shown unreachable, until the machine is forgotten. */
 const MAX_LINKS=6;
 const links=new Map();
-function linkOf(fp){let link=links.get(fp);if(!link){link={fp,base:null,reach:'checking',via:'',asked:0,applied:0,doubted:null,
+// A new link starts with what this tab kept closed for this device on that machine: its removals still to be taken, and
+// those it kept with the tab (`removedHereOf`), so a call taken back after a reload never lands on one.
+function linkOf(fp){let link=links.get(fp);if(!link){
+ const removed=new Set([...removedHereOf(fp),...pendingRemovals.filter(row=>row.node===fp).map(row=>row.thread_id)]);
+ link={fp,base:null,reach:'checking',via:'',asked:0,applied:0,doubted:null,removed,closed:new Set(removed),
  people:rememberedCards.filter(row=>row.node===fp&&!removing(fp,row.thread_id)).map(row=>({...row,available:false,reach:{state:'offline'}})),peopleAnswered:false};links.set(fp,link)}return link}
 function linkBase(fp){return fp!=null&&links.has(fp)?links.get(fp).base:null}
 /** The machines this page watches now: unrevoked pairings in the list's order, bounded, and the call's. */
@@ -423,7 +444,7 @@ function syncLinks(){
  publishLinks();
 }
 function forgetMachineState(fp){
- rememberedCards=rememberedCards.filter(row=>row.node!==fp);saveCards();
+ rememberedCards=rememberedCards.filter(row=>row.node!==fp);saveCards();keepRemovedHere(fp,new Set());
  // Nothing is left to tell a machine this device no longer pairs with.
  void changeRemovals(list=>list.filter(row=>row.node!==fp));
  for(const key of [...removalBackoff.keys()])if(conversationOf(key)?.node===fp)removalBackoff.delete(key);
@@ -1378,13 +1399,15 @@ async function refreshPeople(fp=state.callNode){
   const revived=new Set(settled.filter(row=>listedNow.has(row.thread_id)).map(row=>row.thread_id));
   // A conversation removed on this device is closed for this device, past its removal being settled: the machine keeps it
   // open while another device shows it, and leaves this device's call on it. So the call leaves it and never goes back to it
-  // (`settleOnOpen`, `pickOn`), until the machine lists it for this device again (its agent connected anew).
-  const removed=link.removed||(link.removed=new Set());
+  // (`settleOnOpen`, `pickOn`), until the machine lists it for this device again (its agent connected anew), or
+  // closes it for every device, which takes every call off it.
+  const removed=link.removed;
   for(const thread of removedHere)removed.add(thread);
-  for(const thread of [...removed])if(listedNow.has(thread)&&(!removedHere.has(thread)||revived.has(thread)))removed.delete(thread);
+  for(const thread of [...removed])if(reported.has(thread)&&!removedHere.has(thread)||listedNow.has(thread)&&(!removedHere.has(thread)||revived.has(thread)))removed.delete(thread);
+  keepRemovedHere(fp,removed);
   for(const thread of removed)closed.add(thread);
   link.closed=closed;
-  const hidden=thread=>closed.has(thread);
+  const hidden=thread=>closed.has(thread)||removedHere.has(thread)&&!revived.has(thread);
   // A select of a conversation closed elsewhere is let go of, as one closed here (`closeParticipant`).
   if(pick.op?.node===fp&&!pick.op.leave&&closed.has(conversationOf(pick.op.key)?.thread))letGoOfSelect();
   // Only an answer asked after a binding went says whether it was closed (`goneAt`).
