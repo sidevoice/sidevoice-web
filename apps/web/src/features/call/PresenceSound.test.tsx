@@ -211,6 +211,40 @@ test("desktop, an app slow to answer is asked once at a time, and a late answer 
   expect(screen.locked).toHaveBeenCalledTimes(3);
 });
 
+test("a phone whose app says the screen is locked: the page hidden asks at once, and the sound starts without waiting for the poll", async () => {
+  vi.useFakeTimers();
+  onTestFinished(() => { vi.useRealTimers(); });
+  // The app's answer, as a phone's: locked once the screen goes off, which hides the page.
+  const screen = { locked: vi.fn(async () => document.hidden) };
+  asApp({ screen });
+  const { work } = inCall("hidden");
+  work(true);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  expect(screen.locked).toHaveBeenCalledTimes(1);
+  expect(player.playing).toBe(0);
+  // Hidden: asked now, and playing well before the next poll would have asked.
+  await act(async () => { setHidden(true); await vi.advanceTimersByTimeAsync(10); });
+  expect(screen.locked).toHaveBeenCalledTimes(2);
+  expect(player.playing).toBe(1);
+  // The poll goes on from that answer.
+  await act(async () => { await vi.advanceTimersByTimeAsync(SCREEN_POLL_MS); });
+  expect(screen.locked).toHaveBeenCalledTimes(3);
+  expect(player.playing).toBe(1);
+  // Shown again: the screen is on at once, without asking; an answer still out when it is shown changes nothing.
+  let answer: (locked: boolean) => void = () => undefined;
+  screen.locked.mockImplementationOnce(() => new Promise<boolean>((resolve) => { answer = resolve; }));
+  await act(async () => { await vi.advanceTimersByTimeAsync(SCREEN_POLL_MS); });
+  expect(screen.locked).toHaveBeenCalledTimes(4);
+  act(() => setHidden(false));
+  expect(player.playing).toBe(0);
+  await act(async () => { answer(true); await vi.advanceTimersByTimeAsync(0); });
+  expect(player.playing).toBe(0);
+  expect(screen.locked).toHaveBeenCalledTimes(4);
+  await act(async () => { await vi.advanceTimersByTimeAsync(SCREEN_POLL_MS); });
+  expect(screen.locked).toHaveBeenCalledTimes(5);
+  expect(player.playing).toBe(0);
+});
+
 test("a phone or a browser (no floating card): the page in the background is the screen off, as before", () => {
   asApp({ callSurface: { active: () => true, still() {}, forget() {} } });
   const { work } = inCall("hidden");

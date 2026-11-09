@@ -14,9 +14,9 @@ import { nextGapSeconds, thinkingSound, thinkingSoundGain, thinkingSoundInterval
  * any time), it is made when the sound first plays.
  *
  * An app that plays the cue itself (`host.cue`: the phone's native call holds the audio session, and a webview's Web Audio
- * is not sure to come out through it) is asked to, with the sound and the offset, and the page's context is never made.
- * Its start takes no frequency (sidevoice-desktop docs/BRIDGE.md → "The cues"): the app plays the sound at its own cadence,
- * whatever the person's frequency, rather than the page playing it where it may not be heard.
+ * is not sure to come out through it) is asked to, with the sound, the offset and the frequency (`intervalScale`), and the
+ * page's context is never made. An app before the frequency drops it and plays the sound's own cadence: still the app's,
+ * not the page's, which may not be heard there.
  * An app whose `host.cue` does not take them (one before the sounds) would play its own sound, not the chosen one: the
  * page plays the chosen one itself there. */
 
@@ -187,8 +187,11 @@ function playInHost(cue: CueBridge, options: Required<CueOptions>): ThinkingSoun
       current = { ...current, gainDb: thinkingSoundGain(gainDb) };
       try { cue.start("thinking", current); } catch { /* It plays what it played. */ }
     },
-    // The app plays the sound at its own cadence: its start takes no frequency.
-    setIntervalScale: () => undefined,
+    setIntervalScale(scale) {
+      if (stopped || thinkingSoundIntervalScale(scale) === current.intervalScale) return;
+      current = { ...current, intervalScale: thinkingSoundIntervalScale(scale) };
+      try { cue.start("thinking", current); } catch { /* It plays what it played. */ }
+    },
     stop() {
       if (stopped) return;
       stopped = true;
@@ -232,7 +235,11 @@ const SILENT: ThinkingSoundLoop = { setGain: () => undefined, setIntervalScale: 
  *  itself, else in the page. Nothing where the page has no Web Audio. */
 export function playThinkingSound(choice: ThinkingSoundChoice, random: () => number = Math.random): ThinkingSoundLoop {
   const cue = hostCue();
-  if (cue) return playInHost(cue, { sound: thinkingSound(choice.sound).id, gainDb: thinkingSoundGain(choice.gainDb) });
+  if (cue) {
+    return playInHost(cue, {
+      sound: thinkingSound(choice.sound).id, gainDb: thinkingSoundGain(choice.gainDb), intervalScale: thinkingSoundIntervalScale(choice.intervalScale),
+    });
+  }
   return playInPage(choice, random) ?? SILENT;
 }
 

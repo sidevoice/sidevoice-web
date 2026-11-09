@@ -506,15 +506,18 @@ export interface CallSurfaceBridge {
  *  sidevoice-web#439). `thinking` is the sound that says the agent works. `start` and `stop` are idempotent. An app
  *  without it leaves the page to play the cue in its own Web Audio. */
 export type CueName = "thinking";
-/** Which thinking sound a start plays and how loud (services/thinking-sounds.ts): `sound`, an id of the manifest the app
- *  bundles with the web; `gainDb`, the person's offset from its level. Without them, the default sound at its level. */
-export interface CueOptions { sound?: string; gainDb?: number }
+/** Which thinking sound a start plays, how loud and how often (services/thinking-sounds.ts): `sound`, an id of the manifest
+ *  the app bundles with the web; `gainDb`, the person's offset from its level; `intervalScale`, the person's frequency, a
+ *  factor from 0.5 to 3 on the silence after each play (drawn in the sound's `interval`; 1: its own cadence). Without them,
+ *  the default sound at its level and cadence; an app before the frequency plays the sound's own cadence. */
+export interface CueOptions { sound?: string; gainDb?: number; intervalScale?: number }
 export interface CueBridge {
   /** A start while the cue plays changes nothing with the same options, and plays the new ones instead with others. */
   start(cue: CueName, options?: CueOptions): void;
   stop(cue: CueName): void;
-  /** The options `start` honours, by name (`sound`, `gainDb`). An app before them has none: its start plays a sound of its
-   *  own, whatever is asked, and the page plays the chosen one itself instead. */
+  /** The options `start` honours, by name (`sound`, `gainDb`, `intervalScale`). An app before them has none: its start
+   *  plays a sound of its own, whatever is asked, and the page plays the chosen one itself instead. The frequency is sent
+   *  whether or not it is listed: an app before it plays the sound's own cadence, which the page has nothing better than. */
   readonly options?: readonly string[];
 }
 

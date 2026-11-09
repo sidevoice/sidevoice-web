@@ -20,7 +20,8 @@ export function breathPlays({ inCall, working, presence, screenOff }: { inCall: 
 export const SCREEN_POLL_MS = 2000;
 
 /** Whether the screen counts as off, for "only with the screen off".
- *  - An app that says whether the screen is locked (`host.screen`): that, asked while `asking` (the sound would play on it).
+ *  - An app that says whether the screen is locked (`host.screen`): that, asked while `asking` (the sound would play on it),
+ *    every SCREEN_POLL_MS and at once when the page is hidden; the page shown again is the screen on, without asking.
  *  - The desktop app without it (`host.callControls`): never. Its window hidden or minimised is not the screen off: the
  *    call goes on in sight in its floating card, or the person is in another app.
  *  - A browser or a phone: the page not shown (in the background, behind the lock screen), as the browser says it. */
@@ -33,21 +34,34 @@ function useScreenOff(asking: boolean) {
     document.addEventListener("visibilitychange", changed);
     return () => document.removeEventListener("visibilitychange", changed);
   }, []);
-  // One question at a time, the next a while after the answer: an answer never overtakes a later one, and an app that does
-  // not answer is not asked again and again.
+  // One question at a time, the next a while after the answer: an app that does not answer is not asked again and again.
+  // The page hidden asks at once, not at the next one: an Android webview may be suspended soon after the screen goes off,
+  // before a poll would come. Only the last question's answer counts: an answer never overtakes a later question, nor the
+  // page shown again.
   useEffect(() => {
     if (!screen || !asking) { setLocked(false); return; }
     let gone = false;
     let next: ReturnType<typeof setTimeout> | undefined;
+    let asked = 0;
     const ask = () => {
+      clearTimeout(next);
+      const question = ++asked;
       void screen.locked().then((now) => now === true, () => false).then((now) => {
-        if (gone) return;
+        if (gone || question !== asked) return;
         setLocked(now);
         next = setTimeout(ask, SCREEN_POLL_MS);
       });
     };
+    const changed = () => {
+      if (document.hidden) { ask(); return; }
+      asked++;
+      setLocked(false);
+      clearTimeout(next);
+      next = setTimeout(ask, SCREEN_POLL_MS);
+    };
+    document.addEventListener("visibilitychange", changed);
     ask();
-    return () => { gone = true; clearTimeout(next); };
+    return () => { gone = true; clearTimeout(next); document.removeEventListener("visibilitychange", changed); };
   }, [screen, asking]);
   return screen ? locked : callControls ? false : hidden;
 }

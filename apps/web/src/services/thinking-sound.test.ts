@@ -252,7 +252,7 @@ test("the try plays in the page, even where the app plays the call's cue", async
   preview.stop();
 });
 
-/* An app that plays the cue itself (host.cue) is asked to, with the sound and the offset, and the page makes no Web Audio
+/* An app that plays the cue itself (host.cue) is asked to, with the sound, the offset and the frequency, and the page makes no Web Audio
  * of its own; an app before the sounds (whose start takes no options) would play its own sound, so the page plays it. */
 function withCue(cue: unknown) {
   Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { cue } } });
@@ -264,18 +264,18 @@ test("an app that takes the sound plays the chosen one at the offset, once, and 
   withCue(cue);
   primeThinkingSound();
   const loop = playThinkingSound({ sound: "deep-heartbeat", gainDb: -4 });
-  expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "deep-heartbeat", gainDb: -4 });
+  expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "deep-heartbeat", gainDb: -4, intervalScale: 1 });
   loop.setGain(-4);
   expect(cue.start).toHaveBeenCalledTimes(1);
   loop.setGain(2);
-  expect(cue.start).toHaveBeenLastCalledWith("thinking", { sound: "deep-heartbeat", gainDb: 2 });
+  expect(cue.start).toHaveBeenLastCalledWith("thinking", { sound: "deep-heartbeat", gainDb: 2, intervalScale: 1 });
   loop.stop(); loop.stop();
   expect(cue.stop).toHaveBeenCalledTimes(1);
   expect(cue.stop).toHaveBeenCalledWith("thinking");
   expect(FakeContext.made).toHaveLength(0);
-  // A sound it would not know is asked for as the default; an offset out of range, as the nearest.
-  playThinkingSound({ sound: "a-sound-from-before", gainDb: 50 }).stop();
-  expect(cue.start).toHaveBeenLastCalledWith("thinking", { sound: DEFAULT_THINKING_SOUND, gainDb: 10 });
+  // A sound it would not know is asked for as the default; an offset or a frequency out of range, as the nearest.
+  playThinkingSound({ sound: "a-sound-from-before", gainDb: 50, intervalScale: 9 }).stop();
+  expect(cue.start).toHaveBeenLastCalledWith("thinking", { sound: DEFAULT_THINKING_SOUND, gainDb: 10, intervalScale: 3 });
 });
 
 test("an app whose cue takes no options (before the sounds): the page plays the chosen sound, and priming begins its audio", async () => {
@@ -318,7 +318,7 @@ test("by default the sound plays at its own level, in the page and in the app: t
   const cue = { start: vi.fn(), stop: vi.fn(), options: ["sound", "gainDb"] };
   withCue(cue);
   playThinkingSound({ sound: DEFAULT_CALL_PREFERENCES.sound, gainDb: DEFAULT_CALL_PREFERENCES.soundGainDb }).stop();
-  expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "soft-heartbeat", gainDb: 0 });
+  expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "soft-heartbeat", gainDb: 0, intervalScale: 1 });
 });
 
 test("the frequency stretches or shortens the gaps the page plays at; none is the sound's own cadence", async () => {
@@ -366,13 +366,31 @@ test("another frequency moves the play waiting on the clock, from the end of the
   expect(starts()).toHaveLength(5);
 });
 
-test("an app's cue plays the sound's own cadence: its start takes no frequency, and another frequency asks nothing of it", () => {
-  const cue = { start: vi.fn(), stop: vi.fn(), options: ["sound", "gainDb"] };
+test("an app's cue is asked for the frequency on every start, and asked again when it changes while the cue plays", () => {
+  const cue = { start: vi.fn(), stop: vi.fn(), options: ["sound", "gainDb", "intervalScale"] };
   withCue(cue);
   const loop = playThinkingSound({ sound: "deep-heartbeat", gainDb: -4, intervalScale: 2 });
-  expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "deep-heartbeat", gainDb: -4 });
+  expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "deep-heartbeat", gainDb: -4, intervalScale: 2 });
   loop.setIntervalScale(0.5);
-  expect(cue.start).toHaveBeenCalledTimes(1);
+  expect(cue.start).toHaveBeenLastCalledWith("thinking", { sound: "deep-heartbeat", gainDb: -4, intervalScale: 0.5 });
+  // The same frequency again asks nothing; a volume change keeps the frequency set.
+  loop.setIntervalScale(0.5);
+  expect(cue.start).toHaveBeenCalledTimes(2);
+  loop.setGain(1);
+  expect(cue.start).toHaveBeenLastCalledWith("thinking", { sound: "deep-heartbeat", gainDb: 1, intervalScale: 0.5 });
+  loop.stop();
+  loop.setIntervalScale(1);
+  expect(cue.start).toHaveBeenCalledTimes(3);
+  expect(FakeContext.made).toHaveLength(0);
+});
+
+test("an app before the frequency (its options do not list it) is still asked with it, and still plays the cue, not the page", () => {
+  const cue = { start: vi.fn(), stop: vi.fn(), options: ["sound", "gainDb"] };
+  withCue(cue);
+  const loop = playThinkingSound({ sound: "single-beat", gainDb: 0, intervalScale: 1.5 });
+  expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "single-beat", gainDb: 0, intervalScale: 1.5 });
+  loop.setIntervalScale(0.75);
+  expect(cue.start).toHaveBeenLastCalledWith("thinking", { sound: "single-beat", gainDb: 0, intervalScale: 0.75 });
   loop.stop();
   expect(FakeContext.made).toHaveLength(0);
 });
