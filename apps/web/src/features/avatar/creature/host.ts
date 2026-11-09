@@ -131,10 +131,11 @@ function release(renderer: Stage["renderer"]) {
 /** The stage in `slot` let go of, its renderer and context with it, its seat as if never made: the next creature drawn on it
  *  makes a new one. For the sharp faces' stage once its last creature goes (a page that shows one only now and then — the
  *  room's New conversation panel, the setup's last step — does not keep a WebGL context for the rest of its life beside the
- *  stage's); the stage and the still faces keep theirs. */
-function vacate(slot: Slot) {
+ *  stage's); the stage and the still faces keep theirs. Only `stage` itself: a creature of a stage already let go of (one
+ *  disposed late, after a new stage was made for a creature mounted since) never takes the new one with it. */
+function vacate(slot: Slot, stage: RigStage) {
   const seat = seats[slot];
-  if (!seat.stage) return;
+  if (!seat.stage || seat.stage !== stage) return;
   seat.unwatch?.();
   clearTimeout(seat.giveUp);
   release(seat.stage.renderer);
@@ -377,6 +378,8 @@ export class LiveCreature {
   private needDraw = true;
   /** Its canvas had no box when last asked to draw: it waits for one (its box observer) instead of asking for frames. */
   private hidden = false;
+  /** Disposed already: a second dispose (a late cleanup) does nothing. */
+  private disposed = false;
   private react: { expr?: string; hop?: number; t0: number; until: number } | null = null;
   private ix = { gaze: null as [number, number] | null, gz: [0, 0] as [number, number], w: 0, left: -1e9, last: 0 };
   private look: Framing | null = null;
@@ -755,6 +758,8 @@ export class LiveCreature {
   }
 
   dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
     clearTimeout(this.moodTimer);
     this.framer?.dispose();
     // Its canvas may be drawn into next by another creature (a conversation switched on the stage): it never shows this one.
@@ -764,7 +769,7 @@ export class LiveCreature {
     for (const off of this.off) off();
     dispose(this.item, this.stage);
     // The last sharp face gone: its stage goes too (vacate).
-    if (this.slot === "card" && ![...lives].some((live) => live.drawnBy(this.stage))) vacate("card");
+    if (this.slot === "card" && ![...lives].some((live) => live.drawnBy(this.stage))) vacate("card", this.stage);
   }
 }
 

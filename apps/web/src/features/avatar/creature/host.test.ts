@@ -642,3 +642,29 @@ test("the sharp faces' stage goes with its last creature, its context let go of,
   expect(third.drawnBy(rig.made[before + 1] as never)).toBe(true);
   expect(host.creaturesDrawable("face")).toBe(true);
 });
+
+test("a creature disposed late, after a new sharp stage was made for one mounted since, leaves the new one alone", () => {
+  webgl();
+  const before = rig.made.length;
+  // A panel's creature, its panel closed: its stage goes.
+  const old = mount({ seed: "t1", canvas: canvas(), framing: "face", sharp: true })!;
+  const first = rig.made[before];
+  old.dispose();
+  expect(first.renderer.disposed).toBe(true);
+  // The panel opened again: a new stage for its new creature.
+  const fresh = mount({ seed: "t1", canvas: canvas(), framing: "face", sharp: true })!;
+  const second = rig.made[before + 1];
+  expect(fresh.drawnBy(second as never)).toBe(true);
+  const lost = vi.spyOn(second.renderer, "forceContextLoss");
+  // The old one's cleanup runs again (a late or double dispose): nothing happens to the live one's stage.
+  old.dispose();
+  expect(second.renderer.disposed).toBe(false);
+  expect(lost).not.toHaveBeenCalled();
+  expect(fresh.drawnBy(second as never)).toBe(true);
+  expect(fresh.tick(0)).toBe(true);
+  // Its own dispose, once, still lets the stage go; a second does nothing more.
+  fresh.dispose();
+  fresh.dispose();
+  expect(second.renderer.disposed).toBe(true);
+  expect(lost).toHaveBeenCalledTimes(1);
+});

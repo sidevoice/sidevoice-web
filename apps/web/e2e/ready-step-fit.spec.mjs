@@ -29,9 +29,13 @@ for (const [width, height] of [[1280, 720], [390, 844]]) {
       });
       for (const text of [geometry.title, geometry.line]) {
         expect(geometry.creature.right, "the creature left of its text").toBeLessThanOrEqual(text.left + 0.5);
-        expect(text.top, "beside it, not under it").toBeLessThan(geometry.creature.bottom);
+        // Beside it: their heights overlap, the text neither above nor below the creature.
+        expect(text.top, "not below the creature").toBeLessThan(geometry.creature.bottom);
+        expect(text.bottom, "not above the creature").toBeGreaterThan(geometry.creature.top);
       }
-      expect(geometry.phrase.top, "the phrase under the three").toBeGreaterThanOrEqual(geometry.line.bottom - 0.5);
+      expect(geometry.title.bottom, "the title over the line").toBeLessThanOrEqual(geometry.line.top + 0.5);
+      const above = Math.max(geometry.creature.bottom, geometry.title.bottom, geometry.line.bottom);
+      expect(geometry.phrase.top, "the phrase under all three").toBeGreaterThanOrEqual(above - 0.5);
       const fit = await body.evaluate((node) => ({ scroll: node.scrollHeight, client: node.clientHeight, overflow: getComputedStyle(node).overflowY }));
       expect(fit.overflow).toBe("auto");
       expect(fit.scroll, "nothing below the fold").toBeLessThanOrEqual(fit.client);

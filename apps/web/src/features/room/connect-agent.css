@@ -19,7 +19,7 @@
 /* Compact (the setup's last step): the creature beside the title and the line, the two of them left-aligned after it, the
    phrase under all three; tighter gaps. */
 .connect-agent[data-compact] { grid-template-columns: auto minmax(0, auto); justify-content: center; column-gap: var(--sv-space-2); row-gap: var(--sv-space-1); }
-.connect-agent[data-compact] .connect-waiting-creature { grid-column: 1; grid-row: 1 / span 2; align-self: center; margin-block: calc(-1 * var(--sv-space-6)) calc(-1 * var(--sv-space-3)); }
+.connect-agent[data-compact] .connect-waiting-creature { grid-column: 1; grid-row: 1 / span 2; align-self: center; margin-block: calc(-1 * var(--sv-space-6)) calc(-1 * var(--sv-space-2)); }
 .connect-agent[data-compact] .connect-agent-title { grid-column: 2; grid-row: 1; align-self: end; text-align: start; }
 .connect-agent[data-compact] .connect-agent-body { grid-column: 2; grid-row: 2; align-self: start; text-align: start; }
 .connect-agent[data-compact] :is(.agent-message, .connect-agent-note) { grid-column: 1 / -1; justify-self: center; }
