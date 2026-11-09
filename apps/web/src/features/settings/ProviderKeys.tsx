@@ -89,15 +89,15 @@ function ConnectedRow({ provider, name, catalog, inUse, onDisconnected }: Provid
     if (after === "connected") { setNote(t("keys.tested")); row.current?.focus(); }
     else setNote(t(("keys.why." + after) as MessageKey, { provider: name, last4: last4 ?? "" }));
   }
-  const pill = testing ? <Badge tone="neutral">{t("keys.state.checking")}</Badge>
-    : state === "connected" ? <Badge tone="positive">{t("keys.state.connected")}</Badge>
-    : <Badge tone={TONE[state]} dot>{t(("keys.state." + state) as MessageKey)}</Badge>;
+  const pill = testing ? <Badge tag tone="neutral">{t("keys.state.checking")}</Badge>
+    : state === "connected" ? <Badge tag tone="positive">{t("keys.state.connected")}</Badge>
+    : <Badge tag tone={TONE[state]} dot>{t(("keys.state." + state) as MessageKey)}</Badge>;
   return (
     <div ref={row} className="provider-row" role="group" aria-label={name} data-provider={provider} data-state={state} tabIndex={-1}>
       <span className="provider-mark" aria-hidden="true"><ProviderLogo provider={provider} size={22} /></span>
       <div className="provider-row-copy">
         <span className="provider-row-title"><strong>{name}</strong>{pill}
-          {inUse.length > 0 && <Badge tone="accent">{t("keys.inUseFor", { uses: listed(inUse) })}</Badge>}</span>
+          {inUse.length > 0 && <Badge tag tone="accent">{t("keys.inUseFor", { uses: listed(inUse) })}</Badge>}</span>
         <span className="provider-row-line">{usedFor(provider, catalog, t)}</span>
         {problem && <div className="provider-row-problem">
           <WarningIcon size={14} />

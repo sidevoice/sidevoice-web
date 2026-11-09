@@ -64,6 +64,8 @@ test("connected providers are rows in Your providers — the name with Connected
   const eleven = row("elevenlabs")!;
   expect(yours()).toContainElement(eleven);
   expect(within(eleven).getByText("Connected").closest(".provider-row-title")).toHaveTextContent(/^ElevenLabs\s*Connected/);
+  // A Badge tag, the look an agent's row shares (HostAgentsPanel).
+  expect(within(eleven).getByText("Connected")).toHaveAttribute("data-tag");
   expect(eleven.querySelector(".provider-row-line")).toHaveTextContent(/^Voice · Transcription$/);
   expect(card("openai")!.querySelector(".provider-card-purpose")).toHaveTextContent(/^Transcription · Voice$/);
   expect(within(eleven).getByRole("button", { name: "Disconnect ElevenLabs" })).toHaveAttribute("aria-haspopup", "dialog");

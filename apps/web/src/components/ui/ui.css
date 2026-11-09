@@ -208,6 +208,8 @@
   background: var(--sv-bg-sunken); color: var(--sv-text-muted);
 }
 .ui-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+/* A row's status beside its name: small and soft, a quiet border in its own colour, as a tag rather than a button. */
+.ui-badge[data-tag] { min-height: 20px; font-weight: 500; letter-spacing: .01em; border: 1px solid color-mix(in srgb, currentColor 24%, transparent); }
 .ui-badge[data-tone="accent"] { background: var(--sv-accent-soft); color: var(--sv-accent-text); }
 .ui-badge[data-tone="positive"] { background: var(--sv-positive-soft); color: var(--sv-positive); }
 .ui-badge[data-tone="warning"] { background: var(--sv-warning-soft); color: var(--sv-warning); }

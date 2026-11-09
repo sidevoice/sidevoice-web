@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { DisclosureButton } from "../../components/ui/DisclosureButton";
 import { cn } from "../../lib/cn";
-import { ChevronIcon, ConnectorIcon, HarnessIcon, RefreshIcon } from "../../components/ui/Icons";
+import { Badge, type BadgeTone } from "../../components/ui/Badge";
+import { ChevronIcon, ConnectorIcon, HarnessIcon, LinkIcon, RefreshIcon, UnlinkIcon } from "../../components/ui/Icons";
 import { Snippet } from "../../components/ui/Snippet";
 import { ErrorDetails } from "../../components/ui/ErrorText";
 import { Tooltip } from "../../components/ui/Tooltip";
@@ -147,20 +148,34 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
     void window.sidevoiceActions?.hostAgentAction?.(fp, agent.id, action);
   const failure = error ? translatedError(t, error.key, error.params) : null;
   const errorText = failure?.text ?? null;
-  // Three states to read at a glance — Connected, Not connected, Needs attention (an entry an older Sidevoice made,
-  // another 'sidevoice' entry, settings that can't be read) — the last with its reason after it, the row's action beside.
-  const status: { text: string; tone: "ok" | "error" | "muted" | "attention" | ""; info?: string; reason?: string } = errorText ? { text: errorText, tone: "error" }
-    : busy ? { text: t(`agents.busy.${busy}` as MessageKey), tone: "muted" }
-    : justConnected && agent.registration === "connected" ? { text: t("agents.justConnected", { agent: agent.label }), tone: "ok" }
-    : agent.registration === "connected" ? { text: t("agents.state.connected"), tone: "ok" }
-    // Short in the row; what it means and what to do, only in its (i).
-    : agent.registration === "foreign" ? { text: t("agents.state.attention"), reason: t("agents.foreign"), tone: "attention", info: t("agents.foreign.info", { agent: agent.label }) }
-    : agent.registration === "outdated" ? { text: t("agents.state.attention"), reason: t("agents.outdated"), tone: "attention", info: t("agents.outdated.info", { agent: agent.label }) }
-    : agent.registration === "invalid" ? { text: t("agents.state.attention"), reason: t("agents.invalid"), tone: "attention", info: t("agents.invalid.info", { agent: agent.label, file: agent.instructions?.file ?? "" }) }
-    : agent.registration === "unknown" || !recognized ? { text: t("agents.unknown"), tone: "muted" }
-    : { text: t("agents.state.notConnected"), tone: "muted", ...(manualOnly ? { reason: t("agents.manualOnly") } : {}) };
   const connected = agent.registration === "connected";
   const outdated = agent.registration === "outdated";
+  const unknown = agent.registration === "unknown" || !recognized;
+  // A Connect, Update or Disconnect that failed (the action the error recorded; else the row's own, from where it
+  // stands). A change made but not checked afterwards did not fail: where it stands is unknown until searched again.
+  const unchecked = error?.key === "agents.scan-failed-after";
+  const failed = error && !unchecked ? error.action ?? (connected ? "disconnect" : "connect") : null;
+  const failedKey = failed === "disconnect" ? "agents.state.disconnectFailed"
+    : failed === "connect" ? (outdated ? "agents.state.updateFailed" : "agents.state.connectFailed") : null;
+  // Where it stands, at a glance, as a provider's row says it: a tag beside the name in Providers' tones — what it is
+  // doing meanwhile (as a provider's Checking…), an action that failed (danger, as a provider's refused key), Connected,
+  // Not connected, Needs attention (an entry an older Sidevoice made, another 'sidevoice' entry, settings that can't be
+  // read), or unknown.
+  const reason = agent.registration === "foreign" ? "agents.foreign" : outdated ? "agents.outdated" : agent.registration === "invalid" ? "agents.invalid" : null;
+  const state: { text: string; tone: BadgeTone; dot: boolean } = busy ? { text: t(`agents.busy.${busy}` as MessageKey), tone: "neutral", dot: false }
+    : failedKey ? { text: t(failedKey), tone: "danger", dot: true }
+    : unchecked ? { text: t("agents.unknown"), tone: "neutral", dot: true }
+    : connected ? { text: t("agents.state.connected"), tone: "positive", dot: false }
+    : reason ? { text: t("agents.state.attention"), tone: "warning", dot: true }
+    : unknown ? { text: t("agents.unknown"), tone: "neutral", dot: true }
+    : { text: t("agents.state.notConnected"), tone: "neutral", dot: true };
+  // Under the name, only what there is more to say: what went wrong, else a moment of "ready" once connected, else why it
+  // needs attention (short; what it means and what to do, only in its (i)) or that it is connected by hand.
+  const detail: { text: string; tone: "ok" | "error" | "muted"; info?: string } | null = errorText ? { text: errorText, tone: "error" }
+    : justConnected && connected ? { text: t("agents.justConnected", { agent: agent.label }), tone: "ok" }
+    : reason ? { text: t(reason), tone: "muted", info: t(`${reason}.info` as MessageKey, { agent: agent.label, file: agent.instructions?.file ?? "" }) }
+    : !connected && !unknown && manualOnly ? { text: t("agents.manualOnly"), tone: "muted" }
+    : null;
   // The confirm goes: the focus goes back to Disconnect (after Remove, to the row's action as it now stands).
   const action = useRef<HTMLButtonElement>(null);
   const cancelConfirm = () => { setConfirming(false); requestAnimationFrame(() => action.current?.focus()); };
@@ -170,22 +185,23 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
     <li className="host-agent-row" data-registration={agent.registration} data-open={open || undefined}>
       <div className="host-agent-main">
         <span className="host-agent-icon">{agent.id === "other" ? <ConnectorIcon size={16} /> : <HarnessIcon harness={agent.id} size={18} />}</span>
+        {/* The row keeps its height whether or not there is a line under the name (host-agents.css). */}
         <span className="host-agent-copy">
-          <span className="host-agent-name"><strong>{agent.label}</strong>{agent.version && <span className="muted"> {agent.version}</span>}
+          <span className="host-agent-title">
+            <span className="host-agent-name"><strong>{agent.label}</strong>{agent.version && <span className="muted"> {agent.version}</span>}</span>
+            <Badge tag className="host-agent-state" tone={state.tone} dot={state.dot} role="status">{state.text}</Badge>
             <NewMark id={`agent:${fp}:${agent.id}`} />
           </span>
-          {/* Always one status line under the name, so a row never changes height: what went wrong, else a moment of
-              "ready" once connected, else where it stands. */}
-          <span className="host-agent-status-line">
-            <span className={cn("host-agent-status", status.tone === "ok" && "host-agent-ok", status.tone === "error" && "host-agent-error", status.tone === "muted" && "muted", status.tone === "attention" && "host-agent-attention")}
-              role={errorText ? "alert" : "status"} title={status.reason ? status.text + " · " + status.reason : status.text}>{status.text}{status.reason && <span className="host-agent-reason"> · {status.reason}</span>}</span>
+          {(detail || failure || agent.readiness) && <span className="host-agent-status-line">
+            {detail && <span className={cn("host-agent-status", detail.tone === "ok" && "host-agent-ok", detail.tone === "error" && "host-agent-error", detail.tone === "muted" && "muted")}
+              role={errorText ? "alert" : undefined} title={detail.text}>{detail.text}</span>}
             {failure && <ErrorDetails details={failure.details} />}
-            {status.info && <InfoTip label={t("agents.statusInfo", { agent: agent.label })}>{status.info}</InfoTip>}
+            {detail?.info && <InfoTip label={t("agents.statusInfo", { agent: agent.label })}>{detail.info}</InfoTip>}
             {agent.readiness && <AgentReadiness readiness={agent.readiness} id={readinessId} open={readinessOpen} onToggle={() => setReadinessOpen((value) => !value)} />}
-          </span>
+          </span>}
         </span>
         {/* Every action a button on the row, each with a hint: doing it by hand (add, replace, or take Sidevoice out), and
-            Connect or Disconnect, which Sidevoice does itself. */}
+            Connect or Disconnect, which Sidevoice does itself — at the row's end, the same buttons as a provider's. */}
         <span className="host-agent-actions">
           {hasManualInstructions && <Tooltip content={handHint}>
             <DisclosureButton disabled={!!busy} open={open} controls={panelId} onClick={() => setOpen((value) => !value)}>
@@ -193,13 +209,14 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
             </DisclosureButton>
           </Tooltip>}
           {connected ? can.disconnect !== false && <Tooltip content={t("agents.hint.disconnect", { agent: agent.label })}>
-              <Button ref={action} variant="ghost" size="sm" loading={busy === "disconnect"} disabled={busy === "connect" || confirming} aria-label={t("agents.disconnectNamed", { agent: agent.label })}
-                onClick={() => setConfirming(true)}>{t("agents.disconnect")}</Button>
+              <Button ref={action} variant="secondary" size="sm" loading={busy === "disconnect"} disabled={busy === "connect" || confirming} aria-label={t("agents.disconnectNamed", { agent: agent.label })}
+                onClick={() => setConfirming(true)}><UnlinkIcon />{t("agents.disconnect")}</Button>
             </Tooltip>
-            // An entry an older Sidevoice made reads Update, as its (i) says; the connector's connect rewrites it.
+            // An entry an older Sidevoice made reads Update, as its (i) says; the connector's connect rewrites it. A fix to
+            // what it has, as a provider's Replace key: the same button, without Connect's link.
             : !readOnly && (outdated ? can.update ?? can.connect : can.connect) && <Tooltip content={t(outdated ? "agents.hint.update" : "agents.hint.connect", { agent: agent.label })}>
-              <Button ref={action} variant="primary" size="sm" loading={busy === "connect"} disabled={busy === "disconnect"} aria-label={t(outdated ? "agents.updateNamed" : "agents.connectNamed", { agent: agent.label })}
-                onClick={() => run("connect")}>{t(outdated ? "agents.update" : "agents.connect")}</Button>
+              <Button ref={action} variant="secondary" size="sm" loading={busy === "connect"} disabled={busy === "disconnect"} aria-label={t(outdated ? "agents.updateNamed" : "agents.connectNamed", { agent: agent.label })}
+                onClick={() => run("connect")}>{outdated ? t("agents.update") : <><LinkIcon />{t("agents.connect")}</>}</Button>
             </Tooltip>}
         </span>
       </div>

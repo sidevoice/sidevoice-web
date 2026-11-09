@@ -1,6 +1,9 @@
 import { expect, test, vi, afterEach } from "vitest";
+import type { ReactElement } from "react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { HostAgentsPanel, sidevoiceEntry } from "./HostAgentsPanel";
+import { LinkIcon, UnlinkIcon } from "../../components/ui/Icons";
+import { createHostAgentsController } from "../../services/host-agents";
 import { RoomHeader } from "../room/RoomHeader";
 import { MachineList } from "../room/MachineList";
 import { RoomProvider } from "../../app/RoomProvider";
@@ -200,7 +203,7 @@ test("a foreign Codex row is short, with the why in its (i), and replacing it by
   try {
     render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
 
-    const foreignRow = screen.getByText("· Another ‘sidevoice’ entry").closest("li") as HTMLElement;
+    const foreignRow = screen.getByText("Another ‘sidevoice’ entry").closest("li") as HTMLElement;
     expect(within(foreignRow).getByRole("button", { name: "About Codex’s status" })).toBeInTheDocument();
     // Never touched by Sidevoice: no Connect, no Disconnect.
     expect(within(foreignRow).queryByRole("button", { name: /^Connect / })).toBeNull();
@@ -234,7 +237,7 @@ test("foreign Codex manual replacement closes and confirms on connect, then stay
   let view: ReturnType<typeof render> | undefined;
   try {
     view = render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
-    const row = screen.getByText("· Another ‘sidevoice’ entry").closest("li") as HTMLElement;
+    const row = screen.getByText("Another ‘sidevoice’ entry").closest("li") as HTMLElement;
     const reveal = within(row).getByRole("button", { name: "Replace manually" });
     fireEvent.click(reveal);
     expect(reveal).toHaveAttribute("aria-expanded", "true");
@@ -279,7 +282,7 @@ test("foreign rows without host instructions stay read-only while an automatic c
   setActions({ hostAgentAction: vi.fn(async () => {}) });
   render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
 
-  const foreignRow = screen.getByText("· Another ‘sidevoice’ entry").closest("li") as HTMLElement;
+  const foreignRow = screen.getByText("Another ‘sidevoice’ entry").closest("li") as HTMLElement;
   // Nothing to do on it here, only its (i) to say why.
   expect(foreignRow.querySelectorAll(".host-agent-actions button")).toHaveLength(0);
   expect(within(foreignRow).getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["About claude’s status"]);
@@ -287,7 +290,13 @@ test("foreign rows without host instructions stay read-only while an automatic c
   expect(screen.getByRole("alert")).toHaveTextContent("Could not connect this agent.");
 });
 
-test("a row is always its name and one status line: connecting turns that line to ready, then connected; disconnecting, to not connected", () => {
+/** A row's state, as its tag beside the name says it: the words, Providers' tone, and whether it has a dot. */
+const tagOf = (row: HTMLElement) => {
+  const tag = row.querySelector(".host-agent-title .host-agent-state.ui-badge") as HTMLElement;
+  return { text: tag.textContent, tone: tag.getAttribute("data-tone"), dot: !!tag.querySelector(".ui-badge-dot"), tag: tag.hasAttribute("data-tag") };
+};
+
+test("a row says where it stands in a tag beside its name: connecting reads Connecting…, then Connected with a moment of ready under the name; disconnecting, Not connected", () => {
   vi.useFakeTimers();
   try {
     const store = createRoomStore();
@@ -297,15 +306,112 @@ test("a row is always its name and one status line: connecting turns that line t
     render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
     const row = () => document.querySelector(".host-agent-row") as HTMLElement;
     const lines = () => [...row().querySelectorAll(".host-agent-status")].map((line) => line.textContent);
-    expect(lines()).toEqual(["Not connected"]);
+    // The tag is the row's live status, beside the name (after its version); nothing more to say, no line under it.
+    expect(within(row()).getByRole("status")).toBe(row().querySelector(".host-agent-state"));
+    expect(row().querySelector(".host-agent-title")).toHaveTextContent(/^Codex 0\.157\.0\s*Not connected$/);
+    expect(tagOf(row())).toEqual({ text: "Not connected", tone: "neutral", dot: true, tag: true });
+    expect(lines()).toEqual([]);
+    act(() => store.patch({ hostAgents: { fp: { ...ready([notConnected]), busy: { codex: "connect" } } } }));
+    expect(tagOf(row())).toEqual({ text: "Connecting…", tone: "neutral", dot: false, tag: true });
     act(() => store.patch({ hostAgents: { fp: ready([known("codex", { registration: "connected" })]) } }));
+    expect(tagOf(row())).toEqual({ text: "Connected", tone: "positive", dot: false, tag: true });
     expect(lines()).toEqual(["Codex is ready for new conversations"]);
     expect(row().querySelector(".host-agent-status")).toHaveClass("host-agent-ok");
     act(() => { vi.advanceTimersByTime(5000); });
-    expect(lines()).toEqual(["Connected"]);
+    expect(tagOf(row()).text).toBe("Connected");
+    expect(lines()).toEqual([]);
     act(() => store.patch({ hostAgents: { fp: ready([notConnected]) } }));
-    expect(lines()).toEqual(["Not connected"]);
+    expect(tagOf(row()).text).toBe("Not connected");
   } finally { vi.useRealTimers(); }
+});
+
+test("a Connect or a Disconnect that fails says so in a danger tag beside the name, as a provider's refused key, the why under it", async () => {
+  const store = createRoomStore();
+  // The real controller, its machine answering every action with Sidevoice not running there.
+  const controller = createHostAgentsController({
+    request: async () => { throw { key: "no-connector" }; }, hasHost: () => true,
+    getState: (fp) => store.getState().facts.hostAgents[fp],
+    setState: (fp, next) => store.patch({ hostAgents: { ...store.getState().facts.hostAgents, [fp]: next } }),
+  });
+  setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction: (fp, id, action) => controller.act(fp, id, action) });
+  act(() => store.patch({ hostAgents: { fp: ready([known("codex")]) } }));
+  render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
+  const row = () => document.querySelector(".host-agent-row") as HTMLElement;
+
+  // Connect fails: Couldn't connect, in danger, its dot; why, as an alert under the name; Connect there to try again.
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Connect Codex to Sidevoice" })); });
+  expect(store.getState().facts.hostAgents.fp.actionErrors.codex).toMatchObject({ key: "no-connector", action: "connect" });
+  expect(tagOf(row())).toEqual({ text: "Couldn’t connect", tone: "danger", dot: true, tag: true });
+  expect(within(row()).getByRole("alert")).toHaveTextContent(/^Sidevoice is not running on this machine\.$/);
+  expect(within(row()).getByRole("button", { name: "Connect Codex to Sidevoice" })).toBeInTheDocument();
+
+  // Disconnect fails (asked first, as ever): Couldn't disconnect, in danger.
+  act(() => store.patch({ hostAgents: { fp: ready([known("codex", { registration: "connected" })]) } }));
+  expect(tagOf(row())).toEqual({ text: "Connected", tone: "positive", dot: false, tag: true });
+  fireEvent.click(screen.getByRole("button", { name: "Disconnect Codex from Sidevoice" }));
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Remove from Codex" })); });
+  expect(store.getState().facts.hostAgents.fp.actionErrors.codex).toMatchObject({ key: "no-connector", action: "disconnect" });
+  expect(tagOf(row())).toEqual({ text: "Couldn’t disconnect", tone: "danger", dot: true, tag: true });
+  expect(within(row()).getByRole("alert")).toHaveTextContent(/^Sidevoice is not running on this machine\.$/);
+  expect(within(row()).getByRole("button", { name: "Disconnect Codex from Sidevoice" })).toBeInTheDocument();
+});
+
+test("a failed Update reads Couldn't update; an error from before actions were recorded, the row's own; a change not checked afterwards, unknown", () => {
+  const store = createRoomStore();
+  setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction: vi.fn(async () => {}) });
+  render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
+  const row = () => document.querySelector(".host-agent-row") as HTMLElement;
+  const failing = (changes: Partial<DetectedAgent>, error: HostAgentsState["actionErrors"][string]) =>
+    act(() => store.patch({ hostAgents: { fp: { ...ready([known("codex", changes)]), actionErrors: { codex: error } } } }));
+  failing({ registration: "outdated", actionable: false }, { key: "connect-failed", action: "connect" });
+  expect(tagOf(row())).toEqual({ text: "Couldn’t update", tone: "danger", dot: true, tag: true });
+  failing({}, { key: "connect-failed" });
+  expect(tagOf(row()).text).toBe("Couldn’t connect");
+  failing({ registration: "connected" }, { key: "action-failed" });
+  expect(tagOf(row()).text).toBe("Couldn’t disconnect");
+  // Applied, but not checked: no failure, and where it stands is unknown until searched again; the line says so.
+  failing({}, { key: "agents.scan-failed-after", params: { agent: "Codex" }, action: "connect" });
+  expect(tagOf(row())).toEqual({ text: "Connection status is unknown", tone: "neutral", dot: true, tag: true });
+  expect(within(row()).getByRole("alert")).toHaveTextContent("The change to Codex was applied");
+  // Trying again: the tag says what it is doing meanwhile.
+  act(() => store.patch({ hostAgents: { fp: { ...ready([known("codex")]), busy: { codex: "connect" } } } }));
+  expect(tagOf(row())).toEqual({ text: "Connecting…", tone: "neutral", dot: false, tag: true });
+});
+
+test("Connect, Update and Disconnect are a provider's buttons: secondary, Connect with its link, Disconnect with the link broken", async () => {
+  const store = createRoomStore();
+  const hostAgentAction = vi.fn(async () => {});
+  setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction });
+  const drawn = (icon: ReactElement) => { const view = render(icon); const markup = view.container.innerHTML; view.unmount(); return markup; };
+  const link = drawn(<LinkIcon />), unlink = drawn(<UnlinkIcon />);
+  act(() => store.patch({ hostAgents: { fp: ready([known("codex"), known("cursor", { registration: "connected" }), known("claude", { registration: "outdated", actionable: false })]) } }));
+  render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
+  const connect = screen.getByRole("button", { name: "Connect Codex to Sidevoice" });
+  const disconnect = screen.getByRole("button", { name: "Disconnect cursor from Sidevoice" });
+  const update = screen.getByRole("button", { name: "Update claude’s Sidevoice entry" });
+  for (const button of [connect, disconnect, update]) {
+    expect(button).toHaveClass("ui-button--secondary", "ui-button--sm");
+    expect(button).not.toHaveClass("ui-button--primary");
+    expect(button).not.toHaveClass("ui-button--ghost");
+  }
+  expect(connect).toHaveTextContent(/^Connect$/);
+  expect(connect.querySelector("svg")?.outerHTML).toBe(link);
+  expect(disconnect).toHaveTextContent(/^Disconnect$/);
+  expect(disconnect.querySelector("svg")?.outerHTML).toBe(unlink);
+  // Update fixes what is there, as a provider's Replace key: the same button, without Connect's link.
+  expect(update).toHaveTextContent(/^Update$/);
+  expect(update.querySelector("svg")).toBeNull();
+  // Each still does what it did: Connect runs the connector's connect; Disconnect asks first.
+  await act(async () => { fireEvent.click(connect); });
+  expect(hostAgentAction).toHaveBeenCalledWith("fp", "codex", "connect");
+  fireEvent.click(disconnect);
+  expect(screen.getByRole("group", { name: "Disconnect cursor from Sidevoice" })).toBeInTheDocument();
+  expect(hostAgentAction).not.toHaveBeenCalledWith("fp", "cursor", "disconnect");
+  // Busy, the button keeps its look and says so.
+  act(() => store.patch({ hostAgents: { fp: { ...ready([known("codex")]), busy: { codex: "connect" } } } }));
+  const loading = screen.getByRole("button", { name: "Connect Codex to Sidevoice" });
+  expect(loading).toHaveClass("ui-button--secondary");
+  expect(loading).toHaveAttribute("aria-busy", "true");
 });
 
 test("the row's actions: doing it by hand, and Connect or Disconnect, are buttons on the row, as the connector can", () => {
@@ -384,27 +490,30 @@ test("in Spanish, several commands are Comandos", () => {
   } finally { localStorage.removeItem("sidevoice.settings"); }
 });
 
-test("a row's status is one of three — Connected, Not connected, Needs attention — the last with its reason after it", () => {
+test("a row's status is one of three — Connected, Not connected, Needs attention — in Providers' tones, the last with its reason under the name", () => {
   const store = createRoomStore();
   setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction: vi.fn(async () => {}) });
   render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
   const row = () => document.querySelector(".host-agent-row") as HTMLElement;
-  const status = () => row().querySelector(".host-agent-status") as HTMLElement;
-  const reason = () => status().querySelector(".host-agent-reason")?.textContent ?? null;
-  const cases: [Partial<DetectedAgent>, string, string | null, string][] = [
-    [{ registration: "connected" }, "Connected", null, "host-agent-ok"],
-    [{ registration: "not-connected" }, "Not connected", null, "muted"],
-    [{ registration: "not-connected", can: { connect: false, update: false, disconnect: false } }, "Not connected", " · Connect it manually", "muted"],
-    [{ registration: "outdated", actionable: false }, "Needs attention", " · Set up by an older Sidevoice", "host-agent-attention"],
-    [{ registration: "foreign", actionable: false }, "Needs attention", " · Another ‘sidevoice’ entry", "host-agent-attention"],
-    [{ registration: "invalid", actionable: false }, "Needs attention", " · Its MCP settings can’t be read", "host-agent-attention"],
+  const reason = () => row().querySelector(".host-agent-status") as HTMLElement | null;
+  // As a provider's: Connected positive and plain; Not connected neutral, a problem warning, each with its dot.
+  const cases: [Partial<DetectedAgent>, string, string, string | null][] = [
+    [{ registration: "connected" }, "Connected", "positive", null],
+    [{ registration: "not-connected" }, "Not connected", "neutral", null],
+    [{ registration: "not-connected", can: { connect: false, update: false, disconnect: false } }, "Not connected", "neutral", "Connect it manually"],
+    [{ registration: "outdated", actionable: false }, "Needs attention", "warning", "Set up by an older Sidevoice"],
+    [{ registration: "foreign", actionable: false }, "Needs attention", "warning", "Another ‘sidevoice’ entry"],
+    [{ registration: "invalid", actionable: false }, "Needs attention", "warning", "Its MCP settings can’t be read"],
   ];
-  for (const [changes, state, why, tone] of cases) {
+  for (const [changes, state, tone, why] of cases) {
     act(() => store.patch({ hostAgents: { fp: ready([known("codex", changes)]) } }));
-    expect(status().firstChild?.textContent).toBe(state);
-    expect(reason()).toBe(why);
-    expect(status()).toHaveClass(tone);
-    expect(status()).toHaveAttribute("title", why ? state + why : state);
+    expect(tagOf(row())).toEqual({ text: state, tone, dot: state !== "Connected", tag: true });
+    expect(reason()?.textContent ?? null).toBe(why);
+    if (why) {
+      expect(reason()).toHaveClass("muted");
+      // One line, cut if it must: the whole of it in its title.
+      expect(reason()).toHaveAttribute("title", why);
+    }
     // Needs attention keeps its (i), the why.
     if (state === "Needs attention") expect(within(row()).getByRole("button", { name: "About Codex’s status" })).toBeInTheDocument();
   }
@@ -452,17 +561,17 @@ test("a registration this app does not know reads as unknown, with nothing to do
   setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction: vi.fn(async () => {}) });
   render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
   const row = () => document.querySelector(".host-agent-row") as HTMLElement;
-  const status = () => row().querySelector(".host-agent-status") as HTMLElement;
   const actions = () => [...row().querySelectorAll(".host-agent-actions button")].map((button) => button.textContent);
   // A newer connector's value, extra fields and all: not "Not connected", no Connect, no steps by hand.
   const newer = { registration: "pending-approval", approval: { by: "admin" } } as unknown as Partial<DetectedAgent>;
   act(() => store.patch({ hostAgents: { fp: ready([known("codex", { ...newer, can: undefined, connect: "auto" })]) } }));
-  expect(status().firstChild?.textContent).toBe("Connection status is unknown");
-  expect(status()).toHaveClass("muted");
+  // As a provider's unknown: neutral, with its dot.
+  expect(tagOf(row())).toEqual({ text: "Connection status is unknown", tone: "neutral", dot: true, tag: true });
+  expect(row().querySelector(".host-agent-status")).toBeNull();
   expect(actions()).toEqual([]);
   // Where the connector itself says it can connect, Connect is there; still nothing by hand, and nothing marked new.
   act(() => store.patch({ hostAgents: { fp: ready([known("codex", newer)]) } }));
-  expect(status().firstChild?.textContent).toBe("Connection status is unknown");
+  expect(tagOf(row()).text).toBe("Connection status is unknown");
   expect(actions()).toEqual(["Connect"]);
   act(() => store.patch({ hostAgents: { fp: ready([known("codex", { ...newer, can: { connect: false, update: false, disconnect: false } })]) } }));
   expect(actions()).toEqual([]);
