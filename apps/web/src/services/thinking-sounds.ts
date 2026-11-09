@@ -1,10 +1,12 @@
 import manifest from "../../public/sounds/thinking/sounds.json";
 
 /* The thinking sounds: the cues that say the agent is working on your turn. The web ships them as files
- * (public/sounds/thinking/, made by scripts/encode-thinking-sounds.mjs, which keeps the level each was approved at), and
- * their manifest there, sounds.json, is the one place that says which there are, in Settings' order, which one is the
- * default and how often each plays. The iOS app reads that same file from the web it bundles, to play the one chosen
- * (sidevoice-desktop docs/BRIDGE.md → "The cues"). Each sound's name is a catalogue text, `settings.call.sound.<id>`. */
+ * (public/sounds/thinking/, made by scripts/encode-thinking-sounds.mjs at the level each ships at: the one it was approved
+ * at, or the one it was moved to since), and their manifest there, sounds.json, is the one place that says which there
+ * are, in Settings' order, which one is the default and how often each plays. The person's volume moves that level and
+ * their frequency stretches or shortens those gaps, as the sound plays. The iOS app reads that same file from the web it
+ * bundles, to play the one chosen (sidevoice-desktop docs/BRIDGE.md → "The cues"). Each sound's name is a catalogue text,
+ * `settings.call.sound.<id>`. */
 
 export interface ThinkingSound {
   id: string;
@@ -33,9 +35,27 @@ export function thinkingSoundGain(value: unknown): number {
   return Math.min(THINKING_SOUND_GAIN.max, Math.max(THINKING_SOUND_GAIN.min, Math.round(value)));
 }
 
-/** How long to wait after a play ends before the next one, in seconds: somewhere in the sound's interval. */
-export function nextGapSeconds(sound: ThinkingSound, random: () => number = Math.random): number {
-  const [min, max] = sound.interval;
+/** The person's frequency: a factor on the sound's own gaps (1: its own cadence, 2: twice as long between plays), one of
+ *  these steps, from the least often to the most often, as the control has them. */
+export const THINKING_SOUND_INTERVAL_SCALES: readonly number[] = [3, 2, 1.5, 1.25, 1, 0.75, 0.5];
+
+/** `value` as a factor the frequency can be: the nearest step, 1 (the sound's own cadence) for anything else. */
+export function thinkingSoundIntervalScale(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return 1;
+  const far = (step: number) => Math.abs(Math.log(step / value));
+  return THINKING_SOUND_INTERVAL_SCALES.reduce((near, step) => (far(step) < far(near) ? step : near));
+}
+
+/** The gaps between plays of `sound` at the frequency `scale`, in seconds: its interval, stretched or shortened. */
+export function scaledInterval(sound: ThinkingSound, scale: number = 1): readonly [number, number] {
+  const factor = thinkingSoundIntervalScale(scale);
+  return [sound.interval[0] * factor, sound.interval[1] * factor];
+}
+
+/** How long to wait after a play ends before the next one, in seconds: somewhere in the sound's interval, at the frequency
+ *  `scale`. */
+export function nextGapSeconds(sound: ThinkingSound, scale: number = 1, random: () => number = Math.random): number {
+  const [min, max] = scaledInterval(sound, scale);
   return min + random() * (max - min);
 }
 

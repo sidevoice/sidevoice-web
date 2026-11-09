@@ -139,3 +139,28 @@ test("never: no sound, shown or hidden, and none fetched", async ({ page }) => {
   expect(await playing(page)).toBe(false);
   expect(await watched(page)).toEqual({ fetched: [], cadence: [] });
 });
+
+/** A sound file's level as the page's audio decodes it, over the whole of it, in dB of full scale: its RMS and its peak;
+ *  null where this browser does not decode the format. */
+function decodedLevel(page, file) {
+  return page.evaluate(async (file) => {
+    try {
+      const bytes = await (await fetch(`/voice/sounds/thinking/${file}`)).arrayBuffer();
+      const samples = (await new OfflineAudioContext(1, 1, 48_000).decodeAudioData(bytes)).getChannelData(0);
+      let sum = 0, peak = 0;
+      for (const sample of samples) { sum += sample * sample; peak = Math.max(peak, Math.abs(sample)); }
+      return { rms: 20 * Math.log10(Math.sqrt(sum / samples.length)), peak: 20 * Math.log10(peak) };
+    } catch { return null; }
+  }, file);
+}
+
+test("the soft heartbeat plays 5 dB under the level it was approved at (RMS −14 dB, peak −1 dBFS), in the file this browser decodes", async ({ page }) => {
+  // The page plays a sound's file at the person's offset, 0 dB by default; the iOS app plays the same file (its m4a).
+  await page.goto("/voice/");
+  const levels = [await decodedLevel(page, "soft-heartbeat.webm"), await decodedLevel(page, "soft-heartbeat.m4a")].filter(Boolean);
+  expect(levels.length).toBeGreaterThan(0);
+  for (const level of levels) {
+    expect(level.rms).toBeCloseTo(-14 - 5, 0);
+    expect(level.peak).toBeCloseTo(-1 - 5, 0);
+  }
+});

@@ -8,7 +8,7 @@ import { browserStorage, exclusively } from "./browser-storage";
 import { followKeyboardLayout } from "./browser-keyboard";
 import { browserDeviceName, browserShortcutModifier, iosBodyProbe } from "./identity";
 import { applyViewport as applyViewportOf } from "./viewport";
-import { messageOverlay, nativeCardSeam, nativeHost } from "./native";
+import { messageOverlay, nativeCardSeam, nativeHost, watchHostMember } from "./native";
 import { setMessageOverlay } from "../i18n/translator";
 
 export type * from "./types";
@@ -21,6 +21,9 @@ export const pageMicrophone = microphoneOfPage;
 
 /** The transport of a page served from an origin: what a pairing judged against that origin may do. */
 export const reachOfOrigin = reachOfPage;
+
+/** Be told once the app offers a member it did not at first (native.ts `watchHostMember`): one it offers after a reply. */
+export const onHostMember = watchHostMember;
 
 /* The host's wording of the texts its place changes is applied by the translator over the web's catalogue. */
 setMessageOverlay(messageOverlay);

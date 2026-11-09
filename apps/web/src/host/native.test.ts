@@ -1,8 +1,8 @@
-import { describe, expect, onTestFinished, test } from "vitest";
+import { describe, expect, onTestFinished, test, vi } from "vitest";
 import { cardSeam, host, reachOfOrigin } from ".";
 import { browserDeviceName, browserShortcutModifier } from "./identity";
 import { translator } from "../i18n/translator";
-import { nativeHost } from "./native";
+import { nativeHost, watchHostMember } from "./native";
 
 const withHost = (members: Record<string, unknown> | undefined) => {
   Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: members && { host: members } });
@@ -352,4 +352,45 @@ describe("the host's message overlay", () => {
     expect(translator("en")("devices.speakerFixed")).toBe(browser);
     expect(host().messages("en")).toEqual({});
   });
+});
+
+test("a member the app offers late is watched for a while, told once it is there, and never in a browser", () => {
+  vi.useFakeTimers();
+  try {
+    // A browser: nothing to watch.
+    Reflect.deleteProperty(window, "__sidevoiceHost");
+    const timers = vi.getTimerCount();
+    const none = vi.fn();
+    watchHostMember("cue", none)();
+    expect(vi.getTimerCount()).toBe(timers);
+    // An app whose cue comes after a reply: told once it is there, and no more looking after.
+    let cue: object | null = null;
+    Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { get cue() { return cue; } } } });
+    const arrived = vi.fn();
+    watchHostMember("cue", arrived);
+    vi.advanceTimersByTime(1000);
+    expect(arrived).not.toHaveBeenCalled();
+    cue = {};
+    vi.advanceTimersByTime(250);
+    expect(arrived).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(60_000);
+    expect(arrived).toHaveBeenCalledTimes(1);
+    // One that never comes is given up on after half a minute.
+    cue = null;
+    const never = vi.fn();
+    watchHostMember("cue", never);
+    vi.advanceTimersByTime(30_000);
+    expect(vi.getTimerCount()).toBe(timers);
+    expect(never).not.toHaveBeenCalled();
+    // Already there when the watch begins (it came between the caller's look and its subscription): told at once, and
+    // nothing left to look for.
+    cue = {};
+    const there = vi.fn();
+    watchHostMember("cue", there);
+    expect(there).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(timers);
+  } finally {
+    vi.useRealTimers();
+    Reflect.deleteProperty(window, "__sidevoiceHost");
+  }
 });

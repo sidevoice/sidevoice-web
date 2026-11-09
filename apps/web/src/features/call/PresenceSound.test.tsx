@@ -7,12 +7,19 @@ import { createRoomStore } from "../../state/room-store";
 import { writeCallPreferences, type PresenceSound as PresenceChoice } from "../../services/call-preferences";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
-const player = vi.hoisted(() => ({ playing: 0, plays: 0, choices: [] as { sound: string; gainDb: number }[], gains: [] as number[] }));
+type Choice = { sound: string; gainDb: number; intervalScale?: number };
+const player = vi.hoisted(() => ({ playing: 0, plays: 0, choices: [] as Choice[], gains: [] as number[], scales: [] as number[] }));
 vi.mock("../../services/thinking-sound", () => ({
-  playThinkingSound: (choice: { sound: string; gainDb: number }) => {
+  // No app here holds the cue for the lock (PresenceSound.cue.test.tsx has one).
+  thinkingSoundHeldForLock: () => false,
+  playThinkingSound: (choice: Choice) => {
     player.playing++; player.plays++; player.choices.push(choice);
     let stopped = false;
-    return { setGain: (gainDb: number) => { player.gains.push(gainDb); }, stop: () => { if (!stopped) { stopped = true; player.playing--; } } };
+    return {
+      setGain: (gainDb: number) => { player.gains.push(gainDb); },
+      setIntervalScale: (scale: number) => { player.scales.push(scale); },
+      stop: () => { if (!stopped) { stopped = true; player.playing--; } },
+    };
   },
 }));
 
@@ -35,7 +42,7 @@ function inCall(presence: PresenceChoice) {
   return { store, work };
 }
 
-beforeEach(() => { player.playing = 0; player.plays = 0; player.choices = []; player.gains = []; localStorage.clear(); setHidden(false); });
+beforeEach(() => { player.playing = 0; player.plays = 0; player.choices = []; player.gains = []; player.scales = []; localStorage.clear(); setHidden(false); });
 
 test("when the breath plays, by the choice: never, only with the screen off, always", () => {
   for (const screenOff of [false, true]) {
@@ -88,24 +95,36 @@ test("out of a call, no breath however long the agent works", () => {
   expect(player.playing).toBe(0);
 });
 
-test("it plays the chosen sound at the volume set: the default at its own level until one is chosen", () => {
+test("it plays the chosen sound at the volume and frequency set: the default at its own level and cadence until one is chosen", () => {
   const { work } = inCall("always");
   work(true);
-  expect(player.choices).toEqual([{ sound: "soft-heartbeat", gainDb: 0 }]);
+  expect(player.choices).toEqual([{ sound: "soft-heartbeat", gainDb: 0, intervalScale: 1 }]);
 });
 
 test("another sound chosen while it plays starts that one; another volume applies to the one that plays", () => {
   const { work } = inCall("always");
   act(() => { writeCallPreferences({ sound: "deep-heartbeat", soundGainDb: -3 }); });
   work(true);
-  expect(player.choices).toEqual([{ sound: "deep-heartbeat", gainDb: -3 }]);
+  expect(player.choices).toEqual([{ sound: "deep-heartbeat", gainDb: -3, intervalScale: 1 }]);
   act(() => { writeCallPreferences({ soundGainDb: 4 }); });
   expect(player.gains).toEqual([4]);
   expect(player.plays).toBe(1);
   act(() => { writeCallPreferences({ sound: "single-beat" }); });
   expect(player.plays).toBe(2);
   expect(player.playing).toBe(1);
-  expect(player.choices.at(-1)).toEqual({ sound: "single-beat", gainDb: 4 });
+  expect(player.choices.at(-1)).toEqual({ sound: "single-beat", gainDb: 4, intervalScale: 1 });
+});
+
+test("another frequency applies to the sound that plays, and to the next one chosen", () => {
+  const { work } = inCall("always");
+  act(() => { writeCallPreferences({ soundIntervalScale: 1.5 }); });
+  work(true);
+  expect(player.choices).toEqual([{ sound: "soft-heartbeat", gainDb: 0, intervalScale: 1.5 }]);
+  act(() => { writeCallPreferences({ soundIntervalScale: 0.5 }); });
+  expect(player.scales).toEqual([0.5]);
+  expect(player.plays).toBe(1);
+  act(() => { writeCallPreferences({ sound: "slow-breath" }); });
+  expect(player.choices.at(-1)).toEqual({ sound: "slow-breath", gainDb: 0, intervalScale: 0.5 });
 });
 
 /* The desktop app shows the call in its floating card while its window is hidden or minimised: a hidden page is not the
@@ -192,6 +211,40 @@ test("desktop, an app slow to answer is asked once at a time, and a late answer 
   await act(async () => { answers[2](true); await vi.advanceTimersByTimeAsync(SCREEN_POLL_MS * 2); });
   expect(player.playing).toBe(0);
   expect(screen.locked).toHaveBeenCalledTimes(3);
+});
+
+test("a phone whose app says the screen is locked: the page hidden asks at once, and the sound starts without waiting for the poll", async () => {
+  vi.useFakeTimers();
+  onTestFinished(() => { vi.useRealTimers(); });
+  // The app's answer, as a phone's: locked once the screen goes off, which hides the page.
+  const screen = { locked: vi.fn(async () => document.hidden) };
+  asApp({ screen });
+  const { work } = inCall("hidden");
+  work(true);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  expect(screen.locked).toHaveBeenCalledTimes(1);
+  expect(player.playing).toBe(0);
+  // Hidden: asked now, and playing well before the next poll would have asked.
+  await act(async () => { setHidden(true); await vi.advanceTimersByTimeAsync(10); });
+  expect(screen.locked).toHaveBeenCalledTimes(2);
+  expect(player.playing).toBe(1);
+  // The poll goes on from that answer.
+  await act(async () => { await vi.advanceTimersByTimeAsync(SCREEN_POLL_MS); });
+  expect(screen.locked).toHaveBeenCalledTimes(3);
+  expect(player.playing).toBe(1);
+  // Shown again: the screen is on at once, without asking; an answer still out when it is shown changes nothing.
+  let answer: (locked: boolean) => void = () => undefined;
+  screen.locked.mockImplementationOnce(() => new Promise<boolean>((resolve) => { answer = resolve; }));
+  await act(async () => { await vi.advanceTimersByTimeAsync(SCREEN_POLL_MS); });
+  expect(screen.locked).toHaveBeenCalledTimes(4);
+  act(() => setHidden(false));
+  expect(player.playing).toBe(0);
+  await act(async () => { answer(true); await vi.advanceTimersByTimeAsync(0); });
+  expect(player.playing).toBe(0);
+  expect(screen.locked).toHaveBeenCalledTimes(4);
+  await act(async () => { await vi.advanceTimersByTimeAsync(SCREEN_POLL_MS); });
+  expect(screen.locked).toHaveBeenCalledTimes(5);
+  expect(player.playing).toBe(0);
 });
 
 test("a phone or a browser (no floating card): the page in the background is the screen off, as before", () => {

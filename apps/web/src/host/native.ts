@@ -107,6 +107,27 @@ export function nativeHost(): NativeHost {
   };
 }
 
+/** How often, and how many times, a member an app offers late is looked for (`watchHostMember`): every quarter of a second
+ *  for the first half minute of the watch. */
+const LATE_MEMBER = { everyMs: 250, looks: 120 } as const;
+
+/** Calls `arrived` once the app's host offers `name`: at once if it already does (it may have come since the caller last
+ *  looked), else when it does. An app may offer a member only after a reply of its own, soon after the page loads (iOS's
+ *  `cue`: whether the phone has a player is asked once, as the page loads), and says nothing when it does, so the member is
+ *  looked for again, a while: never in a browser (no app to offer it), never once it is there. Returns the unsubscription. */
+export function watchHostMember(name: string, arrived: () => void): () => void {
+  if (!(globalThis.window as Window | undefined)?.__sidevoiceHost) return () => undefined;
+  if (injected()?.[name]) { arrived(); return () => undefined; }
+  let left: number = LATE_MEMBER.looks;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const look = () => {
+    if (injected()?.[name]) { arrived(); return; }
+    if (--left > 0) timer = setTimeout(look, LATE_MEMBER.everyMs);
+  };
+  timer = setTimeout(look, LATE_MEMBER.everyMs);
+  return () => clearTimeout(timer);
+}
+
 /** The seam of the app's call controls card, in the card's own window: its contract is the card's (call-controls/host.ts),
  *  not the room's `callControls` member, which carries the same name there. */
 export function nativeCardSeam(): unknown {

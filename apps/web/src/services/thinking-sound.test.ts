@@ -1,15 +1,16 @@
 import { afterEach, beforeEach, expect, onTestFinished, test, vi } from "vitest";
-import { playThinkingSound, previewThinkingSound, primeThinkingSound, resetThinkingSoundForTests } from "./thinking-sound";
+import { playThinkingSound, previewThinkingSound, primeThinkingSound, resetThinkingSoundForTests, thinkingSoundHeldForLock } from "./thinking-sound";
 import { DEFAULT_THINKING_SOUND, THINKING_SOUNDS, thinkingSound } from "./thinking-sounds";
+import { DEFAULT_CALL_PREFERENCES } from "./call-preferences";
 
 /* The player keeps one context for the page: begun in the Join tap (prime), and every play is in that one, so a browser
  * that starts a page's audio only from a gesture lets it sound (sidevoice-web#439). It plays the chosen sound at the
- * sound's cadence (now, then a gap in its interval after each play ends) through the person's offset and a limiter; an app
- * that plays the chosen sound itself is asked to instead. */
+ * sound's cadence (now, then a gap in its interval, at the person's frequency, after each play ends) through the person's
+ * offset and a limiter; an app that plays the chosen sound itself is asked to instead. */
 
 const param = (value = 0) => ({ value, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() });
 
-class FakeSource {
+class FakeSource extends EventTarget {
   buffer: { duration: number } | null = null;
   onended: (() => void) | null = null;
   starts: number[] = [];
@@ -22,7 +23,7 @@ class FakeSource {
 }
 
 /** A context whose clock is the test's own (the fake timers' Date), once it runs. */
-class FakeContext {
+class FakeContext extends EventTarget {
   static made: FakeContext[] = [];
   static decodes: ArrayBuffer[] = [];
   static failDecodeOf: string | null = null;
@@ -40,7 +41,7 @@ class FakeContext {
   sources: FakeSource[] = [];
   gains: { gain: ReturnType<typeof param>; connect: (next: unknown) => unknown; disconnect: () => void }[] = [];
   limiters: (Record<"threshold" | "knee" | "ratio" | "attack" | "release", { value: number }> & { connect: (next: unknown) => unknown })[] = [];
-  constructor() { FakeContext.made.push(this); }
+  constructor() { super(); FakeContext.made.push(this); }
   createBufferSource() { const made = new FakeSource(); this.sources.push(made); return made; }
   createGain() { const made = { gain: param(1), connect: vi.fn((next: unknown) => next), disconnect: vi.fn() }; this.gains.push(made); return made; }
   createDynamicsCompressor() {
@@ -251,7 +252,7 @@ test("the try plays in the page, even where the app plays the call's cue", async
   preview.stop();
 });
 
-/* An app that plays the cue itself (host.cue) is asked to, with the sound and the offset, and the page makes no Web Audio
+/* An app that plays the cue itself (host.cue) is asked to, with the sound, the offset and the frequency, and the page makes no Web Audio
  * of its own; an app before the sounds (whose start takes no options) would play its own sound, so the page plays it. */
 function withCue(cue: unknown) {
   Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { cue } } });
@@ -263,18 +264,18 @@ test("an app that takes the sound plays the chosen one at the offset, once, and 
   withCue(cue);
   primeThinkingSound();
   const loop = playThinkingSound({ sound: "deep-heartbeat", gainDb: -4 });
-  expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "deep-heartbeat", gainDb: -4 });
+  expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "deep-heartbeat", gainDb: -4, intervalScale: 1 });
   loop.setGain(-4);
   expect(cue.start).toHaveBeenCalledTimes(1);
   loop.setGain(2);
-  expect(cue.start).toHaveBeenLastCalledWith("thinking", { sound: "deep-heartbeat", gainDb: 2 });
+  expect(cue.start).toHaveBeenLastCalledWith("thinking", { sound: "deep-heartbeat", gainDb: 2, intervalScale: 1 });
   loop.stop(); loop.stop();
   expect(cue.stop).toHaveBeenCalledTimes(1);
   expect(cue.stop).toHaveBeenCalledWith("thinking");
   expect(FakeContext.made).toHaveLength(0);
-  // A sound it would not know is asked for as the default; an offset out of range, as the nearest.
-  playThinkingSound({ sound: "a-sound-from-before", gainDb: 50 }).stop();
-  expect(cue.start).toHaveBeenLastCalledWith("thinking", { sound: DEFAULT_THINKING_SOUND, gainDb: 10 });
+  // A sound it would not know is asked for as the default; an offset or a frequency out of range, as the nearest.
+  playThinkingSound({ sound: "a-sound-from-before", gainDb: 50, intervalScale: 9 }).stop();
+  expect(cue.start).toHaveBeenLastCalledWith("thinking", { sound: DEFAULT_THINKING_SOUND, gainDb: 10, intervalScale: 3 });
 });
 
 test("an app whose cue takes no options (before the sounds): the page plays the chosen sound, and priming begins its audio", async () => {
@@ -307,4 +308,176 @@ test("an app without the cue's functions leaves the sound to the page's Web Audi
   expect(FakeContext.made).toHaveLength(1);
   loop.stop();
   await vi.advanceTimersByTimeAsync(1000);
+});
+
+test("by default the sound plays at its own level, in the page and in the app: the file's level is the default's", async () => {
+  const loop = playThinkingSound({ sound: DEFAULT_CALL_PREFERENCES.sound, gainDb: DEFAULT_CALL_PREFERENCES.soundGainDb });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(FakeContext.made[0].gains[0].gain.value).toBe(1);
+  loop.stop();
+  const cue = { start: vi.fn(), stop: vi.fn(), options: ["sound", "gainDb"] };
+  withCue(cue);
+  playThinkingSound({ sound: DEFAULT_CALL_PREFERENCES.sound, gainDb: DEFAULT_CALL_PREFERENCES.soundGainDb }).stop();
+  expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "soft-heartbeat", gainDb: 0, intervalScale: 1 });
+});
+
+test("the frequency stretches or shortens the gaps the page plays at; none is the sound's own cadence", async () => {
+  const [min, max] = thinkingSound(DEFAULT_THINKING_SOUND).interval;
+  const starts = () => FakeContext.made.at(-1)!.sources.map((source) => source.starts[0]);
+  const twice = playThinkingSound({ ...SOFT, intervalScale: 2 }, () => 0);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(starts()).toEqual([0, 0.6 + 2 * min]);
+  twice.stop();
+  resetThinkingSoundForTests();
+  const half = previewThinkingSound({ ...SOFT, intervalScale: 0.5 }, () => 1);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(starts()).toEqual([0, 0.6 + 0.5 * max]);
+  half.stop();
+  resetThinkingSoundForTests();
+  const own = playThinkingSound(SOFT, () => 0);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(starts()).toEqual([0, 0.6 + min]);
+  own.stop();
+});
+
+test("another frequency moves the play waiting on the clock, from the end of the one before; the next gaps follow it", async () => {
+  const [min] = thinkingSound(DEFAULT_THINKING_SOUND).interval;
+  const loop = playThinkingSound(SOFT, () => 0);
+  await vi.advanceTimersByTimeAsync(0);
+  const [context] = FakeContext.made;
+  const starts = () => context.sources.map((source) => source.starts[0]);
+  expect(starts()).toEqual([0, 0.6 + min]);
+  // In the gap (past where half of it would end), twice as long: the waiting play is stopped before it begins, and put a
+  // gap twice as long after the first.
+  const now = 0.6 + min / 2 + 0.5;
+  await vi.advanceTimersByTimeAsync(now * 1000);
+  loop.setIntervalScale(2);
+  expect(context.sources[1].stops).toHaveLength(1);
+  expect(starts()).toEqual([0, 0.6 + min, 0.6 + 2 * min]);
+  // Then half as long: where that puts it has gone by, so it plays now; the gap after it is drawn at the frequency set.
+  loop.setIntervalScale(0.5);
+  expect(starts()[3]).toBeCloseTo(now, 3);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(starts()[4]).toBeCloseTo(now + 0.6 + min / 2, 3);
+  // Stopped: the plays moved were let go already; nothing more is put on the clock.
+  loop.stop();
+  expect(context.sources.map((source) => source.stops.length)).toEqual([1, 1, 1, 1, 1]);
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(starts()).toHaveLength(5);
+});
+
+test("an app's cue is asked for the frequency on every start, and asked again when it changes while the cue plays", () => {
+  const cue = { start: vi.fn(), stop: vi.fn(), options: ["sound", "gainDb", "intervalScale"] };
+  withCue(cue);
+  const loop = playThinkingSound({ sound: "deep-heartbeat", gainDb: -4, intervalScale: 2 });
+  expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "deep-heartbeat", gainDb: -4, intervalScale: 2 });
+  loop.setIntervalScale(0.5);
+  expect(cue.start).toHaveBeenLastCalledWith("thinking", { sound: "deep-heartbeat", gainDb: -4, intervalScale: 0.5 });
+  // The same frequency again asks nothing; a volume change keeps the frequency set.
+  loop.setIntervalScale(0.5);
+  expect(cue.start).toHaveBeenCalledTimes(2);
+  loop.setGain(1);
+  expect(cue.start).toHaveBeenLastCalledWith("thinking", { sound: "deep-heartbeat", gainDb: 1, intervalScale: 0.5 });
+  loop.stop();
+  loop.setIntervalScale(1);
+  expect(cue.start).toHaveBeenCalledTimes(3);
+  expect(FakeContext.made).toHaveLength(0);
+});
+
+test("an app before the frequency (its options do not list it) is still asked with it, and still plays the cue, not the page", () => {
+  const cue = { start: vi.fn(), stop: vi.fn(), options: ["sound", "gainDb"] };
+  withCue(cue);
+  const loop = playThinkingSound({ sound: "single-beat", gainDb: 0, intervalScale: 1.5 });
+  expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "single-beat", gainDb: 0, intervalScale: 1.5 });
+  loop.setIntervalScale(0.75);
+  expect(cue.start).toHaveBeenLastCalledWith("thinking", { sound: "single-beat", gainDb: 0, intervalScale: 0.75 });
+  loop.stop();
+  expect(FakeContext.made).toHaveLength(0);
+});
+
+test("whileLocked goes only to an app that holds the cue for the lock; one before it, or the page, is never asked to wait", async () => {
+  expect(thinkingSoundHeldForLock()).toBe(false);
+  const holds = { start: vi.fn(), stop: vi.fn(), options: ["sound", "gainDb", "intervalScale", "whileLocked"] };
+  withCue(holds);
+  expect(thinkingSoundHeldForLock()).toBe(true);
+  const held = playThinkingSound({ ...SOFT, whileLocked: true });
+  expect(holds.start).toHaveBeenLastCalledWith("thinking", { sound: "soft-heartbeat", gainDb: 0, intervalScale: 1, whileLocked: true });
+  held.setGain(-2);
+  expect(holds.start).toHaveBeenLastCalledWith("thinking", { sound: "soft-heartbeat", gainDb: -2, intervalScale: 1, whileLocked: true });
+  held.stop();
+  playThinkingSound(SOFT).stop();
+  expect(holds.start.mock.calls.at(-1)?.[1]).not.toHaveProperty("whileLocked");
+  // An app that does not list it would play at once: it is not sent.
+  const before = { start: vi.fn(), stop: vi.fn(), options: ["sound", "gainDb", "intervalScale"] };
+  withCue(before);
+  expect(thinkingSoundHeldForLock()).toBe(false);
+  playThinkingSound({ ...SOFT, whileLocked: true }).stop();
+  expect(before.start.mock.calls[0][1]).not.toHaveProperty("whileLocked");
+  expect(FakeContext.made).toHaveLength(0);
+});
+
+/** Whether `promise` has settled by now (its callbacks run). */
+async function settled(promise: Promise<void> | void) {
+  let done = false;
+  void Promise.resolve(promise).then(() => { done = true; });
+  await vi.advanceTimersByTimeAsync(0);
+  return done;
+}
+
+test("a stop is through once the play sounding has ended on the audio clock, not by a timer; the one waiting is not waited for", async () => {
+  const loop = playThinkingSound(SOFT, () => 0);
+  await vi.advanceTimersByTimeAsync(0);
+  const [context] = FakeContext.made;
+  const [sounding, waiting] = context.sources;
+  await vi.advanceTimersByTimeAsync(100);
+  const through = loop.stop();
+  expect(through).toBeInstanceOf(Promise);
+  // The sounding one fades out to its end; the waiting one never begins.
+  expect(sounding.stops[0]).toBeCloseTo(0.1 + 0.15, 6);
+  expect(waiting.stops[0]).toBeCloseTo(0.1, 6);
+  // The fade's length by the page's clock is no measure: not through until it has ended.
+  await vi.advanceTimersByTimeAsync(200);
+  expect(await settled(through)).toBe(false);
+  sounding.dispatchEvent(new Event("ended"));
+  expect(await settled(through)).toBe(true);
+  expect(context.gains[0].disconnect).not.toHaveBeenCalled();
+});
+
+test("a context suspended mid-fade (iOS) is cut, and that is the end of the stop; else its nodes let go are", async () => {
+  const loop = playThinkingSound(SOFT, () => 0);
+  await vi.advanceTimersByTimeAsync(0);
+  const [context] = FakeContext.made;
+  const through = loop.stop();
+  context.state = "suspended";
+  context.dispatchEvent(new Event("statechange"));
+  // Cut: nothing of it can come out when the context runs again.
+  expect(context.gains[0].disconnect).toHaveBeenCalled();
+  expect(await settled(through)).toBe(true);
+
+  // A clock that never gets there: through, cut, when the nodes are let go.
+  resetThinkingSoundForTests();
+  const late = playThinkingSound(SOFT, () => 0);
+  await vi.advanceTimersByTimeAsync(0);
+  const next = FakeContext.made.at(-1)!;
+  const lateThrough = late.stop();
+  await vi.advanceTimersByTimeAsync(399);
+  expect(await settled(lateThrough)).toBe(false);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(await settled(lateThrough)).toBe(true);
+  expect(next.gains[0].disconnect).toHaveBeenCalled();
+});
+
+test("a stop with nothing sounding (between plays, a context not running, nothing played yet) is through at once", async () => {
+  const loop = playThinkingSound(SOFT, () => 0);
+  await vi.advanceTimersByTimeAsync(0);
+  const [context] = FakeContext.made;
+  context.sources[0].dispatchEvent(new Event("ended"));
+  context.sources[0].onended?.();
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(await settled(loop.stop())).toBe(true);
+
+  resetThinkingSoundForTests();
+  FakeContext.failAll = true;
+  const none = playThinkingSound(SOFT);
+  expect(none.stop()).toBeUndefined();
 });
