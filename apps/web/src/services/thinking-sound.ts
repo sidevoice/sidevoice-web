@@ -16,7 +16,9 @@ import { nextGapSeconds, thinkingSound, thinkingSoundGain, thinkingSoundInterval
  * An app that plays the cue itself (`host.cue`: the phone's native call holds the audio session, and a webview's Web Audio
  * is not sure to come out through it) is asked to, with the sound, the offset and the frequency (`intervalScale`), and the
  * page's context is never made. An app before the frequency drops it and plays the sound's own cadence: still the app's,
- * not the page's, which may not be heard there.
+ * not the page's, which may not be heard there. An app that holds the cue for the lock (`thinkingSoundHeldForLock`) may be
+ * asked to play it only while the screen is locked (`whileLocked`): "only with the screen off" on a phone whose page may be
+ * suspended once the screen locks.
  * An app whose `host.cue` does not take them (one before the sounds) would play its own sound, not the chosen one: the
  * page plays the chosen one itself there. */
 
@@ -27,8 +29,9 @@ const LIMITER = { threshold: -2, knee: 0, ratio: 20, attack: 0.003, release: 0.1
 const TAIL_SECONDS = 0.15;
 const RELEASE_MS = 400;
 
-/** The sound, the person's offset in dB, and their frequency (a factor on the sound's gaps; none: 1, its own cadence). */
-export interface ThinkingSoundChoice { sound: string; gainDb: number; intervalScale?: number }
+/** The sound, the person's offset in dB, and their frequency (a factor on the sound's gaps; none: 1, its own cadence).
+ *  `whileLocked`: only while the screen is locked, for an app that holds the cue for it (`thinkingSoundHeldForLock`). */
+export interface ThinkingSoundChoice { sound: string; gainDb: number; intervalScale?: number; whileLocked?: boolean }
 
 let context: AudioContext | null = null;
 let playing = 0;
@@ -48,6 +51,12 @@ function hostCue(): CueBridge | null {
   const cue = host().cue;
   const options = cue?.options;
   return cue && Array.isArray(options) && options.includes("sound") && options.includes("gainDb") ? cue : null;
+}
+
+/** Whether the app plays the cue itself and holds it for the lock: started with `whileLocked`, it plays only while the
+ *  screen is locked, starting and stopping by itself (an app that does not list it would play at once). */
+export function thinkingSoundHeldForLock(): boolean {
+  return hostCue()?.options?.includes("whileLocked") ?? false;
 }
 
 /** Begins the page's context for the sound, inside the Join gesture: resumed there, it may resume again later. Quiet
@@ -176,7 +185,7 @@ function startLoop(made: AudioContext, sound: ThinkingSound, gainDb: number, int
 
 /** The host's own player, started and stopped as the page's would be. A host that throws is not worth a call's failing, and
  *  is still asked to stop. */
-function playInHost(cue: CueBridge, options: Required<CueOptions>): ThinkingSoundLoop {
+function playInHost(cue: CueBridge, options: CueOptions & { gainDb: number; intervalScale: number }): ThinkingSoundLoop {
   // A start that throws may have begun to play: its cleanup still asks the host to stop.
   try { cue.start("thinking", options); } catch { /* Stopped below. */ }
   let stopped = false;
@@ -232,12 +241,14 @@ function playInPage(choice: ThinkingSoundChoice, random: () => number): Thinking
 const SILENT: ThinkingSoundLoop = { setGain: () => undefined, setIntervalScale: () => undefined, stop: () => undefined };
 
 /** Plays the chosen sound at its cadence until the returned loop is stopped: in the app where it plays the chosen sound
- *  itself, else in the page. Nothing where the page has no Web Audio. */
+ *  itself, else in the page. Nothing where the page has no Web Audio. `whileLocked` goes to an app that holds the cue for
+ *  the lock, and nowhere else: the page's own player has no lock to wait for, and its caller decides by the screen instead. */
 export function playThinkingSound(choice: ThinkingSoundChoice, random: () => number = Math.random): ThinkingSoundLoop {
   const cue = hostCue();
   if (cue) {
     return playInHost(cue, {
       sound: thinkingSound(choice.sound).id, gainDb: thinkingSoundGain(choice.gainDb), intervalScale: thinkingSoundIntervalScale(choice.intervalScale),
+      ...(choice.whileLocked && thinkingSoundHeldForLock() ? { whileLocked: true } : {}),
     });
   }
   return playInPage(choice, random) ?? SILENT;

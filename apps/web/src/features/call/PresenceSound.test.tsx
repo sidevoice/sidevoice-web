@@ -10,6 +10,8 @@ vi.mock("../../services/room-session-controller.js", () => ({}));
 type Choice = { sound: string; gainDb: number; intervalScale?: number };
 const player = vi.hoisted(() => ({ playing: 0, plays: 0, choices: [] as Choice[], gains: [] as number[], scales: [] as number[] }));
 vi.mock("../../services/thinking-sound", () => ({
+  // No app here holds the cue for the lock (PresenceSound.cue.test.tsx has one).
+  thinkingSoundHeldForLock: () => false,
   playThinkingSound: (choice: Choice) => {
     player.playing++; player.plays++; player.choices.push(choice);
     let stopped = false;

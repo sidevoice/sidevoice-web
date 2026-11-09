@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, onTestFinished, test, vi } from "vitest";
-import { playThinkingSound, previewThinkingSound, primeThinkingSound, resetThinkingSoundForTests } from "./thinking-sound";
+import { playThinkingSound, previewThinkingSound, primeThinkingSound, resetThinkingSoundForTests, thinkingSoundHeldForLock } from "./thinking-sound";
 import { DEFAULT_THINKING_SOUND, THINKING_SOUNDS, thinkingSound } from "./thinking-sounds";
 import { DEFAULT_CALL_PREFERENCES } from "./call-preferences";
 
@@ -392,5 +392,26 @@ test("an app before the frequency (its options do not list it) is still asked wi
   loop.setIntervalScale(0.75);
   expect(cue.start).toHaveBeenLastCalledWith("thinking", { sound: "single-beat", gainDb: 0, intervalScale: 0.75 });
   loop.stop();
+  expect(FakeContext.made).toHaveLength(0);
+});
+
+test("whileLocked goes only to an app that holds the cue for the lock; one before it, or the page, is never asked to wait", async () => {
+  expect(thinkingSoundHeldForLock()).toBe(false);
+  const holds = { start: vi.fn(), stop: vi.fn(), options: ["sound", "gainDb", "intervalScale", "whileLocked"] };
+  withCue(holds);
+  expect(thinkingSoundHeldForLock()).toBe(true);
+  const held = playThinkingSound({ ...SOFT, whileLocked: true });
+  expect(holds.start).toHaveBeenLastCalledWith("thinking", { sound: "soft-heartbeat", gainDb: 0, intervalScale: 1, whileLocked: true });
+  held.setGain(-2);
+  expect(holds.start).toHaveBeenLastCalledWith("thinking", { sound: "soft-heartbeat", gainDb: -2, intervalScale: 1, whileLocked: true });
+  held.stop();
+  playThinkingSound(SOFT).stop();
+  expect(holds.start.mock.calls.at(-1)?.[1]).not.toHaveProperty("whileLocked");
+  // An app that does not list it would play at once: it is not sent.
+  const before = { start: vi.fn(), stop: vi.fn(), options: ["sound", "gainDb", "intervalScale"] };
+  withCue(before);
+  expect(thinkingSoundHeldForLock()).toBe(false);
+  playThinkingSound({ ...SOFT, whileLocked: true }).stop();
+  expect(before.start.mock.calls[0][1]).not.toHaveProperty("whileLocked");
   expect(FakeContext.made).toHaveLength(0);
 });

@@ -2,13 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { host } from "../../host";
 import { useRoomStore } from "../../state/room-store";
 import { readCallPreferences, subscribeCallPreferences, type PresenceSound as PresenceChoice } from "../../services/call-preferences";
-import { playThinkingSound, type ThinkingSoundLoop } from "../../services/thinking-sound";
+import { playThinkingSound, thinkingSoundHeldForLock, type ThinkingSoundLoop } from "../../services/thinking-sound";
 import { selectInCall, useStageConversation } from "./stage-view";
 
 /* While the agent works on your turn in a call, a soft sound says so: for a call that goes on with the screen off — a
  * phone in a pocket, in the car, headphones on — where nothing else would. Settings → Call says when (never, only while
  * the screen is off, or always), which sound, how loud and how often. Who decides when it plays is here; the sound itself is the
- * player's (services/thinking-sound.ts). */
+ * player's (services/thinking-sound.ts).
+ *
+ * "Only with the screen off" where the app plays the cue itself and holds it for the lock (iOS): the page may be suspended
+ * once the screen locks, and could not start it then. So the page holds the app's cue for as long as the agent works, locked
+ * or not, with `whileLocked`, and the app plays it only while the screen is locked, starting and stopping by itself. */
 
 /** Whether the sound plays: in a call, while its agent works, as the person chose (`hidden`: only while the screen is off,
  *  as `useScreenOff` reads it). */
@@ -71,8 +75,10 @@ export function PresenceSound() {
   const working = useStageConversation().mood === "working";
   const [prefs, setPrefs] = useState(readCallPreferences);
   useEffect(() => subscribeCallPreferences(() => setPrefs(readCallPreferences())), []);
-  const screenOff = useScreenOff(inCall && working && prefs.presence === "hidden");
-  const plays = breathPlays({ inCall, working, presence: prefs.presence, screenOff });
+  // Read as it draws: the app's cue is offered once the app has answered whether it has one.
+  const whileLocked = prefs.presence === "hidden" && thinkingSoundHeldForLock();
+  const screenOff = useScreenOff(inCall && working && prefs.presence === "hidden" && !whileLocked);
+  const plays = whileLocked ? inCall && working : breathPlays({ inCall, working, presence: prefs.presence, screenOff });
   const loop = useRef<ThinkingSoundLoop | null>(null);
   const gainDb = useRef(prefs.soundGainDb);
   const intervalScale = useRef(prefs.soundIntervalScale);
@@ -82,9 +88,9 @@ export function PresenceSound() {
   useEffect(() => { intervalScale.current = prefs.soundIntervalScale; loop.current?.setIntervalScale(prefs.soundIntervalScale); }, [prefs.soundIntervalScale]);
   useEffect(() => {
     if (!plays) return;
-    const playing = playThinkingSound({ sound: prefs.sound, gainDb: gainDb.current, intervalScale: intervalScale.current });
+    const playing = playThinkingSound({ sound: prefs.sound, gainDb: gainDb.current, intervalScale: intervalScale.current, ...(whileLocked ? { whileLocked } : {}) });
     loop.current = playing;
     return () => { playing.stop(); if (loop.current === playing) loop.current = null; };
-  }, [plays, prefs.sound]);
+  }, [plays, prefs.sound, whileLocked]);
   return null;
 }
