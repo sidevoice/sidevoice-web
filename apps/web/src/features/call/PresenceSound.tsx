@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { host } from "../../host";
+import { useEffect, useReducer, useRef, useState } from "react";
+import { host, onHostMember } from "../../host";
 import { useRoomStore } from "../../state/room-store";
 import { readCallPreferences, subscribeCallPreferences, type PresenceSound as PresenceChoice } from "../../services/call-preferences";
 import { playThinkingSound, thinkingSoundHeldForLock, type ThinkingSoundLoop } from "../../services/thinking-sound";
@@ -75,7 +75,11 @@ export function PresenceSound() {
   const working = useStageConversation().mood === "working";
   const [prefs, setPrefs] = useState(readCallPreferences);
   useEffect(() => subscribeCallPreferences(() => setPrefs(readCallPreferences())), []);
-  // Read as it draws: the app's cue is offered once the app has answered whether it has one.
+  // Read as it draws, and drawn again when the app's cue is offered: the app offers it once it has answered whether the phone
+  // has a player, which may be after a working call is back. Then the sound is handed over: the page's own copy stops and the
+  // app's cue is held for the lock (the effect below, by `whileLocked`).
+  const [, cueOffered] = useReducer((count: number) => count + 1, 0);
+  useEffect(() => onHostMember("cue", cueOffered), []);
   const whileLocked = prefs.presence === "hidden" && thinkingSoundHeldForLock();
   const screenOff = useScreenOff(inCall && working && prefs.presence === "hidden" && !whileLocked);
   const plays = whileLocked ? inCall && working : breathPlays({ inCall, working, presence: prefs.presence, screenOff });

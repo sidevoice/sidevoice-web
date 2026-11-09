@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { act, render } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
 import { PresenceSound } from "./PresenceSound";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
@@ -24,18 +24,19 @@ function asPhone(options: string[]) {
   return { cue, screen };
 }
 
+/** The page in a call on the conversation, the person's choice set first (in act: a page already drawn hears of it). */
 function inCall(presence: PresenceChoice) {
-  writeCallPreferences({ presence });
+  act(() => { writeCallPreferences({ presence }); });
   const store = createRoomStore();
-  render(<RoomProvider store={store}><PresenceSound /></RoomProvider>);
+  const { unmount } = render(<RoomProvider store={store}><PresenceSound /></RoomProvider>);
   act(() => store.patch({ ws: {}, people: [person], callNode: "node", roomBinding: { thread_id: "t1" }, sessionId: "s" } as never));
   const work = (busy: boolean) => act(() => store.patch((busy
     ? { harness: { [KEY]: true }, workingSince: { [KEY]: 0 }, now: 60_000 } : { harness: { [KEY]: false }, workingSince: {} }) as never));
-  return { store, work };
+  return { store, work, unmount };
 }
 
 beforeEach(() => { localStorage.clear(); });
-afterEach(() => { Reflect.deleteProperty(window, "__sidevoiceHost"); resetThinkingSoundForTests(); });
+afterEach(() => { cleanup(); Reflect.deleteProperty(window, "__sidevoiceHost"); resetThinkingSoundForTests(); vi.unstubAllGlobals(); });
 
 test("screen off: while the agent works, the app's cue is held with whileLocked, the screen unlocked, and stopped when the work ends", async () => {
   const { cue, screen } = asPhone(ALL);
@@ -56,10 +57,11 @@ test("screen off: while the agent works, the app's cue is held with whileLocked,
 
 test("screen off: the call ended, or the setting changed, stops the held cue; Always asks for it at once, with no whileLocked", () => {
   const { cue } = asPhone(ALL);
-  const { store, work } = inCall("hidden");
+  const { store, work, unmount } = inCall("hidden");
   work(true);
   act(() => store.patch({ ws: null, reconnecting: false } as never));
   expect(cue.stop).toHaveBeenCalledTimes(1);
+  unmount();
 
   const again = inCall("hidden");
   again.work(true);
@@ -95,4 +97,70 @@ test("an app whose cue does not hold for the lock (before whileLocked): screen o
     await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
     expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "soft-heartbeat", gainDb: 0, intervalScale: 1 });
   } finally { vi.useRealTimers(); }
+});
+
+/** The page's Web Audio, enough to see its copy of the sound start and stop: each play's start and stops, by source. */
+function fakeWebAudio() {
+  const plays: { stops: number }[] = [];
+  const param = () => ({ value: 1, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() });
+  class Context {
+    state = "running";
+    currentTime = 0;
+    destination = {};
+    resume = async () => undefined;
+    suspend = async () => undefined;
+    close = async () => undefined;
+    createGain() { return { gain: param(), connect: (next: unknown) => next, disconnect: () => undefined }; }
+    createDynamicsCompressor() {
+      return { threshold: param(), knee: param(), ratio: param(), attack: param(), release: param(), connect: (next: unknown) => next, disconnect: () => undefined };
+    }
+    createBufferSource() {
+      const play = { stops: 0 };
+      return { buffer: null, onended: null, connect: () => undefined, disconnect: () => undefined, start: () => { plays.push(play); }, stop: () => { play.stops++; } };
+    }
+    async decodeAudioData() { return { duration: 0.6 }; }
+  }
+  vi.stubGlobal("AudioContext", Context);
+  vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) })));
+  return plays;
+}
+
+test("the app's cue offered after a working call is back: the page's copy stops and the cue is held for the lock", async () => {
+  vi.useFakeTimers();
+  try {
+    const plays = fakeWebAudio();
+    // An iPhone whose bridge has not had the app's answer yet: no cue, a screen that is locked.
+    let cue: { start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn>; options: string[] } | null = null;
+    const screen = { locked: vi.fn(async () => true) };
+    Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { screen, get cue() { return cue; } } } });
+    const { work } = inCall("hidden");
+    work(true);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    // Until then, the screen decides and the page plays its own copy.
+    expect(screen.locked).toHaveBeenCalled();
+    expect(plays.length).toBeGreaterThan(0);
+    expect(plays.some((play) => play.stops === 0)).toBe(true);
+    // The app answers: its cue is offered, and the page hands the sound over to it.
+    cue = { start: vi.fn(), stop: vi.fn(), options: ALL };
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    expect(cue.start).toHaveBeenCalledTimes(1);
+    expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "soft-heartbeat", gainDb: 0, intervalScale: 1, whileLocked: true });
+    expect(plays.every((play) => play.stops > 0)).toBe(true);
+    // From then on the app decides by the lock: the screen is not asked, and the page plays nothing of its own.
+    const asked = screen.locked.mock.calls.length;
+    const played = plays.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    expect(screen.locked).toHaveBeenCalledTimes(asked);
+    expect(plays).toHaveLength(played);
+    work(false);
+    expect(cue.stop).toHaveBeenCalledWith("thinking");
+  } finally { vi.useRealTimers(); }
+});
+
+test("in a browser nothing is watched for: no app, no cue to come", () => {
+  const timers = vi.spyOn(globalThis, "setTimeout");
+  const { work } = inCall("hidden");
+  work(true);
+  expect(timers.mock.calls.filter(([, ms]) => ms === 250)).toHaveLength(0);
+  timers.mockRestore();
 });
