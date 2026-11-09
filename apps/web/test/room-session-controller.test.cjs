@@ -2,13 +2,13 @@ const fs=require('node:fs'),vm=require('node:vm'),test=require('node:test'),{moc
 // This device's pairing, as the page keeps it, for every test that does not say otherwise: the machine proved itself
 // at the page's own origin a moment ago, so requests go where they always went and carry its token.
 const PAIRED={fp:'fp-mac',public_key:'pk',host:'macbook',urls:['http://127.0.0.1:8768'],device_id:'dev-1',token:'tok-1',paired_at:1};
-function setup({readThrows=null,strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,siteData=null,localHost=null,nativeData=null,indexedDB=null,outboxScope=null,readingMode=false}={}){
+function setup({readThrows=null,strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,siteData=null,localHost=null,nativeData=null,indexedDB=null,outboxScope=null,readingMode=false,session=null}={}){
  const sourceRoot=__dirname+'/../src'; const uiSource=fs.readdirSync(sourceRoot,{recursive:true}).filter(file=>String(file).endsWith('.tsx')).map(file=>fs.readFileSync(sourceRoot+'/'+file,'utf8')).join('\n');
  class Element{constructor(id){this.id=id;this.children=[];this.dataset={};this.style={setProperty(){}};this.classList={add(){},remove(){}};this.parentElement=this;this.listeners={};this.attributes={}}addEventListener(name,fn){this.listeners[name]=fn}showModal(){this.open=true}close(){this.open=false;this.listeners.close?.()}contains(node){return node===this||this.children.includes(node)}removeAttribute(){}closest(){return null}querySelector(){return null}append(...children){this.children.push(...children)}replaceChildren(...children){this.children=[...children]}remove(){}setAttribute(name,value){this.attributes[name]=value}getAttribute(name){return this.attributes[name]}click(){this.onclick?.()}}
  const elements=new Map(),handlers={},documentHandlers={},observers=[];
  if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element(match[1]));for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','stats-recognition','stats-response'])elements.set(id,new Element(id))}
  const saved=siteData??(stored?{'sidevoice.pairings':JSON.stringify(stored)}:{});
- const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>{if(readThrows&&key===readThrows)throw new Error('blocked');return saved[key]??null},setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element(id))}return elements.get(id)},body:new Element('body'),createElement:()=>new Element(),addEventListener:(name,fn)=>(documentHandlers[name]??=[]).push(fn)},window:{addEventListener:(name,fn)=>handlers[name]=fn},MutationObserver:class{constructor(fn){observers.push(fn)}observe(){}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
+ const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>{if(readThrows&&key===readThrows)throw new Error('blocked');return saved[key]??null},setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:session?storageOf(session):{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element(id))}return elements.get(id)},body:new Element('body'),createElement:()=>new Element(),addEventListener:(name,fn)=>(documentHandlers[name]??=[]).push(fn)},window:{addEventListener:(name,fn)=>handlers[name]=fn},MutationObserver:class{constructor(fn){observers.push(fn)}observe(){}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
  if(localHost||nativeData)context.window.__sidevoiceHost={host:{...(localHost?{localHost}:{}),...(nativeData?{pairings:nativeData.pairings}:{})}};
  // The outbox's storage across reloads, and this tab's scope in it.
  if(indexedDB)context.indexedDB=indexedDB;
@@ -3811,9 +3811,10 @@ function coreRoom({active=[],live=active,closed=[]}={}){
  return room;
 }
 // A call joined on `room`, this tab having picked `selected` before; `cards`, the conversations this device remembers.
-async function callOnCoreRoom(room,{selected='fp-mac|a',cards=null}={}){
+// `saved`: the storage of a tab already open on this device, for another tab of it; `sid`, the session its call gets.
+async function callOnCoreRoom(room,{selected='fp-mac|a',cards=null,saved=null,sid='s1'}={}){
  const stored={pairings:[PAIRED]};
- const s=setup({stored,siteData:{'sidevoice.pairings':JSON.stringify(stored),...(cards?{'sidevoice.conversation-cards.v1':JSON.stringify(cards)}:{})}});
+ const s=setup({stored,siteData:saved??{'sidevoice.pairings':JSON.stringify(stored),...(cards?{'sidevoice.conversation-cards.v1':JSON.stringify(cards)}:{})}});
  const sockets=socketsOf(s);let ids=0;
  s.context.crypto={randomUUID:()=>'id-'+(++ids)};
  s.context.window.sidevoiceUI=new Proxy({},{get:()=>()=>{}});
@@ -3823,8 +3824,8 @@ async function callOnCoreRoom(room,{selected='fp-mac|a',cards=null}={}){
  s.run("keepScreenAwake=()=>{};roomBinding=null;sessionId=null");
  const joined=s.run('toggleCall')();
  for(let i=0;i<500&&!sockets.length;i++)await settleSoon();
- const socket=sockets[0];socket.readyState=1;socket.onopen();room.hello(JSON.parse(socket.sent[0]).data);
- socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'s1',resume:{token:'tok-a',seconds:60},resumed:false}})});
+ const socket=sockets[0];socket.readyState=1;socket.onopen();room.hello(JSON.parse(socket.sent[0]).data,sid);
+ socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:sid,resume:{token:sid==='s1'?'tok-a':'tok-'+sid,seconds:60},resumed:false}})});
  await joined;await settleSoon();await s.run('refreshPeople()');await settleSoon();
  const turns=()=>socket.sent.filter(m=>typeof m==='string').map(m=>JSON.parse(m)).filter(m=>m.type==='voice-user-turn').map(m=>m.data);
  return {s,voice,socket,store,turns};
@@ -4008,6 +4009,175 @@ test('A conversation closed is not gone back to by the refresh that follows the 
  const selects=plain(room.selects.slice(before));
  c.s.run('disconnect()');
  assert.ok(!selects.includes('a'),JSON.stringify(selects));
+});
+// Core's removal while another device still shows the conversation (rust/control/room/channel.rs `remove_for_device`):
+// it is left out of this device's list, stays open for the others, and nothing moves this device's call off it.
+function showingElsewhere(room){
+ room.hiddenHere=new Set();
+ const rows=room.rows,fetch=room.fetch;
+ room.rows=()=>rows().filter(row=>!room.hiddenHere.has(row.thread_id));
+ room.fetch=async(path,options)=>{
+  if(options?.method!=='POST'||!path.includes('/presentation/remove'))return fetch(path,options);
+  room.hiddenHere.add(JSON.parse(options.body).thread_id);
+  return {ok:true,status:200,json:async()=>({status:'removed',closed:false})};
+ };
+ return room;
+}
+const listedRows=c=>plain(c.s.run('roomStore.getState().participants.map(p=>p.threadId)'));
+const beats=async(c,n=4)=>{for(let i=0;i<n;i++){c.s.run('pick.leftAt-=LEAVE_EVERY_MS');await c.s.run('refresh()');await settleSoon();await c.s.run('refreshPeople()');await settleSoon()}};
+test('Removing the conversation the call is on, while another device still shows it, takes the call off it for good',async()=>{
+ const room=showingElsewhere(coreRoom({active:['a','b']}));
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|a'});
+ const before=room.selects.length;
+ await c.s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");await settleSoon();
+ await beats(c);
+ const seen={rows:listedRows(c),target:c.s.run('targetId()'),core:room.targets.get('s1')?.thread_id,selects:plain(room.selects.slice(before)),
+  remembered:c.store['sidevoice.selected'],removals:c.s.run('readRemovals().length')};
+ c.s.run('disconnect()');
+ assert.deepEqual(seen.rows,['fp-mac|b'],JSON.stringify(seen));
+ assert.notEqual(seen.target,'fp-mac|a',JSON.stringify(seen));
+ assert.notEqual(seen.core,'a','the room\'s call left it too');
+ assert.ok(!seen.selects.includes('a'),'and was never put back on it: '+JSON.stringify(seen.selects));
+ assert.notEqual(seen.remembered,'fp-mac|a','nor is it the pick to go back to');
+ assert.equal(seen.removals,0,'the machine took the removal');
+});
+test('A conversation removed here stays off this device past its removal settling, until the machine lists it again',async()=>{
+ const room=showingElsewhere(coreRoom({active:['a']}));
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|a'});
+ await c.s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");await settleSoon();
+ await beats(c);
+ const removed={rows:listedRows(c),target:c.s.run('targetId()'),core:room.targets.get('s1')?.thread_id,remembered:c.store['sidevoice.selected'],removals:c.s.run('readRemovals().length')};
+ // Its agent connects anew: core undoes the removals, and the conversation is this device's again.
+ room.hiddenHere.delete('a');
+ await beats(c);
+ const revived=listedRows(c);
+ c.s.run('disconnect()');
+ assert.deepEqual(removed,{rows:[],target:null,core:undefined,remembered:undefined,removals:0},JSON.stringify(removed));
+ assert.deepEqual(revived,['fp-mac|a']);
+});
+// A tab loading on this device's storage (`saved`) with its own session storage (`tab`), whose call takes back session `sid`
+// with the ticket that storage holds, wherever the room's focus for that session still is.
+async function resumeTab(room,saved,tab,sid){
+ const s=setup({stored:{pairings:[PAIRED]},siteData:saved,session:tab}),sockets=socketsOf(s);let ids=0;
+ s.context.crypto={randomUUID:()=>sid+'-id-'+(++ids)};s.context.window.sidevoiceUI=new Proxy({},{get:()=>()=>{}});
+ withVoice(s,fakeVoice());s.context.fetch=room.fetch;
+ s.run("keepScreenAwake=()=>{};roomBinding=null;sessionId=null");
+ const joined=s.run('toggleCall')();
+ for(let i=0;i<500&&!sockets.length;i++)await settleSoon();
+ const socket=sockets[0];socket.readyState=1;socket.onopen();
+ const hello=JSON.parse(socket.sent[0]).data;room.hello(hello,sid);
+ socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:sid,resume:{token:sid+'-next',seconds:60},resumed:true}})});
+ await joined;await settleSoon();
+ const c={s,store:tab};await beats(c);
+ const seen={resumed:hello.resume?.session_id,rows:listedRows(c),target:s.run('targetId()'),core:room.targets.get(sid)?.thread_id};
+ s.run('disconnect()');
+ return seen;
+}
+test('A reload that takes the call back while the room is still on a conversation removed here leaves it, and does not go back to it',async()=>{
+ const room=showingElsewhere(coreRoom({active:['a','b']}));
+ const fetch=room.fetch;let parked=true;
+ // The first page's leave never lands: the page goes away before it does.
+ room.fetch=async(path,options)=>options?.method==='POST'&&path.includes('/presentation/leave')&&parked?new Promise(()=>{}):fetch(path,options);
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|a'});
+ await c.s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");await settleSoon();
+ await beats(c,2);
+ assert.equal(c.s.run('readRemovals().length'),0,'the removal is settled');
+ assert.equal(room.targets.get('s1')?.thread_id,'a','and the room\'s call is still on it');
+ c.socket.close=function(){this.readyState=3};c.s.handlers.beforeunload();
+ // The same tab loads again: nothing in memory, the removal settled, and the ticket takes the call back as it was.
+ parked=false;
+ const seen=await resumeTab(room,c.s.saved,c.store,'s1');
+ assert.equal(seen.resumed,'s1',JSON.stringify(seen));
+ assert.ok(!seen.rows.includes('fp-mac|a'),JSON.stringify(seen));
+ assert.notEqual(seen.target,'fp-mac|a',JSON.stringify(seen));
+ assert.notEqual(seen.core,'a','the room\'s call left it: '+JSON.stringify(seen));
+ assert.notEqual(c.store['sidevoice.selected'],'fp-mac|a');
+});
+test('A tab that reloads after another tab removed and settled a conversation leaves it, its call taken back still on it',async()=>{
+ const room=showingElsewhere(coreRoom({active:['a','b']}));
+ const a=await callOnCoreRoom(room,{selected:'fp-mac|b'});
+ // Tab B's call is on A in the room, parked by a reload; B never heard of the removal (no storage event reached it).
+ room.sessions.add('s2');room.targets.set('s2',{thread_id:'a',binding_id:'focus-b'});
+ const tabB={'sidevoice.selected':'fp-mac|a','sidevoice.resume':JSON.stringify({session_id:'s2',token:'tok-s2',last_seq:0,node:'fp-mac'})};
+ await a.s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");await settleSoon();
+ await beats(a,2);
+ assert.equal(a.s.run('readRemovals().length'),0,'tab A settled the removal: the shared row is gone');
+ a.s.run('disconnect()');
+ const seen=await resumeTab(room,a.s.saved,tabB,'s2');
+ assert.equal(seen.resumed,'s2',JSON.stringify(seen));
+ assert.ok(!seen.rows.includes('fp-mac|a'),JSON.stringify(seen));
+ assert.notEqual(seen.target,'fp-mac|a',JSON.stringify(seen));
+ assert.notEqual(seen.core,'a','the room\'s call left it: '+JSON.stringify(seen));
+});
+test('Two live tabs: a conversation one removes and settles takes the other\'s call off it, with its storage event or without',async()=>{
+ for(const event of [true,false]){
+  const room=showingElsewhere(coreRoom({active:['a','b']}));
+  const a=await callOnCoreRoom(room,{selected:'fp-mac|b'});
+  const b=await callOnCoreRoom(room,{selected:'fp-mac|a',saved:a.s.saved,sid:'s2'});
+  assert.equal(room.targets.get('s2')?.thread_id,'a');
+  await a.s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");await settleSoon();
+  await beats(a,2);
+  assert.equal(a.s.run('readRemovals().length'),0,'tab A settled it: the shared row is gone');
+  if(event){
+   b.s.handlers.storage({key:'sidevoice.removed-here.v1'});
+   assert.equal(b.s.run("links.get('fp-mac').closed.has('a')"),true,'the event closes it at once');
+   b.s.run('pick.leftAt-=LEAVE_EVERY_MS');await b.s.run('refresh()');await settleSoon();await settleSoon();
+  }else await beats(b);
+  const seen={event,rows:listedRows(b),target:b.s.run('targetId()'),core:room.targets.get('s2')?.thread_id};
+  a.s.run('disconnect()');b.s.run('disconnect()');
+  assert.notEqual(seen.core,'a',JSON.stringify(seen));
+  assert.notEqual(seen.target,'fp-mac|a',JSON.stringify(seen));
+  assert.ok(!seen.rows.includes('fp-mac|a'),JSON.stringify(seen));
+ }
+});
+test('A removal is not let go of while what keeps it closed afterwards cannot be stored',async()=>{
+ const c=await callOnCoreRoom(showingElsewhere(coreRoom({active:['a','b']})),{selected:'fp-mac|b'});
+ const store=c.s.context.localStorage,setItem=store.setItem;let blocked=true;
+ store.setItem=(key,value)=>{if(blocked&&key==='sidevoice.removed-here.v1')throw new Error('QuotaExceededError');return setItem.call(store,key,value)};
+ await c.s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");await settleSoon();
+ await beats(c,2);
+ assert.equal(c.s.run('readRemovals().length'),1,'its row stays: it is what protects it');
+ assert.ok(!listedRows(c).includes('fp-mac|a'));
+ blocked=false;await beats(c,2);
+ assert.equal(c.s.run('readRemovals().length'),0,'let go of once the rest is stored');
+ assert.ok('a' in JSON.parse(c.s.saved['sidevoice.removed-here.v1'])['fp-mac']);
+ c.s.run('disconnect()');
+});
+test('An answer asked before a conversation was removed again does not let go of that removal',async()=>{
+ const room=showingElsewhere(coreRoom({active:['b']}));
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|b'});const {s}=c;
+ const kept=()=>Object.keys(JSON.parse(s.saved['sidevoice.removed-here.v1']||'{}')['fp-mac']||{});
+ const listing={ok:true,status:200,json:async()=>({participants:[{thread_id:'x',title:'X',available:true}],closed_threads:[]})};
+ let release;s.context.fetch=async(path,options)=>path.includes('/participants')?new Promise(resolve=>{release=()=>resolve(listing)}):room.fetch(path,options);
+ const asking=s.run("refreshPeople('fp-mac')");await settleSoon();
+ // Another tab of this device removes X while that answer is on its way.
+ await s.run("changeRemovedHere('fp-mac',['x'],[])");
+ release();await asking;await settleSoon();
+ assert.ok(kept().includes('x'),'asked before the removal: it says nothing of it');
+ assert.ok(!listedRows(c).includes('fp-mac|x'));
+ s.context.fetch=async(path,options)=>path.includes('/participants')?listing:room.fetch(path,options);
+ await s.run("refreshPeople('fp-mac')");await settleSoon();
+ assert.ok(!kept().includes('x'),'asked after, and listing it for this device: it is back');
+ s.run('disconnect()');
+});
+test('What this device keeps closed for itself is shared, bounded, and lets go of a conversation its machine closed for everyone',async()=>{
+ const c=await callOnCoreRoom(showingElsewhere(coreRoom({active:['b']})),{selected:'fp-mac|b'});const {s}=c;
+ const kept=()=>Object.keys(JSON.parse(s.saved['sidevoice.removed-here.v1']||'{}')['fp-mac']||{});
+ await s.run("changeRemovedHere('fp-mac',Array.from({length:MAX_REMOVED_HERE+10},(_,i)=>'old'+i),[])");
+ assert.equal(kept().length,s.run('MAX_REMOVED_HERE'));
+ assert.equal(kept()[0],'old10','the newest are kept');
+ // Another tab's change is taken at once.
+ s.handlers.storage({key:'sidevoice.removed-here.v1'});
+ assert.equal(s.run("linkOf('fp-mac').closed.has('old40')"),true);
+ assert.equal(s.run("linkOf('fp-mac').removed.size"),s.run('MAX_REMOVED_HERE'));
+ await settleSoon();
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({participants:[{thread_id:'old30',title:'Back',available:true}],closed_threads:['old20']})});
+ await s.run("refreshPeople('fp-mac')");await settleSoon();
+ assert.ok(!kept().includes('old20'),'closed for every device: nothing to keep');
+ assert.ok(!kept().includes('old30'),'listed for this device again: nothing to keep');
+ assert.equal(kept().length,s.run('MAX_REMOVED_HERE')-2);
+ assert.equal(s.run("linkOf('fp-mac').closed.has('old20')"),true,'and still closed, as the machine says');
+ s.run('disconnect()');
 });
 test('A pick the room said yes to is not asked for again on every beat when its binding does not follow',async()=>{
  const room=coreRoom({active:['a','b']});
