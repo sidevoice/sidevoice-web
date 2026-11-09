@@ -4009,6 +4009,51 @@ test('A conversation closed is not gone back to by the refresh that follows the 
  c.s.run('disconnect()');
  assert.ok(!selects.includes('a'),JSON.stringify(selects));
 });
+// Core's removal while another device still shows the conversation (rust/control/room/channel.rs `remove_for_device`):
+// it is left out of this device's list, stays open for the others, and nothing moves this device's call off it.
+function showingElsewhere(room){
+ room.hiddenHere=new Set();
+ const rows=room.rows,fetch=room.fetch;
+ room.rows=()=>rows().filter(row=>!room.hiddenHere.has(row.thread_id));
+ room.fetch=async(path,options)=>{
+  if(options?.method!=='POST'||!path.includes('/presentation/remove'))return fetch(path,options);
+  room.hiddenHere.add(JSON.parse(options.body).thread_id);
+  return {ok:true,status:200,json:async()=>({status:'removed',closed:false})};
+ };
+ return room;
+}
+const listedRows=c=>plain(c.s.run('roomStore.getState().participants.map(p=>p.threadId)'));
+const beats=async(c,n=4)=>{for(let i=0;i<n;i++){c.s.run('pick.leftAt-=LEAVE_EVERY_MS');await c.s.run('refresh()');await settleSoon();await c.s.run('refreshPeople()');await settleSoon()}};
+test('Removing the conversation the call is on, while another device still shows it, takes the call off it for good',async()=>{
+ const room=showingElsewhere(coreRoom({active:['a','b']}));
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|a'});
+ const before=room.selects.length;
+ await c.s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");await settleSoon();
+ await beats(c);
+ const seen={rows:listedRows(c),target:c.s.run('targetId()'),core:room.targets.get('s1')?.thread_id,selects:plain(room.selects.slice(before)),
+  remembered:c.store['sidevoice.selected'],removals:c.s.run('readRemovals().length')};
+ c.s.run('disconnect()');
+ assert.deepEqual(seen.rows,['fp-mac|b'],JSON.stringify(seen));
+ assert.notEqual(seen.target,'fp-mac|a',JSON.stringify(seen));
+ assert.notEqual(seen.core,'a','the room\'s call left it too');
+ assert.ok(!seen.selects.includes('a'),'and was never put back on it: '+JSON.stringify(seen.selects));
+ assert.notEqual(seen.remembered,'fp-mac|a','nor is it the pick to go back to');
+ assert.equal(seen.removals,0,'the machine took the removal');
+});
+test('A conversation removed here stays off this device past its removal settling, until the machine lists it again',async()=>{
+ const room=showingElsewhere(coreRoom({active:['a']}));
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|a'});
+ await c.s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");await settleSoon();
+ await beats(c);
+ const removed={rows:listedRows(c),target:c.s.run('targetId()'),core:room.targets.get('s1')?.thread_id,remembered:c.store['sidevoice.selected'],removals:c.s.run('readRemovals().length')};
+ // Its agent connects anew: core undoes the removals, and the conversation is this device's again.
+ room.hiddenHere.delete('a');
+ await beats(c);
+ const revived=listedRows(c);
+ c.s.run('disconnect()');
+ assert.deepEqual(removed,{rows:[],target:null,core:undefined,remembered:undefined,removals:0},JSON.stringify(removed));
+ assert.deepEqual(revived,['fp-mac|a']);
+});
 test('A pick the room said yes to is not asked for again on every beat when its binding does not follow',async()=>{
  const room=coreRoom({active:['a','b']});
  const c=await callOnCoreRoom(room,{selected:'fp-mac|b'});

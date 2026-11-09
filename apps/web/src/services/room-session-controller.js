@@ -157,7 +157,7 @@ function hideRemoved(fp,thread){
  // Its texts that never left this device never will, under this conversation or a later one: they stay as not sent.
  failTexts(entry=>entry.node===fp&&entry.payload.data.thread===thread);
  const link=links.get(fp);
- if(link){link.closed=new Set([...(link.closed||[]),thread]);link.peopleAsked++;link.people=link.people.filter(person=>person.thread_id!==thread);mergePeople()}
+ if(link){link.closed=new Set([...(link.closed||[]),thread]);(link.removed||(link.removed=new Set())).add(thread);link.peopleAsked++;link.people=link.people.filter(person=>person.thread_id!==thread);mergePeople()}
  return disposeConversation(key).catch(()=>{});
 }
 // Each removal is applied once on a tab, by its id: an event delivered late, about one this tab already applied (and which may
@@ -1175,7 +1175,9 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
  const listening=nextThread?conversationCalls.get(conversationKey(fp,nextThread)):null;
  if(listening&&microphoneConfirmed())giveMicrophone(listening);
  refreshApplied=asked;
- const previousThread=targetId(),changed=state.roomBinding?.binding_id!==d.binding?.binding_id;roomStore.batch(()=>{state.roomBinding=d.binding;if(d.binding?.thread_id&&!rememberedOn(fp))rememberThread(targetId());
+ const previousThread=targetId(),changed=state.roomBinding?.binding_id!==d.binding?.binding_id;roomStore.batch(()=>{state.roomBinding=d.binding;
+  // The call's conversation is the pick when there is none, unless it is closed (here, for this device): the call leaves it.
+  if(d.binding?.thread_id&&!rememberedOn(fp)&&!closedPick(targetId()))rememberThread(targetId());
   if(d.binding?.thread_id)acceptEpoch(d.binding.thread_id,d.binding.epoch);
  // An explicitly empty view survives the call's binding being replaced or lost on the same conversation; only the call
  // moving to another conversation puts the view back on the call.
@@ -1358,7 +1360,6 @@ async function refreshPeople(fp=state.callNode){
   for(const thread of [...graced])if(!reported.has(thread))graced.delete(thread);
   const closed=new Set([...reported].filter(thread=>!leaving.has(thread)&&!startLeaving(fp,link,thread)));
   for(const thread of closed)forgetCard(fp,thread);
-  link.closed=closed;
   // What this device removed and its machine has not taken yet stays out of the list, whatever the answer says.
   // A removal the machine has taken is settled by an answer asked after it: one that still lists the conversation means the
   // machine shows it again (its agent connected anew), so it is shown; one that does not list it is what the machine does
@@ -1375,7 +1376,15 @@ async function refreshPeople(fp=state.callNode){
    void changeRemovals(list=>list.filter(row=>!settled.some(done=>sameRemoval(done.node,done.thread_id,done.id)(row)&&row.taken)));
   }
   const revived=new Set(settled.filter(row=>listedNow.has(row.thread_id)).map(row=>row.thread_id));
-  const hidden=thread=>closed.has(thread)||removedHere.has(thread)&&!revived.has(thread);
+  // A conversation removed on this device is closed for this device, past its removal being settled: the machine keeps it
+  // open while another device shows it, and leaves this device's call on it. So the call leaves it and never goes back to it
+  // (`settleOnOpen`, `pickOn`), until the machine lists it for this device again (its agent connected anew).
+  const removed=link.removed||(link.removed=new Set());
+  for(const thread of removedHere)removed.add(thread);
+  for(const thread of [...removed])if(listedNow.has(thread)&&(!removedHere.has(thread)||revived.has(thread)))removed.delete(thread);
+  for(const thread of removed)closed.add(thread);
+  link.closed=closed;
+  const hidden=thread=>closed.has(thread);
   // A select of a conversation closed elsewhere is let go of, as one closed here (`closeParticipant`).
   if(pick.op?.node===fp&&!pick.op.leave&&closed.has(conversationOf(pick.op.key)?.thread))letGoOfSelect();
   // Only an answer asked after a binding went says whether it was closed (`goneAt`).
