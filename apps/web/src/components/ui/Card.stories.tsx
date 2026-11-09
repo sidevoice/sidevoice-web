@@ -37,6 +37,7 @@ function SettingsBlock() {
           <Row label="Thinking sound" description="A soft loop while the agent works." htmlFor="thinking"><Switch id="thinking" checked={on} onChange={setOn} /></Row>
           <Row label="Keep the screen on"><Switch checked={false} onChange={() => {}} /></Row>
           <Row label="A block row" description="Its control goes under the label." block><Button size="sm">Choose</Button></Row>
+          <Row label="A disabled row" description="Another setting turns it off: its words in the disabled ink, its control disabled by its owner." disabled><Switch checked={false} disabled onChange={() => {}} /></Row>
         </Group>
       </Section>
     </div>

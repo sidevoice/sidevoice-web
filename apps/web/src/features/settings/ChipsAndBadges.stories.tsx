@@ -88,6 +88,9 @@ export const SideBySide: Story = {
           <Row name="Badge (primitive)" note="22px, pill, --sv-font-xs; tone by data-tone; optional 6px dot">
             {tones.map((tone) => <Badge key={tone} tone={tone}>{tone}</Badge>)}<Badge tone="positive" dot>dot</Badge>
           </Row>
+          <Row name="Badge tag (primitive)" note="20px, weight 500, a 1px border in its own colour; a provider's and an agent's state in Settings (was a copy in settings.css until 0.29)">
+            {tones.map((tone) => <Badge key={tone} tag tone={tone}>{tone}</Badge>)}<Badge tag dot>dot</Badge>
+          </Row>
           <Row name="HardwareChip" note="Badge accent + .model-hardware (the one that uses the primitive)">
             <HardwareChip build={{ id: "b", backend: "mlx", precision: "int8", acceleratorClass: "gpu", accelerator: "metal", downloadBytes: 1, memoryMb: 1, available: true, reasons: [], installed: false }} t={t} />
           </Row>
