@@ -283,6 +283,16 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), var(--
 .floating-card[data-open=up] .avatar-card { grid-template-areas: "voice" "figure" "compact"; }
 .avatar-figure { grid-area: figure; width: var(--card-w); height: var(--card-w); margin-left: var(--figure-x, auto); margin-right: auto; }
 .avatar-figure .sv-avatar { display: block; width: 100%; height: 100%; }
+/* You muted (AvatarCard): a mic crossed out, white on the solid muted colour (3:1 or more in both themes), at the creature's feet,
+   over it and out of the flow. */
+.avatar-figure { position: relative; }
+.avatar-muted { position: absolute; left: 50%; bottom: 6%; z-index: 1; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--sv-state-muted-solid); color: #fff; box-shadow: 0 0 0 2px rgb(255 255 255 / 92%), 0 2px 8px rgb(0 0 0 / 35%); transform: translateX(-50%); pointer-events: none; }
+.avatar-muted svg { width: 14px; height: 14px; }
+.floating-card[data-size=s] .avatar-muted { width: 20px; height: 20px; }
+.floating-card[data-size=s] .avatar-muted svg { width: 12px; height: 12px; }
+.floating-card[data-size=l] .avatar-muted { width: 28px; height: 28px; }
+.floating-card[data-size=l] .avatar-muted svg { width: 16px; height: 16px; }
 /* Each piece's place across the column is the card's (CallCard.tsx, voice-centre.ts avatarColumn: from the host's `room`): the creature
  * (--figure-x) where the window reaches no further past it on a side than the screen's room there, so the app never moves the window in
  * and the creature with it; the voice text (--voice-x, R13) and the compact card (--compact-x) centred on it as far as the column allows,

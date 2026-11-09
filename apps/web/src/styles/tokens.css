@@ -32,6 +32,9 @@
   --sv-state-working: #6b4fd8;
   --sv-state-attention: #e0a82e;
   --sv-state-muted: #e5484d;
+  /* Muted as a filled mark with a white glyph on it (the floating card's avatar format): the light theme's muted in both themes,
+     white on it 3.9:1; the dark theme's lighter muted would give white only 2.3:1. Not lightened below. */
+  --sv-state-muted-solid: #e5484d;
   --sv-state-idle: #b9b3c4;
   --sv-state-offline: #8a8594;
 }

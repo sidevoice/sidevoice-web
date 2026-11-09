@@ -400,6 +400,10 @@ function AvatarCard({ state, shell, t }: { state: CallControlsState; shell: Card
       onPointerMove={(event) => { if (shell.expanded && event.pointerType === "mouse") zone.aim(zoneAt(event, "none") === "card" ? "card" : (event.target as Element).closest(".avatar-figure") ? "creature" : (event.target as Element).closest(".avatar-compact") ? "card" : "none"); }}>
       <div ref={shell.body} className="avatar-figure" onPointerOver={(event) => zone.aim(zoneAt(event, "creature"))}>
         <CardFigure state={state} size="stage" label={t("stage.agentState", { title: state.call.title, state: moodText(state.call.mood, t) })} />
+        {/* You muted: the creature on nothing has no state line, so a mic crossed out at its feet says it, without dimming the creature
+            (operator, 2026-11-08). A mark on the creature, never in the window's flow: the creature does not move for it. The compact
+            card's mute button says it to assistive technology; this is for the eye. */}
+        {!state.call.micEnabled && <span className="avatar-muted" aria-hidden="true"><MicrophoneOffIcon size={14} /></span>}
       </div>
       {captions && <div ref={voice} className="docked-voice avatar-voice" onPointerOver={(event) => zone.aim(zoneAt(event, "none"))}>
         <DockedVoice />
