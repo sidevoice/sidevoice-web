@@ -193,7 +193,9 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), var(--
 .floating-card[data-size=s] .title-card { --face: 56px; }
 .floating-card[data-size=l] .title-card { --face: 76px; }
 .title-card .card-row { gap: 12px; }
-.card-face { position: relative; flex: none; width: var(--face); height: var(--face); overflow: hidden; border-radius: 30%;
+/* The chip clips nothing it holds: its 30% rounding passes inside the corners of the creature's square (inset 7%), so an overflow clip
+   would cut what the creature draws there; the creature is fitted to its square instead (creature/extent.ts). */
+.card-face { position: relative; flex: none; width: var(--face); height: var(--face); border-radius: 30%;
   background: radial-gradient(circle at 50% 70%, color-mix(in srgb, var(--av-color, #c9b6ec) 34%, transparent), #2f2741 72%); }
 :root[data-theme=light] .card-face { background: radial-gradient(circle at 50% 70%, color-mix(in srgb, var(--av-color, #c9b6ec) 34%, transparent), #ece4f7 72%); }
 .card-face .sv-avatar { position: absolute; inset: 7%; width: 86%; height: 86%; }

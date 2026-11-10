@@ -208,3 +208,18 @@ describe("a tile too narrow for the creature at the nearest step", () => {
     expect(Math.abs(((withCard.zk - 1.3) / 0.08) - Math.round((withCard.zk - 1.3) / 0.08))).toBeLessThan(1e-6);
   });
 });
+
+describe("everything the creature acts out stays on the tile", () => {
+  test("where its acts would rise past the tile's top at the nearest step, the solve steps back until they do not", () => {
+    // its reach: as tall again as its pose over its head, half that under its feet, scaled with the step back
+    const { probe } = creature({ tall: 300 });
+    const reachRows = (lift: number, zk: number) => { const r = probe.rows(lift, zk, 0, 600); const h = r.low - r.top; return { top: r.top - h, bottom: r.low + h / 2 }; };
+    const short = 420;
+    const plain = capCentre(probe, 0, 0, short, 10, short - 10, 14.7, 0, 600);
+    const kept = capCentre({ ...probe, reachRows }, 0, 0, short, 10, short - 10, 14.7, 0, 600);
+    expect(reachRows(plain.lift, plain.zk).top).toBeLessThan(0);
+    expect(kept.zk).toBeGreaterThan(plain.zk);
+    expect(reachRows(kept.lift, kept.zk).top).toBeGreaterThanOrEqual(0);
+    expect(reachRows(kept.lift, kept.zk).bottom).toBeLessThanOrEqual(short);
+  });
+});

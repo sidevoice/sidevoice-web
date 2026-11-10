@@ -1,6 +1,6 @@
 import type { RigCamera, Stage, StageItem } from "./rig.js";
-import { footprintNow, footprintOf, shapeKey, widthReach, type Footprint, type Vec3 } from "./extent";
-import { capCentre, capCentreSteps, FRAME_EASE, stageBands, type FrameAsk, type FrameMotion, type FrameProbe, type FrameSolved, type Framing, type FrameTarget, type Rows,
+import { footprintNow, footprintOf, heightReach, provisionalReach, shapeKey, widthReach, type Footprint, type Vec3 } from "./extent";
+import { capCentre, capCentreSteps, FRAME_EASE, OPTIC, stageBands, type FrameAsk, type FrameMotion, type FrameProbe, type FrameSolved, type Framing, type FrameTarget, type Rows,
   type StageFrame } from "./stage-frame";
 
 /* The creature host's side of the stage's framing (stage-frame.ts): it draws trial framings of the creature into its own
@@ -124,7 +124,7 @@ export class StageFramer {
 
   /** Held still (reduced motion, no GPU): a new framing is taken at once instead of eased into (the reference under
    *  reduced motion). */
-  hold(still: boolean) { this.held = still; }
+  hold(still: boolean) { const was = this.held; this.held = still; if (was && !still && !footprintNow(this.host.item.spec)) this.measure(); }
 
   /** The canvas's box, css px, and where it sits in the tile (the stage's ask). */
   private box() {
@@ -138,35 +138,51 @@ export class StageFramer {
   /** When the ease running started (performance.now). */
   private easeT0 = 0;
 
-  /** The view the framing scales: the desktop's, or the phone's measured one (measured between frames when the creature
-   *  is new to the page; the last framing holds meanwhile). */
+  /** The view the framing scales: the desktop's, or the phone's from the creature's footprint (until it is measured, from its
+   *  provisional reach: never cut, if a little small for a moment). */
   private view(phone: boolean): View {
     if (!phone) return { zoom: DESKTOP_ZOOM };
-    const { canvas, stage, item } = this.host, aspect = canvas.width / canvas.height, key = shapeKey(item.spec) + "|" + aspect.toFixed(4);
+    const { canvas, stage, item } = this.host, aspect = canvas.width / canvas.height, F = this.footprint(), measured = this.measured();
+    const key = shapeKey(item.spec) + "|" + aspect.toFixed(4) + "|" + measured;
     if (this.phone && this.phoneKey === key) return this.phone;
-    const F = footprintNow(item.spec);
-    if (F || !this.phone) { this.phone = phoneFit(stage, item, aspect, F, this.phone?.zoom ?? null); this.phoneKey = F ? key : ""; }
-    if (!F) this.measure();
-    return this.phone;
+    const fit = phoneFit(stage, item, aspect, F, this.phone?.zoom ?? null);
+    // ...then whatever its acts throw past what they draw (a shadow, the head turned to the finger) is held inside the tile's sides too:
+    // stepped back where it would not be (the creature's own size kept where it is)
+    const pts = this.reachPoints(), room = 1 - SIDE_ROOM;
+    for (let n = 0; n < 12 && pts.length; n++) {
+      const r = widthReach(this.cameraAt(aspect, fit, { lift: 0, zk: 1 }), pts);
+      if (!(r > room)) break;
+      fit.zoom *= (r / room) * 1.002;
+    }
+    if (Number.isFinite(fit.zoom) && fit.zoom > 0 && Number.isFinite(fit.lookY ?? 0)) { this.phone = fit; this.phoneKey = key; }
+    return this.phone ?? { zoom: PHONE.zoom };
   }
 
-  /** Asks for the creature's footprint (extent.ts, measured once per shape on the page): framed again on it when it comes. */
+  /** Whether the creature's own footprint is measured (else its provisional reach stands in). */
+  private measured(): boolean { return !!footprintNow(this.host.item.spec); }
+
+  /** Asks for the creature's footprint (extent.ts, measured once per shape on the page). When it comes, the framing is solved again
+   *  only where it moves (a phone's, or a tile whose floor it changes); the canvas's crop follows it (host.measured). A measure that
+   *  fails is asked for again a while later; the provisional reach holds meanwhile. */
   private measure() {
     const { stage, item } = this.host, key = shapeKey(item.spec);
-    if (this.measuring?.key === key) return;
+    if (this.measuring?.key === key || performance.now() < this.retryAt) return;
     this.measuring?.stop();
     const job: { key: string; stop: () => void } = { key, stop: () => {} };
     this.measuring = job;
+    const ask = this.frame.request, before = ask && !ask.phone ? this.floorZk(ask.w, ask.h) : null;
     job.stop = footprintOf(stage, item.spec, () => {
       if (this.measuring !== job) return;
       this.measuring = null;
-      this.phone = null; this.key = ""; this.reached = null; // framed again on what it measured
-      this.solved.clear();
+      this.reached = null;
+      const now = this.frame.request, after = now && !now.phone ? this.floorZk(now.w, now.h) : null;
+      if (!now || now.phone || before !== after) { this.phone = null; this.key = ""; this.solved.clear(); }
       this.host.measured();
+      // (solve draws again only where the framing it applies changed: a creature held still asks for no frame for this)
       this.solve();
-      this.host.poke();
-    });
+    }, () => { if (this.measuring === job) { this.measuring = null; this.retryAt = performance.now() + MEASURE_RETRY_MS; } });
   }
+  private retryAt = -Infinity;
 
   /** The camera for a framing (creator.js viewCam, zoomOf, baseLook). The desktop at no lift and no step back keeps the
    *  rig's own look height, as the reference draws it. */
@@ -177,15 +193,21 @@ export class StageFramer {
     return { zoom, lookY: (v.lookY != null ? v.lookY : 0.3 - (zoom - 1) * 0.55) - f.lift };
   }
 
-  /** A camera for a framing, as the stage draws it, for projecting points (no render). */
-  private projector(v: View, f: Framing) {
-    const { stage, item } = this.host, cam = stage.camera.clone(), c = item.c, { zoom, lookY } = this.camera(v, f);
-    cam.aspect = this.host.aspect(); cam.updateProjectionMatrix();
-    cam.position.set(0, 0.6, 6.7 * zoom); cam.lookAt(0, lookY != null ? lookY : 0.3 + ((c as unknown as { float?: number }).float || 0) * 0.5 - (zoom - 1) * 0.55, 0); cam.updateMatrixWorld();
+  /** The camera the stage draws a framing with (rig.js Stage.aim, the one place it is placed), `aspect` wide, for projecting points. */
+  private cameraAt(aspect: number, v: View, f: Framing): RigCamera {
+    const { stage, item } = this.host, cam = stage.camera.clone();
+    cam.clearViewOffset(); cam.aspect = aspect; cam.updateProjectionMatrix();
+    stage.aim(cam, this.camera(v, f), item.c); cam.updateMatrixWorld();
     return cam;
   }
+  /** The desktop camera for a tile `w` × `h` at a framing (the tests project through it too). */
+  cameraFor(w: number, h: number, f: Framing): RigCamera { return this.cameraAt(w / h, { zoom: DESKTOP_ZOOM }, f); }
 
-  /** The creature's rows at a trial framing, in css px of the tile (creator.js drawnRows). */
+  /** A camera for a framing, as the stage draws it, for projecting points (no render). */
+  private projector(v: View, f: Framing) { return this.cameraAt(this.host.aspect(), v, f); }
+
+  /** The creature's rows at a trial framing, in css px of the tile (creator.js drawnRows), and how far its reach goes up and down
+   *  the tile there (`reachRows`: what capCentre keeps inside it). */
   private probe(v: View, state: string): FrameProbe {
     const { host } = this, { dx, dy } = this.box();
     // In the tile's px: the canvas's rows moved by where it sits in the tile; the cards' columns moved back onto it.
@@ -207,50 +229,89 @@ export class StageFramer {
       for (let y = H - 1; y >= 0 && lowAny < 0; y--) for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3] > 16) { lowAny = y; break; }
       return { low: (low < 0 ? 0 : low + 1) / k + dy, top: top / k + dy, lowAny: (lowAny + 1) / k + dy };
     };
-    return { rows, slope: (zk) => this.slope(v, zk) };
+    return { rows, slope: (zk) => this.slope(v, zk), reachRows: (lift, zk) => this.reachRows(v, { lift, zk }) };
+  }
+
+  /** How far up and down the tile everything the creature can act out reaches at a framing (its footprint, or its provisional
+   *  reach), css px of the tile from its top, its ink included. */
+  private reachRows(v: View, f: Framing): { top: number; bottom: number } {
+    const { h, dy } = this.box();
+    const [top, bottom] = heightReach(this.projector(v, f), this.reachPoints());
+    return { top: ((1 - top) / 2) * h + dy, bottom: ((1 - bottom) / 2) * h + dy };
   }
 
   /** How far from the tile's middle the creature reaches at its closest framing (zk at its floor), css px, over every act it can
    *  play, posed as frames pose it, its ink and its shadow (what the scene canvas must hold, host.ts cropFor) for a desktop tile
-   *  `w` × `h`; null while its acts are measured (this starts that) or on a phone, whose framing is made to the tile's width. */
+   *  `w` × `h`; null while its acts are measured (this starts that: until then the canvas is the whole tile) or on a phone, whose
+   *  framing is made to the tile's width. Always a finite, non-negative number when it is one. */
   reach(w: number, h: number): number | null {
     const ask = this.frame.request;
-    if (!ask || ask.phone) return null;
-    const F = this.footprint();
-    if (!F) return null;
+    if (!ask || ask.phone || !(w > 0 && h > 0)) return null;
+    if (!this.footprint()) return null;
     const at = shapeKey(this.host.item.spec) + "|" + w.toFixed(1) + "|" + h.toFixed(1);
-    if (this.reached?.at !== at) this.reached = { at, px: (widthReach(this.deskCam(w, h, this.floorZk(w, h)), F.reach) * w) / 2 };
-    return this.reached.px;
+    if (this.reached?.at !== at) this.reached = { at, px: (widthReach(this.cameraFor(w, h, this.restFraming(w, h)), this.reachPoints()) * w) / 2 };
+    return Number.isFinite(this.reached.px) && this.reached.px >= 0 ? this.reached.px : null;
   }
   private reached: { at: string; px: number } | null = null;
 
-  /** The footprint of the creature's shape, or null while it is measured (this starts that). */
+  /** The footprint of the creature's shape, or null while it is measured (this starts that, for a creature that moves: one held still
+   *  shows its key poses only, which its provisional reach holds, and the page does no work for it). */
   private footprint(): Footprint | null {
     const F = footprintNow(this.host.item.spec);
-    if (!F) this.measure();
+    if (!F && !this.held) this.measure();
     return F;
   }
 
-  /** The desktop camera at rest for a tile `w` × `h` (no lift), stepped back `zk`. */
-  private deskCam(w: number, h: number, zk: number): RigCamera {
-    const { stage, item } = this.host, cam = stage.camera.clone(), c = item.c, { zoom, lookY } = this.camera({ zoom: DESKTOP_ZOOM }, { lift: 0, zk });
-    cam.clearViewOffset(); cam.aspect = w / h; cam.updateProjectionMatrix();
-    cam.position.set(0, 0.6, 6.7 * zoom); cam.lookAt(0, lookY != null ? lookY : 0.3 + ((c as unknown as { float?: number }).float || 0) * 0.5 - (zoom - 1) * 0.55, 0); cam.updateMatrixWorld();
-    return cam;
+  /** What the creature can reach, as world points: its footprint, or until it is measured its provisional reach (extent.ts: the
+   *  box round its pose at rest and every act's envelope round that), worked out once from the rig at rest. */
+  private reachPoints(): Vec3[] {
+    const F = this.footprint();
+    if (F) return F.reach;
+    if (!this.provisional) {
+      const { stage, item } = this.host, was = { state: item.spec.state, expr: item.spec.expr, opts: item.opts };
+      try { item.spec.state = "idle"; item.spec.expr = undefined; item.opts = { ...item.opts, extra: undefined }; stage.pose(item, 0, 0, true); this.provisional = provisionalReach(item.c); }
+      finally { item.spec.state = was.state; item.spec.expr = was.expr; item.opts = was.opts; }
+    }
+    return this.provisional;
+  }
+  private provisional: Vec3[] | null = null;
+
+  /** The framing a desktop tile `w` × `h` rests at: its floor (floorZk), the creature's middle at rest (feet to the top of its head
+   *  and what it wears) at the optical centre, as capCentre stands it. */
+  restFraming(w: number, h: number): Framing {
+    const zk = this.floorZk(w, h);
+    return { zk, lift: this.opticLift(w, h, zk) };
   }
 
-  /** The least step back at which everything the creature can act out (its footprint, ink and shadow included) fits between a
-   *  desktop tile's sides with SIDE_ROOM to spare: 1 where the tile is wide enough (a landscape tile always is), more on a tall,
-   *  narrow one, whose height alone would size the creature past its sides. 1 until the footprint is measured. */
+  /** The lift that stands the creature's middle at rest at the tile's optical centre at a step back (from the projection). */
+  private opticLift(w: number, h: number, zk: number): number {
+    const c = this.host.item.c, F = footprintNow(this.host.item.spec), V = c.root.position.constructor, q = new V() as unknown as Vec3;
+    const mid = ((F ? F.minY : c.minY) + (F ? F.top : c.body.geometry.boundingBox.max.y + 0.25)) / 2, want = 1 - 2 * OPTIC;
+    let lo = -4, hi = 4;
+    for (let i = 0; i < 30; i++) { const L = (lo + hi) / 2, y = q.set(0, mid, 0).project(this.cameraFor(w, h, { lift: L, zk })).y; if (y > want) hi = L; else lo = L; } // a larger lift aims lower: the creature rises in the frame
+    const lift = (lo + hi) / 2;
+    return Number.isFinite(lift) ? lift : 0;
+  }
+
+  /** The least step back at which everything the creature can act out (its footprint, or its provisional reach; ink and shadow
+   *  included) fits a desktop tile, its middle at rest at the optical centre: between its sides with SIDE_ROOM to spare and
+   *  between its top and its foot with UPRIGHT_ROOM. 1 where the tile has the room (a landscape tile mostly does); more on a tall,
+   *  narrow one, whose height alone would size the creature past its sides, or a short one its acts would leave. Always finite,
+   *  from 1 to ZK_CAP. */
   floorZk(w: number, h: number): number {
-    const F = footprintNow(this.host.item.spec);
-    if (!F || !(w > 0 && h > 0)) return 1;
-    const key = shapeKey(this.host.item.spec) + "|" + (w / h).toFixed(4);
-    if (this.floors.has(key)) return this.floors.get(key)!;
-    const room = 1 - SIDE_ROOM;
-    let zk = 1, r = widthReach(this.deskCam(w, h, zk), F.reach);
-    // The reach shrinks about as 1/zk: aimed there, then nudged out until it holds (a few rounds at most).
-    for (let n = 0; n < 8 && r > room; n++) { zk *= (r / room) * 1.002; r = widthReach(this.deskCam(w, h, zk), F.reach); }
+    if (!(w > 0 && h > 0)) return 1;
+    const pts = this.reachPoints();
+    if (!pts.length) return 1;
+    const key = shapeKey(this.host.item.spec) + "|" + (w / h).toFixed(4) + "|" + this.measured();
+    const kept = this.floors.get(key);
+    if (kept != null) return kept;
+    const fits = (zk: number) => {
+      const cam = this.cameraFor(w, h, { lift: this.opticLift(w, h, zk), zk }), [top, bottom] = heightReach(cam, pts);
+      return widthReach(cam, pts) <= 1 - SIDE_ROOM && top <= 1 - 2 * UPRIGHT_ROOM && bottom >= -1 + 2 * UPRIGHT_ROOM;
+    };
+    let zk = 1;
+    for (let n = 0; n < 60 && zk < ZK_CAP && !fits(zk); n++) zk = Math.min(ZK_CAP, zk * 1.03);
+    if (!Number.isFinite(zk) || zk < 1) zk = 1;
     if (this.floors.size > 16) this.floors.clear();
     this.floors.set(key, zk);
     return zk;
@@ -506,6 +567,9 @@ export class StageFramer {
     return { ...this.camera(v, this.cap), moving };
   }
 
+  /** The canvas's box changed but not the tile (its crop): read again when next needed, the framings solved kept. */
+  reboxed() { this.boxed = null; }
+
   /** Forgets the framing solved (the canvas changed shape, or the creature's room did): solved again when next asked. */
   invalidate() {
     this.key = ""; this.phone = null; this.solved.clear(); this.boxed = null;
@@ -515,8 +579,13 @@ export class StageFramer {
   }
 }
 
-/** The room kept between what the creature can reach and a desktop tile's sides, a share of the tile's half width (floorZk). */
-const SIDE_ROOM = 0.04;
+/** The room kept between what the creature can reach and a desktop tile's sides, a share of the tile's half width, and between it and
+ *  the tile's top and foot, a share of its height (floorZk). */
+const SIDE_ROOM = 0.04, UPRIGHT_ROOM = 0.015;
+/** The furthest a floor steps the creature back (a tile far too small for it: it is drawn small rather than cut). */
+const ZK_CAP = 4;
+/** How long after a measure failed it is tried again (ms). */
+const MEASURE_RETRY_MS = 5000;
 /** The ease's step (the reference's frame at 30 a second), and the most steps a change is sampled for (it lands sooner). */
 const STEP_MS = 1000 / 30, MOTION_STEPS = 60;
 /** How long the first framing is solved for at once, on the pixels, before an estimate stands in for it (a renderer without

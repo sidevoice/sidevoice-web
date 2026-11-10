@@ -32,6 +32,9 @@ export interface Rows { low: number; top: number; lowAny: number }
 export interface FrameProbe {
   rows(lift: number, zk: number, xa: number, xb: number): Rows;
   slope(zk: number): number;
+  /** How far up and down the tile everything the creature can act out reaches at a framing (css px from the tile's top): what is
+   *  kept inside the tile, above the cards' concerns. None: only the pose's rows are kept in. */
+  reachRows?(lift: number, zk: number): { top: number; bottom: number };
 }
 
 /** A framing: the camera's lift (it looks lower by this much) and step back. */
@@ -80,6 +83,7 @@ export function finish<T>(steps: Generator<void, T>): T {
  *  on all of them at once). */
 export function* capCentreSteps(probe: FrameProbe, hTop: number, hBot: number, vh: number, ceil: number, floor: number, gap: number, xa: number, xb: number, zk0 = 1): Generator<void, FrameTarget> {
   const headK = TURN_HEAD, want = vh * OPTIC, mid = (m: Rows) => (m.top + m.lowAny) / 2, last = Math.max(0, Math.floor((ZK_MAX - zk0) / ZK_STEP + 1e-6));
+  const inside = (lift: number, zk: number) => { if (!probe.reachRows) return true; const r = probe.reachRows(lift, zk); return !(r.top < 0) && !(r.bottom > vh); };
   const tried = new Map<number, { f: FrameTarget; fits: boolean }>();
   const at = function* (i: number): Generator<void, { f: FrameTarget; fits: boolean }> {
     const seen = tried.get(i);
@@ -89,7 +93,8 @@ export function* capCentreSteps(probe: FrameProbe, hTop: number, hBot: number, v
     let lift = 0, m = probe.rows(0, zk, xa, xb);
     for (let n = 0; n < 7 && Math.abs(mid(m) - want) > 1; n++) { lift += (mid(m) - want) / probe.slope(zk); yield; m = probe.rows(lift, zk, xa, xb); }
     const head = (m.low - m.top) * headK, f = { lift, zk, low: m.low, top: m.top, head };
-    const r = { f, fits: m.low + gap + hBot <= floor && m.top - head - gap - hTop >= ceil };
+    // ...and everything it can act out inside the tile, whatever the cards need (a step back, if not)
+    const r = { f, fits: m.low + gap + hBot <= floor && m.top - head - gap - hTop >= ceil && inside(lift, zk) };
     tried.set(i, r);
     return r;
   };
@@ -112,6 +117,14 @@ export function* capCentreSteps(probe: FrameProbe, hTop: number, hBot: number, v
     let lift = best.lift, m = probe.rows(lift, zk, xa, xb);
     for (let n = 0; n < 7 && Math.abs(m.low - wantLow) > 1; n++) { lift += (m.low - wantLow) / probe.slope(zk); yield; m = probe.rows(lift, zk, xa, xb); }
     best = { lift, zk, low: m.low, top: m.top, head: (m.low - m.top) / 3 };
+    // what it acts out stays on the tile too: lowered back where it would rise past the top (the card then waits, unseen)
+    if (probe.reachRows && probe.reachRows(best.lift, zk).top < 0) {
+      let hi = best.lift, lo = hi - 8;
+      for (let n = 0; n < 30; n++) { const L = (lo + hi) / 2; if (probe.reachRows(L, zk).top < 0) hi = L; else lo = L; }
+      yield;
+      m = probe.rows(lo, zk, xa, xb);
+      best = { lift: lo, zk, low: m.low, top: m.top, head: (m.low - m.top) / 3 };
+    }
   }
   return best;
 }

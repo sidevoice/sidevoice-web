@@ -6,7 +6,7 @@ import { creatureFromSeed, rigSpec, type CreatureChoice, type RigSpec } from "./
 import type { StageFrame } from "./stage-frame";
 import { StageFramer } from "./stage-framer";
 import { Governor, sceneSize } from "./quality";
-import { aimAt, fitZoom, footprintOf, posedPoints, type Vec3 } from "./extent";
+import { aimAt, fitZoom, footprintOf, posedPoints, provisionalReach, type Vec3 } from "./extent";
 
 /* Where creatures are drawn on a page: two three.js stages (one WebGL context each, whatever the number of creatures),
  * each creature built once into a stage's scene and blitted into its own 2D canvas, as the design reference's creator
@@ -331,8 +331,12 @@ const clamp = (v: number) => Math.max(-1, Math.min(1, v));
 const CROP_MARGIN = 1.1, CROP_PAD_PX = 14, CROP_STEPS = 64, CROP_WHOLE = 0.9;
 /** The share of a tile `fullW` css px wide that the scene canvas takes for a creature reaching `reach` css px from its middle (cropFor). */
 export function cropShare(reach: number, fullW: number): number {
+  // Only a number that can be laid out: anything else (a reach not measured right, a tile with no width) is the whole tile. A share
+  // that is not a number reached the stylesheet as `--crop: NaN`, and `calc(100cqw * NaN)` lays the canvas out zero wide: the
+  // stage with no creature on it.
+  if (!(Number.isFinite(reach) && reach >= 0 && Number.isFinite(fullW) && fullW > 0)) return 1;
   const share = Math.ceil((2 * (reach * CROP_MARGIN + CROP_PAD_PX) / fullW) * CROP_STEPS) / CROP_STEPS;
-  return share > CROP_WHOLE ? 1 : share;
+  return !(share <= CROP_WHOLE) ? 1 : Math.max(1 / CROP_STEPS, share);
 }
 const GAZE_IN = 0.35, GAZE_HOLD = 0.4, GAZE_OUT = 0.8;
 
@@ -417,6 +421,8 @@ export class LiveCreature {
    *  fits its square (from its footprint, extent.ts; null until measured). */
   private faceFraming: { zoom: number } | null = null;
   private reachZoom: number | null = null;
+  /** Until then, a moving face's zoom from its provisional reach (extent.ts), worked out once: it never changes from frame to frame. */
+  private provisionalZoom: number | null = null;
 
   constructor(stage: RigStage, private opts: LiveOptions) {
     this.stage = stage;
@@ -428,28 +434,28 @@ export class LiveCreature {
       // A moving face holds every act it can play inside its square: its footprint, measured once per shape on the page (until
       // then, and while it holds still, the pose it is drawn in: faceZoom).
       this.faceFraming = { zoom: (opts.sharp && opts.whole ? WHOLE_FACE : FACE).zoom };
-      this.off.push(footprintOf(stage, this.item.spec, (F) => { this.reachZoom = fittedFace(this.stage, this.item, this.faceFraming!, F.reach); this.poke(); }));
+      if (this.moving) this.measureFace();
     }
     this.fit();
     if (opts.frame && !face) {
       this.framer = new StageFramer({ stage, item: this.item, canvas: opts.canvas, poke: () => this.poke(),
         render: (zoom, lookY, state, into) => { const shown = this.item.canvas; this.item.canvas = into; try { this.draw(nowS(), true, { zoom, lookY, state }); } finally { this.item.canvas = shown; } },
         mood: () => this.mood, drawn: () => !MODES[this.mood].poster, aspect: () => this.fullAspect(),
-        measured: () => { if (this.fit(false)) { this.framer?.invalidate(); this.poke(); } } }, opts.frame);
+        measured: () => { opts.canvas.dataset.reach = "measured"; if (this.fit(false)) { this.canvasChanged(); this.poke(); } } }, opts.frame);
       this.framer.hold(!this.moving);
       this.fit(false); // (asks the framer for the creature's reach: its acts are measured from here, and the canvas cropped when they are)
     }
     this.setMood(opts.mood ?? "idle", { step: opts.step });
-    const box = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => { this.fit(); this.hidden = false; this.framer?.invalidate(); this.poke(); });
+    const box = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => { this.fit(); this.hidden = false; this.canvasChanged(); this.poke(); });
     // A sharp face also follows its pixel ratio (a window moved to another screen), where the browser says so.
     if (opts.sharp) { try { box?.observe(opts.canvas, { box: "device-pixel-content-box" }); } catch { box?.observe(opts.canvas); } } else box?.observe(opts.canvas);
     this.off.push(() => box?.disconnect());
     // The stage's ceilings follow what it says it is (its first ask, a window turned between a phone's rules and a desktop's).
-    if (opts.frame && !face) this.off.push(opts.frame.listen(() => { if (this.fit(false)) { this.framer?.invalidate(); this.poke(); } }));
+    if (opts.frame && !face) this.off.push(opts.frame.listen(() => { if (this.fit(false)) { this.canvasChanged(); this.poke(); } }));
     // Where the pixels depend on the pixel ratio (the stage's, a sharp face's), the ratio is watched too: a window moved between
     // a 1× and a 2× screen keeps its css box, so no observer above would refit the canvas (blurry on the sharper screen, wasted
     // fill on the other); and not every browser has the device-pixel box the sharp face asks for.
-    if (opts.framing !== "face" || opts.sharp) this.off.push(watchPixelRatio(() => { if (this.fit()) { this.framer?.invalidate(); this.poke(); } }));
+    if (opts.framing !== "face" || opts.sharp) this.off.push(watchPixelRatio(() => { if (this.fit()) { this.canvasChanged(); this.poke(); } }));
     const from = opts.gazeFrom;
     if (from) {
       // T23: only the gaze follows the pointer (the finger while touching); touching does nothing else
@@ -504,15 +510,29 @@ export class LiveCreature {
 
   /** Lays the canvas out at the share cropFor says (a custom property styles/call.css reads); whether that changed. */
   private cropTo(): boolean {
-    const { canvas } = this.opts, fullW = this.css.w / this.laid, want = this.cropFor(fullW, this.css.h);
+    const { canvas } = this.opts, fullW = this.css.w / this.laid, asked = this.cropFor(fullW, this.css.h);
+    // (a share is a finite number between a step and the whole tile, or the whole tile)
+    const want = Number.isFinite(asked) && asked > 0 && asked < 1 ? asked : 1;
     if (want === this.laid) return false;
     this.laid = want;
     if (want === 1) canvas.style.removeProperty("--crop"); else canvas.style.setProperty("--crop", String(want));
     return true;
   }
 
+  /** The tile the framing was solved for (css px, the canvas's full width and its height). */
+  private tileBox = "";
+  /** The canvas changed: the framing is solved again where the tile did (its size, so its rows), and only its box read again where only
+   *  the crop did (a framing is the same for any part of the tile the canvas shows: solving it again would move nothing, yet write the
+   *  cards' place again). */
+  private canvasChanged() {
+    const key = (this.css.w / this.laid).toFixed(1) + "x" + this.css.h.toFixed(1);
+    if (key === this.tileBox) { this.framer?.reboxed(); return; }
+    this.tileBox = key;
+    this.framer?.invalidate();
+  }
+
   /** The camera's aspect: the tile's, whatever part of it the canvas shows. */
-  fullAspect(): number { const { canvas } = this.opts; return canvas.width / (this.laid * canvas.height); }
+  fullAspect(): number { const { canvas } = this.opts, ar = canvas.width / (this.laid * canvas.height); return Number.isFinite(ar) && ar > 0 ? ar : 1.5; }
 
   /** The scene's camera for the canvas's shape now. */
   private framingNow(): Framing | null {
@@ -661,7 +681,8 @@ export class LiveCreature {
   setMoving(moving: boolean) {
     if (moving === this.moving) return;
     this.moving = moving; this.framer?.hold(!moving);
-    if (this.fit(false)) this.framer?.invalidate(); // (a held creature is drawn at a phone's pixels: desktop())
+    if (moving && this.faceFraming) this.measureFace();
+    if (this.fit(false)) this.canvasChanged(); // (a held creature is drawn at a phone's pixels: desktop())
     this.poke();
   }
 
@@ -759,11 +780,33 @@ export class LiveCreature {
     try { this.stage.draw(item, t, lvl, still); } finally { if (windowed) camera3.clearViewOffset(); }
   }
 
+  /** A moving face's footprint asked for (once): its zoom from it when it comes. A face held still never needs it. */
+  private measureFace() {
+    if (this.faceMeasuring) return;
+    this.faceMeasuring = true;
+    this.off.push(footprintOf(this.stage, this.item.spec, (F) => {
+      this.reachZoom = fittedFace(this.stage, this.item, this.faceFraming!, F.reach);
+      this.opts.canvas.dataset.reach = "measured";
+      if (this.moving) this.poke();
+    }, () => { this.faceMeasuring = false; }));
+  }
+  private faceMeasuring = false;
+
   /** A face's zoom for this frame: moving, the one that holds every act it can play (its footprint); held still, or until its
    *  footprint is measured, the one that holds the pose it is drawn in (posed here first, as the draw will pose it). */
   private faceZoom(t: number, lvl: number, still: boolean): number {
     const framing = this.faceFraming!;
-    if (!still && this.reachZoom != null) return this.reachZoom;
+    if (!still) {
+      if (this.reachZoom != null) return this.reachZoom;
+      if (this.provisionalZoom == null) {
+        const { spec } = this.item, was = { state: spec.state, expr: spec.expr, extra: this.item.opts.extra };
+        spec.state = "idle"; spec.expr = undefined; this.item.opts.extra = undefined;
+        this.stage.pose(this.item, 0, 0, true);
+        this.provisionalZoom = fittedFace(this.stage, this.item, framing, provisionalReach(this.item.c));
+        spec.state = was.state; spec.expr = was.expr; this.item.opts.extra = was.extra;
+      }
+      return this.provisionalZoom;
+    }
     this.item.opts.zoom = framing.zoom;
     this.stage.pose(this.item, t, lvl, still);
     return fittedFace(this.stage, this.item, framing, posedPoints(this.item.c, { stride: 3 }));

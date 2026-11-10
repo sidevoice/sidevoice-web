@@ -29,7 +29,7 @@ import "./accessories.js";
 import "./acts.js";
 import { Stage, type StageItem } from "./rig.js";
 import { creatureFromSeed, rigSpec, type CreatureChoice, type RigSpec } from "./catalogue";
-import { aimAt, footActs, holds, measureReach, POSE_EXTREMES, posedPoints, run, STARTLE_HOP, widthReach, type Vec3 } from "./extent";
+import { aimAt, footActs, heightReach, holds, measureReach, POSE_EXTREMES, posedPoints, provisionalReach, run, STARTLE_HOP, widthReach, type Vec3 } from "./extent";
 import { cropShare, FACE, fittedFace, WHOLE_FACE } from "./host";
 import { StageFrame } from "./stage-frame";
 import { StageFramer } from "./stage-framer";
@@ -75,10 +75,11 @@ it.each(MOVING.slice(0, 3))("the floating card's creature holds every act it pla
   expect(cut.slice(0, 5)).toEqual([]);
 }, 300_000);
 
-/** Desktop tiles, from a short, wide window held at 21:9 to a tall, narrow one held at 9:16 (call-view.css --stage-ratio). */
-const TILES = [[1598, 876], [1120, 698], [2000, 857], [695, 298], [848, 1509], [622, 1107], [467, 796]] as const;
+/** Desktop tiles, from a short, wide window held at 21:9 to a tall, narrow one held at 9:16 (call-view.css --stage-ratio), and a phone
+ *  on its side (the desktop's rules: its framing has no landscape). */
+const TILES = [[1598, 876], [1120, 698], [2000, 857], [695, 298], [820, 351], [848, 1509], [622, 1107], [467, 796]] as const;
 
-it.each(MOVING.slice(0, 2))("the stage's creature stays inside its canvas and its tile, at every shape of tile and in every pose (%s)", async (_name, choice) => {
+it.each(MOVING.slice(0, 2))("the stage's creature stays inside its canvas and its tile, both ways, at every shape of tile and in every pose, before its reach is measured and after (%s)", async (_name, choice) => {
   const [W, H] = TILES[0];
   const canvas = document.createElement("canvas");
   canvas.getBoundingClientRect = () => new DOMRect(0, 0, W, H);
@@ -88,27 +89,42 @@ it.each(MOVING.slice(0, 2))("the stage's creature stays inside its canvas and it
   frame.ask({ w: W, h: H, dx: 0, dy: 0, phone: false, desktop: true, rest: true, cards: null, opener: null });
   let done = false;
   const framer = new StageFramer({ stage, item, canvas, render() {}, mood: () => "idle", drawn: () => true, poke() {}, aspect: () => W / H, measured() { done = true; } }, frame);
-  expect(framer.reach(W, H)).toBeNull(); // not measured yet: asks for it
+  // Before the reach is measured: the provisional reach frames it (the first frame), the canvas is the whole tile.
+  expect(framer.reach(W, H)).toBeNull();
+  const framing = (tag: string) => TILES.map(([w, h]) => ({ tag, w, h, ...framer.restFraming(w, h), share: cropShare(framer.reach(w, h) ?? Number.NaN, w) }));
+  const before = framing("provisional");
   const until = Date.now() + 120_000;
   while (!done && Date.now() < until) await new Promise((r) => setTimeout(r, 20));
   expect(done).toBe(true);
-  // the closest framing each tile is drawn at (zk at its floor), the canvas's share of the tile there, and the camera: as the stage's
-  // at rest (zoom 1.32 over the creature's 0.5 size, times the step back), at a square's aspect (what reaches a share of a tile's half
-  // width is that over the tile's aspect), its look raised and lowered as the framing lifts it.
-  const tiles = TILES.map(([w, h]) => ({ w, h, zk: framer.floorZk(w, h), share: cropShare(framer.reach(w, h)!, w) }));
+  const after = framing("measured");
+  // The cameras the stage draws these framings with (framer.cameraFor: rig.js Stage.aim), at a square's aspect: what reaches a share of
+  // a tile's half width there reaches that over the tile's aspect in the tile; up and down, the same (the camera's height is the tile's).
+  const all = [...before, ...after], key = (t: { zk: number; lift: number }) => t.zk.toFixed(5) + "|" + t.lift.toFixed(5);
+  const cams = new Map(all.map((t) => [key(t), { camera: framer.cameraFor(1, 1, t), width: 0, top: -Infinity, bottom: Infinity }]));
   framer.dispose();
-  const zks = [...new Set(tiles.map((t) => t.zk))], c = item.c;
-  const camOf = (zk: number, lift: number) => {
-    const zoom = (1.32 * zk) / 0.5;
-    return aimAt(stage, c, 1)({ zoom, lookY: lift === 0 && zk === 1 ? undefined : 0.3 - (zoom - 1) * 0.55 - lift });
-  };
-  const cams = zks.flatMap((zk) => [-0.8, 0, 0.8].map((lift) => ({ zk, camera: camOf(zk, lift) })));
-  const most = new Map<number, number>(zks.map((zk) => [zk, 0]));
-  await everyPose(stage, item, POSE_EXTREMES, (points) => { for (const { zk, camera } of cams) most.set(zk, Math.max(most.get(zk)!, widthReach(camera, points))); }, 6);
-  const cut = tiles.map((t) => ({ ...t, reach: most.get(t.zk)! / (t.w / t.h) }))
-    .filter((t) => t.reach > Math.min(1, t.share)).map((t) => `${t.w}x${t.h} zk ${t.zk.toFixed(3)}: reaches ${t.reach.toFixed(3)} of the half width, canvas ${t.share}`);
+  await everyPose(stage, item, POSE_EXTREMES, (points) => {
+    for (const c of cams.values()) { c.width = Math.max(c.width, widthReach(c.camera, points)); const [top, bottom] = heightReach(c.camera, points); c.top = Math.max(c.top, top); c.bottom = Math.min(c.bottom, bottom); }
+  }, 6);
+  const cut = all.flatMap((t) => {
+    const c = cams.get(key(t))!, width = c.width / (t.w / t.h), out: string[] = [];
+    if (width > Math.min(1, t.share)) out.push(`${t.tag} ${t.w}x${t.h} zk ${t.zk.toFixed(3)}: ${width.toFixed(3)} of the half width, canvas ${t.share}`);
+    if (c.top > 1 || c.bottom < -1) out.push(`${t.tag} ${t.w}x${t.h} zk ${t.zk.toFixed(3)}: from ${c.bottom.toFixed(3)} to ${c.top.toFixed(3)} of the height`);
+    return out;
+  });
   expect(cut).toEqual([]);
-  // a landscape tile keeps the reference's framing (zk 1) and its canvas is cropped to the creature
-  for (const t of tiles.filter((t) => t.w / t.h > 1.5)) { expect(t.zk).toBe(1); expect(t.share).toBeLessThan(1); }
+  // a landscape tile with room keeps the reference's framing (zk 1) once measured, and its canvas is cropped to the creature
+  for (const t of after.filter((t) => t.w / t.h > 1.5 && t.h > 600)) { expect(t.zk).toBe(1); expect(t.share).toBeLessThan(1); }
+  // every value the stage lays out is a finite number
+  for (const t of all) for (const v of [t.zk, t.lift, t.share]) expect(Number.isFinite(v)).toBe(true);
 }, 300_000);
 
+it.each(MOVING)("what a creature acts out stays inside the envelope round its pose at rest that frames it before it is measured (%s)", (_name, choice) => {
+  const stage = new Stage("paint", 256);
+  const item = stage.add({ ...rigSpec(choice), state: "idle" }, document.createElement("canvas"), { off: 0, turn: 0 }) as Item;
+  item.c.root.visible = true;
+  stage.pose(item, 0, 0, true);
+  const box = provisionalReach(item.c), lo = [0, 1, 2].map((i) => Math.min(...box.map((p) => [p.x, p.y, p.z][i]))), hi = [0, 1, 2].map((i) => Math.max(...box.map((p) => [p.x, p.y, p.z][i])));
+  const F = run(measureReach(stage, item.spec));
+  const out = F.reach.filter((p) => [p.x, p.y, p.z].some((v, i) => v < lo[i] - 1e-6 || v > hi[i] + 1e-6)).map((p) => `${p.x.toFixed(2)} ${p.y.toFixed(2)} ${p.z.toFixed(2)}`);
+  expect(out).toEqual([]);
+}, 120_000);

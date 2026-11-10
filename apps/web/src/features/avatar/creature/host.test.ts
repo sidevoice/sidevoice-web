@@ -58,9 +58,9 @@ vi.mock("./rig.js", () => {
 });
 // The framer solves a framing on the pixels it renders (a 2D readback this DOM does not have): here it answers nothing, and the
 // host's own part of the stage's ask (its pixels) is what is tested.
-vi.mock("./stage-framer", () => ({ StageFramer: class { hold() {} invalidate() {} step() { return null; } dispose() {} reach() { return rig.reach; } } }));
+vi.mock("./stage-framer", () => ({ StageFramer: class { hold() {} invalidate() {} reboxed() {} step() { return null; } dispose() {} reach() { return rig.reach; } } }));
 // What a creature reaches (extent.ts) is measured on the real rig (never-clipped.test.ts): here every creature fits its framing.
-vi.mock("./extent", () => ({ aimAt: () => () => ({}), fitZoom: (_aim: unknown, _points: unknown, from: number) => from, footprintOf: () => () => {}, posedPoints: () => [] }));
+vi.mock("./extent", () => ({ aimAt: () => () => ({}), fitZoom: (_aim: unknown, _points: unknown, from: number) => from, footprintOf: () => () => {}, posedPoints: () => [], provisionalReach: () => [] }));
 vi.mock("./accessories.js", () => ({}));
 vi.mock("./acts.js", () => ({}));
 
@@ -579,6 +579,26 @@ test("the scene canvas is the whole tile where the creature is not measured, rea
   mount({ ...onStage, moving: false, canvas: held, frame: asked({ desktop: true }) });
   expect(held.style.getPropertyValue("--crop")).toBe("");
   expect(rig.views).not.toContain("clear");
+});
+
+test("a reach that is not a finite number never reaches the stylesheet: the canvas stays the whole tile, with a box and its pixels", () => {
+  // (operator, 2026-11-10: a narrow desktop window's stage showed no creature at all. `--crop: NaN` lays the canvas out zero wide
+  // through calc(100cqw * NaN), and with it laid out so, every refit after found no width to undo it from.)
+  webgl();
+  vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(2);
+  for (const reach of [Number.NaN, Number.POSITIVE_INFINITY, -50]) {
+    rig.reach = reach;
+    const { element } = cropped(1598, 876);
+    mount({ ...onStage, moving: true, canvas: element, frame: asked({ desktop: true }) });
+    expect(element.style.getPropertyValue("--crop"), String(reach)).toBe("");
+    expect(element.width).toBeGreaterThan(0);
+    expect(element.height).toBeGreaterThan(0);
+  }
+  // and the share itself: always a finite number from a step to the whole tile
+  expect(host.cropShare(Number.NaN, 1598)).toBe(1);
+  expect(host.cropShare(200, 0)).toBe(1);
+  expect(host.cropShare(200, Number.NaN)).toBe(1);
+  expect(host.cropShare(0, 1598)).toBeGreaterThan(0);
 });
 
 test("the creature canvas is allocated again only when its size changes: not by a refit that finds the same box, nor a retier back to the same rung", () => {
