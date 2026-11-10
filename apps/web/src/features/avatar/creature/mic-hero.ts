@@ -11,7 +11,8 @@ import { MIC_HERO, MIC_HERO_PX, MIC_MOOD, type MicState } from "./mic-hero-spec"
  *
  * Ported from the design reference's creator, whose microphone section was removed from it once the hero was closed
  * (its act stays in reference/2026-11-04/src/acts.js; the section is the creator's buildMic, pickMic and micFrame as they
- * last stood): its own square stage, 384 px, at zoom 1.05; the heroes drawn into 224 px canvases shown at 112 px. A hero
+ * last stood): its own square stage, 384 px, at zoom 1.05 (here a little further back: STAGE_PX, ZOOM); the heroes drawn into
+ * 224 px canvases shown at 112 px. A hero
  * that moves is the creator's large preview (the idle state under the act, the transition's mood over it, drawn on every
  * animation frame); one that holds still is its 112 px heroes (a neutral face, the act's key pose), drawn once per
  * change.
@@ -19,8 +20,10 @@ import { MIC_HERO, MIC_HERO_PX, MIC_MOOD, type MicState } from "./mic-hero-spec"
  * The stage is a WebGL context of its own, made when the first hero mounts and let go when the last one goes: the
  * permissions screens are seldom open, and the call's two stages never wait for this one. */
 
-/** The stage's size and camera. */
-const STAGE_PX = 384, ZOOM = 1.05;
+/** The stage's size and camera: the reference's 384 px, and its camera stepped back from 1.05 so that every state, its
+ *  transition, its ink and the shadow the key light throws to its right are inside the square (at 1.05 the shadow and the
+ *  allowed mic's sound arcs reached past its right edge: never-clipped.test.ts measures every pose against it). */
+export const STAGE_PX = 384, ZOOM = 1.16;
 
 type HeroSpec = typeof MIC_HERO & { state?: string; expr?: string };
 

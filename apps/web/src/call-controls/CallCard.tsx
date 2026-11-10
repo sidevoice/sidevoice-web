@@ -148,7 +148,8 @@ function CardFigure({ state, size, label }: { state: CallControlsState; size: "s
   const avatars = useConversationAvatars();
   const avatar = useConversationAvatar(agent.threadId);
   useMovingCopy(agent.threadId);
-  // The avatar's creature stands on nothing: framed whole, so no act it plays is cut at its box's edge. The title card's is a face in its chip.
+  // The avatar's creature stands on nothing: framed whole, so no act it plays is cut at its box's edge. The title card's is a face in its chip,
+  // stepped back as far as its acts need (creature/extent.ts): never cut at the chip's edge either.
   return <CharacterAvatar spec={agent.spec} state={avatar} size={size} mouth="playback" label={label} live liveFace={size === "stage" ? "whole" : true}
     mouthLevel={agent.threadId ? avatars.mouth(agent.threadId) : undefined} />;
 }

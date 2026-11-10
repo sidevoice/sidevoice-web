@@ -59,16 +59,16 @@ export function voiceType(w: number, h: number) {
   return { u, agent, agentLine: Math.round(agent * 1.375), person, personLine: Math.round(person * 1.4286) };
 }
 
-/** The framing that stands the creature's drawn middle at the optical centre, stepped back from zk 1 only as far as the
- *  cards need: `hBot` px under it (the largest card below, its gap counted once), `hTop` over it, within `ceil`..`floor`
+/** The framing that stands the creature's drawn middle at the optical centre, stepped back from `zk0` (1, or more where the tile
+ *  is too narrow for the creature at 1: StageFramer.floorZk) only as far as the cards need: `hBot` px under it (the largest card below, its gap counted once), `hTop` over it, within `ceil`..`floor`
  *  of a tile `vh` tall; `xa`..`xb` the cards' columns (the creature's lowest row is taken there). Where no step back fits
  *  at the centre, it rises off it: its lowest row a gap over the card below at its largest (T33).
  *
- *  The answer is the reference's: the first step of ZK_STEP from zk 1 at which the cards fit. It is found without trying
+ *  The answer is the reference's: the first step of ZK_STEP from zk0 at which the cards fit. It is found without trying
  *  every step (each try is a few trial renders of the creature): the drawn height scales as 1/zk, so the step that fits is
  *  predicted from the first try, then confirmed (it fits, the step before it does not). */
-export function capCentre(probe: FrameProbe, hTop: number, hBot: number, vh: number, ceil: number, floor: number, gap: number, xa: number, xb: number): FrameTarget {
-  return finish(capCentreSteps(probe, hTop, hBot, vh, ceil, floor, gap, xa, xb));
+export function capCentre(probe: FrameProbe, hTop: number, hBot: number, vh: number, ceil: number, floor: number, gap: number, xa: number, xb: number, zk0 = 1): FrameTarget {
+  return finish(capCentreSteps(probe, hTop, hBot, vh, ceil, floor, gap, xa, xb, zk0));
 }
 
 /** Runs a solver to its answer at once. */
@@ -78,8 +78,8 @@ export function finish<T>(steps: Generator<void, T>): T {
 
 /** capCentre a trial render at a time: it yields before each (a host draws them between frames, so the page never waits
  *  on all of them at once). */
-export function* capCentreSteps(probe: FrameProbe, hTop: number, hBot: number, vh: number, ceil: number, floor: number, gap: number, xa: number, xb: number): Generator<void, FrameTarget> {
-  const zk0 = 1, headK = TURN_HEAD, want = vh * OPTIC, mid = (m: Rows) => (m.top + m.lowAny) / 2, last = Math.floor((ZK_MAX - zk0) / ZK_STEP + 1e-6);
+export function* capCentreSteps(probe: FrameProbe, hTop: number, hBot: number, vh: number, ceil: number, floor: number, gap: number, xa: number, xb: number, zk0 = 1): Generator<void, FrameTarget> {
+  const headK = TURN_HEAD, want = vh * OPTIC, mid = (m: Rows) => (m.top + m.lowAny) / 2, last = Math.max(0, Math.floor((ZK_MAX - zk0) / ZK_STEP + 1e-6));
   const tried = new Map<number, { f: FrameTarget; fits: boolean }>();
   const at = function* (i: number): Generator<void, { f: FrameTarget; fits: boolean }> {
     const seen = tried.get(i);

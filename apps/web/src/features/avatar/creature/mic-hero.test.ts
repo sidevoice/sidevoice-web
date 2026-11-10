@@ -52,11 +52,11 @@ beforeEach(async () => {
 const canvas = () => { const c = document.createElement("canvas"); document.body.appendChild(c); return c; };
 const moods = () => rig.acts.filter(([layer]) => layer === "mood").map(([, name, o]) => [name, (o as { dur?: number } | undefined)?.dur]);
 
-test("the hero is the reference's: round, headphones, mostaza body, berenjena headphones, deep violet eyes, on a 384 px stage at zoom 1.05", () => {
+test("the hero is the reference's: round, headphones, mostaza body, berenjena headphones, deep violet eyes, on a 384 px stage, stepped back from 1.05 to hold all of it", () => {
   const c = canvas();
   mod.mountMicHero({ canvas: c, state: "prompt", moving: false });
   expect(rig.stages).toEqual([{ px: 384, mode: undefined, released: false }]);
-  expect(rig.specs[0]).toMatchObject({ body: "round", parts: ["headphones"], color: "#e0a82e", accent: "#4a2f6b", iris: "#5a3a8a", level: "v1", eyeScale: 1.35, opts: { off: 0, zoom: 1.05 } });
+  expect(rig.specs[0]).toMatchObject({ body: "round", parts: ["headphones"], color: "#e0a82e", accent: "#4a2f6b", iris: "#5a3a8a", level: "v1", eyeScale: 1.35, opts: { off: 0, zoom: 1.16 } });
   expect([c.width, c.height]).toEqual([224, 224]);
   // it acts the state out, a neutral face held still in the act's key pose
   expect(rig.acts[0]).toEqual(["base", "mic", { state: "prompt" }]);

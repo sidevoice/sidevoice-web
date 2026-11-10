@@ -1012,10 +1012,10 @@ export class Stage {
     this.items.push(item);
     return item;
   }
-  draw(item, t, lvl, isStatic) {
-    const { c, spec, canvas, opts } = item;
-    // the camera's aspect and the renderer's size follow the canvas: a creature is never stretched, whatever it is drawn into
-    if (!this.cine && !this.fixed) { const ar = canvas.width / canvas.height; if (Math.abs(ar - this.camera.aspect) > Math.max(1e-3, 2 / Math.min(canvas.width, canvas.height))) { this.camera.aspect = ar; this.camera.updateProjectionMatrix(); this.w = Math.round(this.h * ar); this.renderer.setSize(this.w, this.h); } }
+  // product: the pose alone (the state's motion, the acts, a host's overrides), drawing nothing: a host measures what a creature
+  // reaches by the same pose a frame shows (extent.ts), not a copy of it.
+  pose(item, t, lvl, isStatic) {
+    const { c, spec, opts } = item;
     let st = {};
     if (spec.state) { const [kt, kl] = KEY[spec.state] || [0, 0]; st = STATES3D[spec.state](isStatic ? kt : t + item.off, isStatic ? kl : lvl); }
     if (spec.state === 'speaking') st.voice = true; // the mouth follows the voice whatever mood plays over it
@@ -1027,14 +1027,25 @@ export class Stage {
     const exName = x.expr || acted.expr || spec.expr || st.expr || 'neutral';
     c.pose(st, exName, isStatic ? (KEY[spec.state] || [0, 0.6])[1] : lvl);
     c.animateProps(isStatic ? 0.35 : t + item.off);
+    c.root.position.y += c.float || 0;
+  }
+  // product: where the camera stands for an item's options (not the cine set): draw places it so, and a host projects a
+  // creature through the same camera (extent.ts).
+  aim(camera, opts, c) {
+    const zm = opts.zoom || 1; camera.position.set(0, opts.fit ? 0.4 : 0.6, (opts.fit ? 5.0 : 6.7) * zm); camera.lookAt(0, opts.lookY != null ? opts.lookY : (opts.fit ? 0.02 : 0.3 + (c.float || 0) * 0.5) - (zm - 1) * 0.55, 0); // zoom > 1: room around it (creator acts); lookY: an exact look height (a host's framing)
+  }
+  draw(item, t, lvl, isStatic) {
+    const { c, spec, canvas, opts } = item;
+    // the camera's aspect and the renderer's size follow the canvas: a creature is never stretched, whatever it is drawn into
+    if (!this.cine && !this.fixed) { const ar = canvas.width / canvas.height; if (Math.abs(ar - this.camera.aspect) > Math.max(1e-3, 2 / Math.min(canvas.width, canvas.height))) { this.camera.aspect = ar; this.camera.updateProjectionMatrix(); this.w = Math.round(this.h * ar); this.renderer.setSize(this.w, this.h); } }
+    this.pose(item, t, lvl, isStatic);
     for (const it of this.items) it.c.root.visible = it === item;
     this.floor.position.y = c.minY - 0.005 - (this.cine ? 0.42 : 0); // under the keyboard on the cine set
     if (this.keys) this.keys.position.y = c.minY - 0.005;
-    c.root.position.y += c.float || 0;
     // product: the camera is placed before the light is turned to follow it (the reference placed it after, so a frame lit
     // with the previous frame's camera: the same in a running loop, a stale light on a still drawn once after a reframing)
     if (this.cine) { const cp = opts.cam || [2.4, 0.9, 9.6]; this.camera.position.set(...cp); this.camera.lookAt(0, 0.45 + (c.float || 0) * 0.7, 0); if (this.bokeh) this.bokeh.uniforms.focus.value = this.camera.position.distanceTo(new THREE.Vector3(0, 0.2, 0)); }
-    else { const zm = opts.zoom || 1; this.camera.position.set(0, opts.fit ? 0.4 : 0.6, (opts.fit ? 5.0 : 6.7) * zm); this.camera.lookAt(0, opts.lookY != null ? opts.lookY : (opts.fit ? 0.02 : 0.3 + (c.float || 0) * 0.5) - (zm - 1) * 0.55, 0); } // zoom > 1: room around it (creator acts); lookY: an exact look height (a host's framing)
+    else this.aim(this.camera, opts, c);
     // listening: the rim light takes the accent colour and grows with the voice
     if (this.look === 'render') { this.rim.color.set(c.ring > 0 ? (spec.accent || '#5aa9e6') : '#bfd8ff'); this.rim.intensity = 1.4 + c.ring * 4; }
     // cast-shadow variants use a higher, more lateral key so ears, hats and eyes throw shadows onto the body

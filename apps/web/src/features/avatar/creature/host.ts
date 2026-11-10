@@ -6,6 +6,7 @@ import { creatureFromSeed, rigSpec, type CreatureChoice, type RigSpec } from "./
 import type { StageFrame } from "./stage-frame";
 import { StageFramer } from "./stage-framer";
 import { Governor, sceneSize } from "./quality";
+import { aimAt, fitZoom, footprintOf, posedPoints, type Vec3 } from "./extent";
 
 /* Where creatures are drawn on a page: two three.js stages (one WebGL context each, whatever the number of creatures),
  * each creature built once into a stage's scene and blitted into its own 2D canvas, as the design reference's creator
@@ -19,7 +20,9 @@ import { Governor, sceneSize } from "./quality";
  *    centre, stepping back for a turn's card: fitFrame, capCentre) comes with the stage's voice text, and plugs in here
  *    as a framing ({ zoom, lookY }).
  *  - "face": the whole creature fitted in a square, never cropped from the stage: the creator's face render (renderFace,
- *    T35: fit, zoom 1.5, look height 0.22), the transcript's 44 px face and the floating card's.
+ *    T35: fit, zoom 1.5, look height 0.22), the transcript's 44 px face and the floating card's. The square holds all of it:
+ *    a creature that reaches past the face render's square (a wide body in headphones or a brimmed hat, and the shadow the key
+ *    light throws to its right) steps back until it does (fittedFace: extent.ts); one that fits keeps the render exactly.
  *
  * A face can also be live and sharp (`sharp`: the floating card's creature): drawn about 30 times a second like the
  * stage's, on a stage of its own ("card") whose renderer takes the canvas's size, and the canvas takes its box's size in
@@ -72,12 +75,22 @@ const STARTLE = { expr: "surprised", hop: 1.1, secs: 0.55 } as const;
 
 /** The reference's desktop stage distance (creator.js VIEWS.desktop). */
 export const SCENE_ZOOM = 1.32;
-/** The face render (creator.js renderFace): fitted, stepped back and aimed a little higher, so a hat or ears fit. */
-const FACE = { fit: true, zoom: 1.5, lookY: 0.22 } as const;
+/** The face render (creator.js renderFace): fitted, stepped back and aimed a little higher, so a hat or ears fit. A creature
+ *  that still reaches past its square steps back further (fittedFace). */
+export const FACE = { fit: true, zoom: 1.5, lookY: 0.22 } as const;
+/** The room a face keeps round everything it draws (its ink and shadow included: extent.ts INK_PAD), a share of its half side. */
+const FACE_ROOM = 0.02;
+/** The zoom from `framing`'s own at which every point (a pose's, or a footprint's) is inside a face's square with FACE_ROOM to
+ *  spare: the framing's own zoom where they already are. */
+export function fittedFace(stage: RigStage, item: Item, framing: { zoom: number }, points: Vec3[]): number {
+  const aim = aimAt(stage, item.c, 1);
+  return fitZoom((zoom) => aim({ ...item.opts, ...framing, zoom }), points, framing.zoom, FACE_ROOM);
+}
 /** A sharp face that stands on nothing (the floating card's avatar, `whole`): the face render stepped back further and aimed higher,
  *  so that every act it plays, its props beside it on the floor, its antics overhead and the shadows they cast, is inside its square.
  *  The acts keep inside the reference creator's frame (acts.js ZOOM), which is wider than the face render's: at FACE a boombox, a
- *  splash or the busy cogs reach past the canvas's edges (acts-fit.test.ts measures every act's widest frame against both). */
+ *  splash or the busy cogs reach past the canvas's edges (acts-fit.test.ts measures every act's widest frame against both). Either
+ *  framing is then stepped back as far as this creature's own footprint needs (fittedFace: a wide body, a brim, their shadows). */
 export const WHOLE_FACE = { fit: true, zoom: 1.8, lookY: 0.4 } as const;
 /** The face canvas's height, as the creator's. The stage's canvas is as large as the tile shows (quality.ts sceneSize). */
 const FACE_PX = 144;
@@ -400,6 +413,10 @@ export class LiveCreature {
   /** The stage's framing, where it has one (`frame`), and whether it is still easing toward its target. */
   private framer: StageFramer | null = null;
   private easing = false;
+  /** A face's own framing (FACE, or WHOLE_FACE for a sharp face framed whole), and the zoom at which everything it can act out
+   *  fits its square (from its footprint, extent.ts; null until measured). */
+  private faceFraming: { zoom: number } | null = null;
+  private reachZoom: number | null = null;
 
   constructor(stage: RigStage, private opts: LiveOptions) {
     this.stage = stage;
@@ -407,6 +424,12 @@ export class LiveCreature {
     const face = opts.framing === "face";
     this.item = stage.add(rigSpec(opts.choice ?? creatureFromSeed(opts.seed)), opts.canvas, face ? { ...(opts.sharp && opts.whole ? WHOLE_FACE : FACE), off: 0 } : { turn: 0, off: 0 });
     this.moving = opts.moving ?? true; // (before the first fit: a held creature is sized at a phone's pixels)
+    if (face) {
+      // A moving face holds every act it can play inside its square: its footprint, measured once per shape on the page (until
+      // then, and while it holds still, the pose it is drawn in: faceZoom).
+      this.faceFraming = { zoom: (opts.sharp && opts.whole ? WHOLE_FACE : FACE).zoom };
+      this.off.push(footprintOf(stage, this.item.spec, (F) => { this.reachZoom = fittedFace(this.stage, this.item, this.faceFraming!, F.reach); this.poke(); }));
+    }
     this.fit();
     if (opts.frame && !face) {
       this.framer = new StageFramer({ stage, item: this.item, canvas: opts.canvas, poke: () => this.poke(),
@@ -728,10 +751,22 @@ export class LiveCreature {
     // render's smaller canvas takes the same frame resampled).
     if (this.slot !== "face") this.sizeStage();
     this.warm(t, lvl, still);
+    // A face stands as far back as what it shows needs to stay inside its square (faceZoom).
+    if (this.faceFraming && !camera) item.opts.zoom = this.faceZoom(t, lvl, still);
     // A cropped canvas shows its part of the tile's frame: the same camera, windowed (the view offset is only on for the draw).
     const { canvas } = this.opts, camera3 = this.stage.camera, windowed = this.slot === "scene" && this.laid < 1 && canvas.width > 0;
     if (windowed) { const fullW = canvas.width / this.laid; camera3.setViewOffset(fullW, canvas.height, (fullW - canvas.width) / 2, 0, canvas.width, canvas.height); }
     try { this.stage.draw(item, t, lvl, still); } finally { if (windowed) camera3.clearViewOffset(); }
+  }
+
+  /** A face's zoom for this frame: moving, the one that holds every act it can play (its footprint); held still, or until its
+   *  footprint is measured, the one that holds the pose it is drawn in (posed here first, as the draw will pose it). */
+  private faceZoom(t: number, lvl: number, still: boolean): number {
+    const framing = this.faceFraming!;
+    if (!still && this.reachZoom != null) return this.reachZoom;
+    this.item.opts.zoom = framing.zoom;
+    this.stage.pose(this.item, t, lvl, still);
+    return fittedFace(this.stage, this.item, framing, posedPoints(this.item.c, { stride: 3 }));
   }
 
   /** The scene's and the card's stage renderer take their canvas's size, when that changed. */
@@ -810,6 +845,11 @@ function renderFace(seed: string, expr: string, choice?: CreatureChoice): HTMLCa
   item.spec.state = "idle";
   item.spec.expr = expr;
   item.opts.extra = {};
+  // The whole of it in the square, its shadow included: posed as the draw will pose it, and stepped back from the face render
+  // only where it reaches past it (fittedFace).
+  item.opts.zoom = FACE.zoom;
+  stage.pose(item, 0, 0, true);
+  item.opts.zoom = fittedFace(stage, item, FACE, posedPoints(item.c));
   stage.draw(item, 0, 0, true);
   return canvas;
 }
@@ -943,6 +983,10 @@ export function posterPortrait(seed: string, choice?: CreatureChoice): { img: HT
     // very happy: smiling eyes (the happy lower-lid curve, relaxed lids) and a big open grin, facing straight on
     item.opts.extra = { expr: "happy", bot: 0.42, lid: 0.06, grin: true, gx: 0, gy: 0, tilt: 0, dx: 0, dy: 0, breathe: 0, squash: 0 };
     s.floor.visible = false; if (c.contact) c.contact.visible = false;
+    // the whole of it on the photo: stepped back from 1.5 only where a hat or ears reach past the square (no floor shadow here)
+    stage.pose(item, 0, 0.7, true);
+    const aim = aimAt(stage, item.c, 1);
+    item.opts.zoom = fitZoom((zoom) => aim({ ...item.opts, zoom }), posedPoints(item.c, { shadows: false }), 1.5, FACE_ROOM);
     stage.draw(item, 0, 0.7, true);
   } finally {
     s.floor.visible = true;

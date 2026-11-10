@@ -51,12 +51,16 @@ vi.mock("./rig.js", () => {
       this.draws += 1;
       rig.drawn.push({ state: item.spec.state, expr: item.spec.expr, still });
     }
+    /** The pose a draw shows, drawing nothing (what the faces are fitted on: extent.ts, mocked below). */
+    pose() {}
   }
   return { Stage, ACTS: {} };
 });
 // The framer solves a framing on the pixels it renders (a 2D readback this DOM does not have): here it answers nothing, and the
 // host's own part of the stage's ask (its pixels) is what is tested.
 vi.mock("./stage-framer", () => ({ StageFramer: class { hold() {} invalidate() {} step() { return null; } dispose() {} reach() { return rig.reach; } } }));
+// What a creature reaches (extent.ts) is measured on the real rig (never-clipped.test.ts): here every creature fits its framing.
+vi.mock("./extent", () => ({ aimAt: () => () => ({}), fitZoom: (_aim: unknown, _points: unknown, from: number) => from, footprintOf: () => () => {}, posedPoints: () => [] }));
 vi.mock("./accessories.js", () => ({}));
 vi.mock("./acts.js", () => ({}));
 

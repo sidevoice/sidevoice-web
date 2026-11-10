@@ -192,3 +192,19 @@ test("a desktop is a fine pointer with no coarse one, or the desktop app, never 
   expect(desktopDevice({ handset: false, finePointer: true, anyCoarse: true, app: false })).toBe(false); // a wide phone with a mouse, a touch laptop in a browser: a phone's fill
   expect(desktopDevice({ handset: false, finePointer: true, anyCoarse: true, app: true })).toBe(true); // the app stays a desktop
 });
+
+describe("a tile too narrow for the creature at the nearest step", () => {
+  test("the solve starts from the step the tile's width needs (zk0), never nearer, and still steps back for a card from there", () => {
+    // at rest: the creature at its floor, its drawn middle at the optical centre, no nearer than zk0
+    const rest = creature();
+    const atRest = capCentre(rest.probe, 0, 0, 1100, 10, 1090, 38.5, 0, 600, 1.3);
+    expect(atRest.zk).toBeCloseTo(1.3, 6);
+    expect(rest.calls.every(([, zk]) => zk >= 1.3 - 1e-9)).toBe(true);
+    near((atRest.top + atRest.low) / 2, 1100 * OPTIC, 1.5);
+    // a card too large for the creature at its floor: stepped back from there, in ZK_STEP steps
+    const turn = creature({ tall: 600 });
+    const withCard = capCentre(turn.probe, 0, 380, 1100, 10, 1090, 38.5, 0, 600, 1.3);
+    expect(withCard.zk).toBeGreaterThan(1.3);
+    expect(Math.abs(((withCard.zk - 1.3) / 0.08) - Math.round((withCard.zk - 1.3) / 0.08))).toBeLessThan(1e-6);
+  });
+});
