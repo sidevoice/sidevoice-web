@@ -755,7 +755,12 @@ export class LiveCreature {
       extra.expr = r.expr;
     }
     const item = this.item, framed = camera ?? this.framer?.step() ?? null, view = framed ? null : this.framingNow();
-    if (!camera) this.easing = !!framed && "moving" in framed && !!framed.moving;
+    if (!camera) {
+      const easing = !!framed && "moving" in framed && !!framed.moving;
+      // said on the canvas while it eases to a new framing (`data-easing`), written only as that starts and ends
+      if (easing !== this.easing && this.slot === "scene") this.opts.canvas.toggleAttribute("data-easing", easing);
+      this.easing = easing;
+    }
     if (view || framed) {
       // As the creator draws its stage (viewCam): the camera takes the canvas's shape. The renderer takes it too (sizeStage), so
       // the frame is rendered at the pixels it is shown in; the reference rendered 1152 × 768 and resampled it into the canvas.

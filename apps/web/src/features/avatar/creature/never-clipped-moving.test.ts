@@ -29,7 +29,7 @@ import "./accessories.js";
 import "./acts.js";
 import { Stage, type StageItem } from "./rig.js";
 import { creatureFromSeed, rigSpec, type CreatureChoice, type RigSpec } from "./catalogue";
-import { aimAt, footActs, heightReach, holds, measureReach, POSE_EXTREMES, posedPoints, provisionalReach, run, STARTLE_HOP, widthReach, type Vec3 } from "./extent";
+import { aimAt, footActs, footprintNow, heightReach, holds, measureReach, POSE_EXTREMES, posedPoints, provisionalReach, run, STARTLE_HOP, widthReach, type Vec3 } from "./extent";
 import { cropShare, FACE, fittedFace, WHOLE_FACE } from "./host";
 import { StageFrame } from "./stage-frame";
 import { StageFramer } from "./stage-framer";
@@ -43,6 +43,36 @@ const breathe = () => new Promise((resolve) => setTimeout(resolve, 0));
 /** A few creatures for the moving framings, which play every act: the report's, the widest still face, a tall one, a rolled one. */
 const MOVING: Array<[string, CreatureChoice]> = [["box in headphones", REPORTED], ["can in a straw hat", { ...base, body: "can", head: "straw hat" }],
   ["peanut with bunny ears", { ...base, body: "peanut", ears: "bunny" }], ["rolled t1", creatureFromSeed("t1")]];
+/** The tallest of what a creature can wear, which leans furthest out as the head tips to the pointer's gaze. */
+const TALL: [string, CreatureChoice] = ["round in a wizard hat", { ...base, body: "round", head: "wizard hat" }];
+
+/** A stage framer on a creature (the real rig), asked for a tile `w` × `h` (`phone`: a phone's portrait rules), `held` still or
+ *  moving, its reach measured where it measures it (resolves once it has, or at once where it does not). */
+async function framed(choice: CreatureChoice, w: number, h: number, { phone = false, held = false } = {}) {
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(w * 2); canvas.height = Math.round(h * 2);
+  canvas.getBoundingClientRect = () => new DOMRect(0, 0, w, h);
+  const stage = new Stage("paint", 768, "wide", { fixed: true });
+  const item = stage.add(rigSpec(choice), canvas, { turn: 0, off: 0 }) as Item;
+  const frame = new StageFrame();
+  let done = false;
+  const framer = new StageFramer({ stage, item, canvas, render() {}, mood: () => "idle", drawn: () => true, poke() {}, aspect: () => w / h, measured() { done = true; } }, frame);
+  framer.hold(held);
+  frame.ask({ w, h, dx: 0, dy: 0, phone, desktop: !phone, rest: true, cards: null, opener: null });
+  framer.cameraForAsk(); // (asks for the reach where it is measured)
+  const until = Date.now() + 120_000;
+  if ((!held || phone) && !footprintNow(item.spec)) while (!done && Date.now() < until) await new Promise((r) => setTimeout(r, 20));
+  return { stage, item, framer };
+}
+
+/** Where every pose `extremes` puts it reaches through `camera` (a square's aspect: a share of the half width over the tile's aspect in it). */
+async function reachOf(stage: Stage, item: Item, camera: ReturnType<StageFramer["cameraFor"]>, extremes: ReadonlyArray<Record<string, number> | undefined>, still = false) {
+  const most = { width: 0, top: -Infinity, bottom: Infinity };
+  const keep = (points: Vec3[]) => { most.width = Math.max(most.width, widthReach(camera, points)); const [top, bottom] = heightReach(camera, points); most.top = Math.max(most.top, top); most.bottom = Math.min(most.bottom, bottom); };
+  if (still) for (const extra of extremes) { item.spec.state = "idle"; item.opts = { ...item.opts, extra }; stage.pose(item, 0, 0, true); keep(posedPoints(item.c, { stride: 3 })); }
+  else await everyPose(stage, item, extremes, keep, 6);
+  return most;
+}
 
 /** Every pose of every act over the state it plays in, with the overrides a host lays over it (`extremes`), sampled at other times
  *  than the measure's: each pose's vertices (one in `stride`) and their shadows, handed to `check`. */
@@ -79,7 +109,7 @@ it.each(MOVING.slice(0, 3))("the floating card's creature holds every act it pla
  *  on its side (the desktop's rules: its framing has no landscape). */
 const TILES = [[1598, 876], [1120, 698], [2000, 857], [695, 298], [820, 351], [848, 1509], [622, 1107], [467, 796]] as const;
 
-it.each(MOVING.slice(0, 2))("the stage's creature stays inside its canvas and its tile, both ways, at every shape of tile and in every pose, before its reach is measured and after (%s)", async (_name, choice) => {
+it.each([...MOVING.slice(0, 2), TALL])("the stage's creature stays inside its canvas and its tile, both ways, at every shape of tile and in every pose, before its reach is measured and after (%s)", async (_name, choice) => {
   const [W, H] = TILES[0];
   const canvas = document.createElement("canvas");
   canvas.getBoundingClientRect = () => new DOMRect(0, 0, W, H);
@@ -128,3 +158,40 @@ it.each(MOVING)("what a creature acts out stays inside the envelope round its po
   const out = F.reach.filter((p) => [p.x, p.y, p.z].some((v, i) => v < lo[i] - 1e-6 || v > hi[i] + 1e-6)).map((p) => `${p.x.toFixed(2)} ${p.y.toFixed(2)} ${p.z.toFixed(2)}`);
   expect(out).toEqual([]);
 }, 120_000);
+
+it("a creature held still (reduced motion, no GPU) is framed by the key pose it shows: a normal size on a tall tile, whole, both ways", async () => {
+  for (const [w, h] of [[848, 1509], [622, 1107], [1598, 876]] as const) {
+    const { stage, item, framer } = await framed(REPORTED, w, h, { held: true });
+    const zk = framer.floorZk(w, h), camera = framer.cameraFor(1, 1, framer.restFraming(w, h));
+    framer.dispose();
+    // the provisional envelope (widest acts) would step it back about half again on a 9:16 tile: its key pose does not need it
+    expect(zk, `${w}x${h}`).toBeLessThan(1.1);
+    const r = await reachOf(stage, item, camera, POSE_EXTREMES, true);
+    expect(r.width / (w / h), `${w}x${h} width`).toBeLessThanOrEqual(1);
+    expect(r.top, `${w}x${h} top`).toBeLessThanOrEqual(1);
+    expect(r.bottom, `${w}x${h} foot`).toBeGreaterThanOrEqual(-1);
+  }
+}, 300_000);
+
+it("on a phone (portrait tiles, held still or moving) and on its side, the creature is whole, both ways, in every pose; held still it is the size it is moving", async () => {
+  const views: number[] = [];
+  for (const [w, h, phone] of [[336, 456, true], [366, 655, true], [296, 390, true], [818, 186, false]] as const) {
+    const { stage, item, framer } = await framed(REPORTED, w, h, { phone });
+    const camera = framer.cameraForAsk()!, zoom = (camera as unknown as { position: { z: number } }).position.z;
+    framer.dispose();
+    const r = await reachOf(stage, item, camera, POSE_EXTREMES);
+    const aspect = (camera as unknown as { aspect: number }).aspect;
+    expect(r.width, `${w}x${h} width`).toBeLessThanOrEqual(1);
+    expect(r.top, `${w}x${h} top`).toBeLessThanOrEqual(1);
+    expect(r.bottom, `${w}x${h} foot`).toBeGreaterThanOrEqual(-1);
+    expect(aspect).toBeCloseTo(w / h, 1);
+    if (phone) {
+      const held = await framed(REPORTED, w, h, { phone, held: true });
+      const heldZ = (held.framer.cameraForAsk() as unknown as { position: { z: number } }).position.z;
+      held.framer.dispose();
+      expect(heldZ, `${w}x${h} held`).toBeCloseTo(zoom, 3);
+      views.push(zoom);
+    }
+  }
+  expect(views.length).toBe(3);
+}, 300_000);

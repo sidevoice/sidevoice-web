@@ -117,13 +117,24 @@ export function* capCentreSteps(probe: FrameProbe, hTop: number, hBot: number, v
     let lift = best.lift, m = probe.rows(lift, zk, xa, xb);
     for (let n = 0; n < 7 && Math.abs(m.low - wantLow) > 1; n++) { lift += (m.low - wantLow) / probe.slope(zk); yield; m = probe.rows(lift, zk, xa, xb); }
     best = { lift, zk, low: m.low, top: m.top, head: (m.low - m.top) / 3 };
-    // what it acts out stays on the tile too: lowered back where it would rise past the top (the card then waits, unseen)
-    if (probe.reachRows && probe.reachRows(best.lift, zk).top < 0) {
-      let hi = best.lift, lo = hi - 8;
-      for (let n = 0; n < 30; n++) { const L = (lo + hi) / 2; if (probe.reachRows(L, zk).top < 0) hi = L; else lo = L; }
-      yield;
-      m = probe.rows(lo, zk, xa, xb);
-      best = { lift: lo, zk, low: m.low, top: m.top, head: (m.low - m.top) / 3 };
+    // What it acts out stays on the tile too, both ends (the card then waits, unseen): where it is taller than the tile, stepped back
+    // until it is not; then its lift kept between what keeps its top on the tile and what keeps its foot on it, as near the cards'
+    // as that allows. A larger lift raises it: its rows go up the tile.
+    const reach = probe.reachRows;
+    if (reach) {
+      let z = zk, rr = reach(best.lift, z);
+      for (let n = 0; n < 60 && rr.bottom - rr.top > vh; n++) { z += ZK_STEP; rr = reach(best.lift, z); }
+      if (rr.top < 0 || rr.bottom > vh || z !== zk) {
+        const bound = (ok: (L: number) => boolean, from: number, towards: number) => { let a = from, b = towards; for (let n = 0; n < 40; n++) { const L = (a + b) / 2; if (ok(L)) a = L; else b = L; } return a; };
+        // the highest lift that keeps its top on the tile, the lowest that keeps its foot on it
+        const topOk = (L: number) => !(reach(L, z).top < 0), footOk = (L: number) => !(reach(L, z).bottom > vh);
+        const hiL = topOk(best.lift) ? bound(topOk, best.lift, best.lift + 8) : bound(topOk, best.lift - 8, best.lift);
+        const loL = footOk(best.lift) ? bound(footOk, best.lift, best.lift - 8) : bound(footOk, best.lift + 8, best.lift);
+        const L = Math.min(hiL, Math.max(loL, best.lift));
+        yield;
+        m = probe.rows(L, z, xa, xb);
+        best = { lift: L, zk: z, low: m.low, top: m.top, head: (m.low - m.top) / 3 };
+      }
     }
   }
   return best;

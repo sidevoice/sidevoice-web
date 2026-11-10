@@ -223,3 +223,17 @@ describe("everything the creature acts out stays on the tile", () => {
     expect(reachRows(kept.lift, kept.zk).bottom).toBeLessThanOrEqual(short);
   });
 });
+
+describe("a tile too short for the creature's reach and a card", () => {
+  test("when no step fits, both ends of what it acts out stay on the tile: stepped back until they can, never one end cut for the other", () => {
+    // its reach twice its pose's height, over and under it; a card as tall as half the tile
+    const { probe } = creature({ tall: 260 });
+    const reachRows = (lift: number, zk: number) => { const r = probe.rows(lift, zk, 0, 600); const h = r.low - r.top; return { top: r.top - h, bottom: r.low + h }; };
+    const vh = 300;
+    const f = capCentre({ ...probe, reachRows }, 0, 150, vh, 10, vh - 10, 14, 0, 600);
+    const rr = reachRows(f.lift, f.zk);
+    expect(rr.top).toBeGreaterThanOrEqual(-0.5);
+    expect(rr.bottom).toBeLessThanOrEqual(vh + 0.5);
+    expect(f.zk).toBeGreaterThan(1);
+  });
+});

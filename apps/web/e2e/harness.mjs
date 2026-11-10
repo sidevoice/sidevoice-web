@@ -153,12 +153,18 @@ export async function installHarness(page, { onboarding = { version: 1, choice: 
  *  cards or the turn change. A browser with a GPU does it in a blink; one drawing in software (the CI's) spends a second or
  *  two of ~70 ms frames, in which the page asks for frames, its timers run late and the layer's own properties are
  *  written: a spec of what a settled page does (nothing), or of something timed, waits for this first. It returns at once
- *  where the browser can draw no creature (nothing is solved there), and after `timeout` where the answer never lands. */
-export async function stageFramed(page, timeout = 30_000) {
-  if (!await page.evaluate(() => !!document.createElement("canvas").getContext("webgl"))) return;
+ *  where the browser can draw no creature (nothing is solved there), and after `timeout` where the answer never lands; `strict`,
+ *  it throws in both cases instead. */
+export async function stageFramed(page, timeout = 30_000, { strict = false } = {}) {
+  if (!await page.evaluate(() => !!document.createElement("canvas").getContext("webgl"))) {
+    if (strict) throw new Error("stageFramed: this browser gives no WebGL, so no creature is drawn to frame");
+    return;
+  }
   // The asks of a change just made are made in the frames after it: a layer marked from the answer before it is stale.
   await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
-  await page.locator(".stage-tile .stage-voice[data-framed]").waitFor({ state: "attached", timeout }).catch(() => {});
+  // `strict`: the answer must land within `timeout` (the spec fails there); else a page whose answer never lands goes on as it is.
+  const framed = page.locator(".stage-tile .stage-voice[data-framed]").waitFor({ state: "attached", timeout });
+  if (strict) await framed; else await framed.catch(() => {});
   await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
 }
 

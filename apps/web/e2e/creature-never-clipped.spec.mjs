@@ -42,9 +42,11 @@ async function open(page, { width, height, app }) {
   if (await row.isVisible()) await row.click(); else await picker.click();
   const stage = page.locator(".stage-tile[data-mood] .stage-agent[data-style=creature] > canvas");
   await expect(stage, "the creature's reach measured").toHaveAttribute("data-reach", "measured", { timeout: 90_000 });
-  await stageFramed(page);
-  // the framing on what was measured eases in over a few frames
-  await page.waitForTimeout(1200);
+  await stageFramed(page, 60_000, { strict: true });
+  // The framing on what was measured eases in: drawn a frame or two after it lands (the canvas says so while it eases: data-easing),
+  // then settled.
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+  await expect.poll(() => stage.evaluate((c) => !c.hasAttribute("data-easing")), { timeout: 30_000, message: "the framing settled" }).toBe(true);
   await page.evaluate(`window.__drawn = ${drawn}`);
   return stage;
 }
@@ -64,7 +66,8 @@ async function whole(page, stage) {
   expect({ left: s.l > 0, top: s.t > 0, right: s.r < s.W - 1, bottom: s.b < s.H - 1 }, "clear of the canvas's edges").toEqual({ left: true, top: true, right: true, bottom: true });
   // the conversations' faces: every one shown is painted, and none touches its square's edges
   const faces = page.locator(".conversation-avatar canvas");
-  await expect.poll(() => faces.evaluateAll((all) => all.filter((c) => c.getClientRects().length).every((c) => c.width && window.__drawn(c).count > 0)), { timeout: 20_000, message: "every face shown is painted" }).toBe(true);
+  const shown = () => faces.evaluateAll((all) => all.filter((c) => c.getClientRects().length).map((c) => (c.width ? window.__drawn(c).count : 0)));
+  await expect.poll(async () => { const counts = await shown(); return counts.length > 0 && counts.every((n) => n > 0); }, { timeout: 20_000, message: "faces are shown, and every one is painted" }).toBe(true);
   for (const f of await faces.evaluateAll((all) => all.filter((c) => c.getClientRects().length).map((c) => window.__drawn(c))))
     expect({ left: f.l > 0, top: f.t > 0, right: f.r < f.W - 1, bottom: f.b < f.H - 1 }, "a face clear of its square's edges").toEqual({ left: true, top: true, right: true, bottom: true });
 }

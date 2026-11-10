@@ -58,16 +58,17 @@ function outlineOf(pa: Positions): Float32Array {
   return kept;
 }
 
-/** The furthest the pointer's gaze turns the head either way (rig.js pose: the eyes' gaze, at most 0.85, times 0.42), radians. */
-export const GAZE_TURN = 0.85 * 0.42;
+/** The furthest the pointer's gaze turns the head either way (rig.js pose: the eyes' gaze, at most 0.85, times 0.42), and how far it
+ *  tips it down and up (0.22 a unit of gaze, from a rest of 0.04 down), radians. */
+export const GAZE_TURN = 0.85 * 0.42, GAZE_TIP = { down: 0.04 + 0.85 * 0.22, up: 0.04 - 0.85 * 0.22 } as const;
 /** The startle's hop at its height, world units (host.ts STARTLE: 9 px of the pose's dy a unit of hop, 1.1 of it; rig.js pose: 0.012 a px). */
 export const HOP_LIFT = 9 * 1.1 * 0.012;
 
 /** Visits what a creature draws as it stands now: every drawn mesh's vertices (`exact`: one in `stride`; else its outline points,
  *  outlineOf), and, for what casts a shadow, where those points fall on the floor along the key light. The bursts meant to run off
  *  the frame (noFit) and the ink hulls (outline: the same geometry, INK_PAD covers them) are left out.
- *  `gaze`: what turns with the head (the pivot) is also kept turned to each of the pointer's widest gazes (GAZE_TURN), from where
- *  the pose has it, as a host's gaze would turn it (the rest of the pose kept); `lift`: everything also kept raised by this much
+ *  `gaze`: what turns with the head (the pivot) is also kept turned to each corner of the pointer's widest gazes (GAZE_TURN side to
+ *  side, GAZE_TIP down and up), from where the pose has it, as a host's gaze would turn it (the rest of the pose kept); `lift`: everything also kept raised by this much
  *  (the startle's hop). Both without posing it again. */
 export function visitDrawn(c: Pick<Creature3D, "root" | "minY">, keep: (p: Vec3) => void, { exact = false, stride = 2, shadows = true, gaze = false, lift = 0, drawn }: { exact?: boolean; stride?: number; shadows?: boolean; gaze?: boolean; lift?: number;
   /** Also handed each point drawn as posed (no shadow, no turned or raised copy). */ drawn?: (p: Vec3) => void } = {}) {
@@ -85,12 +86,20 @@ export function visitDrawn(c: Pick<Creature3D, "root" | "minY">, keep: (p: Vec3)
   };
   // the head's pivot, where it stands in the world, and the turns from its pose to the gaze's widest each way
   const pivot = gaze ? (c as unknown as { pivot?: Obj3 & { rotation: { y: number }; matrixWorld: { elements: number[] } } }).pivot : undefined;
-  const turns = pivot ? [GAZE_TURN - pivot.rotation.y, -GAZE_TURN - pivot.rotation.y].map((a) => [Math.cos(a), Math.sin(a)] as const) : [];
-  let px = 0, pz = 0;
+  const p0 = pivot as unknown as { rotation: { x: number; y: number } } | undefined;
+  const turns = p0 ? [GAZE_TURN, -GAZE_TURN].flatMap((y) => [GAZE_TIP.down, GAZE_TIP.up].map((x) => {
+    const a = y - p0.rotation.y, b = x - p0.rotation.x;
+    return [Math.cos(a), Math.sin(a), Math.cos(b), Math.sin(b)] as const;
+  })) : [];
+  let px = 0, py = 0, pz = 0;
   const emit = (p: Vec3, cast: boolean, turned: boolean) => {
     drawn?.(p);
     put(p, cast);
-    if (turned) for (const [cos, sin] of turns) { const dx = p.x - px, dz = p.z - pz; put(r.set(px + dx * cos + dz * sin, p.y, pz - dx * sin + dz * cos), cast); }
+    // tipped about the pivot's side axis, then turned about its upright one (the pose's own order: rig.js pivot.rotation, XYZ)
+    if (turned) for (const [cy, sy, cx, sx] of turns) {
+      const dx = p.x - px, dy = (p.y - py) * cx - (p.z - pz) * sx, dz = (p.y - py) * sx + (p.z - pz) * cx;
+      put(r.set(px + dx * cy + dz * sy, py + dy, pz - dx * sy + dz * cy), cast);
+    }
   };
   const visit = (o: Obj3, top = false, turned = false) => {
     // (the creature's own root counts as shown: a stage hides every creature but the one it draws, between draws)
@@ -113,7 +122,7 @@ export function visitDrawn(c: Pick<Creature3D, "root" | "minY">, keep: (p: Vec3)
     for (const ch of o.children) visit(ch, false, turned);
   };
   root.updateMatrixWorld(true);
-  if (pivot) { const e = pivot.matrixWorld.elements; px = e[12]; pz = e[14]; }
+  if (pivot) { const e = pivot.matrixWorld.elements; px = e[12]; py = e[13]; pz = e[14]; }
   visit(root, true);
 }
 
@@ -223,9 +232,9 @@ export function footActs(): FootAct[] {
   return all.filter(([, name]) => !name || name in (ACTS as Record<string, unknown>));
 }
 
-/** The overrides a host may lay over a pose (rig.js Stage.pose `extra`): none, and the pointer's gaze at its widest each way (the head
- *  turns with it: a boxy body is wider turned). The measure adds them without posing again (visitDrawn `gaze`); the tests pose them. */
-export const POSE_EXTREMES: ReadonlyArray<Record<string, number> | undefined> = [undefined, { gx: 1, gy: 0.6 }, { gx: -1, gy: -0.6 }];
+/** The overrides a host may lay over a pose (rig.js Stage.pose `extra`): none, and the pointer's gaze at each corner of its widest (the
+ *  head turns and tips with it: a boxy body is wider turned, a tall hat leans out tipped). The measure adds them without posing again (visitDrawn `gaze`); the tests pose them. */
+export const POSE_EXTREMES: ReadonlyArray<Record<string, number> | undefined> = [undefined, { gx: 1, gy: 0.6 }, { gx: -1, gy: -0.6 }, { gx: 1, gy: -0.6 }, { gx: -1, gy: 0.6 }];
 /** The startle's hop at its height (host.ts STARTLE: 9 px of the pose's dy a unit of hop, 1.1 of it), on coming into listening. */
 export const STARTLE_HOP = { dy: -9 * 1.1 } as const;
 /** Where in each act the poses are sampled (seconds) and the voice's level they are posed at (its loudest). */
@@ -295,8 +304,8 @@ export function run<T>(steps: Generator<void, T>): T {
 /** The shape a measure is kept for: creatures that differ only in colour reach as far. */
 export const shapeKey = (spec: object) => { const s = spec as { body?: unknown; parts?: unknown; eyeStyle?: unknown }; return JSON.stringify([s.body, s.parts, s.eyeStyle]); };
 
-/** How long a task of a measure runs at most (ms): a few poses, then the page's turn (a frame, input) before the next. */
-const MEASURE_SLICE_MS = 8;
+/** How long a slice of a measure runs (ms): as long as the page is idle, within these; then the page's turn (a frame, input). */
+const MEASURE_SLICE_MS = 8, MEASURE_SLICE_MIN_MS = 4;
 /** The measures made on this page, by shape, and the ones under way: one per shape, whoever asks (the stage, the floating card). */
 const footprints = new Map<string, Footprint>();
 const measuring = new Map<string, Set<{ done: (f: Footprint) => void; failed?: () => void }>>();
@@ -320,16 +329,23 @@ export function footprintOf(stage: Stage, spec: object, done: (f: Footprint) => 
     };
     let gen: Generator<void, Footprint>;
     try { gen = measureReach(stage, spec); } catch (error) { fail(error); return () => {}; }
-    const step = () => {
+    // A slice when the page is idle (requestIdleCallback; where there is none, the task after the next frame is drawn), never
+    // back to back with the last, so the page's frames come first: 4 to 8 ms of poses a slice, in a few seconds at most.
+    const later = () => {
+      if (typeof requestIdleCallback === "function") requestIdleCallback(step, { timeout: 50 });
+      else if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => setTimeout(step, 0));
+      else setTimeout(step, 16);
+    };
+    const step = (idle?: { timeRemaining(): number }) => {
       let r: IteratorResult<void, Footprint>;
-      const until = performance.now() + MEASURE_SLICE_MS;
+      const until = performance.now() + Math.max(MEASURE_SLICE_MIN_MS, Math.min(MEASURE_SLICE_MS, idle?.timeRemaining() ?? MEASURE_SLICE_MS));
       try { do r = gen.next(); while (!r.done && performance.now() < until); } catch (error) { fail(error); return; }
-      if (!r.done) { setTimeout(step, 0); return; }
+      if (!r.done) { later(); return; }
       footprints.set(key, r.value);
       measuring.delete(key);
       for (const w of all) w.done(r.value);
     };
-    setTimeout(step, 0);
+    later();
   }
   const mine = { done, failed };
   waiting.add(mine);

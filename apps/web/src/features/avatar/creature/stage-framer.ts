@@ -1,5 +1,5 @@
 import type { RigCamera, Stage, StageItem } from "./rig.js";
-import { footprintNow, footprintOf, heightReach, provisionalReach, shapeKey, widthReach, type Footprint, type Vec3 } from "./extent";
+import { footprintNow, footprintOf, heightReach, provisionalReach, ReachSet, shapeKey, visitDrawn, widthReach, type Footprint, type Vec3 } from "./extent";
 import { capCentre, capCentreSteps, FRAME_EASE, OPTIC, stageBands, type FrameAsk, type FrameMotion, type FrameProbe, type FrameSolved, type Framing, type FrameTarget, type Rows,
   type StageFrame } from "./stage-frame";
 
@@ -142,8 +142,8 @@ export class StageFramer {
    *  provisional reach: never cut, if a little small for a moment). */
   private view(phone: boolean): View {
     if (!phone) return { zoom: DESKTOP_ZOOM };
-    const { canvas, stage, item } = this.host, aspect = canvas.width / canvas.height, F = this.footprint(), measured = this.measured();
-    const key = shapeKey(item.spec) + "|" + aspect.toFixed(4) + "|" + measured;
+    const { canvas, stage, item } = this.host, aspect = canvas.width / canvas.height, F = this.footprint();
+    const key = shapeKey(item.spec) + "|" + aspect.toFixed(4) + "|" + this.reachTag();
     if (this.phone && this.phoneKey === key) return this.phone;
     const fit = phoneFit(stage, item, aspect, F, this.phone?.zoom ?? null);
     // ...then whatever its acts throw past what they draw (a shadow, the head turned to the finger) is held inside the tile's sides too:
@@ -200,6 +200,14 @@ export class StageFramer {
     stage.aim(cam, this.camera(v, f), item.c); cam.updateMatrixWorld();
     return cam;
   }
+  /** The camera the stage's framing stands at for what it is asked now, at rest and before a card: a phone's view (lift 0: centred),
+   *  or a desktop tile's rest framing (the tests project through it). */
+  cameraForAsk(): RigCamera | null {
+    const ask = this.frame.request;
+    if (!ask || !(ask.w > 0 && ask.h > 0)) return null;
+    return ask.phone ? this.cameraAt(this.host.aspect(), this.view(true), { lift: 0, zk: 1 }) : this.cameraFor(ask.w, ask.h, this.restFraming(ask.w, ask.h));
+  }
+
   /** The desktop camera for a tile `w` × `h` at a framing (the tests project through it too). */
   cameraFor(w: number, h: number, f: Framing): RigCamera { return this.cameraAt(w / h, { zoom: DESKTOP_ZOOM }, f); }
 
@@ -254,19 +262,38 @@ export class StageFramer {
   }
   private reached: { at: string; px: number } | null = null;
 
-  /** The footprint of the creature's shape, or null while it is measured (this starts that, for a creature that moves: one held still
-   *  shows its key poses only, which its provisional reach holds, and the page does no work for it). */
+  /** The footprint of the creature's shape, or null while it is measured (this starts that, for a creature that moves, and on a
+   *  phone, whose framing is made from it; a desktop's creature held still shows its key pose only, which heldReach holds exactly,
+   *  and the page does no work for it). */
   private footprint(): Footprint | null {
     const F = footprintNow(this.host.item.spec);
-    if (!F && !this.held) this.measure();
+    if (!F && (!this.held || this.frame.request?.phone)) this.measure();
     return F;
   }
+
+  /** What a creature held still reaches: the key pose it is drawn in (its state's, with what it has on the go: a working style's key
+   *  pose, the cogs), its head turned to the pointer's widest gazes (it still follows the pointer), its ink and shadow; worked out on
+   *  the rig as the stage poses it still, again when what it shows changes. */
+  private heldReach(): { key: string; points: Vec3[] } {
+    const { stage, item } = this.host, c = item.c, state = RIG_STATE[this.host.mood()] ?? "idle";
+    const key = state + "|" + Object.entries(c.layers).map(([layer, L]) => layer + ":" + L.name).sort().join(",");
+    if (this.held0?.key === key) return this.held0;
+    const was = { state: item.spec.state, expr: item.spec.expr, opts: item.opts }, set = new ReachSet();
+    try { item.spec.state = state; item.spec.expr = undefined; item.opts = { ...item.opts, extra: undefined }; stage.pose(item, 0, 0, true); visitDrawn(c, set.keep, { exact: true, stride: 3, gaze: true }); }
+    finally { item.spec.state = was.state; item.spec.expr = was.expr; item.opts = was.opts; }
+    return (this.held0 = { key, points: set.points });
+  }
+  private held0: { key: string; points: Vec3[] } | null = null;
+
+  /** Which reach frames the creature now, for what is kept by it: its footprint, its held pose's, or its provisional one. */
+  private reachTag(): string { return this.measured() ? "m" : this.held ? "h:" + this.heldReach().key : "p"; }
 
   /** What the creature can reach, as world points: its footprint, or until it is measured its provisional reach (extent.ts: the
    *  box round its pose at rest and every act's envelope round that), worked out once from the rig at rest. */
   private reachPoints(): Vec3[] {
     const F = this.footprint();
     if (F) return F.reach;
+    if (this.held) return this.heldReach().points;
     if (!this.provisional) {
       const { stage, item } = this.host, was = { state: item.spec.state, expr: item.spec.expr, opts: item.opts };
       try { item.spec.state = "idle"; item.spec.expr = undefined; item.opts = { ...item.opts, extra: undefined }; stage.pose(item, 0, 0, true); this.provisional = provisionalReach(item.c); }
@@ -302,7 +329,7 @@ export class StageFramer {
     if (!(w > 0 && h > 0)) return 1;
     const pts = this.reachPoints();
     if (!pts.length) return 1;
-    const key = shapeKey(this.host.item.spec) + "|" + (w / h).toFixed(4) + "|" + this.measured();
+    const key = shapeKey(this.host.item.spec) + "|" + (w / h).toFixed(4) + "|" + this.reachTag();
     const kept = this.floors.get(key);
     if (kept != null) return kept;
     const fits = (zk: number) => {
@@ -579,6 +606,8 @@ export class StageFramer {
   }
 }
 
+/** The rig's state a product's state is drawn in (host.ts MODES). */
+const RIG_STATE: Record<string, string> = { idle: "idle", present: "idle", listening: "listening", speaking: "speaking", working: "working" };
 /** The room kept between what the creature can reach and a desktop tile's sides, a share of the tile's half width, and between it and
  *  the tile's top and foot, a share of its height (floorZk). */
 const SIDE_ROOM = 0.04, UPRIGHT_ROOM = 0.015;
