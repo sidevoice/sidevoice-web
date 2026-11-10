@@ -113,6 +113,11 @@ test("a local file failure's where, reason, root and os_error are kept, unknown 
   expect(JSON.stringify(controller.getSnapshot())).not.toContain("demo-person");
 });
 
+test("inherited property names as params are ignored, never thrown on", () => {
+  const params = JSON.parse('{"constructor":"x","__proto__":"y","toString":"z","hasOwnProperty":"w","reason":"link"}');
+  expect(normalizeLocalHostBridgeError({ key: "install.failed", params }).params).toEqual({ reason: "link" });
+});
+
 test("os_error is kept only as a whole number, and a non-string where or reason is dropped", () => {
   expect(normalizeLocalHostBridgeError({ key: "install.failed", params: { os_error: -3, where: 7, reason: "os" } }).params)
     .toEqual({ os_error: -3, reason: "os" });

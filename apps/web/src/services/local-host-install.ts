@@ -69,7 +69,7 @@ function safeParams(value: unknown) {
     if (key === "check" && typeof entry === "string") {
       const check = entry.trim().toLowerCase();
       if (SAFE_VERIFICATION_CHECKS.has(check)) result.check = check;
-    } else if (key in SAFE_ENUM_PARAMS && typeof entry === "string") {
+    } else if (Object.hasOwn(SAFE_ENUM_PARAMS, key) && typeof entry === "string") {
       result[key] = SAFE_ENUM_PARAMS[key].has(entry) ? entry : "other";
     } else if (key === "os_error" && typeof entry === "number" && Number.isInteger(entry)) {
       result[key] = entry;
