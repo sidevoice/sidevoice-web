@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.30.1](https://github.com/sidevoice/sidevoice-web/compare/v0.30.0...v0.30.1) (2026-11-10)
+
+
+### Bug Fixes
+
+* **avatar:** a creature is never clipped by the box it is drawn in ([#568](https://github.com/sidevoice/sidevoice-web/issues/568)) ([c3c2747](https://github.com/sidevoice/sidevoice-web/commit/c3c2747018e65d6e005bb6bc2f8129a1a044f984))
+
 ## [0.30.0](https://github.com/sidevoice/sidevoice-web/compare/v0.29.0...v0.30.0) (2026-11-09)
 
 
