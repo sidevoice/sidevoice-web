@@ -94,6 +94,10 @@ export class Stage {
   items: StageItem[];
   add<Spec extends object>(spec: Spec, canvas: HTMLCanvasElement | null, opts?: object): StageItem<Spec>;
   draw(item: StageItem, t: number, lvl: number, isStatic: boolean): void;
+  /** The pose a draw shows (the state's motion, the acts, the item's overrides), drawing nothing. */
+  pose(item: StageItem, t: number, lvl: number, isStatic: boolean): void;
+  /** Places `camera` where draw puts the stage's for these item options (zoom, lookY, fit) and this creature. */
+  aim(camera: RigCamera, opts: Record<string, unknown>, c: Creature3D): void;
 }
 
 export const ACTS: Record<string, { kind: string; label: string; dur: number | null; key: number }>;

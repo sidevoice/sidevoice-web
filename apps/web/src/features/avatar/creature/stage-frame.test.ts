@@ -192,3 +192,48 @@ test("a desktop is a fine pointer with no coarse one, or the desktop app, never 
   expect(desktopDevice({ handset: false, finePointer: true, anyCoarse: true, app: false })).toBe(false); // a wide phone with a mouse, a touch laptop in a browser: a phone's fill
   expect(desktopDevice({ handset: false, finePointer: true, anyCoarse: true, app: true })).toBe(true); // the app stays a desktop
 });
+
+describe("a tile too narrow for the creature at the nearest step", () => {
+  test("the solve starts from the step the tile's width needs (zk0), never nearer, and still steps back for a card from there", () => {
+    // at rest: the creature at its floor, its drawn middle at the optical centre, no nearer than zk0
+    const rest = creature();
+    const atRest = capCentre(rest.probe, 0, 0, 1100, 10, 1090, 38.5, 0, 600, 1.3);
+    expect(atRest.zk).toBeCloseTo(1.3, 6);
+    expect(rest.calls.every(([, zk]) => zk >= 1.3 - 1e-9)).toBe(true);
+    near((atRest.top + atRest.low) / 2, 1100 * OPTIC, 1.5);
+    // a card too large for the creature at its floor: stepped back from there, in ZK_STEP steps
+    const turn = creature({ tall: 600 });
+    const withCard = capCentre(turn.probe, 0, 380, 1100, 10, 1090, 38.5, 0, 600, 1.3);
+    expect(withCard.zk).toBeGreaterThan(1.3);
+    expect(Math.abs(((withCard.zk - 1.3) / 0.08) - Math.round((withCard.zk - 1.3) / 0.08))).toBeLessThan(1e-6);
+  });
+});
+
+describe("everything the creature acts out stays on the tile", () => {
+  test("where its acts would rise past the tile's top at the nearest step, the solve steps back until they do not", () => {
+    // its reach: as tall again as its pose over its head, half that under its feet, scaled with the step back
+    const { probe } = creature({ tall: 300 });
+    const reachRows = (lift: number, zk: number) => { const r = probe.rows(lift, zk, 0, 600); const h = r.low - r.top; return { top: r.top - h, bottom: r.low + h / 2 }; };
+    const short = 420;
+    const plain = capCentre(probe, 0, 0, short, 10, short - 10, 14.7, 0, 600);
+    const kept = capCentre({ ...probe, reachRows }, 0, 0, short, 10, short - 10, 14.7, 0, 600);
+    expect(reachRows(plain.lift, plain.zk).top).toBeLessThan(0);
+    expect(kept.zk).toBeGreaterThan(plain.zk);
+    expect(reachRows(kept.lift, kept.zk).top).toBeGreaterThanOrEqual(0);
+    expect(reachRows(kept.lift, kept.zk).bottom).toBeLessThanOrEqual(short);
+  });
+});
+
+describe("a tile too short for the creature's reach and a card", () => {
+  test("when no step fits, both ends of what it acts out stay on the tile: stepped back until they can, never one end cut for the other", () => {
+    // its reach twice its pose's height, over and under it; a card as tall as half the tile
+    const { probe } = creature({ tall: 260 });
+    const reachRows = (lift: number, zk: number) => { const r = probe.rows(lift, zk, 0, 600); const h = r.low - r.top; return { top: r.top - h, bottom: r.low + h }; };
+    const vh = 300;
+    const f = capCentre({ ...probe, reachRows }, 0, 150, vh, 10, vh - 10, 14, 0, 600);
+    const rr = reachRows(f.lift, f.zk);
+    expect(rr.top).toBeGreaterThanOrEqual(-0.5);
+    expect(rr.bottom).toBeLessThanOrEqual(vh + 0.5);
+    expect(f.zk).toBeGreaterThan(1);
+  });
+});

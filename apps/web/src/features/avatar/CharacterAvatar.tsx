@@ -78,7 +78,8 @@ export interface CharacterAvatarProps {
    *  pixels, on the page's card stage (creature/host.ts `sharp`), moving with `live` and in its key pose when it holds
    *  still. Every other small copy is a still face. "whole": a creature on nothing (the floating card's avatar), framed so that
    *  everything it acts out (a prop beside it, its antics overhead, their shadows) is inside its box, as the stage's crop holds it;
-   *  true frames it as a portrait (the title card's face, in its chip). */
+   *  true frames it as a portrait (the title card's face, in its chip). Either way it is stepped back as far as everything it acts out
+   *  needs to stay inside its box (creature/extent.ts): a creature is never cut at its box's edge. */
   liveFace?: boolean | "whole";
   /** Drawn on the stage's scene (a creature): the canvas is the whole tile, the creature standing on its ground, its eyes
    *  following the pointer over the tile. */

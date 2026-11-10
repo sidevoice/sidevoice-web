@@ -16,6 +16,7 @@ eyes (Void, MIT: see `THIRD_PARTY_NOTICES.md`).
 | `faces.ts` | how a still face looks in each state |
 | `fallback.ts` | what stands in where no creature can be drawn: the body colour in a plain outline, no face. No three.js |
 | `host.ts` | where creatures are drawn: two stages per page, the live loop (about 30 frames a second), the still faces, the framings, the pointer gaze, and the acts on the rig's layers; what happens when WebGL is missing, refused or lost; the offline poster's portrait (`posterPortrait`, for `../scene/`) |
+| `extent.ts` | how far a creature reaches and how far back a camera stands to hold it (operator, 2026-11-10: a creature is never cut at its box's edge): `posedPoints` (a still pose, exactly), `measureReach` (every act over its state, posed as a frame poses it, the head also turned and tipped to each corner of the pointer's widest gaze and raised by the startle's hop, the voice at its loudest; its ink and its shadow included; about 1.5 s of work once per creature shape on a page, in 4–8 ms slices in the page's idle time); a creature held still (reduced motion, no GPU) is framed by the key pose it shows instead, and does no measuring on a desktop, `provisionalReach` (until then: the box round its pose at rest and `ACTS_ENVELOPE` round that, so the first frame is never cut), `fitZoom` (the least step back from a framing that holds them). The stage's crop, its width and its height (StageFramer `reach`, `floorZk`, and capCentre keeping both ends of the reach inside the tile, stepping back where they cannot both be), the phone's framing, the still faces, the floating card's creature and the poster's photo are all fitted from it. A crop or a framing that is not a finite number is never laid out (`cropShare`: `--crop: NaN` lays the canvas out zero wide) |
 | `mic-hero.ts`, `mic-hero-spec.ts` | the microphone permission hero (T23): the same mostaza creature with headphones on every permissions screen, a square stage of its own while one is shown, acting out the microphone's state with the `mic` act (in `acts.js`, after the export) and its transitions (excited, sad, confused) |
 
 `CharacterAvatar` (`../CharacterAvatar.tsx`) draws a conversation's creature (the `bicho` kind) through `host.ts`, which
@@ -62,9 +63,14 @@ resizes only the creatures in motion (one held still keeps the size it was drawn
   rendered 1152 × 768 and resampled it, the creator's `viewCam`). The camera
   stands where the stage puts it: by default the reference's desktop distance (`SCENE_ZOOM`, 1.32) with the feet on the
   scene's ground line; a framing `{ zoom, lookY }` (the creator's `item.opts`) replaces it — this is where the stage's
-  own framing (`fitFrame`, `capCentre`) plugs in.
+  own framing (`fitFrame`, `capCentre`) plugs in. The stage's framing is sized by the tile's height, so on a tile too narrow
+  for everything the creature can act out (a tall window's, held at 9:16) it starts stepped back as far as the tile's width
+  needs, and on one too short for what it acts out above and below it, as far as its height needs (`StageFramer.floorZk`, from
+  its footprint, or its provisional reach until that is measured: `extent.ts`); a landscape tile with room keeps the reference's distance.
 - **A face** (`framing: "face"`): the whole creature fitted in a 144 px square, the creator's face render (T35) — the
-  transcript's 44 px face and the floating card's. Still faces are rendered once per conversation and expression and
+  transcript's 44 px face and the floating card's. A creature that reaches past that square (a wide body in headphones or a brim,
+  and the shadow the key light throws to its right) is stepped back until all of it is inside (`extent.ts`); one that fits keeps the
+  render exactly. A sharp face that moves is fitted to every act it can play. Still faces are rendered once per conversation and expression and
   kept (`drawFace`, `faceImage`); a face that moves is drawn live.
 - **Moving or still**: a copy moves where the page's drawings move (`lib/motion.ts`: the GPU, no reduced motion) and it
   is `live`; otherwise it shows its state's key pose (the creator under reduced motion), drawn again on each change.

@@ -32,6 +32,9 @@ export interface Rows { low: number; top: number; lowAny: number }
 export interface FrameProbe {
   rows(lift: number, zk: number, xa: number, xb: number): Rows;
   slope(zk: number): number;
+  /** How far up and down the tile everything the creature can act out reaches at a framing (css px from the tile's top): what is
+   *  kept inside the tile, above the cards' concerns. None: only the pose's rows are kept in. */
+  reachRows?(lift: number, zk: number): { top: number; bottom: number };
 }
 
 /** A framing: the camera's lift (it looks lower by this much) and step back. */
@@ -59,16 +62,16 @@ export function voiceType(w: number, h: number) {
   return { u, agent, agentLine: Math.round(agent * 1.375), person, personLine: Math.round(person * 1.4286) };
 }
 
-/** The framing that stands the creature's drawn middle at the optical centre, stepped back from zk 1 only as far as the
- *  cards need: `hBot` px under it (the largest card below, its gap counted once), `hTop` over it, within `ceil`..`floor`
+/** The framing that stands the creature's drawn middle at the optical centre, stepped back from `zk0` (1, or more where the tile
+ *  is too narrow for the creature at 1: StageFramer.floorZk) only as far as the cards need: `hBot` px under it (the largest card below, its gap counted once), `hTop` over it, within `ceil`..`floor`
  *  of a tile `vh` tall; `xa`..`xb` the cards' columns (the creature's lowest row is taken there). Where no step back fits
  *  at the centre, it rises off it: its lowest row a gap over the card below at its largest (T33).
  *
- *  The answer is the reference's: the first step of ZK_STEP from zk 1 at which the cards fit. It is found without trying
+ *  The answer is the reference's: the first step of ZK_STEP from zk0 at which the cards fit. It is found without trying
  *  every step (each try is a few trial renders of the creature): the drawn height scales as 1/zk, so the step that fits is
  *  predicted from the first try, then confirmed (it fits, the step before it does not). */
-export function capCentre(probe: FrameProbe, hTop: number, hBot: number, vh: number, ceil: number, floor: number, gap: number, xa: number, xb: number): FrameTarget {
-  return finish(capCentreSteps(probe, hTop, hBot, vh, ceil, floor, gap, xa, xb));
+export function capCentre(probe: FrameProbe, hTop: number, hBot: number, vh: number, ceil: number, floor: number, gap: number, xa: number, xb: number, zk0 = 1): FrameTarget {
+  return finish(capCentreSteps(probe, hTop, hBot, vh, ceil, floor, gap, xa, xb, zk0));
 }
 
 /** Runs a solver to its answer at once. */
@@ -78,8 +81,9 @@ export function finish<T>(steps: Generator<void, T>): T {
 
 /** capCentre a trial render at a time: it yields before each (a host draws them between frames, so the page never waits
  *  on all of them at once). */
-export function* capCentreSteps(probe: FrameProbe, hTop: number, hBot: number, vh: number, ceil: number, floor: number, gap: number, xa: number, xb: number): Generator<void, FrameTarget> {
-  const zk0 = 1, headK = TURN_HEAD, want = vh * OPTIC, mid = (m: Rows) => (m.top + m.lowAny) / 2, last = Math.floor((ZK_MAX - zk0) / ZK_STEP + 1e-6);
+export function* capCentreSteps(probe: FrameProbe, hTop: number, hBot: number, vh: number, ceil: number, floor: number, gap: number, xa: number, xb: number, zk0 = 1): Generator<void, FrameTarget> {
+  const headK = TURN_HEAD, want = vh * OPTIC, mid = (m: Rows) => (m.top + m.lowAny) / 2, last = Math.max(0, Math.floor((ZK_MAX - zk0) / ZK_STEP + 1e-6));
+  const inside = (lift: number, zk: number) => { if (!probe.reachRows) return true; const r = probe.reachRows(lift, zk); return !(r.top < 0) && !(r.bottom > vh); };
   const tried = new Map<number, { f: FrameTarget; fits: boolean }>();
   const at = function* (i: number): Generator<void, { f: FrameTarget; fits: boolean }> {
     const seen = tried.get(i);
@@ -89,7 +93,8 @@ export function* capCentreSteps(probe: FrameProbe, hTop: number, hBot: number, v
     let lift = 0, m = probe.rows(0, zk, xa, xb);
     for (let n = 0; n < 7 && Math.abs(mid(m) - want) > 1; n++) { lift += (mid(m) - want) / probe.slope(zk); yield; m = probe.rows(lift, zk, xa, xb); }
     const head = (m.low - m.top) * headK, f = { lift, zk, low: m.low, top: m.top, head };
-    const r = { f, fits: m.low + gap + hBot <= floor && m.top - head - gap - hTop >= ceil };
+    // ...and everything it can act out inside the tile, whatever the cards need (a step back, if not)
+    const r = { f, fits: m.low + gap + hBot <= floor && m.top - head - gap - hTop >= ceil && inside(lift, zk) };
     tried.set(i, r);
     return r;
   };
@@ -112,6 +117,25 @@ export function* capCentreSteps(probe: FrameProbe, hTop: number, hBot: number, v
     let lift = best.lift, m = probe.rows(lift, zk, xa, xb);
     for (let n = 0; n < 7 && Math.abs(m.low - wantLow) > 1; n++) { lift += (m.low - wantLow) / probe.slope(zk); yield; m = probe.rows(lift, zk, xa, xb); }
     best = { lift, zk, low: m.low, top: m.top, head: (m.low - m.top) / 3 };
+    // What it acts out stays on the tile too, both ends (the card then waits, unseen): where it is taller than the tile, stepped back
+    // until it is not; then its lift kept between what keeps its top on the tile and what keeps its foot on it, as near the cards'
+    // as that allows. A larger lift raises it: its rows go up the tile.
+    const reach = probe.reachRows;
+    if (reach) {
+      let z = zk, rr = reach(best.lift, z);
+      for (let n = 0; n < 60 && rr.bottom - rr.top > vh; n++) { z += ZK_STEP; rr = reach(best.lift, z); }
+      if (rr.top < 0 || rr.bottom > vh || z !== zk) {
+        const bound = (ok: (L: number) => boolean, from: number, towards: number) => { let a = from, b = towards; for (let n = 0; n < 40; n++) { const L = (a + b) / 2; if (ok(L)) a = L; else b = L; } return a; };
+        // the highest lift that keeps its top on the tile, the lowest that keeps its foot on it
+        const topOk = (L: number) => !(reach(L, z).top < 0), footOk = (L: number) => !(reach(L, z).bottom > vh);
+        const hiL = topOk(best.lift) ? bound(topOk, best.lift, best.lift + 8) : bound(topOk, best.lift - 8, best.lift);
+        const loL = footOk(best.lift) ? bound(footOk, best.lift, best.lift - 8) : bound(footOk, best.lift + 8, best.lift);
+        const L = Math.min(hiL, Math.max(loL, best.lift));
+        yield;
+        m = probe.rows(L, z, xa, xb);
+        best = { lift: L, zk: z, low: m.low, top: m.top, head: (m.low - m.top) / 3 };
+      }
+    }
   }
   return best;
 }
