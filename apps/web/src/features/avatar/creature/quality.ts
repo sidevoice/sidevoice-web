@@ -6,7 +6,8 @@
  *    frame's, DESKTOP_MAX_AREA);
  *  - a Governor watches what the frames cost and when they arrive, and steps down the resolution the creature is drawn at
  *    (TIERS), then the frame rate, until the frames hold; it steps back up when the rung above is expected to hold with room to
- *    spare, and it did not just fail there.
+ *    spare, and it did not just fail there. A rung whose frames fell behind though they cost it less than its limit (late: the
+ *    page's own work at launch, a resize, a window coming back) is taken back after a calm spell (web#573).
  * Pure: the host (host.ts) feeds it and applies what it says. */
 
 /** The canvas's height at most, as the creator's preview (960 px tall). */
@@ -66,7 +67,8 @@ export const TIERS: readonly Tier[] = [
 export const BUDGET_MS = 8;
 /** A frame that came this much later than asked for counts as late (the GPU or the thread was behind). */
 const LATE = 1.4;
-/** A gap this long is a pause (the loop slept: nothing moved, a tab came back), not a slow frame. */
+/** A gap this long, and twice what was asked for, is a pause (the loop slept: nothing moved, a tab came back), not a slow frame.
+ *  Twice: the last rung spaces its frames out to 500 ms itself (every), and those are frames, not pauses. */
 const PAUSE_MS = 400;
 const OVER_FRAMES = 8;
 /** After a change the frames are not judged for this long: the new size, the first draw of a shadow map, a program compiling. */
@@ -90,6 +92,10 @@ export class Governor {
   private upAt = -Infinity;
   private pinned: number | null = null;
   private area: ((scale: number) => number) | null = null;
+  /** By rung: what a frame cost there when it was stepped down from, and the pixels drawn there then (fill). */
+  private left: ({ cost: number; fill: number } | undefined)[] = [];
+  /** The rung the last retake came from (it held there), while that retake is on trial. */
+  private retookFrom: number | null = null;
 
   constructor(private tiers: readonly Tier[] = TIERS, private budget = BUDGET_MS) {}
 
@@ -110,6 +116,25 @@ export class Governor {
     const r = up / down;
     return r * r;
   }
+  /** The pixels drawn on rung `index` (the real ones, or where they are not known the square of its scale). */
+  private fill(index: number): number {
+    const scale = this.tiers[index].scale, a = this.area?.(scale);
+    return a && a > 0 ? a : scale * scale;
+  }
+  /** The highest rung above this one that was stepped down from while its frames cost it less than its limit, and would still
+   *  (as dear as then, more where it now draws more pixels): they fell behind for something its pixels do not change, the
+   *  page's own work (a launch, a resize, a window coming back), and it held there. Null: none. */
+  private retake(): number | null {
+    for (let i = 0; i < this.index; i++) {
+      const was = this.left[i];
+      if (was && was.cost * Math.max(1, this.fill(i) / was.fill) < this.limit(i)) return i;
+    }
+    return null;
+  }
+
+  /** The frames from `now` are not judged for a moment (SETTLE_MS): the canvas was just resized (its buffers made again, the
+   *  stage's framing solved again). */
+  settle(now: number) { this.since = Math.max(this.since, now); this.calmFrom = Math.max(this.calmFrom, now); }
   /** The frames' spacing now (ms). On the last rung, a frame that still costs more than a sixth of the thread's time is spaced
    *  out until it does not (to 500 ms): a renderer with no GPU gets a slow creature, not a frozen page. */
   get every(): number {
@@ -133,7 +158,8 @@ export class Governor {
   observe(now: number, took: number, gap: number): boolean {
     if (this.pinned != null) return false;
     if (now - this.since < SETTLE_MS) return false;
-    if (gap > PAUSE_MS) { this.calmFrom = now; return false; } // came back from a pause: this frame says nothing
+    // Came back from a pause: this frame says nothing, nor do the next ones for a moment (a window back draws its layers again).
+    if (gap > Math.max(PAUSE_MS, 2 * this.every)) { this.since = now; this.calmFrom = now; return false; }
     this.cost = this.cost ? this.cost * 0.8 + took * 0.2 : took;
     this.late = this.late * 0.8 + Math.min(4, gap / this.every) * 0.2;
     const behind = this.cost > this.limit(this.index) || this.late > LATE;
@@ -141,22 +167,32 @@ export class Governor {
       this.calmFrom = now;
       // Down after a few frames in a row: one slow frame (a program compiling, a garbage collection) is not the device.
       if (++this.over >= OVER_FRAMES && this.index < this.tiers.length - 1) {
-        // Failing within a moment of going up: wait longer before trying again.
-        if (now - this.upAt < this.calm) this.calm = Math.min(CALM_MAX_MS, this.calm * 2);
+        // Failing within a moment of going up: wait longer before trying again, and not on what it cost here before. A retake
+        // that does not hold goes straight back to the rung it came from, and what the rungs cost before is not trusted again
+        // (what made them late was the device after all: a GPU behind, whose work a frame's cost does not show).
+        if (now - this.upAt < this.calm) {
+          this.calm = Math.min(CALM_MAX_MS, this.calm * 2);
+          this.left[this.index] = undefined;
+          const from = this.retookFrom;
+          this.retookFrom = null;
+          if (from != null) { this.left = []; return this.move(from, now); }
+        } else this.left[this.index] = { cost: this.cost, fill: this.fill(this.index) };
         return this.move(this.index + 1, now);
       }
       return false;
     }
     this.over = 0;
     if (this.calmFrom === -Infinity) this.calmFrom = now;
-    // Up when the frame, as dear as it is expected to be on the rung above, would be under ROOM of that rung's limit there (a
-    // steady 4 ms on the second rung is 5.5 ms on the first: under 6), not when it is under a fixed share of the budget now.
-    const up = this.index - 1;
-    if (up >= 0 && this.cost * this.growth(up) < this.limit(up) * ROOM && this.late < 1.1 && now - this.calmFrom > this.calm) {
-      this.upAt = now;
-      return this.move(this.index - 1, now);
-    }
-    return false;
+    if (this.late >= 1.1 || now - this.calmFrom <= this.calm) return false;
+    // Back to a rung left while its frames cost it less than its limit, at once (retake). Else up a rung when the frame, as dear
+    // as it is expected to be on the rung above, would be under ROOM of that rung's limit there (a steady 4 ms on the second rung
+    // is 5.5 ms on the first: under 6), not when it is under a fixed share of the budget now.
+    const back = this.retake(), up = this.index - 1;
+    const to = back ?? (up >= 0 && this.cost * this.growth(up) < this.limit(up) * ROOM ? up : null);
+    if (to == null) return false;
+    this.upAt = now;
+    this.retookFrom = back == null ? null : this.index;
+    return this.move(to, now);
   }
 
   private move(index: number, now: number): boolean {
