@@ -146,11 +146,10 @@ for (const language of ["en", "es"]) {
   }
 }
 
-test("the notice's Download acts in place, its download said in Updates only; a machine behind is never the room's — Updates lists it with its command", async ({ page }) => {
+test("the notice's Download acts in place, its download said in Updates only; a machine out of date is never the room's — Updates lists it, and its page says what to run", async ({ page }) => {
   await installHarness(page);
-  // The paired machine says its Sidevoice is behind (contract gap #57).
-  await page.route("**/api/host/status", (route) => route.fulfill({ status: 200, contentType: "application/json",
-    body: JSON.stringify({ version: "0.8.1", update: { latest: "0.9.0", command: "npx sidevoice@latest install" } }) }));
+  // The paired machine says a version older than the minor the page pins (service.pin.json).
+  await page.route("**/api/host/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ version: "0.19.2" }) }));
   await withUpdater(page, "en", STATES[1]);
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/voice/");
@@ -158,13 +157,16 @@ test("the notice's Download acts in place, its download said in Updates only; a 
   await expect(shown.locator(".update-notice-text")).toHaveText(`Version ${VERSION} available`);
   await shown.getByRole("button", { name: "Download" }).click();
   await page.evaluate((version) => window.__pushUpdate({ state: "downloading", version, progress: 0.3 }), VERSION);
-  // Downloading: the room offers Cancel, and says nothing of the machine behind elsewhere.
+  // Downloading: the room offers Cancel, and says nothing of the machine out of date elsewhere.
   await expect(shown.getByRole("button", { name: "Cancel download" })).toBeVisible();
-  await expect(shown).not.toContainText("npx sidevoice@latest install");
+  await expect(shown).not.toContainText("npx sidevoice@");
   await page.locator(".sidebar-settings").click();
   await page.locator("#settings-updates").click();
   await expect(page.locator("#updates-app")).toHaveAttribute("data-state", "downloading");
-  const machine = page.locator("[id^='updates-machine-']").first();
-  await expect(machine).toContainText("npx sidevoice@latest install");
-  await expect(page.locator(".update-notice")).not.toContainText("npx sidevoice@latest install");
+  const machine = page.locator("#pane-updates [data-machine-row]").first();
+  await expect(machine).toContainText("Version 0.19.2");
+  await expect(machine).toContainText("Out of date");
+  await machine.click();
+  await expect(page.locator("#pane-machines .host-status-card .ui-alert")).toContainText("npx sidevoice@0.20 install");
+  await expect(page.locator(".update-notice")).not.toContainText("npx sidevoice@");
 });

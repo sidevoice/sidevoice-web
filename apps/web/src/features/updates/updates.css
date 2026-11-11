@@ -10,6 +10,8 @@
 .app-update-settings { display: grid; gap: var(--sv-space-3); padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
 .app-update-settings:first-child { padding-top: 0; border-top: 0; }
 .app-update-installed[data-settings-row] { margin-inline: calc(-1 * var(--sv-space-2)); padding: var(--sv-space-1) var(--sv-space-2); border-radius: var(--sv-radius-md); }
+/* The app's row: its icon and its words first, Check for updates wrapping under them where the row is narrow. */
+.app-update-installed-text { display: grid; flex: 1 1 8rem; min-width: 0; }
 .app-update-installed.settings-highlight { background: var(--sv-accent-soft); }
 .app-update-progress { flex: 1 1 5rem; min-width: 4rem; }
 .app-update-setting { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sv-space-2) var(--sv-space-3); }

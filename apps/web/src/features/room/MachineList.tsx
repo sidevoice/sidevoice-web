@@ -18,15 +18,14 @@ import { PrepareThisComputer } from "../pairing/PrepareThisComputer";
 import { InstallCommandHere } from "../pairing/ConnectorSteps";
 import { useThisComputerSection } from "../../state/this-computer";
 import { translator, type Translate } from "../../i18n/translator";
+import { AppRow, OfflineState, RunningState, ServiceCardTop, useLocalService, useRemoteService } from "../settings/service-version";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
 import { motionOf, useSettingsLevels } from "../settings/settings-levels";
 import { MenuRow } from "../settings/SettingsMenu";
 import { machineStatus } from "../settings/machine-status";
-import { ThisDeviceVersion } from "../settings/UpdatesSettings";
 import { MachineEntryCopy, MachineEntryState, MachineState, StateOnIcon, machineEntryName, machineEntryTitle } from "../settings/MachineState";
 import { canRunLocalHostAction, hostCause, hostStatusText, localHostRecovery, runLocalHostAction, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
-import { listeningPort } from "../../services/device-pairing.js";
 import { uiLocale } from "../../i18n/locale";
 
 function dateText(value: string | number | null | undefined) {
@@ -287,10 +286,12 @@ function HostDetail({ machine, name, untitled = false, onForget }: { machine: Ma
             onClick={() => window.sidevoiceActions?.openPairing()}>{t("hosts.machineState.unpaired.pair")}</Button>}
         </div>
       </header>
+      {/* The app's own version, a row of its own on This device only: it is not the service's. */}
+      {machine.local && untitled && <section className="host-section"><AppRow t={t} /></section>}
       {/* Sidevoice on the machine, as a card on every machine's page: this computer's with its controls; another's to read. */}
       <section className="host-section" aria-labelledby={"host-status-" + machine.id}>
         {machine.local ? <LocalHostStatusPanel machine={machine} status={status} titleId={"host-status-" + machine.id} />
-          : <RemoteHostCard machine={machine} titleId={"host-status-" + machine.id} />}
+          : <RemoteHostCard machine={machine} name={name} titleId={"host-status-" + machine.id} />}
       </section>
       <section className="host-section" ref={agents}>
         <HostAgentsPanel fp={machine.pairingId ?? null} />
@@ -325,23 +326,20 @@ function ForgetMachine({ machine, name, onForget }: { machine: MachineView; name
   );
 }
 
-/** Another machine's Sidevoice service, to read: where the machine says, its Sidevoice version. Titled as this
- *  computer's card ("Sidevoice service"): its page names the machine already. How this device reaches it is its
- *  page's header's, two blocks up; no controls: it is run there. */
-function RemoteHostCard({ machine, titleId }: { machine: MachineView; titleId: string }) {
+/** Another machine's Sidevoice service, to read: the same card as this computer's, without its controls — its running state
+ *  at the right, its version with where it stands against the minor this app works with, its port, and under them the
+ *  notice where it is out of date or newer than supported. Not answering, "Offline" and what was last known of it (its
+ *  version, its port), nothing else. Titled as this computer's card ("Sidevoice service"): its page names the machine
+ *  already. How this device reaches it is its page's header's; no controls: it is run there. */
+function RemoteHostCard({ machine, name, titleId }: { machine: MachineView; name: string; titleId: string }) {
   const t = translator();
-  const info = useRoomStore((state) => machine.pairingId ? state.facts.remoteHostStatus?.[machine.pairingId] : undefined);
-  const port = listeningPort(machine.urls);
+  const service = useRemoteService(machine);
+  const { offline } = service;
   useEffect(() => { if (machine.pairingId && machine.state === "connected") void window.sidevoiceActions?.loadMachineInfo?.(machine.pairingId); }, [machine.pairingId, machine.state]);
   return (
-    <div className="host-status-card" data-remote>
-      <div className="host-status-head">
-        <h4 id={titleId}>{t("hosts.section.service")}</h4>
-      </div>
-      {(info?.version || port) && <dl className="host-status-facts">
-        {info?.version && <div className="host-status-product">{t("hosts.productVersion", { version: info.version })}</div>}
-        {port && <div className="host-status-product">{t("hosts.port", { port })}</div>}
-      </dl>}
+    <div className="host-status-card" data-remote data-tone={offline ? undefined : "positive"}>
+      <ServiceCardTop who={machine.pairingId ?? machine.id} titleId={titleId} info={offline ? { version: service.shown, kind: "unknown" } : service} port={service.port}
+        machine={name} command={service.command} offline={offline} end={offline ? <OfflineState t={t} /> : <RunningState t={t} />} t={t} />
     </div>
   );
 }
@@ -360,7 +358,7 @@ function LocalHostStatusPanel({ machine, status, titleId }: { machine: MachineVi
   const statusMessage = hostStatusText(status, t);
   const hasMethod = (action: LocalHostAction) => canRunLocalHostAction(action);
   const state = machineStatus(machine, status, true, t);
-  const port = listeningPort(machine.urls);
+  const service = useLocalService();
   // Unknown is not none: Stop asks unless the service says no call is on.
   const calls = details.calls;
   const buttons: { action: LocalHostAction; label: string; variant: "primary" | "secondary" | "ghost" }[] = [];
@@ -404,19 +402,13 @@ function LocalHostStatusPanel({ machine, status, titleId }: { machine: MachineVi
   const failed = status.state === "failed" || status.state === "service-failed";
   return (
     <div className="host-status-card" data-state={status.state} data-tone={state.tone}>
-      <div className="host-status-head">
-        {/* "Sidevoice service": the page is this computer's already, so its name is not said again. */}
-        <h4 id={titleId} tabIndex={-1}>{t("hosts.section.service")}</h4>
-        <span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{state.short}</span>
-      </div>
-      {/* The facts, compact; then what the state means where it says more than its word. */}
-      <dl className="host-status-facts">
-        {/* One version — the app's, the Sidevoice the person installed, else its service's (never the core's or the
-            connector's) — and whether it is up to date: Update available is a link to its row in Updates, where
-            everything that updates is. */}
-        <ThisDeviceVersion t={t} />
-        {port && <div className="host-status-product">{t("hosts.port", { port: port })}</div>}
-      </dl>
+      {/* "Sidevoice service": the page is this computer's already, so its name is not said again. The service's version — the
+          Sidevoice the person installed, never the core's or the connector's, nor the app's, which has its own row — and
+          where it stands: up to date, updating itself, waiting for a call to end, newer than the app supports; then its port. */}
+      <ServiceCardTop who="local" titleId={titleId} focusable info={service} progress={service.progress} port={service.port} t={t}
+        guidance={service.incompatible ? t(service.api == null ? "hosts.update.incompatibleUnknown" : "hosts.update.incompatible", { api: service.api ?? 0 }) : null}
+        end={<span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{state.short}</span>} />
+      {/* What the state means where it says more than its word. */}
       {/* Running or stopped, the state's word says it ("Running", "Not started") and Start follows: no sentence repeats it.
           Whether it starts at sign-in is its switch's alone, below. */}
       {status.state !== "running" && status.state !== "stopped-by-person" && <p className="host-status-summary">{statusMessage}</p>}

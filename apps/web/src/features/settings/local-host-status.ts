@@ -20,11 +20,21 @@ const SERVICES = new Set(["launchd", "systemd", "none"]);
 const VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 const MAX_STATUS_COUNT = 1_000_000_000;
 
+/** `value` if it is a version the way a service reports its own, else none. */
+export function safeProductVersion(value: unknown): string | undefined {
+  return typeof value === "string" && VERSION.test(value) ? value : undefined;
+}
+/** `value` if it is a TCP port, else none. */
+function safePort(value: unknown): number | undefined {
+  const port = safeLocalHostCount(value);
+  return port !== undefined && port >= 1 && port <= 65535 ? port : undefined;
+}
+
 export interface SafeLocalHostStatusDetails {
   state: LocalHostStatusName | "unknown";
   service?: "launchd" | "systemd" | "none";
   installed?: boolean;
-  core?: { pid?: number; version?: string; api?: number };
+  core?: { pid?: number; version?: string; api?: number; port?: number };
   calls?: number;
   reachable?: boolean;
   attempts?: number;
@@ -71,12 +81,15 @@ export function safeLocalHostStatusDetails(status: LocalHostStatus): SafeLocalHo
     const safeCore: NonNullable<SafeLocalHostStatusDetails["core"]> = {};
     const pid = safeLocalHostCount(core.pid);
     const api = safeLocalHostCount(core.api);
+    const port = safePort(core.port);
     if (pid !== undefined) safeCore.pid = pid;
     if (api !== undefined) safeCore.api = api;
+    if (port !== undefined) safeCore.port = port;
     if (typeof core.version === "string" && VERSION.test(core.version)) safeCore.version = core.version;
     if (Object.keys(safeCore).length) details.core = safeCore;
   }
-  if (typeof source.product_version === "string" && VERSION.test(source.product_version)) details.product_version = source.product_version;
+  const productVersion = safeProductVersion(source.product_version);
+  if (productVersion) details.product_version = productVersion;
   if (source.failure && typeof source.failure === "object" && !Array.isArray(source.failure)) {
     const failure = source.failure as Record<string, unknown>;
     const safeFailure: NonNullable<SafeLocalHostStatusDetails["failure"]> = {};

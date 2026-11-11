@@ -179,7 +179,8 @@ export interface LocalHostStatus {
   state: LocalHostStatusName;
   service?: "launchd" | "systemd" | "none";
   installed?: boolean;
-  core?: { pid?: number; version?: string; api?: number; launch_id?: string } | null;
+  /** `port`: the service's own TCP port, from its core's ready file — never the app's proxy's, which is another each launch. */
+  core?: { pid?: number; version?: string; api?: number; launch_id?: string; port?: number } | null;
   /** The installed Sidevoice's version — the `sidevoice` package, which bundles the core — as the person knows it.
    *  The one version the UI shows. */
   product_version?: string | null;
@@ -230,19 +231,23 @@ export interface LocalHostInstallOperation extends Promise<LocalHostStatus> {
   job: string;
 }
 
-export type LocalHostUpdateState = "available" | "current" | "newer-installed" | "incompatible" | "unknown";
+/** Where this device's service stands against the minor the app pins (`public/service.pin.json`): `available` an older
+ *  patch or minor, which the app updates in the background; `updating` while it does (`progress`); `waiting-call` held
+ *  until the call ends; `newer-installed` a minor above the pinned one, which the app never touches. */
+export type LocalHostUpdateState = "current" | "available" | "updating" | "waiting-call" | "newer-installed" | "incompatible" | "unknown";
 
-/** Build metadata stays opaque until desktop publishes the finalized R4-c metadata fields. */
-export interface LocalHostBuildMetadata {
-  [key: string]: unknown;
-}
-
+/** What `version()` says (sidevoice-desktop#67): `bundled.minor` the minor this page's build pins (none, `{}`, where the
+ *  bundled web has no `service.pin.json`); `installed.version` the installed service's `product_version`, none where
+ *  nothing is installed; `latest` the newest npm patch of the pinned minor, where known; `progress` 0 to 1 while
+ *  `update` is `updating`. A bridge may leave `latest` and `progress` out: nothing is said of them. */
 export interface LocalHostVersion {
   bridge: number;
-  bundled: LocalHostBuildMetadata;
-  installed: LocalHostBuildMetadata | null;
+  bundled: { minor?: string };
+  installed: { version: string } | null;
   core_api: number | null;
   update: LocalHostUpdateState;
+  latest?: string | null;
+  progress?: number | null;
 }
 
 export interface LocalHostBridge {

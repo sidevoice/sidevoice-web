@@ -1,37 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { host, type AppUpdater, type UpdateMode, type UpdaterFailure, type UpdaterStatus } from "../../host";
+import { getReport, subscribe } from "../../services/local-service";
+import { remoteKind } from "../../services/service-version";
 import { useRoomStore } from "../../state/room-store";
 import type { MachineView } from "../../state/room-types";
 
-/* Sidevoice updates the app, then this computer's service: restarting into the app's update is the app's last step,
- * so the service is updated by the page the new app opens — asked for here before the restart, done once the service
- * says it is behind and no call is on, and forgotten after half an hour (a restart that never happened). */
-const CONTINUE_KEY = "sidevoice.update-continue";
-const CONTINUE_MS = 30 * 60 * 1000;
-export function continueAfterRestart() {
-  try { localStorage.setItem(CONTINUE_KEY, String(Date.now())); } catch { /* Then the service waits for its own press. */ }
-}
-export function continuing() {
-  try { const at = Number(localStorage.getItem(CONTINUE_KEY)); return at > 0 && Date.now() - at < CONTINUE_MS; } catch { return false; }
-}
-export function continued() {
-  try { localStorage.removeItem(CONTINUE_KEY); } catch { /* Nothing kept. */ }
-}
-
-/* What wants updating, from four places: this page (a newer build the room serves: out of a call the page reloads
+/* What wants updating, from three places: this page (a newer build the room serves: out of a call the page reloads
  * itself, in one Reload loads it when the person says), the desktop app (its updater, behind the host's `updater`
- * seam: a release's only), this computer's machine (the bridge's `version()`), and each paired machine elsewhere that
- * says it is behind (remoteHostStatus `update`: contract gap #57, which no core says yet). */
+ * seam: a release's only), and each paired machine elsewhere whose Sidevoice is out of date against the minor this page
+ * works with (services/service-version.ts). This computer's service is not one of them: the app updates it itself, in
+ * the background, and its card says where it stands. */
 
-export type UpdateKind = "web" | "machine";
-export interface UpdateItem { id: string; kind: UpdateKind; version: string; required: boolean; machine?: string }
+export type UpdateKind = "web";
+export interface UpdateItem { id: string; kind: UpdateKind; version: string; required: boolean }
 
 /** Where each update is acted on in Settings › Updates, by the id a landing asks for (`settingsFocus`): the app's
- *  action row, this computer's Update, a remote machine's row (its command's Copy). */
+ *  action row. */
 export const UPDATE_PLACE = {
   app: "updates-app",
-  thisComputer: "updates-this-computer",
-  machine: (pairingId: string) => "updates-machine-" + pairingId,
 };
 
 /* When the app last checked successfully: the seam does not say, so this page keeps it — a check it asked for that did
@@ -228,38 +214,30 @@ export function appUpdatePending(status: UpdaterStatus | null, mode: UpdateMode 
   return asked || status.state === "ready" || mode === "manual";
 }
 
-/** What updates Sidevoice on a machine, as the connector's README documents it (sidevoice/sidevoice-connector,
- *  "Commands"): `install` "installs this package's connector and the core it carries (or updates to them)"; `@latest`
- *  has npx fetch the newest package rather than run one it cached. Said for a machine behind whose status names no
- *  command of its own (contract gap #57: no machine names one yet). */
-export const SIDEVOICE_UPDATE_COMMAND = "npx sidevoice@latest install";
-
-/** The paired machines whose Sidevoice is behind, as they said (remoteHostStatus `update`, contract gap #57): only those
- *  still paired here, so a machine forgotten while it was behind is not listed. Its command is the machine's own, else
- *  SIDEVOICE_UPDATE_COMMAND. */
-export function useOutdatedMachines(): { machine: MachineView; version: string | null; latest: string; command: string }[] {
+/** The paired machines whose Sidevoice is out of date against the minor this page works with (an older minor, or an older
+ *  patch of it where this device's service knows the newest): only those still paired here, so a machine forgotten while
+ *  it was behind is not listed. */
+export function useOutdatedMachines(): { machine: MachineView; version: string | null }[] {
   const machines = useRoomStore((state) => state.machines);
   const status = useRoomStore((state) => state.facts.remoteHostStatus);
+  const bridge = host().localHost;
+  const latest = useSyncExternalStore(subscribe, () => getReport(bridge)?.latest ?? null, () => null);
   return machines.flatMap((machine) => {
-    const info = !machine.local && machine.pairingId ? status?.[machine.pairingId] : undefined;
-    return info?.update ? [{ machine, version: info.version ?? null, latest: info.update.latest, command: info.update.command?.trim() || SIDEVOICE_UPDATE_COMMAND }] : [];
+    const version = !machine.local && machine.pairingId ? status?.[machine.pairingId]?.version ?? null : null;
+    return remoteKind(version, latest) === "behind" ? [{ machine, version }] : [];
   });
 }
 
-/** The page's and the paired machines' updates waiting (`items`), and the desktop app's as the room's notice says it
- *  (`app`, with its actions in `appUpdate`). This computer's service is Sidevoice's, updated with the app: its update
- *  is Settings › Updates' to say (useThisComputerUpdate), never the room's on its own. */
+/** The page's updates waiting (`items`), and the desktop app's as the room's notice says it (`app`, with its actions in
+ *  `appUpdate`). Each paired machine, once connected, is asked for its Sidevoice's version (loadMachineInfo), which is how
+ *  one out of date is found. This computer's service is the app's to update by itself: it has no notice. */
 export function useUpdates() {
   const web = useRoomStore((state) => state.facts.webUpdate);
-  const outdated = useOutdatedMachines();
   const appUpdate = useAppUpdate();
-  // Each paired machine, once connected, is asked whether its Sidevoice is behind (loadMachineInfo, contract gap #57).
   const connected = useRoomStore((state) => state.machines.filter((item) => !item.local && item.pairingId && item.state === "connected").map((item) => item.pairingId).join(" "));
   useEffect(() => { for (const fp of connected.split(" ").filter(Boolean)) void window.sidevoiceActions?.loadMachineInfo?.(fp); }, [connected]);
 
   const items: UpdateItem[] = [];
   if (web) items.push({ id: "web", kind: "web", version: web, required: false });
-  // Remote machines behind (contract gap #57): updated by a command run there, from the Updates section.
-  for (const { machine: remote, latest } of outdated) items.push({ id: "machine:" + remote.pairingId, kind: "machine", version: latest, required: false, machine: remote.pairingId });
   return { items, app: appUpdate.noticed, appUpdate };
 }
