@@ -276,9 +276,9 @@ export function placeFigure(stage: RigStage, c: Creature3D, aspect: number, { gr
 // asks for no frame at all (the motion guard's rule, e2e/motion-guard.spec.mjs).
 // About 30 frames a second, as the creator. Where they cost the thread more than its share (BUDGET_MS) or arrive late, the
 // governor (quality.ts) draws the creature at fewer pixels first, then at fewer frames, until they hold, and back up when
-// there is room. At the bottom of its ladder a frame that still costs more than a sixth of the page's thread is spaced
-// out until it does not (a renderer without a GPU, which the page only meets when the motion is forced on: lib/motion.ts
-// holds the drawings still there).
+// there is room, or when what made them late was not what they cost (the page's own work, a window back). At the bottom of
+// its ladder a frame that still costs more than a sixth of the page's thread is spaced out until it does not (a renderer
+// without a GPU, which the page only meets when the motion is forced on: lib/motion.ts holds the drawings still there).
 const lives = new Set<LiveCreature>();
 const governor = new Governor();
 /** The pixels a frame fills at a scale: every scene the loop draws in it (sceneSize, as each fits), summed, since a frame draws them
@@ -496,7 +496,13 @@ export class LiveCreature {
     const key = W + "x" + H;
     if (key === this.sized) return false;
     this.sized = key;
-    if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
+    if (canvas.width !== W || canvas.height !== H) {
+      canvas.width = W; canvas.height = H;
+      // A canvas the loop draws frames of took other pixels (a window dragged, another screen, its crop): the frames that remake its
+      // buffers and solve its framing again are not what it costs (web#573), so they are not judged. Only then: a creature built
+      // again on the same canvas at its size (the floating card's, on every update of the call) holds nothing back.
+      if (this.slot !== "face") governor.settle(performance.now());
+    }
     return true;
   }
 
