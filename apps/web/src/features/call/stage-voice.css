@@ -32,8 +32,13 @@
 /* The dark theme's card: black, as the transcript's dark bubble (T24e). */
 [data-theme="dark"] .vcap.card { --vcap-fill: #212125; color: #fafafa; border-color: #4b4756; box-shadow: 0 12px 32px rgb(0 0 0 / 60%); }
 
-/* The page: a window three lines tall, the line before peeking faded above (PagedText), the run sliding a page up. */
-.vcap .paged-text { --paged-peek: calc(var(--lh) * .55); transition: none; }
+/* The page: a window three lines tall, the line before peeking faded above (PagedText), the run sliding a page up.
+ * The reply's three lines are centred in the card, the first message and each page after it: the card's top and bottom
+ * padding are one length (--vcap-pad-y), and the window runs up to the card's edge over the top one (--paged-peek, the
+ * same length), so the line before shows half cut by the edge and the lines sit where the first message's do. Its sum is
+ * what the card was tall before (.55 lines and 11px, split evenly), so the framing's room for it does not change. */
+.vcap.card.agent { --vcap-pad-y: calc(var(--lh) * .275 + 5.5px); padding-block: var(--vcap-pad-y); }
+.vcap .paged-text { --paged-peek: var(--vcap-pad-y); transition: none; }
 .vcap.agent .paged-text { height: calc(3 * var(--lh) + var(--peek)); }
 .vcap .paged-text-run { transition: transform 600ms cubic-bezier(.3, .7, .2, 1); }
 @media (prefers-reduced-motion: reduce) { .vcap .paged-text-run { transition: none; } }
