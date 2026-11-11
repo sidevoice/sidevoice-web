@@ -501,6 +501,19 @@ export interface CallSurfaceBridge {
   forget(ids: string[]): void;
 }
 
+/** The system's own picker for where the call's audio plays (`host.audioRoute`; iOS's route sheet: speaker, car, AirPods, AirPlay).
+ *  An app cannot choose an arbitrary output there, only the system can, so where the app can open that sheet it offers this and
+ *  the page shows a button of its own that calls `open()`. The sheet is the system's (its look, its choice): the call's audio
+ *  follows the route. Rejects with the app's refusal (`{key, code}`) when it cannot be shown. The button is labelled with where the
+ *  audio plays now: `current()` is that output's name as the system gives it (`null` when it names none; never rejects) and
+ *  `subscribe` is told each new name as the route changes (it says nothing on subscribing) and returns the unsubscribe.
+ *  Offered after a reply of the app's own, so a page looks again for a while (`onHostMember("audioRoute", …)`). */
+export interface AudioRouteBridge {
+  open(): Promise<void>;
+  current(): Promise<string | null>;
+  subscribe(listener: (name: string | null) => void): () => void;
+}
+
 /** The app's own sound for the cues the page decides on (`host.cue`): the page says when, the app plays it through the
  *  audio session its call already owns, where a webview's Web Audio is not sure to come out (a phone's native call session,
  *  sidevoice-web#439). `thinking` is the sound that says the agent works. `start` and `stop` are idempotent. An app
@@ -559,6 +572,8 @@ export interface Host {
   callSurface: CallSurfaceBridge | null;
   /** The app's own player for the page's cues; null where the page plays them itself. */
   cue: CueBridge | null;
+  /** The system's output picker, opened from the page's own button; null where the host has none (a browser, Android). */
+  audioRoute: AudioRouteBridge | null;
   /** Whether the person's screen is locked, from the app; null where it does not say. */
   screen: ScreenBridge | null;
   updater: AppUpdater | null;

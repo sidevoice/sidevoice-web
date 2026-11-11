@@ -1222,6 +1222,7 @@ export const messages: Messages = {
   "runtime.on.gpu": "tarjeta gráfica ({api})",
   "runtime.on.cpu": "procesador",
   "runtime.on.neuralEngine": "Neural Engine",
+  "runtime.stopsInBackground": "Solo funciona con Sidevoice abierto. Para seguir en segundo plano, tiene que ejecutarse en la CPU.",
   "runtime.device": "Este dispositivo: {what}",
   "runtime.device.gpu": "tarjeta gráfica disponible para el navegador",
   "runtime.device.noGpu": "sin tarjeta gráfica que el navegador pueda usar",
