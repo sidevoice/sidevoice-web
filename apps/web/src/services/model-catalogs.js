@@ -36,9 +36,11 @@
  *   (its code, and the provider's own words as `detail` where the host passes them on)
  *   (its catalogue's reason), or null when it took it.
  *   `uninstall`, where the engine has it, takes a model off this device: every build of it.
- *   `recommend`, where the engine has it (the apps' engine; the page's @sidevoice/engine once it is past 0.5.0), says
- *   which local model to start with for each capability, for a person whose transcription hears `languages.stt` and
- *   whose voice says `languages.tts`; nothing is downloaded or chosen for it.
+ *   `recommend`, where the host has it, says which local model to start with for each capability, for a person whose
+ *   transcription hears `languages.stt` and whose voice says `languages.tts`; nothing is downloaded or chosen for it.
+ *   In the apps it is the bridge's (`host.engine.recommend`). The page's own engine has none here yet: once its
+ *   @sidevoice/engine pin is past 0.5.0, `engineCatalogs` below must add it, mapping `languages` to the engine's
+ *   positional `localCatalog().recommend(sttLanguage, ttsLanguage)`.
  */
 
 /** The id of the catalogue of models that run on this device. */

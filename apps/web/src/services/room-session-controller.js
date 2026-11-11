@@ -2775,17 +2775,24 @@ async function loadVoiceCatalogue(){
 // What the engine recommends here, for the language in use (sidevoice-engine#124): said with «Recomendado» where a model
 // is chosen. A device that keeps no voice settings yet starts on it, once a session: preselected in the draft, never
 // downloaded unasked. An engine that cannot say (the page's, today) recommends nothing.
-let recommendedOnce=false;
+// Asked again as the catalogue is read again and as the language to recommend for changes; only the latest question's
+// answer is kept (`recommendAsked`), so an older one that arrives late never replaces it.
+let recommendedOnce=false,recommendAsked=0;
 async function recommendModels(models){
+ const asked=++recommendAsked;
  const settings=state.voiceDraft||state.voiceSettings;
  if(typeof models.recommend!=='function'||!settings){roomStore.patch({voiceRecommendation:null});return}
  const recommendation=await models.recommend(recommendationLanguages(settings,uiLanguage())).catch(()=>null);
+ if(asked!==recommendAsked)return;
  roomStore.patch({voiceRecommendation:recommendation});
  if(!recommendation||recommendedOnce||keepsVoiceSettings(pageStorage()))return;
  recommendedOnce=true;
  const patch=recommendedPatch(state.voiceDraft||state.voiceSettings,recommendation);
  if(patch)editVoice(patch);
 }
+// With transcription on Automatic the language to recommend for is the interface's: another one asks again (once the
+// catalogue has been read: before, the read itself asks).
+onUiLanguage(()=>{const settings=state.voiceDraft||state.voiceSettings;if(settings&&settings.stt.language==null&&state.voiceCatalogue.state==='ready')void modelCatalogs().then(recommendModels).catch(()=>{})});
 // Settings apply as they change (there is no Save): the draft is what was chosen, and what of it is ready is put in use
 // at once; a model still to download waits in the draft, the one in use stays, and it switches once it is ready (the
 // catalogues read again after its install). A download cancelled or failed leaves the one in use as it was.
