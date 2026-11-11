@@ -776,7 +776,8 @@ test("the build a model runs as, with Automatic, is the recommended one, even wh
 });
 
 test("the Model list: each model that can be chosen with its download size at the end of its name's line, its hardware under it", () => {
-  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true), error: "" } });
+  // Spanish chosen to transcribe: the models here speak it, so no line says otherwise.
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true), error: "" }, voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-base", language: "es" } } });
   // The size is not read from the line's end: its description says it first, to screen readers. One that cannot run
   // here is not in the list.
   expect(listOptions("stt-model").map((option) => option.detail)).toEqual(["1 MB · GPU · Metal"]);
@@ -825,4 +826,72 @@ test("a build on disk that no longer runs is not Ready: the build that runs is o
   expect(ready()).toBeNull();
   expect(document.getElementById("stt-model-download")).not.toBeNull();
   expect(actions.editVoice).not.toHaveBeenCalled();
+});
+
+test("a build the engine says stops in the background (a GPU on a phone) says so beside where it runs, and in Advanced; one on the CPU does not (sidevoice-web#572)", () => {
+  const warning = "Works only while Sidevoice is open. To keep it working in the background, run it on the CPU.";
+  const gpu = build("whisper-base/metal", { backend: "whisper-cpp", accelerator: "metal", acceleratorClass: "gpu", stopsInBackground: true } as Partial<ModelBuild>);
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: withBuilds([gpu, build("whisper-base/int8")]), error: "" } });
+  const runs = card("stt-model-card").querySelector(".model-sheet-runs")!;
+  expect(runs.querySelector(".model-prepare-notice")).toHaveTextContent(warning);
+  fireEvent.click(document.querySelector("#stt-model-card .model-runtime .model-runtime-toggle")!);
+  const why = [...document.querySelectorAll(".model-runtime-option")].map((option) => option.querySelector(".model-runtime-why")?.textContent ?? "");
+  // Automatic, then the build on the GPU (warned), then the one on the CPU.
+  expect(why).toEqual(["", warning, ""]);
+  cleanup();
+  // The same build where the engine says nothing of it (a desktop, the page's own engine): nothing is said.
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true), error: "" } });
+  expect(card("stt-model-card").querySelector(".model-sheet-runs .model-prepare-notice")).toBeNull();
+});
+
+test("the engine's recommendation: its family first and marked in the open list, its model marked there and in Model's label row once chosen", () => {
+  const pick = (model: string) => ({ model, build: model + "/int8" });
+  const voiceRecommendation = { stt: { choice: pick("moonshine-tiny"), ranked: [pick("moonshine-tiny"), pick("whisper-base")] }, tts: { ranked: [] } };
+  const { actions } = renderPane({ voiceRecommendation });
+  const families = listOptions("stt-family");
+  expect(families.map((option) => option.value)).toEqual(["moonshine", "whisper"]);
+  const badge = (id: string, value: string) => {
+    fireEvent.click(document.getElementById(id)!);
+    const item = [...document.querySelectorAll<HTMLElement>("[role=option]")].find((option) => option.getAttribute("data-value") === value)!;
+    const text = item.querySelector(".ui-select-item-badge")?.textContent ?? "";
+    fireEvent.keyDown(item, { key: "Escape" });
+    return text;
+  };
+  expect(badge("stt-family", "moonshine")).toContain("Recommended");
+  expect(badge("stt-family", "whisper")).not.toContain("Recommended");
+  // Whisper base is chosen (the default), not the recommended model: Model's label row says nothing.
+  const label = (id: string) => document.getElementById(id)!.closest(".ui-field")!.querySelector(".ui-field-head")!.textContent;
+  expect(label("stt-model")).toBe("Model");
+  chooseOption("stt-family", "moonshine");
+  expect(actions.editVoice).toHaveBeenCalledWith({ stt: { model: "moonshine-tiny" } });
+});
+
+test("the recommended model chosen: «Recommended» in Model's label row and on its entry; a model not in the language in use says so under it", () => {
+  const pick = (model: string) => ({ model, build: model + "/int8" });
+  const voiceRecommendation = { stt: { choice: pick("whisper-base"), ranked: [pick("whisper-base")] }, tts: { ranked: [] } };
+  renderPane({ voiceRecommendation, voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-base", language: "es" } } });
+  const head = document.getElementById("stt-model")!.closest(".ui-field")!.querySelector(".ui-field-head")!;
+  expect(head.querySelector(".ui-badge")?.textContent).toBe("Recommended");
+  fireEvent.click(document.getElementById("stt-model")!);
+  const entry = [...document.querySelectorAll<HTMLElement>("[role=option]")].find((option) => option.getAttribute("data-value") === "whisper-base")!;
+  expect(entry.querySelector(".ui-select-item-badge .ui-badge")?.textContent).toBe("Recommended");
+  expect(entry.querySelector(".model-list-unsupported")).toBeNull();
+  fireEvent.keyDown(entry, { key: "Escape" });
+  cleanup();
+  // In English, a model that speaks only Spanish stays selectable and says it does not speak English.
+  renderPane({ voiceRecommendation });
+  fireEvent.click(document.getElementById("stt-model")!);
+  const spanish = [...document.querySelectorAll<HTMLElement>("[role=option]")].find((option) => option.getAttribute("data-value") === "whisper-base")!;
+  expect(spanish.getAttribute("aria-disabled")).not.toBe("true");
+  expect(spanish.querySelector(".model-list-unsupported")?.textContent).toBe(" · Doesn't support English");
+  fireEvent.keyDown(spanish, { key: "Escape" });
+  expect(listOptions("stt-model").find((option) => option.value === "whisper-base")?.detail).toBe("1 MB · CPU · Doesn't support English");
+});
+
+test("a provider's models carry no recommendation: it is this device's", () => {
+  const pick = (model: string) => ({ model, build: model + "/int8" });
+  const voiceRecommendation = { stt: { choice: pick("scribe_v2"), ranked: [pick("scribe_v2")] }, tts: { ranked: [] } };
+  renderPane({ voiceRecommendation, voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "elevenlabs", model: "scribe_v2", language: null } } });
+  const head = document.getElementById("stt-model")!.closest(".ui-field")!.querySelector(".ui-field-head")!;
+  expect(head.querySelector(".ui-badge")).toBeNull();
 });

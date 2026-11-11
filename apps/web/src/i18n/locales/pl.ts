@@ -1222,6 +1222,7 @@ export const messages: Messages = {
   "runtime.on.gpu": "karta graficzna ({api})",
   "runtime.on.cpu": "procesor",
   "runtime.on.neuralEngine": "Neural Engine",
+  "runtime.stopsInBackground": "Działa tylko przy otwartym Sidevoice. Aby pracować w tle, musi działać na CPU.",
   "runtime.device": "To urządzenie: {what}",
   "runtime.device.gpu": "karta graficzna dostępna dla przeglądarki",
   "runtime.device.noGpu": "brak karty graficznej, z której mogłaby korzystać przeglądarka",

@@ -150,6 +150,14 @@
 .model-prepare-stalled { color: var(--sv-warning); }
 /* A model's download size at the end of its name's line in the Model list, quieter than its name. */
 .model-list-size { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-regular); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* The recommended model's «Recomendado» before its size, on the same line (VoiceSettings.tsx ModelPickers). */
+.model-list-badges { display: inline-flex; align-items: center; gap: var(--sv-space-2); }
+/* A model's name stays on its line in the Model list: too long for the room «Recomendado» and its size leave, it ends in
+   an ellipsis (the list itself is as wide as the screen allows, up to 28rem: ui.css). */
+.ui-select-item:has(.model-list-size, .model-list-badges) .ui-select-item-text { grid-template-columns: minmax(0, 1fr); }
+.ui-select-item:has(.model-list-size, .model-list-badges) .ui-select-item-text > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* That the model does not speak the language in use: its own line under the hardware, as quiet. */
+.model-list-unsupported { display: block; }
 /* The spec sheet (ModelSheet): what the model is in one bordered block, a label column and a value column, tight;
    on a narrow phone each label above its value. */
 .model-prepare-sheet { padding: var(--sv-space-2) var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-surface); }
@@ -163,6 +171,10 @@
 .model-sheet .model-sheet-languages { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sv-space-1) var(--sv-space-2); }
 .model-sheet-languages .model-prepare-notice { align-items: center; padding: 0 var(--sv-space-1-5); border-radius: var(--sv-radius-sm); background: var(--sv-warning-soft); }
 .model-sheet-languages .model-prepare-notice svg { margin-top: 0; }
+/* Where it runs, and beside it that it stops in the background (BackgroundNotice), as the Languages row says a language. */
+.model-sheet-runs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-1-5); }
+.model-sheet-runs .model-prepare-notice { align-items: center; padding: 0 var(--sv-space-1-5); border-radius: var(--sv-radius-sm); background: var(--sv-warning-soft); }
+.model-sheet-runs .model-prepare-notice svg { margin-top: 0; }
 /* Its state, the last row; what to do about it (download, cancel, retry) at the card's foot, full width on a phone. */
 .model-sheet-state { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); min-height: 22px; }
 .model-sheet-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sv-space-3); margin-top: var(--sv-space-2); padding-top: var(--sv-space-2); border-top: 1px solid var(--sv-border); }

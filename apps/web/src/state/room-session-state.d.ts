@@ -82,6 +82,9 @@ export interface SessionFacts {
   *  key is kept for each remote provider. */
  voiceSettings: import('../services/voice-settings.js').DeviceVoiceSettings | null; voiceDraft: import('../services/voice-settings.js').DeviceVoiceSettings | null;
  voiceCatalogue: {state: 'idle' | 'loading' | 'ready' | 'failed'; catalogs: import('../services/model-catalogs.js').CatalogView[]; error: string; details?: string};
+ /** What the engine recommends here (its local catalogue's `recommend`), for the language in use; null where the engine
+  *  cannot say (the page's engine today) or before it has. */
+ voiceRecommendation: import('../services/model-catalogs.js').Recommendation | null;
  /** Whether this device's engine can take a model off it (`uninstallVoiceModel`). */
  modelsRemovable: boolean;
  /** How long a downloaded model not used is kept, in days; null: never; 7 until chosen (model-housekeeping.js). */
