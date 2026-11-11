@@ -828,6 +828,22 @@ test("a build on disk that no longer runs is not Ready: the build that runs is o
   expect(actions.editVoice).not.toHaveBeenCalled();
 });
 
+test("a build the engine says stops in the background (a GPU on a phone) says so beside where it runs, and in Advanced; one on the CPU does not (sidevoice-web#572)", () => {
+  const warning = "Works only while Sidevoice is open. To keep it working in the background, run it on the CPU.";
+  const gpu = build("whisper-base/metal", { backend: "whisper-cpp", accelerator: "metal", acceleratorClass: "gpu", stopsInBackground: true } as Partial<ModelBuild>);
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: withBuilds([gpu, build("whisper-base/int8")]), error: "" } });
+  const runs = card("stt-model-card").querySelector(".model-sheet-runs")!;
+  expect(runs.querySelector(".model-prepare-notice")).toHaveTextContent(warning);
+  fireEvent.click(document.querySelector("#stt-model-card .model-runtime .model-runtime-toggle")!);
+  const why = [...document.querySelectorAll(".model-runtime-option")].map((option) => option.querySelector(".model-runtime-why")?.textContent ?? "");
+  // Automatic, then the build on the GPU (warned), then the one on the CPU.
+  expect(why).toEqual(["", warning, ""]);
+  cleanup();
+  // The same build where the engine says nothing of it (a desktop, the page's own engine): nothing is said.
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: onMetal(true), error: "" } });
+  expect(card("stt-model-card").querySelector(".model-sheet-runs .model-prepare-notice")).toBeNull();
+});
+
 test("the engine's recommendation: its family first and marked in the open list, its model marked there and in Model's label row once chosen", () => {
   const pick = (model: string) => ({ model, build: model + "/int8" });
   const voiceRecommendation = { stt: { choice: pick("moonshine-tiny"), ranked: [pick("moonshine-tiny"), pick("whisper-base")] }, tts: { ranked: [] } };
