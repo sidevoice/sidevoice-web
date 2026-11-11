@@ -6,6 +6,7 @@ import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
 import { Group, Row } from "../../components/ui/Card";
 import { Alert } from "../../components/ui/Alert";
+import { Badge } from "../../components/ui/Badge";
 import { Segmented } from "../../components/ui/Tabs";
 import { voiceChoices, voiceSettingsToLoad, endOfTurnModel, endOfTurnModels, IDLE_UNLOAD_MINUTES, SPEED, type DeviceVoiceSettings as Settings, type Note } from "../../services/voice-settings.js";
 import { SPEECH_LANGUAGES } from "../../services/system-language.js";
@@ -23,7 +24,7 @@ import { useMedia } from "../../state/call-layout";
 import { SETTINGS_PHONE_QUERY, useSectionShown } from "./settings-levels";
 import { VoicePicker } from "./VoicePicker";
 import { ModelLanguageNotice, ModelLanguages } from "./ModelLanguages";
-import { languageName } from "./model-languages";
+import { languageName, languageSupported } from "./model-languages";
 import { listedOption } from "./model-facts";
 import type { ModelBuild } from "@sidevoice/engine";
 
@@ -72,7 +73,13 @@ function noted(t: Translate, option: { disabled: boolean; note: Note | null }): 
   return option.disabled ? { reason: text } : { description: text };
 }
 
-type Listed = { id: string; builds?: ModelBuild[]; recommendedBuild?: string; installed?: boolean };
+type Listed = { id: string; builds?: ModelBuild[]; recommendedBuild?: string; installed?: boolean; languages?: string[] };
+
+/** The app's «Recomendado»: the one Badge "Avanzado" draws next to the recommended build (ModelRuntime.tsx), the same
+ *  wherever the engine's recommendation is said — Model's label row, the model and family lists. */
+function RecommendedBadge({ t }: { t: Translate }) {
+  return <Badge tone="accent">{t("runtime.recommended")}</Badge>;
+}
 
 /** What a model of this device says in the Model list, while it can be chosen: its download size at the end of its
  *  name's line, its hardware under it (model-facts.tsx, sidevoice-web#340). Put before what the pane says of the model
@@ -89,51 +96,88 @@ function SourceSelect({ id, value, sources, onChange, t }: { id: string; value: 
   );
 }
 
-/** The family first, then a model of it: a family changed picks its first model that runs here. A provider's models
- *  have no family, and are one list. */
+/** The family first, then a model of it: a family changed picks its best model for this device (its first in the
+ *  engine's recommended list), else its first that runs here. A provider's models have no family, and are one list.
+ *  On this device the engine's recommendation is said with «Recomendado» (RecommendedBadge): in Model's label row while
+ *  the recommended model is the one chosen, and on its entry and its family's in the open lists; its family comes
+ *  first, and each family's models in the order the engine ranks them. A model that does not speak the language in use
+ *  says so quietly under it, and can still be chosen. */
 function ModelPickers({ task, draft, options, locked, needsKey, t }: { task: Task; draft: Settings; options: Option[]; locked: boolean; needsKey: boolean; t: Translate }) {
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
+  const recommendation = useRoomStore((state) => state.facts.voiceRecommendation?.[task]);
+  const ui = useUiLanguage();
   const facts = optionFacts(t);
+  const local = draft[task].catalog === "local";
   // This device's models as its catalogue lists them, for their facts; a provider's say none.
-  const listed: Listed[] = draft[task].catalog === "local" ? catalogs.find((catalog) => catalog.id === "local")?.models ?? [] : [];
+  const listed: Listed[] = local ? catalogs.find((catalog) => catalog.id === "local")?.models ?? [] : [];
+  // The engine's recommendation is this device's: none for a provider's models.
+  const ranked = local ? recommendation?.ranked ?? [] : [];
+  const recommended = local ? recommendation?.choice?.model ?? null : null;
+  const recommendedFamily = options.find((option) => option.id === recommended)?.group ?? null;
+  const place = (id: string) => { const index = ranked.findIndex((pick) => pick.model === id); return index < 0 ? ranked.length : index; };
   const families = [...new Set(options.map((option) => option.group).filter((group): group is string => !!group))];
   const current = options.find((option) => option.id === draft[task].model);
   const family = current?.group ?? null;
   // What runs here is the engine's word (voiceChoices): a family with no model that does, and a model that does not, are
   // left out of the main view (Advanced lists them, with why); the one in use stays so the list can show it.
   const familyRuns = (name: string) => options.some((option) => option.group === name && option.runs);
-  const shownFamilies = families.filter((name) => familyRuns(name) || name === family);
+  const runningFamilies = families.filter((name) => familyRuns(name) || name === family);
+  const shownFamilies = recommendedFamily && runningFamilies.includes(recommendedFamily)
+    ? [recommendedFamily, ...runningFamilies.filter((name) => name !== recommendedFamily)] : runningFamilies;
   const inFamily = families.length ? options.filter((option) => option.group === family || (!option.group && option.id === draft[task].model)) : options;
-  const shown = inFamily.filter((option) => option.runs || option.id === draft[task].model);
-  // Only a model that runs here is ever picked for the person.
+  // A stable sort: what the engine does not rank keeps the catalogue's order, after what it does.
+  const shown = inFamily.filter((option) => option.runs || option.id === draft[task].model).sort((a, b) => place(a.id) - place(b.id));
+  // The language in use, as the model block says whether a model supports it (ModelLanguageNotice).
+  const inUse = draft.stt.language ?? ui;
+  const unsupported = (model: Listed | undefined) => !!model?.languages && !languageSupported(model.languages, inUse);
+  const unsupportedText = () => {
+    const text = t("voice.languages.unsupported", { language: languageName(inUse) });
+    return text.charAt(0).toLocaleUpperCase(ui) + text.slice(1);
+  };
+  // Only a model that runs here is ever picked for the person: the family's best for this device, else its first.
   const pickFamily = (next: string) => {
-    const first = options.find((option) => option.group === next && option.runs);
-    if (first) edit({ [task]: { model: first.id } });
+    const runsIn = (id: string) => options.some((option) => option.id === id && option.group === next && option.runs);
+    const best = ranked.find((pick) => runsIn(pick.model))?.model ?? options.find((option) => option.group === next && option.runs)?.id;
+    if (best) edit({ [task]: { model: best } });
+  };
+  const modelOption = (option: Option) => {
+    const model = listed.find((each) => each.id === option.id);
+    const { badge, description } = facts(model, option.disabled);
+    const isRecommended = option.id === recommended;
+    const soft = !option.disabled && unsupported(model);
+    return {
+      value: option.id, label: option.id, disabled: option.disabled,
+      ...(isRecommended ? { badge: <span className="model-list-badges"><RecommendedBadge t={t} />{badge}</span> } : badge ? { badge } : {}),
+      ...(description || soft ? { description: <>{description}{soft && <span className="model-list-unsupported">{description && <span className="sr-only"> · </span>}{unsupportedText()}</span>}</> } : {}),
+      ...noted(t, option),
+    };
   };
   return <>
     {shownFamilies.length > 0 && <Field label={t("voice.family")}>
       <Select id={task + "-family"} value={family ?? ""} disabled={locked || needsKey} onValueChange={pickFamily} placeholder={t("voice.family.none")}
-        options={shownFamilies.map((name) => ({ value: name, label: familyName(name) }))} />
+        options={shownFamilies.map((name) => ({ value: name, label: familyName(name), ...(name === recommendedFamily ? { badge: <RecommendedBadge t={t} /> } : {}) }))} />
     </Field>}
-    <Field label={t("voice.model")}>
+    <Field label={t("voice.model")} aside={recommended && draft[task].model === recommended ? <RecommendedBadge t={t} /> : undefined}>
       <Select id={task + "-model"} value={needsKey ? "" : draft[task].model} disabled={locked || needsKey} placeholder={needsKey ? t("voice.prepare.badge.needsKey") : undefined}
-        onValueChange={(model) => edit({ [task]: { model } })} options={shown.map((option) => ({ value: option.id, label: option.id, disabled: option.disabled,
-          ...facts(listed.find((model) => model.id === option.id), option.disabled), ...noted(t, option) }))} />
+        onValueChange={(model) => edit({ [task]: { model } })} options={shown.map(modelOption)} />
     </Field>
   </>;
 }
 
-/** A slot chosen with no model (a provider whose key just came) takes its catalogue's first runnable one. */
+/** A slot chosen with no model (a provider whose key just came) takes its catalogue's first runnable one: on this
+ *  device, the one the engine recommends when it runs. */
 function useFirstModel(task: "stt" | "tts") {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
+  const recommended = useRoomStore((state) => state.facts.voiceRecommendation?.[task]?.choice?.model);
   useEffect(() => {
     const slot = draft?.[task];
     if (!slot || slot.model) return;
-    const first = catalogs.find((catalog) => catalog.id === slot.catalog)?.models
-      .find((model) => model.capabilities.includes(task) && (!model.builds || model.builds.some((build) => build.available)));
+    const runnable = (catalogs.find((catalog) => catalog.id === slot.catalog)?.models ?? [])
+      .filter((model) => model.capabilities.includes(task) && (!model.builds || model.builds.some((build) => build.available)));
+    const first = (slot.catalog === "local" ? runnable.find((model) => model.id === recommended) : undefined) ?? runnable[0];
     if (first) window.sidevoiceActions?.editVoice({ [task]: { model: first.id } });
-  }, [draft, catalogs, task]);
+  }, [draft, catalogs, task, recommended]);
 }
 
 /** One slot: where it runs, its model made ready and tried in its block, then its options. A provider that only lacks
