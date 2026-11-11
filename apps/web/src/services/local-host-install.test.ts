@@ -1,6 +1,6 @@
 import { expect, test, vi } from "vitest";
 import type { LocalHostBridge, LocalHostInstallOperation, LocalHostStatus } from "../host";
-import { createLocalHostInstallController } from "./local-host-install";
+import { createLocalHostInstallController, normalizeLocalHostBridgeError } from "./local-host-install";
 
 const running: LocalHostStatus = { state: "running", reachable: true, installed: true };
 
@@ -95,6 +95,34 @@ test("connector check identifiers are kept while arbitrary check strings are omi
   await vi.waitFor(() => expect(controller.getSnapshot().phase).toBe("failed"));
   expect(controller.getSnapshot()).toMatchObject({ phase: "failed", error: { params: { check: "archive-link" } } });
   expect(JSON.stringify(controller.getSnapshot())).not.toContain("user:pass");
+});
+
+test("a local file failure's where, reason, root and os_error are kept, unknown words become other, and a path is never kept", async () => {
+  const result = deferred<LocalHostStatus>();
+  const bridge = { install: vi.fn(() => operation("job-file", result.promise)) } as unknown as LocalHostBridge;
+  const controller = createLocalHostInstallController(() => bridge);
+  controller.start();
+  result.reject({ key: "install.unsafe", step: "download", params: {
+    where: "scratch", reason: "others-can-replace", root: "C:\\Users\\demo-person\\Temp", os_error: 5, extra: "x",
+  } });
+
+  await vi.waitFor(() => expect(controller.getSnapshot().phase).toBe("failed"));
+  expect(controller.getSnapshot()).toMatchObject({ phase: "failed", error: { key: "install.unsafe", step: "download", params: {
+    where: "scratch", reason: "others-can-replace", root: "other", os_error: 5,
+  } } });
+  expect(JSON.stringify(controller.getSnapshot())).not.toContain("demo-person");
+});
+
+test("inherited property names as params are ignored, never thrown on", () => {
+  const params = JSON.parse('{"constructor":"x","__proto__":"y","toString":"z","hasOwnProperty":"w","reason":"link"}');
+  expect(normalizeLocalHostBridgeError({ key: "install.failed", params }).params).toEqual({ reason: "link" });
+});
+
+test("os_error is kept only as a whole number, and a non-string where or reason is dropped", () => {
+  expect(normalizeLocalHostBridgeError({ key: "install.failed", params: { os_error: -3, where: 7, reason: "os" } }).params)
+    .toEqual({ os_error: -3, reason: "os" });
+  expect(normalizeLocalHostBridgeError({ key: "install.failed", params: { os_error: "5" } }).params).toBeUndefined();
+  expect(normalizeLocalHostBridgeError({ key: "install.failed", params: { os_error: 1.5 } }).params).toBeUndefined();
 });
 
 test("a refused cancellation disables retrying cancel and leaves the job active", async () => {
