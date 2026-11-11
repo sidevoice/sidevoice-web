@@ -101,7 +101,7 @@ export function nativeHost(): NativeHost {
     callControls: member<CallControlsBridge>(app, "callControls", ["settings", "setAlwaysShown"]),
     callSurface: member<CallSurfaceBridge>(app, "callSurface", ["active", "still", "forget"]),
     cue: member<CueBridge>(app, "cue", ["start", "stop"]),
-    audioRoute: member<AudioRouteBridge>(app, "audioRoute", ["open"]),
+    audioRoute: member<AudioRouteBridge>(app, "audioRoute", ["open", "current", "subscribe"]),
     screen: member<ScreenBridge>(app, "screen", ["locked"]),
     updater: updater && typeof updater.status === "function" ? updater : null,
     debug: debug && Array.isArray(debug.available) && typeof debug.set === "function" ? debug as HostDebugBridge : null,

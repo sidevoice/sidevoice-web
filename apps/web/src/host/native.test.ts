@@ -204,7 +204,7 @@ describe("the members an app calls through", () => {
       callControls: { settings: async () => ({}) },
       callSurface: { active: () => true },
       cue: { start() {} },
-      audioRoute: {},
+      audioRoute: { open: async () => {}, current: async () => null },
       screen: {},
       updater: { cancel: async () => {} },
     });
@@ -225,7 +225,7 @@ describe("the members an app calls through", () => {
     const updater = { status: async () => ({}), cancel: async () => {} };
     const callSurface = { active: () => true, still() {}, forget() {} };
     const cue = { start() {}, stop() {} };
-    const audioRoute = { open: async () => {} };
+    const audioRoute = { open: async () => {}, current: async () => null, subscribe: () => () => {} };
     const screen = { locked: async () => false };
     withHost({ localHost, muteShortcut, callControls, callSurface, cue, audioRoute, screen, updater });
     expect(host().screen).toBe(screen);

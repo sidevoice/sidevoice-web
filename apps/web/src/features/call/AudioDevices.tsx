@@ -113,18 +113,33 @@ function useAudioRoute() {
   return route;
 }
 
+/** Where the audio plays now, by the name the system gives it: read once, then each time the route changes. `null` until it is
+ *  known and when the system names none, and the button keeps its own label. */
+function useRouteName(route: AudioRouteBridge) {
+  const [name, setName] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    const take = (next: string | null) => { if (live) setName(next?.trim() || null); };
+    const stop = route.subscribe(take);
+    route.current().then(take, () => take(null));
+    return () => { live = false; stop(); };
+  }, [route]);
+  return name;
+}
+
 /** The speaker where the system chooses it and the app can show its picker: our own button, the system's sheet. */
 function OutputRouteButton({ route, onError }: { route: AudioRouteBridge; onError: (error: ErrorMessage | null) => void }) {
   const t = translator();
   const [opening, setOpening] = useState(false);
+  const name = useRouteName(route);
   const open = async () => {
     setOpening(true); onError(null);
     try { await route.open(); }
     catch (failure) { onError(devicesError(failure, t)); }
     finally { setOpening(false); }
   };
-  return <Button id="audio-output-route" variant="secondary" size="md" block loading={opening} aria-haspopup="dialog" onClick={() => void open()}>
-    <SpeakerIcon />{t("devices.speaker")}
+  return <Button id="audio-output-route" variant="secondary" size="md" block loading={opening} aria-haspopup="dialog" aria-label={name ? `${t("devices.speaker")}: ${name}` : undefined} onClick={() => void open()}>
+    <SpeakerIcon />{name ?? t("devices.speaker")}
   </Button>;
 }
 
