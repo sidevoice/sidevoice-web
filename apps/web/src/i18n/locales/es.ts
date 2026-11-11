@@ -1540,4 +1540,8 @@ export const messages: Messages = {
   "service.status.newer": "Más nueva que la compatible",
   "service.offline": "Sin conexión",
   "service.lastSeen": "Última versión vista: {version}",
+  "service.field.version": "Versión",
+  "service.field.port": "Puerto",
+  "service.field.status": "Estado",
+  "service.listens": "Escucha en el puerto {port}",
 };

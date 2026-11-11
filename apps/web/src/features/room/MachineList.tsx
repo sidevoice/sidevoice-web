@@ -19,7 +19,7 @@ import { InstallCommandHere } from "../pairing/ConnectorSteps";
 import { useThisComputerSection } from "../../state/this-computer";
 import { translator, type Translate } from "../../i18n/translator";
 import { useVariant } from "../../lib/variants";
-import { AppRow, OfflineState, SERVICE_ROW, ServiceCardFoot, ServiceCardTop, useLocalService, useMockOffline, useRemoteService, type ServiceLayout } from "../settings/service-version";
+import { AppRow, OfflineState, SERVICE_ROW, ServiceCardTop, useLocalService, useMockOffline, useRemoteService, type ServiceLayout } from "../settings/service-version";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
 import { motionOf, useSettingsLevels } from "../settings/settings-levels";
@@ -59,9 +59,7 @@ function useNotice() {
 /** The machines Machines lists: every one, or, with this computer in its own section, the other machines. */
 function useListedMachines() {
   const own = useThisComputerSection();
-  const all = useRoomStore((state) => state.machines);
-  const offline = useMockOffline() !== "online";
-  const machines = offline ? all.map((machine) => machine.local ? machine : { ...machine, state: "offline" as const, reach: "offline" as const }) : all;
+  const machines = useRoomStore((state) => state.machines);
   return own ? machines.filter((machine) => !machine.local) : machines;
 }
 
@@ -346,8 +344,7 @@ function RemoteHostCard({ machine, name, titleId }: { machine: MachineView; name
   return (
     <div className="host-status-card" data-remote>
       <ServiceCardTop titleId={titleId} layout={layout} info={service} port={port} supported={service.supported} machine={name} command={service.command} t={t}
-        end={offline ? <OfflineState t={t} /> : null} offline={offline ? (mode === "b2" ? "b2" : "b1") : null} lastSeen={service.lastSeen} />
-      <ServiceCardFoot layout={layout} info={service} offline={offline} t={t} />
+        end={offline ? <OfflineState t={t} /> : null} offline={offline ? mode : null} lastSeen={service.lastSeen} />
     </div>
   );
 }
@@ -452,7 +449,6 @@ function LocalHostStatusPanel({ machine, status, titleId }: { machine: MachineVi
           {failed && typeof navigator.clipboard?.writeText === "function" && <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => void copyDetails()}>{copied ? t("hosts.detailsCopied") : t("hosts.copyDetails")}</Button>}
         </div>}
       {note && <p className="muted" role="status">{note}</p>}
-      <ServiceCardFoot layout={layout} info={service} t={t} />
     </div>
   );
 }

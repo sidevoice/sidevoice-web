@@ -1563,6 +1563,10 @@ export const messages = {
   "service.status.newer": "Newer than the supported version",
   "service.offline": "Offline",
   "service.lastSeen": "Last version seen: {version}",
+  "service.field.version": "Version",
+  "service.field.port": "Port",
+  "service.field.status": "Status",
+  "service.listens": "Listening on port {port}",
 } as const;
 
 export type MessageKey = keyof typeof messages;
