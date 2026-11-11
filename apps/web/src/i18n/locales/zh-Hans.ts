@@ -1205,7 +1205,7 @@ export const messages: Messages = {
   "runtime.notHere": "无法在此运行：{reasons}",
   "runtime.on.gpu": "显卡（{api}）",
   "runtime.on.cpu": "处理器",
-  "runtime.stopsInBackground": "仅在 Sidevoice 打开时可用。要在后台继续运行，必须在 CPU 上运行。",
+  "runtime.stopsInBackground": "仅在 Sidevoice 打开时可用。如需在后台继续使用，须在 CPU 上运行。",
   "runtime.on.neuralEngine": "神经网络引擎",
   "runtime.device": "此设备：{what}",
   "runtime.device.gpu": "浏览器可用的显卡",

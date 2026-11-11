@@ -828,7 +828,7 @@ test("a build on disk that no longer runs is not Ready: the build that runs is o
 });
 
 test("a build the engine says stops in the background (a GPU on a phone) says so beside where it runs, and in Advanced; one on the CPU does not (sidevoice-web#572)", () => {
-  const warning = "Works only while Sidevoice is open. To keep working in the background, it must run on the CPU.";
+  const warning = "Works only while Sidevoice is open. To keep it working in the background, run it on the CPU.";
   const gpu = build("whisper-base/metal", { backend: "whisper-cpp", accelerator: "metal", acceleratorClass: "gpu", stopsInBackground: true } as Partial<ModelBuild>);
   renderPane({ voiceCatalogue: { state: "ready", catalogs: withBuilds([gpu, build("whisper-base/int8")]), error: "" } });
   const runs = card("stt-model-card").querySelector(".model-sheet-runs")!;

@@ -1208,7 +1208,7 @@ export const messages: Messages = {
   "runtime.notHere": "Läuft hier nicht: {reasons}",
   "runtime.on.gpu": "Grafikkarte ({api})",
   "runtime.on.cpu": "Prozessor",
-  "runtime.stopsInBackground": "Funktioniert nur, solange Sidevoice geöffnet ist. Damit es im Hintergrund weiterläuft, muss es auf der CPU laufen.",
+  "runtime.stopsInBackground": "Funktioniert nur, solange Sidevoice geöffnet ist. Für den Hintergrund muss es auf der CPU laufen.",
   "runtime.on.neuralEngine": "Neural Engine",
   "runtime.device": "Dieses Gerät: {what}",
   "runtime.device.gpu": "Grafikkarte für den Browser verfügbar",

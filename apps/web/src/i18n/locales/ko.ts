@@ -1198,7 +1198,7 @@ export const messages: Messages = {
   "runtime.notHere": "여기서는 실행되지 않음: {reasons}",
   "runtime.on.gpu": "그래픽 카드({api})",
   "runtime.on.cpu": "프로세서",
-  "runtime.stopsInBackground": "Sidevoice가 열려 있는 동안에만 작동합니다. 백그라운드에서 계속 작동하려면 CPU에서 실행해야 합니다.",
+  "runtime.stopsInBackground": "Sidevoice가 열려 있을 때만 작동해요. 백그라운드에서 계속 쓰려면 CPU에서 실행해야 해요.",
   "runtime.on.neuralEngine": "Neural Engine",
   "runtime.device": "이 기기: {what}",
   "runtime.device.gpu": "브라우저에서 사용할 수 있는 그래픽 카드",
