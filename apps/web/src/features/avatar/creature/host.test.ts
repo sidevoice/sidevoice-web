@@ -768,7 +768,91 @@ test("a canvas whose room the page skips (content-visibility: hidden, under Sett
   expect(scene.draws).toBe(3);
 });
 
-test("a held-still creature changed while its room is skipped keeps asking for a frame, and shows the change in the first it is seen in", () => {
+/** An IntersectionObserver by hand: the ones made, what each watches, and a way to have one report. */
+function intersectionObservers() {
+  const made: Array<{ targets: Element[]; disconnected: boolean; report(inView: boolean): void }> = [];
+  vi.stubGlobal("IntersectionObserver", class {
+    private entry: { targets: Element[]; disconnected: boolean; report(inView: boolean): void };
+    constructor(private callback: (entries: Array<{ isIntersecting: boolean }>) => void) {
+      this.entry = { targets: [], disconnected: false, report: (inView) => { if (!this.entry.disconnected) this.callback([{ isIntersecting: inView }]); } };
+      made.push(this.entry);
+    }
+    observe(target: Element) { this.entry.targets.push(target); }
+    disconnect() { this.entry.disconnected = true; }
+  });
+  return made;
+}
+
+test("a held-still creature changed while its room is skipped asks for no frame once the page has said it is out of view, and shows the change when it is back", () => {
+  webgl();
+  const loop = animationFrames();
+  const watched = intersectionObservers();
+  const { element, state } = skippable();
+  const live = mount({ ...onStage, canvas: element, moving: false })!;
+  const scene = stageFor("scene");
+  let ms = 100;
+  loop.run(ms);
+  const drawn = scene.draws;
+  expect(loop.pending()).toBe(0); // at rest: no frame asked for
+  expect(watched).toHaveLength(0);
+  state.shown = false;
+  live.redraw(); // (a mood, a framing: something to draw)
+  expect(loop.pending()).toBe(1);
+  loop.run(ms += 40);
+  // Not drawn: it watches its canvas, and asks for frames until the watch has said whether it is in view.
+  expect(scene.draws).toBe(drawn);
+  expect(watched).toHaveLength(1);
+  expect(watched[0].targets).toEqual([element]);
+  expect(loop.pending()).toBe(1);
+  loop.run(ms += 40);
+  expect(watched).toHaveLength(1);
+  // Out of view, as the browser reports a skipped room: nothing asks for a frame, whatever happens meanwhile.
+  watched[0].report(false);
+  loop.run(ms += 40);
+  expect(loop.pending()).toBe(0);
+  live.redraw();
+  live.reframe();
+  expect(loop.pending()).toBe(0);
+  expect(live.wantsFrames()).toBe(false);
+  expect(scene.draws).toBe(drawn);
+  // The room is shown again: the watch says so, the loop wakes, and the very next frame draws the change, then rests.
+  state.shown = true;
+  watched[0].report(true);
+  expect(watched[0].disconnected).toBe(true);
+  expect(loop.pending()).toBe(1);
+  loop.run(ms += 40);
+  expect(scene.draws).toBe(drawn + 1);
+  expect(loop.pending()).toBe(0);
+});
+
+test("a creature at rest made to move while its room is skipped asks for frames again, and the watch goes when it is seen", () => {
+  webgl();
+  const loop = animationFrames();
+  const watched = intersectionObservers();
+  const { element, state } = skippable();
+  const live = mount({ ...onStage, canvas: element, moving: false })!;
+  const scene = stageFor("scene");
+  let ms = 100;
+  loop.run(ms);
+  state.shown = false;
+  live.redraw();
+  loop.run(ms += 40);
+  watched[0].report(false);
+  loop.run(ms += 40);
+  expect(loop.pending()).toBe(0);
+  live.setMoving(true);
+  expect(loop.pending()).toBe(1);
+  const drawn = scene.draws;
+  for (let n = 0; n < 5; n++) { loop.run(ms += 40); expect(loop.pending()).toBe(1); }
+  expect(scene.draws).toBe(drawn);
+  expect(watched).toHaveLength(1); // (one in motion needs no watch, and the one it had is not made again)
+  state.shown = true;
+  loop.run(ms += 40);
+  expect(scene.draws).toBe(drawn + 1);
+  expect(watched[0].disconnected).toBe(true);
+});
+
+test("a creature at rest keeps asking for frames where the browser has no IntersectionObserver, or does not report a skipped room", () => {
   webgl();
   const loop = animationFrames();
   const { element, state } = skippable();
@@ -777,15 +861,42 @@ test("a held-still creature changed while its room is skipped keeps asking for a
   let ms = 100;
   loop.run(ms);
   const drawn = scene.draws;
-  expect(loop.pending()).toBe(0); // at rest: no frame asked for
+  // No IntersectionObserver: nothing can say when the room is shown again.
   state.shown = false;
-  live.redraw(); // (a mood, a framing: something to draw)
+  live.redraw();
   for (let n = 0; n < 10; n++) { expect(loop.pending()).toBe(1); loop.run(ms += 40); }
   expect(scene.draws).toBe(drawn);
   state.shown = true;
   loop.run(ms += 40);
   expect(scene.draws).toBe(drawn + 1);
-  expect(loop.pending()).toBe(0); // and at rest again
+  expect(loop.pending()).toBe(0);
+  // One that says the canvas is in view while the page skips its room cannot be waited on: it is dropped, once, and the frames go on.
+  const watched = intersectionObservers();
+  state.shown = false;
+  live.redraw();
+  loop.run(ms += 40);
+  expect(watched).toHaveLength(1);
+  watched[0].report(true);
+  expect(watched[0].disconnected).toBe(true);
+  for (let n = 0; n < 10; n++) { expect(loop.pending()).toBe(1); loop.run(ms += 40); }
+  expect(watched).toHaveLength(1);
+  expect(scene.draws).toBe(drawn + 1);
+  state.shown = true;
+  loop.run(ms += 40);
+  expect(scene.draws).toBe(drawn + 2);
+});
+
+test("a creature in motion under a skipped room watches nothing: it asks for frames until it is shown", () => {
+  webgl();
+  const loop = animationFrames();
+  const watched = intersectionObservers();
+  const { element, state } = skippable();
+  mount({ ...onStage, canvas: element, moving: true })!;
+  let ms = 100;
+  loop.run(ms);
+  state.shown = false;
+  for (let n = 0; n < 10; n++) { loop.run(ms += 40); expect(loop.pending()).toBe(1); }
+  expect(watched).toHaveLength(0);
 });
 
 test("a canvas with no box still sleeps (its box observer wakes it), whether or not the page can say what it shows", () => {
@@ -848,4 +959,37 @@ test("frames not drawn under a skipped room are a pause to the governor, not qui
   // Frames that go on costing over the budget are judged then, as any.
   for (let n = 0; n < 40; n++) loop.run(ms += 40);
   expect(host.creatureQuality.tier()).toBeGreaterThan(0);
+});
+
+test("a creature in motion that is seen keeps the governor judging while the stage beside it is covered: it steps down on dear frames, and nothing pauses it", async () => {
+  webgl();
+  vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(2);
+  const { Governor } = await import("./quality");
+  const pause = vi.spyOn(Governor.prototype, "pause");
+  const observe = vi.spyOn(Governor.prototype, "observe");
+  const loop = animationFrames();
+  const { element, state } = skippable(364, 655);
+  const stage = mount({ ...onStage, canvas: element, moving: true })!;
+  const cardCanvas = tile(200, 200);
+  const card = mount({ seed: "t3", canvas: cardCanvas, framing: "face", sharp: true, moving: true })!;
+  const scene = stageFor("scene"), face = stageFor("face"), draw = face.draw.bind(face);
+  face.draw = (...args: Parameters<typeof draw>) => { clock += 20; draw(...args); }; // the visible creature's frame costs 20 ms: over the budget
+  state.shown = false; // the stage's room is skipped (Settings over it); the card's creature is not
+  let ms = 100;
+  loop.run(ms); // the first frame starts the governor
+  expect(stage.covered()).toBe(true);
+  expect(card.covered()).toBe(false);
+  // What a frame fills is the card's alone: the covered stage adds nothing to it.
+  const fill = cardCanvas.width * cardCanvas.height;
+  expect(fill).toBeGreaterThan(0);
+  expect(host.drawnFill(1)).toBe(fill);
+  expect(host.drawnFill(0.6)).toBe(fill);
+  // Dear frames, frame after frame: judged as ever (not held off from the settle moment's 1.2 s on), so it gives ground.
+  for (let n = 0; n < 100; n++) loop.run(ms += 40);
+  expect(face.draws).toBeGreaterThan(90);
+  expect(scene.draws).toBe(0);
+  expect(observe.mock.calls.length).toBeGreaterThan(50);
+  expect(host.creatureQuality.tier()).toBeGreaterThan(0);
+  expect(pause).not.toHaveBeenCalled();
+  expect(card.covered()).toBe(false);
 });

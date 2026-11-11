@@ -407,8 +407,15 @@ export class LiveCreature {
   /** Its canvas had no box when last asked to draw: it waits for one (its box observer) instead of asking for frames. */
   private hidden = false;
   /** Its canvas has a box, but the page does not show it: the room it is in is skipped (content-visibility: hidden, as under Settings).
-   *  Nothing says when that ends (its box does not change), so it goes on asking for frames and is drawn at the first one it is seen in. */
+   *  Nothing says when that ends (its box does not change), so a creature in motion goes on asking for frames and is drawn at the first
+   *  one it is seen in; one at rest waits for `watch`. */
   private unseen = false;
+  /** Unseen with nothing moving, it waits for an IntersectionObserver (`watch`) to say its canvas is on screen again, instead of asking
+   *  for a frame at each refresh: `asleep` once that observer has said it is not. `blind`: it said it is, while the page still skipped
+   *  the room, so this browser does not report a skipped room and the creature keeps asking for frames. */
+  private watch: IntersectionObserver | null = null;
+  private asleep = false;
+  private blind = false;
   /** Disposed already: a second dispose (a late cleanup) does nothing. */
   private disposed = false;
   private react: { expr?: string; hop?: number; t0: number; until: number } | null = null;
@@ -462,10 +469,11 @@ export class LiveCreature {
       this.fit(false); // (asks the framer for the creature's reach: its acts are measured from here, and the canvas cropped when they are)
     }
     this.setMood(opts.mood ?? "idle", { step: opts.step });
-    const box = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => { this.fit(); this.hidden = false; this.unseen = false; this.canvasChanged(); this.poke(); });
+    const box = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => { this.fit(); this.hidden = false; this.unseen = false; this.stopWatch(); this.canvasChanged(); this.poke(); });
     // A sharp face also follows its pixel ratio (a window moved to another screen), where the browser says so.
     if (opts.sharp) { try { box?.observe(opts.canvas, { box: "device-pixel-content-box" }); } catch { box?.observe(opts.canvas); } } else box?.observe(opts.canvas);
     this.off.push(() => box?.disconnect());
+    this.off.push(() => this.stopWatch());
     // The stage's ceilings follow what it says it is (its first ask, a window turned between a phone's rules and a desktop's).
     if (opts.frame && !face) this.off.push(opts.frame.listen(() => { if (this.fit(false)) { this.canvasChanged(); this.poke(); } }));
     // Where the pixels depend on the pixel ratio (the stage's, a sharp face's), the ratio is watched too: a window moved between
@@ -744,7 +752,26 @@ export class LiveCreature {
   animates(): boolean { return this.moving && !MODES[this.mood].poster; }
 
   /** It has a frame to draw: a change not drawn yet, or motion (its own, the pointer's gaze, a startle). */
-  wantsFrames(): boolean { return !this.hidden && !seats[this.slot].lost && (this.needDraw || this.active()); }
+  wantsFrames(): boolean { return !this.hidden && !seats[this.slot].lost && !(this.asleep && !this.active()) && (this.needDraw || this.active()); }
+
+  /** Nothing moves and the page does not show its canvas: it waits to be told it does (the watch), asking for no frame meanwhile (the
+   *  motion guard's rule, e2e/motion-guard.spec.mjs: a page whose creatures hold still asks for none). A skipped room keeps its box, so the
+   *  box observer says nothing when it is shown again; an IntersectionObserver does report it, out of view and in view again, in the
+   *  browsers that have one. Without one, or where it does not report it, the creature goes on asking for frames. */
+  private sleepUnseen() {
+    if (this.watch || this.blind || typeof IntersectionObserver === "undefined") return;
+    const watch = new IntersectionObserver((entries) => {
+      if (this.watch !== watch) return;
+      if (!entries[entries.length - 1].isIntersecting) { this.asleep = true; return; }
+      if (shownByPage(this.opts.canvas) === false) this.blind = true;
+      this.stopWatch();
+      this.poke();
+    });
+    this.watch = watch;
+    watch.observe(this.opts.canvas);
+  }
+
+  private stopWatch() { this.watch?.disconnect(); this.watch = null; this.asleep = false; }
 
   /** Whether `stage` is the one it is drawn by. */
   drawnBy(stage: RigStage | null): boolean { return stage === this.stage; }
@@ -762,13 +789,16 @@ export class LiveCreature {
     const seen = shownByPage(canvas);
     if (seen === false) {
       // Nor one whose room the page skips (content-visibility: hidden, as under Settings), though it keeps its box and its size: no frame
-      // is drawn into it, and the loop goes on asking, since nothing says when it is shown again. Whether it has a box is asked once, as
-      // it stops being seen (a layout, which the skipped room would not otherwise get: never per frame), and again when its box observer fires.
+      // is drawn into it, and a creature in motion goes on asking for frames, since nothing says when it is shown again (one at rest waits
+      // for the watch: sleepUnseen). Whether it has a box is asked once, as it stops being seen (a layout, which the skipped room would not
+      // otherwise get: never per frame), and again when its box observer fires.
       this.needDraw = true;
       if (!this.unseen) { this.unseen = true; if (canvas.getClientRects().length === 0) this.hidden = true; }
+      if (!this.hidden && !this.active()) this.sleepUnseen();
       return false;
     }
     this.unseen = false;
+    this.stopWatch();
     // A canvas that is seen has a box. Where the browser cannot say (null), its box is read, each frame.
     if (seen === null && canvas.getClientRects().length === 0) { this.needDraw = true; this.hidden = true; return false; }
     this.needDraw = false;
