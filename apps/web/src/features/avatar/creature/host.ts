@@ -430,6 +430,8 @@ export class LiveCreature {
     const face = opts.framing === "face";
     this.item = stage.add(rigSpec(opts.choice ?? creatureFromSeed(opts.seed)), opts.canvas, face ? { ...(opts.sharp && opts.whole ? WHOLE_FACE : FACE), off: 0 } : { turn: 0, off: 0 });
     this.moving = opts.moving ?? true; // (before the first fit: a held creature is sized at a phone's pixels)
+    // (a canvas reused for another creature is not measured until this one is: e2e and tests wait on it)
+    delete opts.canvas.dataset.reach;
     if (face) {
       // A moving face holds every act it can play inside its square: its footprint, measured once per shape on the page (until
       // then, and while it holds still, the pose it is drawn in: faceZoom).
