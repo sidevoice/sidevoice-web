@@ -150,6 +150,10 @@
 .model-prepare-stalled { color: var(--sv-warning); }
 /* A model's download size at the end of its name's line in the Model list, quieter than its name. */
 .model-list-size { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-regular); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* The recommended model's «Recomendado» before its size, on the same line (VoiceSettings.tsx ModelPickers). */
+.model-list-badges { display: inline-flex; align-items: center; gap: var(--sv-space-2); }
+/* That the model does not speak the language in use: its own line under the hardware, as quiet. */
+.model-list-unsupported { display: block; }
 /* The spec sheet (ModelSheet): what the model is in one bordered block, a label column and a value column, tight;
    on a narrow phone each label above its value. */
 .model-prepare-sheet { padding: var(--sv-space-2) var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-surface); }
