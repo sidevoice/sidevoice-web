@@ -157,6 +157,30 @@ describe("Governor: gives ground a step at a time, and takes it back", () => {
     expect(g.observe(at + 5000, 40, 5000)).toBe(false);
     expect(g.tier).toBe(0);
   });
+  it("frames not drawn because nobody sees the creature (pause, at each of them) hold the judging off until a moment after the first drawn", () => {
+    const g = new Governor();
+    let at = run(g, 0, 60, 3).at;
+    // Five seconds of frames not drawn, each one a pause: nothing is judged, nothing moves.
+    for (let i = 0; i < 150; i++) { at += 1000 / 30; g.pause(at); }
+    expect(g.tier).toBe(0);
+    // The first frames drawn after them cost a lot (the room shown again is laid out): not judged for SETTLE_MS (1.2 s)...
+    expect(run(g, at, 30, BUDGET_MS * 3).moves).toEqual([]);
+    expect(g.tier).toBe(0);
+    // ...and judged as any after it, when they still cost it.
+    expect(run(g, at + 1000, 90, BUDGET_MS * 3).moves.length).toBeGreaterThanOrEqual(1);
+    expect(g.tier).toBeGreaterThan(0);
+  });
+  it("a pause starts the calm spell again: a rung left is not taken back before it has passed", () => {
+    const g = new Governor();
+    let at = run(g, 0, 90, BUDGET_MS * 2).at; // steps down
+    const down = g.tier;
+    expect(down).toBeGreaterThan(0);
+    at = run(g, at, 150, 1).at; // cheap frames: the calm spell (8 s) is half through (5 s)
+    g.pause(at);
+    // Another 5 s of cheap frames is less than the spell from the pause: still on the rung (a step up needs the spell and room).
+    expect(run(g, at, 150, 1).moves).toEqual([]);
+    expect(g.tier).toBe(down);
+  });
   it("lowers the rate only after the resolution is as low as it goes, and the rates are even on a 60 Hz screen", () => {
     const g = new Governor();
     run(g, 0, 3000, BUDGET_MS * 3);
