@@ -19,13 +19,12 @@ import { InstallCommandHere } from "../pairing/ConnectorSteps";
 import { useThisComputerSection } from "../../state/this-computer";
 import { translator, type Translate } from "../../i18n/translator";
 import { useVariant } from "../../lib/variants";
-import { REMOTE_VERSION, RemoteBadge, RemoteEntryState, RemoteLine, RemoteNotice, SERVICE_ROW, ServiceFactsA1, ServiceFactsA3, ServiceRowA2, type RemoteVersionVariant, type ServiceRowVariant } from "../settings/service-version";
+import { AppRow, OfflineState, SERVICE_ROW, ServiceCardFoot, ServiceCardTop, useLocalService, useMockOffline, useRemoteService, type ServiceLayout } from "../settings/service-version";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
 import { motionOf, useSettingsLevels } from "../settings/settings-levels";
 import { MenuRow } from "../settings/SettingsMenu";
 import { machineStatus } from "../settings/machine-status";
-import { ThisDeviceVersion } from "../settings/UpdatesSettings";
 import { MachineEntryCopy, MachineEntryState, MachineState, StateOnIcon, machineEntryName, machineEntryTitle } from "../settings/MachineState";
 import { canRunLocalHostAction, hostCause, hostStatusText, localHostRecovery, runLocalHostAction, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
 import { listeningPort } from "../../services/device-pairing.js";
@@ -60,7 +59,9 @@ function useNotice() {
 /** The machines Machines lists: every one, or, with this computer in its own section, the other machines. */
 function useListedMachines() {
   const own = useThisComputerSection();
-  const machines = useRoomStore((state) => state.machines);
+  const all = useRoomStore((state) => state.machines);
+  const offline = useMockOffline() !== "online";
+  const machines = offline ? all.map((machine) => machine.local ? machine : { ...machine, state: "offline" as const, reach: "offline" as const }) : all;
   return own ? machines.filter((machine) => !machine.local) : machines;
 }
 
@@ -111,7 +112,7 @@ export function MachineNav({ current }: { current: boolean }) {
             <span className="machine-nav-icon" title={machine.local ? t("hosts.thisComputer") : undefined}>
               <NewOnIcon icon={<StateOnIcon icon={machine.local ? <ThisComputerIcon size={18} /> : <OtherMachineIcon size={18} />} status={state} />} isNew={isNew} />
             </span>
-            <MachineEntryCopy name={name} status={state} isNew={isNew} extra={machine.local ? null : <RemoteEntryState machine={machine} t={t} />} />
+            <MachineEntryCopy name={name} status={state} isNew={isNew} />
           </button>
         );
       })}
@@ -184,7 +185,7 @@ export function MachineList() {
                     aria-label={machineEntryName(name, state, isNew, t)}
                     icon={<NewOnIcon icon={<StateOnIcon icon={machine.local ? <ThisComputerIcon size={20} /> : <OtherMachineIcon size={20} />} status={state} />} isNew={isNew} />}
                     label={<span className="machine-nav-name">{name}</span>}
-                    summary={<><MachineEntryState status={state} />{!machine.local && <RemoteEntryState machine={machine} t={t} />}</>} end={<NewAtEnd isNew={isNew} />}
+                    summary={<MachineEntryState status={state} />} end={<NewAtEnd isNew={isNew} />}
                     onClick={() => levels.open("machines", machine.id)} />
                 </li>;
               })}
@@ -261,11 +262,9 @@ function HostDetail({ machine, name, untitled = false, onForget }: { machine: Ma
   useEffect(() => { if (agentRequest?.fp && agentRequest.fp === machine.pairingId) agents.current?.scrollIntoView?.({ block: "start" }); }, [agentRequest, machine.pairingId]);
   // Its state, as This device's section says it where this is that section's page; the hint of what to do, if any.
   const state = machineStatus(machine, status, own, t);
-  const rowVariant = useVariant<ServiceRowVariant>("serviceRow", SERVICE_ROW);
-  const noHeader = machine.local && untitled && (rowVariant === "a2" || rowVariant === "a3");
   return (
     <section className="host-detail" aria-label={name}>
-      {!noHeader && <header className="host-detail-header">
+      <header className="host-detail-header">
         <span className="machine-icon" aria-hidden="true">{machine.local ? <ThisComputerIcon size={20} /> : <OtherMachineIcon size={20} />}</span>
         <div className="host-detail-copy">
           {untitled ? null : naming !== null ? <div className="host-rename" role="group" aria-label={t("hosts.renameLabel")}>
@@ -290,7 +289,9 @@ function HostDetail({ machine, name, untitled = false, onForget }: { machine: Ma
           {state.key === "unpaired" && !machine.local && <Button size="sm" variant="secondary" className="host-pair-again"
             onClick={() => window.sidevoiceActions?.openPairing()}>{t("hosts.machineState.unpaired.pair")}</Button>}
         </div>
-      </header>}
+      </header>
+      {/* MOCK: the app's own version, a row of its own on This device only (not in the service card). */}
+      {machine.local && untitled && <section className="host-section"><AppRow t={t} /></section>}
       {/* Sidevoice on the machine, as a card on every machine's page: this computer's with its controls; another's to read. */}
       <section className="host-section" aria-labelledby={"host-status-" + machine.id}>
         {machine.local ? <LocalHostStatusPanel machine={machine} status={status} titleId={"host-status-" + machine.id} />
@@ -334,27 +335,21 @@ function ForgetMachine({ machine, name, onForget }: { machine: MachineView; name
  *  page's header's, two blocks up; no controls: it is run there. */
 function RemoteHostCard({ machine, name, titleId }: { machine: MachineView; name: string; titleId: string }) {
   const t = translator();
-  const variant = useVariant<RemoteVersionVariant>("remoteVersion", REMOTE_VERSION);
-  const info = useRoomStore((state) => machine.pairingId ? state.facts.remoteHostStatus?.[machine.pairingId] : undefined);
+  const layout = useVariant<ServiceLayout>("serviceRow", SERVICE_ROW);
+  const mode = useMockOffline();
+  const service = useRemoteService(machine);
   const port = listeningPort(machine.urls);
+  const offline = machine.state !== "connected" && machine.state !== "checking";
   useEffect(() => { if (machine.pairingId && machine.state === "connected") void window.sidevoiceActions?.loadMachineInfo?.(machine.pairingId); }, [machine.pairingId, machine.state]);
-  return (<>
-    {/* B1: the notice above the card, in the flow of the page as the permissions notice is. */}
-    {variant === "b1" && <RemoteNotice machine={machine} name={name} t={t} />}
+  // The same card as this device's, without its controls: its version and where it stands as the layout puts them, the
+  // notice under it; not answering, only that (b1) or that and what it was last seen at (b2).
+  return (
     <div className="host-status-card" data-remote>
-      <div className="host-status-head">
-        <h4 id={titleId}>{t("hosts.section.service")}</h4>
-        {variant === "b3" && <span className="svc-head-end"><RemoteBadge machine={machine} t={t} always /></span>}
-      </div>
-      {(info?.version || port) && <dl className="host-status-facts">
-        {info?.version && <div className="host-status-product">{t("hosts.productVersion", { version: info.version })}</div>}
-        {port && <div className="host-status-product">{t("hosts.port", { port })}</div>}
-      </dl>}
-      {/* B2: the notice inside the card, under the version. B3: no box, a state line with the command. */}
-      {variant === "b2" && <RemoteNotice machine={machine} name={name} t={t} flat />}
-      {variant === "b3" && <RemoteLine machine={machine} name={name} t={t} />}
+      <ServiceCardTop titleId={titleId} layout={layout} info={service} port={port} supported={service.supported} machine={name} command={service.command} t={t}
+        end={offline ? <OfflineState t={t} /> : null} offline={offline ? (mode === "b2" ? "b2" : "b1") : null} lastSeen={service.lastSeen} />
+      <ServiceCardFoot layout={layout} info={service} offline={offline} t={t} />
     </div>
-  </>);
+  );
 }
 
 /* This computer's service as a status card: its state with its dot, first, in This device's words (machineStatus, as
@@ -367,7 +362,8 @@ function LocalHostStatusPanel({ machine, status, titleId }: { machine: MachineVi
   const [note, setNote] = useState("");
   const [copied, setCopied] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
-  const rowVariant = useVariant<ServiceRowVariant>("serviceRow", SERVICE_ROW);
+  const layout = useVariant<ServiceLayout>("serviceRow", SERVICE_ROW);
+  const service = useLocalService();
   const details = safeLocalHostStatusDetails(status);
   const statusMessage = hostStatusText(status, t);
   const hasMethod = (action: LocalHostAction) => canRunLocalHostAction(action);
@@ -415,20 +411,11 @@ function LocalHostStatusPanel({ machine, status, titleId }: { machine: MachineVi
   const failureAt = dateText(details.failure?.at);
   const failed = status.state === "failed" || status.state === "service-failed";
   return (
-    <div className="host-status-card" data-state={status.state} data-tone={state.tone} data-service-row={rowVariant}>
-      {rowVariant === "a2" ? <ServiceRowA2 t={t} /> : <div className="host-status-head">
-        {/* "Sidevoice service": the page is this computer's already, so its name is not said again. */}
-        <h4 id={titleId} tabIndex={-1}>{t("hosts.section.service")}</h4>
-        <span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{state.short}</span>
-      </div>}
-      {/* The facts, compact; then what the state means where it says more than its word. */}
-      <dl className="host-status-facts">
-        {/* One version — the app's, the Sidevoice the person installed, else its service's (never the core's or the
-            connector's) — and whether it is up to date: Update available is a link to its row in Updates, where
-            everything that updates is. */}
-        {rowVariant === "a1" ? <ServiceFactsA1 t={t} /> : rowVariant === "a3" ? <ServiceFactsA3 t={t} /> : rowVariant === "a2" ? null : <ThisDeviceVersion t={t} />}
-        {port && <div className="host-status-product">{t("hosts.port", { port: port })}</div>}
-      </dl>
+    <div className="host-status-card" data-state={status.state} data-tone={state.tone}>
+      {/* The service's version and where it stands, in the place the layout gives them (service-version.tsx); the app's own
+          version is no longer here. */}
+      <ServiceCardTop titleId={titleId} focusable layout={layout} info={service} port={port} supported={service.supported} t={t}
+        end={<span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{state.short}</span>} />
       {/* Running or stopped, the state's word says it ("Running", "Not started") and Start follows: no sentence repeats it.
           Whether it starts at sign-in is its switch's alone, below. */}
       {status.state !== "running" && status.state !== "stopped-by-person" && <p className="host-status-summary">{statusMessage}</p>}
@@ -465,6 +452,7 @@ function LocalHostStatusPanel({ machine, status, titleId }: { machine: MachineVi
           {failed && typeof navigator.clipboard?.writeText === "function" && <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => void copyDetails()}>{copied ? t("hosts.detailsCopied") : t("hosts.copyDetails")}</Button>}
         </div>}
       {note && <p className="muted" role="status">{note}</p>}
+      <ServiceCardFoot layout={layout} info={service} t={t} />
     </div>
   );
 }
