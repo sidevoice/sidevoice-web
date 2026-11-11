@@ -27,6 +27,7 @@ import "./accessories.js";
 import "./acts.js";
 import { ACTS, Stage } from "./rig.js";
 import { creatureFromSeed, rigSpec } from "./catalogue";
+import { HOP_LIFT } from "./extent";
 import { StageFrame } from "./stage-frame";
 import { StageFramer } from "./stage-framer";
 
@@ -103,3 +104,21 @@ it.each(["t1", "sidevoice-web"])("the reach holds every pose of every act, and t
   expect(reach).toBeGreaterThanOrEqual(drawnMost * 0.98);
   expect(reach).toBeGreaterThanOrEqual(shadowMost * 0.98);
 }, 90_000);
+
+it("a creature held still while it listens is framed with room for the startle's hop it still plays", async () => {
+  const canvas = document.createElement("canvas");
+  canvas.getBoundingClientRect = () => new DOMRect(0, 0, W, H);
+  const stage = new Stage("paint", 768, "wide", { fixed: true }) as unknown as Stage;
+  const item = stage.add(rigSpec(creatureFromSeed("t1")), canvas, { turn: 0, off: 0 });
+  const frame = new StageFrame();
+  frame.ask({ w: W, h: H, dx: 0, dy: 0, phone: false, desktop: true, rest: true, cards: null, opener: null });
+  const top = (mood: string) => {
+    const framer = new StageFramer({ stage, item, canvas, render() {}, mood: () => mood, drawn: () => true, poke() {}, aspect: () => W / H, measured() {} }, frame);
+    framer.hold(true);
+    const { points } = (framer as unknown as { heldReach(): { points: Array<{ y: number }> } }).heldReach();
+    framer.dispose();
+    return Math.max(...points.map((p) => p.y));
+  };
+  // listening's key pose is the idle one's lifted by the hop: the same rig pose, plus HOP_LIFT
+  expect(top("listening") - top("idle")).toBeGreaterThanOrEqual(HOP_LIFT * 0.9);
+});

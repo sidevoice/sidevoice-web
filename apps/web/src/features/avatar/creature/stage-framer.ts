@@ -1,5 +1,5 @@
 import type { RigCamera, Stage, StageItem } from "./rig.js";
-import { footprintNow, footprintOf, heightReach, provisionalReach, ReachSet, shapeKey, visitDrawn, widthReach, type Footprint, type Vec3 } from "./extent";
+import { footprintNow, footprintOf, heightReach, HOP_LIFT, provisionalReach, ReachSet, shapeKey, visitDrawn, widthReach, type Footprint, type Vec3 } from "./extent";
 import { capCentre, capCentreSteps, FRAME_EASE, OPTIC, stageBands, type FrameAsk, type FrameMotion, type FrameProbe, type FrameSolved, type Framing, type FrameTarget, type Rows,
   type StageFrame } from "./stage-frame";
 
@@ -272,14 +272,15 @@ export class StageFramer {
   }
 
   /** What a creature held still reaches: the key pose it is drawn in (its state's, with what it has on the go: a working style's key
-   *  pose, the cogs), its head turned to the pointer's widest gazes (it still follows the pointer), its ink and shadow; worked out on
+   *  pose, the cogs), its head turned to the pointer's widest gazes (it still follows the pointer), raised by the startle's hop while
+   *  it listens (a held creature still plays it on coming into listening), its ink and shadow; worked out on
    *  the rig as the stage poses it still, again when what it shows changes. */
   private heldReach(): { key: string; points: Vec3[] } {
     const { stage, item } = this.host, c = item.c, state = RIG_STATE[this.host.mood()] ?? "idle";
     const key = state + "|" + Object.entries(c.layers).map(([layer, L]) => layer + ":" + L.name).sort().join(",");
     if (this.held0?.key === key) return this.held0;
     const was = { state: item.spec.state, expr: item.spec.expr, opts: item.opts }, set = new ReachSet();
-    try { item.spec.state = state; item.spec.expr = undefined; item.opts = { ...item.opts, extra: undefined }; stage.pose(item, 0, 0, true); visitDrawn(c, set.keep, { exact: true, stride: 3, gaze: true }); }
+    try { item.spec.state = state; item.spec.expr = undefined; item.opts = { ...item.opts, extra: undefined }; stage.pose(item, 0, 0, true); visitDrawn(c, set.keep, { exact: true, stride: 3, gaze: true, lift: state === "listening" ? HOP_LIFT : 0 }); }
     finally { item.spec.state = was.state; item.spec.expr = was.expr; item.opts = was.opts; }
     return (this.held0 = { key, points: set.points });
   }
