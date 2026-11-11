@@ -2,6 +2,7 @@ import { collisionPadding } from "../../lib/safe-area";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { useContext, useEffect, useRef, useState, type PointerEvent } from "react";
 import { host, onHostMember } from "../../host";
+import type { AudioRouteBridge } from "../../host/types";
 import { Button } from "../../components/ui/Button";
 import { ErrorText } from "../../components/ui/ErrorText";
 import { Select } from "../../components/ui/Select";
@@ -113,18 +114,16 @@ function useAudioRoute() {
 }
 
 /** The speaker where the system chooses it and the app can show its picker: our own button, the system's sheet. */
-function OutputRouteButton({ onError }: { onError: (error: ErrorMessage | null) => void }) {
+function OutputRouteButton({ route, onError }: { route: AudioRouteBridge; onError: (error: ErrorMessage | null) => void }) {
   const t = translator();
-  const route = useAudioRoute();
   const [opening, setOpening] = useState(false);
-  if (!route) return null;
   const open = async () => {
     setOpening(true); onError(null);
     try { await route.open(); }
     catch (failure) { onError(devicesError(failure, t)); }
     finally { setOpening(false); }
   };
-  return <Button id="audio-output-route" variant="secondary" size="md" block loading={opening} aria-label={t("devices.speaker")} onClick={() => void open()}>
+  return <Button id="audio-output-route" variant="secondary" size="md" block loading={opening} aria-haspopup="dialog" onClick={() => void open()}>
     <SpeakerIcon />{t("devices.speaker")}
   </Button>;
 }
@@ -153,7 +152,8 @@ function useDeviceChoices(shown = true) {
  *  default (operator, 2026-10-16: where people look for them). */
 export function AudioDeviceRows() {
   const { t, devices, busy, error, setError, choose, inputs, outputs } = useDeviceChoices(useSectionShown("call"));
-  const pickable = !!useAudioRoute() && !!devices && !devices.outputSelectable;
+  const route = useAudioRoute();
+  const pickable = !!route && !!devices && !devices.outputSelectable;
   // Both always there (operator, 2026-10-16): without the microphone allowed, or before the list is read, each stays on
   // the system's device, held back, saying why.
   const allowed = useOnboardingIfAny()?.microphone?.ready ?? true;
@@ -166,7 +166,7 @@ export function AudioDeviceRows() {
         onValueChange={(input) => void choose({ input: input || null })} options={usable ? inputs : fallback} />
     </Row>
     <Row label={t("devices.speaker")} description={usable && !devices.outputSelectable && !pickable ? t("devices.speakerFixed") : undefined}>
-      {pickable ? <OutputRouteButton onError={setError} /> : <Select id="settings-audio-output" aria-label={t("devices.speaker")} leading={<SpeakerIcon />} value={usable && devices.outputSelectable ? devices.output ?? "" : ""}
+      {pickable ? <OutputRouteButton route={route} onError={setError} /> : <Select id="settings-audio-output" aria-label={t("devices.speaker")} leading={<SpeakerIcon />} value={usable && devices.outputSelectable ? devices.output ?? "" : ""}
         disabled={busy || !usable || !devices.outputSelectable} onValueChange={(output) => void choose({ output: output || null })} options={usable ? outputs : fallback} />}
     </Row>
     {error && <ErrorText className="audio-devices-error" role="alert" message={error} />}
@@ -177,7 +177,8 @@ export function AudioDeviceRows() {
 function DeviceChoices() {
   // Drawn only while the panel is open: opened, it reads the list again.
   const { t, devices, busy, error, setError, choose, inputs, outputs } = useDeviceChoices();
-  const pickable = !!useAudioRoute() && !!devices && !devices.outputSelectable;
+  const route = useAudioRoute();
+  const pickable = !!route && !!devices && !devices.outputSelectable;
   const lost = useRoomStore((state) => state.facts.audioLost);
   const store = useContext(RoomStoreContext);
   const dismissLost = () => store?.patch({ audioLost: null });
@@ -189,7 +190,7 @@ function DeviceChoices() {
           options={inputs} />
       </div>
       <div className="audio-devices-choice">
-        {pickable ? <OutputRouteButton onError={setError} /> : <>
+        {pickable ? <OutputRouteButton route={route} onError={setError} /> : <>
         <Select id="audio-output" aria-label={t("devices.speaker")} aria-describedby={devices.outputSelectable ? undefined : "audio-output-hint"} leading={<SpeakerIcon />} value={devices.outputSelectable ? devices.output ?? "" : ""} disabled={busy || !devices.outputSelectable} onValueChange={(output) => void choose({ output: output || null })}
           options={outputs} />
         {!devices.outputSelectable && <p className="ui-field-hint" id="audio-output-hint">{t("devices.speakerFixed")}</p>}
