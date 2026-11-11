@@ -330,6 +330,25 @@ describe("after a burst: what the page's own work took is given back (web#573)",
     expect(frames(g, at, 600, { slower: 1.6 }).moves).toEqual([0, from]);
   });
 
+  it("a GPU that really is behind (frames late on the top rungs, each cheap on the thread) gets one retake, about 2 s, and never another", () => {
+    const g = desktop();
+    g.start(0, 0);
+    const moves: Array<[number, number]> = [];
+    for (let at = 0; at < 600_000;) {
+      const gap = g.tier <= 2 ? 70 : g.every; // late on rungs 0 to 2 whatever they cost; on time from rung 3
+      at += gap;
+      if (g.observe(at, 2, gap)) moves.push([at, g.tier]);
+    }
+    const tiers = moves.map(([, tier]) => tier), retake = tiers.indexOf(0);
+    expect(tiers.slice(0, 3)).toEqual([1, 2, 3]); // the slide: rungs 0 to 2 left at 2 ms, under their limit
+    expect(retake).toBe(3); // so the first calm spell takes the top back once...
+    expect(tiers[retake + 1]).toBe(3); // ...which fails there: straight back to where it held
+    expect(moves[retake + 1][0] - moves[retake][0]).toBeLessThan(2500); // the settle and eight late frames
+    expect(tiers.slice(retake + 1).filter((tier) => tier < 2)).toEqual([]); // and never again
+    // (Rung 2 is still tried on the old estimate, 2 ms on rung 3 being 4 ms expected there, after 16, 32, then every 64 s: as before.)
+    expect(tiers.slice(retake + 1).every((tier) => tier === 2 || tier === 3)).toBe(true);
+  });
+
   it("frames drawn while the canvas is resized are not judged, nor the moment after", () => {
     const g = desktop();
     g.start(0, 0);
@@ -339,6 +358,17 @@ describe("after a burst: what the page's own work took is given back (web#573)",
     at = drag.at;
     expect(frames(g, at, 1, { late: 70 }).moves).toEqual([]); // (the framing solved again just after)
     expect(g.tier).toBe(0);
+  });
+
+  it("a canvas made again every few seconds (the floating card's picture-in-picture, on each update of the call) does not keep the step back up waiting", () => {
+    const g = desktop();
+    g.start(0, 0);
+    let { at } = frames(g, 0, 10);
+    at = frames(g, at, 4, { late: 70 }).at; // a burst steps it down
+    expect(g.tier).toBeGreaterThan(0);
+    const moves: number[] = [];
+    for (let n = 0; n < 10; n++) { g.settle(at); const spell = frames(g, at, 3); moves.push(...spell.moves); at = spell.at; }
+    expect(moves).toContain(0); // taken back within the thirty seconds, though every 3 s a canvas took new pixels
   });
 
   it("the frames for a moment after a pause (a window coming back) are not judged", () => {

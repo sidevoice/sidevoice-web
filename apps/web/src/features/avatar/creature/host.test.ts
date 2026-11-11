@@ -619,6 +619,26 @@ test("the creature canvas is allocated again only when its size changes: not by 
   expect(element.height).toBeLessThan(1752);
 });
 
+test("the frames are held from judging only when a canvas takes other pixels: a creature built again on the same canvas at its size holds nothing back", async () => {
+  webgl();
+  vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(2);
+  const { Governor } = await import("./quality");
+  const settle = vi.spyOn(Governor.prototype, "settle");
+  const element = canvas();
+  element.getBoundingClientRect = () => new DOMRect(0, 0, 100, 100);
+  const card = () => mount({ seed: "t1", canvas: element, framing: "face", sharp: true })!;
+  card().dispose(); // a new canvas takes its pixels (200 x 200): its first frames are not judged
+  expect(settle).toHaveBeenCalledTimes(1);
+  // The floating card builds its creature again on every update of the call (a turn, a mood): the same canvas, the same pixels.
+  for (let n = 0; n < 3; n++) card().dispose();
+  expect(settle).toHaveBeenCalledTimes(1);
+  // Its box resized (the card's window): other pixels, whose first frames are not judged.
+  element.getBoundingClientRect = () => new DOMRect(0, 0, 150, 150);
+  card();
+  expect([element.width, element.height]).toEqual([300, 300]);
+  expect(settle).toHaveBeenCalledTimes(2);
+});
+
 test("a draw that throws leaves the camera's view offset cleared, so the next draw, a trial or the poster is not windowed", () => {
   webgl();
   vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(2);

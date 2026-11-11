@@ -494,10 +494,13 @@ export class LiveCreature {
     const key = W + "x" + H;
     if (key === this.sized) return false;
     this.sized = key;
-    if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
-    // A canvas the loop draws frames of was resized (a window dragged, another screen): the frames that remake its buffers and
-    // solve its framing again are not what it costs (web#573), so they are not judged.
-    if (this.slot !== "face") governor.settle(performance.now());
+    if (canvas.width !== W || canvas.height !== H) {
+      canvas.width = W; canvas.height = H;
+      // A canvas the loop draws frames of took other pixels (a window dragged, another screen, its crop): the frames that remake its
+      // buffers and solve its framing again are not what it costs (web#573), so they are not judged. Only then: a creature built
+      // again on the same canvas at its size (the floating card's, on every update of the call) holds nothing back.
+      if (this.slot !== "face") governor.settle(performance.now());
+    }
     return true;
   }
 

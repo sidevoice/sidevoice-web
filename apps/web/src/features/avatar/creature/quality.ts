@@ -132,9 +132,10 @@ export class Governor {
     return null;
   }
 
-  /** The frames from `now` are not judged for a moment (SETTLE_MS): the canvas was just resized (its buffers made again, the
-   *  stage's framing solved again). */
-  settle(now: number) { this.since = Math.max(this.since, now); this.calmFrom = Math.max(this.calmFrom, now); }
+  /** The frames from `now` are not judged for a moment (SETTLE_MS): a canvas just took other pixels (its buffers made again, the
+   *  stage's framing solved again). The calm spell runs on through it: a canvas made again on every update of the call (the
+   *  floating card's picture-in-picture) does not keep the step back up waiting. */
+  settle(now: number) { this.since = Math.max(this.since, now); }
   /** The frames' spacing now (ms). On the last rung, a frame that still costs more than a sixth of the thread's time is spaced
    *  out until it does not (to 500 ms): a renderer with no GPU gets a slow creature, not a frozen page. */
   get every(): number {
@@ -170,6 +171,9 @@ export class Governor {
         // Failing within a moment of going up: wait longer before trying again, and not on what it cost here before. A retake
         // that does not hold goes straight back to the rung it came from, and what the rungs cost before is not trusted again
         // (what made them late was the device after all: a GPU behind, whose work a frame's cost does not show).
+        // The known cost: on a GPU that really is behind, the first slide (late frames, each cheap on the thread) records the rungs
+        // it leaves as under their limit, so one retake to the top is certain after the first calm spell: about 2 s of the creature
+        // at full resolution and late (the settle, then eight frames), then back where it held. Once: the records go with it.
         if (now - this.upAt < this.calm) {
           this.calm = Math.min(CALM_MAX_MS, this.calm * 2);
           this.left[this.index] = undefined;
