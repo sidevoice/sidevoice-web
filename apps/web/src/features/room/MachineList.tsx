@@ -18,8 +18,7 @@ import { PrepareThisComputer } from "../pairing/PrepareThisComputer";
 import { InstallCommandHere } from "../pairing/ConnectorSteps";
 import { useThisComputerSection } from "../../state/this-computer";
 import { translator, type Translate } from "../../i18n/translator";
-import { useVariant } from "../../lib/variants";
-import { AppRow, OfflineState, SERVICE_ROW, ServiceCardTop, useLocalService, useMockOffline, useRemoteService, type ServiceLayout } from "../settings/service-version";
+import { AppRow, OfflineState, RunningState, ServiceCardTop, useLocalService, useMockOffline, useRemoteService } from "../settings/service-version";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
 import { motionOf, useSettingsLevels } from "../settings/settings-levels";
@@ -333,18 +332,17 @@ function ForgetMachine({ machine, name, onForget }: { machine: MachineView; name
  *  page's header's, two blocks up; no controls: it is run there. */
 function RemoteHostCard({ machine, name, titleId }: { machine: MachineView; name: string; titleId: string }) {
   const t = translator();
-  const layout = useVariant<ServiceLayout>("serviceRow", SERVICE_ROW);
   const mode = useMockOffline();
   const service = useRemoteService(machine);
   const port = listeningPort(machine.urls);
   const offline = machine.state !== "connected" && machine.state !== "checking";
   useEffect(() => { if (machine.pairingId && machine.state === "connected") void window.sidevoiceActions?.loadMachineInfo?.(machine.pairingId); }, [machine.pairingId, machine.state]);
-  // The same card as this device's, without its controls: its version and where it stands as the layout puts them, the
-  // notice under it; not answering, only that (b1) or that and what it was last seen at (b2).
+  // The same card as this device's, without its controls: its running state at the right, its version with where it stands
+  // and its port, the notice under them; not answering, only that (b1) or that and what it was last seen at (b2).
   return (
-    <div className="host-status-card" data-remote>
-      <ServiceCardTop titleId={titleId} layout={layout} info={service} port={port} supported={service.supported} machine={name} command={service.command} t={t}
-        end={offline ? <OfflineState t={t} /> : null} offline={offline ? mode : null} lastSeen={service.lastSeen} />
+    <div className="host-status-card" data-remote data-tone={offline ? undefined : "positive"}>
+      <ServiceCardTop titleId={titleId} info={service} port={port} supported={service.supported} machine={name} command={service.command} t={t}
+        end={offline ? <OfflineState t={t} /> : <RunningState t={t} />} offline={offline ? mode : null} lastSeen={service.lastSeen} />
     </div>
   );
 }
@@ -359,7 +357,6 @@ function LocalHostStatusPanel({ machine, status, titleId }: { machine: MachineVi
   const [note, setNote] = useState("");
   const [copied, setCopied] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
-  const layout = useVariant<ServiceLayout>("serviceRow", SERVICE_ROW);
   const service = useLocalService();
   const details = safeLocalHostStatusDetails(status);
   const statusMessage = hostStatusText(status, t);
@@ -411,7 +408,7 @@ function LocalHostStatusPanel({ machine, status, titleId }: { machine: MachineVi
     <div className="host-status-card" data-state={status.state} data-tone={state.tone}>
       {/* The service's version and where it stands, in the place the layout gives them (service-version.tsx); the app's own
           version is no longer here. */}
-      <ServiceCardTop titleId={titleId} focusable layout={layout} info={service} port={port} supported={service.supported} t={t}
+      <ServiceCardTop titleId={titleId} focusable info={service} port={port} supported={service.supported} t={t}
         end={<span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{state.short}</span>} />
       {/* Running or stopped, the state's word says it ("Running", "Not started") and Start follows: no sentence repeats it.
           Whether it starts at sign-in is its switch's alone, below. */}

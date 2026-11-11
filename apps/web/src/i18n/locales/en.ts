@@ -1557,16 +1557,15 @@ export const messages = {
   "service.remote.behind.body": "This app works with {supported}.x. Update it on {machine}:",
   "service.remote.newer.title": "Sidevoice {version} is newer than this app supports",
   "service.remote.newer.body": "It may misbehave. Update this app, or install {supported}.x on {machine}.",
-  "service.status.updating": "Updating to {to}…",
-  "service.status.waiting": "Waiting for the call to end",
-  "service.status.behind": "Out of date",
   "service.status.newer": "Newer than the supported version",
   "service.offline": "Offline",
   "service.lastSeen": "Last version seen: {version}",
   "service.field.version": "Version",
   "service.field.port": "Port",
-  "service.field.status": "Status",
-  "service.listens": "Listening on port {port}",
+  "service.badge.updating": "Updating…",
+  "service.badge.newer": "Newer",
+  "service.badge.behind": "Out of date",
+  "service.badge.waiting": "After the call",
 } as const;
 
 export type MessageKey = keyof typeof messages;

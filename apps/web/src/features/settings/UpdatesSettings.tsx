@@ -9,6 +9,8 @@ import { LocalHostUpdateControl } from "../updates/LocalHostUpdate";
 import { useThisComputerUpdate } from "../updates/useThisComputerUpdate";
 import { continueAfterRestart, continued, continuing, UPDATE_PLACE, useOutdatedMachines } from "../updates/useUpdates";
 import { translator, type Translate } from "../../i18n/translator";
+import { useVariant } from "../../lib/variants";
+import { ServiceUpdates, UPDATES_VIEW, type UpdatesView } from "./service-updates";
 import "./updates-settings.css";
 
 /* Updates, a Settings section of their own (decided 2026-10-13), holding everything that updates, each in its row with
@@ -69,6 +71,13 @@ function PartVersion({ hint, version, upToDate, note, t }: { hint?: string; vers
 /** Updates: this computer as one row, Sidevoice (its service updated with the app), then the machines behind; never
  *  an empty card. */
 export function UpdatesSettings() {
+  // MOCK (sidevoice-desktop#67): the alternatives of this view; u0 is the view as it is.
+  const alternative = useVariant<UpdatesView>("updatesView", UPDATES_VIEW);
+  if (alternative !== "u0") return <ServiceUpdates view={alternative} />;
+  return <TodaysUpdates />;
+}
+
+function TodaysUpdates() {
   const t = translator();
   const build = host().identity.build;
   const updater = host().updater !== null;

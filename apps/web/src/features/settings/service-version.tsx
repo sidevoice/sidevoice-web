@@ -3,7 +3,8 @@ import type { MachineView } from "../../state/room-types";
 import type { ReactNode } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Badge, type BadgeTone } from "../../components/ui/Badge";
-import { Group, Row } from "../../components/ui/Card";
+import { WarningIcon } from "../../components/ui/Icons";
+import { Group } from "../../components/ui/Card";
 import { ProgressBar } from "../../components/ui/ProgressBar";
 import { Snippet } from "../../components/ui/Snippet";
 import { host } from "../../host";
@@ -13,20 +14,21 @@ import { safeLocalHostStatusDetails } from "./local-host-status";
 import "./service-version.css";
 
 /* MOCKUP (sidevoice-desktop#67, not for merge). The Sidevoice service card, the same one on This device and on a remote
- * machine, with the service's version, its port and where it stands: four ways to place and word them (`serviceRow`: v1 to
- * v4), and, for a remote machine that does not answer, two ways to say so (`remoteOffline`: b1, b2). The app's own version is
- * a row of its own on This device (AppRow), never in the card.
+ * machine: its running state always at the top right, under the title two columns — Version, with a badge that says
+ * where it stands, and Port — then, where it is needed, the notice (Alert) with the command that updates it inside. The
+ * app's own version is a row of its own on This device (AppRow), never in the card. For a remote machine that does not
+ * answer, two ways to say so (\`remoteOffline\`: b1, b2).
  *
  * Decided: the app pins the service minor; this device's service updates itself to the latest patch of that minor,
  * never during a call; a service newer than the pinned minor is warned about; a remote machine out of date, or newer
  * than the app supports, gets a notice in the permissions notice's style (Alert), with the command that updates it.
  *
- * The fields read here that the real bridge does not report yet — `supported_minor` and `service_update` of the local
+ * The fields read here that the real bridge does not report yet — \`supported_minor\` and \`service_update\` of the local
  * host's status — are the mock's own (playground preview/mock/bridge.mjs): provisional, not a contract. */
 
-export const SERVICE_ROW = ["v1", "v2", "v3", "v4"] as const;
 export const REMOTE_OFFLINE = ["b1", "b2"] as const;
-export type ServiceLayout = typeof SERVICE_ROW[number];
+/** MOCK: where the port sits in the card's two columns: a, in the second column; b, at the card's far right edge. */
+export const PORT_ALIGN = ["a", "b"] as const;
 export type RemoteOffline = typeof REMOTE_OFFLINE[number];
 
 const minorOf = (version: string | null | undefined): [number, number] | null => {
@@ -41,7 +43,7 @@ const PINNED = "0.19";
 const LAST_SEEN: Record<string, string> = { daimon: "0.16.0", "NUC del salón": "0.20.0", "Mac mini": "0.19.2", "Portátil viejo": "0.19.1" };
 
 export type ServiceKind = "current" | "updating" | "waiting" | "behind" | "newer" | "unknown";
-export interface ServiceInfo { version: string | null; kind: ServiceKind; to?: string | null }
+export interface ServiceInfo { version: string | null; kind: ServiceKind }
 
 /** This device's service: its version, and whether it is up to date, updating, waiting for a call to end, or newer than
  *  the minor the app supports. */
@@ -54,7 +56,7 @@ export function useLocalService(): ServiceInfo & { supported: string } {
   const newer = !!mine && !!pinned && compareMinor(mine, pinned) > 0;
   const update = raw.service_update;
   const kind: ServiceKind = !version ? "unknown" : newer ? "newer" : update?.state === "updating" ? "updating" : update?.state === "waiting-for-call" ? "waiting" : "current";
-  return { version, kind, supported, to: update?.to ?? null };
+  return { version, kind, supported };
 }
 
 /** A remote machine's service against what the app supports: out of date, newer, up to date, or not said; and what it
@@ -73,70 +75,74 @@ export function useRemoteService(machine: MachineView): ServiceInfo & { supporte
 export function useMockOffline(): RemoteOffline { return useVariant<RemoteOffline>("remoteOffline", REMOTE_OFFLINE); }
 
 const TONE: Record<ServiceKind, BadgeTone> = { current: "positive", updating: "accent", waiting: "neutral", behind: "warning", newer: "warning", unknown: "neutral" };
-const WORD = {
-  current: "settings.updates.upToDate", updating: "service.status.updating", waiting: "service.status.waiting", behind: "service.status.behind", newer: "service.status.newer",
+const BADGE = {
+  current: "settings.updates.upToDate", updating: "service.badge.updating", waiting: "service.badge.waiting", behind: "service.badge.behind", newer: "service.badge.newer",
 } as const;
-const word = (info: ServiceInfo, t: Translate) => info.kind === "unknown" ? "" : t(WORD[info.kind], { to: info.to ?? "" });
 
-/** The notice for a service out of date or newer than the app supports, in the permissions notice's own Alert; where
- *  there is a command that updates it, it comes under. `machine`: a remote machine's name (not this device). */
-function ServiceNotice({ info, supported, machine, command, t }: { info: ServiceInfo; supported: string; machine?: string; command?: string; t: Translate }) {
+/** The words of the notice for a service out of date or newer than the app supports, and the command that updates it where
+ *  there is one. `machine`: a remote machine's name (not this device). */
+export function noticeOf(info: ServiceInfo, supported: string, machine: string | undefined, command: string | undefined, t: Translate) {
   if ((info.kind !== "behind" && info.kind !== "newer") || !info.version) return null;
   const version = info.version;
   const copy = !machine ? { title: t("service.status.newer"), body: t("service.newerWhy", { version, supported }) }
     : info.kind === "behind" ? { title: t("service.remote.behind.title", { version }), body: t("service.remote.behind.body", { supported, machine }) }
     : { title: t("service.remote.newer.title", { version }), body: t("service.remote.newer.body", { supported, machine }) };
-  return <div className="svc-notice">
-    <Alert tone="warning" title={copy.title}>{copy.body}</Alert>
-    {machine && info.kind === "behind" && command && <Snippet text={command} label={t("settings.updates.copyCommand", { machine })} />}
+  return { ...copy, command: machine && info.kind === "behind" && command ? command : null, machine: machine ?? "" };
+}
+
+/** The notice, in the permissions notice's own Alert; the command that updates it, inside the Alert, to copy. */
+export function ServiceNotice({ info, supported, machine, command, t }: { info: ServiceInfo; supported: string; machine?: string; command?: string; t: Translate }) {
+  const notice = noticeOf(info, supported, machine, command, t);
+  if (!notice) return null;
+  return <Alert tone="warning" title={notice.title}
+    footer={notice.command ? <Snippet text={notice.command} label={t("settings.updates.copyCommand", { machine: notice.machine })} /> : undefined}>{notice.body}</Alert>;
+}
+
+/** The same words, quiet: a line with its icon, the command under it (the compact updates list). */
+export function ServiceHint({ info, supported, machine, command, t }: { info: ServiceInfo; supported: string; machine?: string; command?: string; t: Translate }) {
+  const notice = noticeOf(info, supported, machine, command, t);
+  if (!notice) return null;
+  return <div className="svc-hint">
+    <p><WarningIcon size={16} className="svc-hint-icon" /><span><strong>{notice.title}.</strong> {notice.body}</span></p>
+    {notice.command && <Snippet text={notice.command} label={t("settings.updates.copyCommand", { machine: notice.machine })} />}
   </div>;
 }
 
-/** A key and its value, as a settings row says them: the key at the left, the value at the right. */
-function Fact({ label, children }: { label: string; children: ReactNode }) {
-  return <div className="svc-kv"><dt>{label}</dt><dd>{children}</dd></div>;
+/** Where a service stands, as the badge that follows its version wherever it is said. */
+export function ServiceBadge({ kind, t }: { kind: Exclude<ServiceKind, "unknown">; t: Translate }) {
+  return <Badge tone={TONE[kind]} dot className="svc-badge">{t(BADGE[kind])}</Badge>;
 }
 
-/** The top of the service card, shared by This device's and a remote machine's: its title, and its version, port and where
- *  it stands, placed and worded as the layout says (v1 to v4), with the notice where there is one. `end`: the card's
- *  state at its right (This device's "En marcha", a remote machine's "Sin conexión"). `offline`: a machine that does not
- *  answer, which says that and, in b2, what it was last seen at, and nothing else. */
-export function ServiceCardTop({ titleId, focusable = false, layout, info, port, end, machine, command, supported, offline = null, lastSeen = null, t }: {
-  titleId: string; focusable?: boolean; layout: ServiceLayout; info: ServiceInfo; port: number | null; end: ReactNode; machine?: string; command?: string; supported: string;
+/** The top of the service card, shared by This device's and a remote machine's: its title, with the running state at the
+ *  right (\`end\`: This device's or a remote machine's "En marcha", a machine's "Sin conexión"); under it two columns, the
+ *  version with its badge and the port; the progress bar while it updates; the notice where there is one. \`offline\`: a
+ *  machine that does not answer, which says that and, in b2, what it was last seen at, and nothing else. */
+export function ServiceCardTop({ titleId, focusable = false, info, port, end, machine, command, supported, offline = null, lastSeen = null, t }: {
+  titleId: string; focusable?: boolean; info: ServiceInfo; port: number | null; end: ReactNode; machine?: string; command?: string; supported: string;
   offline?: "b1" | "b2" | null; lastSeen?: string | null; t: Translate;
 }) {
-  const shown = !offline && info.kind !== "unknown";
-  const status = shown ? word(info, t) : "";
+  const kind = !offline && info.kind !== "unknown" ? info.kind : null;
+  const shown = kind !== null;
+  const align = useVariant<typeof PORT_ALIGN[number]>("portAlign", PORT_ALIGN);
   const listening = !offline && port ? port : null;
-  const state = shown ? <span className="svc-word" data-kind={info.kind}>{status}</span> : null;
   return <>
     <div className="host-status-head">
-      <span className="svc-title">
-        <h4 id={titleId} tabIndex={focusable ? -1 : undefined}>{t("hosts.section.service")}</h4>
-        {/* V3: the version as a small tag by the title, and where it stands as another. */}
-        {layout === "v3" && shown && <span className="svc-tags"><Badge tag>{"v" + info.version}</Badge><Badge tag tone={TONE[info.kind]} dot>{status}</Badge></span>}
-      </span>
+      <h4 id={titleId} tabIndex={focusable ? -1 : undefined}>{t("hosts.section.service")}</h4>
       {end}
     </div>
-    {/* V1: a quiet line under the title. V3: where it listens, as a quiet line. */}
-    {layout === "v1" && shown && <p className="svc-meta"><span className="svc-version">{"v" + info.version}</span> · {state}</p>}
-    {layout === "v3" && listening && <p className="svc-meta">{t("service.listens", { port: listening })}</p>}
-    {/* V4: three facts side by side, each under its name. */}
-    {layout === "v4" && (shown || listening) && <dl className="svc-strip">
-      {shown && <div><dt>{t("service.field.version")}</dt><dd>{info.version}</dd></div>}
-      {listening && <div><dt>{t("service.field.port")}</dt><dd>{listening}</dd></div>}
-      {shown && <div><dt>{t("service.field.status")}</dt><dd>{state}</dd></div>}
+    {(shown || listening) && <dl className="svc-strip" data-port={align}>
+      {kind && <div><dt>{t("service.field.version")}</dt><dd><span className="svc-number">{info.version}</span><ServiceBadge kind={kind} t={t} /></dd></div>}
+      {listening && <div data-fact="port"><dt>{t("service.field.port")}</dt><dd><span className="svc-number">{listening}</span></dd></div>}
     </dl>}
     {offline === "b2" && lastSeen && <p className="svc-meta">{t("service.lastSeen", { version: lastSeen })}</p>}
-    {shown && info.kind === "updating" && <ProgressBar value={null} label={status} className="svc-bar" />}
-    {/* V1: the port, a row with the card's other settings. V2: the version and the port, rows of their own. */}
-    {layout === "v1" && listening && <dl className="svc-kvs"><Fact label={t("service.field.port")}>{listening}</Fact></dl>}
-    {layout === "v2" && (shown || listening) && <dl className="svc-kvs">
-      {shown && <Fact label={t("service.field.version")}>{info.version}{" · "}{state}</Fact>}
-      {listening && <Fact label={t("service.field.port")}>{listening}</Fact>}
-    </dl>}
+    {shown && info.kind === "updating" && <ProgressBar value={null} label={t(BADGE.updating)} className="svc-bar" />}
     {shown && <ServiceNotice info={info} supported={supported} machine={machine} command={command} t={t} />}
   </>;
+}
+
+/** The card's state at its right: a machine's service running (This device's has its own words), with its dot. */
+export function RunningState({ t }: { t: Translate }) {
+  return <span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{t("hosts.machineState.running")}</span>;
 }
 
 /** A remote machine that does not answer: its state at the card's right. */
@@ -144,9 +150,22 @@ export function OfflineState({ t }: { t: Translate }) {
   return <span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{t("service.offline")}</span>;
 }
 
-/** The app's own row, on This device only: its name and its version, in the look of any settings row. */
+/** The app's icon, the one the app has. */
+export function AppIcon({ size = 40 }: { size?: number }) {
+  return <img className="svc-app-icon" src={`${import.meta.env.BASE_URL}apple-touch-icon.png`} alt="" width={size} height={size} style={{ width: size, height: size }} />;
+}
+
+/** The app's own row, on This device only: its icon, its name and its version, in the look of any settings row. */
 export function AppRow({ t }: { t: Translate }) {
   const version = host().identity.build?.version;
   if (!version) return null;
-  return <Group><Row label={t("settings.updates.one")} description={t("settings.updates.version", { version })} /></Group>;
+  return <Group>
+    <div className="ui-row svc-app-row">
+      <AppIcon />
+      <div className="ui-row-text">
+        <span className="ui-row-label">{t("settings.updates.one")}</span>
+        <p className="ui-row-description">{t("settings.updates.version", { version })}</p>
+      </div>
+    </div>
+  </Group>;
 }

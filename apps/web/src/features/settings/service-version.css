@@ -1,21 +1,35 @@
 /* MOCKUP (sidevoice-desktop#67): the service card's version, port and state (This device and remote machines). Tokens only. */
-.svc-title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-1) var(--sv-space-3); min-width: 0; flex: 1; }
-.svc-tags { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-1) var(--sv-space-2); }
-.svc-version { font-variant-numeric: tabular-nums; color: var(--sv-text); font-weight: var(--sv-weight-semibold); }
 .host-status-card .svc-meta { margin-top: calc(var(--sv-space-2) * -1); color: var(--sv-text-muted); font-variant-numeric: tabular-nums; }
-.svc-word[data-kind="current"] { color: var(--sv-positive); font-weight: var(--sv-weight-semibold); }
-.svc-word[data-kind="updating"] { color: var(--sv-accent-text); font-weight: var(--sv-weight-semibold); }
-.svc-word[data-kind="waiting"] { color: var(--sv-text-muted); font-weight: var(--sv-weight-semibold); }
-.svc-word[data-kind="behind"], .svc-word[data-kind="newer"] { color: var(--sv-warning); font-weight: var(--sv-weight-semibold); }
 .svc-bar { width: 100%; }
-.svc-notice { display: grid; gap: var(--sv-space-2); min-width: 0; }
-/* V1, V2: key and value rows, as the card's own start-at-sign-in row is. */
-.svc-kvs { display: grid; margin: 0; }
-.svc-kv { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sv-space-4); padding: var(--sv-space-3) 0 0; border-top: 1px solid var(--sv-border); font-size: var(--sv-font-sm); }
-.svc-kv + .svc-kv { margin-top: var(--sv-space-3); }
-.svc-kv dt { margin: 0; font-weight: var(--sv-weight-semibold); }
-.svc-kv dd { margin: 0; text-align: end; color: var(--sv-text-muted); font-variant-numeric: tabular-nums; }
-/* V4: three facts side by side, each under its name. */
-.svc-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); gap: var(--sv-space-2) var(--sv-space-4); margin: 0; padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.ui-alert-footer { margin-top: var(--sv-space-2); }
+/* Two columns under the title, each fact under its name: the version with its badge, and the port. */
+.svc-strip { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--sv-space-2) var(--sv-space-4); margin: 0; padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
 .svc-strip dt { margin: 0; font-size: var(--sv-font-xs); color: var(--sv-text-muted); }
-.svc-strip dd { margin: 0; font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); font-variant-numeric: tabular-nums; }
+.svc-strip dd { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-1) var(--sv-space-2); margin: 0; }
+.svc-number { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); font-variant-numeric: tabular-nums; }
+.svc-badge { flex: none; white-space: nowrap; border-radius: var(--sv-radius-pill); }
+/* The app's row: its icon, its name, its version. */
+.ui-group-card > .svc-app-row { display: flex; align-items: center; gap: var(--sv-space-4); }
+.svc-app-icon { display: block; width: 40px; height: 40px; border-radius: 10px; box-shadow: var(--sv-shadow-sm); }
+
+/* Settings › Actualizaciones (service-updates.tsx): rows with an icon, a version line and a badge; links; a compact list. */
+.ui-group-card > .svc-upd-row { display: flex; align-items: center; gap: var(--sv-space-4); }
+.svc-upd-row .ui-row-text { flex: 1; min-width: 0; }
+.svc-upd-row .ui-row-control { flex: 0 1 auto; max-width: 55%; flex-wrap: wrap; gap: var(--sv-space-2) var(--sv-space-3); }
+.ui-group-card > .svc-upd-row[data-compact] { min-height: 44px; padding-block: 10px; }
+.svc-upd-below { display: grid; gap: var(--sv-space-3); padding: 0 var(--sv-space-5) var(--sv-space-4); }
+.svc-upd-below + .ui-row { border-top: 1px solid var(--sv-border); }
+.ui-group-card > .svc-link-row { width: 100%; margin: 0; border: 0; border-radius: 0; background: none; font: inherit; color: inherit; text-align: start; cursor: pointer; }
+.svc-link-row:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
+@media (hover: hover) { .svc-link-row:hover { background: var(--sv-hover); } }
+.svc-chevron { display: inline-grid; place-items: center; color: var(--sv-text-muted); }
+.svc-machine-icon { display: inline-grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 10px; background: var(--sv-accent-soft); color: var(--sv-accent-text); }
+.svc-hint { display: grid; gap: var(--sv-space-2); font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+.svc-hint p { margin: 0; display: flex; gap: var(--sv-space-2); align-items: flex-start; }
+.svc-hint-icon { flex: none; margin-top: 2px; color: var(--sv-warning); }
+
+/* P-B: the version at the left, the port at the card's right edge, as the title and the state are. */
+.svc-strip[data-port="b"] { grid-template-columns: minmax(0, 1fr) auto; }
+.svc-strip[data-port="b"] > [data-fact="port"] { text-align: end; }
+.svc-strip[data-port="b"] > [data-fact="port"] dd { justify-content: flex-end; }
+.svc-upd-below:empty { display: none; }
