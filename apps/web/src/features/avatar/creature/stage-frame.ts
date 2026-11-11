@@ -70,8 +70,8 @@ export function voiceType(w: number, h: number) {
  *  The answer is the reference's: the first step of ZK_STEP from zk0 at which the cards fit. It is found without trying
  *  every step (each try is a few trial renders of the creature): the drawn height scales as 1/zk, so the step that fits is
  *  predicted from the first try, then confirmed (it fits, the step before it does not). */
-export function capCentre(probe: FrameProbe, hTop: number, hBot: number, vh: number, ceil: number, floor: number, gap: number, xa: number, xb: number, zk0 = 1): FrameTarget {
-  return finish(capCentreSteps(probe, hTop, hBot, vh, ceil, floor, gap, xa, xb, zk0));
+export function capCentre(probe: FrameProbe, hTop: number, hBot: number, vh: number, ceil: number, floor: number, gap: number, xa: number, xb: number, zk0 = 1, sway = 0): FrameTarget {
+  return finish(capCentreSteps(probe, hTop, hBot, vh, ceil, floor, gap, xa, xb, zk0, sway));
 }
 
 /** Runs a solver to its answer at once. */
@@ -81,7 +81,10 @@ export function finish<T>(steps: Generator<void, T>): T {
 
 /** capCentre a trial render at a time: it yields before each (a host draws them between frames, so the page never waits
  *  on all of them at once). */
-export function* capCentreSteps(probe: FrameProbe, hTop: number, hBot: number, vh: number, ceil: number, floor: number, gap: number, xa: number, xb: number, zk0 = 1): Generator<void, FrameTarget> {
+export function* capCentreSteps(probe: FrameProbe, hTop: number, hBot: number, vh: number, ceil: number, floor: number, gap: number, xa: number, xb: number, zk0 = 1, sway = 0): Generator<void, FrameTarget> {
+  // `sway`: the share of its drawn height a creature that is not held still moves below its key pose (breathing, squash with the
+  // voice). The cards' gap is kept to the lowest it goes, so the room is kept under it besides the gap, on what is below it.
+  const swayRoom = (low: number, top: number) => sway * Math.max(0, low - top);
   const headK = TURN_HEAD, want = vh * OPTIC, mid = (m: Rows) => (m.top + m.lowAny) / 2, last = Math.max(0, Math.floor((ZK_MAX - zk0) / ZK_STEP + 1e-6));
   const inside = (lift: number, zk: number) => { if (!probe.reachRows) return true; const r = probe.reachRows(lift, zk); return !(r.top < 0) && !(r.bottom > vh); };
   const tried = new Map<number, { f: FrameTarget; fits: boolean }>();
@@ -94,14 +97,14 @@ export function* capCentreSteps(probe: FrameProbe, hTop: number, hBot: number, v
     for (let n = 0; n < 7 && Math.abs(mid(m) - want) > 1; n++) { lift += (mid(m) - want) / probe.slope(zk); yield; m = probe.rows(lift, zk, xa, xb); }
     const head = (m.low - m.top) * headK, f = { lift, zk, low: m.low, top: m.top, head };
     // ...and everything it can act out inside the tile, whatever the cards need (a step back, if not)
-    const r = { f, fits: m.low + gap + hBot <= floor && m.top - head - gap - hTop >= ceil && inside(lift, zk) };
+    const r = { f, fits: m.low + swayRoom(m.low, m.top) + gap + hBot <= floor && m.top - head - gap - hTop >= ceil && inside(lift, zk) };
     tried.set(i, r);
     return r;
   };
   let i = 0, r = yield* at(0);
   if (!r.fits) {
     // the tallest the creature may be drawn at the centre for the cards to fit, from its height at the first try
-    const h0 = r.f.low - r.f.top, room = Math.min(2 * (floor - want - gap - hBot), (want - gap - hTop - ceil) / (0.5 + headK));
+    const h0 = r.f.low - r.f.top, room = Math.min(2 * (floor - want - gap - sway * h0 - hBot), (want - gap - hTop - ceil) / (0.5 + headK));
     const guess = room > 0 && h0 > 0 ? Math.ceil(((zk0 * h0) / room - zk0) / ZK_STEP - 1e-6) : last;
     i = Math.max(1, Math.min(last, guess));
     r = yield* at(i);
@@ -112,7 +115,7 @@ export function* capCentreSteps(probe: FrameProbe, hTop: number, hBot: number, v
   if (!r.fits) {
     // ... but never out of the tile: its top stays on it (a tile too short for a card and the creature both, as a phone on
     // its side: the card then waits, unseen, rather than cover it: StageVoice)
-    const zk = best.zk, wantLow = Math.max(floor - hBot - gap, best.low - best.top);
+    const zk = best.zk, wantLow = Math.max(floor - hBot - gap - swayRoom(best.low, best.top), best.low - best.top);
     yield;
     let lift = best.lift, m = probe.rows(lift, zk, xa, xb);
     for (let n = 0; n < 7 && Math.abs(m.low - wantLow) > 1; n++) { lift += (m.low - wantLow) / probe.slope(zk); yield; m = probe.rows(lift, zk, xa, xb); }

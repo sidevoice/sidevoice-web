@@ -157,6 +157,30 @@ describe("Governor: gives ground a step at a time, and takes it back", () => {
     expect(g.observe(at + 5000, 40, 5000)).toBe(false);
     expect(g.tier).toBe(0);
   });
+  it("frames not drawn because nobody sees the creature (pause, at each of them) hold the judging off until a moment after the first drawn", () => {
+    const g = new Governor();
+    let at = run(g, 0, 60, 3).at;
+    // Five seconds of frames not drawn, each one a pause: nothing is judged, nothing moves.
+    for (let i = 0; i < 150; i++) { at += 1000 / 30; g.pause(at); }
+    expect(g.tier).toBe(0);
+    // The first frames drawn after them cost a lot (the room shown again is laid out): not judged for SETTLE_MS (1.2 s)...
+    expect(run(g, at, 30, BUDGET_MS * 3).moves).toEqual([]);
+    expect(g.tier).toBe(0);
+    // ...and judged as any after it, when they still cost it.
+    expect(run(g, at + 1000, 90, BUDGET_MS * 3).moves.length).toBeGreaterThanOrEqual(1);
+    expect(g.tier).toBeGreaterThan(0);
+  });
+  it("a pause starts the calm spell again: a rung left is not taken back before it has passed", () => {
+    const g = new Governor();
+    let at = run(g, 0, 90, BUDGET_MS * 2).at; // steps down
+    const down = g.tier;
+    expect(down).toBeGreaterThan(0);
+    at = run(g, at, 150, 1).at; // cheap frames: the calm spell (8 s) is half through (5 s)
+    g.pause(at);
+    // Another 5 s of cheap frames is less than the spell from the pause: still on the rung (a step up needs the spell and room).
+    expect(run(g, at, 150, 1).moves).toEqual([]);
+    expect(g.tier).toBe(down);
+  });
   it("lowers the rate only after the resolution is as low as it goes, and the rates are even on a 60 Hz screen", () => {
     const g = new Governor();
     run(g, 0, 3000, BUDGET_MS * 3);
@@ -282,5 +306,116 @@ describe("Governor: gives ground a step at a time, and takes it back", () => {
     expect(g.tier).toBe(3);
     expect(g.pin(null)).toBe(true);
     expect(g.tier).toBe(0);
+  });
+});
+
+describe("after a burst: what the page's own work took is given back (web#573)", () => {
+  // The desktop stage's creature canvas (599 x 876 css px at pixel ratio 2): its rungs fill 2.1, 1.2, 0.5 and 0.25 M px, so a step up
+  // is about twice the pixels. A frame costs 3 ms whatever it fills (posing, the draw calls) and 3 ms more at the full look.
+  const fill = (scale: number) => { const s = sceneSize(599, 876, 2, scale, true); return s.width * s.height; };
+  const desktop = () => { const g = new Governor(); g.measureBy(fill); return g; };
+  const cost = (g: Governor, slower = 1) => slower * (3 + 3 * fill(g.scale) / fill(1));
+  /** `secs` seconds of frames from `at`, `late` ms apart if given (the page's thread busy elsewhere), else as asked for; with
+   *  `settle`, the canvas is being resized on each. The rungs it moved to, and the time after. */
+  const frames = (g: Governor, at: number, secs: number, { late = 0, slower = 1, settle = false, took = 0 } = {}) => {
+    const moves: number[] = [];
+    for (const end = at + secs * 1000; at < end;) {
+      const gap = late || g.every;
+      at += gap;
+      if (settle) g.settle(at);
+      if (g.observe(at, took || cost(g, slower), gap)) moves.push(g.tier);
+    }
+    return { moves, at };
+  };
+
+  it("frames late for a while (a launch's own work), though they cost under the limit, step it down, and the calm gives it all back", () => {
+    const g = desktop();
+    g.start(0, 0);
+    const burst = frames(g, 0, 8, { late: 70 });
+    expect(g.tier).toBeGreaterThanOrEqual(2); // a rung every 1.5 s or so
+    // On the rung it fell to, one up is about twice the pixels: 3.7 ms there is 8.7 ms expected on the rung above, never under 6.
+    // What it cost on the full look when it left (6 ms, under 8) is what it would cost there again.
+    const after = frames(g, burst.at, 60);
+    expect(after.moves).toEqual([0]);
+    expect(frames(g, after.at, 600).moves).toEqual([]); // and it holds there
+  });
+
+  it("a retake that does not hold goes straight back where it came from, and is not tried again", () => {
+    const g = desktop();
+    g.start(0, 0);
+    let { at } = frames(g, 0, 20); // the full look holds: 6 ms
+    expect(g.tier).toBe(0);
+    at = frames(g, at, 4, { late: 70 }).at; // a burst steps it down
+    const from = g.tier;
+    expect(from).toBeGreaterThan(0);
+    // and the device is slower from then on: 9.6 ms on the full look, over its 8
+    // One try back to the full look after the calm spell, which fails there: back to the rung it held at once (not down every rung
+    // between), and no other try in ten minutes.
+    expect(frames(g, at, 600, { slower: 1.6 }).moves).toEqual([0, from]);
+  });
+
+  it("a GPU that really is behind (frames late on the top rungs, each cheap on the thread) gets one retake, about 2 s, and never another", () => {
+    const g = desktop();
+    g.start(0, 0);
+    const moves: Array<[number, number]> = [];
+    for (let at = 0; at < 600_000;) {
+      const gap = g.tier <= 2 ? 70 : g.every; // late on rungs 0 to 2 whatever they cost; on time from rung 3
+      at += gap;
+      if (g.observe(at, 2, gap)) moves.push([at, g.tier]);
+    }
+    const tiers = moves.map(([, tier]) => tier), retake = tiers.indexOf(0);
+    expect(tiers.slice(0, 3)).toEqual([1, 2, 3]); // the slide: rungs 0 to 2 left at 2 ms, under their limit
+    expect(retake).toBe(3); // so the first calm spell takes the top back once...
+    expect(tiers[retake + 1]).toBe(3); // ...which fails there: straight back to where it held
+    expect(moves[retake + 1][0] - moves[retake][0]).toBeLessThan(2500); // the settle and eight late frames
+    expect(tiers.slice(retake + 1).filter((tier) => tier < 2)).toEqual([]); // and never again
+    // (Rung 2 is still tried on the old estimate, 2 ms on rung 3 being 4 ms expected there, after 16, 32, then every 64 s: as before.)
+    expect(tiers.slice(retake + 1).every((tier) => tier === 2 || tier === 3)).toBe(true);
+  });
+
+  it("frames drawn while the canvas is resized are not judged, nor the moment after", () => {
+    const g = desktop();
+    g.start(0, 0);
+    let { at } = frames(g, 0, 10);
+    const drag = frames(g, at, 3, { settle: true, took: 30, late: 60 }); // its buffers made again on every frame, and late
+    expect(drag.moves).toEqual([]);
+    at = drag.at;
+    expect(frames(g, at, 1, { late: 70 }).moves).toEqual([]); // (the framing solved again just after)
+    expect(g.tier).toBe(0);
+  });
+
+  it("a canvas made again every few seconds (the floating card's picture-in-picture, on each update of the call) does not keep the step back up waiting", () => {
+    const g = desktop();
+    g.start(0, 0);
+    let { at } = frames(g, 0, 10);
+    at = frames(g, at, 4, { late: 70 }).at; // a burst steps it down
+    expect(g.tier).toBeGreaterThan(0);
+    const moves: number[] = [];
+    for (let n = 0; n < 10; n++) { g.settle(at); const spell = frames(g, at, 3); moves.push(...spell.moves); at = spell.at; }
+    expect(moves).toContain(0); // taken back within the thirty seconds, though every 3 s a canvas took new pixels
+  });
+
+  it("the frames for a moment after a pause (a window coming back) are not judged", () => {
+    const g = desktop();
+    g.start(0, 0);
+    let { at } = frames(g, 0, 10);
+    at += 5000;
+    expect(g.observe(at, 3, 5000)).toBe(false);
+    expect(frames(g, at, 1, { late: 70 }).moves).toEqual([]);
+    expect(g.tier).toBe(0);
+  });
+
+  it("on the last rung, one long frame does not hold the creature at its slowest: its frames are still judged, and come back", () => {
+    const g = new Governor();
+    g.start(TIERS.length - 1, 0);
+    let at = run(g, 0, 90, 3, 1000 / 15).at;
+    at += g.every; g.observe(at, 400, g.every); // a hitch spaces its frames out to near 500 ms
+    expect(g.every).toBeGreaterThan(400);
+    // Spaced so, each frame came more than PAUSE_MS after the last: they are frames still, not pauses.
+    for (let i = 0; i < 20; i++) { const gap = g.every; at += gap; g.observe(at, 3, gap); }
+    expect(g.every).toBeCloseTo(1000 / 15, 1);
+    const back = run(g, at, 900, 3, 1000 / 15);
+    expect(back.moves.length).toBeGreaterThan(0); // and it climbs again
+    expect(g.tier).toBeLessThan(TIERS.length - 1);
   });
 });
