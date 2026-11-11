@@ -460,7 +460,7 @@ export class StageFramer {
       // not held up by them.
       if (!pending) this.prefetch(ask, rest, v);
     }
-    this.frame.solve({ target: to, gap, below: to.low + gap, belowAny: Math.max(to.low, to.reach ?? 0) + gap, above: to.top - to.head - gap, key }, pending);
+    this.frame.solve({ target: to, gap, below: to.low + this.sway(to) + gap, belowAny: Math.max(to.low, to.reach ?? 0) + this.sway(to) + gap, above: to.top - to.head - gap, key }, pending);
   }
 
   /** Whether trial framings can be drawn now: the creature drawn, its canvas laid out. */
@@ -470,7 +470,7 @@ export class StageFramer {
   private keyOf(ask: FrameAsk, rest: boolean, pose: string, v: View): string | null {
     if (!(ask.h > 0 && ask.w > 0) || (!rest && !ask.cards)) return null;
     const zk0 = ask.phone ? 1 : this.floorZk(ask.w, ask.h);
-    return [rest ? "rest" : "turn", pose, ask.phone, ask.w.toFixed(1), ask.h.toFixed(1), ask.dy.toFixed(1), v.zoom, v.lookY, zk0.toFixed(4), shapeKey(this.host.item.spec), rest ? "" : JSON.stringify(ask.cards)].join("|");
+    return [rest ? "rest" : "turn", pose, ask.phone, ask.w.toFixed(1), ask.h.toFixed(1), ask.dy.toFixed(1), v.zoom, v.lookY, zk0.toFixed(4), shapeKey(this.host.item.spec), rest ? "" : JSON.stringify(ask.cards), this.held].join("|");
   }
 
   /** The solve on the pixels for `key` (queued, or found queued): `then` once it is done. */
@@ -483,7 +483,8 @@ export class StageFramer {
     }
     const { floor, ceil, gap } = stageBands(ask.h, ask.phone), probe = this.probe(v, pose);
     const zk0 = ask.phone ? 1 : this.floorZk(ask.w, ask.h);
-    const steps = rest ? capCentreSteps(probe, 0, 0, ask.h, ceil, floor, gap, 0, ask.w, zk0) : this.turnSteps(v, probe, pose, ask.cards!, ask.h, ceil, floor, gap, zk0);
+    const sway = this.held ? 0 : MOTION_ROOM;
+    const steps = rest ? capCentreSteps(probe, 0, 0, ask.h, ceil, floor, gap, 0, ask.w, zk0, sway) : this.turnSteps(v, probe, pose, ask.cards!, ask.h, ceil, floor, gap, zk0, sway);
     const job: Job = { key, steps, wanted: !!then, done: (t) => { this.solved.set(key, t); if (this.solved.size > 8) this.solved.delete(this.solved.keys().next().value!); then?.(); } };
     if (ahead) this.jobs.push(job); else this.jobs.unshift(job);
     this.run();
@@ -507,16 +508,17 @@ export class StageFramer {
     const probe: FrameProbe = { rows: (lift, zk) => this.estimate(v, { lift, zk }) ?? { top: 0, low: 0, lowAny: 0 }, slope: (zk) => this.slope(v, zk) };
     void pose;
     const zk0 = ask.phone ? 1 : this.floorZk(ask.w, ask.h);
-    return rest ? capCentre(probe, 0, 0, ask.h, ceil, floor, gap, 0, ask.w, zk0)
-      : capCentre(probe, Math.max(0, ask.cards!.above), ask.cards!.below, ask.h, ceil, floor, gap, ask.cards!.xa, ask.cards!.xb, zk0);
+    const sway = this.held ? 0 : MOTION_ROOM;
+    return rest ? capCentre(probe, 0, 0, ask.h, ceil, floor, gap, 0, ask.w, zk0, sway)
+      : capCentre(probe, Math.max(0, ask.cards!.above), ask.cards!.below, ask.h, ceil, floor, gap, ask.cards!.xa, ask.cards!.xb, zk0, sway);
   }
 
   /** A turn's framing: fitted on the pose it was entered in, as the reference fits it. Every card of the turn goes where
    *  it puts them, what the person sent where their pill was (it pops out of it), even while the agent rests or works by
    *  then (a pose that may reach a few px lower: recorded for the human, PR "Decisions"). */
-  private *turnSteps(v: View, probe: FrameProbe, pose: string, cards: NonNullable<FrameAsk["cards"]>, vh: number, ceil: number, floor: number, gap: number, zk0 = 1): Generator<void, FrameTarget> {
+  private *turnSteps(v: View, probe: FrameProbe, pose: string, cards: NonNullable<FrameAsk["cards"]>, vh: number, ceil: number, floor: number, gap: number, zk0 = 1, sway = 0): Generator<void, FrameTarget> {
     void v; void pose;
-    return yield* capCentreSteps(probe, Math.max(0, cards.above), cards.below, vh, ceil, floor, gap, cards.xa, cards.xb, zk0);
+    return yield* capCentreSteps(probe, Math.max(0, cards.above), cards.below, vh, ceil, floor, gap, cards.xa, cards.xb, zk0, sway);
   }
 
   /** Steps the solves a trial render at a time, in the page's idle time (its layout, input and frames come first; a
@@ -548,15 +550,17 @@ export class StageFramer {
     }
   }
 
+  /** The room a creature that is not held still takes below its key pose, kept under it for good (it breathes and squashes with the
+   *  voice all the while a card shows); none for one held still, which is drawn in its key pose only. */
+  private sway(to: { low: number; top: number }): number { return this.held ? 0 : Math.max(0, to.low - to.top) * MOTION_ROOM; }
   /** The creature's lowest drawn row where it stands now (eased), css px of the tile: its projected bounds, moved by how
    *  they differ from the pixels at the framings eased between (all of it at the target). Mid-way, care besides: a couple
-   *  of px, and while it moves the room its breathing and its squash with the voice take below its key pose; none once it
-   *  stands at the target, so a card settles exactly where the framing puts it. */
+   *  of px, tapering off as it lands. While it is not held still, the room its breathing and its squash with the voice take below
+   *  its key pose (sway) is kept too, mid-way and once it stands at the target. */
   private lowNow(v: View, est: Rows): number { void v; return this.lowAt(est, this.cap); }
   private lowAt(est: Rows, at: Framing): number {
     const e = this.ease, to = this.to!, p = e.span > 1e-6 ? Math.max(0, Math.min(1, 1 - Math.hypot(to.lift - at.lift, to.zk - at.zk) / e.span)) : 1;
-    const sway = this.held ? 0 : (to.low - to.top) * MOTION_ROOM + 1;
-    return est.low + e.corrFrom + (e.corrTo - e.corrFrom) * p + (1 - p) * (2 + sway);
+    return est.low + e.corrFrom + (e.corrTo - e.corrFrom) * p + this.sway(to) + (1 - p) * (2 + (this.held ? 0 : 1));
   }
 
   /** Where the ease stands `n` steps (1/30 s each) after it started: FRAME_EASE of the way a step, as the reference's
@@ -574,7 +578,7 @@ export class StageFramer {
     for (let n = 0; n <= MOTION_STEPS; n++) {
       const f = this.ease.span > 0 ? this.easedAt(n) : { lift: to.lift, zk: to.zk }, settled = f.lift === to.lift && f.zk === to.zk;
       const est = settled ? null : this.estimate(v, f);
-      floor.push((est ? this.lowAt(est, f) : to.low) + gap);
+      floor.push((est ? this.lowAt(est, f) : to.low + this.sway(to)) + gap);
       feet.push(this.footAt(v, f, h) + dy);
       if (settled) break;
     }
