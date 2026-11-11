@@ -1198,6 +1198,7 @@ export const messages: Messages = {
   "runtime.notHere": "Não roda aqui: {reasons}",
   "runtime.on.gpu": "placa de vídeo ({api})",
   "runtime.on.cpu": "processador",
+  "runtime.stopsInBackground": "Só funciona com o Sidevoice aberto. Para continuar em segundo plano, precisa rodar na CPU.",
   "runtime.on.neuralEngine": "Neural Engine",
   "runtime.device": "Este dispositivo: {what}",
   "runtime.device.gpu": "placa de vídeo disponível para o navegador",
