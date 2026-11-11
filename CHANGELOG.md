@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.31.0](https://github.com/sidevoice/sidevoice-web/compare/v0.30.1...v0.31.0) (2026-11-11)
+
+
+### Features
+
+* **call:** open the system's output picker from the speaker control where the host can ([#585](https://github.com/sidevoice/sidevoice-web/issues/585)) ([39a5e8f](https://github.com/sidevoice/sidevoice-web/commit/39a5e8f6e259b473a8e2aa6df0de15d19b46ff81))
+* **settings:** say that a GPU build on a phone works only while the app is open ([#588](https://github.com/sidevoice/sidevoice-web/issues/588)) ([e5abc9e](https://github.com/sidevoice/sidevoice-web/commit/e5abc9efcbbde6dfef27d6b49221d3a2d0c76021))
+* **settings:** the engine's recommended model, preselected and marked «Recomendado» ([#587](https://github.com/sidevoice/sidevoice-web/issues/587)) ([99dd1da](https://github.com/sidevoice/sidevoice-web/commit/99dd1da8d996130e96707fde9386a1b9b35c42c7))
+
+
+### Bug Fixes
+
+* **avatar:** creature framing follow-ups, held startle hop and stale data-reach ([#576](https://github.com/sidevoice/sidevoice-web/issues/576)) ([b5535e1](https://github.com/sidevoice/sidevoice-web/commit/b5535e193062326dafb6eef5087a3df29f138533))
+* **call:** let a reply the person spoke over resume when their turn comes to nothing ([#590](https://github.com/sidevoice/sidevoice-web/issues/590)) ([f59e07e](https://github.com/sidevoice/sidevoice-web/commit/f59e07ea8325639a4d49479e7904f6e1a570fdad))
+* **call:** replies drop only on the room's withdrawal, so all of them play after a turn that comes to nothing ([#591](https://github.com/sidevoice/sidevoice-web/issues/591)) ([d5b4695](https://github.com/sidevoice/sidevoice-web/commit/d5b4695588393c838fbee3372a62a4876e0e26a4))
+* **creature:** do not draw into a canvas whose room the page skips (Settings over a call) ([#589](https://github.com/sidevoice/sidevoice-web/issues/589)) ([7e3b15e](https://github.com/sidevoice/sidevoice-web/commit/7e3b15e11583183649fe0db99da8406265a7b626))
+* **creature:** the stage takes back the resolution a passing burst took ([#577](https://github.com/sidevoice/sidevoice-web/issues/577)) ([debd4a2](https://github.com/sidevoice/sidevoice-web/commit/debd4a21517c5161797fe231b124fb9ed16b1aa0))
+* **install:** show where/reason/root/os_error of a local install failure in Copy details ([#575](https://github.com/sidevoice/sidevoice-web/issues/575)) ([b0661ca](https://github.com/sidevoice/sidevoice-web/commit/b0661ca4f3406357e2dc6f9a67d1f661780fc541))
+* **stage:** centre the reply card's three lines between its top and bottom edge ([#579](https://github.com/sidevoice/sidevoice-web/issues/579)) ([d569e5c](https://github.com/sidevoice/sidevoice-web/commit/d569e5cebf2493463533e9c7ac2c6c33a6c1b606))
+* **stage:** keep room under a live creature for its breathing once the framing settles ([#583](https://github.com/sidevoice/sidevoice-web/issues/583)) ([612492b](https://github.com/sidevoice/sidevoice-web/commit/612492b3359db0758f42c9bde8386056a91128c6))
+
 ## [0.30.1](https://github.com/sidevoice/sidevoice-web/compare/v0.30.0...v0.30.1) (2026-11-10)
 
 
