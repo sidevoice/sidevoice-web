@@ -4,11 +4,11 @@ The controller tests exercise core frames in producer order: each conversation's
 
 | Core case | Web boundary evidence |
 | --- | --- |
-| T01 | Played-zero interruption, empty terminal and words terminal. A reply the voice holds over a turn resumes after an empty terminal (no words or cancelled) with nothing reported of the pause, and every later reply plays after it in order; nothing is retired at the turn start. Words wait for the held reply's barge-in end and retire the older queued replies before the final frame, or once the start's epoch arrives when it comes after the words (sidevoice-core#248). |
-| T02a/b | Open-turn and delayed-ack gates; ack → refusal → cancelled → fresh reply. |
-| T03 | Reply older than a turn that brought words discarded; an older epoch alone plays (the room withdraws what is late); higher epoch reply held for a second device's participant fact. |
-| T04a/b | Same-epoch FIFO and Skip; multiple old replies retired, fresh new-epoch reply admitted. |
-| T05 | Checkpoint cut with queued successors retired before final words; a manual replay is never late by epoch and plays after them. |
+| T01 | Played-zero interruption, empty terminal and words terminal. Nothing is retired at a turn start, and what waits in the page queue is held from the start until the room acknowledges the turn's end. A reply the voice holds over a turn resumes after a terminal with no words (empty, cancelled or merged), which goes at once with nothing reported of the pause; every later reply plays after it, in order, once the end is acknowledged. Words wait for the held reply's barge-in end; the room's withdrawal, which it sends ahead of acknowledging the words, is the only thing that drops a queued reply (sidevoice-core#248) |
+| T02a/b | Open-turn, delayed-ack and unacknowledged-end gates; ack → refusal → cancelled → fresh reply |
+| T03 | An older epoch alone plays; a reply the room withdrew is never handed to the voice; higher epoch reply held for a second device's participant fact |
+| T04a/b | Same-epoch FIFO and Skip; several queued replies dropped by the room's withdrawal, fresh new-epoch reply admitted |
+| T05 | Checkpoint cut ahead of the final words; the queued successor dropped by the room's withdrawal; a manual replay, which the room never withdraws by epoch, plays after them |
 | T06a/b/c | Output mute, output loss, voice off/on, written unheard reply; microphone independent. Core-retained unheard rows survive both web history caps. A and B have separate calls: A's pending STT and merge hold finish on A at its normal end of turn while B takes new speech. Recorded inactive/disconnected admission reasons are explained. |
 | T06d/e | Return and globally heard participant/history reconciliation; note rows omitted from the transcript. A manually heard text-only row loses its current not-played mark. Core owns the five-second notice scheduling. |
 | T07 | Delayed handle settlement after hang-up and new call; offline words on replacement session. An older core-retained unheard row remains in the transcript and session cache. |

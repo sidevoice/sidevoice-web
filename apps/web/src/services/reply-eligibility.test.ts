@@ -15,9 +15,7 @@ test.each([
  ['not in focus', {...facts,focused:false},'focus_changed'],
  ['mute', {...facts,output:'agents_muted'},'agents_muted'],
  ['voice off', {...facts,output:'voice_off'},'voice_off'],
- ['older than a turn that brought words', {...facts,epoch:3,wordsEpoch:3},'newer_turn'],
- ['older than a turn that came to nothing', {...facts,epoch:3},'play'],
- ['older than an empty turn after one with words', {...facts,epoch:4,wordsEpoch:2},'play'],
+ ['older epoch: late only if the room withdraws it', {...facts,epoch:3},'play'],
  ['turn open', {...facts,openTurns:new Set(['t'])},'hold'],
  ['epoch unknown', {...facts,epoch:null},'hold'],
 ] as const)('%s has the correct playback decision',(_name,input,decision)=>{
@@ -31,7 +29,4 @@ test('a reply sent to an earlier session of the same call plays whatever its epo
  expect(replyEligibility(earlier,{...mine,output:'voice_off'})).toBe('voice_off');
  expect(replyEligibility(earlier,{...mine,earlierSessions:new Set(['new'])})).toBe('call_ended');
  expect(replyEligibility(earlier,{...mine,earlierSessions:undefined})).toBe('call_ended');
-});
-test('a manual replay is never late, whatever turn brought words after it',()=>{
- expect(replyEligibility({...reply,epoch:1,requested:true},{...facts,epoch:3,wordsEpoch:3})).toBe('play');
 });

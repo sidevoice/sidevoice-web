@@ -4,21 +4,18 @@
  *  (`earlierSessions`: the room gave the call a new session while the person stayed in it) is still this call's to
  *  play, in order; its epoch belongs to that session and says nothing about this one.
  *
- *  An older epoch alone does not make a reply late. A turn advances the epoch when it starts, but it makes the replies
- *  before it late only if it brings words: one that comes to nothing (no words, cancelled) changed nothing, and what
- *  the agent said plays on (sidevoice-core#248). `wordsEpoch` is the epoch of this conversation's latest turn known to
- *  have brought words; a reply of an earlier epoch is late. Turns spoken elsewhere are the room's to settle: it
- *  withdraws what they make late (`voice-reply-withdrawn`). */
-export function replyEligibility(reply, {sessionId, earlierSessions = /** @type {Set<string> | undefined} */ (undefined), threadId, focused, epoch, wordsEpoch = /** @type {number | undefined} */ (undefined), openTurns, output}) {
+ *  An older epoch does not make a reply late here. A turn advances the epoch when it starts, but whether it made the
+ *  replies before it late is the room's to say: it withdraws them (`voice-reply-withdrawn`) when the turn brings words,
+ *  and keeps them when it comes to nothing (sidevoice-core#248). */
+export function replyEligibility(reply, {sessionId, earlierSessions = /** @type {Set<string> | undefined} */ (undefined), threadId, focused, epoch, openTurns, output}) {
   const earlier = reply.session_id !== sessionId;
   if (earlier && !earlierSessions?.has(reply.session_id)) return 'call_ended';
   if (reply.thread_id !== threadId || !focused) return 'focus_changed';
   if (output !== 'on') return output;
   if (!earlier) {
     if (!Number.isInteger(epoch) || !Number.isInteger(reply.epoch)) return 'hold';
-    // Manual replay deliberately keeps the history row's original epoch. Core issued it for this current session.
-    if (!reply.requested && Number.isInteger(wordsEpoch) && reply.epoch < /** @type {number} */ (wordsEpoch)) return 'newer_turn';
-    // A newer reply may have come from another device. Wait for the room's epoch fact.
+    // A newer reply may have come from another device. Wait for the room's epoch fact. A manual replay keeps the
+    // history row's original epoch, which the room issued for this session.
     if (!reply.requested && reply.epoch > epoch) return 'hold';
   }
   if (openTurns?.size) return 'hold';

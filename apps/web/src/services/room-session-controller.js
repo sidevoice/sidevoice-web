@@ -811,29 +811,15 @@ const callSessions=new Set();
 const replyQueue=[];
 const threadEpochs=new Map();
 function acceptEpoch(thread,epoch){if(Number.isInteger(epoch))threadEpochs.set(thread,Math.max(epoch,threadEpochs.get(thread)??epoch))}
-/* A turn spoken here makes the replies before it late only once it brings words (sidevoice-core#248): its start
- * advances the epoch, but a turn that comes to nothing changed nothing, and every reply the agent published plays on.
- * Its epoch is the room's (its start's answer); its words are this call's own terminal frame, the one the room decides
- * on. Whichever is known second settles it. `wordsEpochs`: per conversation, the latest epoch that brought words. */
-const wordsEpochs=new Map();
-const spokenTurns=new Map(); // wire turn id → {thread, epoch?, words?}
-function spokenTurn(turnId,thread,fact,drain=true){
- const turn={...spokenTurns.get(turnId),thread,...fact};
- if(Number.isInteger(turn.epoch)&&turn.words){spokenTurns.delete(turnId);broughtWords(thread,turn.epoch,drain)}
- else spokenTurns.set(turnId,turn);
-}
-// What of this conversation still waits in this page's queue from before that turn is late: it ends here, as the
-// room's withdrawal of it would, ahead of the words when the epoch is known by then. What may play next is decided
-// once the words have gone (`drain` false): they never wait behind it.
-function broughtWords(thread,epoch,drain){
- wordsEpochs.set(thread,Math.max(epoch,wordsEpochs.get(thread)??epoch));
- stoppingReplies=true;
- for(const said of [...replies.values()]){
-  const reply=said.reply;
-  if(reply.thread_id===thread&&!said.saying&&!reply.requested&&reply.session_id===state.sessionId&&Number.isInteger(reply.epoch)&&reply.epoch<epoch)finishReply(said,{status:'unplayed',reason:'newer_turn'});
- }
- stoppingReplies=false;
- if(drain)drainReplies();
+/* Whether a reply is late is the room's alone: it withdraws what a turn with words made late (`voice-reply-withdrawn`),
+ * and it says so ahead of acknowledging those words (sidevoice-core#248). So a turn holds what waits in this page's
+ * queue from its start until the room has taken its end: `closingTurns`, by turn, with the end's message once kept.
+ * A turn that came to nothing withdraws nothing, and all of it plays on. */
+const closingTurns=new Map(); // wire turn id → {thread, id: the end's outbox id, or null until it is kept}
+function closingThreads(){
+ const kept=new Set(outbox.list().map(entry=>entry.id));
+ for(const [turn,closing] of closingTurns)if(closing.id&&!kept.has(closing.id))closingTurns.delete(turn);
+ return [...closingTurns.values()].map(closing=>closing.thread);
 }
 const openVoiceTurns=new Map();
 const awaitingTurnAck=new Map();
@@ -843,7 +829,7 @@ let callGeneration=0;
 function clearTurnLifecycle(){
  ++callGeneration;turnNodes.clear();openVoiceTurns.clear();replyQueue.length=0;
  turnWireIds.clear();usedWireIds.clear();
- awaitingTurnAck.clear();startMessageTurns.clear();threadEpochs.clear();wordsEpochs.clear();spokenTurns.clear();turnSend=Promise.resolve();turnSendPending=0;
+ awaitingTurnAck.clear();startMessageTurns.clear();threadEpochs.clear();closingTurns.clear();turnSend=Promise.resolve();turnSendPending=0;
 }
 let speechOutput='on';
 let stoppingReplies=false;
@@ -929,8 +915,8 @@ function drainReplies(){
   const said=replyQueue[0];
   if(replies.get(said.reply.utterance_id)!==said){replyQueue.shift();continue}
   const reply=said.reply;
-  const openHere=new Set([...openVoiceTurns.values(),...awaitingTurnAck.values()].filter(thread=>thread===reply.thread_id));
-  const eligibility=moving?'focus_changed':replyEligibility(reply,{sessionId:state.sessionId,earlierSessions:callSessions,threadId:isLeaving(reply.thread_id)?reply.thread_id:targetThread(),focused:callInFocus(),epoch:threadEpochs.get(reply.thread_id),wordsEpoch:wordsEpochs.get(reply.thread_id),openTurns:openHere,output:speechOutput});
+  const openHere=new Set([...openVoiceTurns.values(),...awaitingTurnAck.values(),...closingThreads()].filter(thread=>thread===reply.thread_id));
+  const eligibility=moving?'focus_changed':replyEligibility(reply,{sessionId:state.sessionId,earlierSessions:callSessions,threadId:isLeaving(reply.thread_id)?reply.thread_id:targetThread(),focused:callInFocus(),epoch:threadEpochs.get(reply.thread_id),openTurns:openHere,output:speechOutput});
   if(eligibility==='hold')return;
   replyQueue.shift();
   if(eligibility!=='play'){finishReply(said,{status:'unplayed',reason:eligibility});continue}
@@ -2006,6 +1992,8 @@ function recordMessage(raw, socket) {
         outbox.remove(d.client_msg_id);
         armResend(socket||state.ws);
         if(queuedTexts().length)void flushTexts();
+        // A turn's end taken: what the room withdrew for it came first, and what it left plays on.
+        if(closingTurns.size)drainReplies();
         // Core acknowledges transport before it can accept or refuse the start.
         return;
     }
@@ -2034,7 +2022,6 @@ function recordMessage(raw, socket) {
     if (t === 'voice-user-turn' && d.phase === 'started') {
         state.roomRevision = Math.max(state.roomRevision, d.revision);
         acceptEpoch(d.thread_id,d.epoch);
-        if(Number.isInteger(d.epoch)&&(spokenTurns.has(d.turn_id)||openVoiceTurns.has(d.turn_id)))spokenTurn(d.turn_id,d.thread_id,{epoch:d.epoch});
         awaitingTurnAck.delete(d.turn_id);
         for(const [id,turn] of startMessageTurns)if(turn===d.turn_id)startMessageTurns.delete(id);
         if (state.userTurn?.id === d.turn_id)
@@ -2223,7 +2210,7 @@ function voiceTurn(event,entry=null){
   usedWireIds.add(id);turnWireIds.set(key,id);
  }
  const turn={...event,turn_id:turnWireIds.get(key)??event.turn_id};
- // What the room decides a turn on: words make the replies before it late; anything else comes to nothing.
+ // A turn with words ends the replies the voice held for it; anything else comes to nothing, and they play on.
  const words=turn.phase==='finished'&&!!turn.text?.trim()&&!turn.merged;
  if(event.phase!=='started')turnWireIds.delete(key);
  if(turn.phase==='started'){
@@ -2234,13 +2221,12 @@ function voiceTurn(event,entry=null){
  if(!target||target.node!==state.callNode||target.generation!==callGeneration)return;
  if(turn.phase==='started'){
   // The voice holds what it says over the turn, and what waits in this page's queue waits for the turn too. Neither is
-  // retired here: only words make them late, and a turn that comes to nothing lets every one of them play on.
+  // retired here: only the room withdraws a reply, and a turn that comes to nothing lets every one of them play on.
   openVoiceTurns.set(turn.turn_id,target.thread_id);
  }
  else{
   openVoiceTurns.delete(turn.turn_id);
-  if(words)spokenTurn(turn.turn_id,target.thread_id,{words:true},false);
-  else spokenTurns.delete(turn.turn_id);
+  closingTurns.set(turn.turn_id,{thread:target.thread_id,id:null});
  }
  roomStore.batch(()=>{
   if(turn.phase==='started'){
@@ -2271,10 +2257,14 @@ function voiceTurn(event,entry=null){
  const active=turn.phase==='started'?[]:[...replies.values()].filter(said=>said.reply.thread_id===target.thread_id&&said.saying&&!(!words&&said.held));
  const generation=callGeneration;
  const send=()=>{
-  if(generation!==callGeneration||target.node!==state.callNode||!state.sessionId)return;
+  const closing=turn.phase==='started'?null:closingTurns.get(turn.turn_id);
+  // An end that never goes holds nothing.
+  const release=()=>{if(closing&&closingTurns.get(turn.turn_id)===closing){closingTurns.delete(turn.turn_id);drainReplies()}};
+  if(generation!==callGeneration||target.node!==state.callNode||!state.sessionId){release();return}
   const entry=keepMessage('user-turn','voice-user-turn',payload);
-  if(!entry){failTurnRows([turn.turn_id]);return}
+  if(!entry){failTurnRows([turn.turn_id]);release();return}
   if(turn.phase==='started'){awaitingTurnAck.set(turn.turn_id,target.thread_id);startMessageTurns.set(entry.id,turn.turn_id)}
+  else if(closing)closing.id=entry.id;
   flushOutbox();drainReplies();
  };
  if(!turnSendPending&&!active.length)send();
