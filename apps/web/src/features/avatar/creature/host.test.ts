@@ -712,3 +712,140 @@ test("a creature disposed late, after a new sharp stage was made for one mounted
   expect(second.renderer.disposed).toBe(true);
   expect(lost).toHaveBeenCalledTimes(1);
 });
+
+/** The page's animation frames by hand: what the loop asked for runs when a test says, at the time it gives. */
+function animationFrames() {
+  const asked = new Map<number, FrameRequestCallback>();
+  let id = 0;
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => { asked.set(++id, callback); return id; });
+  vi.stubGlobal("cancelAnimationFrame", (n: number) => { asked.delete(n); });
+  return {
+    /** The frames the loop has asked for and not had yet. */
+    pending: () => asked.size,
+    /** The frame asked for runs, at `ms`. */
+    run(ms: number) { const callbacks = [...asked.values()]; asked.clear(); for (const callback of callbacks) callback(ms); },
+  };
+}
+/** A canvas whose room the page can skip (what `checkVisibility` says), and how often the page was asked for its box. */
+function skippable(w = 364, h = 655) {
+  const element = tile(w, h);
+  const state = { shown: true, asked: [] as unknown[], boxes: 0 };
+  const rects = element.getClientRects.bind(element);
+  element.getClientRects = () => { state.boxes += 1; return rects(); };
+  element.checkVisibility = ((options?: unknown) => { state.asked.push(options); return state.shown; }) as never;
+  return { element, state };
+}
+
+test("a canvas whose room the page skips (content-visibility: hidden, under Settings) is not drawn, the loop keeps asking, and it is drawn again in the first frame it is shown", () => {
+  webgl();
+  const loop = animationFrames();
+  const { element, state } = skippable();
+  const live = mount({ ...onStage, canvas: element, moving: true })!;
+  const scene = stageFor("scene");
+  let ms = 100;
+  loop.run(ms);
+  expect(scene.draws).toBe(1);
+  expect(live.drawsFrames()).toBe(true);
+  // The room is skipped: the canvas keeps its box (and its size), and nothing is drawn into it, frame after frame, while the loop goes on.
+  state.shown = false;
+  for (let n = 0; n < 30; n++) { expect(loop.pending()).toBe(1); loop.run(ms += 40); }
+  expect(scene.draws).toBe(1);
+  expect(loop.pending()).toBe(1);
+  expect(live.covered()).toBe(true);
+  expect(live.drawsFrames()).toBe(false);
+  expect(live.wantsFrames()).toBe(true);
+  // Asked of the style (the options cover a room skipped by `auto` too), and its box asked once, as it stopped being seen: not per frame.
+  expect(state.asked.every((options) => (options as { contentVisibilityAuto: boolean }).contentVisibilityAuto === true)).toBe(true);
+  expect(state.boxes).toBe(1);
+  // Settings closes: the very next frame draws it, with nothing else to wake it.
+  state.shown = true;
+  loop.run(ms += 40);
+  expect(scene.draws).toBe(2);
+  expect(live.covered()).toBe(false);
+  expect(live.drawsFrames()).toBe(true);
+  expect(state.boxes).toBe(1); // a canvas that is seen has a box: it is not asked
+  loop.run(ms += 40);
+  expect(scene.draws).toBe(3);
+});
+
+test("a held-still creature changed while its room is skipped keeps asking for a frame, and shows the change in the first it is seen in", () => {
+  webgl();
+  const loop = animationFrames();
+  const { element, state } = skippable();
+  const live = mount({ ...onStage, canvas: element, moving: false })!;
+  const scene = stageFor("scene");
+  let ms = 100;
+  loop.run(ms);
+  const drawn = scene.draws;
+  expect(loop.pending()).toBe(0); // at rest: no frame asked for
+  state.shown = false;
+  live.redraw(); // (a mood, a framing: something to draw)
+  for (let n = 0; n < 10; n++) { expect(loop.pending()).toBe(1); loop.run(ms += 40); }
+  expect(scene.draws).toBe(drawn);
+  state.shown = true;
+  loop.run(ms += 40);
+  expect(scene.draws).toBe(drawn + 1);
+  expect(loop.pending()).toBe(0); // and at rest again
+});
+
+test("a canvas with no box still sleeps (its box observer wakes it), whether or not the page can say what it shows", () => {
+  webgl();
+  const loop = animationFrames();
+  const { element, state } = skippable();
+  const live = mount({ ...onStage, canvas: element, moving: true })!;
+  const scene = stageFor("scene");
+  element.getClientRects = () => [] as unknown as DOMRectList;
+  state.shown = false; // (no box: not shown either)
+  loop.run(100);
+  expect(scene.draws).toBe(0);
+  expect(live.wantsFrames()).toBe(false);
+  expect(live.covered()).toBe(false);
+  expect(loop.pending()).toBe(0);
+  // A browser that cannot say what the page shows (no checkVisibility) reads the box, as it always did.
+  const old = tile(364, 655);
+  old.getClientRects = () => [] as unknown as DOMRectList;
+  const waiting = mount({ ...onStage, canvas: old, moving: true })!;
+  expect(old.checkVisibility).toBeUndefined();
+  expect(waiting.tick(0)).toBe(false);
+  expect(waiting.wantsFrames()).toBe(false);
+  old.getClientRects = () => [new DOMRect(0, 0, 364, 655)] as unknown as DOMRectList;
+  waiting.redraw();
+  expect(waiting.wantsFrames()).toBe(false); // (asleep until its box observer says it has one)
+});
+
+test("a scene whose room is skipped adds nothing to what the governor takes a frame to fill", () => {
+  webgl();
+  const { element, state } = skippable(600, 400);
+  const covered = mount({ ...onStage, canvas: element, moving: true })!;
+  const alone = mount({ ...onStage, canvas: tile(300, 200), moving: true })!;
+  expect(host.drawnFill(1)).toBe(covered.areaAt(1) + alone.areaAt(1));
+  state.shown = false;
+  expect(covered.tick(0)).toBe(false);
+  expect(host.drawnFill(1)).toBe(alone.areaAt(1));
+  state.shown = true;
+  expect(covered.tick(1)).toBe(true);
+  expect(host.drawnFill(1)).toBe(covered.areaAt(1) + alone.areaAt(1));
+});
+
+test("frames not drawn under a skipped room are a pause to the governor, not quick frames; the ones after it are not judged for a moment, and then are", () => {
+  webgl();
+  const loop = animationFrames();
+  const { element, state } = skippable();
+  mount({ ...onStage, canvas: element, moving: true })!;
+  const scene = stageFor("scene"), draw = scene.draw.bind(scene);
+  scene.draw = (...args: Parameters<typeof draw>) => { clock += 20; draw(...args); }; // a frame costs the thread 20 ms: over the budget
+  let ms = 100;
+  loop.run(ms); // the first frame starts the governor
+  state.shown = false;
+  for (let n = 0; n < 75; n++) loop.run(ms += 40); // three seconds under Settings
+  expect(scene.draws).toBe(1);
+  expect(host.creatureQuality.tier()).toBe(0);
+  state.shown = true;
+  // The room is shown again: its first frames are dear, and are not judged (the moment's 1.2 s: 30 frames).
+  for (let n = 0; n < 25; n++) loop.run(ms += 40);
+  expect(scene.draws).toBe(26);
+  expect(host.creatureQuality.tier()).toBe(0);
+  // Frames that go on costing over the budget are judged then, as any.
+  for (let n = 0; n < 40; n++) loop.run(ms += 40);
+  expect(host.creatureQuality.tier()).toBeGreaterThan(0);
+});

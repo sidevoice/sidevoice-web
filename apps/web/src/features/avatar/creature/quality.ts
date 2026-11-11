@@ -154,13 +154,18 @@ export class Governor {
   /** Starts on this rung (a phone's, from what the device says of itself); no judging for a moment. */
   start(tier: number, now: number) { this.index = Math.max(0, Math.min(this.tiers.length - 1, tier)); this.since = now; }
 
+  /** No frame was drawn at `now` because nobody sees the creature (moving under a full page), or one came back from a gap (observe):
+   *  the frames after it are not judged for a moment (a window back draws its layers again, a room shown again is laid out), and the
+   *  calm spell starts again. Called at each frame not drawn, it holds that moment off until the first frame drawn after the last. */
+  pause(now: number) { this.since = now; this.calmFrom = now; }
+
   /** A frame was drawn at `now` (ms): it cost the thread `took`, and came `gap` after the last one drawn, asked for `every`
    *  after it. Whether the rung changed (the host sizes the canvas and the shadow map to it). */
   observe(now: number, took: number, gap: number): boolean {
     if (this.pinned != null) return false;
     if (now - this.since < SETTLE_MS) return false;
     // Came back from a pause: this frame says nothing, nor do the next ones for a moment (a window back draws its layers again).
-    if (gap > Math.max(PAUSE_MS, 2 * this.every)) { this.since = now; this.calmFrom = now; return false; }
+    if (gap > Math.max(PAUSE_MS, 2 * this.every)) { this.pause(now); return false; }
     this.cost = this.cost ? this.cost * 0.8 + took * 0.2 : took;
     this.late = this.late * 0.8 + Math.min(4, gap / this.every) * 0.2;
     const behind = this.cost > this.limit(this.index) || this.late > LATE;

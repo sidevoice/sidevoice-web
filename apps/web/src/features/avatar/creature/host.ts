@@ -271,6 +271,14 @@ export function placeFigure(stage: RigStage, c: Creature3D, aspect: number, { gr
   return { zoom, lookY: lookForGround(stage, c, aspect, zoom, ground) };
 }
 
+/** Whether the page shows `canvas`'s pixels, asked of the style alone (no layout, so a room the page skips is not laid out for it): false
+ *  for a canvas with no box, and for one whose room is skipped, `content-visibility: hidden` (Settings over a call) or `auto` and off
+ *  screen. A skipped room keeps its boxes: a canvas in it has a size, and `getClientRects` lists it. Null where the browser has no
+ *  `checkVisibility` (before Chrome 105, Firefox 106, Safari 17.4): it cannot say, and every frame is drawn as it was. */
+function shownByPage(canvas: HTMLCanvasElement): boolean | null {
+  return typeof canvas.checkVisibility === "function" ? canvas.checkVisibility({ contentVisibilityAuto: true }) : null;
+}
+
 // ---------- the frame loop ----------
 // One loop for the page, running only while a creature has something to draw: a page where every creature holds still
 // asks for no frame at all (the motion guard's rule, e2e/motion-guard.spec.mjs).
@@ -312,12 +320,15 @@ function frame(ms: number) {
     const t0 = performance.now();
     // Only motion is judged: a creature held still (reduced motion, a key pose drawn on a change) asks for few frames, and
     // drawing it at fewer pixels would only change what it shows.
-    let animated = false;
-    for (const live of lives) if (live.tick(ms / 1000) && live.animates()) animated = true;
+    let animated = false, covered = false;
+    for (const live of lives) {
+      if (live.tick(ms / 1000)) { if (live.animates()) animated = true; }
+      else if (live.covered() && live.animates()) covered = true;
+    }
     if (animated) {
       if (!judging) { judging = true; governor.start(0, ms); }
       else if (governor.observe(ms, performance.now() - t0, gap)) retier();
-    }
+    } else if (covered) governor.pause(ms); // moving where nobody sees it: no frame was drawn, which is a pause, not a quick one
   }
   // (not when a creature woke the loop while it drew: that one is already asked for)
   if (!frameId && wanted()) frameId = requestAnimationFrame(frame);
@@ -395,6 +406,9 @@ export class LiveCreature {
   private needDraw = true;
   /** Its canvas had no box when last asked to draw: it waits for one (its box observer) instead of asking for frames. */
   private hidden = false;
+  /** Its canvas has a box, but the page does not show it: the room it is in is skipped (content-visibility: hidden, as under Settings).
+   *  Nothing says when that ends (its box does not change), so it goes on asking for frames and is drawn at the first one it is seen in. */
+  private unseen = false;
   /** Disposed already: a second dispose (a late cleanup) does nothing. */
   private disposed = false;
   private react: { expr?: string; hop?: number; t0: number; until: number } | null = null;
@@ -448,7 +462,7 @@ export class LiveCreature {
       this.fit(false); // (asks the framer for the creature's reach: its acts are measured from here, and the canvas cropped when they are)
     }
     this.setMood(opts.mood ?? "idle", { step: opts.step });
-    const box = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => { this.fit(); this.hidden = false; this.canvasChanged(); this.poke(); });
+    const box = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => { this.fit(); this.hidden = false; this.unseen = false; this.canvasChanged(); this.poke(); });
     // A sharp face also follows its pixel ratio (a window moved to another screen), where the browser says so.
     if (opts.sharp) { try { box?.observe(opts.canvas, { box: "device-pixel-content-box" }); } catch { box?.observe(opts.canvas); } } else box?.observe(opts.canvas);
     this.off.push(() => box?.disconnect());
@@ -721,7 +735,10 @@ export class LiveCreature {
   }
 
   /** It is a scene or a floating card the loop draws frames of now: in motion, with a box on the page, its renderer there. */
-  drawsFrames(): boolean { return (this.slot === "scene" || this.slot === "card") && this.animates() && !this.hidden && !seats[this.slot].lost; }
+  drawsFrames(): boolean { return (this.slot === "scene" || this.slot === "card") && this.animates() && !this.hidden && !this.unseen && !seats[this.slot].lost; }
+
+  /** It was not drawn at its last frame because the page does not show its canvas, which has a box (`unseen`). */
+  covered(): boolean { return this.unseen && !this.hidden; }
 
   /** Its frames are motion (it moves, and is not the poster), so the governor judges what they cost. */
   animates(): boolean { return this.moving && !MODES[this.mood].poster; }
@@ -741,7 +758,19 @@ export class LiveCreature {
     if (seats[this.slot].lost) { this.needDraw = true; return false; }
     // Nobody sees a canvas out of the page or with no box (a closed panel, the phone's hidden list): it is drawn when it
     // has one again (its box observer asks for it).
-    if (!canvas.isConnected || canvas.getClientRects().length === 0) { this.needDraw = true; this.hidden = true; return false; }
+    if (!canvas.isConnected) { this.needDraw = true; this.hidden = true; return false; }
+    const seen = shownByPage(canvas);
+    if (seen === false) {
+      // Nor one whose room the page skips (content-visibility: hidden, as under Settings), though it keeps its box and its size: no frame
+      // is drawn into it, and the loop goes on asking, since nothing says when it is shown again. Whether it has a box is asked once, as
+      // it stops being seen (a layout, which the skipped room would not otherwise get: never per frame), and again when its box observer fires.
+      this.needDraw = true;
+      if (!this.unseen) { this.unseen = true; if (canvas.getClientRects().length === 0) this.hidden = true; }
+      return false;
+    }
+    this.unseen = false;
+    // A canvas that is seen has a box. Where the browser cannot say (null), its box is read, each frame.
+    if (seen === null && canvas.getClientRects().length === 0) { this.needDraw = true; this.hidden = true; return false; }
     this.needDraw = false;
     if (this.slot === "scene" && this.scaled !== governor.scale) this.fit(false);
     this.draw(t, !this.moving || !on);
