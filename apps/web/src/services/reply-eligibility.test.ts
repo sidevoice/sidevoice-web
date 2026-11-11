@@ -15,7 +15,7 @@ test.each([
  ['not in focus', {...facts,focused:false},'focus_changed'],
  ['mute', {...facts,output:'agents_muted'},'agents_muted'],
  ['voice off', {...facts,output:'voice_off'},'voice_off'],
- ['new turn', {...facts,epoch:3},'newer_turn'],
+ ['older epoch: late only if the room withdraws it', {...facts,epoch:3},'play'],
  ['turn open', {...facts,openTurns:new Set(['t'])},'hold'],
  ['epoch unknown', {...facts,epoch:null},'hold'],
 ] as const)('%s has the correct playback decision',(_name,input,decision)=>{

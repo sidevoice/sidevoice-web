@@ -1752,13 +1752,24 @@ test('The room\'s withdrawals cancel what it names, and each reply\'s end goes t
  c.push(first,{type:'voice-reply-withdrawn',data:{session_id:'other',utterance_ids:['r-6'],reason:'newer_turn'}});
  s.run('disconnect()');
 });
-test('T03 stale reply is written but never handed to either voice host',async()=>{
+test('T03 a reply the room withdrew is written but never handed to either voice host',async()=>{
  const c=await callOnRoom();
  c.s.run("threadEpochs.set('a',2)");
+ const turn=started('busy');c.voice.emit('turn',turn);
  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'stale',thread_id:'a',revision:2,reply_revision:1,epoch:1,history_id:'stale-row',text:'Old answer'}});
+ c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['stale'],reason:'newer_turn'}});
+ c.voice.emit('turn',{turn_id:'busy',phase:'cancelled',merged:false});
  assert.equal(c.voice.said.length,0);
  assert.equal(c.s.run('history.at(-1).text'),'Old answer');
  assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').map(d=>[d.utterance_id,d.status,d.reason])),[['stale','unplayed','newer_turn']]);
+ c.s.run('disconnect()');
+});
+test('T03 an older epoch alone does not make a reply late: only the room withdraws it (sidevoice-core#248)',async()=>{
+ const c=await callOnRoom();
+ c.s.run("threadEpochs.set('a',2)");
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'older',thread_id:'a',revision:2,reply_revision:1,epoch:1,history_id:'older-row',text:'Older answer'}});
+ assert.deepEqual(c.voice.said.map(s=>s.text),['Older answer']);
+ assert.equal(sentOf(c,c.first,'voice-playback').length,0);
  c.s.run('disconnect()');
 });
 test('T03/T11 a reply from another device waits for the newer room epoch, never discarded against a cached one',async()=>{
@@ -1876,25 +1887,60 @@ test('Listening again to a reply names no utterance: the machine mints a fresh o
  assert.deepEqual(posts,[{session_id:'s1',history_id:'s1:voice:original'},{session_id:'s1',history_id:'s1:voice:original'}]);
  c.s.run('disconnect()');
 });
-test('T01 an empty turn resumes the reply it held, telling the room nothing of the pause, and retires queued replies before its terminal frame',async()=>{
+test('T01 a turn that comes to nothing resumes the reply it held, telling the room nothing of the pause, and every later reply plays after it (sidevoice-core#248)',async()=>{
+ for(const ending of ['cancelled','no words','merged']){
+  const c=await callOnRoom();
+  const reply=(id,requested=false)=>c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:id,text:id,requested}});
+  reply('playing');reply('queued');reply('replay',true);
+  const handle=c.voice.said[0];handle.step({type:'playing'});
+  c.voice.emit('turn',started('empty'));
+  handle.step({type:'held',heard_chars:1});
+  assert.deepEqual(plain(c.s.run('karaokeState')),{segment:'playing',from:1,to:1},'held, lit up to what was heard');
+  // The room advances the epoch at the start, whatever the turn comes to.
+  c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'empty',thread_id:'a',revision:2,epoch:1}});
+  assert.equal(sentOf(c,c.first,'voice-playback').some(d=>d.status!=='playing'),false,'nothing is retired while the turn is open');
+  c.voice.emit('turn',ending==='cancelled'?{turn_id:'empty',phase:'cancelled',merged:false}:ending==='merged'?{...finished('empty','Half'),merged:true}:finished('empty','  '));
+  const end=c.frames(c.first).find(f=>f.type==='voice-user-turn'&&f.data.turn_id==='empty'&&f.data.phase!=='started');
+  assert.ok(end,'the terminal frame does not wait for the held reply: '+ending);
+  const ofHeld=()=>c.frames(c.first).filter(f=>['voice-playback','reply-hearing'].includes(f.type)&&f.data.utterance_id==='playing'&&f.data.status!=='playing');
+  assert.deepEqual(ofHeld(),[],'nothing of the held reply reaches the room');
+  assert.equal(handle.cancelled,false);
+  handle.step({type:'progress',sounding:[1,7],heard_chars:1});
+  handle.step({type:'done',outcome:{status:'heard'}});
+  assert.deepEqual(plain(ofHeld().map(f=>[f.type,f.data.status??f.data.outcome])),[['voice-playback','heard'],['reply-hearing','heard']],'it went on and was heard');
+  assert.deepEqual(c.voice.said.map(s=>s.text),['playing'],'what waited holds until the room has taken the turn\'s end');
+  // The room withdraws nothing for a turn that came to nothing: its acknowledgement lets the rest play, in order.
+  c.push(c.first,{type:'voice-ack',data:{client_msg_id:end.data.client_msg_id}});
+  assert.deepEqual(c.voice.said.map(s=>s.text),['playing','queued'],ending);
+  c.voice.said[1].step({type:'done',outcome:{status:'heard'}});
+  assert.deepEqual(c.voice.said.map(s=>s.text),['playing','queued','replay'],ending);
+  // The agent's next reply, admitted by the room at the current epoch, plays after them.
+  c.voice.said[2].step({type:'done',outcome:{status:'heard'}});
+  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'next',thread_id:'a',revision:2,reply_revision:2,epoch:1,history_id:'next',text:'next'}});
+  assert.equal(c.voice.said.at(-1).text,'next');
+  assert.equal(sentOf(c,c.first,'voice-playback').some(d=>d.reason==='newer_turn'),false,ending);
+  c.s.run('disconnect()');
+ }
+});
+test('T01 after words, what waited is held until the room takes them, and only its withdrawal drops a reply',async()=>{
  const c=await callOnRoom();
- const reply=(id,requested=false)=>c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:id,text:id,requested}});
- reply('playing');reply('queued');reply('replay',true);
+ const reply=(id,epoch=0)=>c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:'a',revision:1,reply_revision:1,epoch,history_id:id,text:id}});
+ reply('playing');reply('queued');reply('kept');
  const handle=c.voice.said[0];handle.step({type:'playing'});
- c.voice.emit('turn',started('empty'));
+ c.voice.emit('turn',started('words'));
+ c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'words',thread_id:'a',revision:2,epoch:1}});
  handle.step({type:'held',heard_chars:1});
- assert.deepEqual(plain(c.s.run('karaokeState')),{segment:'playing',from:1,to:1},'held, lit up to what was heard');
- c.voice.emit('turn',{turn_id:'empty',phase:'cancelled',merged:false});
- const frames=c.frames(c.first),end=frames.findIndex(f=>f.type==='voice-user-turn'&&f.data.turn_id==='empty'&&f.data.phase==='cancelled');
- assert.ok(end>0,'the terminal frame does not wait for the held reply');
- for(const id of ['queued','replay'])assert.ok(frames.findIndex(f=>f.type==='voice-playback'&&f.data.utterance_id===id&&f.data.reason==='newer_turn')<end);
- const ofHeld=()=>c.frames(c.first).filter(f=>['voice-playback','reply-hearing'].includes(f.type)&&f.data.utterance_id==='playing'&&f.data.status!=='playing');
- assert.deepEqual(ofHeld(),[],'nothing of the held reply reaches the room');
- assert.equal(handle.cancelled,false);
- handle.step({type:'progress',sounding:[1,7],heard_chars:1});
- handle.step({type:'done',outcome:{status:'heard'}});
- assert.deepEqual(plain(ofHeld().map(f=>[f.type,f.data.status??f.data.outcome])),[['voice-playback','heard'],['reply-hearing','heard']],'it went on and was heard');
+ handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:1,reason:'barge-in'}});
+ c.voice.emit('turn',finished('words','Some words'));
+ await c.until(()=>turnSent(c,c.first,'words','finished').length===1,'the words');
+ assert.deepEqual(c.voice.said.map(s=>s.text),['playing'],'nothing starts before the room has taken the words');
+ assert.equal(sentOf(c,c.first,'voice-playback').some(d=>d.utterance_id==='queued'||d.utterance_id==='kept'),false,'and nothing is dropped on its own');
+ // The room says what the words made late before it acknowledges them.
+ c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['queued'],reason:'newer_turn'}});
  assert.deepEqual(c.voice.said.map(s=>s.text),['playing']);
+ c.push(c.first,{type:'voice-ack',data:{client_msg_id:turnSent(c,c.first,'words','finished')[0].client_msg_id}});
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.utterance_id==='queued').map(d=>[d.status,d.reason])),[['unplayed','newer_turn']]);
+ assert.deepEqual(c.voice.said.map(s=>s.text),['playing','kept'],'what the room did not withdraw plays');
  c.s.run('disconnect()');
 });
 test('T01 words over a held reply wait for its end before they go',async()=>{
@@ -1912,18 +1958,24 @@ test('T01 words over a held reply wait for its end before they go',async()=>{
  assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.reason,d.heard_chars])),[['user_interrupted',2]]);
  c.s.run('disconnect()');
 });
-test('T05 a checkpoint cut reports every queued successor before final words and allows a fresh replay',async()=>{
+test('T05 a checkpoint cut: the room withdraws the queued successor before taking the words; a manual replay it keeps plays after them',async()=>{
  const c=await callOnRoom(),reply=(id,requested=false)=>c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:id,text:id,requested}});
  reply('first');reply('successor');reply('old-replay',true);
  const handle=c.voice.said[0];handle.step({type:'playing'});
  c.voice.emit('turn',started('checkpoint'));
+ c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'checkpoint',revision:2,thread_id:'a',epoch:1}});
  handle.step({type:'held',heard_chars:2});
  handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'barge-in'}});
  c.voice.emit('turn',finished('checkpoint','New words'));
  const frames=c.frames(c.first),end=frames.findIndex(f=>f.type==='voice-user-turn'&&f.data.turn_id==='checkpoint'&&f.data.phase==='finished');
- for(const id of ['first','successor','old-replay'])assert.ok(frames.findIndex(f=>f.type==='voice-playback'&&f.data.utterance_id===id&&f.data.status!=='playing')<end);
+ assert.ok(end>0);
+ assert.ok(frames.findIndex(f=>f.type==='voice-playback'&&f.data.utterance_id==='first'&&f.data.status!=='playing')<end,'the cut goes ahead of the words');
  assert.deepEqual(c.voice.said.map(s=>s.text),['first']);
- c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'checkpoint',revision:2,thread_id:'a',epoch:1}});
+ c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['successor'],reason:'newer_turn'}});
+ c.push(c.first,{type:'voice-ack',data:{client_msg_id:frames[end].data.client_msg_id}});
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.utterance_id==='successor').map(d=>[d.status,d.reason])),[['unplayed','newer_turn']]);
+ assert.deepEqual(c.voice.said.map(s=>s.text),['first','old-replay'],'the room never withdraws a requested replay by epoch');
+ c.voice.said[1].step({type:'done',outcome:{status:'heard'}});
  reply('new-replay',true);assert.equal(c.voice.said.at(-1).text,'new-replay');
  c.s.run('disconnect()');
 });
@@ -1956,13 +2008,16 @@ test('T07 deferred final words keep their captured node through a replacement se
  assert.equal(turnSent(c,socket,'during-drop','finished')[0].thread_id,'a');
  c.s.run('disconnect()');
 });
-test('T04b a spoken turn retires several locally queued replies at the old epoch',async()=>{
+test('T04b the room withdrawing several queued replies for a turn with words drops each, and a fresh reply plays',async()=>{
  const c=await callOnRoom(),reply=(id,epoch=0)=>c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:'a',revision:1,reply_revision:1,epoch,history_id:id,text:id}});
  reply('one');reply('two');reply('three');const handle=c.voice.said[0];handle.step({type:'playing'});
  c.voice.emit('turn',started('new-spoken'));handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:1,reason:'barge-in'}});
  c.voice.emit('turn',finished('new-spoken','New question'));
  c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'new-spoken',thread_id:'a',revision:2,epoch:1}});
- assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.utterance_id,d.reason])),[['two','newer_turn'],['three','newer_turn'],['one','user_interrupted']]);
+ await c.until(()=>turnSent(c,c.first,'new-spoken','finished').length===1,'the words');
+ c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['two','three'],reason:'newer_turn'}});
+ c.push(c.first,{type:'voice-ack',data:{client_msg_id:turnSent(c,c.first,'new-spoken','finished')[0].client_msg_id}});
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.utterance_id,d.reason])),[['one','user_interrupted'],['two','newer_turn'],['three','newer_turn']]);
  reply('fresh',1);assert.equal(c.voice.said.at(-1).text,'fresh');
  c.s.run('disconnect()');
 });
@@ -1976,7 +2031,7 @@ test('T08 typed context leaves queued playback and an open spoken turn untouched
  c.s.run("$('text-message').value='Typed context'");
  c.s.context.fetch=async()=>({ok:true,status:200,json:async()=>({accepted:true,messages:[]})});await c.s.run('sendText()');
  assert.equal(handle.cancelled,false);assert.equal(c.s.run("openVoiceTurns.has('open')"),true);
- assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.utterance_id==='two').map(d=>[d.status,d.reason])),[['unplayed','newer_turn']],'the spoken start, not typing, retired the queued old reply');
+ assert.equal(sentOf(c,c.first,'voice-playback').some(d=>d.utterance_id==='two'),false,'neither typing nor the spoken start retires the queued old reply: only words would');
  assert.equal(sentOf(c,c.first,'voice-playback').some(d=>d.utterance_id==='three'),false,'typing does not retire a new held reply');
  c.s.run('disconnect()');
 });
@@ -2750,6 +2805,10 @@ test('T02 an accepted reply cannot start while a voice turn or its start acknowl
  c.voice.emit('turn',finished('new-turn','New question'));
  assert.equal(c.voice.said.length,0,'the final transcript does not clear the unacknowledged start');
  c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'new-turn',revision:2,thread_id:'a',epoch:1}});
+ assert.equal(c.voice.said.length,0,'nor does the start\'s answer: the words are not taken yet');
+ assert.equal(sentOf(c,c.first,'voice-playback').some(d=>d.utterance_id==='waiting'),false,'and the page drops nothing on its own');
+ c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['waiting'],reason:'newer_turn'}});
+ c.push(c.first,{type:'voice-ack',data:{client_msg_id:turnSent(c,c.first,'new-turn','finished')[0].client_msg_id}});
  assert.equal(c.voice.said.length,0);
  assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.utterance_id==='waiting').map(d=>[d.status,d.reason])),[['unplayed','newer_turn']]);
  c.s.run('disconnect()');
