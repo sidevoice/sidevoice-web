@@ -4,7 +4,7 @@ The controller tests exercise core frames in producer order: each conversation's
 
 | Core case | Web boundary evidence |
 | --- | --- |
-| T01 | Played-zero interruption, empty terminal and words terminal, including queued receipts before the final frame. |
+| T01 | Played-zero interruption, empty terminal and words terminal, including queued receipts before the final frame. A reply the voice holds over a turn resumes after an empty terminal with nothing reported of the pause; words wait for its barge-in end. |
 | T02a/b | Open-turn and delayed-ack gates; ack → refusal → cancelled → fresh reply. |
 | T03 | Older reply discarded; higher epoch reply held for a second device's participant fact. |
 | T04a/b | Same-epoch FIFO and Skip; multiple old replies retired, fresh new-epoch reply admitted. |

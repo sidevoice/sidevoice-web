@@ -1819,6 +1819,7 @@ test('T01 and T02 map played-zero barge-in to physical and semantic receipts bef
  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'core-reply',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'row',text:'é🐙ab'}});
  const handle=c.voice.said[0];handle.step({type:'playing'});
  c.voice.emit('turn',started('spoken'));
+ handle.step({type:'held',heard_chars:0});
  handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:0,reason:'barge-in'}});
  c.voice.emit('turn',finished('spoken','New words'));
  const frames=c.frames(c.first).filter(f=>['voice-playback','reply-hearing','voice-user-turn'].includes(f.type));
@@ -1875,18 +1876,40 @@ test('Listening again to a reply names no utterance: the machine mints a fresh o
  assert.deepEqual(posts,[{session_id:'s1',history_id:'s1:voice:original'},{session_id:'s1',history_id:'s1:voice:original'}]);
  c.s.run('disconnect()');
 });
-test('T01 empty turn retires queued replies before its terminal frame, including requested replay',async()=>{
+test('T01 an empty turn resumes the reply it held, telling the room nothing of the pause, and retires queued replies before its terminal frame',async()=>{
  const c=await callOnRoom();
  const reply=(id,requested=false)=>c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:id,text:id,requested}});
  reply('playing');reply('queued');reply('replay',true);
  const handle=c.voice.said[0];handle.step({type:'playing'});
  c.voice.emit('turn',started('empty'));
- handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:1,reason:'barge-in'}});
+ handle.step({type:'held',heard_chars:1});
+ assert.deepEqual(plain(c.s.run('karaokeState')),{segment:'playing',from:1,to:1},'held, lit up to what was heard');
  c.voice.emit('turn',{turn_id:'empty',phase:'cancelled',merged:false});
  const frames=c.frames(c.first),end=frames.findIndex(f=>f.type==='voice-user-turn'&&f.data.turn_id==='empty'&&f.data.phase==='cancelled');
- assert.ok(end>0);
+ assert.ok(end>0,'the terminal frame does not wait for the held reply');
  for(const id of ['queued','replay'])assert.ok(frames.findIndex(f=>f.type==='voice-playback'&&f.data.utterance_id===id&&f.data.reason==='newer_turn')<end);
+ const ofHeld=()=>c.frames(c.first).filter(f=>['voice-playback','reply-hearing'].includes(f.type)&&f.data.utterance_id==='playing'&&f.data.status!=='playing');
+ assert.deepEqual(ofHeld(),[],'nothing of the held reply reaches the room');
+ assert.equal(handle.cancelled,false);
+ handle.step({type:'progress',sounding:[1,7],heard_chars:1});
+ handle.step({type:'done',outcome:{status:'heard'}});
+ assert.deepEqual(plain(ofHeld().map(f=>[f.type,f.data.status??f.data.outcome])),[['voice-playback','heard'],['reply-hearing','heard']],'it went on and was heard');
  assert.deepEqual(c.voice.said.map(s=>s.text),['playing']);
+ c.s.run('disconnect()');
+});
+test('T01 words over a held reply wait for its end before they go',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'held',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'held',text:'Hello there'}});
+ const handle=c.voice.said[0];handle.step({type:'playing'});
+ c.voice.emit('turn',started('words'));
+ handle.step({type:'held',heard_chars:2});
+ c.voice.emit('turn',finished('words','New words'));
+ assert.equal(turnSent(c,c.first,'words','finished').length,0,"the words wait for the held reply's end");
+ handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'barge-in'}});
+ await c.until(()=>turnSent(c,c.first,'words','finished').length===1,'words after the cut');
+ const frames=c.frames(c.first);
+ assert.ok(frames.findIndex(f=>f.type==='voice-playback'&&f.data.status==='interrupted')<frames.findIndex(f=>f.data.phase==='finished'));
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.reason,d.heard_chars])),[['user_interrupted',2]]);
  c.s.run('disconnect()');
 });
 test('T05 a checkpoint cut reports every queued successor before final words and allows a fresh replay',async()=>{
@@ -1894,6 +1917,7 @@ test('T05 a checkpoint cut reports every queued successor before final words and
  reply('first');reply('successor');reply('old-replay',true);
  const handle=c.voice.said[0];handle.step({type:'playing'});
  c.voice.emit('turn',started('checkpoint'));
+ handle.step({type:'held',heard_chars:2});
  handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'barge-in'}});
  c.voice.emit('turn',finished('checkpoint','New words'));
  const frames=c.frames(c.first),end=frames.findIndex(f=>f.type==='voice-user-turn'&&f.data.turn_id==='checkpoint'&&f.data.phase==='finished');

@@ -916,7 +916,10 @@ function drainReplies(){
   saying.onEvent(event=>{
    if(replies.get(reply.utterance_id)!==said)return;
    if(event.type==='playing'){said.playing=true;state.karaokeState={segment:speechSegment(reply),from:0,to:0};reportPlayback(said,{status:'playing'})}
-   else if(event.type==='progress')state.karaokeState={segment:speechSegment(reply),...sayingRange(event,reply.text)};
+   else if(event.type==='progress'){said.held=false;state.karaokeState={segment:speechSegment(reply),...sayingRange(event,reply.text)}}
+   // The person spoke over it: it waits for their turn, lit up to what was heard. Their words end it (its `done`); a
+   // turn that comes to nothing lets it go on, and the room hears nothing of the pause.
+   else if(event.type==='held'){said.held=true;state.karaokeState={segment:speechSegment(reply),...sayingRange({sounding:null,heard_chars:event.heard_chars},reply.text)}}
    else if(event.type==='done')finishReply(said,playbackReport(event.outcome,reply.text,said.withdrawn,said.action));
   });
   void saying.outcome.then(outcome=>finishReply(said,playbackReport(outcome,reply.text,said.withdrawn,said.action))).catch(()=>{});
@@ -2204,7 +2207,7 @@ function voiceTurn(event,entry=null){
  if(!target||target.node!==state.callNode||target.generation!==callGeneration)return;
  if(turn.phase==='started'){
   openVoiceTurns.set(turn.turn_id,target.thread_id);
-  // The voice displaces active handles itself. Replies still only in this page's queue need their own terminal receipt.
+  // The voice holds or ends active handles itself. Replies still only in this page's queue need their own terminal receipt.
   stoppingReplies=true;
   for(const said of [...replies.values()])if(said.reply.thread_id===target.thread_id&&!said.saying)finishReply(said,{status:'unplayed',reason:'newer_turn'});
   stoppingReplies=false;
@@ -2234,8 +2237,9 @@ function voiceTurn(event,entry=null){
   }
  });
  const payload=turnMessage(turn,target);
- // A final turn frame cannot outrun the terminal playback evidence it caused.
- const active=turn.phase==='started'?[]:[...replies.values()].filter(said=>said.reply.thread_id===target.thread_id&&said.saying);
+ // A final turn frame cannot outrun the terminal playback evidence it caused. A turn that came to nothing caused none
+ // to a reply held for it: that reply goes on, and the frame goes now.
+ const active=turn.phase==='started'?[]:[...replies.values()].filter(said=>said.reply.thread_id===target.thread_id&&said.saying&&!(turn.phase==='cancelled'&&said.held));
  const generation=callGeneration;
  const send=()=>{
   if(generation!==callGeneration||target.node!==state.callNode||!state.sessionId)return;
