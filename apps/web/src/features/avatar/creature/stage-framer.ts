@@ -550,13 +550,13 @@ export class StageFramer {
     }
   }
 
-  /** The creature's lowest drawn row where it stands now (eased), css px of the tile: its projected bounds, moved by how
-   *  they differ from the pixels at the framings eased between (all of it at the target). Mid-way, care besides: a couple
-   *  of px, and while it moves the room its breathing and its squash with the voice take below its key pose; none once it
-   *  stands at the target, so a card settles exactly where the framing puts it. */
   /** The room a creature that is not held still takes below its key pose, kept under it for good (it breathes and squashes with the
    *  voice all the while a card shows); none for one held still, which is drawn in its key pose only. */
   private sway(to: { low: number; top: number }): number { return this.held ? 0 : Math.max(0, to.low - to.top) * MOTION_ROOM; }
+  /** The creature's lowest drawn row where it stands now (eased), css px of the tile: its projected bounds, moved by how
+   *  they differ from the pixels at the framings eased between (all of it at the target). Mid-way, care besides: a couple
+   *  of px, tapering off as it lands. While it is not held still, the room its breathing and its squash with the voice take below
+   *  its key pose (sway) is kept too, mid-way and once it stands at the target. */
   private lowNow(v: View, est: Rows): number { void v; return this.lowAt(est, this.cap); }
   private lowAt(est: Rows, at: Framing): number {
     const e = this.ease, to = this.to!, p = e.span > 1e-6 ? Math.max(0, Math.min(1, 1 - Math.hypot(to.lift - at.lift, to.zk - at.zk) / e.span)) : 1;

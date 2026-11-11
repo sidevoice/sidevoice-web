@@ -64,10 +64,13 @@ describe("capCentre", () => {
   });
 
   test("a creature that is not held still: the room it moves under its key pose is kept under it, besides the gap", () => {
-    const sway = 0.01, card = 200, held = capCentre(creature().probe, 0, card, vh, ceil, floor, gap, 0, 1118);
-    const live = capCentre(creature().probe, 0, card, vh, ceil, floor, gap, 0, 1118, 1, sway);
-    // never nearer than the held one, and the card fits under its lowest reach, a gap from it
-    expect(live.zk).toBeGreaterThanOrEqual(held.zk);
+    const sway = 0.01, at = (card: number, k = 0) => capCentre(creature().probe, 0, card, vh, ceil, floor, gap, 0, 1118, 1, k);
+    // a card the held creature fits under with less than its sway to spare: only a creature that keeps the room steps back for it
+    let card = 0, held = at(0);
+    for (card = 100; card < 300; card++) { held = at(card); if (held.zk > 1 && floor - (held.low + gap + card) < sway * (held.low - held.top)) break; }
+    expect(card).toBeLessThan(300);
+    const live = at(card, sway);
+    expect(live.zk).toBeGreaterThan(held.zk);
     expect(live.low + sway * (live.low - live.top) + gap + card).toBeLessThanOrEqual(floor);
   });
 
