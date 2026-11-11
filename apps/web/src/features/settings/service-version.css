@@ -3,7 +3,7 @@
 .svc-bar { width: 100%; }
 .ui-alert-footer { margin-top: var(--sv-space-2); }
 /* Two columns under the title, each fact under its name: the version with its badge, and the port. */
-.svc-strip { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--sv-space-2) var(--sv-space-4); margin: 0; padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.svc-strip { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--sv-space-2) var(--sv-space-4); margin: 0; padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
 .svc-strip dt { margin: 0; font-size: var(--sv-font-xs); color: var(--sv-text-muted); }
 .svc-strip dd { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-1) var(--sv-space-2); margin: 0; }
 .svc-number { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); font-variant-numeric: tabular-nums; }
@@ -28,9 +28,7 @@
 .svc-hint p { margin: 0; display: flex; gap: var(--sv-space-2); align-items: flex-start; }
 .svc-hint-icon { flex: none; margin-top: 2px; color: var(--sv-warning); }
 
-/* P-B: the version at the left, the port at the card's right edge, as the title and the state are. */
-.svc-strip[data-port="b"] { grid-template-columns: minmax(0, 1fr) auto; }
-.svc-strip[data-port="b"] > [data-fact="port"] { text-align: end; }
-.svc-strip[data-port="b"] > [data-fact="port"] dd { justify-content: flex-end; }
-.svc-upd-below:empty { display: none; }
 .svc-hint p .ui-button { margin-inline-start: auto; flex: none; }
+/* The port at the card's right edge, as the title and the state are. */
+.svc-strip > [data-fact="port"] { text-align: end; }
+.svc-strip > [data-fact="port"] dd { justify-content: flex-end; }

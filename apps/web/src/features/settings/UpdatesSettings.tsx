@@ -71,13 +71,11 @@ function PartVersion({ hint, version, upToDate, note, t }: { hint?: string; vers
 /** Updates: this computer as one row, Sidevoice (its service updated with the app), then the machines behind; never
  *  an empty card. */
 export function UpdatesSettings() {
-  // MOCK (sidevoice-desktop#67): the alternatives of this view; u0 is the view as it is.
-  const alternative = useVariant<UpdatesView>("updatesView", UPDATES_VIEW);
-  if (alternative !== "u0") return <ServiceUpdates view={alternative} />;
-  return <TodaysUpdates />;
+  // MOCK (sidevoice-desktop#67): this view in its two alternatives (service-updates.tsx); today's is TodaysUpdates.
+  return <ServiceUpdates view={useVariant<UpdatesView>("updatesView", UPDATES_VIEW)} />;
 }
 
-function TodaysUpdates() {
+export function TodaysUpdates() {
   const t = translator();
   const build = host().identity.build;
   const updater = host().updater !== null;

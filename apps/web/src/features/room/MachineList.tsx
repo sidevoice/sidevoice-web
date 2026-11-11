@@ -18,7 +18,7 @@ import { PrepareThisComputer } from "../pairing/PrepareThisComputer";
 import { InstallCommandHere } from "../pairing/ConnectorSteps";
 import { useThisComputerSection } from "../../state/this-computer";
 import { translator, type Translate } from "../../i18n/translator";
-import { AppRow, OfflineState, RunningState, ServiceCardTop, useLocalService, useMockOffline, useRemoteService } from "../settings/service-version";
+import { AppRow, OfflineState, RunningState, ServiceCardTop, useLocalService, useRemoteService } from "../settings/service-version";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
 import { motionOf, useSettingsLevels } from "../settings/settings-levels";
@@ -332,17 +332,15 @@ function ForgetMachine({ machine, name, onForget }: { machine: MachineView; name
  *  page's header's, two blocks up; no controls: it is run there. */
 function RemoteHostCard({ machine, name, titleId }: { machine: MachineView; name: string; titleId: string }) {
   const t = translator();
-  const mode = useMockOffline();
   const service = useRemoteService(machine);
-  const port = listeningPort(machine.urls);
   const offline = machine.state !== "connected" && machine.state !== "checking";
   useEffect(() => { if (machine.pairingId && machine.state === "connected") void window.sidevoiceActions?.loadMachineInfo?.(machine.pairingId); }, [machine.pairingId, machine.state]);
   // The same card as this device's, without its controls: its running state at the right, its version with where it stands
-  // and its port, the notice under them; not answering, only that (b1) or that and what it was last seen at (b2).
+  // and its port, the notice under them; not answering, "Sin conexión" and what was last known, nothing else.
   return (
     <div className="host-status-card" data-remote data-tone={offline ? undefined : "positive"}>
-      <ServiceCardTop who={machine.pairingId ?? machine.id} titleId={titleId} info={service} port={port} supported={service.supported} machine={name} command={service.command} t={t}
-        end={offline ? <OfflineState t={t} /> : <RunningState t={t} />} offline={offline ? mode : null} lastSeen={service.lastSeen} />
+      <ServiceCardTop who={machine.pairingId ?? machine.id} titleId={titleId} info={offline ? { version: service.lastSeen, kind: "unknown" } : service} port={service.port} supported={service.supported} machine={name} command={service.command} t={t}
+        end={offline ? <OfflineState t={t} /> : <RunningState t={t} />} offline={offline} />
     </div>
   );
 }

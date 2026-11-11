@@ -9,8 +9,8 @@ import { Group } from "../../components/ui/Card";
 import { ProgressBar } from "../../components/ui/ProgressBar";
 import { Snippet } from "../../components/ui/Snippet";
 import { host } from "../../host";
-import { useVariant } from "../../lib/variants";
 import type { Translate } from "../../i18n/translator";
+import { listeningPort } from "../../services/device-pairing.js";
 import { safeLocalHostStatusDetails } from "./local-host-status";
 import "./service-version.css";
 
@@ -27,10 +27,6 @@ import "./service-version.css";
  * The fields read here that the real bridge does not report yet — \`supported_minor\` and \`service_update\` of the local
  * host's status — are the mock's own (playground preview/mock/bridge.mjs): provisional, not a contract. */
 
-export const REMOTE_OFFLINE = ["b1", "b2"] as const;
-/** MOCK: where the port sits in the card's two columns: a, in the second column; b, at the card's far right edge. */
-export const PORT_ALIGN = ["a", "b"] as const;
-export type RemoteOffline = typeof REMOTE_OFFLINE[number];
 
 const minorOf = (version: string | null | undefined): [number, number] | null => {
   const match = /^(\d+)\.(\d+)/.exec(version ?? "");
@@ -41,6 +37,8 @@ const compareMinor = (a: [number, number], b: [number, number]) => a[0] - b[0] |
 /** The service minor this app pins, where the mock says none (a browser has no local host). */
 const PINNED = "0.19";
 /** MOCK: what a machine was last seen running, for a machine that is not answering (the app would keep it per pairing). */
+/** MOCK: the port each machine answers at, where its pairing's address names none. */
+const PORTS: Record<string, number> = { daimon: 18779, "NUC del salón": 14403, "Mac mini": 10829, "Portátil viejo": 10829 };
 const LAST_SEEN: Record<string, string> = { daimon: "0.16.0", "NUC del salón": "0.20.0", "Mac mini": "0.19.2", "Portátil viejo": "0.19.1" };
 
 export type ServiceKind = "current" | "updating" | "waiting" | "behind" | "newer" | "unknown";
@@ -62,18 +60,16 @@ export function useLocalService(): ServiceInfo & { supported: string } {
 
 /** A remote machine's service against what the app supports: out of date, newer, up to date, or not said; and what it
  *  was last seen at when it does not answer. */
-export function useRemoteService(machine: MachineView): ServiceInfo & { supported: string; command: string; lastSeen: string | null } {
+export function useRemoteService(machine: MachineView): ServiceInfo & { supported: string; command: string; lastSeen: string | null; port: number | null } {
   const info = useRoomStore((state) => machine.pairingId ? state.facts.remoteHostStatus?.[machine.pairingId] : undefined);
   const local = useRoomStore((state) => state.facts.localHostStatus) as unknown as { supported_minor?: string | null };
   const supported = local.supported_minor || PINNED;
   const mine = minorOf(info?.version), pinned = minorOf(supported);
   const kind: ServiceKind = !mine || !pinned ? "unknown" : compareMinor(mine, pinned) > 0 ? "newer" : compareMinor(mine, pinned) < 0 || info?.update ? "behind" : "current";
   return { version: info?.version ?? null, kind, supported, command: info?.update?.command?.trim() || `npx sidevoice@${supported} install`,
-    lastSeen: info?.version ?? LAST_SEEN[machine.host] ?? null };
+    lastSeen: info?.version ?? LAST_SEEN[machine.host] ?? null, port: listeningPort(machine.urls) ?? PORTS[machine.host] ?? null };
 }
 
-/** MOCK: how a remote machine that does not answer says so (b1, or b2 with what it was last seen at). */
-export function useMockOffline(): RemoteOffline { return useVariant<RemoteOffline>("remoteOffline", REMOTE_OFFLINE); }
 
 const TONE: Record<ServiceKind, BadgeTone> = { current: "positive", updating: "accent", waiting: "neutral", behind: "warning", newer: "warning", unknown: "neutral" };
 const BADGE = {
@@ -143,26 +139,24 @@ export function ServiceBadge({ kind, t }: { kind: Exclude<ServiceKind, "unknown"
  *  right (\`end\`: This device's or a remote machine's "En marcha", a machine's "Sin conexión"); under it two columns, the
  *  version with its badge and the port; the progress bar while it updates; the notice where there is one. \`offline\`: a
  *  machine that does not answer, which says that and, in b2, what it was last seen at, and nothing else. */
-export function ServiceCardTop({ who, titleId, focusable = false, info, port, end, machine, command, supported, offline = null, lastSeen = null, t }: {
+export function ServiceCardTop({ who, titleId, focusable = false, info, port, end, machine, command, supported, offline = false, t }: {
   who: string; titleId: string; focusable?: boolean; info: ServiceInfo; port: number | null; end: ReactNode; machine?: string; command?: string; supported: string;
-  offline?: "b1" | "b2" | null; lastSeen?: string | null; t: Translate;
+  offline?: boolean; t: Translate;
 }) {
+  // Not answering, the card is the same with what was last known: the version without a badge, the port, no notice.
   const kind = !offline && info.kind !== "unknown" ? info.kind : null;
-  const shown = kind !== null;
-  const align = useVariant<typeof PORT_ALIGN[number]>("portAlign", PORT_ALIGN);
-  const listening = !offline && port ? port : null;
+  const version = info.version && (kind !== null || offline) ? info.version : null;
   return <>
     <div className="host-status-head">
       <h4 id={titleId} tabIndex={focusable ? -1 : undefined}>{t("hosts.section.service")}</h4>
       {end}
     </div>
-    {(shown || listening) && <dl className="svc-strip" data-port={align}>
-      {kind && <div><dt>{t("service.field.version")}</dt><dd><span className="svc-number">{info.version}</span><ServiceBadge kind={kind} t={t} /></dd></div>}
-      {listening && <div data-fact="port"><dt>{t("service.field.port")}</dt><dd><span className="svc-number">{listening}</span></dd></div>}
+    {(version || port) && <dl className="svc-strip">
+      {version && <div><dt>{t("service.field.version")}</dt><dd><span className="svc-number">{version}</span>{kind && <ServiceBadge kind={kind} t={t} />}</dd></div>}
+      {port && <div data-fact="port"><dt>{t("service.field.port")}</dt><dd><span className="svc-number">{port}</span></dd></div>}
     </dl>}
-    {offline === "b2" && lastSeen && <p className="svc-meta">{t("service.lastSeen", { version: lastSeen })}</p>}
-    {shown && info.kind === "updating" && <ProgressBar value={null} label={t(BADGE.updating)} className="svc-bar" />}
-    {shown && <ServiceNotice who={who} info={info} supported={supported} machine={machine} command={command} t={t} />}
+    {kind === "updating" && <ProgressBar value={null} label={t(BADGE.updating)} className="svc-bar" />}
+    {kind && <ServiceNotice who={who} info={info} supported={supported} machine={machine} command={command} t={t} />}
   </>;
 }
 
