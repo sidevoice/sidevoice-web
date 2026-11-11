@@ -57,26 +57,30 @@ interface Open {
   status?: LocalHostStatus;
   /** The room's notice (UpdateNotice), beside Settings. */
   notice?: boolean;
+  /** This computer's own section (the app): false, a host that is not the app, whose computer is listed among the machines. */
+  own?: boolean;
   /** Readies the fake updater before the page first asks it. */
   prepare?: (fake: ReturnType<typeof fakeUpdater>) => void;
 }
 
 /** The desktop app (its build, its updater on a release), or a browser (`build` null), with Settings at `section`. */
-function open({ build = RELEASE, updater, section = "this-computer", machines = [], remote = {}, reach = {}, service = null, status = running, notice, prepare }: Open = {}) {
+function open({ build = RELEASE, updater, section = "this-computer", machines = [], remote = {}, reach = {}, service = null, status = running, notice, own = true, prepare }: Open = {}) {
   const withUpdater = updater === undefined ? build?.channel === "release" : updater !== false;
   const fake = fakeUpdater(updater || undefined);
   prepare?.(fake);
   const version = typeof service === "function" ? vi.fn(service) : vi.fn(async () => service!);
-  if (build) Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build,
+  // A host with no build is not the app (its computer is a machine among the others); with none at all, a browser.
+  if (build || !own) Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { ...(build ? { build } : {}),
     ...(withUpdater ? { updater: fake.updater } : {}),
     localHost: { state: vi.fn(async () => status), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install: vi.fn(),
       ...(service ? { version } : {}) } } } });
   window.sidevoiceActions = { openPairing: vi.fn(), localHostDevices: vi.fn().mockResolvedValue([]), machineDevices: vi.fn().mockResolvedValue([]),
     loadHostAgents: vi.fn(), loadMachineInfo: vi.fn() } as unknown as typeof window.sidevoiceActions;
   const store = createRoomStore();
-  act(() => { store.patch({ pairings: [...(build ? [local] : []), ...machines], machinesReady: true, inApp: !!build, localHostAvailable: !!build,
+  const hosts = build || !own ? [local] : [];
+  act(() => { store.patch({ pairings: [...hosts, ...machines], machinesReady: true, inApp: !!build && own, localHostAvailable: !!build || !own,
     localHostStatus: status, remoteHostStatus: remote as never, settingsSection: section,
-    machineLinks: Object.fromEntries([...(build ? [local] : []), ...machines].map((pairing) => [pairing.fp, { reach: reach[pairing.fp] ?? "ok", via: "node" }])) as never }); });
+    machineLinks: Object.fromEntries([...hosts, ...machines].map((pairing) => [pairing.fp, { reach: reach[pairing.fp] ?? "ok", via: "node" }])) as never }); });
   render(<RoomProvider store={store}><SettingsDialog />{notice && <UpdateNotice />}</RoomProvider>);
   document.getElementById("language-settings")!.setAttribute("open", "");
   return { store, fake, version };
@@ -243,6 +247,25 @@ test("a remote machine out of date: the room's notice says nothing of it; Update
   expect(document.querySelector(".update-notice")).toBeNull();
   expect(screen.queryByRole("button", { name: "See updates" })).toBeNull();
   expect(machineRows().slice(1)).toEqual([["Lab box", "Version 0.19.2", "Out of date"]]);
+});
+
+test("a computer listed among the machines (a host that is not the app: no section of its own) has This device's row, as the app says it stands, in Updates; one out of date is why a browser has Updates", async () => {
+  const { store } = open({ build: null, own: false, section: "general", machines: [lab], remote: { "fp-lab": says("0.20.1") }, service: { ...SERVICE_CURRENT, update: "available" } });
+  // No app, and the machines up to date: but this computer's service is behind, as its bridge says.
+  await waitFor(() => expect(entry()).not.toBeNull());
+  act(() => { store.patch({ settingsSection: "updates" }); });
+  await waitFor(() => expect(machineRows()).toEqual([["MacBook", "Version 0.9.0", "Out of date"], ["Lab box", "Version 0.20.1", "Up to date"]]));
+  const row = pane("updates").querySelector<HTMLElement>("[data-machine-row=local]")!;
+  expect(row.querySelector("svg")).toHaveClass("lucide-laptop");
+  // It opens its page among the machines'.
+  await act(async () => { fireEvent.click(row); });
+  const facts = store.getState().facts;
+  expect([facts.settingsSection, facts.machinesView.machine]).toEqual(["machines", "local-host"]);
+  cleanup();
+  // Current, there is no Updates in a browser, and this computer is not one that is out of date.
+  open({ build: null, own: false, section: "general", machines: [lab], remote: { "fp-lab": says("0.20.1") }, service: SERVICE_CURRENT });
+  await settle();
+  expect(entry()).toBeNull();
 });
 
 test("a nightly with no updater: the app's row, its note under it, updated by hand; no Automatic/Manual, no Check", async () => {

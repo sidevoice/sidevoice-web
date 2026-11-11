@@ -87,14 +87,16 @@ function useDismissal(who: string, info: ServiceInfo) {
 }
 
 /** The notice, in the permissions notice's own Alert, the command that updates it inside to copy. Out of date cannot be
- *  closed; newer than supported can (×), and stays closed for that version of that machine. `who`: whose service it is,
- *  for that. */
-export function ServiceNotice({ who, info, machine, command, t }: { who: string; info: ServiceInfo; machine?: string; command?: string; t: Translate }) {
+ *  closed; newer than supported can (×, named for the notice it closes), and stays closed for that version of that machine.
+ *  `who`: whose service it is, for that. `onClosed`: told as it is closed, while focus is still on its ×: where focus goes
+ *  rather than being lost with it. */
+export function ServiceNotice({ who, info, machine, command, onClosed, t }: { who: string; info: ServiceInfo; machine?: string; command?: string; onClosed?: () => void; t: Translate }) {
   const notice = noticeOf(info, machine, command, t);
   const close = useDismissal(who, info);
   if (!notice || close.dismissed) return null;
+  const closeNotice = () => { onClosed?.(); close.dismiss(); };
   return <Alert tone="warning" title={notice.title}
-    action={close.closable ? <Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("ui.close")} title={t("ui.close")} onClick={close.dismiss}><CloseIcon size={14} /></Button> : undefined}
+    action={close.closable ? <Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("ui.closeNamed", { name: notice.title })} title={t("ui.close")} onClick={closeNotice}><CloseIcon size={14} /></Button> : undefined}
     footer={notice.command ? <Snippet text={notice.command} label={t("settings.updates.copyCommand", { machine: notice.machine })} /> : undefined}>{notice.body}</Alert>;
 }
 
@@ -103,19 +105,19 @@ export function ServiceBadge({ kind, t }: { kind: Exclude<ServiceKind, "unknown"
   return <Badge tone={TONE[kind]} dot className="svc-badge">{t(BADGE[kind])}</Badge>;
 }
 
-/** The top of the service card, shared by This device's and a remote machine's: its title, with the running state at the
- *  right (`end`); under it two columns, the version with its badge and the port; the progress bar while it updates; the
+/** The top of the service card, shared by This device's and a remote machine's: its title (focusable: where focus lands when a
+ *  card's action or notice goes), with the running state at the right (`end`); under it two columns, the version with its badge and the port; the progress bar while it updates; the
  *  notice where there is one. A version nothing says the standing of (no `version()`) has no badge. `offline`: a machine that
  *  does not answer, which has what was last known — its version without a badge, its port — and nothing else. */
-export function ServiceCardTop({ who, titleId, focusable = false, info, progress = null, port, end, machine, command, offline = false, guidance, t }: {
-  who: string; titleId: string; focusable?: boolean; info: ServiceInfo; progress?: number | null; port: number | null; end: ReactNode; machine?: string; command?: string;
+export function ServiceCardTop({ who, titleId, info, progress = null, port, end, machine, command, offline = false, guidance, t }: {
+  who: string; titleId: string; info: ServiceInfo; progress?: number | null; port: number | null; end: ReactNode; machine?: string; command?: string;
   offline?: boolean; guidance?: string | null; t: Translate;
 }) {
   const kind = !offline && info.kind !== "unknown" ? info.kind : null;
   const version = info.version;
   return <>
     <div className="host-status-head">
-      <h4 id={titleId} tabIndex={focusable ? -1 : undefined}>{t("hosts.section.service")}</h4>
+      <h4 id={titleId} tabIndex={-1}>{t("hosts.section.service")}</h4>
       {end}
     </div>
     {(version || port) && <dl className="svc-strip">
@@ -124,7 +126,8 @@ export function ServiceCardTop({ who, titleId, focusable = false, info, progress
     </dl>}
     {kind === "updating" && <ProgressBar value={progress} label={t(BADGE.updating)} className="svc-bar" />}
     {guidance && <p className="host-update-guidance" role="status">{guidance}</p>}
-    {kind && <ServiceNotice who={who} info={info} machine={machine} command={command} t={t} />}
+    {/* Closing a notice leaves focus on the card's title. */}
+    {kind && <ServiceNotice who={who} info={info} machine={machine} command={command} onClosed={() => document.getElementById(titleId)?.focus()} t={t} />}
   </>;
 }
 

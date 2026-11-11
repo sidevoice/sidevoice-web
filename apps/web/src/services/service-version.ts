@@ -13,24 +13,39 @@ export const PINNED_MINOR: string = pin.minor;
 export type ServiceKind = "current" | "updating" | "waiting" | "behind" | "newer" | "unknown";
 export interface ServiceInfo { version: string | null; kind: ServiceKind }
 
-type Triple = [number, number, number];
-const triple = (version: string | null | undefined): Triple | null => {
-  const match = /^(\d+)\.(\d+)(?:\.(\d+))?/.exec(version ?? "");
-  return match ? [Number(match[1]), Number(match[2]), Number(match[3] ?? 0)] : null;
+interface Parsed { core: [number, number, number]; pre: string[] }
+const parse = (version: string | null | undefined): Parsed | null => {
+  const match = /^(\d+)\.(\d+)(?:\.(\d+))?(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?/.exec(version ?? "");
+  return match ? { core: [Number(match[1]), Number(match[2]), Number(match[3] ?? 0)], pre: match[4] ? match[4].split(".") : [] } : null;
 };
-const compare = (a: readonly number[], b: readonly number[]) => a[0] - b[0] || a[1] - b[1] || (a[2] ?? 0) - (b[2] ?? 0);
+const compareCore = (a: readonly number[], b: readonly number[]) => a[0] - b[0] || a[1] - b[1] || (a[2] ?? 0) - (b[2] ?? 0);
+/** Prereleases as semver orders them, as the desktop app does: one is lower than its release; else identifier by
+ *  identifier — numbers by value, below words, words alphabetically, a shorter list below a longer one it starts. */
+function comparePre(a: string[], b: string[]) {
+  if (!a.length || !b.length) return a.length === b.length ? 0 : a.length ? -1 : 1;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if (i >= a.length) return -1;
+    if (i >= b.length) return 1;
+    const numbers = [/^\d+$/.test(a[i]), /^\d+$/.test(b[i])];
+    if (numbers[0] && numbers[1]) { const by = Number(a[i]) - Number(b[i]); if (by) return by; }
+    else if (numbers[0] || numbers[1]) return numbers[0] ? -1 : 1;
+    else if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1;
+  }
+  return 0;
+}
+const compareSemver = (a: Parsed, b: Parsed) => compareCore(a.core, b.core) || comparePre(a.pre, b.pre);
 
 /** A remote machine's service against the pinned minor: newer, up to date, or out of date — an older minor, or, where this
- *  device knows the newest patch of the pinned minor (`latest`, from its own service), an older patch of it. Not saying its
- *  version, nothing. */
+ *  device knows the newest patch of the pinned minor (`latest`, from its own service), an older version of it, a
+ *  prerelease of that patch included. Not saying its version, nothing. */
 export function remoteKind(version: string | null | undefined, latest?: string | null): ServiceKind {
-  const mine = triple(version), pinned = triple(PINNED_MINOR + ".0");
+  const mine = parse(version), pinned = parse(PINNED_MINOR + ".0");
   if (!mine || !pinned) return "unknown";
-  const minor = compare(mine.slice(0, 2), pinned.slice(0, 2));
+  const minor = compareCore(mine.core.slice(0, 2), pinned.core.slice(0, 2));
   if (minor > 0) return "newer";
   if (minor < 0) return "behind";
-  const newest = triple(latest);
-  return newest && compare(newest.slice(0, 2), pinned.slice(0, 2)) === 0 && mine[2] < newest[2] ? "behind" : "current";
+  const newest = parse(latest);
+  return newest && compareCore(newest.core.slice(0, 2), pinned.core.slice(0, 2)) === 0 && compareSemver(mine, newest) < 0 ? "behind" : "current";
 }
 
 /** This device's service as the app's bridge says it (`version().update`); a value this page does not know says nothing. */
@@ -56,7 +71,7 @@ function readLastSeen(): Record<string, string> {
 /** The version `pairing` last said, if it ever did. */
 export function lastSeenVersion(pairing: string | null | undefined): string | null {
   const version = pairing ? readLastSeen()[pairing] : null;
-  return typeof version === "string" && triple(version) ? version : null;
+  return typeof version === "string" && parse(version) ? version : null;
 }
 export function rememberServiceVersion(pairing: string, version: string) {
   const kept = readLastSeen();

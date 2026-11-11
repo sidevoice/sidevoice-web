@@ -405,7 +405,7 @@ function LocalHostStatusPanel({ machine, status, titleId }: { machine: MachineVi
       {/* "Sidevoice service": the page is this computer's already, so its name is not said again. The service's version — the
           Sidevoice the person installed, never the core's or the connector's, nor the app's, which has its own row — and
           where it stands: up to date, updating itself, waiting for a call to end, newer than the app supports; then its port. */}
-      <ServiceCardTop who="local" titleId={titleId} focusable info={service} progress={service.progress} port={service.port} t={t}
+      <ServiceCardTop who="local" titleId={titleId} info={service} progress={service.progress} port={service.port} t={t}
         guidance={service.incompatible ? t(service.api == null ? "hosts.update.incompatibleUnknown" : "hosts.update.incompatible", { api: service.api ?? 0 }) : null}
         end={<span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{state.short}</span>} />
       {/* What the state means where it says more than its word. */}

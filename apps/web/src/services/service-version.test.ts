@@ -37,6 +37,22 @@ test("the newest patch of the pinned minor, where known, makes an older patch of
   expect(remoteKind(`${major}.${minor + 1}.0`, at(2))).toBe("newer");
 });
 
+test("prereleases are ordered as semver orders them, as the desktop app does: one is below its release, so a release candidate of the newest patch is out of date", () => {
+  const [major, minor] = PINNED_MINOR.split(".").map(Number);
+  const at = (patch: string) => `${major}.${minor}.${patch}`;
+  const release = at("3");
+  // Below the release it is a candidate of; the release itself and what is above it, not.
+  for (const mine of [at("3-rc.1"), at("3-alpha"), at("3-0"), at("2")]) expect(remoteKind(mine, release), mine).toBe("behind");
+  for (const mine of [at("3"), at("3+build.5"), at("4-rc.1"), at("4")]) expect(remoteKind(mine, release), mine).toBe("current");
+  // Between two prereleases: numbers by value and below words, words alphabetically, a shorter list below a longer one.
+  const rc = at("3-rc.2");
+  for (const mine of [at("3-rc.1"), at("3-beta.9"), at("3-rc"), at("3-2"), at("3-rc.1.9")]) expect(remoteKind(mine, rc), mine).toBe("behind");
+  for (const mine of [at("3-rc.2"), at("3-rc.10"), at("3-rc.2.1"), at("3-rc.x"), at("3-snapshot")]) expect(remoteKind(mine, rc), mine).toBe("current");
+  // Without the newest known, a prerelease of the pinned minor is as current as any patch of it.
+  expect(remoteKind(at("3-rc.1"))).toBe("current");
+  expect(remoteKind(at("3-rc.1"), null)).toBe("current");
+});
+
 test("a machine that says no version, or one that is not a version, says nothing of where it stands", () => {
   for (const version of [null, undefined, "", "latest", "v1"]) expect(remoteKind(version as never)).toBe("unknown");
 });
