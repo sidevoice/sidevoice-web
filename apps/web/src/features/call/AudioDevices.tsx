@@ -1,6 +1,7 @@
 import { collisionPadding } from "../../lib/safe-area";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { useContext, useEffect, useRef, useState, type PointerEvent } from "react";
+import { host, onHostMember } from "../../host";
 import { Button } from "../../components/ui/Button";
 import { ErrorText } from "../../components/ui/ErrorText";
 import { Select } from "../../components/ui/Select";
@@ -19,7 +20,8 @@ import { useSectionShown } from "../settings/settings-levels";
  * says what there is and what is chosen (audioDevices, the same on the web and in the desktop app) and follows a device
  * plugged in or out by itself; opening the panel reads the list again. A choice applies at once — the desktop moves the
  * speaker after what is playing — and is this device's from then on. A speaker this platform cannot choose is shown,
- * disabled, with why; a chosen device that went away is said once, the system's default in use since.
+ * disabled, with why, unless the host can open the system's own output picker (iOS: `host.audioRoute`), where the speaker is a
+ * button that opens it instead; a chosen device that went away is said once, the system's default in use since.
  *
  * With a mouse, resting on the chevron opens it, and it stays while the pointer is on the chevron or on the panel; it
  * closes a moment after the pointer leaves both. A click on the chevron, a key (Enter, Space, ArrowUp) or a tap opens it
@@ -102,6 +104,31 @@ function devicesError(error: unknown, t: Translate): ErrorMessage {
   return key ? { text: t(key) } : errorMessage(error, { generic: t("devices.error.other") });
 }
 
+/** The system's output picker, where the host offers one: read where it is drawn, and looked for again for a while, since an app
+ *  may offer it only after a reply of its own (watchHostMember). */
+function useAudioRoute() {
+  const [route, setRoute] = useState(() => host().audioRoute);
+  useEffect(() => route ? undefined : onHostMember("audioRoute", () => setRoute(host().audioRoute)), [route]);
+  return route;
+}
+
+/** The speaker where the system chooses it and the app can show its picker: our own button, the system's sheet. */
+function OutputRouteButton({ onError }: { onError: (error: ErrorMessage | null) => void }) {
+  const t = translator();
+  const route = useAudioRoute();
+  const [opening, setOpening] = useState(false);
+  if (!route) return null;
+  const open = async () => {
+    setOpening(true); onError(null);
+    try { await route.open(); }
+    catch (failure) { onError(devicesError(failure, t)); }
+    finally { setOpening(false); }
+  };
+  return <Button id="audio-output-route" variant="secondary" size="md" block loading={opening} aria-label={t("devices.speaker")} onClick={() => void open()}>
+    <SpeakerIcon />{t("devices.speaker")}
+  </Button>;
+}
+
 /** The devices to choose and what choosing does: the list read again where it is drawn, busy while a choice is made,
  *  why a choice failed. The call's panel and Settings › Call share it. */
 function useDeviceChoices(shown = true) {
@@ -119,13 +146,14 @@ function useDeviceChoices(shown = true) {
   };
   const inputs = devices ? [{ value: "", label: t("devices.default") }, ...devices.inputs.map((device, index) => ({ value: device.id, label: deviceName(device.label, index, "mic", t) }))] : [];
   const outputs = devices ? [{ value: "", label: t("devices.default") }, ...devices.outputs.map((device, index) => ({ value: device.id, label: deviceName(device.label, index, "speaker", t) }))] : [];
-  return { t, devices, busy, error, choose, inputs, outputs };
+  return { t, devices, busy, error, setError, choose, inputs, outputs };
 }
 
 /** Settings › Call: the microphone and the speaker as rows, the same choices as the call's panel, the system's by
  *  default (operator, 2026-10-16: where people look for them). */
 export function AudioDeviceRows() {
-  const { t, devices, busy, error, choose, inputs, outputs } = useDeviceChoices(useSectionShown("call"));
+  const { t, devices, busy, error, setError, choose, inputs, outputs } = useDeviceChoices(useSectionShown("call"));
+  const pickable = !!useAudioRoute() && !!devices && !devices.outputSelectable;
   // Both always there (operator, 2026-10-16): without the microphone allowed, or before the list is read, each stays on
   // the system's device, held back, saying why.
   const allowed = useOnboardingIfAny()?.microphone?.ready ?? true;
@@ -137,9 +165,9 @@ export function AudioDeviceRows() {
       <Select id="settings-audio-input" aria-label={t("devices.mic")} leading={<MicrophoneIcon />} value={usable ? devices.input ?? "" : ""} disabled={busy || !usable}
         onValueChange={(input) => void choose({ input: input || null })} options={usable ? inputs : fallback} />
     </Row>
-    <Row label={t("devices.speaker")} description={usable && !devices.outputSelectable ? t("devices.speakerFixed") : undefined}>
-      <Select id="settings-audio-output" aria-label={t("devices.speaker")} leading={<SpeakerIcon />} value={usable && devices.outputSelectable ? devices.output ?? "" : ""}
-        disabled={busy || !usable || !devices.outputSelectable} onValueChange={(output) => void choose({ output: output || null })} options={usable ? outputs : fallback} />
+    <Row label={t("devices.speaker")} description={usable && !devices.outputSelectable && !pickable ? t("devices.speakerFixed") : undefined}>
+      {pickable ? <OutputRouteButton onError={setError} /> : <Select id="settings-audio-output" aria-label={t("devices.speaker")} leading={<SpeakerIcon />} value={usable && devices.outputSelectable ? devices.output ?? "" : ""}
+        disabled={busy || !usable || !devices.outputSelectable} onValueChange={(output) => void choose({ output: output || null })} options={usable ? outputs : fallback} />}
     </Row>
     {error && <ErrorText className="audio-devices-error" role="alert" message={error} />}
   </Group>;
@@ -148,7 +176,8 @@ export function AudioDeviceRows() {
 /** What the panel holds: the microphone and the speaker to choose, a lost device said once, and why a choice failed. */
 function DeviceChoices() {
   // Drawn only while the panel is open: opened, it reads the list again.
-  const { t, devices, busy, error, choose, inputs, outputs } = useDeviceChoices();
+  const { t, devices, busy, error, setError, choose, inputs, outputs } = useDeviceChoices();
+  const pickable = !!useAudioRoute() && !!devices && !devices.outputSelectable;
   const lost = useRoomStore((state) => state.facts.audioLost);
   const store = useContext(RoomStoreContext);
   const dismissLost = () => store?.patch({ audioLost: null });
@@ -160,9 +189,11 @@ function DeviceChoices() {
           options={inputs} />
       </div>
       <div className="audio-devices-choice">
+        {pickable ? <OutputRouteButton onError={setError} /> : <>
         <Select id="audio-output" aria-label={t("devices.speaker")} aria-describedby={devices.outputSelectable ? undefined : "audio-output-hint"} leading={<SpeakerIcon />} value={devices.outputSelectable ? devices.output ?? "" : ""} disabled={busy || !devices.outputSelectable} onValueChange={(output) => void choose({ output: output || null })}
           options={outputs} />
         {!devices.outputSelectable && <p className="ui-field-hint" id="audio-output-hint">{t("devices.speakerFixed")}</p>}
+        </>}
       </div>
     </>}
     {(lost?.input || lost?.output) && <p className="audio-devices-lost" role="status">

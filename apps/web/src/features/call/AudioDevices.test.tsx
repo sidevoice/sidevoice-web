@@ -4,10 +4,11 @@ import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import type { SidevoiceActions } from "../../state/room-types";
 import { AudioDeviceRows, AudioDevices } from "./AudioDevices";
+import { installApp, removeApp } from "../../host/testing";
 import { chooseOption, listOptions, selectedValue } from "../../test/select";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
-afterEach(() => { cleanup(); delete window.sidevoiceActions; });
+afterEach(() => { cleanup(); removeApp(); delete window.sidevoiceActions; });
 
 /* The panel the microphone's chevron opens: the voice's devices to choose, the speaker disabled with why where it
  * cannot be chosen, and a lost device said once. Where it is drawn and how a pointer opens it: e2e/device-popover. */
@@ -69,6 +70,38 @@ test("a speaker this platform cannot choose is disabled, saying why; a lost devi
   expect(screen.getByText("The chosen microphone is gone: the system's default is in use.")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Got it" }));
   expect(store.getState().facts.audioLost).toBeNull();
+});
+
+test("where the host can open the system's output picker, the speaker is our button that opens it, and says nothing of Control Center", async () => {
+  const open = vi.fn(async () => undefined);
+  installApp({ audioRoute: { open } });
+  panel({ audioDevices: devices({ outputSelectable: false }) });
+  const button = screen.getByRole("button", { name: "Speaker" });
+  expect(screen.queryByRole("combobox", { name: "Speaker" })).toBeNull();
+  expect(document.getElementById("audio-output-hint")).toBeNull();
+  await act(async () => { fireEvent.click(button); });
+  expect(open).toHaveBeenCalledTimes(1);
+});
+
+test("a picker the host cannot show says so in the list's own words, and a selectable speaker keeps its select", async () => {
+  installApp({ audioRoute: { open: async () => { throw { key: "audio_route", code: "audio-route-picker-failed" }; } } });
+  panel({ audioDevices: devices({ outputSelectable: false }) });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Speaker" })); });
+  expect(screen.getByRole("alert")).toBeInTheDocument();
+  cleanup();
+  panel({ audioDevices: devices({ outputSelectable: true }) });
+  expect(screen.getByLabelText("Speaker")).not.toBeDisabled();
+});
+
+test("Settings' speaker row is the same button, with no note", () => {
+  installApp({ audioRoute: { open: async () => undefined } });
+  const actions = { setAudioDevices: vi.fn(async () => undefined), refreshAudioDevices: vi.fn(async () => undefined) };
+  window.sidevoiceActions = actions as unknown as SidevoiceActions;
+  const store = createRoomStore();
+  store.patch({ settingsSection: "call", audioDevices: devices({ outputSelectable: false }) } as never);
+  render(<RoomProvider store={store} runtime={false}><AudioDeviceRows /></RoomProvider>);
+  expect(screen.getByRole("button", { name: "Speaker" })).toBeInTheDocument();
+  expect(screen.queryByText(/plays through/)).toBeNull();
 });
 
 /* Settings › Call and the panel only read the store: the runtime keeps `audioDevices` fresh (services/audio-device-refresh.ts). */

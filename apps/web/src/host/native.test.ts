@@ -19,7 +19,7 @@ describe("a page outside an app", () => {
     expect(outside.voice.runs).toBe("page");
     expect(nativeHost().storage).toBeNull();
     for (const member of [nativeHost().microphone, outside.localHost, outside.reset, outside.muteShortcut, outside.mediaDuck, outside.textScale,
-      outside.callControls, outside.callSurface, outside.cue, outside.screen, outside.updater, outside.debug]) expect(member).toBeNull();
+      outside.callControls, outside.callSurface, outside.cue, outside.audioRoute, outside.screen, outside.updater, outside.debug]) expect(member).toBeNull();
     expect(cardSeam()).toBeNull();
   });
 
@@ -204,6 +204,7 @@ describe("the members an app calls through", () => {
       callControls: { settings: async () => ({}) },
       callSurface: { active: () => true },
       cue: { start() {} },
+      audioRoute: {},
       screen: {},
       updater: { cancel: async () => {} },
     });
@@ -213,6 +214,7 @@ describe("the members an app calls through", () => {
     expect(host().callControls).toBeNull();
     expect(host().callSurface).toBeNull();
     expect(host().cue).toBeNull();
+    expect(host().audioRoute).toBeNull();
     expect(host().updater).toBeNull();
   });
 
@@ -223,11 +225,13 @@ describe("the members an app calls through", () => {
     const updater = { status: async () => ({}), cancel: async () => {} };
     const callSurface = { active: () => true, still() {}, forget() {} };
     const cue = { start() {}, stop() {} };
+    const audioRoute = { open: async () => {} };
     const screen = { locked: async () => false };
-    withHost({ localHost, muteShortcut, callControls, callSurface, cue, screen, updater });
+    withHost({ localHost, muteShortcut, callControls, callSurface, cue, audioRoute, screen, updater });
     expect(host().screen).toBe(screen);
     expect(host().callSurface).toBe(callSurface);
     expect(host().cue).toBe(cue);
+    expect(host().audioRoute).toBe(audioRoute);
     expect(host().localHost).toBe(localHost);
     expect(host().muteShortcut).toBe(muteShortcut);
     expect(host().callControls).toBe(callControls);
