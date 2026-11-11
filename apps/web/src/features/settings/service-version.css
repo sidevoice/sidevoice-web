@@ -1,0 +1,32 @@
+/* MOCKUP (sidevoice-desktop#67): service version rows, A (This device) and B (a remote machine). Design-system tokens only. */
+.host-status-facts > .svc-extra { display: block; flex: 1 0 100%; order: 5; min-width: 0; }
+.svc-a1-word { font-weight: var(--sv-weight-regular, 400); color: var(--sv-text-muted); }
+.svc-a1-line[data-state="updating"] .svc-a1-word { color: var(--sv-accent-text); }
+.svc-bar { max-width: 22rem; }
+
+/* A2: the card is a group of rows. */
+.host-status-card[data-service-row="a2"] { padding: 0; gap: 0; }
+.host-status-card[data-service-row="a2"] > .svc-a2-row { border-radius: var(--sv-radius-xl) var(--sv-radius-xl) 0 0; }
+.host-status-card[data-service-row="a2"] > :not(.svc-a2-row):not(.svc-a2-notice) { padding: var(--sv-space-3) var(--sv-space-5); border-top: 1px solid var(--sv-border); }
+.host-status-card[data-service-row="a2"] > .svc-a2-notice { padding: 0 var(--sv-space-5) var(--sv-space-3); }
+.host-status-card[data-service-row="a2"] > .svc-a2-row:has(+ .svc-a2-notice) { }
+.svc-a2-row .svc-bar { margin-top: var(--sv-space-2); }
+
+/* A3: version first. */
+.host-status-facts > .svc-a3 { flex: 1 0 100%; display: grid; gap: var(--sv-space-2); min-width: 0; }
+.svc-a3-number { font-size: var(--sv-font-2xl, 1.75rem); font-weight: var(--sv-weight-bold); letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.svc-a3-state { display: inline-flex; align-items: center; gap: var(--sv-space-2); font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); }
+.svc-glyph { display: inline-flex; }
+.svc-glyph[data-state="current"] { color: var(--sv-positive); }
+.svc-glyph[data-state="updating"] { color: var(--sv-accent-text); }
+.svc-glyph[data-state="waiting"] { color: var(--sv-text-muted); }
+.svc-glyph[data-state="newer"] { color: var(--sv-warning); }
+.svc-a3-policy { font-size: var(--sv-font-xs) !important; }
+
+/* B: the notice, in the permissions notice's Alert. */
+.svc-notice { display: grid; gap: var(--sv-space-2); min-width: 0; }
+.host-status-card > .svc-notice { margin-top: var(--sv-space-1); }
+.svc-remote-line { display: grid; gap: var(--sv-space-2); min-width: 0; }
+.svc-remote-line-text { display: flex; gap: var(--sv-space-2); align-items: flex-start; }
+.svc-remote-line-icon { flex: none; margin-top: 2px; color: var(--sv-warning); }
+.host-status-head .svc-head-end { display: inline-flex; align-items: center; gap: var(--sv-space-2); }

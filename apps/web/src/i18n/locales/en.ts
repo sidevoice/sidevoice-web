@@ -1552,6 +1552,21 @@ export const messages = {
   "settings.developer.systemCall": "Treat calls as system calls (CallKit / Telecom)",
   "settings.developer.systemCall.hint": "On: the call uses the system's calling features, with its lock screen card, in-call screen and headset or car buttons. Off: the app's own call, with its own notification. Takes effect on the next call.",
   "settings.developer.group.calls": "Calls",
+  "service.badge.current": "Up to date",
+  "service.badge.updating": "Updating…",
+  "service.badge.waiting": "Waiting",
+  "service.badge.newer": "Newer",
+  "service.line.updating": "Updating to {to}…",
+  "service.line.waiting": "Waiting for the call to end to update to {to}",
+  "service.line.newer": "Newer than the supported version",
+  "service.newerWhy": "This app works with Sidevoice {supported}.x. Version {version} may misbehave.",
+  "service.policy": "This app uses Sidevoice {supported}.x. Patches install by themselves, never during a call.",
+  "service.remote.behind.title": "Sidevoice {version} is out of date",
+  "service.remote.behind.body": "This app works with {supported}.x. Update it on {machine}:",
+  "service.remote.newer.title": "Sidevoice {version} is newer than this app supports",
+  "service.remote.newer.body": "It may misbehave. Update this app, or install {supported}.x on {machine}.",
+  "service.remote.badge.behind": "Out of date",
+  "service.remote.badge.newer": "Too new",
 } as const;
 
 export type MessageKey = keyof typeof messages;

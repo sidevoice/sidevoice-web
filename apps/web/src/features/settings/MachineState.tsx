@@ -61,7 +61,7 @@ export function machineEntryTitle(name: string, status: MachineStatus) {
 
 /** An entry's words (a machine under Remote machines, This device): its name, cut short when long, and "New" at its end
  *  (VARIANTS `section-new` A, B); its state on a line of its own when it needs the person, never cut short. */
-export function MachineEntryCopy({ name, status, isNew }: { name: string; status: MachineStatus | null; isNew: boolean | number }) {
+export function MachineEntryCopy({ name, status, isNew, extra = null }: { name: string; status: MachineStatus | null; isNew: boolean | number; extra?: ReactNode }) {
   return (
     <span className="machine-entry-copy">
       <span className="machine-entry-line">
@@ -69,6 +69,7 @@ export function MachineEntryCopy({ name, status, isNew }: { name: string; status
         <NewAtEnd isNew={isNew} />
       </span>
       <MachineEntryState status={status} />
+      {extra}
     </span>
   );
 }
