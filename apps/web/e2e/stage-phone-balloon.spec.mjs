@@ -100,12 +100,6 @@ async function onStage(page, theme, state, { held = false } = {}) {
  *  floor; recorded for the human). */
 const need = (state, tileHeight) => state.endsWith("sent") ? 14 - 0.5 : Math.max(14, tileHeight * 0.035) - 1.5;
 
-/** On a desktop the creature lives under its cards: it breathes and squashes with the voice (about 1% of its drawn height, a few px,
- *  more with voice: the framer's MOTION_ROOM), and the framing is solved on one trial frame of it, a px or two off the pixels
- *  drawn (WebKit's software GL lands up to ~2.5 px short of the nominal 3.5% gap, settled, and a frame later 1 px more or less).
- *  What the page promises there is the floor, never touching: 14 px, a half px of rounding. */
-const FLOOR = 14 - 0.5;
-
 /** Whether this browser gives the page WebGL (the creature needs it; without it its fallback stands in). */
 const webgl = (page) => page.evaluate(() => !!document.createElement("canvas").getContext("webgl"));
 
@@ -281,7 +275,7 @@ test.describe("desktop", () => {
       expect(card.bottom, "inside the tile").toBeLessThanOrEqual(m.tile.bottom + 0.5);
       for (const drawn of m.drawn ?? []) {
         expect(drawn.over, "the creature's pixels under the card").toBe(0);
-        if (drawn.gap != null) expect(drawn.gap, "the gap to the creature").toBeGreaterThanOrEqual(FLOOR);
+        if (drawn.gap != null) expect(drawn.gap, "the gap to the creature").toBeGreaterThanOrEqual(need(state, m.tileHeight));
       }
       // The stage's framing moves the creature by its camera: its box never moves.
       const agent = await page.evaluate(() => getComputedStyle(document.querySelector(".stage-agent")).translate);
@@ -299,6 +293,7 @@ test.describe("desktop", () => {
       await settled(page);
       const key = await page.evaluate(() => { const person = window.sidevoiceUI.store.getState().facts.people.find((p) => p.thread_id === "t1"); return `${person.node}|t1`; });
       const samples = await sampleTransition(page, STATES[state].at(-1)(key), 2500);
+      const tileHeight = await page.evaluate(() => document.querySelector(".stage-tile").clientHeight);
       const drawn = await webgl(page);
       if (drawn) expect(samples.length, "the card seen over the creature's canvas").toBeGreaterThan(0);
       // What a failure shows: each frame's time, gap and pixels under the card, from the card's first visible frame.
@@ -307,7 +302,7 @@ test.describe("desktop", () => {
         if (drawn) expect(s.drawn, `${s.t} ms: the creature is drawn`).toBe(true);
         expect(s.inside, `${s.t} ms: the card inside the tile`).toBe(true);
         expect(s.over, `${s.t} ms: the creature's pixels under the card (ms:gap/pixels ${trail})`).toBe(0);
-        if (s.gap != null) expect(s.gap, `${s.t} ms: the gap to the creature (ms:gap/pixels ${trail})`).toBeGreaterThanOrEqual(FLOOR);
+        if (s.gap != null) expect(s.gap, `${s.t} ms: the gap to the creature (ms:gap/pixels ${trail})`).toBeGreaterThanOrEqual(Math.max(14, tileHeight * 0.035) - 1.5);
       }
     });
   }
