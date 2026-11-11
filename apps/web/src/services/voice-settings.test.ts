@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { TURN_TUNING, defaultVoiceSettings, editVoiceSettings, readVoiceSettings, readyVoiceSettings, remoteProviders, voiceChoices, voiceEndOfTurn, voiceHalves, voiceInput, voiceOutput, voiceSettingsToLoad, modelReady, writeVoiceSettings, VOICE_SETTINGS_KEY } from "./voice-settings.js";
+import { TURN_TUNING, defaultVoiceSettings, editVoiceSettings, keepsVoiceSettings, readVoiceSettings, recommendationLanguages, recommendedPatch, readyVoiceSettings, remoteProviders, voiceChoices, voiceEndOfTurn, voiceHalves, voiceInput, voiceOutput, voiceSettingsToLoad, modelReady, writeVoiceSettings, VOICE_SETTINGS_KEY } from "./voice-settings.js";
 import type { CatalogView } from "./model-catalogs.js";
 
 /* The voice settings this device keeps, and the choices the pane offers from the engine's catalogues. */
@@ -226,4 +226,34 @@ test("Automatic is ready by the build recommended now: a new recommendation not 
   const settings = { ...defaultVoiceSettings(), stt: { ...defaultVoiceSettings().stt, catalog: "local", model: "m" } };
   expect(modelReady(settings, "stt", catalogs("m/sherpa"))).toBe(true);
   expect(modelReady(settings, "stt", catalogs("m/metal"))).toBe(false);
+});
+
+const pick = (model: string) => ({ model, build: model + "/int8" });
+const RECOMMENDATION = { stt: { choice: pick("moonshine-tiny"), ranked: [pick("moonshine-tiny"), pick("whisper-base")] }, tts: { choice: pick("kokoro-82m-v1.0"), ranked: [pick("kokoro-82m-v1.0")] } };
+
+test("the engine is asked to recommend for the language chosen to transcribe, else the interface's, for both slots", () => {
+  expect(recommendationLanguages(defaultVoiceSettings(), "it")).toEqual({ stt: "it", tts: "it" });
+  const spanish = { ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-base", language: "es" } };
+  expect(recommendationLanguages(spanish, "it")).toEqual({ stt: "es", tts: "es" });
+});
+
+test("a device that keeps no settings starts on the recommended models: only slots still on this device's default", () => {
+  // Kokoro is the default voice already: only transcription changes.
+  expect(recommendedPatch(defaultVoiceSettings(), RECOMMENDATION)).toEqual({ stt: { model: "moonshine-tiny" } });
+  expect(recommendedPatch(defaultVoiceSettings(), { ...RECOMMENDATION, tts: { choice: pick("supertonic-3"), ranked: [pick("supertonic-3")] } }))
+    .toEqual({ stt: { model: "moonshine-tiny" }, tts: { model: "supertonic-3" } });
+  // A slot on a provider, or on another model, is the person's: left as it is.
+  const chosen = { ...defaultVoiceSettings(), stt: { catalog: "elevenlabs", model: "scribe_v2", language: null } };
+  expect(recommendedPatch(chosen, { ...RECOMMENDATION, tts: { ranked: [] } })).toBeNull();
+  expect(recommendedPatch(defaultVoiceSettings(), { stt: { ranked: [] }, tts: { ranked: [] } })).toBeNull();
+  expect(keepsVoiceSettings(memory())).toBe(false);
+  expect(keepsVoiceSettings(memory({ [VOICE_SETTINGS_KEY]: "{}" }))).toBe(true);
+});
+
+test("this device as the source again takes the recommended model when it runs, else its first that does", () => {
+  const remote = { ...defaultVoiceSettings(), stt: { catalog: "elevenlabs", model: "scribe_v2", language: null } };
+  expect(editVoiceSettings(remote, { stt: { catalog: "local" } }, CATALOGS, RECOMMENDATION).stt.model).toBe("moonshine-tiny");
+  expect(editVoiceSettings(remote, { stt: { catalog: "local" } }, CATALOGS).stt.model).toBe("whisper-base");
+  const unrunnable = { ...RECOMMENDATION, stt: { choice: pick("whisper-large"), ranked: [] } };
+  expect(editVoiceSettings(remote, { stt: { catalog: "local" } }, CATALOGS, unrunnable).stt.model).toBe("whisper-base");
 });

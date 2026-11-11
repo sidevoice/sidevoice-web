@@ -13,6 +13,7 @@ import { LOCAL_CATALOG } from './model-catalogs.js';
  * @typedef {import('@sidevoice/voice').VoiceEndOfTurnSettings} VoiceEndOfTurnSettings
  * @typedef {import('./model-catalogs.js').CatalogView} CatalogView
  * @typedef {import('./model-catalogs.js').CatalogModel} CatalogModel
+ * @typedef {import('./model-catalogs.js').Recommendation} Recommendation
  * @typedef {{
  *   stt: {catalog: string, model: string, language: string | null, build?: string},
  *   tts: {catalog: string, model: string, voice: string | null, speed: number, build?: string},
@@ -186,20 +187,23 @@ function speedFor(model, speed) {
 }
 
 /**
- * `settings` with `patch` applied. Another source takes that source's first model for the slot; another model drops
- * the voice and a language it does not have, and brings the speed within its range.
+ * `settings` with `patch` applied. Another source takes that source's first model for the slot (this device's: the one
+ * the engine recommends, when `recommendation` names one that runs); another model drops the voice and a language it
+ * does not have, and brings the speed within its range.
  * @param {DeviceVoiceSettings} settings
  * @param {{stt?: Partial<DeviceVoiceSettings["stt"]>, tts?: Partial<DeviceVoiceSettings["tts"]>, patience?: DeviceVoiceSettings["patience"], end_of_turn?: DeviceVoiceSettings["end_of_turn"], turn?: Partial<Omit<TurnTuning, "listening_bar">> & {listening_bar?: Partial<TurnTuning["listening_bar"]>}}} patch
  * @param {CatalogView[]} [catalogs]
+ * @param {Recommendation | null} [recommendation]
  * @returns {DeviceVoiceSettings}
  */
-export function editVoiceSettings(settings, patch, catalogs = []) {
+export function editVoiceSettings(settings, patch, catalogs = [], recommendation = null) {
   const turn = patch.turn ? normaliseTurnTuning({ ...settings.turn, ...patch.turn, listening_bar: { ...settings.turn.listening_bar, ...patch.turn.listening_bar } }, settings.turn) : settings.turn;
   const stt = { ...settings.stt, ...patch.stt }, tts = { ...settings.tts, ...patch.tts };
   for (const [slot, capability, before] of [[stt, 'stt', settings.stt], [tts, 'tts', settings.tts]]) {
     if (slot.catalog !== before.catalog && !(patch[capability]?.model)) {
-      const first = offered(catalogs.find((catalog) => catalog.id === slot.catalog), capability).find((model) => runs(model));
-      slot.model = first?.id ?? '';
+      const models = offered(catalogs.find((catalog) => catalog.id === slot.catalog), capability).filter((model) => runs(model));
+      const chosen = slot.catalog === LOCAL_CATALOG ? recommendation?.[capability]?.choice?.model : undefined;
+      slot.model = (models.find((model) => model.id === chosen) ?? models[0])?.id ?? '';
     }
   }
   // A build is one model's: another model, or none asked for, is the engine's own choice again.
@@ -223,6 +227,42 @@ const sameLanguage = (a, b) => a.toLowerCase().split('-')[0] === b.toLowerCase()
  *  (sidevoice-core#112): it is left out, not the catalogue with it. */
 function offered(catalog, capability) {
   return (catalog?.models ?? []).filter((model) => Array.isArray(model?.capabilities) && model.capabilities.includes(capability));
+}
+
+/**
+ * The languages the engine is asked to recommend for: the one chosen to transcribe, else the interface's (`ui`), for
+ * both slots, as the model block says which languages a model supports (ModelLanguages.tsx): the voice speaks the
+ * language chosen to transcribe (`voiceOutput`), and has no setting of its own.
+ * @param {DeviceVoiceSettings} settings
+ * @param {string} ui
+ */
+export function recommendationLanguages(settings, ui) {
+  const language = settings.stt.language ?? ui;
+  return { stt: language, tts: language };
+}
+
+/**
+ * What a device that keeps no voice settings yet starts on: the patch that puts the engine's recommended model in each
+ * slot still on this device's default model; `null` when there is none to make. Only preselected: nothing is
+ * downloaded for it (the model block offers its download).
+ * @param {DeviceVoiceSettings} settings
+ * @param {Recommendation} recommendation
+ */
+export function recommendedPatch(settings, recommendation) {
+  const defaults = defaultVoiceSettings();
+  /** @type {{stt?: {model: string}, tts?: {model: string}}} */
+  const patch = {};
+  for (const task of /** @type {const} */ (['stt', 'tts'])) {
+    const model = recommendation[task]?.choice?.model;
+    const slot = settings[task];
+    if (model && slot.catalog === LOCAL_CATALOG && slot.model === defaults[task].model && model !== slot.model) patch[task] = { model };
+  }
+  return patch.stt || patch.tts ? patch : null;
+}
+
+/** Whether this device keeps voice settings of its own: once it does, nothing is preselected for it. */
+export function keepsVoiceSettings(storage) {
+  try { return storage?.getItem(VOICE_SETTINGS_KEY) != null; } catch { return false; }
 }
 
 /** Whether `model` can be used here: a remote one always (its provider runs it), a local one when a build of it runs. */

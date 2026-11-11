@@ -10,8 +10,9 @@ import { translator, type Translate, type MessageKey } from "../../i18n/translat
 /* The models this device's voice runs the call with: what turns the person's speech into text, what speaks the agent's
  * replies, and the smart end of turn's — each its model's id as its catalogue names it, where it runs (this device, or a
  * provider) and whether it is ready. They are shown in the call's details, opened from the stage's title (CallDetails;
- * 2026-10-15: no chips on the stage), and the title wears a dot while one needs something. They are the settings the
- * voice is given (voiceSettingsHere); the voice reports no model of its own. */
+ * 2026-10-15: no chips on the stage), and the title wears a dot while one needs something. They are the settings being
+ * chosen, as the setup's Ready step reads them (the draft, else what is kept: a model chosen and not here yet is the one
+ * its Download installs), as this device can take them (voiceSettingsHere); the voice reports no model of its own. */
 
 /** A model's slot as the details say it; `attention` when something must be done or waited for before it works. */
 export type Slot = { id: string; where: string; state: string; attention: boolean; task: "stt" | "tts" | "end-of-turn"; status: string; catalog: string;
@@ -19,7 +20,8 @@ export type Slot = { id: string; where: string; state: string; attention: boolea
   fraction: number | null };
 
 function useSlots(t: Translate): { stt: Slot | null; tts: Slot | null; turn: Slot | null } {
-  const saved = useRoomStore((state) => state.facts.voiceSettings);
+  // The draft first: what Download installs (installVoiceModel) and what the engine's recommendation preselects.
+  const saved = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
   const keys = useRoomStore((state) => state.facts.providerKeys);
   // The catalogue is read as the stage first shows (as Settings, the setup and an install read it too): until it is,

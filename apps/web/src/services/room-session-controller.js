@@ -6,7 +6,7 @@ import {host as pageHost} from '../host/index.ts';
 import {createHostAgentsController} from './host-agents.ts';
 import {withoutLost} from './audio-choice.ts';
 import {currentDeviceName} from '../state/device-name.ts';
-import {translator,setUiLanguage,onUiLanguage,UI_LANGUAGES} from '../i18n/translator.ts';
+import {translator,setUiLanguage,onUiLanguage,uiLanguage,UI_LANGUAGES} from '../i18n/translator.ts';
 import {voiceFailure,roomFailure,worded,errorLine} from '../features/settings/error-message.ts';
 import {failureCode} from './failure-code.js';
 import {probeSiteStorage} from './site-storage.js';
@@ -17,7 +17,7 @@ import {readCallPreferences} from './call-preferences.ts';
 import {primeThinkingSound} from './thinking-sound.ts';
 import {clampDeviceName,deviceNameProblem} from './device-name-rules.js';
 import {readDeleteUnused,writeDeleteUnused,staleModels} from './model-housekeeping.js';
-import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,voiceSettingsToLoad,endOfTurnModel,readyVoiceSettings,modelReady,voiceHalves,voiceInput,voiceOutput} from './voice-settings.js';
+import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,recommendationLanguages,recommendedPatch,keepsVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,voiceSettingsToLoad,endOfTurnModel,readyVoiceSettings,modelReady,voiceHalves,voiceInput,voiceOutput} from './voice-settings.js';
 import {createTurnRelay} from './turn-relay.js';
 import {turnMessage,playbackReport,sayingRange} from './voice-room.js';
 import {replyEligibility} from './reply-eligibility.js';
@@ -2768,14 +2768,38 @@ async function loadVoiceCatalogue(){
  try{const models=await modelCatalogs();const catalogs=await models.catalogs();roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},modelsRemovable:typeof models.uninstall==='function',providerKeys:await keptProviderKeys(models,catalogs)});
   // A model chosen while it was not here yet is put in use once it is; Smart's too, kept from before (`handed`).
   void applyVoiceSettings();
+  void recommendModels(models);
   void deleteUnusedModels(models,catalogs)}
  catch(error){const words=voiceError(error,'models');roomStore.patch({voiceCatalogue:{state:'failed',catalogs:[],error:errorLine(words),details:words.details||''}})}
 }
+// What the engine recommends here, for the language in use (sidevoice-engine#124): said with «Recomendado» where a model
+// is chosen. A device that keeps no voice settings yet starts on it, once a session: preselected in the draft, never
+// downloaded unasked. An engine that cannot say (the page's, today) recommends nothing.
+// Asked again as the catalogue is read again and as the language to recommend for changes; only the latest question's
+// answer is kept (`recommendAsked`), so an older one that arrives late never replaces it.
+let recommendedOnce=false,recommendAsked=0;
+async function recommendModels(models){
+ const asked=++recommendAsked;
+ const settings=state.voiceDraft||state.voiceSettings;
+ if(typeof models.recommend!=='function'||!settings){roomStore.patch({voiceRecommendation:null});return}
+ const recommendation=await models.recommend(recommendationLanguages(settings,uiLanguage())).catch(()=>null);
+ if(asked!==recommendAsked)return;
+ roomStore.patch({voiceRecommendation:recommendation});
+ if(!recommendation||recommendedOnce||keepsVoiceSettings(pageStorage()))return;
+ recommendedOnce=true;
+ const patch=recommendedPatch(state.voiceDraft||state.voiceSettings,recommendation);
+ if(patch)editVoice(patch);
+}
+// With transcription on Automatic the language to recommend for is the interface's: another one asks again (once the
+// catalogue has been read: before, the read itself asks).
+onUiLanguage(()=>{const settings=state.voiceDraft||state.voiceSettings;if(settings&&settings.stt.language==null&&state.voiceCatalogue.state==='ready')void modelCatalogs().then(recommendModels).catch(()=>{})});
 // Settings apply as they change (there is no Save): the draft is what was chosen, and what of it is ready is put in use
 // at once; a model still to download waits in the draft, the one in use stays, and it switches once it is ready (the
 // catalogues read again after its install). A download cancelled or failed leaves the one in use as it was.
 function editVoice(patch){
- roomStore.patch({voiceDraft:editVoiceSettings(state.voiceDraft||state.voiceSettings,patch,state.voiceCatalogue.catalogs)});
+ roomStore.patch({voiceDraft:editVoiceSettings(state.voiceDraft||state.voiceSettings,patch,state.voiceCatalogue.catalogs,state.voiceRecommendation)});
+ // Another language to transcribe in is another language to recommend for.
+ if(patch.stt&&'language' in patch.stt)void modelCatalogs().then(recommendModels).catch(()=>{});
  // A try of the end of turn that runs takes a change of it at once, before the voice is given the settings to keep.
  if(turnTry&&TURN_FIELDS.some(key=>key in patch))retuneTurnTry();
  void applyVoiceSettings();
