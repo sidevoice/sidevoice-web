@@ -64,7 +64,7 @@ export interface SessionFacts {
    *  on a phone. */
   machinesView: { machine: string | null };
  localHostAvailable: boolean; localHostStatus: import('../host').LocalHostStatus;
- /** Each paired machine's reach, and — where the machine says (core GET /api/host/status: a contract gap) — its
+ /** Each paired machine's reach, and — where the machine says (core GET /api/host/status) — its
   *  Sidevoice version. */
  remoteHostStatus: Record<string, {state: 'checking' | 'connected' | 'offline'; checkedAt: number; version?: string | null}>;
  /** How each paired machine is reached, by fingerprint (every one of them is live), and the machine the call is with. */

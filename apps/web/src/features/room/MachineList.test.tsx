@@ -676,17 +676,49 @@ test("a machine's page has no section above it — no Remote machines, no 'The c
   expect(within(section).getByRole("button", { name: "Forget NUC" })).toBeInTheDocument();
 });
 
-test("a machine forgotten from its page leaves the overview, not the page of another", async () => {
+test("a machine forgotten from its page leaves the overview, not the page of another; focus, which went with its Forget, is on the overview's first row", async () => {
   const forget = vi.fn();
   const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), loadHostAgents: vi.fn(), loadMachineInfo: vi.fn(), forgetMachine: forget };
   window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
   const lab = paired({ fp: "fp-lab", host: "Lab box" });
   const store = room([paired(), lab], { machineLinks: { "fp-nuc": { reach: "ok", via: "node" }, "fp-lab": { reach: "ok", via: "node" } } });
   expect(document.querySelector('#machines .host-detail')).toHaveAttribute("aria-label", "NUC");
+  within(forgetFoot()!).getByRole("button", { name: "Forget NUC" }).focus();
   act(() => { store.patch({ pairings: [lab] }); });
-  // NUC is gone: no page for it, so the overview, with the one left.
+  // NUC is gone: no page for it, so the overview, with the one left, and nothing of NUC selected any more.
   expect(document.querySelector("#machines .host-detail")).toBeNull();
   expect(overviewRows()).toEqual([["Lab box", null, null]]);
+  expect(store.getState().facts.machinesView.machine).toBeNull();
+  await waitFor(() => expect(document.activeElement).toBe(document.querySelector("#machines [data-machine-row=fp-lab]")));
+});
+
+test("a machine that goes while focus is elsewhere does not take it; with no machine left, focus is on Add a machine", async () => {
+  const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), loadHostAgents: vi.fn(), loadMachineInfo: vi.fn() };
+  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
+  const lab = paired({ fp: "fp-lab", host: "Lab box" });
+  const store = room([paired(), lab], { machineLinks: { "fp-nuc": { reach: "ok", via: "node" }, "fp-lab": { reach: "ok", via: "node" } } });
+  const elsewhere = document.createElement("button");
+  document.body.append(elsewhere);
+  elsewhere.focus();
+  act(() => { store.patch({ pairings: [lab] }); });
+  await act(async () => { await new Promise((resolve) => requestAnimationFrame(() => resolve(null))); });
+  expect(document.activeElement).toBe(elsewhere);
+  elsewhere.remove();
+  // The last one goes from its own page: the empty overview's Add.
+  act(() => { store.patch({ machinesView: { machine: "fp-lab" } }); });
+  within(forgetFoot()!).getByRole("button", { name: "Forget Lab box" }).focus();
+  act(() => { store.patch({ pairings: [] }); });
+  await waitFor(() => expect(document.activeElement).toBe(document.getElementById("pair-device-open")));
+});
+
+test("this computer, listed among the machines where it has no section of its own, is This device's row there too: its icon, its version as the app says it stands", async () => {
+  buildBridge(undefined, { update: "available" });
+  actions();
+  room([local, paired()], { localHostAvailable: true, inApp: false, machinesView: { machine: null }, localHostStatus: { ...running, product_version: "0.20.1" },
+    machineLinks: { "fp-nuc": { reach: "ok", via: "node" } }, remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 1, version: "0.20.4" } } });
+  await waitFor(() => expect(overviewRows()).toEqual([["MacBook", "Version 0.20.1", "Out of date"], ["NUC", "Version 0.20.4", "Up to date"]]));
+  expect(document.querySelector("#machines [data-machine-row=local] svg")).toHaveClass("lucide-laptop");
+  expect(document.querySelector("#machines [data-machine-row=fp-nuc] svg")).toHaveClass("lucide-server");
 });
 
 test("asked for a machine's agents, Machines shows that machine once, without feeding the store back into itself", () => {
@@ -922,8 +954,12 @@ test("a service newer than the minor the app pins is warned about, once closed (
   expect(alert).toHaveTextContent("This app works with Sidevoice 0.20.x. Version 0.21.0 may misbehave.");
   // The command is for a machine that is run elsewhere: this one is never told to install anything.
   expect(alert.querySelector(".ui-snippet")).toBeNull();
-  await act(async () => { fireEvent.click(within(alert).getByRole("button", { name: "Close" })); });
+  // The × says which notice it closes; closed, focus is on the card's title rather than lost with it.
+  const close = within(alert).getByRole("button", { name: "Close Newer than the supported version" });
+  close.focus();
+  await act(async () => { fireEvent.click(close); });
   expect(cardOf(thisDevice()).querySelector(".ui-alert")).toBeNull();
+  expect(document.activeElement).toBe(cardOf(thisDevice()).querySelector("h4"));
   expect(cardFacts(thisDevice())[0]).toEqual(["Version", "0.21.0", "Newer"]);
   expect(JSON.parse(localStorage.getItem("sidevoice.service-notice-dismissed")!)).toEqual(["local:0.21.0"]);
   // A newer one again: warned again.
@@ -976,7 +1012,7 @@ test("a remote machine out of date: the notice, in the permissions notice's aler
   expect(alert).toHaveTextContent("This app works with 0.20.x. Update it on NUC:");
   expect(alert.querySelector(".ui-snippet-text")).toHaveTextContent("npx sidevoice@0.20 install");
   expect(within(alert).getByRole("button", { name: "Copy the command for NUC" })).toBeInTheDocument();
-  expect(within(alert).queryByRole("button", { name: "Close" })).toBeNull();
+  expect(within(alert).queryByRole("button", { name: /^Close/ })).toBeNull();
 });
 
 test("a remote machine newer than the app supports: the notice says it may misbehave and can be closed, kept closed for that machine and version; the badge stays", async () => {
@@ -987,8 +1023,11 @@ test("a remote machine newer than the app supports: the notice says it may misbe
   expect(alert).toHaveTextContent("Sidevoice 0.21.0 is newer than this app supports");
   expect(alert).toHaveTextContent("It may misbehave. Update this app, or install 0.20.x on NUC.");
   expect(alert.querySelector(".ui-snippet")).toBeNull();
-  await act(async () => { fireEvent.click(within(alert).getByRole("button", { name: "Close" })); });
+  const close = within(alert).getByRole("button", { name: "Close Sidevoice 0.21.0 is newer than this app supports" });
+  close.focus();
+  await act(async () => { fireEvent.click(close); });
   expect(card.querySelector(".ui-alert")).toBeNull();
+  expect(document.activeElement).toBe(card.querySelector("h4"));
   expect(cardFacts(card.parentElement!)[0]).toEqual(["Version", "0.21.0", "Newer"]);
   expect(JSON.parse(localStorage.getItem("sidevoice.service-notice-dismissed")!)).toEqual(["fp-nuc:0.21.0"]);
   // Another version of it, or another machine: not closed.

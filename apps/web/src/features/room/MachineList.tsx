@@ -18,7 +18,7 @@ import { PrepareThisComputer } from "../pairing/PrepareThisComputer";
 import { InstallCommandHere } from "../pairing/ConnectorSteps";
 import { useThisComputerSection } from "../../state/this-computer";
 import { translator, type Translate } from "../../i18n/translator";
-import { RemoteMachineRow } from "../settings/MachineRows";
+import { LocalMachineRow, RemoteMachineRow } from "../settings/MachineRows";
 import { AppRow, OfflineState, RunningState, ServiceCardTop, useLocalService, useRemoteService } from "../settings/service-version";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
 import { NewOnIcon, useHighlights } from "../highlights/highlights";
@@ -154,6 +154,21 @@ export function MachineList() {
     forgetting.current = null;
     levels.back({ instantly: true });
   }, [gone]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The same on a desktop, where the pane goes back to the overview: the machine whose page it showed is gone. Its control
+  // went with the focus that was on it (the document has it now): the overview's first row takes it, else Add a machine;
+  // focus that was elsewhere stays there. Said, forgotten here, as a phone's is.
+  const shownPage = useRef<string | null>(null);
+  useEffect(() => {
+    if (levels.phone) return;
+    if (picked && machines.some((machine) => machine.id === picked)) { shownPage.current = picked; return; }
+    if (!shownPage.current || picked !== shownPage.current) return;
+    shownPage.current = null;
+    if (forgetting.current?.id === picked) levels.say(t("settings.machineForgotten", { machine: forgetting.current.name }));
+    forgetting.current = null;
+    store?.patch({ machinesView: { machine: null } });
+    if (document.activeElement && document.activeElement !== document.body) return;
+    requestAnimationFrame(() => (document.querySelector<HTMLElement>("#machines [data-machine-row]") ?? document.querySelector<HTMLElement>("#machines .machines-add button, #pair-device-open"))?.focus());
+  }, [picked, machines, levels.phone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const empty = machines.length === 0 && <div className="machines-empty"><p className="muted">{t(own ? "hosts.noneOther" : "hosts.none")}</p>
     <Button id="pair-device-open" variant="primary" title={t(own ? "hosts.addRemote" : "hosts.add")} aria-label={t(own ? "hosts.addRemote" : "hosts.add")}
@@ -165,7 +180,10 @@ export function MachineList() {
   // The overview: each machine a row — its name, its Sidevoice's version, where that stands, a chevron — then Add a machine.
   const overview = <>
     {machines.length > 0 && <Group>
-      {machines.map((machine) => <RemoteMachineRow key={machine.id} machine={machine} name={machineName(machine, t)} isNew={notice(machine)} onOpen={() => open(machine)} />)}
+      {/* This computer, listed here only where it has no section of its own, is This device's row, as in Updates. */}
+      {machines.map((machine) => machine.local
+        ? <LocalMachineRow key={machine.id} machine={machine} name={machineName(machine, t)} isNew={notice(machine)} onOpen={() => open(machine)} />
+        : <RemoteMachineRow key={machine.id} machine={machine} name={machineName(machine, t)} isNew={notice(machine)} onOpen={() => open(machine)} />)}
     </Group>}
     {empty}
     {machines.length > 0 && <div className="machines-add"><Button variant="secondary" size="sm" title={t(own ? "hosts.addRemote" : "hosts.add")} aria-label={t(own ? "hosts.addRemote" : "hosts.add")}
@@ -199,7 +217,7 @@ export function MachineList() {
       <div className="ui-section-body">
         {/* Hidden on a desktop, where the machines are under Machines in Settings' own navigation. */}
         <div className="machines-inline"><MachineNav current /></div>
-        <HostDetail machine={shown} name={machineName(shown, t)} />
+        <HostDetail machine={shown} name={machineName(shown, t)} onForget={() => { forgetting.current = { id: shown.id, name: machineName(shown, t) }; }} />
       </div>
     </section>
   );
@@ -405,7 +423,7 @@ function LocalHostStatusPanel({ machine, status, titleId }: { machine: MachineVi
       {/* "Sidevoice service": the page is this computer's already, so its name is not said again. The service's version — the
           Sidevoice the person installed, never the core's or the connector's, nor the app's, which has its own row — and
           where it stands: up to date, updating itself, waiting for a call to end, newer than the app supports; then its port. */}
-      <ServiceCardTop who="local" titleId={titleId} focusable info={service} progress={service.progress} port={service.port} t={t}
+      <ServiceCardTop who="local" titleId={titleId} info={service} progress={service.progress} port={service.port} t={t}
         guidance={service.incompatible ? t(service.api == null ? "hosts.update.incompatibleUnknown" : "hosts.update.incompatible", { api: service.api ?? 0 }) : null}
         end={<span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{state.short}</span>} />
       {/* What the state means where it says more than its word. */}

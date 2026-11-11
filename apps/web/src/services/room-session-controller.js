@@ -398,7 +398,7 @@ function setLocalHostStatus(status){
 }
 let localHostEpoch=0;
 // What a paired machine says of its Sidevoice — its version — for its page's card and its row: asked of it with this
-// device's pairing (core GET /api/host/status, which core does not serve yet: a contract gap). Unknown stays unknown. Whether
+// device's pairing (core GET /api/host/status). Unknown stays unknown. Whether
 // it is out of date is the page's to judge, against the minor it pins (services/service-version.ts); the version it says is
 // kept, to say again when the machine does not answer.
 // One question per machine at a time: every place asking while it is out (its page's card, each place the updates

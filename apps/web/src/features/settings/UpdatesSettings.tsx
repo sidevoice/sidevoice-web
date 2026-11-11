@@ -3,6 +3,7 @@ import { Group, Section } from "../../components/ui/Card";
 import { DESKTOP_NIGHTLY_URL } from "../../services/desktop-host";
 import { host, type AppBuild } from "../../host";
 import { currentDeviceName } from "../../state/device-name";
+import type { MachineView } from "../../state/room-types";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { useThisComputerSection } from "../../state/this-computer";
 import { AppUpdateSettings } from "../updates/AppUpdateSettings";
@@ -46,7 +47,9 @@ export function UpdatesSettings() {
   const app = build !== null || updater;
   const own = useThisComputerSection();
   const machines = useRoomStore((state) => state.machines);
-  const remotes = machines.filter((machine) => !machine.local);
+  // With its own section this computer is This device, the first row; without one it is listed among the machines.
+  const listed = own ? machines.filter((machine) => !machine.local) : machines;
+  const open = (machine: MachineView) => store?.patch({ settingsSection: "machines", settingsLevel: "page", machinesView: { machine: machine.id } });
   const thisDevice = machines.find((machine) => machine.local) ?? null;
   // The name this device has here, followed as it is set.
   useRoomStore((state) => state.facts.deviceName);
@@ -57,11 +60,12 @@ export function UpdatesSettings() {
       // A landing lights the update's own line (its row with its button), never the whole card.
       ? <Group><div className="updates-settings"><AppUpdateSettings />{noted && <DesktopBuildNote build={build} updater={updater} t={t} />}</div></Group>
       : <><AppRow t={t} />{noted && <DesktopBuildNote build={build} updater={updater} t={t} />}</>)}
-    {(own || remotes.length > 0) && <Group title={t("hosts.title")}>
+    {(own || listed.length > 0) && <Group title={t("hosts.title")}>
       {own && <LocalMachineRow machine={thisDevice} name={currentDeviceName()}
         onOpen={() => store?.patch({ settingsSection: "this-computer", settingsLevel: "page" })} />}
-      {remotes.map((machine) => <RemoteMachineRow key={machine.id} machine={machine} name={machineName(machine, t)}
-        onOpen={() => store?.patch({ settingsSection: "machines", settingsLevel: "page", machinesView: { machine: machine.id } })} />)}
+      {listed.map((machine) => machine.local
+        ? <LocalMachineRow key={machine.id} machine={machine} name={machineName(machine, t)} onOpen={() => open(machine)} />
+        : <RemoteMachineRow key={machine.id} machine={machine} name={machineName(machine, t)} onOpen={() => open(machine)} />)}
     </Group>}
   </Section>;
 }

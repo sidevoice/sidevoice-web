@@ -28,12 +28,13 @@ function LinkRow({ icon, name, spoken, description, badge, isNew = 0, onOpen, ..
   </button>;
 }
 
-/** This device's row: its name, its service's version and where it stands; the green dot on its icon while its service runs. */
-export function LocalMachineRow({ machine, name, onOpen }: { machine: MachineView | null; name: string; onOpen: () => void }) {
+/** This device's row: its name, its service's version and where the app says it stands; the green dot on its icon while its
+ *  service runs. Where this computer is listed among the machines (it has no section of its own), it is this row there too. */
+export function LocalMachineRow({ machine, name, isNew = 0, onOpen }: { machine: MachineView | null; name: string; isNew?: number; onOpen: () => void }) {
   const t = translator();
   const service = useLocalService();
   const local = useRoomStore((state) => state.facts.localHostStatus);
-  return <LinkRow icon={<StateOnIcon icon={<ThisComputerIcon size={20} />} status={machineStatus(machine, local, true, t)} />} name={name} onOpen={onOpen} data-machine-row="local"
+  return <LinkRow icon={<StateOnIcon icon={<ThisComputerIcon size={20} />} status={machineStatus(machine, local, true, t)} />} name={name} isNew={isNew} onOpen={onOpen} data-machine-row="local" data-machine={machine?.id}
     description={service.version ? t("settings.updates.version", { version: service.version }) : null}
     badge={service.kind === "unknown" ? null : <ServiceBadge kind={service.kind} t={t} />} />;
 }

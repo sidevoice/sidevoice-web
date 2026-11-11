@@ -1,8 +1,9 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { host, type AppUpdater, type UpdateMode, type UpdaterFailure, type UpdaterStatus } from "../../host";
 import { getReport, subscribe } from "../../services/local-service";
-import { remoteKind } from "../../services/service-version";
+import { localKind, remoteKind } from "../../services/service-version";
 import { useRoomStore } from "../../state/room-store";
+import { useThisComputerSection } from "../../state/this-computer";
 import type { MachineView } from "../../state/room-types";
 
 /* What wants updating, from three places: this page (a newer build the room serves: out of a call the page reloads
@@ -215,16 +216,19 @@ export function appUpdatePending(status: UpdaterStatus | null, mode: UpdateMode 
 }
 
 /** The paired machines whose Sidevoice is out of date against the minor this page works with (an older minor, or an older
- *  patch of it where this device's service knows the newest): only those still paired here, so a machine forgotten while
- *  it was behind is not listed. */
+ *  version of it where this device's service knows the newest): only those still paired here, so a machine forgotten while
+ *  it was behind is not listed. This computer is not one where it has its own section — the app updates its service by
+ *  itself — but where it is listed among the machines (this device cannot be the app's), it is judged as the app says it. */
 export function useOutdatedMachines(): { machine: MachineView; version: string | null }[] {
   const machines = useRoomStore((state) => state.machines);
   const status = useRoomStore((state) => state.facts.remoteHostStatus);
+  const own = useThisComputerSection();
   const bridge = host().localHost;
-  const latest = useSyncExternalStore(subscribe, () => getReport(bridge)?.latest ?? null, () => null);
+  const report = useSyncExternalStore(subscribe, () => getReport(bridge), () => null);
   return machines.flatMap((machine) => {
-    const version = !machine.local && machine.pairingId ? status?.[machine.pairingId]?.version ?? null : null;
-    return remoteKind(version, latest) === "behind" ? [{ machine, version }] : [];
+    if (machine.local) return !own && localKind(report?.update) === "behind" ? [{ machine, version: null }] : [];
+    const version = machine.pairingId ? status?.[machine.pairingId]?.version ?? null : null;
+    return remoteKind(version, report?.latest ?? null) === "behind" ? [{ machine, version }] : [];
   });
 }
 

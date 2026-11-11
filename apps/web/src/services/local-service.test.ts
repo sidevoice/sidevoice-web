@@ -61,6 +61,28 @@ test("every 2 s while it updates or waits for a call to end — its progress mov
   stop();
 });
 
+test("not asked on a timer while the window is hidden — Settings keeps a listener for the whole session — and again from the moment it is shown", async () => {
+  const version = bridge([report("updating", { progress: 0.2 })]);
+  const stop = subscribe(() => {});
+  await flush();
+  expect(version).toHaveBeenCalledTimes(1);
+  const hidden = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+  // The question already out comes back, and no timer follows it.
+  await ticks(10 * POLL_IDLE_MS);
+  expect(version).toHaveBeenCalledTimes(2);
+  await ticks(10 * POLL_IDLE_MS);
+  expect(version).toHaveBeenCalledTimes(2);
+  hidden.mockReturnValue("visible");
+  document.dispatchEvent(new Event("visibilitychange"));
+  await flush();
+  expect(version).toHaveBeenCalledTimes(3);
+  // Updating: every 2 s again.
+  await ticks(POLL_BUSY_MS);
+  expect(version).toHaveBeenCalledTimes(4);
+  stop();
+  hidden.mockRestore();
+});
+
 test("asked again when the window is focused or shown, not when it is hidden", async () => {
   const version = bridge([report("current")]);
   const stop = subscribe(() => {});
