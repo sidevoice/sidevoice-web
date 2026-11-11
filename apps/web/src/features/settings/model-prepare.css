@@ -152,6 +152,10 @@
 .model-list-size { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-regular); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* The recommended model's «Recomendado» before its size, on the same line (VoiceSettings.tsx ModelPickers). */
 .model-list-badges { display: inline-flex; align-items: center; gap: var(--sv-space-2); }
+/* A model's name stays on its line in the Model list: too long for the room «Recomendado» and its size leave, it ends in
+   an ellipsis (the list itself is as wide as the screen allows, up to 28rem: ui.css). */
+.ui-select-item:has(.model-list-size, .model-list-badges) .ui-select-item-text { grid-template-columns: minmax(0, 1fr); }
+.ui-select-item:has(.model-list-size, .model-list-badges) .ui-select-item-text > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* That the model does not speak the language in use: its own line under the hardware, as quiet. */
 .model-list-unsupported { display: block; }
 /* The spec sheet (ModelSheet): what the model is in one bordered block, a label column and a value column, tight;
