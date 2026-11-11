@@ -407,7 +407,7 @@ export function SettingsDialog() {
                   // This device is a machine's entry too: its name, and its service's state under it, said in its name.
                   const device = section.id === "this-computer";
                   return <Fragment key={section.id}><button type="button" id={"settings-" + section.id} className={device ? "ui-nav-item this-device-entry" : "ui-nav-item"} aria-controls={"pane-" + section.id}
-                    aria-current={section.id === current ? section.id === "machines" ? "true" : "page" : undefined} aria-label={device ? machineEntryName(label(section.id), thisDevice, isNew(section.id), t) : undefined}
+                    aria-current={section.id === current ? section.id === "machines" && machine ? "true" : "page" : undefined} aria-label={device ? machineEntryName(label(section.id), thisDevice, isNew(section.id), t) : undefined}
                     onClick={() => section.id === "machines" ? store?.patch({ settingsSection: "machines", machinesView: { machine: null } }) : show(section.id)}>
                     <NewOnIcon icon={icon(section.id)} isNew={isNew(section.id) || updated(section.id)} />
                     {device ? <MachineEntryCopy name={label(section.id)} status={thisDevice} isNew={isNew(section.id)} /> : <span>{label(section.id)}</span>}

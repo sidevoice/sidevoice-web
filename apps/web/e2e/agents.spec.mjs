@@ -21,7 +21,7 @@ async function openMachines(page, width, height) {
 
 async function openAgents(page) {
   // A phone's Machines is a list: the machine's row opens its page, under its name.
-  const open = page.locator(".machines-menu .machine-entry[data-name='E2E Host']");
+  const open = page.locator("#pane-machines [data-machine-row][data-name='E2E Host']");
   await expect(open).toBeVisible();
   await expect(open).toHaveAccessibleName(/Online/);
   await open.click();
@@ -99,6 +99,6 @@ test("a machine that revokes this device loses its Agents actions and asks for p
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("sidevoice.pairings")));
   expect(stored.pairings[0].revoked).toBe(true);
   await pairingDialog.getByRole("button", { name: "Close pairing" }).click();
-  await expect(page.locator(".machine-entry[data-state='revoked']").first()).toHaveAttribute("data-name", "E2E Host");
+  await expect(page.locator("#pane-machines [data-machine-row][data-state='revoked']").first()).toHaveAttribute("data-name", "E2E Host");
   await expect(page.getByRole("heading", { name: "Agents", exact: true })).toHaveCount(0);
 });

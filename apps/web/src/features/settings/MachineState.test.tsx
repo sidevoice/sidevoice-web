@@ -39,8 +39,9 @@ function open(facts: Record<string, unknown> = {}, pairings = [local, paired(), 
   window.sidevoiceActions = { openPairing: vi.fn(), localHostDevices: vi.fn().mockResolvedValue([]), machineDevices: vi.fn().mockResolvedValue([]),
     loadHostAgents: vi.fn(), revokeLocalHostDevice: vi.fn(), loadMachineInfo: vi.fn() } as unknown as typeof window.sidevoiceActions;
   const store = createRoomStore();
+  // A machine's page is open — the first remote one — unless the facts say otherwise (`{ machine: null }`: the overview).
   act(() => { store.patch({ pairings, machinesAt: 1_700_086_400_000, machinesReady: true, localHostAvailable: true, inApp: true,
-    localHostStatus: running, machineLinks: links, settingsSection: "machines", ...facts }); });
+    localHostStatus: running, machineLinks: links, settingsSection: "machines", machinesView: { machine: pairings.find((item) => !item.local)?.fp ?? null }, ...facts }); });
   render(<RoomProvider store={store}><SettingsDialog /></RoomProvider>);
   document.getElementById("language-settings")!.setAttribute("open", "");
   return store;

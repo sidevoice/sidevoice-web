@@ -141,6 +141,8 @@ test("a failed local host projected during setup returns to the normal room and 
   pane?.removeAttribute("hidden");
   dialog?.setAttribute("open", "");
   expect(document.querySelector(".machine-entry[data-local='true']")).toHaveAttribute("data-name", "This computer");
+  // Its page, from Machines' overview: where the installed service's card is.
+  act(() => store.patch({ machinesView: { machine: "local-host" } }));
   await act(async () => { rejectInstall({ key: "install.service", step: "service" }); await Promise.resolve(); });
   expect(document.querySelector(".local-host-banner")).toBeInTheDocument();
   // Once preparation has stopped, the installed service's Retry restarts it from the banner or its card.

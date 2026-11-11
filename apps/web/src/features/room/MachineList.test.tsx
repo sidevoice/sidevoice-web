@@ -42,9 +42,12 @@ const thisDevice = () => document.getElementById("this-computer")!;
 const Panes = () => <><ThisComputerSettings /><MachineList /></>;
 
 
+/** Settings' Machines, drawn with `facts`. A machine's page is open — the first remote one — unless the facts say `machinesView`
+ *  (`{ machine: null }`: the overview, which is what Remote machines opens first). */
 function room(pairings: PairingSummary[], facts: Record<string, unknown> = {}) {
   const store = createRoomStore();
-  act(() => { store.patch({ pairings, machinesAt: 1_700_086_400_000,
+  const first = pairings.find((item) => !item.local)?.fp ?? null;
+  act(() => { store.patch({ pairings, machinesAt: 1_700_086_400_000, machinesView: { machine: first },
     machinesReady: true, localHostAvailable: pairings.some((item) => item.local), inApp: pairings.some((item) => item.local), localHostStatus: running, ...facts }); });
   render(<RoomProvider store={store}><Panes /></RoomProvider>);
   return store;
@@ -392,7 +395,7 @@ test("an in-flight device list cannot repopulate Devices after reachability is l
 
 test("in a browser (this device can't host) it is plain Machines, Add a machine, with no This device", async () => {
   actions();
-  const store = room([paired()], { machineLinks: { "fp-nuc": { reach: "ok", via: "node" } } });
+  const store = room([paired()], { machinesView: { machine: null }, machineLinks: { "fp-nuc": { reach: "ok", via: "node" } } });
   expect(store.getState().facts.inApp).toBeFalsy();
   const machines = document.getElementById("machines")!;
   expect(within(machines).getByRole("heading", { level: 2 })).toHaveTextContent(/^Machines$/);
@@ -410,7 +413,7 @@ test("in a browser (this device can't host) it is plain Machines, Add a machine,
   expect(document.getElementById("pair-device-open")).toHaveAttribute("title", "Add a machine");
   cleanup();
   // Not even a browser talking to a local Sidevoice: that one is a machine among the others.
-  room([local, paired()], { localHostAvailable: true, inApp: false });
+  room([local, paired()], { localHostAvailable: true, inApp: false, machinesView: { machine: null } });
   expect(within(document.getElementById("machines")!).getByRole("heading", { level: 2 })).toHaveTextContent(/^Machines$/);
   expect([...document.querySelectorAll(".machine-nav button")].map((button) => button.textContent)).toEqual([expect.stringMatching(/MacBook/), expect.stringMatching(/^NUC/), "Add"]);
   expect(document.querySelector(".machine-nav-add")).toHaveAccessibleName("Add a machine");
@@ -585,8 +588,8 @@ test("the remote machines are entries under Remote machines, Add a remote machin
   const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), loadHostAgents: vi.fn() };
   window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
   const other = paired({ fp: "fp-other", host: "Other PC" });
-  const store = room([local, paired(), other], { machineLinks: { "fp-nuc": { reach: "ok", via: "node" }, "fp-other": { reach: "ok", via: "node" } } });
-  const machines = document.getElementById("machines")!;
+  const store = room([local, paired(), other], { machinesView: { machine: null }, machineLinks: { "fp-nuc": { reach: "ok", via: "node" }, "fp-other": { reach: "ok", via: "node" } } });
+  let machines = document.getElementById("machines")!;
   const nav = machines.querySelector(".machines-inline .machine-nav")!;
   expect(within(machines).getByRole("heading", { level: 2 })).toHaveTextContent("Remote machines");
   expect([...nav.querySelectorAll("button")].map((button) => button.textContent)).toEqual([expect.stringMatching(/^NUC/), expect.stringMatching(/^Other PC/), "Add"]);
@@ -594,22 +597,96 @@ test("the remote machines are entries under Remote machines, Add a remote machin
   expect(entry("NUC")).toHaveAccessibleName("NUC, Online");
   // Each a server, as Remote machines' own icon is: in its entry and in its page's header.
   expect(entry("NUC").querySelector("svg")).toHaveClass("lucide-server");
-  expect(machines.querySelector('.host-detail[aria-label="NUC"] .machine-icon svg')).toHaveClass("lucide-server");
-  // Remote machines alone is the first remote machine; this computer's page is This device's.
-  // Each card is the Sidevoice service: the remote machine's, to read, there; this computer's, with its controls, here.
-  expect(within(machines).getByRole("heading", { name: "Sidevoice service" }).closest(".host-status-card")).toHaveAttribute("data-remote");
-  expect(machines.querySelector(".host-status-card:not([data-remote])")).toBeNull();
+  // Remote machines alone is their overview, no machine's page; this computer's page is This device's.
+  // Each card is the Sidevoice service: the remote machine's, to read, on its page; this computer's, with its controls, here.
+  expect(machines.querySelector(".host-status-card")).toBeNull();
+  expect(entry("NUC")).not.toHaveAttribute("aria-current");
   expect(within(thisDevice()).getByRole("heading", { name: "Sidevoice service" }).closest(".host-status-card")).not.toHaveAttribute("data-remote");
   await act(async () => { entry("Other PC").click(); });
-  expect(store.getState().facts.machinesView.machine).not.toBeNull();
+  expect(store.getState().facts.machinesView.machine).toBe("fp-other");
+  // Its page replaces the overview in the pane.
+  machines = document.getElementById("machines")!;
   // Every machine's page has its Sidevoice service's card: another machine's, to read.
   const page = (name: string) => within(machines).queryByRole("region", { name });
   expect(page("NUC")).toBeNull();
   expect(within(page("Other PC")!).getByRole("heading", { name: "Sidevoice service" }).closest(".host-status-card")).toHaveAttribute("data-remote");
   await act(async () => { entry("NUC").click(); });
   expect(within(page("NUC")!).getByRole("heading", { name: "Sidevoice service" }).closest(".host-status-card")).toHaveAttribute("data-remote");
+  expect(machines.querySelector('.host-detail[aria-label="NUC"] .machine-icon svg')).toHaveClass("lucide-server");
   expect(within(machines).getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
   expect(entry("NUC")).toHaveAttribute("aria-current", "page");
+});
+
+/* Remote machines is a page of its own (sidevoice-web#593): the machines as rows, the same rows as Settings › Updates'; a
+ * machine's page shows that machine and nothing about the section. */
+/** The overview's rows: each machine's name, its version line and its badge. */
+const overviewRows = () => [...document.querySelectorAll<HTMLElement>("#machines [data-machine-row]")].map((row) => [
+  row.querySelector(".svc-link-name")?.textContent, row.querySelector(".ui-row-description")?.textContent ?? null, row.querySelector(".ui-badge")?.textContent ?? null]);
+
+test("Remote machines opens its overview: each machine a row — name, version, where it stands — and Add a remote machine; no machine's page, no card", async () => {
+  onTestFinished(() => localStorage.removeItem("sidevoice.service-last-seen"));
+  localStorage.setItem("sidevoice.service-last-seen", JSON.stringify({ "fp-away": "0.19.9" }));
+  const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), loadHostAgents: vi.fn(), loadMachineInfo: vi.fn() };
+  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
+  const lab = paired({ fp: "fp-lab", host: "Lab box" }), away = paired({ fp: "fp-away", host: "Attic" });
+  const store = room([local, paired(), lab, away], { machinesView: { machine: null }, machineLinks: { "fp-nuc": { reach: "ok", via: "node" }, "fp-lab": { reach: "ok", via: "node" }, "fp-away": { reach: "offline", via: "" } },
+    remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 1, version: "0.20.4" }, "fp-lab": { state: "connected", checkedAt: 1, version: "0.19.2" } } });
+  const section = document.getElementById("machines")!;
+  expect(within(section).getByRole("heading", { level: 2 })).toHaveTextContent(/^Remote machines$/);
+  expect(section.querySelector(".ui-section-description")).toHaveTextContent("The computers where your agents run.");
+  // This computer is This device's, not a row here.
+  expect(overviewRows()).toEqual([["NUC", "Version 0.20.4", "Up to date"], ["Lab box", "Version 0.19.2", "Out of date"], ["Attic", "Version 0.19.9", "Offline"]]);
+  // A button, whole row: its name says its machine, its version, where it stands, and — connected — that it is online.
+  expect(within(section).getByRole("button", { name: /^NUC ?, Online Version 0\.20\.4 Up to date$/ })).toBeInTheDocument();
+  expect(within(section).getByRole("button", { name: /^Attic Version 0\.19\.9 Offline$/ })).toBeInTheDocument();
+  // The green dot on a connected machine's icon, nothing on one that does not answer.
+  expect(section.querySelector('[data-machine="fp-nuc"] .state-on-icon-dot')).not.toBeNull();
+  expect(section.querySelector('[data-machine="fp-away"] .state-on-icon-dot')).toBeNull();
+  // No machine's page, no card, no notice: the rows only; and Add a remote machine after them.
+  expect(section.querySelector(".host-detail, .host-status-card, .ui-alert")).toBeNull();
+  const add = section.querySelector<HTMLElement>(".machines-add button")!;
+  expect(add).toHaveAccessibleName("Add a remote machine");
+  await act(async () => { add.click(); });
+  expect(done.openPairing).toHaveBeenCalledTimes(1);
+  // Each machine is asked for its version, once connected.
+  expect(done.loadMachineInfo.mock.calls.map(([fp]) => fp).sort()).toEqual(["fp-lab", "fp-nuc"]);
+  // The row opens the machine's page, in the pane: Remote machines (in the nav) is the way back.
+  await act(async () => { section.querySelector<HTMLElement>("[data-machine-row=fp-lab]")!.click(); });
+  expect(store.getState().facts.machinesView.machine).toBe("fp-lab");
+  expect(document.querySelector("#machines .host-detail")).toHaveAttribute("aria-label", "Lab box");
+  expect(entry("Lab box")).toHaveAttribute("aria-current", "page");
+  act(() => { store.patch({ machinesView: { machine: null } }); });
+  expect(overviewRows()).toHaveLength(3);
+  expect(entry("Lab box")).not.toHaveAttribute("aria-current");
+});
+
+test("a machine's page has no section above it — no Remote machines, no 'The computers where your agents run' — only that machine, its name the page's heading", async () => {
+  const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), loadHostAgents: vi.fn(), loadMachineInfo: vi.fn() };
+  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
+  room([local, paired()], { machineLinks: { "fp-nuc": { reach: "ok", via: "node" } } });
+  const section = document.getElementById("machines")!;
+  expect(section.querySelector(".ui-section-head, .ui-section-title, .ui-section-description")).toBeNull();
+  expect(within(section).queryByText("Remote machines")).toBeNull();
+  expect(within(section).queryByText(/The computers where your agents run/)).toBeNull();
+  expect(within(section).getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual(["NUC"]);
+  // That machine: its state, its card, its agents, its devices, Forget.
+  expect(within(section).getByRole("region", { name: "NUC" })).toBeInTheDocument();
+  expect(within(section).getByRole("heading", { name: "Sidevoice service" })).toBeInTheDocument();
+  expect(within(section).getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
+  expect(within(section).getByRole("button", { name: "Forget NUC" })).toBeInTheDocument();
+});
+
+test("a machine forgotten from its page leaves the overview, not the page of another", async () => {
+  const forget = vi.fn();
+  const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), loadHostAgents: vi.fn(), loadMachineInfo: vi.fn(), forgetMachine: forget };
+  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
+  const lab = paired({ fp: "fp-lab", host: "Lab box" });
+  const store = room([paired(), lab], { machineLinks: { "fp-nuc": { reach: "ok", via: "node" }, "fp-lab": { reach: "ok", via: "node" } } });
+  expect(document.querySelector('#machines .host-detail')).toHaveAttribute("aria-label", "NUC");
+  act(() => { store.patch({ pairings: [lab] }); });
+  // NUC is gone: no page for it, so the overview, with the one left.
+  expect(document.querySelector("#machines .host-detail")).toBeNull();
+  expect(overviewRows()).toEqual([["Lab box", null, null]]);
 });
 
 test("asked for a machine's agents, Machines shows that machine once, without feeding the store back into itself", () => {

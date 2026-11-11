@@ -47,6 +47,7 @@ export function UpdatesSettings() {
   const own = useThisComputerSection();
   const machines = useRoomStore((state) => state.machines);
   const remotes = machines.filter((machine) => !machine.local);
+  const thisDevice = machines.find((machine) => machine.local) ?? null;
   // The name this device has here, followed as it is set.
   useRoomStore((state) => state.facts.deviceName);
   // A nightly or development app says what it is under its version.
@@ -57,7 +58,7 @@ export function UpdatesSettings() {
       ? <Group><div className="updates-settings"><AppUpdateSettings />{noted && <DesktopBuildNote build={build} updater={updater} t={t} />}</div></Group>
       : <><AppRow t={t} />{noted && <DesktopBuildNote build={build} updater={updater} t={t} />}</>)}
     {(own || remotes.length > 0) && <Group title={t("hosts.title")}>
-      {own && <LocalMachineRow name={currentDeviceName()}
+      {own && <LocalMachineRow machine={thisDevice} name={currentDeviceName()}
         onOpen={() => store?.patch({ settingsSection: "this-computer", settingsLevel: "page" })} />}
       {remotes.map((machine) => <RemoteMachineRow key={machine.id} machine={machine} name={machineName(machine, t)}
         onOpen={() => store?.patch({ settingsSection: "machines", settingsLevel: "page", machinesView: { machine: machine.id } })} />)}

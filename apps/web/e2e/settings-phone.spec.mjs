@@ -26,7 +26,7 @@ test("a phone's Settings: the system's back and Escape go up a level, and from t
   await expect(page.locator("#settings-machines .settings-menu-summary")).toHaveText(/^E2E Host · Online$/);
   await page.locator("#settings-machines").click();
   await expect(title).toHaveText("Machines");
-  const machine = page.locator(".machines-menu .machine-entry[data-name='E2E Host']");
+  const machine = page.locator("#pane-machines [data-machine-row][data-name='E2E Host']");
   // Online: a dot on its icon, said in its name.
   await expect(machine).toHaveAccessibleName(/Online/);
   await machine.click();
