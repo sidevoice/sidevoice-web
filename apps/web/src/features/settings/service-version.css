@@ -33,3 +33,4 @@
 .svc-strip[data-port="b"] > [data-fact="port"] { text-align: end; }
 .svc-strip[data-port="b"] > [data-fact="port"] dd { justify-content: flex-end; }
 .svc-upd-below:empty { display: none; }
+.svc-hint p .ui-button { margin-inline-start: auto; flex: none; }

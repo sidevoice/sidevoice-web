@@ -341,7 +341,7 @@ function RemoteHostCard({ machine, name, titleId }: { machine: MachineView; name
   // and its port, the notice under them; not answering, only that (b1) or that and what it was last seen at (b2).
   return (
     <div className="host-status-card" data-remote data-tone={offline ? undefined : "positive"}>
-      <ServiceCardTop titleId={titleId} info={service} port={port} supported={service.supported} machine={name} command={service.command} t={t}
+      <ServiceCardTop who={machine.pairingId ?? machine.id} titleId={titleId} info={service} port={port} supported={service.supported} machine={name} command={service.command} t={t}
         end={offline ? <OfflineState t={t} /> : <RunningState t={t} />} offline={offline ? mode : null} lastSeen={service.lastSeen} />
     </div>
   );
@@ -408,7 +408,7 @@ function LocalHostStatusPanel({ machine, status, titleId }: { machine: MachineVi
     <div className="host-status-card" data-state={status.state} data-tone={state.tone}>
       {/* The service's version and where it stands, in the place the layout gives them (service-version.tsx); the app's own
           version is no longer here. */}
-      <ServiceCardTop titleId={titleId} focusable info={service} port={port} supported={service.supported} t={t}
+      <ServiceCardTop who="local" titleId={titleId} focusable info={service} port={port} supported={service.supported} t={t}
         end={<span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{state.short}</span>} />
       {/* Running or stopped, the state's word says it ("Running", "Not started") and Start follows: no sentence repeats it.
           Whether it starts at sign-in is its switch's alone, below. */}

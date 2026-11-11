@@ -1,9 +1,10 @@
 import { useRoomStore } from "../../state/room-store";
 import type { MachineView } from "../../state/room-types";
-import type { ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Badge, type BadgeTone } from "../../components/ui/Badge";
-import { WarningIcon } from "../../components/ui/Icons";
+import { Button } from "../../components/ui/Button";
+import { CloseIcon, WarningIcon } from "../../components/ui/Icons";
 import { Group } from "../../components/ui/Card";
 import { ProgressBar } from "../../components/ui/ProgressBar";
 import { Snippet } from "../../components/ui/Snippet";
@@ -90,20 +91,45 @@ export function noticeOf(info: ServiceInfo, supported: string, machine: string |
   return { ...copy, command: machine && info.kind === "behind" && command ? command : null, machine: machine ?? "" };
 }
 
-/** The notice, in the permissions notice's own Alert; the command that updates it, inside the Alert, to copy. */
-export function ServiceNotice({ info, supported, machine, command, t }: { info: ServiceInfo; supported: string; machine?: string; command?: string; t: Translate }) {
+/* The "newer than supported" notice can be closed, and then stays closed for that version of that machine (its badge stays);
+ * the "out of date" one, with its command, cannot. Kept in this page's storage, as a list of "machine:version". */
+const DISMISSED = "sidevoice.service-notice-dismissed";
+const subscribe = (changed: () => void) => { window.addEventListener("storage", changed); window.addEventListener("svc-dismissed", changed); return () => { window.removeEventListener("storage", changed); window.removeEventListener("svc-dismissed", changed); }; };
+const snapshot = () => { try { return localStorage.getItem(DISMISSED) ?? "[]"; } catch { return "[]"; } };
+function useDismissal(who: string, info: ServiceInfo) {
+  const raw = useSyncExternalStore(subscribe, snapshot, () => "[]");
+  const id = who + ":" + info.version;
+  const closable = info.kind === "newer";
+  let list: string[] = [];
+  try { list = JSON.parse(raw); } catch { /* none */ }
+  return { closable, dismissed: closable && list.includes(id), dismiss() {
+    try { localStorage.setItem(DISMISSED, JSON.stringify([...new Set([...list, id])])); } catch { /* storage blocked: closed for now only */ }
+    window.dispatchEvent(new Event("svc-dismissed"));
+  } };
+}
+
+/** The notice's close button. */
+function CloseNotice({ onClose, t }: { onClose: () => void; t: Translate }) {
+  return <Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("ui.close")} title={t("ui.close")} onClick={onClose}><CloseIcon size={14} /></Button>;
+}
+
+/** The notice, in the permissions notice's own Alert; the command that updates it, inside the Alert, to copy. `who`: whose
+ *  service it is, for its dismissal. */
+export function ServiceNotice({ who, info, supported, machine, command, t }: { who: string; info: ServiceInfo; supported: string; machine?: string; command?: string; t: Translate }) {
   const notice = noticeOf(info, supported, machine, command, t);
-  if (!notice) return null;
-  return <Alert tone="warning" title={notice.title}
+  const close = useDismissal(who, info);
+  if (!notice || close.dismissed) return null;
+  return <Alert tone="warning" title={notice.title} action={close.closable ? <CloseNotice onClose={close.dismiss} t={t} /> : undefined}
     footer={notice.command ? <Snippet text={notice.command} label={t("settings.updates.copyCommand", { machine: notice.machine })} /> : undefined}>{notice.body}</Alert>;
 }
 
 /** The same words, quiet: a line with its icon, the command under it (the compact updates list). */
-export function ServiceHint({ info, supported, machine, command, t }: { info: ServiceInfo; supported: string; machine?: string; command?: string; t: Translate }) {
+export function ServiceHint({ who, info, supported, machine, command, t }: { who: string; info: ServiceInfo; supported: string; machine?: string; command?: string; t: Translate }) {
   const notice = noticeOf(info, supported, machine, command, t);
-  if (!notice) return null;
+  const close = useDismissal(who, info);
+  if (!notice || close.dismissed) return null;
   return <div className="svc-hint">
-    <p><WarningIcon size={16} className="svc-hint-icon" /><span><strong>{notice.title}.</strong> {notice.body}</span></p>
+    <p><WarningIcon size={16} className="svc-hint-icon" /><span><strong>{notice.title}.</strong> {notice.body}</span>{close.closable && <CloseNotice onClose={close.dismiss} t={t} />}</p>
     {notice.command && <Snippet text={notice.command} label={t("settings.updates.copyCommand", { machine: notice.machine })} />}
   </div>;
 }
@@ -117,8 +143,8 @@ export function ServiceBadge({ kind, t }: { kind: Exclude<ServiceKind, "unknown"
  *  right (\`end\`: This device's or a remote machine's "En marcha", a machine's "Sin conexión"); under it two columns, the
  *  version with its badge and the port; the progress bar while it updates; the notice where there is one. \`offline\`: a
  *  machine that does not answer, which says that and, in b2, what it was last seen at, and nothing else. */
-export function ServiceCardTop({ titleId, focusable = false, info, port, end, machine, command, supported, offline = null, lastSeen = null, t }: {
-  titleId: string; focusable?: boolean; info: ServiceInfo; port: number | null; end: ReactNode; machine?: string; command?: string; supported: string;
+export function ServiceCardTop({ who, titleId, focusable = false, info, port, end, machine, command, supported, offline = null, lastSeen = null, t }: {
+  who: string; titleId: string; focusable?: boolean; info: ServiceInfo; port: number | null; end: ReactNode; machine?: string; command?: string; supported: string;
   offline?: "b1" | "b2" | null; lastSeen?: string | null; t: Translate;
 }) {
   const kind = !offline && info.kind !== "unknown" ? info.kind : null;
@@ -136,7 +162,7 @@ export function ServiceCardTop({ titleId, focusable = false, info, port, end, ma
     </dl>}
     {offline === "b2" && lastSeen && <p className="svc-meta">{t("service.lastSeen", { version: lastSeen })}</p>}
     {shown && info.kind === "updating" && <ProgressBar value={null} label={t(BADGE.updating)} className="svc-bar" />}
-    {shown && <ServiceNotice info={info} supported={supported} machine={machine} command={command} t={t} />}
+    {shown && <ServiceNotice who={who} info={info} supported={supported} machine={machine} command={command} t={t} />}
   </>;
 }
 

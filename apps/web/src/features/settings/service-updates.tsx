@@ -61,8 +61,8 @@ function RemoteRow({ view, machine, t }: { view: Alternative; machine: MachineVi
   const badge = offline ? <Badge tone="neutral" dot className="svc-badge">{t("service.offline")}</Badge> : known ? <ServiceBadge kind={known} t={t} /> : null;
   const line = offline ? (mode === "b2" && service.lastSeen ? t("service.lastSeen", { version: service.lastSeen }) : null) : service.version ? t("settings.updates.version", { version: service.version }) : null;
   const description = view === "u2" ? null : view === "u3" ? line : [t("hosts.section.service"), line].filter(Boolean).join(" · ");
-  const below = view === "u1" ? known && <ServiceNotice info={service} supported={service.supported} machine={name} command={service.command} t={t} />
-    : view === "u2" ? known && <ServiceHint info={service} supported={service.supported} machine={name} command={service.command} t={t} /> : null;
+  const below = view === "u1" ? known && <ServiceNotice who={machine.pairingId ?? machine.id} info={service} supported={service.supported} machine={name} command={service.command} t={t} />
+    : view === "u2" ? known && <ServiceHint who={machine.pairingId ?? machine.id} info={service} supported={service.supported} machine={name} command={service.command} t={t} /> : null;
   return <UpdateRow view={view} icon={view === "u3" ? <span className="svc-machine-icon"><OtherMachineIcon size={20} /></span> : undefined} label={name} description={description}
     value={view === "u2" && !offline && service.version ? number(service.version) : undefined} badge={badge} below={below}
     onOpen={view === "u3" ? () => store?.patch({ settingsSection: "machines", settingsLevel: "page", machinesView: { machine: machine.id } }) : undefined} />;
@@ -79,8 +79,8 @@ export function ServiceUpdates({ view }: { view: Alternative }) {
   const device = currentDeviceName();
   const info: ServiceInfo = service;
   const localBadge = service.kind === "unknown" ? null : <ServiceBadge kind={service.kind} t={t} />;
-  const localBelow = view === "u1" ? <>{service.kind === "updating" && <ProgressBar value={null} label={t("service.badge.updating")} className="svc-bar" />}<ServiceNotice info={info} supported={service.supported} t={t} /></>
-    : view === "u2" ? <>{service.kind === "updating" && <ProgressBar value={null} label={t("service.badge.updating")} className="svc-bar" />}<ServiceHint info={info} supported={service.supported} t={t} /></> : null;
+  const localBelow = view === "u1" ? <>{service.kind === "updating" && <ProgressBar value={null} label={t("service.badge.updating")} className="svc-bar" />}<ServiceNotice who="local" info={info} supported={service.supported} t={t} /></>
+    : view === "u2" ? <>{service.kind === "updating" && <ProgressBar value={null} label={t("service.badge.updating")} className="svc-bar" />}<ServiceHint who="local" info={info} supported={service.supported} t={t} /></> : null;
   const appRow = <AppUpdateRow view={view} kind={appKind} t={t} />;
   return <Section id="updates" title={t("settings.section.updates")} description={t("settings.updates.description")}>
     {view === "u2" ? <Group>
