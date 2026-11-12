@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.32.3](https://github.com/sidevoice/sidevoice-web/compare/v0.32.2...v0.32.3) (2026-11-12)
+
+
+### Bug Fixes
+
+* **card:** the person's pill is a pill beside the reply it cut in on ([#603](https://github.com/sidevoice/sidevoice-web/issues/603)) ([7f13135](https://github.com/sidevoice/sidevoice-web/commit/7f131355f15d62eecee6c78a02a0d8ed95a38cf0))
+
 ## [0.32.2](https://github.com/sidevoice/sidevoice-web/compare/v0.32.1...v0.32.2) (2026-11-12)
 
 
