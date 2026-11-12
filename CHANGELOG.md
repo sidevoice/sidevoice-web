@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.32.2](https://github.com/sidevoice/sidevoice-web/compare/v0.32.1...v0.32.2) (2026-11-12)
+
+
+### Bug Fixes
+
+* **creature:** a creature built again on the stage's canvas does not keep the last one's crop ([#601](https://github.com/sidevoice/sidevoice-web/issues/601)) ([51e672f](https://github.com/sidevoice/sidevoice-web/commit/51e672fbdbac82feb8692f5d52f3251749111902))
+
 ## [0.32.1](https://github.com/sidevoice/sidevoice-web/compare/v0.32.0...v0.32.1) (2026-11-12)
 
 
