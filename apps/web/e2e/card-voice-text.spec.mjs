@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openCard } from "./motion-states.mjs";
+import { holdReply, openCard } from "./motion-states.mjs";
 
 // Each case opens the room, then the card, two page loads that a software GL and a busy runner take their time over (the first
 // case of a worker, cold, has run past the 30 s default). The checks themselves wait on what they read.
@@ -127,6 +127,49 @@ for (const format of ["card", "avatar"]) {
     }));
     for (const bar of blink) expect(bar).toMatchObject({ name: "turn-bar-blink", state: "running", props: ["opacity", "transform"], lowestOpacity: 0.4 });
     await expect(turn.getByRole("button", { name: "Cancel sending" })).toBeVisible();
+  });
+}
+
+/* The docked cards share one cell of their column, so a card's height must be its own: the person's pill (border-radius 999px) stretched to
+ * the three lines of the reply it cut in on, which is still there lifting away, was a circle (seen in the desktop app, 2026-11-12). Read
+ * with a card three lines tall beside the pill, in the cell's one place, and then at the end of the real turn: the reply it cut in on is
+ * gone, and the column is the pill's own size, so the pill sits where the creature or the card puts it, not in the reply's width. */
+/** The person's turn opens over the reply on the card, as the app relays the room's facts. */
+const speakOver = (page) => page.evaluate(() => {
+  const call = window.__cardState.call, facts = call.facts, reply = facts.history[facts.history.length - 1];
+  window.__cardState = { ...window.__cardState, call: { ...call, facts: { ...facts, userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: reply.thread }, pendingPhase: "listening" } } };
+  window.__cardListener(window.__cardState);
+});
+
+for (const format of ["card", "avatar"]) {
+  test(`${format}: the person's pill is a pill whatever card shares its cell, and the reply it cut in on leaves the column`, async ({ context }) => {
+    const page = await openCard(context, { state: "agent-speaking", format, size: "m" });
+    await holdReply(page);
+    const reply = page.locator(".docked-voice .vcap.agent");
+    await expect(reply).toHaveCount(1);
+    await speakOver(page);
+    const pill = page.locator(".docked-voice .vcap.card.person.pill");
+    await expect(pill).toBeVisible();
+    // The reply lifts away (SENT_LEAVING_MS) and is gone: only the pill is left in the column, which is as tall as it.
+    await expect(reply).toHaveCount(0);
+    const { column, mine } = await page.evaluate(() => {
+      const node = document.querySelector(".docked-voice .vcap.card.person.pill"), box = document.querySelector(".docked-voice").getBoundingClientRect();
+      return { column: { width: box.width, height: box.height }, mine: { width: node.offsetWidth, height: node.offsetHeight } };
+    });
+    expect(mine.height).toBeLessThan(mine.width / 2);
+    expect(column.height).toBeCloseTo(mine.height, 0);
+    if (format === "avatar") expect(column.width).toBeCloseTo(mine.width, 0);
+    // A taller card in the same cell (the leaving reply's three lines): the pill keeps its own height.
+    const beside = await page.evaluate(() => {
+      const node = document.querySelector(".docked-voice .vcap.card.person.pill"), tall = document.createElement("div");
+      tall.className = "vcap card agent";
+      tall.style.cssText = "height: 96px; visibility: hidden";
+      node.parentElement.append(tall);
+      const height = node.offsetHeight;
+      tall.remove();
+      return height;
+    });
+    expect(beside).toBe(mine.height);
   });
 }
 

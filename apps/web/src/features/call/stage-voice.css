@@ -88,7 +88,9 @@
  * on the stage, and the column is as tall as the tallest there. A card is as wide as its words, up to the column's width (the
  * one track is the column's: a card's own width never widens it). The type stays at the stage's floor (18 and 16px: a tile
  * this small is always at it), and the pop and the lift go by a small tile's unit. */
-.docked-voice { --vu: .6px; display: grid; grid-template-columns: minmax(0, 1fr); justify-items: end; pointer-events: auto; }
+/* A card keeps its own height, at the cell's top (call-card.css: its bottom where the column opens up), never the tallest one's: the person's
+ * pill, stretched to the three lines of a reply leaving beside it, was a circle (border-radius 999px). */
+.docked-voice { --vu: .6px; display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; justify-items: end; pointer-events: auto; }
 .docked-voice:empty { display: none; }
 .docked-voice > .vcap { position: static; grid-area: 1 / 1; max-width: 100%; transform: none; transform-origin: 50% 0; }
 .docked-voice > .vcap.card, .docked-voice > .vcap.card.person { width: auto; max-width: 100%; }

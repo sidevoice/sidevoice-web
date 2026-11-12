@@ -13,7 +13,7 @@ import { StageBackdrop, useSceneScale, type PosterWords } from "../avatar/StageS
 import type { MouthLevel } from "../avatar/avatar-state";
 import { uiLanguage, translator, type Translate } from "../../i18n/translator";
 import { moodText } from "./conversation-state";
-import { useAgentTurns, useReadingClock, useSpokenFrom, type AgentTurn } from "./speech-reading";
+import { SENT_LEAVING_MS, useAgentTurns, useReadingClock, useSpokenFrom, type AgentTurn } from "./speech-reading";
 import type { Reading } from "./speech-chunks";
 import { LitText } from "./LitText";
 import { PagedText } from "./PagedText";
@@ -53,12 +53,37 @@ import "./call-view.css";
  * (DockedVoice). */
 export type AgentLook = "balloon" | "card";
 
+/** `on`, once it has held for `ms`; off as soon as it lets go. */
+function useHeldFor(on: boolean, ms: number): boolean {
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    if (!on) { setHeld(false); return; }
+    const timer = window.setTimeout(() => setHeld(true), ms);
+    return () => window.clearTimeout(timer);
+  }, [on, ms]);
+  return on && held;
+}
+
+/** A card the person's turn cut in on (`cut`), as it goes: `away` (lifting) from the first moment of the cut, `gone` once it has lifted
+ *  away. It stays away when the turn closes, until its reply sounds again (`sounding`: the voice took it up where it held it), not until
+ *  the turn closes: a turn with words has the room withdraw the reply after those words are sent, so the card of a reply that will
+ *  never sound again would come back for the seconds it lingers. */
+function useCutAway(cut: boolean, sounding: boolean): { away: boolean; gone: boolean } {
+  const [away, setAway] = useState(cut);
+  const now = cut ? true : sounding ? false : away;
+  if (now !== away) setAway(now);
+  return { away: now, gone: useHeldFor(now, SENT_LEAVING_MS) };
+}
+
 /** One reply on the stage, in a speech balloon whose tail points down at the agent (call-view.css), or the stage's card:
  *  a few lines at a time (PagedText), lit as the voice says them, moving on with the words heard. `cut`: the person's
- *  turn took its place under the creature, so it lifts away. */
-function AgentBubble({ turn, look = "balloon", cut = false }: { turn: AgentTurn; look?: AgentLook; cut?: boolean }) {
-  if (look === "card") return (
-    <div className="vcap card agent" data-leaving={turn.leaving || cut || undefined} aria-hidden="true" translate="no">
+ *  turn took its place under the creature, so it lifts away, and is gone once it has (useCutAway): faded, it would still hold its
+ *  room in the docked column's one cell (call-card.css), and the person's pill beside it would be as tall and as wide as the reply.
+ *  `sounding`: the voice is saying this reply now; the card comes back, popping in, when it is. */
+function AgentBubble({ turn, look = "balloon", cut = false, sounding = false }: { turn: AgentTurn; look?: AgentLook; cut?: boolean; sounding?: boolean }) {
+  const { away, gone } = useCutAway(cut, sounding);
+  if (look === "card") return gone ? null : (
+    <div className="vcap card agent" data-leaving={turn.leaving || away || undefined} aria-hidden="true" translate="no">
       <PagedText measure={turn.text} follow=".lit-heard" lines={3} turn="page" fixed>
         <LitText text={turn.text} spoken={turn.spoken} />
       </PagedText>
@@ -118,7 +143,9 @@ function AgentBubbles({ reading, reply, sounding, messages, onUp, look, cut }: {
   const up = turns.length > 0;
   useEffect(() => { onUp(up); }, [up, onUp]);
   useEffect(() => () => onUp(false), [onUp]);
-  return <>{turns.map((turn) => <AgentBubble key={turn.key} turn={turn} look={look} cut={cut} />)}</>;
+  // Only the reply on the stage now can be the one sounding: an older one leaving is not made to come back by it.
+  const now = reply ? reply.segment ?? String(reply.time) : null;
+  return <>{turns.map((turn) => <AgentBubble key={turn.key} turn={turn} look={look} cut={cut} sounding={sounding && turn.key === now} />)}</>;
 }
 
 /** What is said, as the stage's cards: the agent's reply and the person's turn (the pill where their words will come, then

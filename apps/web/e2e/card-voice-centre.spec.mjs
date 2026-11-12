@@ -1,19 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { openCard } from "./motion-states.mjs";
+import { holdReply, openCard } from "./motion-states.mjs";
 
 /* The avatar format's voice text (the person's pill, the agent's balloon) is centred on the creature (R13), as far as the room the
  * host says the creature has to the work area's sides allows (CallControlsState.room), and wraps where even that is too narrow.
  * Measured as boxes in a real browser: the CSS custom properties alone would still pass with the margin rules gone. */
-
-/** The reply held sounding. The card's first state is a snapshot of the room taken while the room's own timers run the reply to its
- *  end (a slow machine can take it after the reply is over); the card here is told the reply as sounding and not yet said, and
- *  nothing moves it on, so the balloon stays for as long as the case measures it. */
-const holdReply = (page) => page.evaluate(() => {
-  const call = window.__cardState.call, facts = call.facts, reply = facts.history[facts.history.length - 1];
-  window.__cardState = { ...window.__cardState, call: { ...call, facts: { ...facts, botLive: true, karaokeState: { segment: reply.segment, from: 0, to: reply.text.length },
-    history: [...facts.history.slice(0, -1), { ...reply, audio: "playing" }] } } };
-  window.__cardListener(window.__cardState);
-});
 
 /** The room told to the card as the app relays it. */
 const told = (page, room) => page.evaluate((room) => window.__cardListener({ ...window.__cardState, room }), room);
