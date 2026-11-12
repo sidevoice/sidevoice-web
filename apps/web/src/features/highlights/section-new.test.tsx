@@ -32,7 +32,7 @@ function open(stored: Record<string, string> | null, n = 1) {
   const store = createRoomStore();
   const ids = Array.from({ length: n }, () => `codex-${++found}`);
   shown = ids[0];
-  act(() => { store.patch({ pairings: [nuc], machinesReady: true, machineLinks: { "fp-nuc": { reach: "ok", via: "node" } }, hostAgents: { "fp-nuc": listing(ids) }, settingsSection: "machines" }); });
+  act(() => { store.patch({ pairings: [nuc], machinesReady: true, machineLinks: { "fp-nuc": { reach: "ok", via: "node" } }, hostAgents: { "fp-nuc": listing(ids) }, settingsSection: "machines", machinesView: { machine: "fp-nuc" } }); });
   render(<RoomProvider store={store}><RoomHeader /><SettingsDialog /></RoomProvider>);
   document.getElementById("language-settings")!.setAttribute("open", "");
 }

@@ -217,10 +217,6 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
   .settings-menu-row > .ui-badge { flex: none; }
   .settings-menu-chevron { display: inline-grid; flex: none; color: var(--sv-text-subtle); }
   .settings-menu-chevron svg:dir(rtl) { transform: scaleX(-1); }
-  /* Add a machine opens a dialog, not a page: the accent's words, no chevron. A machine's name, unlike a label, is cut. */
-  .settings-menu-row--add .settings-menu-icon, .settings-menu-row--add .settings-menu-label { color: var(--sv-accent-text); }
-  .machines-menu .settings-menu-label { display: flex; align-items: center; gap: var(--sv-space-1); min-width: 0; }
-  .machines-menu .settings-menu-label .machine-nav-name { min-width: 0; overflow: hidden; font-size: var(--sv-font-md); line-height: calc(1.375rem * var(--sv-line-k, 1)); white-space: nowrap; text-overflow: ellipsis; }
 
   /* Machines' list and a machine's page, in the one place of the page they share. */
   .settings-sublevels { display: grid; min-width: 0; }

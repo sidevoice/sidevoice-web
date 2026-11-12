@@ -177,9 +177,10 @@ export function useSettingsLevelsOf(dialog: HTMLDialogElement | null, { nav, con
    *  the first machine, else Add a machine, when that one is gone. */
   const focusRow = (left: Stack) => {
     if (left.length === 2) { document.getElementById("settings-" + left[1])?.focus({ preventScroll: true }); return; }
-    const page = content.current;
+    // Machines' own rows (Updates lists the machines too, in a page not shown).
+    const page = content.current?.querySelector<HTMLElement>("#pane-machines");
     const row = [...page?.querySelectorAll<HTMLElement>("[data-machine]") ?? []].find((entry) => entry.dataset.machine === left[2])
-      ?? page?.querySelector<HTMLElement>(".machines-menu .settings-menu-row") ?? document.getElementById("pair-device-open");
+      ?? page?.querySelector<HTMLElement>("[data-machine]") ?? page?.querySelector<HTMLElement>(".machines-add button") ?? document.getElementById("pair-device-open");
     row?.focus({ preventScroll: true });
   };
 

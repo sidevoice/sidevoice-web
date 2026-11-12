@@ -27,7 +27,7 @@
 .host-back-icon { transform: rotate(90deg); }
 .host-detail-header { display: flex; align-items: center; gap: var(--sv-space-3); flex-wrap: wrap; }
 .host-detail-copy { display: grid; flex: 1; min-width: 12rem; }
-.host-detail-header h3 { display: flex; align-items: center; margin: 0; font-size: var(--sv-font-xl); line-height: calc(1.625rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-bold); letter-spacing: -.015em; }
+.host-detail-header h2 { display: flex; align-items: center; margin: 0; font-size: var(--sv-font-xl); line-height: calc(1.625rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-bold); letter-spacing: -.015em; }
 .host-detail-header p { margin: 0; font-size: var(--sv-font-sm); }
 /* Its state at length under its name, a word in its tone, semibold; what to do about it, when there is something, on
    the line under. */
@@ -99,6 +99,7 @@
 .machine-nav-add { color: var(--sv-text-muted); }
 .machine-nav-add svg { width: 16px; height: 16px; }
 .machines-inline { display: none; }
+.machines-add { justify-self: start; }
 .machines-empty { display: grid; justify-items: start; gap: var(--sv-space-3); }
 
 /* Pairing another device, in its own small dialog: the code large and selectable, its time left under it. */

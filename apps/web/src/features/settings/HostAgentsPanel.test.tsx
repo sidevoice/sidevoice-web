@@ -115,7 +115,7 @@ test("P11 an agent new on a machine: off for this release, no mark on the gear, 
   const pending = ready([known("cursor", { actionable: true, label: "Cursor" })]);
   const openAgentSettings = vi.fn((fp: string | null) => store.patch({ settingsAgentRequest: { fp, id: 1 } }));
   setActions({ openAgentSettings });
-  act(() => store.patch({ pairings: [host], machinesReady: true, hostAgents: { [host.fp]: pending } }));
+  act(() => store.patch({ pairings: [host], machinesReady: true, hostAgents: { [host.fp]: pending }, machinesView: { machine: host.fp } }));
 
   render(<RoomProvider store={store}><RoomHeader /><MachineList /></RoomProvider>);
   const gear = settingsEntry();
