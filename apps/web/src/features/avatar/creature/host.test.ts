@@ -581,6 +581,26 @@ test("the scene canvas is the whole tile where the creature is not measured, rea
   expect(rig.views).not.toContain("clear");
 });
 
+test("a creature built again on the stage's canvas takes the crop it needs, not the one the last creature left on it", () => {
+  // (operator, 2026-11-12: the busy cogs and the crank's machine sliced by one vertical line. The stage's canvas is kept when another
+  // conversation comes on the stage; the last creature's `--crop` stayed on it, the new one read that narrow box as the whole tile,
+  // and its own share of it came to more than CROP_WHOLE, so it was never written.)
+  webgl();
+  vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(2);
+  const { element } = cropped(1598, 876), frame = asked({ desktop: true });
+  rig.reach = 200;
+  mount({ ...onStage, moving: true, canvas: element, frame })!.dispose();
+  const first = Number(element.style.getPropertyValue("--crop"));
+  expect(first).toBeCloseTo((2 * (200 * 1.1 + 14)) / 1598, 1);
+  // another conversation's creature, reaching further (its props beside it), on the same canvas
+  rig.reach = 300;
+  mount({ ...onStage, seed: "t2", moving: true, canvas: element, frame });
+  const second = Number(element.style.getPropertyValue("--crop"));
+  expect(second).toBeCloseTo((2 * (300 * 1.1 + 14)) / 1598, 1);
+  expect(second).toBeGreaterThan(first);
+  expect(element.width).toBe(Math.round(1598 * second * 2));
+});
+
 test("a reach that is not a finite number never reaches the stylesheet: the canvas stays the whole tile, with a box and its pixels", () => {
   // (operator, 2026-11-10: a narrow desktop window's stage showed no creature at all. `--crop: NaN` lays the canvas out zero wide
   // through calc(100cqw * NaN), and with it laid out so, every refit after found no width to undo it from.)

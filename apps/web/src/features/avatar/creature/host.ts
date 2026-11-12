@@ -451,8 +451,16 @@ export class LiveCreature {
     const face = opts.framing === "face";
     this.item = stage.add(rigSpec(opts.choice ?? creatureFromSeed(opts.seed)), opts.canvas, face ? { ...(opts.sharp && opts.whole ? WHOLE_FACE : FACE), off: 0 } : { turn: 0, off: 0 });
     this.moving = opts.moving ?? true; // (before the first fit: a held creature is sized at a phone's pixels)
-    // (a canvas reused for another creature is not measured until this one is: e2e and tests wait on it)
+    // A canvas reused for another creature keeps nothing the last one wrote on it (the stage builds one again on its canvas whenever
+    // another conversation comes on it, or creatures can be drawn again after a lost context: CharacterAvatar). It is not measured
+    // until this one is, nor easing (e2e and tests wait on both), nor laid out at the last one's crop: this creature starts at the
+    // whole tile (`laid` 1) and reads the tile's width from the canvas's box at that share (cropTo). Left at the last crop, its box was
+    // taken for the whole tile, the share worked out from it came to nearly all of it, so it was never written, and the canvas stayed
+    // as narrow as the last creature needed: a wider one, or the same one in a narrower window, was cut at its edges (operator,
+    // 2026-11-12: the busy cogs and the crank's machine sliced by one vertical line).
     delete opts.canvas.dataset.reach;
+    opts.canvas.removeAttribute("data-easing");
+    opts.canvas.style.removeProperty("--crop");
     if (face) {
       // A moving face holds every act it can play inside its square: its footprint, measured once per shape on the page (until
       // then, and while it holds still, the pose it is drawn in: faceZoom).
