@@ -11,7 +11,7 @@ import { CARD_MARGIN } from "./card-shell";
 import { translator } from "../i18n/translator";
 import { litPart } from "../features/call/lit-part";
 import { PAGE_MS } from "../features/call/PagedText";
-import { SENT_LEAVING_MS } from "../features/call/speech-reading";
+import { AGENT_LINGER_MS, SENT_LEAVING_MS } from "../features/call/speech-reading";
 
 vi.mock("../services/room-session-controller.js", () => ({}));
 
@@ -146,6 +146,67 @@ test.each(["card", "avatar"])("%s: the person's turn is the stage's pill, then \
   // Cancel sending: the card's command, from the pill's ×.
   fireEvent.click(screen.getByRole("button", { name: "Cancel sending" }));
   expect(host.run).toHaveBeenCalledWith({ command: "cancel-input" });
+});
+
+/* The person's turn over a reply the voice holds for it (the voice's "held": no longer sounding, still the reply on the stage). When the turn closes
+ * with words, the room withdraws the reply after the words are sent: the card must not come back for the seconds that reply lingers. It comes
+ * back when the voice takes the reply up again (a turn that came to nothing), popping in. */
+const REPLY_MESSAGE = (ROOM.history as unknown as Array<Record<string, unknown>>)[0];
+const HELD = { botLive: false, karaokeState: { segment: "h-2", from: 20, to: 20 } };
+const SENT = { ...draft, segment: "u-sent", text: "Run the tests and tell me what fails.", draft: false, delivery: "delivered" };
+const speaksOver = { ...speaks, ...HELD, history: [REPLY_MESSAGE, draft] };
+const closesEmpty = { userLive: false, userTurn: null, pendingPhase: "", pendingText: "", ...HELD, history: [REPLY_MESSAGE] };
+const closesWithWords = { ...closesEmpty, history: [REPLY_MESSAGE, SENT] };
+const withdrawn = { karaokeState: null, botLive: false, history: [{ ...REPLY_MESSAGE, audio: "unplayed" }, SENT] };
+
+test.each(["card", "avatar"])("%s: a reply the person's turn cut in on stays gone after a turn with words, even when its withdrawal comes later", (format) => {
+  vi.useFakeTimers();
+  const host = page(format);
+  const reply = () => document.querySelector(".docked-voice .vcap.card.agent");
+  expect(reply()).not.toBeNull();
+  host.say(speaksOver);
+  expect(reply()).toHaveAttribute("data-leaving");
+  act(() => { vi.advanceTimersByTime(SENT_LEAVING_MS); });
+  expect(reply()).toBeNull();
+  // The turn closes with words; the room has not withdrawn the reply yet (it does so after the message): it does not come back.
+  host.say(closesWithWords);
+  expect(reply()).toBeNull();
+  // Its withdrawal lands: the reply lingers as a normal end, and its card does not show for it.
+  host.say(withdrawn);
+  expect(reply()).toBeNull();
+  act(() => { vi.advanceTimersByTime(AGENT_LINGER_MS + SENT_LEAVING_MS); });
+  expect(reply()).toBeNull();
+});
+
+test.each(["card", "avatar"])("%s: the withdrawal landing while the cut reply still lifts away does not bring it back", (format) => {
+  vi.useFakeTimers();
+  const host = page(format);
+  const reply = () => document.querySelector(".docked-voice .vcap.card.agent");
+  host.say(speaksOver);
+  act(() => { vi.advanceTimersByTime(200); });
+  host.say(closesWithWords);
+  host.say(withdrawn);
+  // Still lifting away, not shown again; gone when its time is up.
+  expect(reply()).toHaveAttribute("data-leaving");
+  act(() => { vi.advanceTimersByTime(SENT_LEAVING_MS - 200); });
+  expect(reply()).toBeNull();
+  act(() => { vi.advanceTimersByTime(AGENT_LINGER_MS + SENT_LEAVING_MS); });
+  expect(reply()).toBeNull();
+});
+
+test.each(["card", "avatar"])("%s: a reply the person's turn cut in on comes back, popping in, when the voice takes it up again", (format) => {
+  vi.useFakeTimers();
+  const host = page(format);
+  const reply = () => document.querySelector(".docked-voice .vcap.card.agent");
+  host.say(speaksOver);
+  act(() => { vi.advanceTimersByTime(SENT_LEAVING_MS); });
+  expect(reply()).toBeNull();
+  // The turn came to nothing: the voice still holds the reply, which stays away until it sounds.
+  host.say(closesEmpty);
+  expect(reply()).toBeNull();
+  host.say({ botLive: true, karaokeState: { segment: "h-2", from: 20, to: 40 } });
+  expect(reply()).not.toBeNull();
+  expect(reply()).not.toHaveAttribute("data-leaving");
 });
 
 test("just the avatar: a press on its voice text moves nothing, a press on the creature drags", () => {
