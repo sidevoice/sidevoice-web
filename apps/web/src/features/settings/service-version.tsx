@@ -48,16 +48,16 @@ export function useLocalService(): ServiceInfo & { progress: number | null; inco
     port: details.core?.port ?? null };
 }
 
-/** A remote machine's service against the pinned minor. `version`: what it says now; `shown`: that, else what it was last
- *  seen running (it may not answer). `offline`: it is not connected, nor being checked. */
-export function useRemoteService(machine: MachineView): ServiceInfo & { shown: string | null; port: number | null; command: string; offline: boolean } {
+/** A remote machine's service against the pinned minor. `version`: what it says now, else what it was last
+ *  seen running (it may not answer), and `kind` is judged for whichever it is. `offline`: it is not connected, nor being checked. */
+export function useRemoteService(machine: MachineView): ServiceInfo & { port: number | null; command: string; offline: boolean } {
   const info = useRoomStore((state) => machine.pairingId ? state.facts.remoteHostStatus?.[machine.pairingId] : undefined);
   // The newest patch of the pinned minor, where this device's own service knows it.
   const bridge = host().localHost;
   const latest = useSyncExternalStore(subscribe, () => getReport(bridge)?.latest ?? null, () => null);
-  const version = info?.version ?? null;
+  const version = info?.version ?? lastSeenVersion(machine.pairingId);
   return {
-    version, kind: remoteKind(version, latest), shown: version ?? lastSeenVersion(machine.pairingId), port: listeningPort(machine.urls),
+    version, kind: remoteKind(version, latest), port: listeningPort(machine.urls),
     command: `npx sidevoice@${PINNED_MINOR} install`, offline: machine.state !== "connected" && machine.state !== "checking",
   };
 }
