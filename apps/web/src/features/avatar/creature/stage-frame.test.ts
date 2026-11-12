@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { capCentre, desktopDevice, easeFraming, FRAME_EASE, OPTIC, StageFrame, stageBands, TURN_HEAD, voiceType, type FrameProbe } from "./stage-frame";
+import { capCentre, cardHeight, desktopDevice, easeFraming, FRAME_EASE, OPTIC, StageFrame, stageBands, TURN_HEAD, voiceType, type FrameProbe } from "./stage-frame";
 
 /* The stage's framing (the design reference's fitFrame and capCentre: T21, T24d, T28, T33, T43), on a creature modelled
  * as a camera sees it: `tall` px tall at the nearest step (zk 1), smaller as it steps back (1/zk), its drawn middle
@@ -34,6 +34,19 @@ describe("the tile's bands", () => {
     expect(voiceType(1118, 628).agent).toBeCloseTo(25.6 * 628 / 600, 6);
     // phone 390 × 844: the floors
     expect(voiceType(364, 655)).toEqual({ u: 364 / 900, agent: 18, agentLine: 25, person: 16, personLine: 23 });
+    // a phone on its side (844 x 390: a tile 186 px tall): the type steps down from the floors so the agent's card takes 42% of the tile
+    // at most (it took 55%), the person's with it in proportion, the card's lines still whole px
+    const side = voiceType(818, 186);
+    expect(side.agentLine).toBe(18);
+    expect(cardHeight(side.agentLine)).toBeLessThanOrEqual(0.42 * 186);
+    expect(side.agent).toBeCloseTo(18 / 1.375, 6);
+    expect(side.person / side.agent).toBeCloseTo(16 / 18, 6);
+    // ...and never under 12px for the agent's, whatever the tile
+    expect(voiceType(300, 120).agent).toBe(12);
+    // a tile tall enough for the floors' card keeps them (245 px: 102 is 42% of it)
+    expect(voiceType(818, 245)).toMatchObject({ agent: 18, agentLine: 25, person: 16, personLine: 23 });
+    // the card's height, for the line the css lays it out with (measured: 102 px at 25)
+    expect(cardHeight(25)).toBeCloseTo(101.75, 6);
     // a large screen: the ceilings
     expect(voiceType(2400, 1500)).toMatchObject({ agent: 34, agentLine: 47, person: 28, personLine: 40 });
   });
@@ -85,6 +98,19 @@ describe("capCentre", () => {
     const cardTop = f.low + gap;
     expect(cardTop - f.low).toBeGreaterThanOrEqual(Math.max(14, vh * 0.035) - 1e-9);
     expect(cardTop + card).toBeLessThanOrEqual(floor + 1.01);
+  });
+
+  test("a tile too short for the card with it at the centre (a phone on its side): it rises off the centre and steps back only as far as the card needs, never to the furthest step", () => {
+    // a tile 186 px tall, the agent's card 102: the creature's middle at the centre would leave no room under it at any step
+    const vh2 = 186, b = stageBands(vh2, false), card = 102, tall = 60;
+    const f = capCentre(creature({ tall, mid0: vh2 / 2 }).probe, 0, card, vh2, b.ceil, b.floor, b.gap, 0, 1);
+    // its lowest row a gap over the card, which ends on the floor; its head's room and a gap under the ceiling
+    near(f.low, b.floor - card - b.gap);
+    expect(f.top - f.head - b.gap).toBeGreaterThanOrEqual(b.ceil - 1e-9);
+    // drawn larger than at the furthest step (its size there: tall / 3.4), and one step nearer would not have kept those
+    expect(f.low - f.top).toBeGreaterThan(tall / 3.4 + 5);
+    const nearer = tall / (f.zk - 0.08);
+    expect(f.low - nearer * (1 + TURN_HEAD) - b.gap).toBeLessThan(b.ceil);
   });
 
   test("a tile too short for the card and the creature both: it never rises out of the tile, its top kept on it", () => {
@@ -187,8 +213,10 @@ describe("capCentre finds the reference's step with fewer trial renders", () => 
       const { floor, ceil, gap } = stageBands(vh, vh === 655);
       const a = creature({ tall, mid0: vh * 0.55 }), b = creature({ tall, mid0: vh * 0.55 });
       const fast = capCentre(a.probe, 0, card, vh, ceil, floor, gap, 0, 1), ref = scan(b.probe, 0, card, vh, ceil, floor, gap);
-      expect(fast.zk).toBeCloseTo(ref.zk, 9);
-      if (ref.fits) expect(fast.lift).toBeCloseTo(ref.lift, 6);
+      // where the cards fit with it at the centre, the reference's step and lift; where no step does, the reference stops at the
+      // furthest, and this one steps back no further than that (and only as far as the creature rising off the centre needs)
+      if (ref.fits) { expect(fast.zk).toBeCloseTo(ref.zk, 9); expect(fast.lift).toBeCloseTo(ref.lift, 6); }
+      else expect(fast.zk).toBeLessThanOrEqual(ref.zk + 1e-9);
       expect(a.calls.length).toBeLessThanOrEqual(b.calls.length);
     }
   });

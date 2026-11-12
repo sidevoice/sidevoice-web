@@ -4,8 +4,9 @@
  * The creature stands in one place whatever is said: its drawn middle (from the highest drawn row, a hat or the cogs
  * included, to the lowest, its shadow included) at the tile's optical centre, OPTIC from the top, the same on every turn.
  * It steps back (smaller: the camera's distance times `zk`) only when the largest card of either turn would not fit under
- * or over it; where even the furthest step leaves no room there, it rises off the optical centre rather than let a card
- * touch it. A card keeps a gap to it, always: max(14px, 3.5% of the tile's height). The creature is as large at rest (idle,
+ * or over it; where no step back leaves room for a card with it at the optical centre (a tile too short for both), it rises
+ * off the centre rather than let a card touch it, and steps back only as far as that needs: the largest creature that stands
+ * between the tile's top and the card. A card keeps a gap to it, always: max(14px, 3.5% of the tile's height). The creature is as large at rest (idle,
  * working, present: nothing said) as during a turn, whenever no card needs it to step back; a phone keeps one framing for
  * all. Framing changes ease at FRAME_EASE a frame.
  *
@@ -53,12 +54,30 @@ export function stageBands(vh: number, phone: boolean): { floor: number; ceil: n
   return { floor: vh - (phone ? 58 : 10), ceil: phone ? 70 : 10, gap: Math.max(14, vh * 0.035) };
 }
 
+/** The most of a tile's height the card the creature steps back for may take (the agent's: three lines, always). A tile too short for
+ *  it at the type's floor (a phone on its side: 186 px of tile, a card of 102) takes the type down instead, so the creature keeps the
+ *  rest of the tile. */
+const CARD_SHARE = 0.42;
+/** The least the agent's type steps down to for it (px); the person's goes down with it, in the proportion they have at the floors. */
+const TYPE_LEAST = 12;
+
+/** The agent's card's height for a line `line` px tall (stage-voice.css, .vcap.card.agent): its three lines, the padding over and
+ *  under them (.275 of a line and 5.5px each) and the border. What the person sent is as tall for its own line (3.55 lines and 13px
+ *  too: its first line's room above and the padding add up the same). */
+export const cardHeight = (line: number) => 3.55 * line + 13;
+
 /** The voice text's unit and type, sized by the tile (the product's stage text, call-view.css, as the reference sizes
  *  it): u = min(w/900, h/600); the agent's words clamp(25.6u, 18, 34), the person's clamp(22.4u, 16, 28), each line on
- *  whole pixels. */
+ *  whole pixels. Where the agent's card would take more than CARD_SHARE of the tile's height at those floors (a tile under
+ *  about 245 px tall), both step down from them together to the type whose card does not, and no lower than TYPE_LEAST for the agent's. */
 export function voiceType(w: number, h: number) {
   const u = Math.min(w / 900, h / 600), clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
-  const agent = clamp(25.6 * u, 18, 34), person = clamp(22.4 * u, 16, 28);
+  let agent = clamp(25.6 * u, 18, 34), person = clamp(22.4 * u, 16, 28);
+  if (cardHeight(Math.round(agent * 1.375)) > CARD_SHARE * h) {
+    const line = Math.floor((CARD_SHARE * h - 13) / 3.55 + 1e-9), fit = Math.min(agent, Math.max(TYPE_LEAST, line / 1.375));
+    person *= fit / agent;
+    agent = fit;
+  }
   return { u, agent, agentLine: Math.round(agent * 1.375), person, personLine: Math.round(person * 1.4286) };
 }
 
@@ -113,13 +132,31 @@ export function* capCentreSteps(probe: FrameProbe, hTop: number, hBot: number, v
   }
   let best = r.f;
   if (!r.fits) {
+    // No step back leaves room for the cards with it at the centre: it rises off it, its lowest row a gap over the card at its
+    // largest, which ends on the floor. It steps back only as far as that needs (the least step at which what has risen still
+    // keeps its head's room and a gap under the tile's top): never the furthest, which is the smallest it can be drawn. (A tile
+    // as short as a phone on its side: the card, 102 px of its 186, left a creature of 20 px, where one of 45 fits over it.)
+    // The creature is `h` tall (1/zk of its height at the nearest step), its lowest row at floor - hBot - gap - sway·h, and its top,
+    // headroom and gap over that, so the tallest it can be drawn is what the band between the ceiling and the card leaves.
+    const h0 = (tried.get(0) ?? r).f, tall = h0.low - h0.top;
+    const risen = function* (j: number, from: number): Generator<void, { lift: number; zk: number; m: Rows; ok: boolean }> {
+      const zk = zk0 + j * ZK_STEP;
+      yield;
+      let lift = from, m = probe.rows(lift, zk, xa, xb);
+      const wantLow = Math.max(floor - hBot - gap - swayRoom(m.low, m.top), m.low - m.top);
+      for (let n = 0; n < 7 && Math.abs(m.low - wantLow) > 1; n++) { lift += (m.low - wantLow) / probe.slope(zk); yield; m = probe.rows(lift, zk, xa, xb); }
+      return { lift, zk, m, ok: m.top - (m.low - m.top) * headK - gap - hTop >= ceil };
+    };
+    const band = floor - hBot - 2 * gap - hTop - ceil, hMax = band / (1 + headK + sway);
+    let j = hMax > 0 && tall > 0 ? Math.max(0, Math.min(last, Math.ceil(((zk0 * tall) / hMax - zk0) / ZK_STEP - 1e-6))) : last;
+    let up = yield* risen(j, r.f.lift);
+    if (up.ok) { while (j > 0) { const nearer = yield* risen(j - 1, up.lift); if (!nearer.ok) break; up = nearer; j--; } }
+    else { while (j < last && !up.ok) up = yield* risen(++j, up.lift); }
     // ... but never out of the tile: its top stays on it (a tile too short for a card and the creature both, as a phone on
     // its side: the card then waits, unseen, rather than cover it: StageVoice)
-    const zk = best.zk, wantLow = Math.max(floor - hBot - gap - swayRoom(best.low, best.top), best.low - best.top);
-    yield;
-    let lift = best.lift, m = probe.rows(lift, zk, xa, xb);
-    for (let n = 0; n < 7 && Math.abs(m.low - wantLow) > 1; n++) { lift += (m.low - wantLow) / probe.slope(zk); yield; m = probe.rows(lift, zk, xa, xb); }
-    best = { lift, zk, low: m.low, top: m.top, head: (m.low - m.top) / 3 };
+    const zk = up.zk, lift = up.lift;
+    let m = up.m;
+    best = { lift, zk, low: m.low, top: m.top, head: (m.low - m.top) * headK };
     // What it acts out stays on the tile too, both ends (the card then waits, unseen): where it is taller than the tile, stepped back
     // until it is not; then its lift kept between what keeps its top on the tile and what keeps its foot on it, as near the cards'
     // as that allows. A larger lift raises it: its rows go up the tile.

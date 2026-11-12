@@ -209,3 +209,48 @@ test.describe("on a phone", () => {
     });
   }
 });
+
+/** The stage's creature as drawn now, in css px: its drawn height (from the pixels), and its tile's. */
+async function creatureSize(stage) {
+  return stage.evaluate((canvas) => {
+    const s = window.__drawn(canvas), tile = canvas.closest(".stage-tile").getBoundingClientRect();
+    return { height: ((s.b - s.t + 1) * s.box.h) / s.H, tile: tile.height, agentCard: document.querySelector(".stage-voice .vcap.agent.meas")?.offsetHeight ?? 0 };
+  });
+}
+
+/* A phone on its side (a tile far wider than tall, 167 to 220 px of height): the stage steps the creature back to leave room under it
+ * for the largest card of a turn, and the card was 102 px of it, so while it listened or spoke the creature was drawn at about a tenth of
+ * the tile's height, a third of its size at rest (2026-11-12: "far too small"). Now the card's type steps down in so short a tile (a card
+ * is no more than 42% of the tile's height, the agent's type no lower than 12 px) and the creature, rising off the tile's middle to stand
+ * over it, steps back no further than that needs: here it stays at 55% of the size it has at rest or more (it was a third), and at 15% of
+ * the tile's height or more (a tenth), whole, as the same sweep reads it. Over many rolls of the creature (each run of the harness rolls its own),
+ * the least seen was 0.19 of the tile and 0.64 of its size at rest. */
+test.describe("on a phone on its side", () => {
+  test.use({ hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+  for (const [width, height] of [[844, 390], [932, 430], [667, 375]]) {
+    test(`at ${width} × ${height}, the creature keeps a sensible size while it listens and speaks, and is drawn whole`, async ({ page }) => {
+      test.setTimeout(300_000);
+      const where = `${width} × ${height}`;
+      const stage = await open(page, { width, height, app: false });
+      await page.evaluate(startVoice);
+      // at rest: the creature in its plain pose, as large as the tile lets it be
+      expect(await page.evaluate(putState, { mood: "idle" }), `${where}: the stage shows it at rest`).toBe(true);
+      await settled(page, stage);
+      const rest = await creatureSize(stage);
+      expect(rest.height / rest.tile, `${where}: at rest, a creature of some size on the stage`).toBeGreaterThan(0.1);
+      for (const mood of ["listening", "speaking"]) {
+        expect(await page.evaluate(putState, { mood }), `${where}: the stage shows ${mood}`).toBe(true);
+        await settled(page, stage);
+        for (let n = 0; n < 3; n++) {
+          await stageWhole(page, stage, `${where}, ${mood}, read ${n + 1}`, 500);
+          const turn = await creatureSize(stage);
+          expect(turn.height / turn.tile, `${where}, ${mood}: its height (${turn.height.toFixed(1)} px) at least 15% of the tile's (${turn.tile.toFixed(0)} px) or more`).toBeGreaterThanOrEqual(0.15);
+          expect(turn.height / rest.height, `${where}, ${mood}: its height (${turn.height.toFixed(1)} px) at least 55% of what it is at rest (${rest.height.toFixed(1)} px)`).toBeGreaterThanOrEqual(0.55);
+          // the card it makes room for is the one the type was sized to: at most 42% of the tile (a px of rounding aside)
+          expect(turn.agentCard, `${where}: the agent's card (${turn.agentCard} px) takes no more than 42% of the tile`).toBeLessThanOrEqual(0.42 * turn.tile + 1);
+          await page.waitForTimeout(150);
+        }
+      }
+    });
+  }
+});
