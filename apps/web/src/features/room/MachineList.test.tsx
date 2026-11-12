@@ -1065,6 +1065,19 @@ test("a machine not yet heard from (its version unknown) says its port alone: no
   expect(window.sidevoiceActions!.loadMachineInfo).toHaveBeenCalledWith("fp-nuc");
 });
 
+test("a connected machine that says no version shows the last one seen, with its badge judged for that version, on its page and in its row alike", async () => {
+  onTestFinished(() => localStorage.removeItem("sidevoice.service-last-seen"));
+  for (const [seen, badge, alert] of [["0.20.0", "Up to date", false], ["0.19.9", "Out of date", true]] as const) {
+    localStorage.setItem("sidevoice.service-last-seen", JSON.stringify({ "fp-nuc": seen }));
+    const { card, store } = await remotePage(undefined);
+    expect(cardFacts(card.parentElement!)).toEqual([["Version", seen, badge], ["Port", "9000", null]]);
+    expect(card.querySelector(".ui-alert") !== null).toBe(alert);
+    act(() => { store.patch({ machinesView: { machine: null } }); });
+    expect(overviewRows()).toEqual([["NUC", "Version " + seen, badge]]);
+    cleanup();
+  }
+});
+
 test("This device's title follows a rename made while the page is mounted", async () => {
   actions();
   onTestFinished(() => localStorage.removeItem("sidevoice.deviceName"));

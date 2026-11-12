@@ -54,5 +54,5 @@ export function RemoteMachineRow({ machine, name, isNew = 0, onOpen }: { machine
   // Connected is the green dot on its icon, said in words to a screen reader; the rest the badge says.
   return <LinkRow icon={<StateOnIcon icon={<OtherMachineIcon size={20} />} status={state} />} name={name} spoken={state.key === "direct" ? state.short : null}
     isNew={isNew} onOpen={onOpen} data-machine-row={machine.id} data-machine={machine.id} data-name={name} data-state={machine.state}
-    description={service.shown ? t("settings.updates.version", { version: service.shown }) : null} badge={badge} />;
+    description={service.version ? t("settings.updates.version", { version: service.version }) : null} badge={badge} />;
 }

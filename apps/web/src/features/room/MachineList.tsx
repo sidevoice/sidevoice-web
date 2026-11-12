@@ -356,7 +356,7 @@ function RemoteHostCard({ machine, name, titleId }: { machine: MachineView; name
   useEffect(() => { if (machine.pairingId && machine.state === "connected") void window.sidevoiceActions?.loadMachineInfo?.(machine.pairingId); }, [machine.pairingId, machine.state]);
   return (
     <div className="host-status-card" data-remote data-tone={offline ? undefined : "positive"}>
-      <ServiceCardTop who={machine.pairingId ?? machine.id} titleId={titleId} info={offline ? { version: service.shown, kind: "unknown" } : service} port={service.port}
+      <ServiceCardTop who={machine.pairingId ?? machine.id} titleId={titleId} info={service} port={service.port}
         machine={name} command={service.command} offline={offline} end={offline ? <OfflineState t={t} /> : <RunningState t={t} />} t={t} />
     </div>
   );
