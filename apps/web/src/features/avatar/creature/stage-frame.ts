@@ -4,8 +4,11 @@
  * The creature stands in one place whatever is said: its drawn middle (from the highest drawn row, a hat or the cogs
  * included, to the lowest, its shadow included) at the tile's optical centre, OPTIC from the top, the same on every turn.
  * It steps back (smaller: the camera's distance times `zk`) only when the largest card of either turn would not fit under
- * or over it; where even the furthest step leaves no room there, it rises off the optical centre rather than let a card
- * touch it. A card keeps a gap to it, always: max(14px, 3.5% of the tile's height). The creature is as large at rest (idle,
+ * or over it. Where the card needs a step back with it at the optical centre, it rises off the centre instead whenever that lets it
+ * stand larger (the least step at which it clears the card and keeps all it acts out on the tile: the largest creature that stands
+ * between the tile's top and the card), as near the centre as that allows; so its size follows the tile's height without a jump where
+ * the centre starts to hold the card at the furthest step, and in a tile too short for the card at the centre at any step it is this
+ * one. A card keeps a gap to it, always: max(14px, 3.5% of the tile's height). The creature is as large at rest (idle,
  * working, present: nothing said) as during a turn, whenever no card needs it to step back; a phone keeps one framing for
  * all. Framing changes ease at FRAME_EASE a frame.
  *
@@ -53,12 +56,32 @@ export function stageBands(vh: number, phone: boolean): { floor: number; ceil: n
   return { floor: vh - (phone ? 58 : 10), ceil: phone ? 70 : 10, gap: Math.max(14, vh * 0.035) };
 }
 
+/** The most of a tile's height the card the creature steps back for may take (the agent's: three lines, always). A tile too short for
+ *  it at the type's floor (a phone on its side: 186 px of tile, a card of 102) takes the type down instead, so the creature keeps the
+ *  rest of the tile. */
+const CARD_SHARE = 0.42;
+/** The least either type steps down to for it (px): the agent's, and the person's, which goes down with it in the proportion they have at
+ *  the floors until it is there. */
+const TYPE_LEAST = 12;
+
+/** The agent's card's height for a line `line` px tall (stage-voice.css, .vcap.card.agent): its three lines, the padding over and
+ *  under them (.275 of a line and 5.5px each) and the border. What the person sent is as tall for its own line (3.55 lines and 13px
+ *  too: its first line's room above and the padding add up the same). */
+export const cardHeight = (line: number) => 3.55 * line + 13;
+
 /** The voice text's unit and type, sized by the tile (the product's stage text, call-view.css, as the reference sizes
  *  it): u = min(w/900, h/600); the agent's words clamp(25.6u, 18, 34), the person's clamp(22.4u, 16, 28), each line on
- *  whole pixels. */
+ *  whole pixels. Where the agent's card would take more than CARD_SHARE of the tile's height at those floors (a tile under
+ *  about 242 px tall, whatever the device), both step down from them together to the type whose card does not, and neither lower
+ *  than TYPE_LEAST. */
 export function voiceType(w: number, h: number) {
   const u = Math.min(w / 900, h / 600), clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
-  const agent = clamp(25.6 * u, 18, 34), person = clamp(22.4 * u, 16, 28);
+  let agent = clamp(25.6 * u, 18, 34), person = clamp(22.4 * u, 16, 28);
+  if (cardHeight(Math.round(agent * 1.375)) > CARD_SHARE * h) {
+    const line = Math.floor((CARD_SHARE * h - 13) / 3.55 + 1e-9), fit = Math.min(agent, Math.max(TYPE_LEAST, line / 1.375));
+    person = Math.min(person, Math.max(TYPE_LEAST, (person * fit) / agent));
+    agent = fit;
+  }
   return { u, agent, agentLine: Math.round(agent * 1.375), person, personLine: Math.round(person * 1.4286) };
 }
 
@@ -112,31 +135,57 @@ export function* capCentreSteps(probe: FrameProbe, hTop: number, hBot: number, v
     else { while (i < last && !r.fits) r = yield* at(++i); }
   }
   let best = r.f;
-  if (!r.fits) {
-    // ... but never out of the tile: its top stays on it (a tile too short for a card and the creature both, as a phone on
-    // its side: the card then waits, unseen, rather than cover it: StageVoice)
-    const zk = best.zk, wantLow = Math.max(floor - hBot - gap - swayRoom(best.low, best.top), best.low - best.top);
-    yield;
-    let lift = best.lift, m = probe.rows(lift, zk, xa, xb);
-    for (let n = 0; n < 7 && Math.abs(m.low - wantLow) > 1; n++) { lift += (m.low - wantLow) / probe.slope(zk); yield; m = probe.rows(lift, zk, xa, xb); }
-    best = { lift, zk, low: m.low, top: m.top, head: (m.low - m.top) / 3 };
-    // What it acts out stays on the tile too, both ends (the card then waits, unseen): where it is taller than the tile, stepped back
-    // until it is not; then its lift kept between what keeps its top on the tile and what keeps its foot on it, as near the cards'
-    // as that allows. A larger lift raises it: its rows go up the tile.
-    const reach = probe.reachRows;
-    if (reach) {
-      let z = zk, rr = reach(best.lift, z);
-      for (let n = 0; n < 60 && rr.bottom - rr.top > vh; n++) { z += ZK_STEP; rr = reach(best.lift, z); }
-      if (rr.top < 0 || rr.bottom > vh || z !== zk) {
-        const bound = (ok: (L: number) => boolean, from: number, towards: number) => { let a = from, b = towards; for (let n = 0; n < 40; n++) { const L = (a + b) / 2; if (ok(L)) a = L; else b = L; } return a; };
-        // the highest lift that keeps its top on the tile, the lowest that keeps its foot on it
-        const topOk = (L: number) => !(reach(L, z).top < 0), footOk = (L: number) => !(reach(L, z).bottom > vh);
-        const hiL = topOk(best.lift) ? bound(topOk, best.lift, best.lift + 8) : bound(topOk, best.lift - 8, best.lift);
-        const loL = footOk(best.lift) ? bound(footOk, best.lift, best.lift - 8) : bound(footOk, best.lift + 8, best.lift);
-        const L = Math.min(hiL, Math.max(loL, best.lift));
-        yield;
-        m = probe.rows(L, z, xa, xb);
-        best = { lift: L, zk: z, low: m.low, top: m.top, head: (m.low - m.top) / 3 };
+  if (!r.fits || (i > 0 && (hBot > 0 || hTop > 0))) {
+    // The centre holds the cards only at a step back (or at none): it may stand larger risen off the centre, its lowest row a gap over the
+    // card at its largest, which ends on the floor. The risen creature takes the least step back at which it still keeps its head's room and a
+    // gap under the tile's top, and all it acts out inside the tile (a tile as short as a phone on its side: the card, 102 px of its 186,
+    // left a creature of 20 px at the furthest step, where one of 45 fits over it). So where the least risen step is nearer than the centre's
+    // (the centre's own, where it is not), the creature is the larger of the two, whichever tile it is in: its size does not jump where the
+    // centre starts to fit at the furthest step, and with no centre fitting at any it is the risen one. At rest, with no card to make room
+    // for, the optical centre is the creature's place (T28) and it steps back only for the tile itself (the rise is then only where no step fits).
+    // The creature is `h` tall (1/zk of its height at the nearest step), its lowest row at floor - hBot - gap - sway·h, and its top,
+    // headroom and gap over that, so the tallest it can be drawn is what the band between the ceiling and the card leaves.
+    const h0 = (tried.get(0) ?? r).f, tall = h0.low - h0.top, cap = r.fits ? i : last;
+    const risen = function* (j: number, from: number): Generator<void, { lift: number; zk: number; m: Rows; ok: boolean }> {
+      const zk = zk0 + j * ZK_STEP;
+      yield;
+      let lift = from, m = probe.rows(lift, zk, xa, xb);
+      // its lowest row as near the optical centre's as the band between the ceiling and the card allows: the lowest that clears the card (the
+      // risen one) where the centre is under the card's top, the highest that keeps its head's room where the centre would put it too high
+      const h = m.low - m.top, lowMax = floor - hBot - gap - swayRoom(m.low, m.top), lowMin = ceil + gap + hTop + (1 + headK) * h, lowC = want + (m.low - mid(m));
+      const wantLow = Math.max(lowMin <= lowMax ? Math.max(lowMin, Math.min(lowC, lowMax)) : lowMax, h);
+      for (let n = 0; n < 7 && Math.abs(m.low - wantLow) > 1; n++) { lift += (m.low - wantLow) / probe.slope(zk); yield; m = probe.rows(lift, zk, xa, xb); }
+      return { lift, zk, m, ok: m.top - (m.low - m.top) * headK - gap - hTop >= ceil && inside(lift, zk) };
+    };
+    const band = floor - hBot - 2 * gap - hTop - ceil, hMax = band / (1 + headK + sway);
+    let j = hMax > 0 && tall > 0 ? Math.max(0, Math.min(cap, Math.ceil(((zk0 * tall) / hMax - zk0) / ZK_STEP - 1e-6))) : cap;
+    let up = yield* risen(j, r.f.lift);
+    if (up.ok) { while (j > 0) { const nearer = yield* risen(j - 1, up.lift); if (!nearer.ok) break; up = nearer; j--; } }
+    else { while (j < cap && !up.ok) up = yield* risen(++j, up.lift); }
+    if (!r.fits || (up.ok && j < i)) {
+      // ... but never out of the tile: its top stays on it (a tile too short for a card and the creature both, as a phone on
+      // its side: the card then waits, unseen, rather than cover it: StageVoice)
+      const zk = up.zk, lift = up.lift;
+      let m = up.m;
+      best = { lift, zk, low: m.low, top: m.top, head: (m.low - m.top) * headK };
+      // What it acts out stays on the tile too, both ends (the card then waits, unseen): where it is taller than the tile, stepped back
+      // until it is not; then its lift kept between what keeps its top on the tile and what keeps its foot on it, as near the cards'
+      // as that allows. A larger lift raises it: its rows go up the tile.
+      const reach = probe.reachRows;
+      if (reach) {
+        let z = zk, rr = reach(best.lift, z);
+        for (let n = 0; n < 60 && rr.bottom - rr.top > vh; n++) { z += ZK_STEP; rr = reach(best.lift, z); }
+        if (rr.top < 0 || rr.bottom > vh || z !== zk) {
+          const bound = (ok: (L: number) => boolean, from: number, towards: number) => { let a = from, b = towards; for (let n = 0; n < 40; n++) { const L = (a + b) / 2; if (ok(L)) a = L; else b = L; } return a; };
+          // the highest lift that keeps its top on the tile, the lowest that keeps its foot on it
+          const topOk = (L: number) => !(reach(L, z).top < 0), footOk = (L: number) => !(reach(L, z).bottom > vh);
+          const hiL = topOk(best.lift) ? bound(topOk, best.lift, best.lift + 8) : bound(topOk, best.lift - 8, best.lift);
+          const loL = footOk(best.lift) ? bound(footOk, best.lift, best.lift - 8) : bound(footOk, best.lift + 8, best.lift);
+          const L = Math.min(hiL, Math.max(loL, best.lift));
+          yield;
+          m = probe.rows(L, z, xa, xb);
+          best = { lift: L, zk: z, low: m.low, top: m.top, head: (m.low - m.top) / 3 };
+        }
       }
     }
   }
