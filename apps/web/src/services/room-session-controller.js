@@ -2474,8 +2474,9 @@ async function setAudioDevices(choice){
  keepAudio(kept);audioDevicesChanged(devices);return devices;
 }
 async function refreshAudioDevices(){
- // Focus, permission and section changes must never start the voice just to read this list.
- const opening=voiceHostOpening;
+ // Focus, permission and section changes must never start the voice just to read this list. In an app the host is the
+ // app's own, already there and free to ask: its list is the only true one (the webview's cannot choose a speaker).
+ const opening=voiceHostOpening??(pageHost().voice.runs==='app'?voiceHost():null);
  if(!opening){
   const media=globalThis.navigator?.mediaDevices;
   if(typeof media?.enumerateDevices!=='function')return;

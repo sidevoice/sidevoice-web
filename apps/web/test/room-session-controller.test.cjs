@@ -3749,6 +3749,14 @@ test('Refreshing devices never opens the voice host, and an opened host fills th
  assert.equal(s.run('voiceHostOpening'),opening,'later refreshes reuse the host');
  assert.equal(s.run('audioDevices.outputs.length'),1);
 });
+test('In an app the list is the app\'s own from the first read, never the webview\'s (its speaker can be chosen)',async()=>{
+ const s=setup();
+ s.context.navigator={mediaDevices:{enumerateDevices:async()=>[{kind:'audioinput',deviceId:'browser-mic',label:'Browser microphone'}]}};
+ withVoice(s,voiceWithDevices());
+ await s.run('refreshAudioDevices')();
+ assert.equal(s.run('audioDevices.inputs.length'),2,'the app\'s devices, not the browser\'s');
+ assert.equal(s.run('audioDevices.outputSelectable'),true);
+});
 test('This device\'s microphone and speaker are given to the voice when it is made, kept as chosen, and a lost one is said once',async()=>{
  const s=setup();const voice=withVoice(s,voiceWithDevices());
  s.context.localStorage.setItem('sidevoice.audio-devices',JSON.stringify({input:'mic-b'}));
