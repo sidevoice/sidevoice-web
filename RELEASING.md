@@ -50,6 +50,14 @@ The changelog is written from the squashed PR titles. To change it, edit `CHANGE
 before merging it: any later merge into `main` regenerates the PR. After the release, fix the notes on the
 Release itself.
 
+## The Sidevoice service minor this web works with
+
+`apps/web/public/service.pin.json` (`{ "minor": "0.20" }`) declares the one minor of the Sidevoice service this web speaks
+the contract of. It ships in the build (`voice/service.pin.json`); the page judges every machine against it, and the
+desktop app reads it from the web it bundles (`web.pin.json`), updating this device's service to the newest patch of that
+minor and never to the next one. A service release that is a minor (`feat` in the service) arrives with the web (and so the
+desktop app) that bumps this file; a patch (`fix`) needs nothing here. This file is the only place the minor is written.
+
 ## Which version comes next
 
 `fix:` → patch, `feat:` → minor. While the version is 0.x a breaking change (`feat!:` or a `BREAKING CHANGE:`

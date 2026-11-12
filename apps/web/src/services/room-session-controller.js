@@ -25,6 +25,7 @@ import {playbackHearing,writtenReplyHearing} from './reply-hearing-policy.js';
 import {refusalError,shouldRejoin,DEVICE_ABSENT} from './refusals.js';
 import {followWorking} from './working-clock.ts';
 import {holdPressed} from '../state/shortcuts.ts';
+import {rememberServiceVersion} from './service-version.ts';
 import {watchAudioDeviceRefresh} from './audio-device-refresh.ts';
 import {createMicrophoneAccess} from './microphone-access.ts';
 import {audioDiagnostics} from './audio-diagnostics.ts';
@@ -396,8 +397,10 @@ function setLocalHostStatus(status){
  roomStore.patch({localHostStatus:status});
 }
 let localHostEpoch=0;
-// What a paired machine says of its Sidevoice — its version, and whether it is behind — for its page's card: asked of it with this
-// device's pairing (core GET /api/host/status, which core does not serve yet: a contract gap). Unknown stays unknown.
+// What a paired machine says of its Sidevoice — its version — for its page's card and its row: asked of it with this
+// device's pairing (core GET /api/host/status). Unknown stays unknown. Whether
+// it is out of date is the page's to judge, against the minor it pins (services/service-version.ts); the version it says is
+// kept, to say again when the machine does not answer.
 // One question per machine at a time: every place asking while it is out (its page's card, each place the updates
 // show) shares its answer.
 const machineInfoLoads=new Map();
@@ -411,11 +414,8 @@ async function readMachineInfo(fp){
   const answer=await hostApi(fp,'/api/host/status',{headers:{accept:'application/json'},cache:'no-store'});
   const info=answer&&typeof answer==='object'?answer:{};
   const version=typeof info.version==='string'&&/^\d+\.\d+\.\d+/.test(info.version)?info.version:null;
-  // Behind the latest, and the command that updates it there where it names one (contract gap #57: no core says it
-  // yet; with none, Updates says the documented one).
-  const u=info.update&&typeof info.update==='object'?info.update:null;
-  const update=u&&typeof u.latest==='string'&&u.latest.trim()?{latest:u.latest,command:typeof u.command==='string'&&u.command.trim()?u.command:null}:null;
-  roomStore.patch({remoteHostStatus:{...state.remoteHostStatus,[fp]:{...state.remoteHostStatus?.[fp],version,update}}});
+  if(version)rememberServiceVersion(fp,version);
+  roomStore.patch({remoteHostStatus:{...state.remoteHostStatus,[fp]:{...state.remoteHostStatus?.[fp],version}}});
  }catch{}
 }
 async function refreshLocalHost(){

@@ -5,46 +5,41 @@ import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import { fakeUpdater } from "../../test/updater";
 import { UpdateNotice } from "../updates/UpdateNotice";
-import { SIDEVOICE_UPDATE_COMMAND } from "../updates/useUpdates";
 import type { UpdaterStatus } from "../../host";
 import type { PairingSummary } from "../../services/device-pairing.js";
 import type { LocalHostStatus, LocalHostVersion } from "../../host";
+import { resetLocalService } from "../../services/local-service";
 import { DEVELOPER_MODE_KEY } from "./developer-mode";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 const CHECKED = "sidevoice.updates-checked-at";
 afterEach(() => {
   cleanup();
-  // A restart into the app's update asks the service to follow (one row): never into the next test.
-  for (const key of ["sidevoice.settings", CHECKED, "sidevoice.update-continue"]) localStorage.removeItem(key);
+  for (const key of ["sidevoice.settings", CHECKED, "sidevoice.service-last-seen", "sidevoice.service-notice-dismissed"]) localStorage.removeItem(key);
   delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost;
+  resetLocalService();
 });
 
-/* Updates (decided): a Settings section of their own, holding everything that updates, each row with its action right
- * there once an update is found — this computer as one row, Sidevoice (decided), top to bottom: Automatic or Manual;
- * the installed version, Sidevoice 0.9.0 (· Up to date once a check says so, · Checking… while the person's runs)
- * beside Check for updates, with no Version line above it (only a nightly's or development build's note); then, only
- * while a newer one is in view, its own line with just the new version and its one action — Sidevoice 0.10.0
- * available · Download in manual, Sidevoice 0.10.0 · Downloading… with its progress, Sidevoice 0.10.0 ready · Restart
- * to update in either mode — or, where only this computer's service is behind the one the app bundles, Update available
- * · Update Sidevoice; then each remote machine that is behind, with the command to run there (the room's notice never
- * says those). The one row's own steps (the service following the app's restart) are UpdatesSidevoiceRow.test.tsx. In
- * the desktop app always; in a browser only while a machine is behind, with only those machines. A check that finds
- * one and This device's Update available land on the row's action, in view and focused. */
+/* Updates (decided; sidevoice-desktop#67, U3): a Settings section of their own, holding everything that updates. The app
+ * first, as a row of its own — its icon, its name and its version, with Automatic or Manual, Check for updates (and Up to
+ * date once a check says so, Checking… while the person's runs) and, only while a newer one is in view, its own line with
+ * just the new version and its one action — Sidevoice 0.10.0 available · Download in manual, Sidevoice 0.10.0 ·
+ * Downloading… with its progress, Sidevoice 0.10.0 ready · Restart to update in either mode. Then the machines, one link
+ * row each — this device's and every paired machine's: its name, its service's version and where that stands, a
+ * chevron to its page; no notice in this view. In the desktop app always; in a browser only while a machine is out of
+ * date, with only the machines. */
 
 const local: PairingSummary = { fp: "fp-local", host: "MacBook", local: true, urls: ["http://127.0.0.1:45781"], device_id: "d-local", paired_at: 1_700_000_000, revoked: false };
 const lab: PairingSummary = { fp: "fp-lab", host: "Lab box", urls: ["https://lab.example"], device_id: "d-lab", paired_at: 1_700_000_100, revoked: false };
+const nuc: PairingSummary = { ...lab, fp: "fp-nuc", host: "NUC", device_id: "d-nuc" };
 const running: LocalHostStatus = { state: "running", reachable: true, installed: true, service: "launchd", core: { version: "0.1.0", api: 1 }, calls: 0, product_version: "0.9.0" };
 const RELEASE = { channel: "release", version: "0.9.0", commit: "abcdef0123456789", date: "2026-10-13T08:00:00Z" };
 const NIGHTLY = { channel: "nightly", version: "0.10.0-nightly", commit: "abcdef0123456789", date: "2026-10-13T08:00:00Z" };
 const DEV = { channel: "dev", version: "0.10.0-dev" };
-const COMMAND = "curl -fsSL https://sidevoice.app/install | sh";
-/** What a remote machine says when its Sidevoice is behind (loadMachineInfo, contract gap #57). */
-const behind = (version: string | null = "0.4.0", command = COMMAND) => ({ state: "connected", checkedAt: 1, version, update: { latest: "0.5.0", command } });
-/** This computer's service, as the bridge says it when the app bundles a newer one. */
-const BUNDLED: LocalHostVersion = { bridge: 3, bundled: { version: "0.9.1" }, installed: { version: "0.9.0" }, core_api: 1, update: "available" };
-/** This computer's service as the app bundles it: current. The one row says Up to date only with it so. */
-const SERVICE_CURRENT: LocalHostVersion = { ...BUNDLED, bundled: { version: "0.9.0" }, update: "current" };
+/** What a remote machine says of its Sidevoice (loadMachineInfo): its version. The app pins 0.20 (public/service.pin.json). */
+const says = (version: string | null) => ({ state: "connected", checkedAt: 1, version });
+/** This computer's service as the bridge reports it. */
+const SERVICE_CURRENT: LocalHostVersion = { bridge: 3, bundled: { minor: "0.20" }, installed: { version: "0.9.0" }, core_api: 1, update: "current", latest: null, progress: null };
 
 interface Open {
   /** The app's build; null, a browser. */
@@ -55,54 +50,64 @@ interface Open {
   machines?: PairingSummary[];
   /** What each paired machine elsewhere said (remoteHostStatus). */
   remote?: Record<string, unknown>;
+  /** How each paired machine is reached (machineLinks' `reach`); connected where none is said. */
+  reach?: Record<string, string>;
   /** What the bridge says of this computer's service (its `version()`), or how it answers. */
   service?: LocalHostVersion | (() => Promise<LocalHostVersion>) | null;
-  /** The bridge's `update()`. */
-  update?: ReturnType<typeof vi.fn>;
   status?: LocalHostStatus;
   /** The room's notice (UpdateNotice), beside Settings. */
   notice?: boolean;
+  /** This computer's own section (the app): false, a host that is not the app, whose computer is listed among the machines. */
+  own?: boolean;
   /** Readies the fake updater before the page first asks it. */
   prepare?: (fake: ReturnType<typeof fakeUpdater>) => void;
 }
 
 /** The desktop app (its build, its updater on a release), or a browser (`build` null), with Settings at `section`. */
-function open({ build = RELEASE, updater, section = "this-computer", machines = [], remote = {}, service = null, update = vi.fn(async () => running), status = running, notice, prepare }: Open = {}) {
+function open({ build = RELEASE, updater, section = "this-computer", machines = [], remote = {}, reach = {}, service = null, status = running, notice, own = true, prepare }: Open = {}) {
   const withUpdater = updater === undefined ? build?.channel === "release" : updater !== false;
   const fake = fakeUpdater(updater || undefined);
   prepare?.(fake);
   const version = typeof service === "function" ? vi.fn(service) : vi.fn(async () => service!);
-  if (build) Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build,
+  // A host with no build is not the app (its computer is a machine among the others); with none at all, a browser.
+  if (build || !own) Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { ...(build ? { build } : {}),
     ...(withUpdater ? { updater: fake.updater } : {}),
     localHost: { state: vi.fn(async () => status), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install: vi.fn(),
-      ...(service ? { version, update } : {}) } } } });
+      ...(service ? { version } : {}) } } } });
   window.sidevoiceActions = { openPairing: vi.fn(), localHostDevices: vi.fn().mockResolvedValue([]), machineDevices: vi.fn().mockResolvedValue([]),
     loadHostAgents: vi.fn(), loadMachineInfo: vi.fn() } as unknown as typeof window.sidevoiceActions;
   const store = createRoomStore();
-  act(() => { store.patch({ pairings: [...(build ? [local] : []), ...machines], machinesReady: true, inApp: !!build, localHostAvailable: !!build,
+  const hosts = build || !own ? [local] : [];
+  act(() => { store.patch({ pairings: [...hosts, ...machines], machinesReady: true, inApp: !!build && own, localHostAvailable: !!build || !own,
     localHostStatus: status, remoteHostStatus: remote as never, settingsSection: section,
-    machineLinks: Object.fromEntries([...(build ? [local] : []), ...machines].map((pairing) => [pairing.fp, { reach: "ok", via: "node" }])) }); });
+    machineLinks: Object.fromEntries([...hosts, ...machines].map((pairing) => [pairing.fp, { reach: reach[pairing.fp] ?? "ok", via: "node" }])) as never }); });
   render(<RoomProvider store={store}><SettingsDialog />{notice && <UpdateNotice />}</RoomProvider>);
   document.getElementById("language-settings")!.setAttribute("open", "");
-  return { store, fake, update, version };
+  return { store, fake, version };
 }
 
 const entry = () => document.getElementById("settings-updates");
 const pane = (id: string) => document.getElementById("pane-" + id)!;
 const updates = () => within(pane("updates"));
 const groups = () => [...pane("updates").querySelectorAll(".ui-group-title")].map((title) => title.textContent);
-const group = (name: string) => [...pane("updates").querySelectorAll<HTMLElement>(".ui-group")].find((item) => item.querySelector(".ui-group-title")?.textContent === name)!;
+/** The app's group (the first); its name is only for the tests' reading. */
+const group = (_name: string) => pane("updates").querySelector<HTMLElement>(".ui-group")!;
 const navOrder = () => [...document.querySelectorAll(".settings-nav > button.ui-nav-item")].map((item) => item.id.replace("settings-", ""));
 /** The app's newer version's line, only while one is in view (the installed version's line holds the id otherwise). */
 const appRow = () => document.querySelector<HTMLElement>("#pane-updates .update-action-row#updates-app");
-/** The installed version's line, holding Check for updates. */
+/** The app's row, holding Check for updates. */
 const installedLine = () => pane("updates").querySelector<HTMLElement>(".app-update-installed");
-/** Its words: Sidevoice 0.9.0, with · Up to date or · Checking…. */
-const installed = () => installedLine()!.querySelector<HTMLElement>(".update-action-copy")!;
-/** Each machine behind as Updates says it: its name, its versions, where to run the command, the command. */
-const machineRows = () => [...pane("updates").querySelectorAll(".updates-machine")].map((row) => [
-  row.querySelector(".host-status-product")?.textContent, row.querySelector(".host-status-build")?.textContent,
-  row.querySelector(".host-agent-where")?.textContent, row.querySelector(".ui-snippet-text")?.textContent]);
+/** Its words: Version 0.9.0, with · Up to date or · Checking… (what a screen reader is told of a check after it). */
+const installed = () => {
+  const line = installedLine()!;
+  const words = document.createElement("span");
+  words.textContent = [line.querySelector(".ui-row-description")?.textContent, line.querySelector(".ui-badge")?.textContent].filter(Boolean).join(" · ")
+    + (line.querySelector("[role=status]")?.textContent ?? "");
+  return words;
+};
+/** Each machine's row as Updates says it: its name, its version line, its badge. */
+const machineRows = () => [...pane("updates").querySelectorAll<HTMLElement>("[data-machine-row]")].map((row) => [
+  row.querySelector(".svc-link-name")?.textContent, row.querySelector(".ui-row-description")?.textContent ?? null, row.querySelector(".ui-badge")?.textContent ?? null]);
 const settle = () => act(async () => {});
 const inSpanish = () => {
   localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
@@ -115,73 +120,279 @@ async function landsOn(control: () => HTMLElement | null, row?: () => HTMLElemen
   expect(row()).toHaveClass("settings-highlight");
   expect([...document.querySelectorAll(".settings-highlight")]).toEqual([row()]);
 }
-/** The line an update is acted on in, holding `control`: its words and its button. */
-const lineOf = (control: () => HTMLElement | null) => () => control()?.closest<HTMLElement>(".update-action-row") ?? null;
 
-test("Updates is a section of its own, before Advanced: this computer as one row, Sidevoice — Automatic/Manual first, then Sidevoice 0.9.0 with Check for updates; no Version line", async () => {
+test("Updates is a section of its own, before Advanced: the app's row — its icon, name and version, Automatic/Manual first, then Check for updates — and the machines as rows", async () => {
   open({ section: "updates" });
   await settle();
   expect(entry()).toHaveTextContent(/^Updates$/);
   expect(navOrder().slice(-3)).toEqual(["machines", "updates", "advanced"]);
   expect(entry()).toHaveAttribute("aria-current", "page");
   expect(updates().getByRole("heading", { name: "Updates", level: 2 })).toBeInTheDocument();
-  expect(updates().getByText("Sidevoice on this computer: its versions, and how it updates.")).toBeInTheDocument();
-  // One row, Sidevoice, the app and its service as one; no machine is behind, so no Remote machines.
-  expect(groups()).toEqual(["Sidevoice"]);
-  // The app's version said once, on the installed version's line, with no hint and no service's number: no Version
-  // line above it, with the app's updater.
-  expect(group("Sidevoice").querySelector(".host-status-product, .updates-settings-version")).toBeNull();
-  expect(group("Sidevoice").querySelector(".updates-part-hint")).toBeNull();
-  expect(group("Sidevoice").querySelector(".updates-up-to-date")).toBeNull();
+  expect(updates().getByText("Sidevoice on this device and on your machines: their versions, and where each stands.")).toBeInTheDocument();
+  // The app, then the machines: this device alone, no other is paired.
+  expect(groups()).toEqual(["Machines"]);
   const modes = await updates().findByRole("radiogroup", { name: "Updates" });
   const check = updates().getByRole("button", { name: "Check for updates" });
-  // Never checked here: the version alone, nothing claims Up to date yet, and no line says when it checked; no
-  // colour, no badge, no update's line.
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
+  // The app's row: its icon, its name, its version said once — never the service's — with Check for updates; never
+  // checked here, nothing claims Up to date yet.
+  expect(installedLine()!.querySelector("img.svc-app-icon")).not.toBeNull();
+  expect(installedLine()!.querySelector(".ui-row-label")).toHaveTextContent(/^Sidevoice app$/);
+  expect(installed()).toHaveTextContent(/^Version 0\.9\.0$/);
   expect(installedLine()).toContainElement(check);
   expect(pane("updates")).not.toHaveTextContent(/Not checked yet|Last checked|Up to date/);
   expect(appRow()).toBeNull();
-  expect(group("Sidevoice").querySelector(".update-action-row, .ui-badge")).toBeNull();
-  // Nothing newer in view: a landing on the app goes to the installed version's line.
   expect(document.getElementById("updates-app")).toBe(installedLine());
-  // In order: Automatic or Manual, then the installed version with Check for updates.
   expect(modes.compareDocumentPosition(installedLine()!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // This device's row: its service's version (said by the app, whatever the bridge's report).
+  expect(machineRows()).toEqual([[expect.any(String), "Version 0.9.0", null]]);
 });
 
-test("Sidevoice 0.9.0 · Up to date on the installed version's line once checked and the app and its service both current; never with its service behind", async () => {
+test("Up to date is a badge on the app's row once a check went through and found nothing: never before any check, never after a failure", async () => {
   localStorage.setItem(CHECKED, String(Date.parse("2026-10-12T09:30:00Z")));
-  open({ section: "updates", service: SERVICE_CURRENT });
-  await settle();
-  await waitFor(() => expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Up to date$/));
-  expect(group("Sidevoice").querySelector(".host-status-product")).toBeNull();
-  // Up to date is never a colour, nor a badge.
-  expect(group("Sidevoice").querySelector(".update-action-row, .ui-badge")).toBeNull();
+  open({ section: "updates" });
+  await updates().findByRole("button", { name: "Check for updates" });
+  await waitFor(() => expect(installed()).toHaveTextContent(/^Version 0\.9\.0 · Up to date$/));
+  // Up to date is the badge's, never an update's line.
+  expect(group("app").querySelector(".update-action-row")).toBeNull();
   cleanup();
-  // Its service behind what the app bundles: checked, but not Up to date.
-  open({ section: "updates", service: BUNDLED });
-  await updates().findByRole("button", { name: "Update Sidevoice" });
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
-  expect(pane("updates")).not.toHaveTextContent("Up to date");
+  localStorage.removeItem(CHECKED);
+  open({ section: "updates" });
+  await updates().findByRole("button", { name: "Check for updates" });
+  await settle();
+  expect(installed()).toHaveTextContent(/^Version 0\.9\.0$/);
+  expect(installedLine()!.querySelector(".ui-badge")).toBeNull();
 });
+
+test.each([
+  ["current", "Up to date"], ["available", "Out of date"], ["updating", "Updating…"], ["waiting-call", "After the call"], ["newer-installed", "Newer"],
+] as const)("This device's row says where its service stands, as the app reports it: %s is %s", async (update, badge) => {
+  const { store } = open({ section: "updates", service: { ...SERVICE_CURRENT, update } });
+  await waitFor(() => expect(machineRows()[0][2]).toBe(badge));
+  expect(machineRows()[0][1]).toBe("Version 0.9.0");
+  // The row is a link: it opens this device's page, where its card is.
+  await act(async () => { fireEvent.click(pane("updates").querySelector<HTMLElement>("[data-machine-row=local]")!); });
+  expect([store.getState().facts.settingsSection, store.getState().facts.settingsLevel]).toEqual(["this-computer", "page"]);
+});
+
+test("This device's row says no badge where the app reports nothing it knows: no version(), a state of a newer app, a failed report", async () => {
+  open({ section: "updates", service: { ...SERVICE_CURRENT, update: "something-new" as never } });
+  await settle();
+  expect(machineRows()[0]).toEqual([expect.any(String), "Version 0.9.0", null]);
+  cleanup();
+  open({ section: "updates", service: async () => { throw new Error("no"); } });
+  await settle();
+  expect(machineRows()[0]).toEqual([expect.any(String), "Version 0.9.0", null]);
+  cleanup();
+  // A service with no version: the row says its name alone.
+  open({ section: "updates", status: { ...running, product_version: undefined }, service: { ...SERVICE_CURRENT, installed: null } });
+  await settle();
+  expect(machineRows()[0]).toEqual([expect.any(String), null, null]);
+});
+
+test("each paired machine is a row — its name, its version, where that stands against the minor the app pins (0.20) — and opens its own page; an offline one says Offline and the version it was last seen running", async () => {
+  localStorage.setItem("sidevoice.service-last-seen", JSON.stringify({ "fp-offline": "0.19.9" }));
+  const offline: PairingSummary = { ...lab, fp: "fp-offline", host: "Attic", device_id: "d-attic" };
+  const mac: PairingSummary = { ...lab, fp: "fp-mac", host: "Mac mini", device_id: "d-mac" };
+  const { store } = open({ section: "updates", machines: [lab, nuc, mac, offline], reach: { "fp-offline": "offline" },
+    remote: { "fp-lab": says("0.19.2"), "fp-nuc": says("0.20.3"), "fp-mac": says("0.21.0") } });
+  await settle();
+  expect(machineRows().slice(1)).toEqual([
+    ["Lab box", "Version 0.19.2", "Out of date"],
+    ["NUC", "Version 0.20.3", "Up to date"],
+    ["Mac mini", "Version 0.21.0", "Newer"],
+    ["Attic", "Version 0.19.9", "Offline"],
+  ]);
+  // No notice in this view: the machine's page says what to do.
+  expect(pane("updates").querySelector(".ui-alert, .ui-snippet")).toBeNull();
+  await act(async () => { fireEvent.click(pane("updates").querySelector<HTMLElement>("[data-machine-row=" + store.getState().machines.find((machine) => machine.pairingId === "fp-lab")!.id + "]")!); });
+  const facts = store.getState().facts;
+  expect([facts.settingsSection, facts.settingsLevel, store.getState().machines.find((machine) => machine.id === facts.machinesView.machine)?.pairingId]).toEqual(["machines", "page", "fp-lab"]);
+});
+
+test("a machine is out of date also by a patch, where this device's service knows the newest of the pinned minor", async () => {
+  open({ section: "updates", machines: [lab, nuc], service: { ...SERVICE_CURRENT, latest: "0.20.2" }, remote: { "fp-lab": says("0.20.1"), "fp-nuc": says("0.20.2") } });
+  await waitFor(() => expect(machineRows().slice(1)).toEqual([["Lab box", "Version 0.20.1", "Out of date"], ["NUC", "Version 0.20.2", "Up to date"]]));
+});
+
+test("in a browser: no Updates section while no machine is out of date", () => {
+  open({ build: null, section: "general", machines: [lab], remote: { "fp-lab": says("0.20.4") } });
+  expect(entry()).toBeNull();
+  expect(document.getElementById("pane-updates")).toBeNull();
+});
+
+test("in a browser, a machine out of date: Updates lists only the machines — no app, no service — and goes as the machine is updated", async () => {
+  const { store } = open({ build: null, section: "updates", machines: [lab, nuc], remote: { "fp-lab": says("0.19.2"), "fp-nuc": says("0.20.0") } });
+  await settle();
+  expect(entry()).toHaveTextContent(/^Updates$/);
+  expect(updates().getByText("Sidevoice on your machines: their versions, and which are out of date.")).toBeInTheDocument();
+  expect(groups()).toEqual(["Machines"]);
+  expect(pane("updates").querySelector(".app-update-settings, .svc-app-row")).toBeNull();
+  expect(machineRows()).toEqual([["Lab box", "Version 0.19.2", "Out of date"], ["NUC", "Version 0.20.0", "Up to date"]]);
+  // Updated: none out of date, no section, and Settings is back where the person can be.
+  act(() => { store.patch({ remoteHostStatus: { "fp-lab": says("0.20.0"), "fp-nuc": says("0.20.0") } } as never); });
+  expect(entry()).toBeNull();
+  expect(document.getElementById("pane-updates")).toBeNull();
+  expect(store.getState().facts.settingsSection).toBe("general");
+});
+
+test("a machine forgotten while it was out of date: no longer listed, and in a browser no section for it", async () => {
+  open({ build: null, section: "general", machines: [], remote: { "fp-lab": says("0.19.2") } });
+  await settle();
+  expect(entry()).toBeNull();
+});
+
+test("a remote machine out of date: the room's notice says nothing of it; Updates has its row", async () => {
+  open({ section: "general", machines: [lab], remote: { "fp-lab": says("0.19.2") }, notice: true });
+  await settle();
+  expect(document.querySelector(".update-notice")).toBeNull();
+  expect(screen.queryByRole("button", { name: "See updates" })).toBeNull();
+  expect(machineRows().slice(1)).toEqual([["Lab box", "Version 0.19.2", "Out of date"]]);
+});
+
+test("a computer listed among the machines (a host that is not the app: no section of its own) has This device's row, as the app says it stands, in Updates; one out of date is why a browser has Updates", async () => {
+  const { store } = open({ build: null, own: false, section: "general", machines: [lab], remote: { "fp-lab": says("0.20.1") }, service: { ...SERVICE_CURRENT, update: "available" } });
+  // No app, and the machines up to date: but this computer's service is behind, as its bridge says.
+  await waitFor(() => expect(entry()).not.toBeNull());
+  act(() => { store.patch({ settingsSection: "updates" }); });
+  await waitFor(() => expect(machineRows()).toEqual([["MacBook", "Version 0.9.0", "Out of date"], ["Lab box", "Version 0.20.1", "Up to date"]]));
+  const row = pane("updates").querySelector<HTMLElement>("[data-machine-row=local]")!;
+  expect(row.querySelector("svg")).toHaveClass("lucide-laptop");
+  // It opens its page among the machines'.
+  await act(async () => { fireEvent.click(row); });
+  const facts = store.getState().facts;
+  expect([facts.settingsSection, facts.machinesView.machine]).toEqual(["machines", "local-host"]);
+  cleanup();
+  // Current, there is no Updates in a browser, and this computer is not one that is out of date.
+  open({ build: null, own: false, section: "general", machines: [lab], remote: { "fp-lab": says("0.20.1") }, service: SERVICE_CURRENT });
+  await settle();
+  expect(entry()).toBeNull();
+});
+
+test("a nightly with no updater: the app's row, its note under it, updated by hand; no Automatic/Manual, no Check", async () => {
+  open({ build: NIGHTLY, section: "updates" });
+  await settle();
+  const row = group("app").querySelector(".svc-app-row")!;
+  expect(row.querySelector(".ui-row-label")).toHaveTextContent(/^Sidevoice app$/);
+  expect(row.querySelector(".ui-row-description")).toHaveTextContent(/^Version 0\.10\.0-nightly$/);
+  expect(installedLine()).toBeNull();
+  const note = pane("updates").querySelector(".host-status-build")!;
+  expect(note).toHaveTextContent("Nightly · abcdef0 · 2026-10-13 — updates by hand");
+  const link = within(note as HTMLElement).getByRole("link", { name: /updates by hand/ });
+  expect(link).toHaveAttribute("href", "https://github.com/sidevoice/sidevoice-desktop/releases/tag/nightly");
+  expect(link).toHaveAttribute("target", "_blank");
+  expect(screen.queryByRole("radiogroup", { name: "Updates" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Check for updates/ })).toBeNull();
+});
+
+test("a nightly with an updater (desktop #56, for now) updates as a release: no 'by hand', its controls, its found update", async () => {
+  open({ build: NIGHTLY, section: "updates", updater: { mode: "manual", status: { state: "available", version: "0.11.0-nightly" } } });
+  await settle();
+  const note = pane("updates").querySelector(".host-status-build")!;
+  expect(note).toHaveTextContent(/^Nightly · abcdef0 · 2026-10-13$/);
+  expect(within(note as HTMLElement).queryByRole("link")).toBeNull();
+  const modes = await updates().findByRole("radiogroup", { name: "Updates" });
+  expect(modes.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(installed()).toHaveTextContent(/^Version 0\.10\.0-nightly$/);
+  expect(updates().getByRole("button", { name: "Check for updates" })).toBeInTheDocument();
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.11\.0-nightly availableDownload$/);
+  expect(within(appRow()!).getByRole("button", { name: "Download" })).toBeInTheDocument();
+});
+
+test("a development build: Development build under its version, no updater's controls", async () => {
+  open({ build: DEV, section: "updates" });
+  await settle();
+  expect(group("app").querySelector(".svc-app-row .ui-row-description")).toHaveTextContent(/^Version 0\.10\.0-dev$/);
+  expect(pane("updates").querySelector(".host-status-build")).toHaveTextContent(/^Development build$/);
+  expect(screen.queryByRole("link", { name: /updates by hand/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Check for updates/ })).toBeNull();
+});
+
+test("in Spanish: Actualizaciones, the app's row, the machines' rows with their badges", async () => {
+  inSpanish();
+  localStorage.setItem(CHECKED, String(Date.parse("2026-10-12T09:30:00Z")));
+  open({ section: "updates", machines: [lab, nuc], service: { ...SERVICE_CURRENT, update: "waiting-call" }, remote: { "fp-lab": says("0.19.2"), "fp-nuc": says("0.21.0") },
+    updater: { mode: "manual", status: { state: "idle" } } });
+  await settle();
+  expect(entry()).toHaveTextContent(/^Actualizaciones$/);
+  expect(groups()).toEqual(["Máquinas"]);
+  expect(updates().getByText("Sidevoice en este dispositivo y en tus máquinas: sus versiones y en qué punto está cada una.")).toBeInTheDocument();
+  expect(installedLine()!.querySelector(".ui-row-label")).toHaveTextContent(/^App de Sidevoice$/);
+  await waitFor(() => expect(installed()).toHaveTextContent(/^Versión 0\.9\.0 · Al día$/));
+  expect(updates().getByRole("button", { name: "Buscar actualizaciones" })).toBeInTheDocument();
+  await waitFor(() => expect(machineRows()).toEqual([[expect.any(String), "Versión 0.9.0", "Tras la llamada"], ["Lab box", "Versión 0.19.2", "Desactualizada"], ["NUC", "Versión 0.21.0", "Más nueva"]]));
+});
+
+test("in Spanish: Automáticas (recomendado) | Manuales, Buscar actualizaciones (which tries a failed check again), each failure — never Al día beside one — and a nightly que se actualiza a mano", async () => {
+  inSpanish();
+  localStorage.setItem(CHECKED, String(Date.parse("2026-10-12T09:30:00Z")));
+  for (const { code, state, es, retry, boton } of FAILURES) {
+    open({ section: "updates", updater: { status: { state, version: "0.10.0", error: { code } }, mode: "manual" } });
+    const modes = await updates().findByRole("radiogroup", { name: "Actualizaciones" });
+    expect(within(modes).getByRole("radio", { name: "Manuales" })).toHaveAttribute("aria-checked", "true");
+    expect(within(modes).getByRole("radio", { name: "Automáticas (recomendado)" })).toBeInTheDocument();
+    expect(updates().getByRole("button", { name: "Buscar actualizaciones" })).toBeInTheDocument();
+    expect(installed()).toHaveTextContent(/^Versión 0\.9\.0$/);
+    expect(pane("updates")).not.toHaveTextContent(/Última comprobación|Al día/);
+    expect(updates().getByRole("alert")).toHaveTextContent(es);
+    if (retry) expect(updates().getByRole("button", { name: boton! })).toBeInTheDocument();
+    else {
+      expect(appRow()).toHaveTextContent(/^Sidevoice 0\.10\.0 listaReiniciar para actualizar/);
+      expect(within(appRow()!).getByRole("button", { name: "Reiniciar para actualizar" })).toBeInTheDocument();
+    }
+    if (retry === "check") expect(updates().queryByRole("button", { name: /^Reintentar/ })).toBeNull();
+    cleanup();
+  }
+  open({ build: NIGHTLY, section: "updates" });
+  expect(pane("updates").querySelector(".host-status-build")).toHaveTextContent("Nightly · abcdef0 · 2026-10-13 — se actualiza a mano (se abre en una pestaña nueva)");
+  cleanup();
+  open({ build: DEV, section: "updates" });
+  expect(pane("updates").querySelector(".host-status-build")).toHaveTextContent(/^Versión de desarrollo$/);
+});
+
+/* Developer mode (developer-mode.ts) is turned on from the build in Advanced (SettingsDialog.test.tsx), no longer from
+ * a version in Updates: there, in any build, the version is only text. */
+
+const developerKept = () => {
+  onTestFinished(() => localStorage.removeItem(DEVELOPER_MODE_KEY));
+  return () => localStorage.getItem(DEVELOPER_MODE_KEY);
+};
+const clickTimes = (element: Element, times: number) => { for (let i = 0; i < times; i++) fireEvent.click(element); };
+
+test("the versions in Updates (the app's row, its version with no updater, a machine's row) are only text: ten clicks add nothing and keep nothing", async () => {
+  const kept = developerKept();
+  open({ build: NIGHTLY, section: "updates", updater: {} });
+  await settle();
+  clickTimes(installedLine()!.querySelector(".ui-row-description")!, 10);
+  expect(navOrder().at(-1)).toBe("advanced");
+  expect(within(installedLine()!).queryByRole("status")).toBeNull();
+  cleanup();
+  open({ build: NIGHTLY, section: "updates" });
+  await settle();
+  clickTimes(pane("updates").querySelector<HTMLElement>(".svc-app-row .ui-row-description")!, 10);
+  expect(navOrder().at(-1)).toBe("advanced");
+  expect(kept()).toBeNull();
+});
+
+
 
 test("Up to date only after a check that went through and found nothing: never before any check, never after a failure — which Check for updates itself tries again", async () => {
   // Its service current, as the app bundles it: what the line says is the app's check.
   const { fake } = open({ section: "updates", service: SERVICE_CURRENT, updater: { mode: "manual", status: { state: "available", version: "0.10.0" } } });
   const check = await updates().findByRole("button", { name: "Check for updates" });
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
-  expect(pane("updates")).not.toHaveTextContent("Up to date");
+  expect(installed()).toHaveTextContent(/^Version 0\.9\.0$/);
+  expect(installedLine()).not.toHaveTextContent("Up to date");
   // Installed elsewhere and checked again: nothing waits.
   fake.updater.check.mockResolvedValueOnce({ state: "idle" });
   await act(async () => { fake.push({ state: "idle" }); });
   await act(async () => { fireEvent.click(check); });
   // The line, then what a screen reader is told of the check.
-  await waitFor(() => expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Up to date(Sidevoice is up to date\.)?$/));
+  await waitFor(() => expect(installed()).toHaveTextContent(/^Version 0\.9\.0 · Up to date(Sidevoice is up to date\.)?$/));
   expect(appRow()).toBeNull();
   // The next check fails: what failed, under the installed version — not Up to date, and no Retry of its own.
   fake.updater.check.mockResolvedValueOnce({ state: "idle", error: { code: "update-check-failed" } });
   await act(async () => { fireEvent.click(check); });
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
-  expect(pane("updates")).not.toHaveTextContent("Up to date");
+  expect(installed()).toHaveTextContent(/^Version 0\.9\.0$/);
+  expect(installedLine()).not.toHaveTextContent("Up to date");
   const alert = updates().getByRole("alert");
   expect(alert).toHaveTextContent("Couldn't check for updates.");
   expect(alert).toHaveClass("app-update-failure");
@@ -190,7 +401,7 @@ test("Up to date only after a check that went through and found nothing: never b
   // Check for updates is what tries again; a check that goes through says Up to date again.
   await act(async () => { fireEvent.click(check); });
   expect(fake.updater.check).toHaveBeenCalledTimes(3);
-  await waitFor(() => expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Up to date/));
+  await waitFor(() => expect(installed()).toHaveTextContent(/^Version 0\.9\.0 · Up to date/));
   expect(updates().queryByRole("alert")).toBeNull();
   cleanup();
   // Idle and never checked, its service current: not Up to date either.
@@ -198,93 +409,12 @@ test("Up to date only after a check that went through and found nothing: never b
   open({ section: "updates", service: SERVICE_CURRENT });
   await updates().findByRole("button", { name: "Check for updates" });
   await settle();
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
+  expect(installed()).toHaveTextContent(/^Version 0\.9\.0$/);
 });
 
-test("in Spanish: Sidevoice 0.9.0 · Al día beside Buscar actualizaciones once checked; never checked, Sidevoice 0.9.0 alone, then its update's line", async () => {
-  inSpanish();
-  localStorage.setItem(CHECKED, String(Date.parse("2026-10-12T09:30:00Z")));
-  open({ section: "updates", service: SERVICE_CURRENT });
-  let check = await updates().findByRole("button", { name: "Buscar actualizaciones" });
-  await waitFor(() => expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Al día$/));
-  expect(installedLine()).toContainElement(check);
-  cleanup();
-  localStorage.removeItem(CHECKED);
-  open({ section: "updates", updater: { mode: "manual", status: { state: "available", version: "0.10.0" } } });
-  check = await updates().findByRole("button", { name: "Buscar actualizaciones" });
-  await settle();
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
-  expect(pane("updates")).not.toHaveTextContent(/Aún sin comprobar|Última comprobación|Al día/);
-  expect(check.compareDocumentPosition(appRow()!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-});
 
-/** This device's version line, as its card says it. */
-const deviceLine = () => pane("this-computer").querySelector(".this-device-version");
 
-test("This device says its version and Update available, a link to the row's button in Updates: no Automatic/Manual, no Check, no Update, no build note", async () => {
-  const { store } = open({ build: NIGHTLY, service: BUNDLED, updater: {} });
-  await settle();
-  const card = pane("this-computer");
-  // The app's number (the Sidevoice the person installed); the service is behind what the app bundles.
-  await waitFor(() => expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.10\.0-nightly · Update available$/));
-  const link = within(card).getByRole("button", { name: "Update available, see it in Updates" });
-  expect(card.querySelector(".host-status-facts")).toContainElement(link);
-  expect(within(card).queryByRole("button", { name: "See updates" })).toBeNull();
-  expect(within(card).queryByRole("radiogroup", { name: "Updates" })).toBeNull();
-  expect(within(card).queryByRole("button", { name: /Check for updates|Update Sidevoice/ })).toBeNull();
-  expect(card.querySelector(".host-status-build, .app-update-settings, .host-update-control")).toBeNull();
-  await act(async () => { fireEvent.click(link); });
-  expect([store.getState().facts.settingsSection, store.getState().facts.settingsLevel]).toEqual(["updates", "page"]);
-  expect(entry()).toHaveAttribute("aria-current", "page");
-  await landsOn(() => document.getElementById("updates-this-computer"), lineOf(() => document.getElementById("updates-this-computer")));
-});
 
-test("This device says what it always said of the app's update, whatever Updates shows for Cancel: automatic's download by itself and its cancel say nothing, manual's download says Update available", async () => {
-  const version = "0.10.0";
-  const auto = open({ notice: true, updater: { mode: "automatic", status: { state: "available", version } } });
-  await settle();
-  expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
-  act(() => auto.fake.push({ state: "downloading", version, progress: 0.4 }));
-  expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
-  auto.fake.updater.cancel.mockImplementationOnce(async () => { auto.fake.push({ state: "available", version }); });
-  await act(async () => { fireEvent.click(within(noticeBox()).getByRole("button", { name: "Cancel download" })); });
-  expect(auto.fake.updater.cancel).toHaveBeenCalledTimes(1);
-  expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
-  act(() => auto.fake.push({ state: "ready", version }));
-  expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Update available$/);
-  cleanup();
-  delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost;
-  const manual = open({ updater: { mode: "manual", status: { state: "available", version } } });
-  await settle();
-  expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Update available$/);
-  act(() => manual.fake.push({ state: "downloading", version, progress: 0.4 }));
-  expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Update available$/);
-});
-
-test("This device: Up to date where the app (after a check) and its service both say so, with no link; nothing said where neither can", async () => {
-  // Before any check, the app cannot say it is current: the line says the version alone.
-  open({ service: { ...BUNDLED, bundled: { version: "0.9.0" }, update: "current" } });
-  await settle();
-  expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
-  cleanup();
-  localStorage.setItem("sidevoice.updates-checked-at", String(Date.now()));
-  open({ service: { ...BUNDLED, bundled: { version: "0.9.0" }, update: "current" } });
-  await waitFor(() => expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Up to date$/));
-  expect(within(pane("this-computer")).queryByRole("button", { name: /Update available/ })).toBeNull();
-  cleanup();
-  // The app's update found: Update available, landing on the new version's line.
-  const { fake, store } = open({ service: { ...BUNDLED, update: "current" }, updater: { status: { state: "ready", version: "0.10.0" } } });
-  await waitFor(() => expect(deviceLine()).toHaveTextContent(/· Update available$/));
-  await act(async () => { fireEvent.click(within(pane("this-computer")).getByRole("button", { name: "Update available, see it in Updates" })); });
-  await landsOn(() => appRow() && within(appRow()!).getByRole("button", { name: "Restart to update" }), appRow);
-  expect(store.getState().facts.settingsSection).toBe("updates");
-  expect(fake.updater.restart).not.toHaveBeenCalled();
-  cleanup();
-  // A development build: no updater and no update of its service from here: its version alone.
-  open({ build: DEV, service: BUNDLED });
-  await settle();
-  expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.10\.0-dev$/);
-});
 
 test("manual: an update found has its own line under the installed version, Sidevoice 0.10.0 available · Download; Sidevoice 0.10.0 · Downloading… with its progress in that line; then Sidevoice 0.10.0 ready · Restart to update", async () => {
   const { fake } = open({ section: "updates", updater: { mode: "manual", status: { state: "available", version: "0.10.0" } } });
@@ -293,7 +423,7 @@ test("manual: an update found has its own line under the installed version, Side
   // Each version said once: the installed one on its line, the new one on its own, never 0.9.0 · 0.10.0.
   expect(appRow()).toHaveTextContent(/^Sidevoice 0\.10\.0 availableDownload$/);
   expect(appRow()).toHaveAttribute("data-state", "available");
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
+  expect(installed()).toHaveTextContent(/^Version 0\.9\.0$/);
   expect(pane("updates")).not.toHaveTextContent("0.9.0 · 0.10.0");
   // The id is the new version's line now: a landing goes there, not to the installed version.
   expect(installedLine()).not.toHaveAttribute("id");
@@ -333,7 +463,7 @@ test("automatic, what the app found by itself: nothing while it is available; Ca
   // An update whose version the app does not say (a gap of the seam): what is known; the installed version on its line.
   act(() => fake.push({ state: "ready" }));
   expect(appRow()).toHaveTextContent(/^Update readyRestart to update$/);
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
+  expect(installed()).toHaveTextContent(/^Version 0\.9\.0$/);
 });
 
 test("with no version known: Update available · Download, then Downloading the update…, then Update ready", async () => {
@@ -466,7 +596,7 @@ test("each failure is said where it happened: a check's under the installed vers
       expect(alert).toHaveClass("app-update-failure");
       expect(alert.closest(".app-update-settings")).not.toBeNull();
       expect(installedLine()!.compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(pane("updates")).not.toHaveTextContent("Up to date");
+      expect(installedLine()).not.toHaveTextContent("Up to date");
       expect(updates().queryByRole("button", { name: /^Retry/ })).toBeNull();
     } else {
       expect(appRow()).toContainElement(alert);
@@ -508,14 +638,14 @@ test("Check for updates is busy while the app checks — Sidevoice 0.9.0 · Chec
   fake.updater.check.mockImplementationOnce(() => new Promise<UpdaterStatus>((resolve) => { answer = resolve; }));
   const button = await updates().findByRole("button", { name: "Check for updates" });
   await settle();
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
+  expect(installed()).toHaveTextContent(/^Version 0\.9\.0$/);
   await act(async () => { fireEvent.click(button); });
   expect(button).toHaveAttribute("aria-busy", "true");
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Checking…$/);
+  expect(installed()).toHaveTextContent(/^Version 0\.9\.0 · Checking…$/);
   await act(async () => { answer({ state: "idle" }); });
   expect(button).not.toHaveAttribute("aria-busy");
   expect(updates().getByRole("status")).toHaveTextContent(/^Sidevoice is up to date\.$/);
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Up to date(Sidevoice is up to date\.)?$/);
+  expect(installed()).toHaveTextContent(/^Version 0\.9\.0 · Up to date(Sidevoice is up to date\.)?$/);
   expect(pane("updates")).not.toHaveTextContent(/Last checked|Not checked yet|Checking…/);
   expect(Number(localStorage.getItem(CHECKED))).toBeGreaterThan(0);
 });
@@ -544,7 +674,7 @@ test("when it last checked is kept: on the next visit, Up to date at once; an up
   localStorage.setItem(CHECKED, String(before));
   const { fake } = open({ section: "updates", service: SERVICE_CURRENT });
   await updates().findByRole("button", { name: "Check for updates" });
-  await waitFor(() => expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Up to date$/));
+  await waitFor(() => expect(installed()).toHaveTextContent(/^Version 0\.9\.0 · Up to date$/));
   await settle();
   await act(async () => { fake.push({ state: "available", version: "0.10.0" }); });
   expect(Number(localStorage.getItem(CHECKED))).toBeGreaterThan(before);
@@ -599,220 +729,22 @@ test("each part shows where the app has its method: no settings or setMode, no U
   expect(updates().queryByRole("button", { name: "Check for updates" })).toBeNull();
 });
 
-test("this computer's service behind what the app bundles: under Sidevoice 0.9.0, Update available · Update Sidevoice, which updates it; no version in its words, no number of its own", async () => {
-  const { update } = open({ section: "updates", service: BUNDLED });
-  const row = group("Sidevoice");
-  const button = await within(row).findByRole("button", { name: "Update Sidevoice" });
-  // Sidevoice's version said once, on the installed version's line above (no Version line); the service's new one is
-  // not the app's, so it is not said; its line says no version at all.
-  expect(row.querySelector(".host-status-product")).toBeNull();
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
-  expect(button.closest(".update-action")).toHaveTextContent(/^Update availableUpdate Sidevoice$/);
-  expect(button.closest(".update-action-row")).not.toHaveAttribute("id");
-  expect(installedLine()!.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(pane("updates")).not.toHaveTextContent("0.9.1");
-  expect(screen.getAllByRole("button", { name: "Update Sidevoice" })).toHaveLength(1);
-  await act(async () => { fireEvent.click(button); });
-  expect(update).toHaveBeenCalledTimes(1);
-});
 
-test("this computer's Update waits for active calls", async () => {
-  const { update } = open({ section: "updates", service: BUNDLED, status: { ...running, calls: 2 } });
-  expect(await updates().findByText("Wait for 2 active calls to finish before updating.")).toBeInTheDocument();
-  expect(updates().getByRole("button", { name: "Update Sidevoice" })).toBeDisabled();
-  expect(update).not.toHaveBeenCalled();
-});
 
-test("this computer's Update, done: asked again, and gone once current", async () => {
-  const current: LocalHostVersion = { ...BUNDLED, update: "current" };
-  const answers = [BUNDLED, BUNDLED, current];
-  const { update, version } = open({ section: "updates", service: async () => answers.shift() ?? current });
-  const button = await updates().findByRole("button", { name: "Update Sidevoice" });
-  await act(async () => { fireEvent.click(button); });
-  expect(update).toHaveBeenCalledOnce();
-  await waitFor(() => expect(updates().queryByRole("button", { name: "Update Sidevoice" })).toBeNull());
-  expect(version).toHaveBeenCalledTimes(3);
-});
 
-test("this computer's Update failing: said, with details to copy that leave out what the bridge must not repeat and the installer's log redacted", async () => {
-  const update = vi.fn().mockRejectedValue({ key: "SV1.private-pairing-code", step: "token-secret", params: { check: "archive-link", token: "raw-token" },
-    log_tail: ["staging C:\\Users\\Demo Person\\AppData\\Local\\Sidevoice", "secret=demo-secret", "service exited with code 1"] });
-  open({ section: "updates", service: BUNDLED, update });
-  const writeText = vi.fn(async (_value: string) => {});
-  const previous = Object.getOwnPropertyDescriptor(navigator, "clipboard");
-  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
-  try {
-    const button = await updates().findByRole("button", { name: "Update Sidevoice" });
-  await act(async () => { fireEvent.click(button); });
-    expect(await updates().findByRole("alert")).toHaveTextContent("Sidevoice could not prepare this computer.");
-    expect(updates().getByRole("button", { name: "Retry updating Sidevoice" })).toBeInTheDocument();
-    await act(async () => { fireEvent.click(updates().getByRole("button", { name: "Copy details" })); });
-    const copied = writeText.mock.calls[0][0];
-    expect(JSON.parse(copied)).toEqual({ key: "install.unknown", params: { check: "archive-link" },
-      log_tail: ["staging ~\\AppData\\Local\\Sidevoice", "secret=•••", "service exited with code 1"] });
-    expect(copied).not.toMatch(/SV1\.private-pairing-code|token-secret|raw-token|Demo Person|demo-secret/);
-    // Copied only: no log line on screen.
-    expect(updates().queryByText(/staging|secret=|exited with code/)).toBeNull();
-  } finally {
-    if (previous) Object.defineProperty(navigator, "clipboard", previous);
-    else Reflect.deleteProperty(navigator, "clipboard");
-  }
-});
 
-test("a newer one installed when Update is pressed is never downgraded", async () => {
-  const newer: LocalHostVersion = { ...BUNDLED, update: "newer-installed" };
-  const answers = [BUNDLED, newer];
-  const { update } = open({ section: "updates", service: async () => answers.shift() ?? newer });
-  const button = await updates().findByRole("button", { name: "Update Sidevoice" });
-  await act(async () => { fireEvent.click(button); });
-  expect(await updates().findByText("A newer Sidevoice core is already installed. Update the desktop app to use it.")).toBeInTheDocument();
-  expect(update).not.toHaveBeenCalled();
-});
 
-test.each([
-  ["newer-installed", "A newer Sidevoice core is already installed. Update the desktop app to use it."],
-  ["incompatible", "This machine reports core API 9, which this app cannot use."],
-] as const)("no Update when the bridge says %s: why, instead", async (state, copy) => {
-  open({ section: "updates", service: { ...BUNDLED, core_api: 9, update: state } });
-  expect(await updates().findByText(copy)).toBeInTheDocument();
-  expect(updates().queryByRole("button", { name: "Update Sidevoice" })).toBeNull();
-});
 
-test("this computer's service with no version and nothing to say: the one row is the app's alone, Sidevoice 0.9.0", async () => {
-  open({ section: "updates", status: { ...running, product_version: undefined }, service: { ...BUNDLED, update: "current" } });
-  await settle();
-  expect(groups()).toEqual(["Sidevoice"]);
-  expect(group("Sidevoice").querySelector(".host-status-product, .updates-settings-version")).toBeNull();
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
-  expect(group("Sidevoice").querySelector(".update-action-row")).toBeNull();
-  expect(updates().queryByRole("button", { name: /Update Sidevoice/ })).toBeNull();
-});
 
-test("a nightly with no updater: Updates says so under its version, updated by hand; no Automatic/Manual, no Check, no Update", async () => {
-  open({ build: NIGHTLY, section: "updates", service: BUNDLED });
-  await settle();
-  // With no updater, its Version line, as before, its note under it.
-  expect(group("Sidevoice").querySelector(".updates-settings-version .host-status-product")).toHaveTextContent(/^Version 0\.10\.0-nightly$/);
-  expect(installedLine()).toBeNull();
-  const note = pane("updates").querySelector(".host-status-build")!;
-  expect(note).toHaveTextContent("Nightly · abcdef0 · 2026-10-13 — updates by hand");
-  const link = within(note as HTMLElement).getByRole("link", { name: /updates by hand/ });
-  expect(link).toHaveAttribute("href", "https://github.com/sidevoice/sidevoice-desktop/releases/tag/nightly");
-  expect(link).toHaveAttribute("target", "_blank");
-  expect(screen.queryByRole("radiogroup", { name: "Updates" })).toBeNull();
-  expect(screen.queryByRole("button", { name: /Check for updates|Update Sidevoice/ })).toBeNull();
-});
 
-test("a nightly with an updater (desktop #56, for now) updates as a release: no 'by hand', its controls, its found update first, then this computer's Update", async () => {
-  open({ build: NIGHTLY, section: "updates", service: BUNDLED, updater: { mode: "manual", status: { state: "available", version: "0.11.0-nightly" } } });
-  await settle();
-  const note = pane("updates").querySelector(".host-status-build")!;
-  expect(note).toHaveTextContent(/^Nightly · abcdef0 · 2026-10-13$/);
-  expect(within(note as HTMLElement).queryByRole("link")).toBeNull();
-  // Its note alone above the row, no Version line: its version is the installed version's line's to say.
-  expect(group("Sidevoice").querySelector(".host-status-product")).toBeNull();
-  const modes = await updates().findByRole("radiogroup", { name: "Updates" });
-  expect(note.compareDocumentPosition(modes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.10\.0-nightly$/);
-  expect(updates().getByRole("button", { name: "Check for updates" })).toBeInTheDocument();
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.11\.0-nightly availableDownload$/);
-  expect(within(appRow()!).getByRole("button", { name: "Download" })).toBeInTheDocument();
-  // The one row's one button: the service's waits behind the app's.
-  expect(updates().queryByRole("button", { name: "Update Sidevoice" })).toBeNull();
-  cleanup();
-  open({ build: NIGHTLY, section: "updates", service: BUNDLED, updater: { mode: "manual" } });
-  expect(await updates().findByRole("button", { name: "Update Sidevoice" })).toBeInTheDocument();
-});
 
-test("a development build: Development build under its version, no updater's controls, no Update", async () => {
-  open({ build: DEV, section: "updates", service: BUNDLED });
-  await settle();
-  expect(group("Sidevoice").querySelector(".updates-settings-version .host-status-product")).toHaveTextContent(/^Version 0\.10\.0-dev$/);
-  expect(pane("updates").querySelector(".host-status-build")).toHaveTextContent(/^Development build$/);
-  expect(screen.queryByRole("link", { name: /updates by hand/ })).toBeNull();
-  expect(screen.queryByRole("button", { name: /Check for updates|Update Sidevoice/ })).toBeNull();
-});
 
-test("in the desktop app, a remote machine behind: this computer's one row, then the machine — its versions, the command to run there — and the description says machines too", async () => {
-  const other: PairingSummary = { ...lab, fp: "fp-nuc", host: "NUC", device_id: "d-nuc" };
-  open({ section: "updates", machines: [lab, other], remote: { "fp-lab": behind(), "fp-nuc": { state: "connected", checkedAt: 1, version: "0.5.0", update: null } } });
-  await settle();
-  expect(groups()).toEqual(["Sidevoice", "Remote machines"]);
-  expect(updates().getByText("Sidevoice on this computer, and the machines whose Sidevoice is behind: their versions, and how they update.")).toBeInTheDocument();
-  // Only the one behind; the one up to date is not listed.
-  expect(machineRows()).toEqual([["Lab box", "0.4.0 · 0.5.0 available", "Run this on Lab box:", COMMAND]]);
-  expect(updates().getByRole("button", { name: "Copy the command for Lab box" })).toBeInTheDocument();
-});
 
-test("a machine behind that names no command of its own: the documented one, npx sidevoice@latest install — never a placeholder", async () => {
-  open({ section: "updates", machines: [lab], remote: { "fp-lab": { state: "connected", checkedAt: 1, version: "0.4.0", update: { latest: "0.5.0", command: null } } } });
-  await settle();
-  expect(SIDEVOICE_UPDATE_COMMAND).toBe("npx sidevoice@latest install");
-  expect(machineRows()).toEqual([["Lab box", "0.4.0 · 0.5.0 available", "Run this on Lab box:", "npx sidevoice@latest install"]]);
-  expect(updates().getByRole("button", { name: "Copy the command for Lab box" })).toBeInTheDocument();
-});
 
-test("in a browser: no Updates section while no machine is behind", () => {
-  open({ build: null, section: "general", machines: [lab], remote: { "fp-lab": { state: "connected", checkedAt: 1, version: "0.5.0", update: null } } });
-  expect(entry()).toBeNull();
-  expect(document.getElementById("pane-updates")).toBeNull();
-});
 
-test("in a browser, a machine behind: Updates lists only the machines — no app, no service — and goes as the machine is updated", async () => {
-  const unnamed: PairingSummary = { ...lab, fp: "fp-x", host: "", device_id: "d-x" };
-  const { store } = open({ build: null, section: "updates", machines: [lab, unnamed], remote: { "fp-lab": behind(), "fp-x": behind(null, "npx sidevoice@latest install") } });
-  await settle();
-  expect(entry()).toHaveTextContent(/^Updates$/);
-  expect(updates().getByText("Machines whose Sidevoice is behind, and how to update them.")).toBeInTheDocument();
-  expect(groups()).toEqual(["Remote machines"]);
-  expect(pane("updates").querySelector(".app-update-settings")).toBeNull();
-  expect(machineRows()).toEqual([
-    ["Lab box", "0.4.0 · 0.5.0 available", "Run this on Lab box:", COMMAND],
-    ["Unnamed machine", "Version 0.5.0 available", "Run this on Unnamed machine:", "npx sidevoice@latest install"],
-  ]);
-  // Updated (and the other forgotten): no machine behind, no section, and Settings is back where the person can be.
-  act(() => { store.patch({ pairings: [lab], remoteHostStatus: { "fp-lab": { state: "connected", checkedAt: 2, version: "0.5.0", update: null } } } as never); });
-  expect(entry()).toBeNull();
-  expect(document.getElementById("pane-updates")).toBeNull();
-  expect(store.getState().facts.settingsSection).toBe("general");
-});
 
-test("a machine forgotten while it was behind: no longer listed, and in a browser no section for it", async () => {
-  open({ build: null, section: "general", machines: [], remote: { "fp-lab": behind() } });
-  await settle();
-  expect(entry()).toBeNull();
-});
 
-/* Landing: This device's Update available and a link to a machine's row open Updates on the row's action, in view
- * and focused, the row lit; the room's notice is this computer's alone, the app's Download and Restart done in place
- * (UpdateNotice.test.tsx). */
 
-test("This device's Update available, this computer's service behind: Updates, its Update Sidevoice focused, its line lit — not the version, not the card", async () => {
-  const { store } = open({ service: BUNDLED, notice: true });
-  // The room says nothing of it: the service is Sidevoice's, said here.
-  await settle();
-  expect(document.querySelector(".update-notice")).toBeNull();
-  const link = await within(pane("this-computer")).findByRole("button", { name: "Update available, see it in Updates" });
-  await act(async () => { fireEvent.click(link); });
-  expect([store.getState().facts.settingsSection, store.getState().facts.settingsLevel]).toEqual(["updates", "page"]);
-  await landsOn(() => document.getElementById("updates-this-computer"), lineOf(() => document.getElementById("updates-this-computer")));
-  expect(document.activeElement).toHaveAccessibleName("Update Sidevoice");
-  expect(store.getState().facts.settingsFocus).toBeNull();
-});
-
-test("a remote machine behind: the room's notice says nothing of it; Updates has its row and its command, a landing there focusing its Copy, its row lit", async () => {
-  const { store } = open({ section: "general", machines: [lab], remote: { "fp-lab": behind() }, notice: true });
-  await settle();
-  // The room: no notice, no See updates, no words for the machine; it is its row's in Updates to say.
-  expect(document.querySelector(".update-notice")).toBeNull();
-  expect(screen.queryByRole("button", { name: "See updates" })).toBeNull();
-  expect(document.body).not.toHaveTextContent("Lab box needs an update");
-  expect(machineRows()).toEqual([["Lab box", "0.4.0 · 0.5.0 available", "Run this on Lab box:", COMMAND]]);
-  // A landing on the machine's row (as a link to it asks): its command's Copy, in view and focused, its row lit.
-  act(() => { store.patch({ settingsSection: "updates", settingsLevel: "page", settingsFocus: "updates-machine-fp-lab" }); });
-  await landsOn(() => updates().getByRole("button", { name: "Copy the command for Lab box" }), () => document.getElementById("updates-machine-fp-lab"));
-  expect(document.querySelector(".update-notice")).toBeNull();
-});
 
 test("the room's notice: the app's Download downloads in place, Settings left where it was", async () => {
   const { fake, store } = open({ section: "general", updater: { mode: "manual", status: { state: "available", version: "0.10.0" } }, notice: true });
@@ -822,81 +754,5 @@ test("the room's notice: the app's Download downloads in place, Settings left wh
   expect(store.getState().facts.settingsSection).toBe("general");
 });
 
-test("in Spanish: Actualizaciones, its one row, Sidevoice — Sidevoice 0.10.0 disponible · Descargar, then the service's Actualización disponible · Actualizar Sidevoice — a machine behind and This device's Actualización disponible", async () => {
-  inSpanish();
-  open({ section: "updates", machines: [lab], remote: { "fp-lab": behind() }, service: BUNDLED, updater: { mode: "manual", status: { state: "available", version: "0.10.0" } } });
-  await settle();
-  expect(entry()).toHaveTextContent(/^Actualizaciones$/);
-  expect(groups()).toEqual(["Sidevoice", "Máquinas remotas"]);
-  expect(updates().getByText("Sidevoice en este ordenador y las máquinas con un Sidevoice anterior: sus versiones y cómo se actualizan.")).toBeInTheDocument();
-  expect(group("Sidevoice").querySelector(".updates-part-hint")).toBeNull();
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.10\.0 disponibleDescargar$/);
-  expect(within(appRow()!).getByRole("button", { name: "Descargar", description: "Sidevoice 0.10.0 disponible" })).toBeInTheDocument();
-  expect(machineRows()).toEqual([["Lab box", "0.4.0 · 0.5.0 disponible", "Ejecuta esto en Lab box:", COMMAND]]);
-  expect(updates().getByRole("button", { name: "Copiar el comando para Lab box" })).toBeInTheDocument();
-  expect(within(pane("this-computer")).getByRole("button", { name: "Actualización disponible, verla en Actualizaciones", hidden: true })).toHaveTextContent(/^Actualización disponible$/);
-  cleanup();
-  // Only the service behind: the row's one button, Actualizar Sidevoice, with no version in its words.
-  open({ section: "updates", service: BUNDLED });
-  const button = await updates().findByRole("button", { name: "Actualizar Sidevoice" });
-  expect(button.closest(".update-action")).toHaveTextContent(/^Actualización disponibleActualizar Sidevoice$/);
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
-});
 
-test("in Spanish: Automáticas (recomendado) | Manuales, Buscar actualizaciones (which tries a failed check again), each failure — never Al día beside one — and a nightly que se actualiza a mano", async () => {
-  inSpanish();
-  localStorage.setItem(CHECKED, String(Date.parse("2026-10-12T09:30:00Z")));
-  for (const { code, state, es, retry, boton } of FAILURES) {
-    open({ section: "updates", service: SERVICE_CURRENT, updater: { status: { state, version: "0.10.0", error: { code } }, mode: "manual" } });
-    const modes = await updates().findByRole("radiogroup", { name: "Actualizaciones" });
-    expect(within(modes).getByRole("radio", { name: "Manuales" })).toHaveAttribute("aria-checked", "true");
-    expect(within(modes).getByRole("radio", { name: "Automáticas (recomendado)" })).toBeInTheDocument();
-    expect(updates().getByRole("button", { name: "Buscar actualizaciones" })).toBeInTheDocument();
-    expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
-    expect(pane("updates")).not.toHaveTextContent(/Última comprobación|Al día/);
-    expect(updates().getByRole("alert")).toHaveTextContent(es);
-    if (retry) expect(updates().getByRole("button", { name: boton! })).toBeInTheDocument();
-    else {
-      expect(appRow()).toHaveTextContent(/^Sidevoice 0\.10\.0 listaReiniciar para actualizar/);
-      expect(within(appRow()!).getByRole("button", { name: "Reiniciar para actualizar" })).toBeInTheDocument();
-    }
-    if (retry === "check") expect(updates().queryByRole("button", { name: /^Reintentar/ })).toBeNull();
-    cleanup();
-  }
-  open({ build: NIGHTLY, section: "updates" });
-  expect(pane("updates").querySelector(".host-status-build")).toHaveTextContent("Nightly · abcdef0 · 2026-10-13 — se actualiza a mano (se abre en una pestaña nueva)");
-  cleanup();
-  open({ build: DEV, section: "updates" });
-  expect(pane("updates").querySelector(".host-status-build")).toHaveTextContent(/^Versión de desarrollo$/);
-});
 
-/* Developer mode (developer-mode.ts) is turned on from the build in Advanced (SettingsDialog.test.tsx), no longer from
- * a version in Updates: there, in any build, the version is only text. */
-
-const developerKept = () => {
-  onTestFinished(() => localStorage.removeItem(DEVELOPER_MODE_KEY));
-  return () => localStorage.getItem(DEVELOPER_MODE_KEY);
-};
-const clickTimes = (element: Element, times: number) => { for (let i = 0; i < times; i++) fireEvent.click(element); };
-
-test("the versions in Updates (the installed line, the Version line with no updater, This device's card) are only text: ten clicks add nothing and keep nothing", async () => {
-  const kept = developerKept();
-  open({ build: NIGHTLY, section: "updates", updater: {} });
-  await settle();
-  clickTimes(installed(), 10);
-  expect(navOrder().at(-1)).toBe("advanced");
-  expect(within(installed()).queryByRole("status")).toBeNull();
-  cleanup();
-  open({ build: NIGHTLY, section: "updates" });
-  await settle();
-  clickTimes(pane("updates").querySelector<HTMLElement>(".updates-settings-version .host-status-product")!, 10);
-  expect(navOrder().at(-1)).toBe("advanced");
-  cleanup();
-  open({ build: NIGHTLY, service: BUNDLED, updater: {} });
-  await settle();
-  await waitFor(() => expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.10\.0-nightly/));
-  clickTimes(deviceLine()!, 10);
-  expect(navOrder().at(-1)).toBe("advanced");
-  expect(kept()).toBeNull();
-});

@@ -14,7 +14,7 @@ vi.mock("../../services/room-session-controller.js", () => ({}));
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
-  for (const key of ["sidevoice.variants", "sidevoice.settings", "sidevoice.updates-checked-at", "sidevoice.update-continue"]) localStorage.removeItem(key);
+  for (const key of ["sidevoice.variants", "sidevoice.settings", "sidevoice.updates-checked-at"]) localStorage.removeItem(key);
   sessionStorage.removeItem("sidevoice.update-notice-hidden");
   delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost;
   delete (window as { sidevoiceActions?: unknown }).sidevoiceActions;
@@ -35,7 +35,7 @@ afterEach(() => {
 
 const local: PairingSummary = { fp: "fp-local", host: "MacBook", local: true, urls: ["http://127.0.0.1:45781"], device_id: "d-local", paired_at: 1_700_000_000, revoked: false };
 const running: LocalHostStatus = { state: "running", reachable: true, installed: true, service: "launchd", core: { version: "0.8.1", api: 1 }, calls: 0, product_version: "0.8.1" };
-const CURRENT: LocalHostVersion = { bridge: 3, bundled: { version: "0.8.1" }, installed: { version: "0.8.1" }, core_api: 1, update: "current" };
+const CURRENT: LocalHostVersion = { bridge: 3, bundled: { minor: "0.20" }, installed: { version: "0.8.1" }, core_api: 1, update: "current", latest: null, progress: null };
 const FOUND: UpdaterStatus = { state: "available", version: "0.4.0" };
 const CHECK_MS = 1500;
 const STEP_MS = 2000;
@@ -91,8 +91,14 @@ const appRow = () => document.querySelector<HTMLElement>("#pane-updates .update-
 const checkButton = () => updates().getByRole("button", { name: /^(Check for updates|Buscar actualizaciones)$/, hidden: true });
 /** The installed version's line, holding Check for updates. */
 const installedLine = () => checkButton().closest<HTMLElement>(".app-update-installed")!;
-/** Its words: Sidevoice 0.3.0, with · Checking… or · Up to date. */
-const installed = () => installedLine().querySelector<HTMLElement>(".update-action-copy")!;
+/** Its words: Version 0.3.0, with · Checking… or · Up to date (what a screen reader is told of a check after it). */
+const installed = () => {
+  const line = installedLine();
+  const words = document.createElement("span");
+  words.textContent = [line.querySelector(".ui-row-description")?.textContent, line.querySelector(".ui-badge")?.textContent].filter(Boolean).join(" · ")
+    + (line.querySelector("[role=status]")?.textContent ?? "");
+  return words;
+};
 const press = () => act(async () => { fireEvent.click(checkButton()); });
 const percentOf = () => within(appRow()!).getByRole("progressbar", { hidden: true }).getAttribute("aria-valuenow");
 /** The room's notice in words — what it says · its action — or null. */
@@ -100,7 +106,6 @@ const notice = () => {
   const shown = document.querySelector<HTMLElement>(".update-notice:not([data-leaving])");
   return shown ? `${shown.querySelector(".update-notice-text")?.textContent} · ${within(shown).getAllByRole("button", { hidden: true })[0].textContent}` : null;
 };
-const deviceLine = () => document.getElementById("pane-this-computer")!.querySelector(".this-device-version");
 /** Every button's name, as a person hears it. */
 const buttons = () => [...document.querySelectorAll("button")].map((button) => button.getAttribute("aria-label") || button.textContent || "");
 /** No restart into an update offered anywhere (This computer's service has a Restart of its own: not this). */
@@ -117,7 +122,7 @@ test("automatic, the person's check: Sidevoice 0.3.0 · Checking…, then Sidevo
   await press();
   // While the app checks: Checking… on the installed version's line, the button busy; nothing found yet, nothing in the
   // room.
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0 · Checking…$/);
+  expect(installed()).toHaveTextContent(/^Version 0\.3\.0 · Checking…$/);
   expect(checkButton()).toHaveAttribute("aria-busy", "true");
   expect(appRow()).toBeNull();
   expect(notice()).toBeNull();
@@ -126,7 +131,7 @@ test("automatic, the person's check: Sidevoice 0.3.0 · Checking…, then Sidevo
   // room silent. The installed version stays on its own line, saying neither Checking… nor Up to date.
   expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Downloading…\s?0\s?%(Cancel download|Cancelar la descarga)$/);
   expect(appRow()).toHaveAttribute("data-state", "downloading");
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0$/);
+  expect(installed()).toHaveTextContent(/^Version 0\.3\.0$/);
   expect(installedLine()).not.toHaveAttribute("id");
   expect(checkButton()).not.toHaveAttribute("aria-busy");
   expect(buttons().filter((name) => /Download/.test(name))).toEqual([]);
@@ -139,15 +144,14 @@ test("automatic, the person's check: Sidevoice 0.3.0 · Checking…, then Sidevo
     noRestart();
   }
   await wait(STEP_MS);
-  // Ready: the new version and Restart to update, pressed only by the person; the room says it; This device too.
+  // Ready: the new version and Restart to update, pressed only by the person; the room says it.
   expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 readyRestart to update$/);
   expect(within(appRow()!).queryByRole("progressbar", { hidden: true })).toBeNull();
   expect(notice()).toBe("Sidevoice 0.4.0 is ready · Restart to update");
-  expect(deviceLine()).toHaveTextContent(/· Update available$/);
   expect(fake.updater.restart).not.toHaveBeenCalled();
   // A minute after the check: no line says when it last checked.
   await wait(60_000);
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0$/);
+  expect(installed()).toHaveTextContent(/^Version 0\.3\.0$/);
   expect(document.getElementById("pane-updates")).not.toHaveTextContent(/Last checked|Not checked yet/);
 });
 
@@ -156,13 +160,13 @@ test("manual, the person's check: Sidevoice 0.3.0 · Checking…, then Sidevoice
   const { fake } = app("manual");
   await wait(0);
   await press();
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0 · Checking…$/);
+  expect(installed()).toHaveTextContent(/^Version 0\.3\.0 · Checking…$/);
   expect(appRow()).toBeNull();
   expect(notice()).toBeNull();
   await wait(CHECK_MS);
   expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 availableDownload$/);
   expect(within(appRow()!).getByRole("button", { name: "Download", description: "Sidevoice 0.4.0 available", hidden: true })).toBeInTheDocument();
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0$/);
+  expect(installed()).toHaveTextContent(/^Version 0\.3\.0$/);
   expect(notice()).toBe("Version 0.4.0 available · Download");
   expect(within(appRow()!).queryByRole("progressbar", { hidden: true })).toBeNull();
   noRestart();
@@ -188,18 +192,18 @@ test("nothing new: Sidevoice 0.3.0 · Checking…, then Sidevoice 0.3.0 · Up to
   app("automatic", { finds: false });
   await wait(0);
   await press();
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0 · Checking…$/);
+  expect(installed()).toHaveTextContent(/^Version 0\.3\.0 · Checking…$/);
   await wait(CHECK_MS);
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0 · Up to date(Sidevoice is up to date\.)?$/);
+  expect(installed()).toHaveTextContent(/^Version 0\.3\.0 · Up to date(Sidevoice is up to date\.)?$/);
   // Up to date is never a colour: the installed version's line is not an update's.
   expect(installedLine().closest(".update-action-row")).toBeNull();
   expect(document.getElementById("updates-app")).toBe(installedLine());
   expect(appRow()).toBeNull();
   expect(notice()).toBeNull();
   await wait(59_000);
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0 · Up to date/);
+  expect(installed()).toHaveTextContent(/^Version 0\.3\.0 · Up to date/);
   await wait(1_100);
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0 · Up to date/);
+  expect(installed()).toHaveTextContent(/^Version 0\.3\.0 · Up to date/);
   expect(document.getElementById("pane-updates")).not.toHaveTextContent(/Last checked|just now|2026/);
 });
 
@@ -218,19 +222,17 @@ test("the app's own check, automatic: no Checking…, no progress anywhere — a
   expect(installed()).not.toHaveTextContent("Checking…");
   expect(checkButton()).not.toHaveAttribute("aria-busy");
   await wait(CHECK_MS);
-  // Downloading by itself: Updates and the room offer Cancel, step after step; This device says nothing of it, nor Up to date.
+  // Downloading by itself: Updates and the room offer Cancel, step after step.
   for (let step = 0; step < 4; step++) {
     expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Downloading….*Cancel download$/);
     expect(document.getElementById("pane-updates")).not.toHaveTextContent(/Checking|found/);
     expect(notice()).toBe("Sidevoice 0.4.0 · Downloading… · Cancel download");
-    expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.3\.0$/);
-    expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0$/);
+    expect(installed()).toHaveTextContent(/^Version 0\.3\.0$/);
     await wait(STEP_MS);
   }
-  // Ready: its line, the new version, Restart to update; the notice; This device's Update available.
+  // Ready: its line, the new version, Restart to update; the notice.
   expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 readyRestart to update$/);
   expect(notice()).toBe("Sidevoice 0.4.0 is ready · Restart to update");
-  expect(deviceLine()).toHaveTextContent(/· Update available$/);
   expect(fake.updater.check).toHaveBeenCalledTimes(1);
   expect(fake.updater.restart).not.toHaveBeenCalled();
 });
@@ -262,10 +264,10 @@ test("in Spanish: Sidevoice 0.3.0 · Buscando…, Sidevoice 0.4.0 · Descargando
   app("automatic");
   await wait(0);
   await press();
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0 · Buscando…$/);
+  expect(installed()).toHaveTextContent(/^Versión 0\.3\.0 · Buscando…$/);
   await wait(CHECK_MS + STEP_MS);
   expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Descargando…\s?30\s?%(Cancel download|Cancelar la descarga)$/);
-  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0$/);
+  expect(installed()).toHaveTextContent(/^Versión 0\.3\.0$/);
   expect(document.getElementById("pane-updates")).not.toHaveTextContent(/Última comprobación|Aún sin comprobar/);
   await wait(3 * STEP_MS);
   expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 listaReiniciar para actualizar$/);

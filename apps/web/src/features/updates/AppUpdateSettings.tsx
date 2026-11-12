@@ -1,4 +1,4 @@
-import { useContext, useEffect, useId, useState, type ReactNode } from "react";
+import { useContext, useEffect, useId, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { ErrorText } from "../../components/ui/ErrorText";
 import { ProgressBar } from "../../components/ui/ProgressBar";
@@ -6,6 +6,7 @@ import { Segmented } from "../../components/ui/Tabs";
 import { host } from "../../host";
 import { RoomStoreContext } from "../../state/room-store";
 import { updaterFailure } from "../settings/error-message";
+import { AppIcon, ServiceBadge } from "../settings/service-version";
 import { translator, type Translate } from "../../i18n/translator";
 import { UPDATE_PLACE, useAppUpdate } from "./useUpdates";
 import type { UpdateMode, UpdaterStatus } from "../../host";
@@ -22,21 +23,19 @@ function hasAction(status: UpdaterStatus | null, can: ReturnType<typeof useAppUp
   return status?.state === "available" && can.download;
 }
 
-/** Sidevoice on this computer, in Settings › Updates (a release's updater; none, `service` alone), top to bottom:
- *  Updates, automatic or manual, as the app keeps it; the Sidevoice installed — Sidevoice 0.3.0, with Up to date once a
- *  check says so (`current`: a check went through, the app idle and its service as the app bundles it), Checking…
- *  while the person's check runs — and Check for updates; then, only while a newer version waits, one line with just
+/** The app on this computer, in Settings › Updates (a release's updater; none, nothing), top to bottom: Updates,
+ *  automatic or manual, as the app keeps it; the app's row — its icon, its name and its version (Version 0.3.0), with Up
+ *  to date once a check says so (a check went through and the app is idle), Checking… while the person's check runs —
+ *  and Check for updates; then, only while a newer version waits, one line with just
  *  the new version and its one action (UPDATE_PLACE `app`, where a landing focuses): Sidevoice 0.4.0 available ·
  *  Download (a check never downloads in manual; automatic's download starts by itself), Sidevoice 0.4.0 ·
  *  Downloading… with its progress in the line and a Cancel, Sidevoice 0.4.0 ready · Restart to update, in either mode, only ever
  *  pressed by the person; a download or an install that failed, said under it, with Retry download. Each version is
  *  said once: the installed one on its line, the new one on its own. What the person's own check found shows each step;
- *  one the app found by itself shows only as `inView` has it (automatic: downloading, to cancel, and ready). Its service is folded into it: the
- *  app's update found, it follows the app's restart; else, behind the one the app bundles, its Update Sidevoice is that
- *  line (`service`), as is what stands in the way. Each part shows where the app has the method for it. Restart to
- *  update restarts with `onRestart` first. A check that finds none says so to a screen reader too. Up to date is never
- *  a colour: those are for what waits. */
-export function AppUpdateSettings({ service, onRestart, current }: { service?: ReactNode; onRestart?: () => void; current?: boolean } = {}) {
+ *  one the app found by itself shows only as `inView` has it (automatic: downloading, to cancel, and ready). The
+ *  service is not part of it: the app updates it by itself, and its own card says where it stands. Each part shows where
+ *  the app has the method for it. A check that finds none says so to a screen reader too. */
+export function AppUpdateSettings() {
   const t = translator();
   const store = useContext(RoomStoreContext);
   const update = useAppUpdate();
@@ -48,7 +47,7 @@ export function AppUpdateSettings({ service, onRestart, current }: { service?: R
   const { status, mode, can, checkedAt, inView } = update;
   // What the app says next replaces what a call of this page's said.
   useEffect(() => { setFailure(null); }, [status?.state]);
-  if (!update.updater) return <>{service}</>;
+  if (!update.updater) return null;
 
   function change(next: UpdateMode) {
     setModeFailed(false);
@@ -59,7 +58,7 @@ export function AppUpdateSettings({ service, onRestart, current }: { service?: R
     setFailure(null); setUpToDate(false);
     setBusy(action);
     try {
-      if (action === "restart") { onRestart?.(); await update.restart(); return; }
+      if (action === "restart") { await update.restart(); return; }
       if (action === "cancel") { await update.cancel(); return; }
       const next = action === "check" ? await update.check() : await update.download();
       if (action !== "check" || !next || next.error) return;
@@ -79,10 +78,9 @@ export function AppUpdateSettings({ service, onRestart, current }: { service?: R
   const rowError = found && (code === "update-download-failed" || code === "update-install-failed" || code === "update-cancel-failed") ? error : null;
   const checkError = rowError ? null : error;
   const checking = busy === "check" || update.checking;
-  // Up to date once a check went through, while nothing waits and nothing failed: the app idle, its service current.
-  const upToDateNow = (current ?? (status?.state === "idle" && !status.error && checkedAt != null)) && !checkError;
+  // Up to date once a check went through, while nothing waits and nothing failed.
+  const upToDateNow = status?.state === "idle" && !status.error && checkedAt != null && !checkError;
   const installed = host().identity.build?.version || null;
-  const name = installed ? t("updates.row.current", { version: installed }) : t("updates.row.app");
   return <>
     {can.mode && mode && <div className="app-update-setting">
       <span className="app-update-setting-copy"><span className="host-status-login-label">{t("updates.mode")}</span>
@@ -92,16 +90,21 @@ export function AppUpdateSettings({ service, onRestart, current }: { service?: R
         items={[{ value: "automatic", label: t("updates.mode.automatic") }, { value: "manual", label: t("updates.mode.manual") }]} />
     </div>}
     <div className="app-update-settings">
-      {/* The Sidevoice installed: where a landing goes while no newer one waits. */}
+      {/* The app installed, in its row: where a landing goes while no newer one waits. */}
       <div id={found ? undefined : UPDATE_PLACE.app} className="app-update-setting app-update-installed" data-settings-row="">
-        <span className="update-action-copy">{checking ? `${name} · ${t("updates.checking")}` : upToDateNow ? `${name} · ${t("settings.updates.upToDate")}` : name}
+        <AppIcon />
+        <span className="app-update-installed-text">
+          <span className="ui-row-label">{t("settings.updates.one")}</span>
+          {(installed || checking) && <span className="ui-row-description">{[installed && t("settings.updates.version", { version: installed }), checking && t("updates.checking")].filter(Boolean).join(" · ")}</span>}
           {/* Only while nothing was found since: one the app found by itself later is not up to date. */}
-          {upToDate && status?.state === "idle" && <span role="status" className="sr-only">{t("updates.upToDate")}</span>}</span>
+          {upToDate && status?.state === "idle" && <span role="status" className="sr-only">{t("updates.upToDate")}</span>}
+        </span>
+        {!checking && upToDateNow && <ServiceBadge kind="current" t={t} />}
         {can.check && <Button size="sm" variant="secondary" loading={checking} onClick={() => void act("check")}>{t("updates.check")}</Button>}
       </div>
       {!!checkError && <div className="app-update-failure" role="alert"><ErrorText message={updaterFailure(checkError, { t })} /></div>}
-      {/* A newer version: the app's, its service following its restart; else what its service waits for. */}
-      {found ? <AppUpdateRow status={found} can={can} busy={busy} error={rowError} act={(action) => void act(action)} t={t} /> : service}
+      {/* A newer version, once found. */}
+      {found && <AppUpdateRow status={found} can={can} busy={busy} error={rowError} act={(action) => void act(action)} t={t} />}
     </div>
   </>;
 }

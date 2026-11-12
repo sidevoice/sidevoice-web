@@ -1,0 +1,29 @@
+/* The service card's version, port and state (service-version.tsx), on This device and on remote machines. Tokens only. */
+.svc-bar { width: 100%; }
+/* Two columns under the title, each fact under its name: the version with its badge, and the port at the card's right edge,
+ * as the title and the state are. */
+.svc-strip { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--sv-space-2) var(--sv-space-4); margin: 0; padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.svc-strip dt { margin: 0; font-size: var(--sv-font-xs); color: var(--sv-text-muted); }
+.svc-strip dd { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-1) var(--sv-space-2); margin: 0; }
+.svc-strip > [data-fact="port"] { text-align: end; }
+.svc-strip > [data-fact="port"] dd { justify-content: flex-end; }
+.svc-number { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); font-variant-numeric: tabular-nums; }
+.svc-badge { flex: none; white-space: nowrap; border-radius: var(--sv-radius-pill); }
+/* The app's row: its icon, its name, its version. */
+.ui-group-card > .svc-app-row { display: flex; align-items: center; gap: var(--sv-space-4); }
+.svc-app-icon { display: block; flex: none; width: 40px; height: 40px; border-radius: 10px; box-shadow: var(--sv-shadow-sm); }
+
+/* A machine as a row that opens its page (Settings › Updates, Remote machines): its icon, its name over its version, its
+ * badge, a chevron. */
+/* The button's own look reset at no specificity, so the rows' dividers (.ui-row + .ui-row) still draw. */
+:where(.svc-link-row) { margin: 0; border: 0; border-radius: 0; background: none; font: inherit; color: inherit; text-align: start; cursor: pointer; }
+.ui-group-card:has(> .svc-link-row) { overflow: hidden; }
+.ui-group-card > .ui-row.svc-link-row { display: flex; align-items: center; gap: var(--sv-space-4); width: 100%; }
+.ui-row.svc-link-row .ui-row-text { flex: 1; min-width: 0; }
+.svc-link-row .ui-row-description { display: block; }
+.svc-link-name { overflow-wrap: anywhere; }
+.ui-row.svc-link-row .ui-row-control { display: flex; align-items: center; flex: 0 1 auto; max-width: 55%; flex-wrap: wrap; justify-content: flex-end; gap: var(--sv-space-2) var(--sv-space-3); }
+.svc-link-row:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
+@media (hover: hover) { .svc-link-row:hover { background: var(--sv-hover); } }
+.svc-chevron { display: inline-grid; place-items: center; color: var(--sv-text-muted); }
+.svc-machine-icon { display: inline-grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 10px; background: var(--sv-accent-soft); color: var(--sv-accent-text); }
