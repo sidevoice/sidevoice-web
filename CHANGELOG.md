@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.32.0](https://github.com/sidevoice/sidevoice-web/compare/v0.31.0...v0.32.0) (2026-11-12)
+
+
+### Features
+
+* **settings:** one service card with its version and where it stands, for this device and every machine ([#595](https://github.com/sidevoice/sidevoice-web/issues/595)) ([0ad0738](https://github.com/sidevoice/sidevoice-web/commit/0ad0738521d00eb1df8bed71293666024ef9a309))
+* **settings:** Remote machines opens an overview of its machines, and a machine's page has no section above it ([#596](https://github.com/sidevoice/sidevoice-web/issues/596)) ([fde14dd](https://github.com/sidevoice/sidevoice-web/commit/fde14ddf33db805a6539d6e174b131d3795bbda2))
+
 ## [0.31.0](https://github.com/sidevoice/sidevoice-web/compare/v0.30.1...v0.31.0) (2026-11-11)
 
 
