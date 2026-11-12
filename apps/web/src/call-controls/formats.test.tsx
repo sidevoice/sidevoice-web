@@ -138,6 +138,11 @@ test.each(["card", "avatar"])("%s: the person's turn is the stage's pill, then \
   expect(pill).toHaveAttribute("data-phase", "listening");
   expect(pill.querySelector(".turn-bars")).not.toBeNull();
   expect(reply()).toHaveAttribute("data-leaving");
+  // Lifted away, it is gone: faded in the column's one cell, it would keep the room of its three lines and its width, and the pill beside it
+  // would be as tall as it (a circle) and as wide.
+  act(() => { vi.advanceTimersByTime(SENT_LEAVING_MS); });
+  expect(column().querySelector(".vcap.card.agent")).toBeNull();
+  expect(column().children).toHaveLength(1);
   // Cancel sending: the card's command, from the pill's ×.
   fireEvent.click(screen.getByRole("button", { name: "Cancel sending" }));
   expect(host.run).toHaveBeenCalledWith({ command: "cancel-input" });

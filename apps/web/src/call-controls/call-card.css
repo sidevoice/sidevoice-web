@@ -232,6 +232,7 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), var(--
 :root[data-theme=dark] .docked-voice > .vcap.card { box-shadow: 0 2px 8px rgb(0 0 0 / 50%); }
 /* Opening up, the cards grow away from the card: their pop and their lift come from its side. */
 .floating-card[data-open=up] .docked-voice > .vcap { transform-origin: 50% 100%; }
+.floating-card[data-open=up] .docked-voice { align-items: end; }
 
 /* ---------- B1: the picture-in-picture ---------- */
 /* One box, as the room's screen: the room's title block, its stage tile at 16:9, its call bar. */

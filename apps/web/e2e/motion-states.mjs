@@ -137,7 +137,8 @@ export async function openRoom(page, { people = MIXED, state = "not-in-call", mo
 const POSTER = new Set(["offline-machine", "own-offline"]);
 
 /** The desktop app's floating card (call-controls.html) in `state`, in `format` (card | pip | avatar) at `size`: the room's
- *  own projection of the call (its `callCard` snapshot) handed to the card through a host of its own, as the app hands it.
+ *  own projection of the call (its `callCard` snapshot) handed to the card through a host of its own, as the app hands it. `state` may be a
+ *  list, set one after the other (the person speaking over a reply: ["agent-speaking", "person-speaking"]).
  *  `expanded`: the controls that wait for the pointer are out. `level` / `playback`: the microphone's / the reply's level
  *  arrive as the app relays them (about 30 a second). Returns the card's page, in `context`. */
 export async function openCard(context, { state = "listening", format = "pip", size = "m", mode = "still", expanded = false, level = false, playback = false, people = MIXED } = {}) {
@@ -149,7 +150,7 @@ export async function openCard(context, { state = "listening", format = "pip", s
   await choose(room);
   // The state is set and read in one go: some of them end on the room's own timers (the person's turn, the reply), so a read in a
   // second round trip, on a busy machine, could find the state already over.
-  const call = await room.evaluate(`(${applyState})({ id: ${JSON.stringify(state)} }), window.sidevoiceUI.store.getState().callCard`);
+  const call = await room.evaluate(`${[state].flat().map((id) => `(${applyState})({ id: ${JSON.stringify(id)} })`).join(", ")}, window.sidevoiceUI.store.getState().callCard`);
   await room.close();
   const page = await context.newPage();
   await page.addInitScript(probe);

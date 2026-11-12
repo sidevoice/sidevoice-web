@@ -13,7 +13,7 @@ import { StageBackdrop, useSceneScale, type PosterWords } from "../avatar/StageS
 import type { MouthLevel } from "../avatar/avatar-state";
 import { uiLanguage, translator, type Translate } from "../../i18n/translator";
 import { moodText } from "./conversation-state";
-import { useAgentTurns, useReadingClock, useSpokenFrom, type AgentTurn } from "./speech-reading";
+import { SENT_LEAVING_MS, useAgentTurns, useReadingClock, useSpokenFrom, type AgentTurn } from "./speech-reading";
 import type { Reading } from "./speech-chunks";
 import { LitText } from "./LitText";
 import { PagedText } from "./PagedText";
@@ -53,11 +53,25 @@ import "./call-view.css";
  * (DockedVoice). */
 export type AgentLook = "balloon" | "card";
 
+/** `on`, once it has held for `ms`, and off again as soon as it lets go. */
+function useHeldFor(on: boolean, ms: number): boolean {
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    if (!on) { setHeld(false); return; }
+    const timer = window.setTimeout(() => setHeld(true), ms);
+    return () => window.clearTimeout(timer);
+  }, [on, ms]);
+  return held;
+}
+
 /** One reply on the stage, in a speech balloon whose tail points down at the agent (call-view.css), or the stage's card:
  *  a few lines at a time (PagedText), lit as the voice says them, moving on with the words heard. `cut`: the person's
- *  turn took its place under the creature, so it lifts away. */
+ *  turn took its place under the creature, so it lifts away, and is gone once it has: faded, it would still hold its room in the
+ *  docked column's one cell (call-card.css), and the person's pill beside it would be as tall and as wide as the reply. It
+ *  comes back, popping in, if the turn comes to nothing while the reply is still to be said. */
 function AgentBubble({ turn, look = "balloon", cut = false }: { turn: AgentTurn; look?: AgentLook; cut?: boolean }) {
-  if (look === "card") return (
+  const gone = useHeldFor(cut, SENT_LEAVING_MS);
+  if (look === "card") return gone ? null : (
     <div className="vcap card agent" data-leaving={turn.leaving || cut || undefined} aria-hidden="true" translate="no">
       <PagedText measure={turn.text} follow=".lit-heard" lines={3} turn="page" fixed>
         <LitText text={turn.text} spoken={turn.spoken} />
