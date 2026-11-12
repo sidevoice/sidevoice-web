@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.32.1](https://github.com/sidevoice/sidevoice-web/compare/v0.32.0...v0.32.1) (2026-11-12)
+
+
+### Bug Fixes
+
+* **devices:** in an app, read the speaker list from the app's host, not the webview ([#598](https://github.com/sidevoice/sidevoice-web/issues/598)) ([6a71794](https://github.com/sidevoice/sidevoice-web/commit/6a71794e85e40072ee898f454c5b6b031b9d4bda))
+* **settings:** a machine that says no version shows its last seen one, with its badge ([#599](https://github.com/sidevoice/sidevoice-web/issues/599)) ([744fc97](https://github.com/sidevoice/sidevoice-web/commit/744fc978fea234abce9cd157ee53540dccc29c6d))
+
 ## [0.32.0](https://github.com/sidevoice/sidevoice-web/compare/v0.31.0...v0.32.0) (2026-11-12)
 
 
