@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.32.4](https://github.com/sidevoice/sidevoice-web/compare/v0.32.3...v0.32.4) (2026-11-13)
+
+
+### Bug Fixes
+
+* **creature:** the eye patch's strap is one band, with no second one over the head ([#607](https://github.com/sidevoice/sidevoice-web/issues/607)) ([b9a52fa](https://github.com/sidevoice/sidevoice-web/commit/b9a52fa69c4242a1d4ac9d2d558f02e10e873577))
+
 ## [0.32.3](https://github.com/sidevoice/sidevoice-web/compare/v0.32.2...v0.32.3) (2026-11-12)
 
 
