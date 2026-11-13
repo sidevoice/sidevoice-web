@@ -1,7 +1,7 @@
 // Accessories and eye styles in the creature style (toon ink), registered into rig.js's registries.
-// Ported unchanged from the frozen design reference (reference/2026-11-04/src/accessories.js, SHA-256 2e1ae895…); only
-// this header and the rig's file name differ. Imported for its registrations (creature/host.ts); rig.js does not know
-// this module exists.
+// Ported from the frozen design reference (reference/2026-11-04/src/accessories.js, SHA-256 2e1ae895…), unchanged but for
+// this header, the rig's file name and the edits marked "product:" (the eye patch's strap has no ink hull). Imported for
+// its registrations (creature/host.ts); rig.js does not know this module exists.
 //
 // Every accessory is fitted to the body it is built on: hats measure the head's section at their seat (a hat
 // on the box body comes out rounded-square, one on the onion perches on the tip), never come down over the
@@ -771,7 +771,10 @@ acc('eyepatch', 'face', 'eye patch', (ctx, k) => {
   ctx.eyes.R.anchor.updateMatrixWorld(true);
   const A = E.anchor.localToWorld(V(0.1 * E.W, E.H * 0.85, 0)), B = ctx.eyes.R.anchor.localToWorld(V(ctx.eyes.R.W * 1.3, ctx.eyes.R.H * 1.15, 0));
   const u = V(B.x - A.x, B.y - A.y, 0).normalize(), v = V(0, 0, 1), c = k.axisAt(A.y).setY(A.y + (0 - A.x) * (u.y / u.x));
-  k.part(k.ribbon(k.hitBody, c, u, v, 0.012, 0.036, 0.02), C.ink, { ol: 0.016 });
+  // product: no ink hull. The strap is ink and lies 0.012 off the head, so its inverted hull (0.016 x the paint level's 1.9) sank into the
+  // head and came out of it only as a sliver above the strap and as depth-fighting stripes along it, in every pose (plainest where
+  // the head tips, as at work): a second band over the head. An ink part is its own outline, as the lens above and the monocle's cord are.
+  k.part(k.ribbon(k.hitBody, c, u, v, 0.012, 0.036, 0.02), C.ink, { ol: 0 });
 });
 
 // ---------- eye styles ----------
