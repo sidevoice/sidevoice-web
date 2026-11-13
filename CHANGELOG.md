@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.33.1](https://github.com/sidevoice/sidevoice-web/compare/v0.33.0...v0.33.1) (2026-11-13)
+
+
+### Bug Fixes
+
+* **settings:** remove the call audio mode developer option ([#612](https://github.com/sidevoice/sidevoice-web/issues/612)) ([359c826](https://github.com/sidevoice/sidevoice-web/commit/359c826ee644f5422bf7213135c06eb9e4f038e5))
+
 ## [0.33.0](https://github.com/sidevoice/sidevoice-web/compare/v0.32.4...v0.33.0) (2026-11-13)
 
 
