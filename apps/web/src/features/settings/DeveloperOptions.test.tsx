@@ -5,6 +5,7 @@ import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import type { DebugSwitch } from "../../host";
 import { translator } from "../../i18n/translator";
+import { chooseOption, listOptions, selectedValue } from "../../test/select";
 
 afterEach(() => {
   cleanup();
@@ -241,4 +242,50 @@ test("the system-call switch and its Calls group are the catalogue's words, in t
   render(<RoomProvider store={createRoomStore()}><DeveloperOptions t={translator("es")} /></RoomProvider>);
   expect(groups()).toContain("Llamadas");
   expect(screen.getAllByRole("switch").map((s) => s.getAttribute("aria-label"))).toEqual(["Tratar las llamadas como llamadas del sistema (CallKit / Telecom)"]);
+});
+
+/* The iPhone's call audio mode (`host.debug.callAudio`, sidevoice-desktop docs/MOBILE.md → "The call audio mode test"): a list
+ * of the audio session's modes in the Calls group, only where the app offers it, chosen through `choose`. */
+
+/** An iPhone's `host.debug`: the system-call switch and the call audio mode, `choose` taking it unless told otherwise. */
+function withCallAudio({ choose }: { choose?: (value: string) => Promise<void> } = {}) {
+  const held = { systemCall: false, callAudio: "voiceChat" };
+  const debug = {
+    available: ["systemCall", "callAudio"],
+    get systemCall() { return held.systemCall; },
+    get callAudio() { return held.callAudio; },
+    set: vi.fn(async (_name: DebugSwitch, on: boolean) => { held.systemCall = on; }),
+    choose: vi.fn(async (_name: string, value: string) => { if (choose) await choose(value); else held.callAudio = value; }),
+  };
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel: "nightly", version: "0.2.1-nightly.608" }, debug } } });
+  return { debug, held };
+}
+
+test("an iPhone's call audio mode is listed under the system-call switch, voice chat until another is chosen", async () => {
+  const { debug, held } = withCallAudio();
+  mount();
+  expect(groups()).toContain("Calls");
+  expect(rows()).toContain("Call audio mode (test)");
+  expect(selectedValue("developer-call-audio")).toBe("voiceChat");
+  expect(listOptions("developer-call-audio").map((option) => option.label)).toEqual([
+    "Voice chat (normal)", "Video chat", "Default (no voice processing)", "Default, voice chat only in calls",
+  ]);
+  chooseOption("developer-call-audio", "voiceChatInCalls");
+  await act(async () => {});
+  expect(debug.choose).toHaveBeenLastCalledWith("callAudio", "voiceChatInCalls");
+  expect(held.callAudio).toBe("voiceChatInCalls");
+  expect(selectedValue("developer-call-audio")).toBe("voiceChatInCalls");
+});
+
+test("a mode the app refuses goes back, with a line saying so; no list where the app does not offer it", async () => {
+  withCallAudio({ choose: () => Promise.reject({ key: "bad_request" }) });
+  mount();
+  chooseOption("developer-call-audio", "videoChat");
+  await act(async () => {});
+  expect(selectedValue("developer-call-audio")).toBe("voiceChat");
+  expect(screen.getByRole("alert")).toHaveTextContent("The app could not change it.");
+  cleanup();
+  withDebug({ available: ["systemCall"] });
+  mount();
+  expect(rows()).not.toContain("Call audio mode (test)");
 });
