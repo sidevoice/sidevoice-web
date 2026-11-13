@@ -1518,7 +1518,7 @@ export const messages: Messages = {
   "settings.developer.callAudio.voiceChat": "Czat głosowy (zwykły)",
   "settings.developer.callAudio.videoChat": "Czat wideo",
   "settings.developer.callAudio.default": "Domyślny (bez przetwarzania głosu)",
-  "settings.developer.callAudio.voiceChatInCalls": "Domyślny, czat głosowy tylko w połączeniach",
+  "settings.developer.callAudio.voiceChatInCalls": "Domyślny, czat głosowy tylko podczas połączeń",
   "settings.developer.group.calls": "Połączenia",
   "service.newerWhy": "Ta aplikacja działa z Sidevoice {supported}.x. Wersja {version} może działać nieprawidłowo.",
   "service.remote.behind.title": "Sidevoice {version} jest nieaktualny",

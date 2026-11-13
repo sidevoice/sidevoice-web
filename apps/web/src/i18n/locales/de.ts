@@ -1500,7 +1500,7 @@ export const messages: Messages = {
   "settings.developer.callAudio.voiceChat": "Sprachchat (normal)",
   "settings.developer.callAudio.videoChat": "Videochat",
   "settings.developer.callAudio.default": "Standard (ohne Sprachverarbeitung)",
-  "settings.developer.callAudio.voiceChatInCalls": "Standard, Sprachchat nur in Anrufen",
+  "settings.developer.callAudio.voiceChatInCalls": "Standard, Sprachchat nur bei Anrufen",
   "settings.developer.group.calls": "Anrufe",
   "service.newerWhy": "Diese App funktioniert mit Sidevoice {supported}.x. Version {version} kann Fehler verursachen.",
   "service.remote.behind.title": "Sidevoice {version} ist veraltet",

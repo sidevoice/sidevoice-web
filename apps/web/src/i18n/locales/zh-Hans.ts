@@ -1493,7 +1493,7 @@ export const messages: Messages = {
   "settings.developer.systemCall": "将通话视为系统通话（CallKit / Telecom）",
   "settings.developer.systemCall.hint": "开启：通话使用系统通话功能，带有锁屏卡片、通话界面以及耳机或车载按键。关闭：应用自己的通话，使用自己的通知。下次通话时生效。",
   "settings.developer.callAudio": "通话音频模式（测试）",
-  "settings.developer.callAudio.hint": "iPhone 音频会话的模式，用于比较扬声器的音量。语音聊天是常规模式。没有声音在播放时立即生效，否则从下次通话开始生效。",
+  "settings.developer.callAudio.hint": "iPhone 音频会话的模式，用于比较扬声器的音量。语音聊天是常规模式。未播放音频时立即生效，否则从下次通话开始生效。",
   "settings.developer.callAudio.voiceChat": "语音聊天（常规）",
   "settings.developer.callAudio.videoChat": "视频聊天",
   "settings.developer.callAudio.default": "默认（不进行语音处理）",

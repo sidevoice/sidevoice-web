@@ -1497,7 +1497,7 @@ export const messages: Messages = {
   "settings.developer.callAudio.voiceChat": "Chat vocal (normal)",
   "settings.developer.callAudio.videoChat": "Chat vidéo",
   "settings.developer.callAudio.default": "Par défaut (sans traitement de la voix)",
-  "settings.developer.callAudio.voiceChatInCalls": "Par défaut, chat vocal seulement en appel",
+  "settings.developer.callAudio.voiceChatInCalls": "Par défaut, chat vocal uniquement pendant les appels",
   "settings.developer.group.calls": "Appels",
   "service.newerWhy": "Cette application fonctionne avec Sidevoice {supported}.x. La version {version} risque de ne pas fonctionner correctement.",
   "service.remote.behind.title": "Sidevoice {version} n’est pas à jour",

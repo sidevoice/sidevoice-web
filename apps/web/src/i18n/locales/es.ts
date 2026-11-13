@@ -1516,7 +1516,7 @@ export const messages: Messages = {
   "settings.developer.callAudio": "Modo de audio de las llamadas (prueba)",
   "settings.developer.callAudio.hint": "El modo de la sesión de audio del iPhone, para comparar lo alto que suena el altavoz. Chat de voz es el modo normal. Se aplica al momento si no suena nada; si no, desde la próxima llamada.",
   "settings.developer.callAudio.voiceChat": "Chat de voz (normal)",
-  "settings.developer.callAudio.videoChat": "Videollamada",
+  "settings.developer.callAudio.videoChat": "Chat de vídeo",
   "settings.developer.callAudio.default": "Predeterminado (sin procesamiento de voz)",
   "settings.developer.callAudio.voiceChatInCalls": "Predeterminado, chat de voz solo en llamadas",
   "settings.developer.group.calls": "Llamadas",

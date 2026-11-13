@@ -1485,7 +1485,7 @@ export const messages: Messages = {
   "settings.developer.systemCall": "कॉल को सिस्टम कॉल की तरह मानें (CallKit / Telecom)",
   "settings.developer.systemCall.hint": "चालू: कॉल सिस्टम की कॉलिंग सुविधाओं का इस्तेमाल करती है, जिनमें लॉक स्क्रीन कार्ड, कॉल स्क्रीन और हेडसेट या कार के बटन शामिल हैं। बंद: ऐप की अपनी कॉल, अपनी सूचना के साथ। अगली कॉल से लागू होगा।",
   "settings.developer.callAudio": "कॉल का ऑडियो मोड (परीक्षण)",
-  "settings.developer.callAudio.hint": "iPhone के ऑडियो सेशन का मोड, यह तुलना करने के लिए कि स्पीकर कितनी तेज़ बजता है। वॉइस चैट सामान्य मोड है। कुछ न बज रहा हो तो तुरंत लागू होगा, वरना अगली कॉल से।",
+  "settings.developer.callAudio.hint": "iPhone के ऑडियो सेशन का मोड, यह तुलना करने के लिए कि स्पीकर कितना तेज़ बजता है। वॉइस चैट सामान्य मोड है। कुछ न बज रहा हो तो तुरंत लागू होगा, वरना अगली कॉल से।",
   "settings.developer.callAudio.voiceChat": "वॉइस चैट (सामान्य)",
   "settings.developer.callAudio.videoChat": "वीडियो चैट",
   "settings.developer.callAudio.default": "डिफ़ॉल्ट (आवाज़ की प्रोसेसिंग के बिना)",
