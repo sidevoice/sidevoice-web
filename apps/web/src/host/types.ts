@@ -470,29 +470,18 @@ export interface AppUpdater {
  *  layer the GPU draws) and its repaint counters (how often the CPU repainted each layer) on the desktop; on a phone,
  *  whether the call is a call of the system's (CallKit, Telecom: sidevoice-desktop #393). */
 export type DebugSwitch = "inspectable" | "compositingBorders" | "repaintCounters" | "systemCall";
-/** What the app's debugging seam can choose among values (`choose`): on an iPhone, the audio session's mode for the call
- *  audio mode test (sidevoice-desktop, docs/MOBILE.md → "The call audio mode test"). */
-export type DebugChoice = "callAudio";
-/** The audio session's modes `callAudio` chooses among: voice chat (the default), video chat, default, and default outside
- *  the room's call with voice chat in it. */
-export type CallAudioMode = "voiceChat" | "videoChat" | "default" | "voiceChatInCalls";
 /** The app's debugging seam (`host.debug`, sidevoice-desktop #168), present only in a nightly or a development build.
  *  `available` is the switches this platform has (all three on macOS, none elsewhere): the page shows only those. Each
  *  switch is a live getter, so it is read when it is needed, and again once `set` resolves, for what took. A rejection
  *  means the app did not change it. */
 export interface HostDebugBridge {
-  readonly available: readonly (DebugSwitch | DebugChoice)[];
+  readonly available: readonly DebugSwitch[];
   /** Each switch is read only when `available` lists it: the desktop has the first three, a phone `systemCall`. */
   readonly inspectable?: boolean;
   readonly compositingBorders?: boolean;
   readonly repaintCounters?: boolean;
   readonly systemCall?: boolean;
-  /** The call audio mode chosen, read only when `available` lists `callAudio`. */
-  readonly callAudio?: CallAudioMode;
   set(name: DebugSwitch, on: boolean): Promise<void>;
-  /** Chooses `value` for a choice `available` lists; resolves when done, and the choice then reads what took. A rejection
-   *  means the app did not change it. Absent where the app has no choice. */
-  choose?(name: DebugChoice, value: string): Promise<void>;
 }
 
 /** The host's wording of the texts its place changes (a phone has no browser, a Control Center, …): web catalogue keys to the
