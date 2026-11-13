@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.33.0](https://github.com/sidevoice/sidevoice-web/compare/v0.32.4...v0.33.0) (2026-11-13)
+
+
+### Features
+
+* **settings:** call audio mode test choice in Developer options ([#609](https://github.com/sidevoice/sidevoice-web/issues/609)) ([e71f57a](https://github.com/sidevoice/sidevoice-web/commit/e71f57a24484a8215877cc7bc92f4eeacea67e78))
+
 ## [0.32.4](https://github.com/sidevoice/sidevoice-web/compare/v0.32.3...v0.32.4) (2026-11-13)
 
 
