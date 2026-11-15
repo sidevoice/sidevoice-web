@@ -17,17 +17,14 @@ const EXAMPLE_TRACE = [
   "      at desktop/tauri/src/lib.rs:226",
 ].join("\n");
 
-const EXAMPLE_LOG = [
-  "14:32:07.412  INFO audio: stream opened stream=microphone sample_rate=48000",
-  "14:32:09.031  WARN call{call=c-7f3a}: core link lost attempt=2",
-  "14:32:09.538  INFO call{call=c-7f3a}: core link up duration_ms=507",
-  "14:32:11.204 ERROR call{call=c-7f3a}: capture failed error.type=desktop.audio-capture-stalled",
-  "14:32:11.205 ERROR panic: panic code.filepath=shared/core/src/audio/input.rs code.lineno=212",
-].join("\n");
+/* The app's own report: the install id is a placeholder (the host does not hand it to the page: `host.crashReports` is get/set of the
+ * mode), the modules are the ones that hold a frame of the trace, and it carries no log lines. */
+const EXAMPLE_INSTALL_ID = "3f9a1c7e5b2d4086a1e9c0d7b4f25a68";
+const EXAMPLE_MODULES = "sidevoice_desktop, sidevoice_core";
 
-/** Code, as it is written: not translated, not wrapped. `more` is the line that says how much was left out. */
-function Block({ text, more }: { text: string; more?: string }) {
-  return <pre translate="no">{more ? text + "\n" + more : text}</pre>;
+/** Code, as it is written: not translated, not wrapped. */
+function Block({ text }: { text: string }) {
+  return <pre translate="no">{text}</pre>;
 }
 
 /** The build as a report names it: "Sidevoice 0.33.1", and a nightly or a development build says so, with its day. */
@@ -46,8 +43,10 @@ export function ReportPreview({ t = translator() }: { t?: Translate }) {
         <dt>{t("crashReports.report.version")}</dt><dd translate="no">{versionOf(host().identity.build)}</dd>
         <dt>{t("crashReports.report.system")}</dt><dd>macOS 15.1 · arm64</dd>
         <dt>{t("crashReports.report.code")}</dt><dd translate="no">desktop.panic</dd>
+        <dt>{t("crashReports.report.installId")}</dt><dd><span translate="no">{EXAMPLE_INSTALL_ID}</span> <span className="crash-report-example">{t("crashReports.report.installIdNote")}</span></dd>
         <dt>{t("crashReports.report.trace")}</dt><dd><Block text={EXAMPLE_TRACE} /></dd>
-        <dt>{t("crashReports.report.logs")}</dt><dd><Block text={EXAMPLE_LOG} more={t("crashReports.report.moreLines")} /></dd>
+        <dt>{t("crashReports.report.modules")}</dt><dd translate="no">{EXAMPLE_MODULES}</dd>
+        <dt>{t("crashReports.report.logs")}</dt><dd>{t("crashReports.report.logsNote")}</dd>
       </dl>
       <p className="crash-report-never"><b>{t("crashReports.report.neverLead")}</b> {t("crashReports.report.neverBody")}</p>
     </div>
