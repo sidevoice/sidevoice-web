@@ -111,17 +111,31 @@ async function settled(page, stage) {
   await expect.poll(() => stage.evaluate((c) => !c.hasAttribute("data-easing")), { timeout: 30_000, message: "the framing settled" }).toBe(true);
 }
 
+/** How long a read of the stage waits for its creature to be drawn: a resize's redraw is a frame or two, at a software GL's pace,
+ *  with room to spare. A creature that is genuinely not drawn does not come back, so this only bounds how long it takes to say so. */
+const DRAWN_WITHIN = 10_000;
+
 /** The stage's creature as drawn now: there (at least `least` px of it: a turn on a phone on its side steps it far back, to make
- *  room for its card), inside its tile, cut by nothing it sits in, and clear of its canvas's edges. */
+ *  room for its card), inside its tile, cut by nothing it sits in, and clear of its canvas's edges.
+ *
+ *  Whether it is drawn is read until it is: the stage's canvas is resized when the window or the framing changes, and a resize
+ *  clears it until the next frame draws it again, so a single read can land on the blank between the two (the reach and the
+ *  layout have settled by then and say nothing of that frame). The sample that first shows it drawn then decides everything else,
+ *  so the pixels, the box and the cuts it is judged by are of the same frame. A canvas that stays blank, or a creature that is not
+ *  there, fails here once `DRAWN_WITHIN` has run out, with what was last read. */
 async function stageWhole(page, stage, what, least = 500) {
-  const { s, tile, cuts } = await stage.evaluate((canvas) => {
-    const r = canvas.closest(".stage-tile").getBoundingClientRect();
-    return { s: window.__drawn(canvas), tile: { x: r.x, y: r.y, width: r.width, height: r.height }, cuts: window.__clipped(canvas) };
-  });
-  // drawn: a canvas with a box and pixels, and a creature on it
-  expect(s.W * s.H, `${what}: the canvas has pixels`).toBeGreaterThan(0);
-  expect(s.box.w * s.box.h, `${what}: the canvas has a box`).toBeGreaterThan(0);
-  expect(s.count, `${what}: the creature is drawn`).toBeGreaterThan(least);
+  let sample;
+  await expect.poll(async () => {
+    sample = await stage.evaluate((canvas) => {
+      const r = canvas.closest(".stage-tile").getBoundingClientRect();
+      return { s: window.__drawn(canvas), tile: { x: r.x, y: r.y, width: r.width, height: r.height }, cuts: window.__clipped(canvas) };
+    });
+    const { s } = sample;
+    // drawn: a canvas with pixels and a box, and a creature on it
+    return s.W * s.H > 0 && s.box.w * s.box.h > 0 && s.count > least ? "drawn"
+      : `blank: canvas ${s.W} × ${s.H} px, box ${s.box.w} × ${s.box.h}, ${s.count} px drawn (more than ${least} wanted)`;
+  }, { timeout: DRAWN_WITHIN, intervals: [50, 100, 250, 500], message: `${what}: the creature is drawn` }).toBe("drawn");
+  const { s, tile, cuts } = sample;
   // inside its tile (its border's px aside), cut by nothing it sits in, and nothing it draws at its canvas's edges, either way
   expect(s.box.x, `${what}: inside its tile`).toBeGreaterThanOrEqual(tile.x - 0.5);
   expect(s.box.x + s.box.w, `${what}: inside its tile`).toBeLessThanOrEqual(tile.x + tile.width + 0.5);
