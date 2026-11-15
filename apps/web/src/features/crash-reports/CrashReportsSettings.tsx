@@ -70,7 +70,7 @@ export function CrashReportsSettings({ t }: { t: Translate }) {
           toggle={t("crashReports.report.toggle")} open={open.report} onToggle={() => setOpen((value) => ({ ...value, report: !value.report }))}
           control={<Segmented<CrashReportsMode | ""> size="sm" label={t("crashReports.label")} value={mode ?? ""} onChange={(next) => { if (next) void choose(next); }}
             items={[{ value: "auto", label: t("crashReports.mode.auto"), disabled: !known }, { value: "never", label: t("crashReports.mode.never"), disabled: !known }]} />}
-          panel={<ReportPreview t={t} />} />
+          panel={<ReportPreview t={t} mode={mode} />} />
         <DisclosureRow block label={t("logs.label")} description={t("logs.description")}
           note={<p className="logs-note crash-tip"><InfoIcon size={16} /><span>{t("crashReports.tip")}</span></p>}
           toggle={t("logs.toggle")} open={open.logs} onToggle={() => setOpen((value) => ({ ...value, logs: !value.logs }))} panel={<LogsViewer />} />

@@ -1524,6 +1524,7 @@ export const messages: Messages = {
   "crashReports.report.trace": "Trace du plantage",
   "crashReports.report.installId": "ID d’installation",
   "crashReports.report.installIdNote": "Un nombre aléatoire, renouvelé chaque année.",
+  "crashReports.report.installIdNone": "Aucun : il n’est pas créé tant que vous choisissez de ne pas envoyer de rapports.",
   "crashReports.report.modules": "Modules contenant du code dans la panne",
   "crashReports.report.logs": "Lignes du journal",
   "crashReports.report.logsNote": "Aucune dans le rapport de l’app elle-même. Celui d’une machine contient au plus ses 20 dernières alertes et erreurs, avec des heures relatives à la panne.",

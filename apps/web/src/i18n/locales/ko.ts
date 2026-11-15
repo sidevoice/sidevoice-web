@@ -1516,6 +1516,7 @@ export const messages: Messages = {
   "crashReports.report.trace": "오류 추적 정보",
   "crashReports.report.installId": "설치 ID",
   "crashReports.report.installIdNote": "무작위 숫자이며 매년 새로 바뀌어요.",
+  "crashReports.report.installIdNone": "없음: 보고서를 보내지 않도록 설정한 동안에는 만들어지지 않아요.",
   "crashReports.report.modules": "문제 지점에 코드가 있는 모듈",
   "crashReports.report.logs": "로그 줄",
   "crashReports.report.logsNote": "앱 자체의 보고서에는 없어요. 기기의 보고서에는 마지막 경고와 오류가 최대 20줄까지 들어 있고, 시각은 문제가 생긴 때를 기준으로 한 상대 값이에요.",

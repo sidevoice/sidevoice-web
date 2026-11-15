@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { host, type AppBuild } from "../../host";
 import { translator, type Translate } from "../../i18n/translator";
 
@@ -17,8 +18,8 @@ const EXAMPLE_TRACE = [
   "      at desktop/tauri/src/lib.rs:226",
 ].join("\n");
 
-/* The app's own report: the install id is a placeholder (the host does not hand it to the page: `host.crashReports` is get/set of the
- * mode), the modules are the ones that hold a frame of the trace, and it carries no log lines. */
+/* The app's own report: the install id is the app's own when it offers `crashReports.installId()` (null: none is kept, as under
+ * "never"), else a placeholder (an app before that method), the modules are the ones that hold a frame of the trace, and it carries no log lines. */
 const EXAMPLE_INSTALL_ID = "3f9a1c7e5b2d4086a1e9c0d7b4f25a68";
 const EXAMPLE_MODULES = "sidevoice_desktop, sidevoice_core";
 
@@ -35,7 +36,24 @@ export function versionOf(build: AppBuild | null): string {
   return `Sidevoice ${build.version}${kind ? ` (${kind})` : ""}`;
 }
 
-export function ReportPreview({ t = translator() }: { t?: Translate }) {
+/** The install id the app holds: a string, null (none: under "never" it is not created, and a created one is forgotten), "pending"
+ *  while the app answers, or "unknown" where the app cannot say (no method, or one that fails). Read again when `mode` changes. */
+function useInstallId(mode: string | null): string | null | "pending" | "unknown" {
+  const [id, setId] = useState<string | null | "pending" | "unknown">("pending");
+  useEffect(() => {
+    const bridge = host().crashReports;
+    if (typeof bridge?.installId !== "function") { setId("unknown"); return; }
+    let live = true;
+    bridge.installId().then(
+      (answer) => { if (live) setId(typeof answer?.installId === "string" && answer.installId ? answer.installId : null); },
+      () => { if (live) setId("unknown"); });
+    return () => { live = false; };
+  }, [mode]);
+  return id;
+}
+
+export function ReportPreview({ t = translator(), mode = null }: { t?: Translate; mode?: string | null }) {
+  const installId = useInstallId(mode);
   return (
     <div className="crash-report">
       <p className="crash-report-example">{t("crashReports.report.example")}</p>
@@ -43,7 +61,10 @@ export function ReportPreview({ t = translator() }: { t?: Translate }) {
         <dt>{t("crashReports.report.version")}</dt><dd translate="no">{versionOf(host().identity.build)}</dd>
         <dt>{t("crashReports.report.system")}</dt><dd>macOS 15.1 · arm64</dd>
         <dt>{t("crashReports.report.code")}</dt><dd translate="no">desktop.panic</dd>
-        <dt>{t("crashReports.report.installId")}</dt><dd><span translate="no">{EXAMPLE_INSTALL_ID}</span> <span className="crash-report-example">{t("crashReports.report.installIdNote")}</span></dd>
+        <dt>{t("crashReports.report.installId")}</dt><dd>{installId === "pending" ? null
+          : installId === null ? <span className="crash-report-example">{t("crashReports.report.installIdNone")}</span>
+          : installId === "unknown" ? <><span translate="no">{EXAMPLE_INSTALL_ID}</span> <span className="crash-report-example">{t("crashReports.report.installIdNote")}</span></>
+          : <span translate="no" className="crash-report-id">{installId}</span>}</dd>
         <dt>{t("crashReports.report.trace")}</dt><dd><Block text={EXAMPLE_TRACE} /></dd>
         <dt>{t("crashReports.report.modules")}</dt><dd translate="no">{EXAMPLE_MODULES}</dd>
         <dt>{t("crashReports.report.logs")}</dt><dd>{t("crashReports.report.logsNote")}</dd>

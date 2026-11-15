@@ -1516,6 +1516,7 @@ export const messages: Messages = {
   "crashReports.report.trace": "Rastreamento da falha",
   "crashReports.report.installId": "ID de instalação",
   "crashReports.report.installIdNote": "Um número aleatório, renovado todo ano.",
+  "crashReports.report.installIdNone": "Nenhum: ele não é criado enquanto você escolher não enviar relatórios.",
   "crashReports.report.modules": "Módulos com código na falha",
   "crashReports.report.logs": "Linhas do registro",
   "crashReports.report.logsNote": "Nenhuma no relatório do próprio app. O de uma máquina leva no máximo seus últimos 20 avisos e erros, com horários relativos à falha.",

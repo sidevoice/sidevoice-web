@@ -1524,6 +1524,7 @@ export const messages: Messages = {
   "crashReports.report.trace": "故障跟踪",
   "crashReports.report.installId": "安装 ID",
   "crashReports.report.installIdNote": "一个随机数，每年更换一次。",
+  "crashReports.report.installIdNone": "无：选择不发送报告期间不会生成。",
   "crashReports.report.modules": "故障中含有代码的模块",
   "crashReports.report.logs": "日志行",
   "crashReports.report.logsNote": "应用自身的报告中没有。某台机器的报告最多包含它最近 20 条警告和错误，时间相对于故障发生时刻。",

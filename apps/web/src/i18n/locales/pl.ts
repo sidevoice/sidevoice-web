@@ -1545,6 +1545,7 @@ export const messages: Messages = {
   "crashReports.report.trace": "Ślad awarii",
   "crashReports.report.installId": "ID instalacji",
   "crashReports.report.installIdNote": "Losowa liczba, odnawiana co roku.",
+  "crashReports.report.installIdNone": "Brak: nie jest tworzony, dopóki wybierasz niewysyłanie raportów.",
   "crashReports.report.modules": "Moduły z kodem w awarii",
   "crashReports.report.logs": "Linie dziennika",
   "crashReports.report.logsNote": "Brak w raporcie samej aplikacji. Raport o maszynie zawiera najwyżej jej 20 ostatnich ostrzeżeń i błędów, z czasami względem awarii.",

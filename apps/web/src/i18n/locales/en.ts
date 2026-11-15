@@ -1568,6 +1568,7 @@ export const messages = {
   "crashReports.report.trace": "Stack trace",
   "crashReports.report.installId": "Installation ID",
   "crashReports.report.installIdNote": "A random number, replaced every year.",
+  "crashReports.report.installIdNone": "None: it is not created while you choose not to send reports.",
   "crashReports.report.modules": "Modules with code in the failure",
   "crashReports.report.logs": "Log lines",
   "crashReports.report.logsNote": "None in the app’s own report. A report about a machine carries at most its last 20 warnings and errors, with times relative to the crash.",

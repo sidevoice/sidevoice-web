@@ -1525,6 +1525,7 @@ export const messages: Messages = {
   "crashReports.report.trace": "障害のトレース",
   "crashReports.report.installId": "インストール ID",
   "crashReports.report.installIdNote": "ランダムな数値で、毎年更新されます。",
+  "crashReports.report.installIdNone": "なし：レポートを送らない設定のあいだは作られません。",
   "crashReports.report.modules": "不具合の発生箇所にコードがあるモジュール",
   "crashReports.report.logs": "ログの行",
   "crashReports.report.logsNote": "アプリ自身のレポートにはありません。マシンのレポートには、直近の警告とエラーが最大 20 行まで含まれ、時刻は不具合発生時点からの相対です。",

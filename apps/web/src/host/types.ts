@@ -567,6 +567,9 @@ export interface CrashReportsBridge {
   get(): Promise<CrashReportsMode> | CrashReportsMode;
   set(mode: CrashReportsMode): Promise<void>;
   subscribe?(listener: (mode: CrashReportsMode) => void): () => void;
+  /** The id this install reports under, for the preview of what a report holds: null under `never` (none is created, and a
+   *  created one is forgotten). Optional: an app before it has none, and the preview then shows a placeholder. */
+  installId?(): Promise<{ installId: string } | null>;
 }
 
 export interface Host {

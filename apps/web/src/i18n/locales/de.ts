@@ -1527,6 +1527,7 @@ export const messages: Messages = {
   "crashReports.report.trace": "Stacktrace des Fehlers",
   "crashReports.report.installId": "Installations-ID",
   "crashReports.report.installIdNote": "Eine Zufallszahl, die jedes Jahr erneuert wird.",
+  "crashReports.report.installIdNone": "Keine: Sie wird nicht erstellt, solange du keine Berichte senden lässt.",
   "crashReports.report.modules": "Module mit Code im Fehler",
   "crashReports.report.logs": "Protokollzeilen",
   "crashReports.report.logsNote": "Keine im Bericht der App selbst. Der Bericht einer Maschine enthält höchstens ihre letzten 20 Warnungen und Fehler, mit Zeiten relativ zum Absturz.",

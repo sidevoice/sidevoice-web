@@ -1516,6 +1516,7 @@ export const messages: Messages = {
   "crashReports.report.trace": "गड़बड़ी का ट्रेस",
   "crashReports.report.installId": "इंस्टॉलेशन ID",
   "crashReports.report.installIdNote": "एक रैंडम संख्या, जो हर साल बदल जाती है।",
+  "crashReports.report.installIdNone": "कोई नहीं: रिपोर्ट न भेजने का विकल्प चुनने पर यह नहीं बनाई जाती।",
   "crashReports.report.modules": "गड़बड़ी में कोड वाले मॉड्यूल",
   "crashReports.report.logs": "लॉग की लाइनें",
   "crashReports.report.logsNote": "ऐप की अपनी रिपोर्ट में कोई नहीं। किसी मशीन की रिपोर्ट में उसकी आख़िरी 20 चेतावनियाँ और एरर तक होते हैं, समय क्रैश के सापेक्ष।",

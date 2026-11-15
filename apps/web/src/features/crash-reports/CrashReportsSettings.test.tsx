@@ -254,3 +254,33 @@ describe("in Spanish, as the design has it", () => {
     expect(pane().getByRole("button", { name: "Ver registros" })).toBeInTheDocument();
   });
 });
+
+describe("the installation ID in the preview", () => {
+  const idRow = () => [...document.querySelectorAll("#pane-crash-reports dt")].find((term) => term.textContent === "Installation ID")!.nextElementSibling as HTMLElement;
+  const seePreview = async () => { await settle(); fireEvent.click(pane().getByRole("button", { name: "See what is sent" })); await settle(); };
+
+  test("an app without the method shows the placeholder with its note", async () => {
+    open();
+    await seePreview();
+    expect(idRow()).toHaveTextContent("3f9a1c7e5b2d4086a1e9c0d7b4f25a68");
+    expect(idRow()).toHaveTextContent("A random number, replaced every year.");
+  });
+
+  test("an app that answers null says none is kept", async () => {
+    const installId = vi.fn(async () => null);
+    withApp({ crashReports: { get: async () => "never", set: async () => undefined, installId } }, "never");
+    open("crash-reports", null);
+    await seePreview();
+    expect(installId).toHaveBeenCalled();
+    expect(idRow()).toHaveTextContent("None: it is not created while you choose not to send reports.");
+    expect(idRow()).not.toHaveTextContent("3f9a1c7e");
+  });
+
+  test("an app that answers an id shows it, in monospace", async () => {
+    withApp({ crashReports: { get: async () => "auto", set: async () => undefined, installId: async () => ({ installId: "abcd1234real" }) } });
+    open("crash-reports", null);
+    await seePreview();
+    expect(idRow()).toHaveTextContent(/^abcd1234real$/);
+    expect(idRow().querySelector(".crash-report-id")).not.toBeNull();
+  });
+});
