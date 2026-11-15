@@ -1,0 +1,124 @@
+/* Settings → Crash reports (CrashReportsSettings): the setting and the logs as two rows of one card, each opening a panel
+ * under it; the report's preview; the logs' viewer (LogsViewer, LogFilters); and the room's notices that go with them
+ * (CrashReportsNotice, ServiceFailureNotices). Only what the design system has no piece for lives here. */
+
+/* ----- the rows: a disclosure under the row's words, what it opens under the row, with no rule above it */
+.crash-disclosure { width: fit-content; margin-block-start: var(--sv-space-1); margin-inline-start: calc(-1 * var(--sv-space-3)); }
+.crash-row-panel { grid-column: 1 / -1; min-width: 0; margin-top: var(--sv-space-1); }
+.crash-row .ui-row-control .ui-segmented { max-width: 100%; }
+.crash-tip { margin: var(--sv-space-2) 0 0; }
+
+/* A line that goes with something and asks nothing: an icon and a quiet sentence, no fill, no border (a note the design system
+   has no piece for yet: PtHint with an icon). */
+.logs-note { display: flex; align-items: flex-start; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
+.logs-note > svg { flex: none; margin-top: 2px; color: var(--sv-accent-text); }
+.logs-offline { padding: var(--sv-space-3); border-radius: var(--sv-radius-md); background: var(--sv-bg-subtle); }
+
+/* ----- what a report holds */
+.crash-report { display: grid; gap: var(--sv-space-3); min-width: 0; margin: 0; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); color: var(--sv-text); }
+.crash-report p { margin: 0; }
+.crash-report-example { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+.crash-report-rows { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; margin: 0; font-size: var(--sv-font-md); }
+.crash-report-rows dt { margin-top: var(--sv-space-3); font-size: var(--sv-font-xs); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
+.crash-report-rows dt:first-child { margin-top: 0; }
+.crash-report-rows dd { min-width: 0; margin: 0; overflow-wrap: anywhere; line-height: calc(1.375rem * var(--sv-line-k, 1)); }
+.crash-report pre { max-width: 100%; margin: var(--sv-space-1) 0 0; padding: var(--sv-space-2) var(--sv-space-3); overflow-x: auto; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken);
+  color: var(--sv-text); font: var(--sv-font-xs) / 1.6 var(--sv-font-mono); white-space: pre; }
+.crash-report-never { font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
+.crash-report-never b { color: var(--sv-text); }
+
+/* ----- the logs: the places in a row, the controls, a tall log, its foot */
+.logs-viewer, .logs-panel { display: grid; gap: var(--sv-space-3); min-width: 0; }
+.logs-tabs { margin-inline: calc(-1 * var(--sv-space-1)); }
+.logs-tabs .state-on-icon-dot { border-color: var(--sv-bg); }
+.logs-bar { display: grid; gap: var(--sv-space-2); }
+.logs-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); }
+.logs-search { position: relative; flex: 1 1 14rem; min-width: 0; }
+.logs-search > svg { position: absolute; top: 50%; inset-inline-start: 11px; transform: translateY(-50%); color: var(--sv-text-muted); pointer-events: none; }
+.logs-search .ui-input { padding-inline: 34px 36px; }
+.logs-clear { position: absolute; top: 50%; inset-inline-end: 2px; transform: translateY(-50%); }
+.logs-chips { gap: var(--sv-space-1-5); }
+
+/* A choice that can be on or off, a pill; one that is on says so with a check, not only with its colour. */
+.logs-chip { display: inline-flex; align-items: center; gap: var(--sv-space-1); min-height: 26px; padding: 0 10px; border: 1px solid var(--sv-border-strong); border-radius: var(--sv-radius-pill); background: var(--sv-bg); color: var(--sv-text-muted);
+  font: var(--sv-weight-medium) var(--sv-font-sm) / 1 var(--sv-font-sans); white-space: nowrap; }
+button.logs-chip { cursor: pointer; }
+.logs-chip svg { flex: none; }
+@media (hover: hover) { button.logs-chip:hover { color: var(--sv-text); border-color: var(--sv-text-muted); } }
+.logs-chip:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+button.logs-chip[aria-pressed="true"], .logs-chip--on { border-color: var(--sv-accent); background: var(--sv-accent-soft); color: var(--sv-accent-text); }
+.logs-chip--on { gap: var(--sv-space-1-5); padding-inline-end: 2px; }
+.logs-chip-x.ui-button { width: 22px; min-height: 22px; padding: 0; border-radius: 50%; }
+.logs-chip-n { margin-inline-start: var(--sv-space-1); padding-inline-start: var(--sv-space-1-5); border-inline-start: 1px solid color-mix(in srgb, currentColor 25%, transparent); font-size: var(--sv-font-xs); font-variant-numeric: tabular-nums; opacity: .85; }
+
+/* The filters' popover (the design system's Popover): a head, the level as cards with counts, the pieces as chips with counts,
+   and what is left in sight. */
+.ui-popover.logs-pop { gap: var(--sv-space-4); width: min(22rem, calc(100vw - 24px)); }
+.logs-pop-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); margin-top: calc(-1 * var(--sv-space-1)); }
+.logs-pop-head .ui-button { margin-inline-end: calc(-1 * var(--sv-space-2)); }
+.logs-pop-title { font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); color: var(--sv-text); }
+.logs-pop-group { display: grid; gap: var(--sv-space-2); min-width: 0; }
+.logs-pop-label { font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
+.logs-pop-chips { display: flex; flex-wrap: wrap; gap: var(--sv-space-1-5); }
+.ui-popover .logs-pop-hint, .ui-popover .logs-pop-foot { margin: 0; color: var(--sv-text-muted); }
+.logs-pop-foot { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); font-variant-numeric: tabular-nums; }
+.logs-level-card { display: flex; align-items: center; gap: var(--sv-space-2); width: 100%; min-height: 40px; padding: 0 var(--sv-space-3) 0 var(--sv-space-2); border-radius: var(--sv-radius-md); box-shadow: none;
+  font: var(--sv-weight-medium) var(--sv-font-md) / 1.2 var(--sv-font-sans); color: var(--sv-text); }
+.logs-level-card[data-selected] { box-shadow: inset 0 0 0 1px var(--sv-accent); }
+.logs-level-check { display: grid; place-items: center; flex: none; width: 16px; color: var(--sv-accent-text); }
+.logs-level-name { flex: 1; min-width: 0; text-align: start; }
+.logs-level-count { flex: none; font-size: var(--sv-font-sm); font-variant-numeric: tabular-nums; color: var(--sv-text-muted); }
+.logs-level-card[data-selected] .logs-level-count { color: var(--sv-accent-text); font-weight: var(--sv-weight-semibold); }
+
+/* The log: the chat's way back to the latest floats over it (transcript.css `.latest-jump`, which takes its colours from the
+   transcript's tokens: here too, over the log's own ground). */
+.logs-wrap { position: relative; }
+.logs-viewer .logs-wrap { --tr-panel: var(--sv-bg-subtle); }
+.logview, .logs-status-box { height: 540px; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
+.logview { overflow: auto; overscroll-behavior: contain; padding: var(--sv-space-2) 0; font: var(--sv-font-sm) / 1.55 var(--sv-font-mono); }
+.logview:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.logs-status-box { display: grid; place-content: center; justify-items: center; gap: var(--sv-space-3); margin: 0; padding: var(--sv-space-4); color: var(--sv-text-muted); font-size: var(--sv-font-md); text-align: center; }
+.logs-status-box p { margin: 0; }
+.logs-empty { display: grid; justify-items: center; gap: var(--sv-space-3); margin: 0; padding: var(--sv-space-12) var(--sv-space-4); color: var(--sv-text-muted); font: var(--sv-weight-regular) var(--sv-font-md) / 1.5 var(--sv-font-sans); text-align: center; white-space: normal; }
+.logs-empty p { margin: 0; }
+
+/* A line is the event as the file has it, in monospace: its first line, then its backtrace; only the piece sits outside it. */
+.logs-line { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: var(--sv-space-2); padding: 1px var(--sv-space-3); }
+.logs-line[data-level="WARN"] { background: var(--sv-warning-soft); }
+.logs-line[data-level="ERROR"] { background: var(--sv-danger-soft); }
+.logs-line-text { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.logs-tone-time { color: var(--sv-text-subtle); }
+.logs-tone-level { font-weight: 700; color: var(--sv-text-muted); }
+.logs-line[data-level="WARN"] .logs-tone-level { color: var(--sv-warning); }
+.logs-line[data-level="ERROR"] .logs-tone-level { color: var(--sv-danger); }
+.logs-tone-target { color: var(--sv-accent-text); }
+.logview mark { padding: 0 1px; border-radius: 3px; background: color-mix(in srgb, var(--sv-warning) 35%, transparent); color: inherit; }
+.logs-redacted { padding: 0 4px; border-radius: var(--sv-radius-xs); background: var(--sv-accent-soft); color: var(--sv-accent-text); }
+/* A line's piece, a small pill: its word is the meaning, the shape only helps the eye. */
+.logs-piece { display: inline-block; min-width: 5.7em; margin-top: 2px; padding: 0 6px; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-pill); background: var(--sv-bg); color: var(--sv-text-muted);
+  font: 600 calc(10.5px * var(--sv-text-scale, 1)) / 1.5 var(--sv-font-sans); text-align: center; white-space: nowrap; }
+
+.logs-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sv-space-1) var(--sv-space-3); font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+.logs-count { font-variant-numeric: tabular-nums; }
+.logs-actions { display: flex; align-items: center; gap: var(--sv-space-1); }
+.logs-select { flex: 0 1 11rem; min-width: 0; }
+.logs-status { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+.logs-status:empty { display: none; }
+
+@media (max-width: 767px) {
+  .logs-search { flex: 1 1 10rem; }
+  .logs-foot { align-items: flex-start; }
+  .logs-actions { flex-wrap: wrap; }
+  .logview, .logs-status-box { height: min(64vh, 480px); }
+  /* A phone reads at arm's length (theme.css): a smaller step for a line that is code. */
+  .logview { font-size: var(--sv-font-xs); }
+  .logs-line { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .logs-piece { justify-self: start; margin-top: 3px; }
+}
+
+/* ----- the room's notices: the strip's close button sits at the top of a notice that may be taller than a line, and a link
+   inside a notice's sentence takes the look of the provider key link, inline */
+.crash-notice .ui-alert-action { align-self: start; }
+.crash-link { display: inline; margin: 0; padding: 0; border: 0; background: none; color: var(--sv-accent-text); font: inherit; font-weight: var(--sv-weight-semibold); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.crash-link:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: var(--sv-radius-xs); }
+.service-failure-notices { display: grid; }

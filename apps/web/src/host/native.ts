@@ -1,5 +1,5 @@
 import type {
-  AppBuild, AppUpdater, AppVoice, CallControlsBridge, AudioRouteBridge, CallSurfaceBridge, CueBridge, Host, HostDebugBridge, HostIdentity, HostPresence, HostStorage, LocalHostBridge,
+  AppBuild, AppUpdater, AppVoice, CallControlsBridge, AudioRouteBridge, CallSurfaceBridge, CrashReportsBridge, CueBridge, Host, HostDebugBridge, HostIdentity, HostPresence, HostStorage, LocalHostBridge,
   MediaDuckBridge, MessageOverlay, MicrophoneBridge, MuteShortcutBridge, PairingsStore, ReachTransport, ResetBridge, ScreenBridge, ShortcutsBridge, TextScaleBridge,
 } from "./types";
 
@@ -103,6 +103,7 @@ export function nativeHost(): NativeHost {
     cue: member<CueBridge>(app, "cue", ["start", "stop"]),
     audioRoute: member<AudioRouteBridge>(app, "audioRoute", ["open", "current", "subscribe"]),
     screen: member<ScreenBridge>(app, "screen", ["locked"]),
+    crashReports: member<CrashReportsBridge>(app, "crashReports", ["set"]),
     updater: updater && typeof updater.status === "function" ? updater : null,
     debug: debug && Array.isArray(debug.available) && typeof debug.set === "function" ? debug as HostDebugBridge : null,
   };

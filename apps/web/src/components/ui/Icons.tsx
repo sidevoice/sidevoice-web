@@ -9,7 +9,7 @@ import {
   Download, RotateCcw, Trash2, Activity, Check, CheckCheck, ChevronDown, ChevronUp, Clock3, Copy, Keyboard, KeyRound,
   Monitor, Plus, Plug, RefreshCw, SlidersHorizontal, Wrench, X,
   Box, AudioWaveform, ArrowLeft, ArrowRight, RefreshCcwDot, Pencil, Laptop, Server,
-  Timer, Link, Unlink, Search, ChevronLeft, ChevronRight, Eye, EyeOff, Sparkle, ShieldCheck, PictureInPicture2, Terminal,
+  Timer, Link, Unlink, Search, ChevronLeft, ChevronRight, Eye, EyeOff, Sparkle, ShieldCheck, PictureInPicture2, Terminal, FolderOpen,
 } from "lucide-react";
 import { useId, type ComponentType } from "react";
 // Other products' own marks, from their brand kits (assets/logos/README.md: where each comes from and its rules).
@@ -208,6 +208,12 @@ export const ShortcutsIcon = mark(Keyboard, 16);
 export const PermissionsIcon = mark(ShieldCheck, 16);
 export const IntegrationsIcon = mark(KeyRound, 16);
 export const AdvancedIcon = mark(Wrench, 16);
+/** What Sidevoice does when something fails, and what it writes down while it works (Settings › Crash reports). */
+export const CrashReportsIcon = mark(Activity, 16);
+/** What narrows a list: the logs' filters. */
+export const FiltersIcon = mark(SlidersHorizontal, 16);
+/** Showing a folder in the system's file manager (the logs'). */
+export const FolderIcon = mark(FolderOpen, 16);
 /** Developer options (Settings, in a nightly with developer mode on). */
 export const DeveloperIcon = mark(Terminal, 16);
 

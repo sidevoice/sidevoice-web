@@ -549,6 +549,18 @@ export interface ScreenBridge {
   locked(): Promise<boolean>;
 }
 
+/** What the person chose for crash reports (Settings → Crash reports): send them automatically, the default, or never.
+ *  The choice is the page's, kept on this device (services/crash-reports.ts); the app only does what it says. */
+export type CrashReportsMode = "auto" | "never";
+/** The app's crash reports (Sentry), offered only by an app that sends them: `set` tells it the person's choice, at every
+ *  start of the page and at each change, and is idempotent. The app keeps its own copy, to hold to it before the page has
+ *  loaded, and sends nothing after `never`, queued reports included. A rejection means the app did not take the choice: the
+ *  page then keeps the one it had and says so. A browser sends no crash reports and offers none, so neither the section nor
+ *  the notice about them is there. */
+export interface CrashReportsBridge {
+  set(mode: CrashReportsMode): Promise<void> | void;
+}
+
 export interface Host {
   identity: HostIdentity;
   /** The host's overlay for `language` (a tag: `es`, `zh-Hans`) exactly: nothing from its primary subtag or English, which
@@ -583,4 +595,6 @@ export interface Host {
   screen: ScreenBridge | null;
   updater: AppUpdater | null;
   debug: HostDebugBridge | null;
+  /** Where the page tells the app whether to send crash reports; null where the host sends none (a browser). */
+  crashReports: CrashReportsBridge | null;
 }

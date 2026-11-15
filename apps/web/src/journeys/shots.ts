@@ -3,7 +3,9 @@ import { defaultVoiceSettings } from "../services/voice-settings.js";
 import { WORKING_SHOWN_AFTER_MS } from "../state/room-session-state.js";
 import { emptyOnboardingRecord, type OnboardingRecord, type OnboardingStep } from "../services/onboarding-state";
 import type { PairingSummary } from "../services/device-pairing.js";
-import type { UpdateMode, UpdaterStatus } from "../host";
+import type { CrashReportsMode, UpdateMode, UpdaterStatus } from "../host";
+import type { ServiceFailure } from "../features/crash-reports/service-failures";
+import type { FixtureOptions } from "./log-fixtures";
 import type { AgentReadinessStatus, TrialProgress } from "../state/room-types";
 
 /* Every screen the storyboard shows (journeys.html): each a state of the real app, seeded — the room's facts, the
@@ -34,6 +36,10 @@ export interface Shot {
   shortcuts?: Record<string, unknown>;
   /** The desktop app's floating card settings (CallControlsBridge), where the shot shows them. */
   floatingCard?: boolean;
+  /** An app that sends crash reports (`host.crashReports`), with the choice and the first-run notice's flag it starts with; the
+   *  service failures it has been told of; and the logs the places can be read from (`sample`, with how they behave; none: no
+   *  place can be read, as is the case today). Absent: a browser, which has none of it. */
+  crashReports?: { mode?: CrashReportsMode; noticeSeen?: boolean; failures?: ServiceFailure[]; logs?: { sample: FixtureOptions } | "none" };
   /** A pairing code's redemption, for the pairing shots: its refusal, in the controller's words; the addresses the code
    *  lists (its https one when absent); and an address typed in the machine's address. */
   pairRefusal?: string;
@@ -173,6 +179,35 @@ const TURN_TRIES = {
     return new Promise((_, reject) => setTimeout(() => reject({ code: "trial-cancelled" }), 0));
   } },
 };
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/** Settings at Crash reports, its rows opened as asked (the setting's preview, the logs). */
+const crashReportsOpen = (...open: ("report" | "logs")[]) => async (doc: Document) => {
+  openSettings("crash-reports")(doc);
+  await wait(100);
+  const toggles = doc.querySelectorAll<HTMLElement>(".crash-disclosure");
+  if (open.includes("report")) toggles[0]?.click();
+  if (open.includes("logs")) toggles[1]?.click();
+  // The lines (or what says there are none) drawn: the places are read, not at once on a busy machine.
+  for (let tries = 0; open.includes("logs") && tries < 60 && !doc.querySelector("#pane-crash-reports .logview, #pane-crash-reports .logs-status-box, #pane-crash-reports .logs-offline"); tries++) await wait(50);
+  await wait(150);
+  // The viewer at the top of the page, where the log is to be seen whole.
+  doc.querySelector<HTMLElement>("#pane-crash-reports .logs-viewer")?.scrollIntoView({ block: "start" });
+};
+/** A text typed into a field, as React hears it. */
+const typeInto = (field: HTMLInputElement, value: string) => {
+  Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), "value")!.set!.call(field, value);
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+};
+/** The logs' places: this device, the NUC (answering) and an old laptop (not). */
+const LOG_MACHINES = { pairings: [NUC, LAPTOP], callNode: NUC.fp, machineLinks: { [NUC.fp]: { reach: "ok", via: "node" }, [LAPTOP.fp]: { reach: "away", via: "" } } };
+const APP_RUNNING = { desktop: localBridge(running), facts: { ...LOG_MACHINES, pairings: [THIS, ...LOG_MACHINES.pairings], localHostStatus: running, localHostAvailable: true,
+  machineLinks: { ...LOG_MACHINES.machineLinks, [THIS.fp]: { reach: "ok", via: "node" } } } };
+const SAMPLE_LOGS = { sample: {} };
+const FAILURES: ServiceFailure[] = [
+  { id: "f-1", piece: "connector", machine: null, code: "connector.process_exited", at: new Date(2026, 10, 14, 14, 32, 4).getTime(), version: "0.21.0", exit: { code: 101 } },
+  { id: "f-2", piece: "core", machine: "fp-nuc", code: "core.panic", at: new Date(2026, 10, 14, 14, 32, 51).getTime(), version: "0.9.3", exit: { code: 101 } },
+];
 
 export const JOURNEYS: Journey[] = [
   { id: "first-run", title: "First run", note: "The setup, step by step, on a device that has none yet.", shots: [
@@ -317,6 +352,52 @@ export const JOURNEYS: Journey[] = [
     { id: "s-machine-offline", caption: "Machines: a remote machine that does not answer.", facts: { pairings: [LAPTOP, NUC], callNode: null, machineLinks: { [LAPTOP.fp]: { reach: "away", via: "" }, [NUC.fp]: { reach: "ok", via: "node" } } }, after: openSettings("machines") },
     { id: "s-machine-revoked", caption: "Machines: a machine that no longer knows this device.", facts: { pairings: [{ ...NUC, revoked: true }], callNode: null, machineLinks: { [NUC.fp]: { reach: "revoked", via: "" } } }, after: openSettings("machines") },
     { id: "s-advanced", caption: "Advanced: memory when idle, the downloaded models, reset, the build.", facts: { modelsRemovable: true }, after: openSettings("advanced") },
+  ] },
+  { id: "crash-reports", title: "Crash reports and logs", note: "Where the app sends them (the desktop and mobile apps; a browser sends none): the one setting, what a report holds, the logs of this device and of each machine, the one-line notice once, and a service that failed told as any failure is.", shots: [
+    { id: "cr-section", caption: "Settings › Crash reports: Send automatically (the default) with See what is sent under its words, then Logs with their advice and See logs; both closed.",
+      crashReports: { logs: "none" }, after: openSettings("crash-reports") },
+    { id: "cr-report", caption: "See what is sent, opened: the fields of a report, an example of each, and what is never sent. Opens with no line above it.",
+      crashReports: { logs: "none" }, after: crashReportsOpen("report") },
+    { id: "cr-never", caption: "Don't send chosen: its words say nothing is sent, and the preview stays one press away.", crashReports: { mode: "never", logs: "none" }, after: crashReportsOpen() },
+    { id: "cr-logs", caption: "See logs, opened on this device: its tabs (this device, then each machine), the search and Filters, the lines as the file has them (a panic with its backtrace in full), how many, how many to ask for, Copy and Open folder.",
+      crashReports: { logs: SAMPLE_LOGS }, ...APP_RUNNING, after: crashReportsOpen("logs") },
+    { id: "cr-logs-filters", caption: "Filters: the level as cards with counts, the pieces as chips with counts, what is left in sight; what is on shows under the search as chips that come off.", views: ["desktop"],
+      crashReports: { logs: SAMPLE_LOGS }, ...APP_RUNNING, after: async (doc) => {
+        await crashReportsOpen("logs")(doc);
+        doc.querySelector<HTMLElement>("#pane-crash-reports .logs-row button")?.click();
+        await wait(150);
+        doc.querySelector<HTMLElement>('.logs-pop [role=radio][data-level=warn]')?.click();
+        await wait(50);
+        [...doc.querySelectorAll<HTMLElement>(".logs-pop .logs-chip")].find((chip) => chip.textContent?.startsWith("Connector"))?.click();
+        await wait(150);
+      } },
+    { id: "cr-logs-search-empty", caption: "A search nothing matches: the log says so, and Clear filters brings the lines back.", views: ["desktop"],
+      crashReports: { logs: SAMPLE_LOGS }, ...APP_RUNNING, after: async (doc) => {
+        await crashReportsOpen("logs")(doc);
+        typeInto(doc.querySelector<HTMLInputElement>("#pane-crash-reports [role=searchbox]")!, "no such text");
+        await wait(250);
+      } },
+    { id: "cr-logs-away", caption: "Scrolled up from the end: the log keeps its place, and the chat's way back to the latest floats over it, with a dot once new lines have come.", views: ["desktop"],
+      crashReports: { logs: { sample: { liveEveryMs: 300 } } }, ...APP_RUNNING, after: async (doc) => {
+        await crashReportsOpen("logs")(doc);
+        const log = doc.querySelector<HTMLElement>("#pane-crash-reports .logview");
+        if (log) { log.scrollTop = Math.max(0, log.scrollHeight / 2); log.dispatchEvent(new Event("scroll")); }
+        await wait(1000);
+      } },
+    { id: "cr-logs-offline", caption: "A machine that is not connected: its tab says so and its logs will show when it connects again (the app keeps none of them).", views: ["desktop"],
+      crashReports: { logs: SAMPLE_LOGS }, ...APP_RUNNING, after: async (doc) => {
+        await crashReportsOpen("logs")(doc);
+        [...doc.querySelectorAll<HTMLElement>("#pane-crash-reports [role=tab]")].find((tab) => tab.textContent?.includes("Old laptop"))?.click();
+        await wait(150);
+      } },
+    { id: "cr-logs-unavailable", caption: "Where no log can be read from yet (today: the app and the machines serve no lines), the tab says so.", views: ["desktop"],
+      crashReports: { logs: "none" }, ...APP_RUNNING, after: crashReportsOpen("logs") },
+    { id: "cr-logs-loading", caption: "A place being read: the box keeps its size and says so, so nothing moves when the lines arrive.", views: ["desktop"],
+      crashReports: { logs: { sample: { delayMs: 2 ** 31 - 1 } } }, ...APP_RUNNING, after: crashReportsOpen("logs") },
+    { id: "cr-notice", caption: "The first-run notice, once after the setup (and once on a device that updates): one line under the header, a link to the setting and a ×; it asks nothing and blocks nothing.",
+      crashReports: { noticeSeen: false } },
+    { id: "cr-failure", caption: "A connector or a core that failed and restarted, told as the app tells a failure: the danger strip, its facts behind Details (code, time, version, how it ended), and a × to put it away.",
+      crashReports: { failures: FAILURES }, after: (doc) => { doc.querySelector<HTMLElement>(".service-failure-notices summary")?.click(); } },
   ] },
   { id: "updates", title: "Updates and what's new", note: "What wants updating, said over the room without moving it; what a release added, shown once, never the setup again.", shots: [
     { id: "u-web", caption: "A new version of the page while in a call: Reload loads it at once, in the call or not.", facts: { webUpdate: "b2" } },

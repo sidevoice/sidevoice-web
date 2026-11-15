@@ -16,6 +16,8 @@ import { PairingDialog } from "../features/pairing/PairingDialog";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { NoMachineScreen } from "../features/pairing/NoMachineScreen";
 import { LocalHostBanner } from "../features/settings/LocalHostBanner";
+import { CrashReportsNotice } from "../features/crash-reports/CrashReportsNotice";
+import { ServiceFailureNotices } from "../features/crash-reports/ServiceFailureNotices";
 import { StorageBlockedBanner } from "../features/settings/StorageBlockedBanner";
 import { OnboardingProvider, useOnboarding } from "../features/onboarding/onboarding-context";
 import { Wizard } from "../features/onboarding/Wizard";
@@ -82,6 +84,8 @@ function RoomContent() {
       <div className="room-shell" hidden={roomHidden} aria-hidden={roomHidden || undefined}>
         <RoomHeader blocked={blocked} />
         <LocalHostBanner />
+        <ServiceFailureNotices />
+        <CrashReportsNotice />
         {/* The call: the conversations, the stage over its bar, and the transcript when it is open (2026-10-10). One layout
             whatever is set up (operator, 2026-10-16): the conversations' column and Settings always; only the call's own
             space says what is missing — what is missing — one at a time. */}
