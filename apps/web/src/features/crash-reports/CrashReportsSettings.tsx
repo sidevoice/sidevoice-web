@@ -3,8 +3,8 @@ import { DisclosureButton } from "../../components/ui/DisclosureButton";
 import { Group, Section } from "../../components/ui/Card";
 import { CheckIcon, InfoIcon } from "../../components/ui/Icons";
 import { Segmented } from "../../components/ui/Tabs";
-import { host, type CrashReportsMode } from "../../host";
-import { chooseCrashReports, useCrashReports } from "../../services/crash-reports";
+import type { CrashReportsMode } from "../../host";
+import { chooseCrashReports, useCrashReports, useCrashReportsOffered } from "../../services/crash-reports";
 import type { Translate } from "../../i18n/translator";
 import { RoomStoreContext } from "../../state/room-store";
 import { LogsViewer } from "./LogsViewer";
@@ -17,10 +17,11 @@ import "./crash-reports.css";
  * panel ("See logs"), with the line of advice for when something does not work. Each opens like the agents' "I'll do it
  * myself": a ghost button under the row's words, its panel under the row with no rule above it.
  *
- * Only where the app sends crash reports (it offers `host().crashReports`): a browser sends none, so offers no choice. */
+ * Only where the app sends crash reports (it offers `host().crashReports`, possibly after the page loaded): a browser sends
+ * none, so offers no choice. The setting is the app's: this shows what the app says, and none is claimed until it has said. */
 
 export function useCrashReportsSection(): boolean {
-  return host().crashReports !== null;
+  return useCrashReportsOffered();
 }
 
 /** A row of a group whose words carry a disclosure (the agents' DisclosureButton), and what it opens below the row's whole
@@ -46,6 +47,7 @@ function DisclosureRow({ label, description, note, toggle, open, onToggle, panel
 export function CrashReportsSettings({ t }: { t: Translate }) {
   const store = useContext(RoomStoreContext);
   const { mode } = useCrashReports();
+  const known = mode !== null;
   const [open, setOpen] = useState({ report: false, logs: false });
   const [saved, setSaved] = useState<CrashReportsMode | null>(null);
   useEffect(() => {
@@ -64,10 +66,10 @@ export function CrashReportsSettings({ t }: { t: Translate }) {
     <Section id="crash-reports" title={t("settings.section.crashReports")} description={t("crashReports.description")}
       actions={<span className="settings-saved" role="status">{saved && <><CheckIcon size={14} />{t("settings.saved")}<span className="sr-only">. {t(`crashReports.saved.${saved}`)}</span></>}</span>}>
       <Group>
-        <DisclosureRow label={t("crashReports.label")} description={t(`crashReports.mode.${mode}.hint`)}
+        <DisclosureRow label={t("crashReports.label")} description={mode ? t(`crashReports.mode.${mode}.hint`) : ""}
           toggle={t("crashReports.report.toggle")} open={open.report} onToggle={() => setOpen((value) => ({ ...value, report: !value.report }))}
-          control={<Segmented size="sm" label={t("crashReports.label")} value={mode} onChange={(next) => void choose(next)}
-            items={[{ value: "auto", label: t("crashReports.mode.auto") }, { value: "never", label: t("crashReports.mode.never") }]} />}
+          control={<Segmented<CrashReportsMode | ""> size="sm" label={t("crashReports.label")} value={mode ?? ""} onChange={(next) => { if (next) void choose(next); }}
+            items={[{ value: "auto", label: t("crashReports.mode.auto"), disabled: !known }, { value: "never", label: t("crashReports.mode.never"), disabled: !known }]} />}
           panel={<ReportPreview t={t} />} />
         <DisclosureRow block label={t("logs.label")} description={t("logs.description")}
           note={<p className="logs-note crash-tip"><InfoIcon size={16} /><span>{t("crashReports.tip")}</span></p>}

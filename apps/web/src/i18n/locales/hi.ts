@@ -1581,4 +1581,5 @@ export const messages: Messages = {
   "serviceFailure.detail.version": "वर्शन",
   "serviceFailure.detail.exit": "प्रोसेस समाप्ति",
   "serviceFailure.exitCode": "कोड {code}",
+  "serviceFailure.repeat": "×{n}",
 };

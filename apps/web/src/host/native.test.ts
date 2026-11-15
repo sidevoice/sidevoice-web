@@ -207,7 +207,7 @@ describe("the members an app calls through", () => {
       audioRoute: { open: async () => {}, current: async () => null },
       screen: {},
       updater: { cancel: async () => {} },
-      crashReports: {},
+      crashReports: { set: async () => {} },
     });
     expect(host().screen).toBeNull();
     expect(host().localHost).toBeNull();
@@ -229,7 +229,7 @@ describe("the members an app calls through", () => {
     const cue = { start() {}, stop() {} };
     const audioRoute = { open: async () => {}, current: async () => null, subscribe: () => () => {} };
     const screen = { locked: async () => false };
-    const crashReports = { set: async () => {} };
+    const crashReports = { get: async () => "auto", set: async () => {}, subscribe: () => () => {} };
     withHost({ localHost, muteShortcut, callControls, callSurface, cue, audioRoute, screen, updater, crashReports });
     expect(host().screen).toBe(screen);
     expect(host().callSurface).toBe(callSurface);

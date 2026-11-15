@@ -1599,7 +1599,7 @@ export const messages: Messages = {
   "logs.folder.failed": "No se pudo abrir la carpeta.",
   "logs.redacted": "Los registros se redactan en su origen: los tokens, las claves, los códigos de emparejamiento y el contenido de tus conversaciones no llegan a escribirse.",
   "crashReports.notice": "Sidevoice envía informes de fallos para ayudarnos a arreglar errores. Puedes desactivarlo en {settings}.",
-  "crashReports.notice.settings": "Ajustes",
+  "crashReports.notice.settings": "Configuración",
   "crashReports.notice.close": "Cerrar aviso",
   "serviceFailure.connector.here": "El conector de este dispositivo falló y se reinició",
   "serviceFailure.core.here": "El núcleo de este dispositivo falló y se reinició",
@@ -1610,4 +1610,5 @@ export const messages: Messages = {
   "serviceFailure.detail.version": "Versión",
   "serviceFailure.detail.exit": "Salida del proceso",
   "serviceFailure.exitCode": "código {code}",
+  "serviceFailure.repeat": "×{n}",
 };

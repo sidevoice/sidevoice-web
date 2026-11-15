@@ -83,10 +83,13 @@ function renderShot(shot: Shot) {
   }
   if (shot.crashReports) {
     const { mode = "auto", noticeSeen = true, failures = [], logs } = shot.crashReports;
-    installApp({ ...installedMembers(), crashReports: { set: later } });
-    // The choice, and whether the notice was put away, are this frame's own, kept in memory (the frames share one storage):
-    // what is changed in a frame stays in it, and shows in it.
-    let stored = JSON.stringify({ mode, noticeSeen });
+    // The mode is the app's, held here in memory as an app holds it: a change made in the frame stays in it and shows in it.
+    let held = mode;
+    installApp({ ...installedMembers(), crashReports: { get: async () => held, set: async (next: typeof mode) => { held = next; } },
+      // An app says its build: the report's preview names the version it runs.
+      build: { channel: "release", version: "0.33.1" } });
+    // Whether the notice was put away is the page's, and this frame's own, kept in memory too (the frames share one storage).
+    let stored = JSON.stringify({ noticeSeen });
     const read = Storage.prototype.getItem;
     const write = Storage.prototype.setItem;
     Storage.prototype.getItem = function (key: string) { return this === localStorage && key === CRASH_REPORTS_KEY ? stored : read.call(this, key); };

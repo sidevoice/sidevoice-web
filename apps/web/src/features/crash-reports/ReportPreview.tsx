@@ -1,8 +1,11 @@
+import { host, type AppBuild } from "../../host";
 import { translator, type Translate } from "../../i18n/translator";
 
 /* "See what is sent": the fields a crash report holds, in the order it holds them, as one report reads. The values are an
  * example: this page cannot know the system the app runs on (the host answers no `os`) nor a failure that has not happened, so
- * what it shows is a report's shape with plausible content, and says so in its first line. The report itself is the app's. */
+ * what it shows is a report's shape with plausible content, and says so in its first line. The version is the one thing it does
+ * know: the app's own build, as the host says it (`host().identity.build`); an app that says none shows the product's name alone,
+ * never a number made up. The report itself is the app's. */
 
 const EXAMPLE_TRACE = [
   "called `Option::unwrap()` on a `None` value",
@@ -27,12 +30,20 @@ function Block({ text, more }: { text: string; more?: string }) {
   return <pre translate="no">{more ? text + "\n" + more : text}</pre>;
 }
 
+/** The build as a report names it: "Sidevoice 0.33.1", and a nightly or a development build says so, with its day. */
+export function versionOf(build: AppBuild | null): string {
+  if (!build?.version) return "Sidevoice";
+  const day = /^\d{4}-\d{2}-\d{2}/.exec(build.date ?? "")?.[0];
+  const kind = build.channel === "nightly" || build.channel === "dev" ? [build.channel, day].filter(Boolean).join(" ") : "";
+  return `Sidevoice ${build.version}${kind ? ` (${kind})` : ""}`;
+}
+
 export function ReportPreview({ t = translator() }: { t?: Translate }) {
   return (
     <div className="crash-report">
       <p className="crash-report-example">{t("crashReports.report.example")}</p>
       <dl className="crash-report-rows">
-        <dt>{t("crashReports.report.version")}</dt><dd>Sidevoice 0.21.0 (nightly 2026-11-14)</dd>
+        <dt>{t("crashReports.report.version")}</dt><dd translate="no">{versionOf(host().identity.build)}</dd>
         <dt>{t("crashReports.report.system")}</dt><dd>macOS 15.1 · arm64</dd>
         <dt>{t("crashReports.report.code")}</dt><dd translate="no">desktop.panic</dd>
         <dt>{t("crashReports.report.trace")}</dt><dd><Block text={EXAMPLE_TRACE} /></dd>

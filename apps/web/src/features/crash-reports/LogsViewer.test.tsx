@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, onTestFinished, test, vi } from "vitest";
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { LogsViewer } from "./LogsViewer";
-import { installLogSources } from "./log-sources";
-import { LAPTOP, NUC, THIS, event, renderInRoom, roomWith, serving, withApp } from "./crash-reports.test-util";
+import { LogCursorExpired, installLogSources, type LogBatch } from "./log-sources";
+import { LAPTOP, NUC, THIS, event, realTimeout, renderInRoom, roomWith, serving, withApp } from "./crash-reports.test-util";
 import { removeApp } from "../../host/testing";
 
 /* The logs' viewer: a tab per place, the lines as the file has them, the filters, the end followed, Copy. */
@@ -44,7 +44,7 @@ describe("the places", () => {
     expect(tab).toHaveTextContent("Old laptop (Offline)");
     fireEvent.click(tab);
     expect(screen.getByText("Old laptop is not connected.")).toBeInTheDocument();
-    expect(screen.getByText(/Its logs will show when it connects again\./)).toBeInTheDocument();
+    expect(screen.getByText(/Its logs will appear when it reconnects\./)).toBeInTheDocument();
     expect(lines()).toHaveLength(0);
     // Nothing was asked of a machine that cannot answer: the app keeps no copy of its logs.
     expect(served.reads).toEqual([{ kind: "device" }]);
@@ -83,20 +83,20 @@ describe("the places", () => {
 describe("reading", () => {
   test("shows a box that says it is reading while the lines come, the same size they will fill", async () => {
     withApp();
-    let release!: (events: typeof LINES) => void;
+    let release!: (batch: LogBatch) => void;
     installLogSources({ open: () => ({ tail: () => new Promise((resolve) => { release = resolve; }) }) });
     renderInRoom(<LogsViewer />, roomWith([[THIS, "ok"]]));
     await settle();
     expect(document.querySelector(".logs-status-box")).toHaveTextContent("Reading the log…");
     expect(document.querySelector(".logs-status-box")).toHaveAttribute("role", "status");
     expect(screen.queryByRole("searchbox")).toBeNull();
-    await act(async () => { release(LINES); });
+    await act(async () => { release({ lines: LINES, cursor: "0" }); });
     expect(lines()).toHaveLength(4);
   });
 
   test("a read that fails says so and can be tried again", async () => {
     withApp();
-    const tail = vi.fn().mockRejectedValueOnce(new Error("down")).mockResolvedValue(LINES);
+    const tail = vi.fn().mockRejectedValueOnce(new Error("down")).mockResolvedValue({ lines: LINES, cursor: "0" });
     installLogSources({ open: () => ({ tail }) });
     renderInRoom(<LogsViewer />, roomWith([[THIS, "ok"]]));
     await settle();
@@ -126,7 +126,7 @@ describe("reading", () => {
 
   test("the box is a labelled region the keyboard can enter", async () => {
     await open();
-    expect(screen.getByRole("region", { name: "Log lines of This device" })).toHaveAttribute("tabindex", "0");
+    expect(screen.getByRole("region", { name: "Log lines from This device" })).toHaveAttribute("tabindex", "0");
   });
 });
 
@@ -153,7 +153,7 @@ describe("the search and the filters", () => {
     await open();
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "no such text" } });
     await settle();
-    expect(screen.getByText("No line matches what you are looking for.")).toBeInTheDocument();
+    expect(screen.getByText("No lines match your search.")).toBeInTheDocument();
     fireEvent.click(within(log()).getByRole("button", { name: "Clear filters" }));
     await settle();
     expect(lines()).toHaveLength(4);
@@ -219,7 +219,7 @@ describe("the search and the filters", () => {
     await open([LINES[0], LINES[1]]);
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     const popover = await screen.findByRole("dialog", { name: "Log filters" });
-    expect(within(popover).queryByText("Pieces")).toBeNull();
+    expect(within(popover).queryByText("Components")).toBeNull();
   });
 
   test("how many lines is a cut of what was read: choosing asks nothing of the place", async () => {
@@ -310,8 +310,97 @@ describe("following the end", () => {
   });
 });
 
+describe("from the read to the follow", () => {
+  const first = LINES.slice(0, 2);
+
+  test("the follow starts where the read ended: what was written between the two is told once, before what comes after", async () => {
+    // A source whose log grows between its read and the viewer's follow: the cursor is what makes the gap whole.
+    withApp();
+    const gap = event("g", "app", "14:32:08.000  INFO audio: written between");
+    const next = event("n", "app", "14:32:12.000  INFO audio: written after");
+    const follow = vi.fn((_: { sinceCursor: string }, onLines: (batch: LogBatch) => void) => { onLines({ lines: [gap], cursor: "c2" }); return () => undefined; });
+    installLogSources({ open: () => ({ tail: async () => ({ lines: first, cursor: "c1" }), follow }) });
+    renderInRoom(<LogsViewer />, roomWith([[THIS, "ok"]]));
+    await settle();
+    expect(follow.mock.calls[0][0]).toEqual({ sinceCursor: "c1" });
+    expect(lines().map((line) => line.querySelector(".logs-line-text")!.textContent)).toEqual([...first, gap].map((line) => line.text));
+    await act(async () => { follow.mock.calls[0][1]({ lines: [next], cursor: "c3" }); });
+    await settle();
+    expect(lines().map((line) => line.querySelector(".logs-line-text")!.textContent)).toEqual([...first, gap, next].map((line) => line.text));
+  });
+
+  describe("when the follow breaks", () => {
+    afterEach(() => { vi.useRealTimers(); });
+    const tick = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); await new Promise((resolve) => realTimeout(resolve, 30)); });
+    const fakeClock = () => vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const texts = () => lines().map((line) => line.querySelector(".logs-line-text")!.textContent);
+
+    test("it is taken up again from the last cursor it had, and what was written meanwhile comes once", async () => {
+      fakeClock();
+      withApp();
+      const served = serving(first);
+      renderInRoom(<LogsViewer />, roomWith([[THIS, "ok"]]));
+      await tick(0);
+      const live = event("l", "app", "14:32:09.000  INFO audio: live");
+      await served.push(live);
+      await served.fail();
+      const missed = event("m", "app", "14:32:10.000  INFO audio: written while it was down");
+      served.write(missed);
+      expect(served.followers.size).toBe(0);
+      await tick(1000);
+      expect(served.follows.map((follow) => follow.sinceCursor)).toEqual(["0", "1"]);
+      expect(texts()).toEqual([...first, live, missed].map((line) => line.text));
+      expect(screen.queryByText("The log could not be read.")).toBeNull();
+    });
+
+    test("after a few tries the log is said to have stopped, and Retry reads it again", async () => {
+      fakeClock();
+      withApp();
+      const served = serving(first);
+      renderInRoom(<LogsViewer />, roomWith([[THIS, "ok"]]));
+      await tick(0);
+      // Each try is followed by another break, a little later each time; the last one is not tried again.
+      for (const wait of [1000, 3000, 9000]) { await served.fail(); await tick(wait); }
+      await served.fail();
+      expect(served.follows).toHaveLength(4);
+      const stalled = screen.getByText("The log could not be read.");
+      expect(stalled.closest("[role=status]")).not.toBeNull();
+      expect(lines()).toHaveLength(2);
+      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+      await tick(0);
+      expect(served.reads).toHaveLength(2);
+      expect(screen.queryByText("The log could not be read.")).toBeNull();
+    });
+
+    test("a cursor the log no longer holds means reading the log again, not following from it", async () => {
+      fakeClock();
+      withApp();
+      const served = serving(first);
+      renderInRoom(<LogsViewer />, roomWith([[THIS, "ok"]]));
+      await tick(0);
+      await served.fail(new LogCursorExpired());
+      await tick(0);
+      expect(served.reads).toHaveLength(2);
+      expect(lines()).toHaveLength(2);
+    });
+
+    test("a log that ended is not followed again", async () => {
+      fakeClock();
+      withApp();
+      const served = serving(first);
+      renderInRoom(<LogsViewer />, roomWith([[THIS, "ok"]]));
+      await tick(0);
+      await served.end();
+      await tick(20000);
+      expect(served.follows).toHaveLength(1);
+      expect(lines()).toHaveLength(2);
+      expect(screen.queryByText("The log could not be read.")).toBeNull();
+    });
+  });
+});
+
 describe("copying and the folder", () => {
-  test("Copy puts the lines in view on the clipboard as the file has them, and says how many", async () => {
+  test("Copy puts the lines in view on the clipboard as the file has them, each led by its piece, and says how many", async () => {
     await open();
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
@@ -320,9 +409,24 @@ describe("copying and the folder", () => {
     await settle();
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
     await settle();
-    expect(writeText).toHaveBeenCalledWith(WARN.text);
+    expect(writeText).toHaveBeenCalledWith("[app] " + WARN.text);
     expect(screen.getByRole("button", { name: "Copied" })).toBeInTheDocument();
     expect(screen.getAllByRole("status").some((status) => status.textContent === "Copied 1 line.")).toBe(true);
+  });
+
+  test("every line carries its piece, a backtrace stays under its first line, and the piece is said as the language names it", async () => {
+    localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
+    onTestFinished(() => localStorage.removeItem("sidevoice.settings"));
+    await open();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    onTestFinished(() => { delete (navigator as { clipboard?: unknown }).clipboard; });
+    fireEvent.click(screen.getByRole("button", { name: "Copiar" }));
+    await settle();
+    const copied = String(writeText.mock.calls[0][0]);
+    expect(copied.split("\n").filter((line) => /^\[/.test(line)).map((line) => line.slice(0, line.indexOf("]") + 1))).toEqual(["[app]", "[app]", "[conector]", "[núcleo]"]);
+    expect(copied).toContain("[núcleo] " + LINES[3].text);
+    expect(copied.endsWith("at ./rust/room/mixer.rs:97:13")).toBe(true);
   });
 
   test("with nothing in view there is nothing to copy, and it says so", async () => {

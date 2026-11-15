@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { RoomProvider } from "../../app/RoomProvider";
 import { OnboardingProvider } from "../onboarding/onboarding-context";
 import { createOnboardingRepository } from "../../services/onboarding-state";
-import { CRASH_REPORTS_KEY, readCrashReports, writeCrashReports } from "../../services/crash-reports";
+import { CRASH_REPORTS_KEY, markCrashReportsNoticeSeen, resetCrashReportsNotice } from "../../services/crash-reports";
 import { removeApp } from "../../host/testing";
 import { createRoomStore } from "../../state/room-store";
 import { CrashReportsNotice } from "./CrashReportsNotice";
@@ -11,7 +11,8 @@ import { withApp } from "./crash-reports.test-util";
 
 /* The first-run notice: one line, once, after the setup — also for a device that updates — asking and blocking nothing. */
 
-afterEach(() => { cleanup(); removeApp(); localStorage.removeItem(CRASH_REPORTS_KEY); localStorage.removeItem("sidevoice.settings"); });
+afterEach(() => { cleanup(); resetCrashReportsNotice(); removeApp(); localStorage.removeItem("sidevoice.settings"); });
+const storedSeen = () => (JSON.parse(localStorage.getItem(CRASH_REPORTS_KEY) ?? "{}") as { noticeSeen?: boolean }).noticeSeen === true;
 
 const settle = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)); });
 const memory = () => { const kept = new Map<string, string>(); return { getItem: (key: string) => kept.get(key) ?? null, setItem: (key: string, value: string) => void kept.set(key, value) }; };
@@ -25,14 +26,16 @@ async function show({ setUp = true } = {}) {
   await settle();
   return { store, patch };
 }
-const notice = () => document.querySelector<HTMLElement>(".crash-reports-notice");
+/** The live region, in the page whether or not there is anything to say; and the notice in it. */
+const region = () => document.querySelector<HTMLElement>(".crash-reports-notice");
+const notice = () => region()?.querySelector<HTMLElement>(".crash-notice") ?? null;
 
 describe("when it shows", () => {
   test("once the setup is done, on a device whose app sends crash reports: its sentence, a link to Settings and a ×", async () => {
     withApp();
     await show();
     expect(notice()).not.toBeNull();
-    expect(notice()).toHaveAttribute("role", "status");
+    expect(region()).toHaveAttribute("role", "status");
     expect(notice()).toHaveTextContent("Sidevoice sends crash reports to help us fix errors. You can turn it off in Settings.");
     expect(within(notice()!).getByRole("button", { name: "Settings" })).toBeInTheDocument();
     expect(within(notice()!).getByRole("button", { name: "Close notice" })).toBeInTheDocument();
@@ -60,17 +63,59 @@ describe("when it shows", () => {
   });
 
   test("not to someone who has already chosen not to send", async () => {
-    withApp();
-    writeCrashReports({ mode: "never" });
+    withApp({}, "never");
     await show();
+    expect(notice()).toBeNull();
+  });
+
+  test("nor to a page that lost its storage while the app holds Don't send: the mode is the app's, so the notice never says it sends", async () => {
+    localStorage.clear();
+    withApp({}, "never");
+    await show();
+    expect(notice()).toBeNull();
+  });
+
+  test("not before the app has said which it is: it is not claimed to send, and then it says so", async () => {
+    let answer!: (mode: "auto" | "never") => void;
+    withApp({ crashReports: { get: () => new Promise((resolve) => { answer = resolve; }), set: async () => undefined } });
+    await show();
+    expect(notice()).toBeNull();
+    await act(async () => { answer("auto"); });
+    expect(notice()).not.toBeNull();
+  });
+
+  test("goes when the app's own setting turns sending off", async () => {
+    const app = withApp();
+    await show();
+    expect(notice()).not.toBeNull();
+    await act(async () => { app.change("never"); });
     expect(notice()).toBeNull();
   });
 
   test("not again once it was put away", async () => {
     withApp();
-    writeCrashReports({ noticeSeen: true });
+    markCrashReportsNoticeSeen();
     await show();
     expect(notice()).toBeNull();
+  });
+});
+
+describe("being read out", () => {
+  test("its region is in the page before its words, and the words go into that same region", async () => {
+    let answer!: (mode: "auto" | "never") => void;
+    withApp({ crashReports: { get: () => new Promise((resolve) => { answer = resolve; }), set: async () => undefined } });
+    await show();
+    const before = region()!;
+    expect(before).toHaveAttribute("role", "status");
+    expect(before).toBeEmptyDOMElement();
+    await act(async () => { answer("auto"); });
+    expect(region()).toBe(before);
+    expect(before).toHaveTextContent("Sidevoice sends crash reports");
+  });
+
+  test("in a browser the region is there too, empty: nothing is said", async () => {
+    await show();
+    expect(region()).toBeEmptyDOMElement();
   });
 });
 
@@ -80,7 +125,7 @@ describe("putting it away", () => {
     await show();
     fireEvent.click(screen.getByRole("button", { name: "Close notice" }));
     expect(notice()).toBeNull();
-    expect(readCrashReports()).toEqual({ mode: "auto", noticeSeen: true });
+    expect(storedSeen()).toBe(true);
     cleanup();
     await show();
     expect(notice()).toBeNull();
@@ -99,7 +144,7 @@ describe("putting it away", () => {
     expect(opened).toHaveBeenCalledTimes(1);
     expect(patch).toHaveBeenCalledWith(expect.objectContaining({ settingsSection: "crash-reports", settingsLevel: "page" }));
     expect(notice()).toBeNull();
-    expect(readCrashReports().noticeSeen).toBe(true);
+    expect(storedSeen()).toBe(true);
   });
 });
 
@@ -107,8 +152,8 @@ test("in Spanish, as the design words it, the link in the middle of its sentence
   localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
   withApp();
   await show();
-  expect(notice()).toHaveTextContent("Sidevoice envía informes de fallos para ayudarnos a arreglar errores. Puedes desactivarlo en Ajustes.");
-  expect(within(notice()!).getByRole("button", { name: "Ajustes" })).toBeInTheDocument();
+  expect(notice()).toHaveTextContent("Sidevoice envía informes de fallos para ayudarnos a arreglar errores. Puedes desactivarlo en Configuración.");
+  expect(within(notice()!).getByRole("button", { name: "Configuración" })).toBeInTheDocument();
   expect(within(notice()!).getByRole("button", { name: "Cerrar aviso" })).toBeInTheDocument();
 });
 

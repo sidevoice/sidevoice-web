@@ -1589,4 +1589,5 @@ export const messages: Messages = {
   "serviceFailure.detail.version": "Version",
   "serviceFailure.detail.exit": "Fin du processus",
   "serviceFailure.exitCode": "code {code}",
+  "serviceFailure.repeat": "×{n}",
 };

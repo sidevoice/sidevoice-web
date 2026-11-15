@@ -19,7 +19,6 @@ import { startMotion } from "./lib/motion";
 import { startTextScale } from "./lib/text-scale";
 import { forgetVariant } from "./lib/variants";
 import { applyViewport, host } from "./host";
-import { startCrashReports } from "./services/crash-reports";
 
 // Uncaught errors are reported to the room before anything else is loaded: the controller owns the
 // socket, so until it exists the reports wait here.
@@ -44,8 +43,6 @@ startPageTheme();
 startMotion();
 // The phone's text size, which the type tokens follow (lib/text-scale.ts).
 startTextScale();
-// What the person chose for crash reports, told to the app that sends them (services/crash-reports.ts).
-startCrashReports();
 
 const root = createRoot(document.getElementById("root")!);
 

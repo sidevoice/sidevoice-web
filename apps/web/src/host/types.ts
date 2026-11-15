@@ -549,16 +549,24 @@ export interface ScreenBridge {
   locked(): Promise<boolean>;
 }
 
-/** What the person chose for crash reports (Settings → Crash reports): send them automatically, the default, or never.
- *  The choice is the page's, kept on this device (services/crash-reports.ts); the app only does what it says. */
+/** What happens when something fails (Settings → Crash reports): send a crash report automatically, the default, or never. */
 export type CrashReportsMode = "auto" | "never";
-/** The app's crash reports (Sentry), offered only by an app that sends them: `set` tells it the person's choice, at every
- *  start of the page and at each change, and is idempotent. The app keeps its own copy, to hold to it before the page has
- *  loaded, and sends nothing after `never`, queued reports included. A rejection means the app did not take the choice: the
- *  page then keeps the one it had and says so. A browser sends no crash reports and offers none, so neither the section nor
- *  the notice about them is there. */
+/** The app's crash reports (Sentry), offered only by an app that sends them. The setting is the app's, not the page's: the app
+ *  keeps the choice, holds to it before any page has loaded and sends nothing after `never`, queued reports included; the page
+ *  keeps no copy and never tells the app a value it did not just get from the person (a page that lost its own storage must
+ *  not turn sending back on).
+ *  - `get` is what the app holds now (`auto` until the person says otherwise); the page reads it whenever Settings or the
+ *    notice shows, and shows only what it answers.
+ *  - `set` is the person's choice, idempotent; a rejection means the app did not take it: the page puts the choice back as it
+ *    was and says so.
+ *  - `subscribe`, where the choice can change elsewhere (the app's own menu), is told each new mode as it changes (nothing on
+ *    subscribing) and returns the unsubscribe; without it the page reads again each time Settings or the notice mounts.
+ *  A browser sends no crash reports and offers none, so neither the section nor the notice about them is there. An app may
+ *  offer it only after a reply of its own: the page looks again for a while (`onHostMember("crashReports", …)`). */
 export interface CrashReportsBridge {
-  set(mode: CrashReportsMode): Promise<void> | void;
+  get(): Promise<CrashReportsMode> | CrashReportsMode;
+  set(mode: CrashReportsMode): Promise<void>;
+  subscribe?(listener: (mode: CrashReportsMode) => void): () => void;
 }
 
 export interface Host {
@@ -595,6 +603,6 @@ export interface Host {
   screen: ScreenBridge | null;
   updater: AppUpdater | null;
   debug: HostDebugBridge | null;
-  /** Where the page tells the app whether to send crash reports; null where the host sends none (a browser). */
+  /** The app's crash reports setting (the app owns it); null where the host sends none (a browser). */
   crashReports: CrashReportsBridge | null;
 }

@@ -103,7 +103,7 @@ export function nativeHost(): NativeHost {
     cue: member<CueBridge>(app, "cue", ["start", "stop"]),
     audioRoute: member<AudioRouteBridge>(app, "audioRoute", ["open", "current", "subscribe"]),
     screen: member<ScreenBridge>(app, "screen", ["locked"]),
-    crashReports: member<CrashReportsBridge>(app, "crashReports", ["set"]),
+    crashReports: member<CrashReportsBridge>(app, "crashReports", ["get", "set"]),
     updater: updater && typeof updater.status === "function" ? updater : null,
     debug: debug && Array.isArray(debug.available) && typeof debug.set === "function" ? debug as HostDebugBridge : null,
   };

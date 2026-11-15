@@ -1,5 +1,5 @@
 import type { LogEvent, LogPiece } from "../features/crash-reports/log-model";
-import type { LogPlace, LogSource, LogSources } from "../features/crash-reports/log-sources";
+import type { LogBatch, LogPlace, LogSource, LogSources } from "../features/crash-reports/log-sources";
 
 /* Sample logs for the storyboard and the tests of the logs' viewer: events as a log file has them (time, level, target, a
  * sentence for a person, fields), a panic with its backtrace in full, and an error with many fields. Seeded, so a place reads
@@ -95,24 +95,32 @@ export interface FixtureOptions {
   delayMs?: number;
 }
 
-/** Sources for every place, as `installLogSources` takes them. `push` adds a line to the places being followed, as a test or a shot does. */
+/** Sources for every place, as `installLogSources` takes them, and honouring their contract (log-sources.ts): the cursor of a read is
+ *  how many live lines it holds, and a follow from a cursor is told first the live lines written since, then each new one.
+ *  `push` adds a line to the places being followed, as a test or a shot does. */
 export function fixtureLogSources(options: FixtureOptions = {}): LogSources & { push(text: string, piece?: LogPiece): void } {
-  const followers = new Set<(events: LogEvent[]) => void>();
-  let serial = 0;
-  const push = (text: string, piece: LogPiece = "connector") => { const event = { id: `live:${++serial}`, piece, text }; for (const follower of followers) follower([event]); };
+  const followers = new Set<(batch: LogBatch) => void>();
+  /** Every live line so far: what a read holds and a follow is caught up with. */
+  const live: LogEvent[] = [];
+  const push = (text: string, piece: LogPiece = "connector") => {
+    live.push({ id: `live:${live.length + 1}`, piece, text });
+    for (const follower of followers) follower({ lines: [live[live.length - 1]], cursor: String(live.length) });
+  };
   return {
     push,
     open(place: LogPlace): LogSource {
       return {
-        tail: (lines) => new Promise((resolve) => setTimeout(() => resolve(fixtureEvents(place, lines)), options.delayMs ?? 0)),
-        follow: (onEvents) => {
-          followers.add(onEvents);
+        tail: ({ limit }) => new Promise((resolve) => setTimeout(() => resolve({ lines: [...fixtureEvents(place, limit), ...live].slice(-limit), cursor: String(live.length) }), options.delayMs ?? 0)),
+        follow: ({ sinceCursor }, onLines) => {
+          const missed = live.slice(Number(sinceCursor));
+          if (missed.length) onLines({ lines: missed, cursor: String(live.length) });
+          followers.add(onLines);
           let timer: ReturnType<typeof setInterval> | undefined;
           if (options.liveEveryMs) {
             let at = AT;
-            timer = setInterval(() => { at += options.liveEveryMs!; push(written(at, "INFO", "call{call=c-7f3a}", "The agent started speaking", `turn=t-${serial + 32}`), "app"); }, options.liveEveryMs);
+            timer = setInterval(() => { at += options.liveEveryMs!; push(written(at, "INFO", "call{call=c-7f3a}", "The agent started speaking", `turn=t-${live.length + 32}`), "app"); }, options.liveEveryMs);
           }
-          return () => { followers.delete(onEvents); if (timer) clearInterval(timer); };
+          return () => { followers.delete(onLines); if (timer) clearInterval(timer); };
         },
       };
     },

@@ -4,6 +4,7 @@ import { CheckIcon, CopyIcon, FolderIcon, InfoIcon, OtherMachineIcon, ThisComput
 import { Select } from "../../components/ui/Select";
 import { COPY_FEEDBACK_MS } from "../../components/ui/Snippet";
 import { Tabs } from "../../components/ui/Tabs";
+import { uiLocale } from "../../i18n/locale";
 import { pluralKey, translator, type Translate } from "../../i18n/translator";
 import type { MachineView } from "../../state/room-types";
 import { useRoomStore } from "../../state/room-store";
@@ -12,8 +13,8 @@ import { canRunLocalHostAction, runLocalHostAction } from "../settings/local-hos
 import { machineStatus } from "../settings/machine-status";
 import { StateOnIcon } from "../settings/MachineState";
 import { LogControls, PIECE_KEY } from "./LogFilters";
-import { DEFAULT_LINES, LINE_CHOICES, NO_FILTERS, filterEvents, tokens, type LogEvent, type LogFilters, type LogPiece } from "./log-model";
-import { logSourceFor, logSourcesVersion, onLogSources, placeKey, type LogPlace, type LogSource } from "./log-sources";
+import { DEFAULT_LINES, LINE_CHOICES, NO_FILTERS, copyText, filterEvents, tokens, type LogEvent, type LogFilters, type LogPiece } from "./log-model";
+import { LogCursorExpired, logSourceFor, logSourcesVersion, onLogSources, placeKey, type LogCursor, type LogPlace, type LogSource } from "./log-sources";
 
 /* The logs, in the settings' own panel under "See logs": one tab per place (this device, then each paired machine), the
  * lines of the place chosen as its file has them — monospace, a backtrace in full, the piece beside the line because the file
@@ -87,20 +88,28 @@ function Note({ children }: { children: React.ReactNode }) {
   return <p className="logs-note logs-offline"><InfoIcon size={16} />{children}</p>;
 }
 
-type Read = { status: "loading" | "ready" | "failed"; events: LogEvent[]; arrived: number };
+type Read = { status: "loading" | "ready" | "failed"; events: LogEvent[]; arrived: number; stalled: boolean };
+const LOADING: Read = { status: "loading", events: [], arrived: 0, stalled: false };
+/** How long to wait before following again from the last cursor, after the follow broke: each wait is one more try. */
+const RESUME_AFTER_MS = [1000, 3000, 9000];
 
-/** Reads a place's latest lines once, then follows what is written, if the source can say: events that come together are
- *  drawn together, once a frame. A failed read can be tried again (`retry`). */
+/** Reads a place's latest lines once, then follows what is written after them (log-sources.ts: the cursor of the read is where
+ *  the follow starts, so nothing between the two is lost or told twice): events that come together are drawn together, once a
+ *  frame. A follow that breaks is taken up again from its last cursor a few times, then the log is said to have stopped (and
+ *  can be read again with `retry`, as can a read that failed). */
 function useLogEvents(source: LogSource) {
-  const [read, setRead] = useState<Read>({ status: "loading", events: [], arrived: 0 });
+  const [read, setRead] = useState<Read>(LOADING);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
     let alive = true;
     let stop: (() => void) | undefined;
+    let resumeTimer: ReturnType<typeof setTimeout> | undefined;
+    let cursor: LogCursor;
+    let resumed = 0;
     let pending: LogEvent[] = [];
     let scheduled = false;
-    setRead({ status: "loading", events: [], arrived: 0 });
+    setRead(LOADING);
     const flush = () => {
       scheduled = false;
       if (!alive || !pending.length) return;
@@ -108,18 +117,32 @@ function useLogEvents(source: LogSource) {
       pending = [];
       setRead((before) => {
         const events = [...before.events, ...more];
-        return { status: "ready", events: events.length > MAX_KEPT ? events.slice(-MAX_KEPT) : events, arrived: before.arrived + 1 };
+        return { ...before, status: "ready", events: events.length > MAX_KEPT ? events.slice(-MAX_KEPT) : events, arrived: before.arrived + 1 };
       });
     };
-    source.tail(MAX_LINES, controller.signal).then((events) => {
+    const follow = () => {
+      resumeTimer = undefined;
+      stop = source.follow?.({ sinceCursor: cursor }, (batch) => {
+        cursor = batch.cursor;
+        resumed = 0;
+        for (const line of batch.lines) pending.push(line);
+        if (pending.length && !scheduled) { scheduled = true; (globalThis.requestAnimationFrame ?? ((run: () => void) => setTimeout(run, 16)))(flush); }
+      }, (error) => {
+        stop = undefined;
+        if (!alive) return;
+        // The cursor is gone from the log: what came after it cannot be told, so read the log again.
+        if (error instanceof LogCursorExpired) setAttempt((n) => n + 1);
+        else if (resumed < RESUME_AFTER_MS.length) resumeTimer = setTimeout(follow, RESUME_AFTER_MS[resumed++]);
+        else setRead((before) => ({ ...before, stalled: true }));
+      }, () => { stop = undefined; });
+    };
+    source.tail({ limit: MAX_LINES }, controller.signal).then((batch) => {
       if (!alive) return;
-      setRead({ status: "ready", events, arrived: 0 });
-      stop = source.follow?.((incoming) => {
-        pending.push(...incoming);
-        if (!scheduled) { scheduled = true; (globalThis.requestAnimationFrame ?? ((run: () => void) => setTimeout(run, 16)))(flush); }
-      });
-    }, () => { if (alive) setRead({ status: "failed", events: [], arrived: 0 }); });
-    return () => { alive = false; controller.abort(); stop?.(); };
+      cursor = batch.cursor;
+      setRead({ ...LOADING, status: "ready", events: batch.lines });
+      follow();
+    }, () => { if (alive) setRead({ ...LOADING, status: "failed" }); });
+    return () => { alive = false; controller.abort(); stop?.(); clearTimeout(resumeTimer); };
   }, [source, attempt]);
   return { read, retry: () => setAttempt((n) => n + 1) };
 }
@@ -143,7 +166,8 @@ function LogReader({ source, place, name }: { source: LogSource; place: LogPlace
   async function copyLines() {
     if (!rows.length) { setStatus(t("logs.copy.none")); return; }
     let ok = true;
-    try { await navigator.clipboard.writeText(rows.map((row) => row.text).join("\n")); } catch { ok = false; }
+    // Each line led by its piece, as the viewer shows it beside the line: pasted into a chat, a merged log stays attributable.
+    try { await navigator.clipboard.writeText(copyText(rows, (piece) => pieceLabel(piece).toLocaleLowerCase(uiLocale()))); } catch { ok = false; }
     setCopy(ok ? "copied" : "failed");
     setStatus(ok ? t(pluralKey("logs.copy.done", rows.length), { n: rows.length }) : t("logs.copy.failedStatus"));
     window.clearTimeout(timer.current);
@@ -180,6 +204,8 @@ function LogReader({ source, place, name }: { source: LogSource; place: LogPlace
         </span>
       </div>}
       <span className="logs-status" role="status" aria-live="polite">{status}</span>
+      {ready && read.stalled && <p className="logs-note logs-stalled" role="status"><InfoIcon size={16} /><span>{t("logs.failed")}</span>
+        <Button variant="secondary" size="sm" onClick={retry}>{t("hosts.retry")}</Button></p>}
       {ready && <p className="logs-note"><InfoIcon size={16} /><span>{t("logs.redacted")}</span></p>}
     </>
   );
@@ -212,6 +238,17 @@ function LogView({ rows, query, name, arrived, none, onClear }: { rows: LogEvent
   const [away, setAway] = useState(false);
   const [fresh, setFresh] = useState(false);
   const toFoot = () => { const node = view.current; if (node) node.scrollTop = node.scrollHeight; };
+  // Lines off screen are not laid out (`content-visibility: auto`, .logs-line): a line's height is an estimate until it comes into
+  // view, so the foot moves as the last ones are drawn. While the reader is at the end the foot is held as the lines' size changes
+  // (it runs after layout and before paint: nothing is seen to slip).
+  const lines = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const node = lines.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    const watcher = new ResizeObserver(() => { if (following.current) toFoot(); });
+    watcher.observe(node);
+    return () => watcher.disconnect();
+  }, []);
 
   // Something new: at the foot it is followed before it is painted; above it, the place is kept and the way back gets its dot.
   useLayoutEffect(() => {
@@ -235,9 +272,11 @@ function LogView({ rows, query, name, arrived, none, onClear }: { rows: LogEvent
   const label = (piece: LogPiece) => t(PIECE_KEY[piece]);
   return <>
     <div className="logview" ref={view} tabIndex={0} role="region" aria-label={t("logs.region", { name })} onScroll={readScroll}>
-      {none ? <p className="logs-empty">{t("logs.noLines")}</p>
-        : rows.length === 0 ? <div className="logs-empty"><p>{t("logs.empty")}</p><Button variant="secondary" size="sm" onClick={onClear}>{t("logs.filters.clear")}</Button></div>
-          : rows.map((row) => <LogRow key={row.id} event={row} query={query} label={label(row.piece)} />)}
+      <div ref={lines}>
+        {none ? <p className="logs-empty">{t("logs.noLines")}</p>
+          : rows.length === 0 ? <div className="logs-empty"><p>{t("logs.empty")}</p><Button variant="secondary" size="sm" onClick={onClear}>{t("logs.filters.clear")}</Button></div>
+            : rows.map((row) => <LogRow key={row.id} event={row} query={query} label={label(row.piece)} />)}
+      </div>
     </div>
     <button type="button" className="latest-jump" data-show={away || undefined} data-new={away && fresh || undefined} aria-hidden={!away || undefined}
       tabIndex={away ? undefined : -1} aria-label={t("logs.toEnd")} title={t("logs.toEnd")} onClick={jump}><ToLatestArrowIcon /></button>

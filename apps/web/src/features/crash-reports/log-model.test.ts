@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { activeFilterCount, facets, filterEvents, headOf, levelOf, NO_FILTERS, segments, tokens, type LogEvent, type LogPiece } from "./log-model";
+import { activeFilterCount, copyText, facets, filterEvents, headOf, levelOf, NO_FILTERS, segments, tokens, type LogEvent, type LogPiece } from "./log-model";
 
 /* The log as the viewer holds it: events exactly as the file has them, narrowed by level, piece and search. */
 
@@ -72,6 +72,19 @@ describe("filters", () => {
   });
 });
 
+describe("what Copy puts on the clipboard", () => {
+  test("each event led by its piece in brackets, as the file has it, a backtrace under its first line", () => {
+    const lowercase = (piece: LogPiece) => label(piece).toLowerCase();
+    expect(copyText(EVENTS, lowercase)).toBe([
+      "[app] " + EVENTS[0].text, "[app] " + EVENTS[1].text, "[connector] " + EVENTS[2].text, "[core] " + BACKTRACE].join("\n"));
+    expect(copyText([], lowercase)).toBe("");
+  });
+
+  test("the piece is said as the language names it", () => {
+    expect(copyText([EVENTS[2]], () => "conector")).toBe("[conector] " + EVENTS[2].text);
+  });
+});
+
 describe("what a line holds that is not plain text", () => {
   test("the search's matches and the log's redaction markers are marked; joined, the parts are the text", () => {
     const text = "14:32:09 INFO delivery: Received text=<redacted> and [redacted] later";
@@ -91,6 +104,17 @@ describe("what a line holds that is not plain text", () => {
     expect(parts.map((p) => p.text).join("")).toBe(BACKTRACE);
     expect(parts.filter((p) => p.tone).map((p) => [p.tone, p.text])).toEqual([["time", "14:32:11.205"], ["level", "ERROR"], ["target", "panic{thread=tokio}"]]);
     expect(parts.filter((p) => p.text.includes("mixer")).every((p) => !p.tone)).toBe(true);
+  });
+
+  test("a line with thousands of matches is cut in one pass and is still the text", () => {
+    const text = "14:32:07.412  INFO audio: " + "ab ".repeat(20000);
+    const started = performance.now();
+    const parts = tokens(text, "ab");
+    expect(parts.map((p) => p.text).join("")).toBe(text);
+    expect(parts.filter((p) => p.kind === "hit")).toHaveLength(20000);
+    expect(parts.filter((p) => p.tone).map((p) => p.tone)).toEqual(["time", "level", "target"]);
+    // Quadratic in the matches this took seconds; one pass takes a few milliseconds.
+    expect(performance.now() - started).toBeLessThan(1000);
   });
 
   test("a match across the tones keeps both: the hit and the tone it sits on", () => {

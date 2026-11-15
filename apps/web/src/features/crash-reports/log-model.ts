@@ -54,6 +54,12 @@ export function headOf(text: string): LogHead | null {
 /** What a search looks in: the event as written, and the name of its piece as the person sees it beside the line. */
 const haystack = (event: LogEvent, pieceLabel: (piece: LogPiece) => string) => (pieceLabel(event.piece) + "\n" + event.text).toLowerCase();
 
+/** What Copy puts on the clipboard: each event as the file has it (its backtrace under it), led by its piece in brackets, since the
+ *  file does not say it and a pasted line must stay attributable (`[connector] 14:32:07.412  INFO …`). */
+export function copyText(events: readonly LogEvent[], pieceLabel: (piece: LogPiece) => string): string {
+  return events.map((event) => `[${pieceLabel(event.piece)}] ${event.text}`).join("\n");
+}
+
 /** The events the filters leave, in their order. */
 export function filterEvents(events: readonly LogEvent[], filters: LogFilters, pieceLabel: (piece: LogPiece) => string): LogEvent[] {
   const query = filters.query.trim().toLowerCase();
@@ -89,10 +95,17 @@ export interface Segment { text: string; kind?: "hit" | "redacted" }
 const REDACTED = "<redacted>|\\[redacted\\]";
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/** The pattern of a search, built once for the search and not once per line drawn (a search is drawn on up to a thousand lines). */
+let patternOf: { needle: string; pattern: RegExp } | null = null;
+function patternFor(needle: string): RegExp {
+  if (patternOf?.needle !== needle) patternOf = { needle, pattern: new RegExp(needle ? `(${escapeRegExp(needle)})|(${REDACTED})` : `()(${REDACTED})`, "gi") };
+  patternOf.pattern.lastIndex = 0;
+  return patternOf.pattern;
+}
+
 /** `text` cut into its plain parts, the matches of `query` and the redaction markers; joined, they are `text`. */
 export function segments(text: string, query: string): Segment[] {
-  const needle = query.trim();
-  const pattern = new RegExp(needle ? `(${escapeRegExp(needle)})|(${REDACTED})` : `()(${REDACTED})`, "gi");
+  const pattern = patternFor(query.trim());
   const parts: Segment[] = [];
   let at = 0;
   for (const match of text.matchAll(pattern)) {
@@ -114,7 +127,8 @@ export interface Token extends Segment { tone?: Tone }
 const TARGET = /^(\s+)(\S+?):(?=\s|$)/;
 
 /** An event cut into the parts it is drawn in: the search's matches, the redaction markers, and the time, level and target of
- *  its first line. Joined, the parts are the event's text, untouched. */
+ *  its first line. Joined, the parts are the event's text, untouched. One pass over the text, two cursors walking the matches and
+ *  the (at most three, ordered, disjoint) tones: linear in the text and its matches, however many the search finds. */
 export function tokens(text: string, query: string): Token[] {
   const head = headOf(text);
   const tones: { start: number; end: number; tone: Tone }[] = [];
@@ -124,18 +138,20 @@ export function tokens(text: string, query: string): Token[] {
     const target = TARGET.exec(head.rest);
     if (target) tones.push({ start: levelAt + head.level.length + target[1].length, end: levelAt + head.level.length + target[1].length + target[2].length, tone: "target" });
   }
-  const parts = segments(text, query);
-  const cuts = new Set<number>([0, text.length]);
+  // The parts of `segments` follow one another and cover the whole text: each has the offset it starts at.
+  const spans: { end: number; kind?: Segment["kind"] }[] = [];
   let offset = 0;
-  const spans = parts.map((part) => { const span = { ...part, start: offset, end: offset + part.text.length }; offset = span.end; return span; });
-  for (const span of spans) { cuts.add(span.start); cuts.add(span.end); }
-  for (const tone of tones) { cuts.add(tone.start); cuts.add(tone.end); }
-  const points = [...cuts].sort((a, b) => a - b);
+  for (const part of segments(text, query)) { offset += part.text.length; spans.push({ end: offset, kind: part.kind }); }
   const result: Token[] = [];
-  for (let i = 0; i < points.length - 1; i++) {
-    const [start, end] = [points[i], points[i + 1]];
-    if (end <= start) continue;
-    result.push({ text: text.slice(start, end), kind: spans.find((span) => span.start <= start && end <= span.end)?.kind, tone: tones.find((tone) => tone.start <= start && end <= tone.end)?.tone });
+  let at = 0, span = 0, tone = 0;
+  while (at < text.length) {
+    while (spans[span].end <= at) span++;
+    while (tone < tones.length && tones[tone].end <= at) tone++;
+    const inTone = tone < tones.length && tones[tone].start <= at ? tones[tone] : undefined;
+    // The part ends where the match does, where the tone does, or where the next tone begins.
+    const end = Math.min(spans[span].end, inTone ? inTone.end : tone < tones.length ? tones[tone].start : text.length);
+    result.push({ text: text.slice(at, end), kind: spans[span].kind, tone: inTone?.tone });
+    at = end;
   }
   return result;
 }

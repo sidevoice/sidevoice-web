@@ -1529,7 +1529,7 @@ export const messages: Messages = {
   "crashReports.report.moreLines": "… 45 weitere Zeilen",
   "crashReports.report.neverLead": "Wird nie gesendet:",
   "crashReports.report.neverBody": "der Inhalt deiner Unterhaltungen, Tokens oder Schlüssel, Kopplungscodes oder die Namen deiner Geräte. Auch nicht der Text von Fehlern, die Daten enthalten könnten: nur ihr Code. Pfade in deinem Home-Ordner erscheinen als ~.",
-  "crashReports.tip": "Funktioniert etwas nicht? Frag deinen Agenten: Er kann den Zustand von Sidevoice prüfen. Wenn er die Protokolle dieser App braucht, kopiere sie und füge sie bei ihm ein.",
+  "crashReports.tip": "Funktioniert etwas nicht? Frag deinen Agenten: Er kann den Zustand von Sidevoice prüfen. Wenn er die Protokolle dieser App braucht, kopiere sie und füge sie in den Chat mit ihm ein.",
   "logs.label": "Protokolle",
   "logs.description": "Was Sidevoice während der Arbeit protokolliert, auf diesem Gerät und auf jedem Rechner. Das hilft, einen Fehler nachzuvollziehen.",
   "logs.toggle": "Protokolle ansehen",
@@ -1547,7 +1547,7 @@ export const messages: Messages = {
   "logs.filters.reset": "Zurücksetzen",
   "logs.filters.active": "Aktive Filter",
   "logs.filters.remove": "Filter entfernen: {name}",
-  "logs.filters.clear": "Filter löschen",
+  "logs.filters.clear": "Filter entfernen",
   "logs.level": "Stufe",
   "logs.level.all": "Alle Stufen",
   "logs.level.warn": "Warnungen und Fehler",
@@ -1592,4 +1592,5 @@ export const messages: Messages = {
   "serviceFailure.detail.version": "Version",
   "serviceFailure.detail.exit": "Prozessende",
   "serviceFailure.exitCode": "Code {code}",
+  "serviceFailure.repeat": "×{n}",
 };

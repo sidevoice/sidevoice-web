@@ -36,6 +36,30 @@ export function reportServiceFailure(failure: ServiceFailure) {
   changed();
 }
 
+/** The failures as strips: those of one piece on one place with the same code are one strip with how many they were (a service
+ *  that fails in a loop is one line, not a wall of them), the newest first. */
+export interface FailureGroup {
+  /** The newest of them: what the strip says and its details. */
+  latest: ServiceFailure;
+  count: number;
+  /** Every failure of the group, to put them all away with its ×. */
+  ids: string[];
+}
+
+/** The most strips the room shows at once; the rest are there under them, and come up as these are put away. */
+export const MAX_FAILURE_STRIPS = 3;
+
+export function groupFailures(failures: readonly ServiceFailure[]): FailureGroup[] {
+  const groups = new Map<string, FailureGroup>();
+  for (const failure of failures) {
+    const key = `${failure.machine ?? ""}\u0000${failure.piece}\u0000${failure.code}`;
+    const group = groups.get(key);
+    if (group) { group.count++; group.ids.push(failure.id); }
+    else groups.set(key, { latest: failure, count: 1, ids: [failure.id] });
+  }
+  return [...groups.values()];
+}
+
 /** The person put it away. */
 export function dismissServiceFailure(id: string) {
   const next = failures.filter((failure) => failure.id !== id);

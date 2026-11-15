@@ -207,6 +207,9 @@ const SAMPLE_LOGS = { sample: {} };
 const FAILURES: ServiceFailure[] = [
   { id: "f-1", piece: "connector", machine: null, code: "connector.process_exited", at: new Date(2026, 10, 14, 14, 32, 4).getTime(), version: "0.21.0", exit: { code: 101 } },
   { id: "f-2", piece: "core", machine: "fp-nuc", code: "core.panic", at: new Date(2026, 10, 14, 14, 32, 51).getTime(), version: "0.9.3", exit: { code: 101 } },
+  // The connector failed twice more: the same piece, place and code, so one strip with its count.
+  { id: "f-3", piece: "connector", machine: null, code: "connector.process_exited", at: new Date(2026, 10, 14, 14, 33, 40).getTime(), version: "0.21.0", exit: { code: 101 } },
+  { id: "f-4", piece: "connector", machine: null, code: "connector.process_exited", at: new Date(2026, 10, 14, 14, 35, 12).getTime(), version: "0.21.0", exit: { code: 101 } },
 ];
 
 export const JOURNEYS: Journey[] = [
@@ -384,7 +387,7 @@ export const JOURNEYS: Journey[] = [
         if (log) { log.scrollTop = Math.max(0, log.scrollHeight / 2); log.dispatchEvent(new Event("scroll")); }
         await wait(1000);
       } },
-    { id: "cr-logs-offline", caption: "A machine that is not connected: its tab says so and its logs will show when it connects again (the app keeps none of them).", views: ["desktop"],
+    { id: "cr-logs-offline", caption: "A machine that is not connected: its tab says so and its logs will appear when it reconnects (the app keeps none of them).", views: ["desktop"],
       crashReports: { logs: SAMPLE_LOGS }, ...APP_RUNNING, after: async (doc) => {
         await crashReportsOpen("logs")(doc);
         [...doc.querySelectorAll<HTMLElement>("#pane-crash-reports [role=tab]")].find((tab) => tab.textContent?.includes("Old laptop"))?.click();
@@ -396,7 +399,7 @@ export const JOURNEYS: Journey[] = [
       crashReports: { logs: { sample: { delayMs: 2 ** 31 - 1 } } }, ...APP_RUNNING, after: crashReportsOpen("logs") },
     { id: "cr-notice", caption: "The first-run notice, once after the setup (and once on a device that updates): one line under the header, a link to the setting and a ×; it asks nothing and blocks nothing.",
       crashReports: { noticeSeen: false } },
-    { id: "cr-failure", caption: "A connector or a core that failed and restarted, told as the app tells a failure: the danger strip, its facts behind Details (code, time, version, how it ended), and a × to put it away.",
+    { id: "cr-failure", caption: "A connector or a core that failed and restarted, told as the app tells a failure: the danger strip, its facts behind Details (code, time, version, how it ended), and a × to put it away. A service that keeps failing is one strip with its count.",
       crashReports: { failures: FAILURES }, after: (doc) => { doc.querySelector<HTMLElement>(".service-failure-notices summary")?.click(); } },
   ] },
   { id: "updates", title: "Updates and what's new", note: "What wants updating, said over the room without moving it; what a release added, shown once, never the setup again.", shots: [

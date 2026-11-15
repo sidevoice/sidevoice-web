@@ -12,13 +12,39 @@ import type { LogEvent } from "./log-model";
  *  hosts them), or a paired machine by its row's id. */
 export type LogPlace = { kind: "device" } | { kind: "machine"; id: string };
 
+/** Where a read ended: opaque to the viewer, which only hands it back. A source gives one with every batch of lines it
+ *  delivers, and it means "right after the last line of this batch". */
+export type LogCursor = string;
+
+/** Lines, oldest first, as the file has them, and the cursor right after the last of them. */
+export interface LogBatch {
+  lines: LogEvent[];
+  cursor: LogCursor;
+}
+
+/** What a source's `follow` reports (`onError`) when its cursor is no longer in the log. */
+export class LogCursorExpired extends Error {
+  constructor() { super("The cursor is no longer in the log"); this.name = "LogCursorExpired"; }
+}
+
+/* The contract of a source (for whoever implements one: the app's own log, a machine's core):
+ *
+ * - `tail` reads the latest `limit` lines and says where it stopped. An empty log answers `{ lines: [], cursor }` with the
+ *   cursor of its start. It rejects when the log cannot be read; a `signal` that aborts says nobody is waiting any more.
+ * - `follow({ sinceCursor })` delivers every line written AFTER that cursor, in order, whenever it was written: what came
+ *   between the `tail` and the `follow` is delivered first (catch-up), then what is written from then on. Not "from now": a
+ *   source that starts at the moment of the call drops the lines of that gap. Each batch carries its own cursor, the one to
+ *   come back with. No line is delivered twice (a cursor never goes back), and `LogEvent.id` is unique within the place.
+ * - The viewer follows once per tab, after its `tail`, and calls the returned function when it leaves.
+ * - `onError`: the follow broke (the link to a machine dropped, the process went away). The follow is over; nothing more will
+ *   be delivered by it. The viewer keeps what it holds and follows again from the last cursor it received, a few times, before
+ *   it says the log stopped. A cursor the log no longer holds (rotated away) is a `LogCursorExpired`: the lines after it can
+ *   no longer be told, so the viewer reads the log again from its tail instead.
+ * - `onEnd`: the log ended for good (not an error: nothing is written any more). No retry.
+ * A source without `follow` shows what `tail` read and no more. */
 export interface LogSource {
-  /** The latest `lines` events, oldest first, as the file has them. Rejects when the log cannot be read; a `signal` that
-   *  aborts says nobody is waiting for it any more. */
-  tail(lines: number, signal: AbortSignal): Promise<LogEvent[]>;
-  /** Tells of events written from now on, oldest first, until stopped (the returned function). Absent: the viewer shows
-   *  what it read and no more. */
-  follow?(onEvents: (events: LogEvent[]) => void): () => void;
+  tail(options: { limit: number }, signal: AbortSignal): Promise<LogBatch>;
+  follow?(options: { sinceCursor: LogCursor }, onLines: (batch: LogBatch) => void, onError?: (error: unknown) => void, onEnd?: () => void): () => void;
 }
 
 export interface LogSources {

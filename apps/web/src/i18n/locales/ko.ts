@@ -1581,4 +1581,5 @@ export const messages: Messages = {
   "serviceFailure.detail.version": "버전",
   "serviceFailure.detail.exit": "프로세스 종료",
   "serviceFailure.exitCode": "코드 {code}",
+  "serviceFailure.repeat": "×{n}",
 };

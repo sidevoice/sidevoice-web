@@ -1503,7 +1503,7 @@ export const messages: Messages = {
   "crashReports.label": "Quando algo falha",
   "crashReports.mode.auto": "Enviar automaticamente",
   "crashReports.mode.never": "Não enviar",
-  "crashReports.mode.auto.hint": "Quando o Sidevoice falha, enviamos um relatório anônimo para podermos corrigir o problema. Ele não inclui o que você conversa com seu agente. Você pode parar de enviá-los.",
+  "crashReports.mode.auto.hint": "Quando o Sidevoice falha, enviamos um relatório anônimo para podermos corrigir o problema. Ele não inclui o que você fala com seu agente. Você pode parar de enviá-los.",
   "crashReports.mode.never.hint": "Nada é enviado quando algo falha. Você pode reativar quando quiser.",
   "crashReports.saved.auto": "Os relatórios de falhas serão enviados automaticamente.",
   "crashReports.saved.never": "Nenhum relatório de falha será enviado.",
@@ -1533,7 +1533,7 @@ export const messages: Messages = {
   "logs.search.clear": "Limpar a busca",
   "logs.filters": "Filtros",
   "logs.filters.label": "Filtros do registro",
-  "logs.filters.reset": "Restaurar",
+  "logs.filters.reset": "Redefinir",
   "logs.filters.active": "Filtros ativos",
   "logs.filters.remove": "Remover o filtro: {name}",
   "logs.filters.clear": "Remover filtros",
@@ -1581,4 +1581,5 @@ export const messages: Messages = {
   "serviceFailure.detail.version": "Versão",
   "serviceFailure.detail.exit": "Saída do processo",
   "serviceFailure.exitCode": "código {code}",
+  "serviceFailure.repeat": "×{n}",
 };
