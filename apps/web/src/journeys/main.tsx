@@ -12,6 +12,10 @@ import { createRoomStore } from "../state/room-store";
 import { createOnboardingRepository, emptyOnboardingRecord } from "../services/onboarding-state";
 import { BASE_FACTS, JOURNEYS, type Shot } from "./shots";
 import { installApp, installedMembers } from "../host/testing";
+import { CRASH_REPORTS_KEY } from "../services/crash-reports";
+import { reportServiceFailure } from "../features/crash-reports/service-failures";
+import { installLogSources } from "../features/crash-reports/log-sources";
+import { fixtureLogSources } from "./log-fixtures";
 
 /* The journeys' storyboard (journeys.html, served by the dev server only): every screen and state of the app laid out
  * as the person meets them, on a phone and a desktop, light and dark, each captioned. Not interactive: each frame is
@@ -68,7 +72,7 @@ function renderShot(shot: Shot) {
     const status = shot.desktop.state as Record<string, unknown>;
     installApp({ ...installedMembers(), localHost: {
       state: async () => status, subscribe: () => noop, pairing: async () => null,
-      start: later, stop: later, restart: later, serviceInstall: later, serviceUninstall: later, agents: async () => ({ agents: [
+      start: later, stop: later, restart: later, serviceInstall: later, serviceUninstall: later, ...(shot.crashReports ? { revealLog: later } : {}), agents: async () => ({ agents: [
         { id: "claude-code", label: "Claude Code", version: "2.4" }, { id: "codex", label: "Codex", version: "0.157" }] }),
       ...(shot.desktop.pairingCode ? { pairingCode: async () => ({ code: "SV1.7KQ2-M9XA", expires_in: 600, reach: "direct" }) } : {}),
       ...(shot.desktop.version ? { version: async () => shot.desktop!.version, update: later } : {}),
@@ -76,6 +80,22 @@ function renderShot(shot: Shot) {
       ...(shot.desktop.install ? { install: () => Object.assign(shot.desktop!.install === "fails"
         ? new Promise((_, reject) => setTimeout(() => reject({ key: "install.network", step: "download" }), 0)) : new Promise(noop), { job: "j" }) } : {}),
     } });
+  }
+  if (shot.crashReports) {
+    const { mode = "auto", noticeSeen = true, failures = [], logs } = shot.crashReports;
+    // The mode is the app's, held here in memory as an app holds it: a change made in the frame stays in it and shows in it.
+    let held = mode;
+    installApp({ ...installedMembers(), crashReports: { get: async () => held, set: async (next: typeof mode) => { held = next; } },
+      // An app says its build: the report's preview names the version it runs.
+      build: { channel: "release", version: "0.33.1" } });
+    // Whether the notice was put away is the page's, and this frame's own, kept in memory too (the frames share one storage).
+    let stored = JSON.stringify({ noticeSeen });
+    const read = Storage.prototype.getItem;
+    const write = Storage.prototype.setItem;
+    Storage.prototype.getItem = function (key: string) { return this === localStorage && key === CRASH_REPORTS_KEY ? stored : read.call(this, key); };
+    Storage.prototype.setItem = function (key: string, value: string) { if (this === localStorage && key === CRASH_REPORTS_KEY) stored = value; else write.call(this, key, value); };
+    for (const failure of failures) reportServiceFailure(failure);
+    if (logs && logs !== "none") installLogSources(fixtureLogSources(logs.sample));
   }
   // The actions the runtime would bind: here they do nothing — but those the shot gives (a try that listens) — and a
   // pairing code is refused as the shot says.

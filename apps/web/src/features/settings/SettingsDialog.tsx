@@ -1,7 +1,7 @@
 import { Fragment, memo, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { OverlayPortalProvider, Tooltip } from "../../components/ui/Tooltip";
-import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, DeveloperIcon, FloatingCardIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ShortcutsIcon, PermissionsIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon, UpdateIcon, WarningIcon } from "../../components/ui/Icons";
+import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, CrashReportsIcon, DeveloperIcon, FloatingCardIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ShortcutsIcon, PermissionsIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon, UpdateIcon, WarningIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { Select } from "../../components/ui/Select";
 import { LanguagePicker } from "../../components/ui/LanguagePicker";
@@ -45,6 +45,7 @@ import { turnTuningDevEnabled } from "./TurnTuningDev";
 import { DEVELOPER_OPTIONS_TITLE, DeveloperOptions } from "./DeveloperOptions";
 import { isNightlyBuild, useDeveloperMode, useDeveloperModeGesture } from "./developer-mode";
 import { UpdatesSettings, useUpdatesSection } from "./UpdatesSettings";
+import { CrashReportsSettings, useCrashReportsSection } from "../crash-reports/CrashReportsSettings";
 import "./settings.css";
 
 /* Settings: a screen of their own, its sections beside its content on a desktop; on a phone a menu of them, each
@@ -70,6 +71,8 @@ const SECTIONS: ({ id: string; icon: (size?: number) => ReactNode } & ({ label: 
   { id: "machines", label: "settings.section.machines", icon: (size) => <MachinesIcon size={size} /> },
   // Everything that updates: in the desktop app, or wherever a machine is behind (UpdatesSettings).
   { id: "updates", label: "settings.section.updates", icon: (size) => <UpdateIcon size={size} /> },
+  // What happens when something fails and the logs, where the app sends crash reports (CrashReportsSettings).
+  { id: "crash-reports", label: "settings.section.crashReports", icon: (size) => <CrashReportsIcon size={size} /> },
   { id: "advanced", label: "settings.section.advanced", icon: (size) => <AdvancedIcon size={size} /> },
   // Below Advanced, English-only and outside the catalogues: for a nightly with developer mode on (DeveloperOptions).
   { id: "developer", text: DEVELOPER_OPTIONS_TITLE, icon: (size) => <DeveloperIcon size={size} /> },
@@ -201,9 +204,9 @@ function Pane({ id, current, children }: { id: string; current: string; children
 /** Every section's page, one shown. Drawn again only when what they are given changes, not with Settings' header and
  *  levels: going up a level or opening a list redrew every section of Settings with it (sidevoice-web: a phone's Back
  *  took a second). */
-const SettingsPanes = memo(function SettingsPanes({ current, language, microphone, access, floatingCardShown, permissionsShown, shortcutsShown, ownComputer, updatesShown, developerShown }: {
+const SettingsPanes = memo(function SettingsPanes({ current, language, microphone, access, floatingCardShown, permissionsShown, shortcutsShown, ownComputer, updatesShown, crashReportsShown, developerShown }: {
   current: string; language: string; microphone: MicrophoneSnapshot | null; access: MicrophoneAccess | null; floatingCardShown: boolean; permissionsShown: boolean;
-  shortcutsShown: boolean; ownComputer: boolean; updatesShown: boolean; developerShown: boolean;
+  shortcutsShown: boolean; ownComputer: boolean; updatesShown: boolean; crashReportsShown: boolean; developerShown: boolean;
 }) {
   const t = translator(language);
   return <div className="settings-column">
@@ -218,6 +221,7 @@ const SettingsPanes = memo(function SettingsPanes({ current, language, microphon
     {ownComputer && <Pane id="this-computer" current={current}><ThisComputerSettings /></Pane>}
     <Pane id="machines" current={current}><MachineList /></Pane>
     {updatesShown && <Pane id="updates" current={current}><UpdatesSettings /></Pane>}
+    {crashReportsShown && <Pane id="crash-reports" current={current}><CrashReportsSettings t={t} /></Pane>}
     <Pane id="advanced" current={current}><AdvancedSettings t={t} /></Pane>
     {developerShown && <Pane id="developer" current={current}><DeveloperOptions t={t} /></Pane>}
   </div>;
@@ -315,6 +319,8 @@ export function SettingsDialog() {
   const show = (section: string) => store?.patch({ settingsSection: section });
   // Updates: in the desktop app, or wherever a machine is behind.
   const updatesShown = useUpdatesSection();
+  // Crash reports: where the app sends them, never in a browser.
+  const crashReportsShown = useCrashReportsSection();
   // Shortcuts: in the desktop app, or wherever there is a keyboard; never on a phone.
   const shortcutsShown = useShortcutsSection();
   // The microphone's reader, one for Permissions and Call's link to it. Permissions is drawn only where there is
@@ -332,12 +338,12 @@ export function SettingsDialog() {
   const developerShown = developerMode || turnTuningDevEnabled();
   const sections = SECTIONS.filter((section) => (section.id !== "this-computer" || ownComputer) && (section.id !== "updates" || updatesShown)
     && (section.id !== "shortcuts" || shortcutsShown) && (section.id !== "permissions" || permissionsShown)
-    && (section.id !== "floating-card" || floatingCardShown) && (section.id !== "developer" || developerShown));
+    && (section.id !== "floating-card" || floatingCardShown) && (section.id !== "crash-reports" || crashReportsShown) && (section.id !== "developer" || developerShown));
   // Updates shown as the last machine behind is updated (a browser, a phone), or Shortcuts as the mouse or trackpad
   // goes (a tablet's keyboard taken off): General.
   useEffect(() => {
-    if ((current === "updates" && !updatesShown) || (current === "shortcuts" && !shortcutsShown) || (current === "permissions" && !permissionsShown && mediaKnown)) show("general");
-  }, [current, updatesShown, shortcutsShown, permissionsShown, mediaKnown]); // eslint-disable-line react-hooks/exhaustive-deps
+    if ((current === "updates" && !updatesShown) || (current === "shortcuts" && !shortcutsShown) || (current === "crash-reports" && !crashReportsShown) || (current === "permissions" && !permissionsShown && mediaKnown)) show("general");
+  }, [current, updatesShown, shortcutsShown, crashReportsShown, permissionsShown, mediaKnown]); // eslint-disable-line react-hooks/exhaustive-deps
   // Developer mode turned off from its own page: General, with the focus on its entry rather than lost with the page.
   useEffect(() => {
     if (current !== "developer" || developerShown) return;
@@ -422,7 +428,7 @@ export function SettingsDialog() {
             </nav>
             <div className="settings-content" ref={content} hidden={!pageShown} inert={motionOf(across, 2)?.startsWith("out") || undefined} data-motion={motionOf(across, 2)}>
               <SettingsPanes current={current} language={uiLanguage()} microphone={mic.microphone} access={mic.access} floatingCardShown={floatingCardShown}
-                permissionsShown={permissionsShown} shortcutsShown={shortcutsShown} ownComputer={ownComputer} updatesShown={updatesShown} developerShown={developerShown} />
+                permissionsShown={permissionsShown} shortcutsShown={shortcutsShown} ownComputer={ownComputer} updatesShown={updatesShown} crashReportsShown={crashReportsShown} developerShown={developerShown} />
             </div>
             {/* Settings' own polite region (a machine forgotten), never the call's. */}
             <p className="sr-only" role="status">{said}</p>

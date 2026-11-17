@@ -549,6 +549,29 @@ export interface ScreenBridge {
   locked(): Promise<boolean>;
 }
 
+/** What happens when something fails (Settings → Crash reports): send a crash report automatically, the default, or never. */
+export type CrashReportsMode = "auto" | "never";
+/** The app's crash reports (Sentry), offered only by an app that sends them. The setting is the app's, not the page's: the app
+ *  keeps the choice, holds to it before any page has loaded and sends nothing after `never`, queued reports included; the page
+ *  keeps no copy and never tells the app a value it did not just get from the person (a page that lost its own storage must
+ *  not turn sending back on).
+ *  - `get` is what the app holds now (`auto` until the person says otherwise); the page reads it whenever Settings or the
+ *    notice shows, and shows only what it answers.
+ *  - `set` is the person's choice, idempotent; a rejection means the app did not take it: the page puts the choice back as it
+ *    was and says so.
+ *  - `subscribe`, where the choice can change elsewhere (the app's own menu), is told each new mode as it changes (nothing on
+ *    subscribing) and returns the unsubscribe; without it the page reads again each time Settings or the notice mounts.
+ *  A browser sends no crash reports and offers none, so neither the section nor the notice about them is there. An app may
+ *  offer it only after a reply of its own: the page looks again for a while (`onHostMember("crashReports", …)`). */
+export interface CrashReportsBridge {
+  get(): Promise<CrashReportsMode> | CrashReportsMode;
+  set(mode: CrashReportsMode): Promise<void>;
+  subscribe?(listener: (mode: CrashReportsMode) => void): () => void;
+  /** The id this install reports under, for the preview of what a report holds: null under `never` (none is created, and a
+   *  created one is forgotten). Optional: an app before it has none, and the preview then shows a placeholder. */
+  installId?(): Promise<{ installId: string } | null>;
+}
+
 export interface Host {
   identity: HostIdentity;
   /** The host's overlay for `language` (a tag: `es`, `zh-Hans`) exactly: nothing from its primary subtag or English, which
@@ -583,4 +606,6 @@ export interface Host {
   screen: ScreenBridge | null;
   updater: AppUpdater | null;
   debug: HostDebugBridge | null;
+  /** The app's crash reports setting (the app owns it); null where the host sends none (a browser). */
+  crashReports: CrashReportsBridge | null;
 }

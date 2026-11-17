@@ -19,7 +19,7 @@ describe("a page outside an app", () => {
     expect(outside.voice.runs).toBe("page");
     expect(nativeHost().storage).toBeNull();
     for (const member of [nativeHost().microphone, outside.localHost, outside.reset, outside.muteShortcut, outside.mediaDuck, outside.textScale,
-      outside.callControls, outside.callSurface, outside.cue, outside.audioRoute, outside.screen, outside.updater, outside.debug]) expect(member).toBeNull();
+      outside.callControls, outside.callSurface, outside.cue, outside.audioRoute, outside.screen, outside.updater, outside.debug, outside.crashReports]) expect(member).toBeNull();
     expect(cardSeam()).toBeNull();
   });
 
@@ -207,6 +207,7 @@ describe("the members an app calls through", () => {
       audioRoute: { open: async () => {}, current: async () => null },
       screen: {},
       updater: { cancel: async () => {} },
+      crashReports: { set: async () => {} },
     });
     expect(host().screen).toBeNull();
     expect(host().localHost).toBeNull();
@@ -216,6 +217,7 @@ describe("the members an app calls through", () => {
     expect(host().cue).toBeNull();
     expect(host().audioRoute).toBeNull();
     expect(host().updater).toBeNull();
+    expect(host().crashReports).toBeNull();
   });
 
   test("a complete member is the app's own object", () => {
@@ -227,7 +229,8 @@ describe("the members an app calls through", () => {
     const cue = { start() {}, stop() {} };
     const audioRoute = { open: async () => {}, current: async () => null, subscribe: () => () => {} };
     const screen = { locked: async () => false };
-    withHost({ localHost, muteShortcut, callControls, callSurface, cue, audioRoute, screen, updater });
+    const crashReports = { get: async () => "auto", set: async () => {}, subscribe: () => () => {} };
+    withHost({ localHost, muteShortcut, callControls, callSurface, cue, audioRoute, screen, updater, crashReports });
     expect(host().screen).toBe(screen);
     expect(host().callSurface).toBe(callSurface);
     expect(host().cue).toBe(cue);
@@ -236,6 +239,7 @@ describe("the members an app calls through", () => {
     expect(host().muteShortcut).toBe(muteShortcut);
     expect(host().callControls).toBe(callControls);
     expect(host().updater).toBe(updater);
+    expect(host().crashReports).toBe(crashReports);
   });
 
   test("the microphone is whatever the app says, a settings link alone included, and its help is always there", () => {

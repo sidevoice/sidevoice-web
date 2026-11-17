@@ -12,7 +12,8 @@
  * icon, an opened reply's words), the colour it drew is the one here: that is what was seen and closed.
  * The shared components' rules load after this file, so a rule here that reshapes one of them names it as well. */
 
-.transcript {
+/* `.logs-wrap`: the logs' viewer (features/crash-reports) draws the way back to the latest over its own box, in these colours. */
+.transcript, .logs-wrap {
   --tr-panel: #fbf9f6; --tr-ink: #1b1d24; --tr-edge: #c5b9d5; --tr-line: #e6dff0;
   --tr-panel-shadow: 0 3px 8px rgb(42 26 64 / 8%), 0 18px 40px -22px rgb(74 47 107 / 40%);
   --tr-icon-bg: #f3eefa; --tr-icon-ink: #686b7a; --tr-hover: #0000000d; --tr-scroll: #d6cce4; --tr-grab: #c5b9d5;
@@ -28,7 +29,7 @@
   --tr-field: #fff; --tr-field-edge: #c5b9d5; --tr-field-ink: #8b8696; --tr-send-bg: #ebe6f2; --tr-send-ink: #4a2f6b;
   --tr-scrim: rgb(20 14 30 / 38%);
 }
-[data-theme="dark"] .transcript, .transcript[data-theme="dark"] {
+[data-theme="dark"] .transcript, .transcript[data-theme="dark"], [data-theme="dark"] .logs-wrap {
   --tr-panel: #19181d; --tr-ink: #f2f1f5; --tr-edge: #3d3946; --tr-line: #2e2b35;
   --tr-icon-bg: #2a2633; --tr-icon-ink: #93939c; --tr-scroll: #3d3946;
   --tr-bubble: #212125; --tr-bubble-ink: #fafafa; --tr-bubble-edge: #4b4756; --tr-bubble-shadow: 0 6px 18px rgb(0 0 0 / 35%);
