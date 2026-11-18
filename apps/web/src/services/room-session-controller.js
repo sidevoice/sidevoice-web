@@ -2554,8 +2554,10 @@ async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){d
  // Nothing to join without a machine this device is paired with: the tap asks for a code instead.
  if(!pairings.list.some(p=>!p.revoked)){openPairing(pairings.list.length?reachNote(state):'');return}
  personSignal();primeNowPlaying();primeBreath();state.callEnded=null;state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();sayCallError=null;setRoomError('');joinStatus('voice');
- // Whether Smart's model is on disk is the catalogue's to say (voiceSettingsToLoad): read while the machine is looked for.
- const catalogue=state.voiceCatalogue.state==='ready'?null:loadVoiceCatalogue();
+ // Whether Smart's model is on disk is the catalogue's to say (voiceSettingsToLoad): read in the background, never waited
+ // for (a remote provider's listing can take minutes). The call starts with the last catalogue known, and the settings
+ // are corrected (`applyVoiceSettings`) once it has been read.
+ if(state.voiceCatalogue.state!=='ready')void loadVoiceCatalogue();
  try{
   const fp=await callMachine(epoch);if(epoch!==connectEpoch)return;
   // From here the call is this machine's: what the voice reports is kept for it, and its reach is the one said. A machine this
@@ -2564,7 +2566,7 @@ async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){d
   const pairing=pairings.list.find(p=>p.fp===fp);
   if(!pairing||pairing.revoked){const text=reachNote(state)||NO_MACHINE;reachFailure={text,node:fp};throw worded(text)}
   const owner=await voiceHost();if(epoch!==connectEpoch)return;voiceOwner=owner;
-  await catalogue;handed=voiceSettingsToLoad(state.voiceSettings,state.voiceCatalogue.catalogs);
+  handed=voiceSettingsToLoad(state.voiceSettings,state.voiceCatalogue.catalogs);
   if(epoch!==connectEpoch)return;
   if(rememberedOn(fp))await prepareConversationCall(fp,rememberedOn(fp),null);
   if(epoch!==connectEpoch)return;

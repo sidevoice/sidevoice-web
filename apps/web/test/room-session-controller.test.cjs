@@ -1608,7 +1608,7 @@ function joining(s,{admission={admitted:true,reason:null,message:null,clients:1,
  return {sockets,voice,tap:()=>s.run('toggleCall')()};
 }
 // `microphone`: what the platform says of the microphone when the call is joined (microphone-access.ts), where a test says.
-async function callOnRoom({timers=null,clearTimers=null,indexedDB=null,outboxScope=null,stored=undefined,readingMode=false,microphone=null,voice:given=null}={}){
+async function callOnRoom({timers=null,clearTimers=null,indexedDB=null,outboxScope=null,stored=undefined,readingMode=false,microphone=null,voice:given=null,engine=null}={}){
  const s=setup({indexedDB,outboxScope,readingMode,...(stored?{stored}:{})});const sockets=socketsOf(s);let ids=0;
  if(microphone)s.run(`microphone.getSnapshot=()=>({state:'${microphone}'})`);
  s.context.crypto={randomUUID:()=>'id-'+(++ids)};
@@ -1616,7 +1616,7 @@ async function callOnRoom({timers=null,clearTimers=null,indexedDB=null,outboxSco
  const store={'sidevoice.selected':'fp-mac|a'};s.context.sessionStorage=storageOf(store);
  if(timers)s.context.setTimeout=timers;
  if(clearTimers)s.context.clearTimeout=handle=>{if(!clearTimers.delete(handle))clearTimeout(handle)};
- const voice=withVoice(s,given??fakeVoice());
+ const voice=withVoice(s,given??fakeVoice(),engine);
  s.context.fetch=async path=>({ok:true,status:200,json:async()=>path.includes('/participants')
   ?{participants:[{thread_id:'a',title:'A',available:true,reach:{state:'listening'},epoch:0}]}
   :{binding:{thread_id:'a',title:'A',binding_id:'b'},room:{revision:0},clients:[],call:null,messages:[]}});
@@ -1641,6 +1641,15 @@ const started=(turn_id,at=1)=>({turn_id,phase:'started',started_at:at});
 const finished=(turn_id,text)=>({turn_id,phase:'finished',text,started_at:1,ended_at:2,merged:false,timings:{audio_ms:900,endpoint_silence_ms:400,recognition_ms:600}});
 // The message the page sent for a turn's phase.
 const turnSent=(c,socket,turn_id,phase)=>sentOf(c,socket,'voice-user-turn').filter(d=>d.turn_id===turn_id&&d.phase===phase);
+
+test('A call joins the room while a provider\'s catalogue never answers',async()=>{
+ const engine={...fakeEngine([]),catalogs:()=>new Promise(()=>{})};
+ const c=await callOnRoom({engine});
+ assert.equal(c.sockets.length,1);
+ assert.equal(c.s.run('state.connecting'),false,'the join finished');
+ assert.equal(c.s.run('state.voiceCatalogue.state'),'loading','the catalogue is still being read in the background');
+ assert.equal(c.voice.calls[0][0],'start');
+});
 
 test('A call starts its voice with the halves of the settings, and only then joins the room with the hello the room takes',async()=>{
  const c=await callOnRoom();const {voice,firstHello}=c;
