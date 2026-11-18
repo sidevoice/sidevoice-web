@@ -105,9 +105,12 @@ const installed = () => {
     + (line.querySelector("[role=status]")?.textContent ?? "");
   return words;
 };
-/** Each machine's row as Updates says it: its name, its version line, its badge. */
+/** Each machine's row as Updates says it: its name, its version line, its badge (where its service stands). */
 const machineRows = () => [...pane("updates").querySelectorAll<HTMLElement>("[data-machine-row]")].map((row) => [
-  row.querySelector(".svc-link-name")?.textContent, row.querySelector(".ui-row-description")?.textContent ?? null, row.querySelector(".ui-badge")?.textContent ?? null]);
+  row.querySelector(".svc-link-name")?.textContent, row.querySelector(".ui-row-description")?.textContent ?? null, row.querySelector(".svc-badge")?.textContent ?? null]);
+/** The rows that say they are this device (the tag beside the name): the machine each belongs to, by its name. */
+const thisDeviceRows = () => [...pane("updates").querySelectorAll<HTMLElement>("[data-machine-row]")]
+  .filter((row) => row.querySelector(".ui-row-label > .ui-badge")?.textContent === "This device").map((row) => row.querySelector(".svc-link-name")?.textContent);
 const settle = () => act(async () => {});
 const inSpanish = () => {
   localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
@@ -130,7 +133,7 @@ test("Updates is a section of its own, before Advanced: the app's row — its ic
   expect(updates().getByRole("heading", { name: "Updates", level: 2 })).toBeInTheDocument();
   expect(updates().getByText("Sidevoice on this device and on your machines: their versions, and where each stands.")).toBeInTheDocument();
   // The app, then the machines: this device alone, no other is paired.
-  expect(groups()).toEqual(["Machines"]);
+  expect(groups()).toEqual(["Sidevoice service on your machines"]);
   const modes = await updates().findByRole("radiogroup", { name: "Updates" });
   const check = updates().getByRole("button", { name: "Check for updates" });
   // The app's row: its icon, its name, its version said once — never the service's — with Check for updates; never
@@ -189,6 +192,32 @@ test("This device's row says no badge where the app reports nothing it knows: no
   expect(machineRows()[0]).toEqual([expect.any(String), null, null]);
 });
 
+test("the machines' list says it is the Sidevoice service, and this device's row says it is this device: beside its name, with the badge the device list uses, never on another machine's row", async () => {
+  const { store } = open({ section: "updates", machines: [lab, nuc], service: { ...SERVICE_CURRENT, update: "available" }, remote: { "fp-lab": says("0.19.2"), "fp-nuc": says("0.20.0") } });
+  await waitFor(() => expect(machineRows()[0][2]).toBe("Out of date"));
+  // The heading is the service's, over the machines; the app's row is above it, never in it.
+  expect(groups()).toEqual(["Sidevoice service on your machines"]);
+  expect(group("app").querySelector("[data-machine-row]")).toBeNull();
+  // This device alone has the tag, in its name's line; its service's standing is still the badge at the right.
+  expect(thisDeviceRows()).toHaveLength(1);
+  const row = pane("updates").querySelector<HTMLElement>("[data-machine-row=local]")!;
+  const tag = row.querySelector<HTMLElement>(".ui-row-label > .ui-badge")!;
+  expect(tag).toHaveTextContent(/^This device$/);
+  expect(tag).toHaveAttribute("data-tone", "accent");
+  expect(tag.previousElementSibling).toHaveClass("svc-link-name");
+  expect(row.querySelector(".ui-row-control .svc-badge")).toHaveTextContent(/^Out of date$/);
+  expect(row).toHaveAccessibleName(new RegExp("This device"));
+  // The others' rows are as they were.
+  for (const other of [...pane("updates").querySelectorAll<HTMLElement>("[data-machine-row]")].filter((entry) => entry !== row)) {
+    expect(other.querySelector(".ui-row-label > .ui-badge")).toBeNull();
+    expect(other.querySelector(".ui-row-label")).not.toHaveAttribute("data-tagged");
+    expect(other).not.toHaveTextContent("This device");
+  }
+  // The tag does not change what the row does: it still opens this device's page.
+  await act(async () => { fireEvent.click(row); });
+  expect([store.getState().facts.settingsSection, store.getState().facts.settingsLevel]).toEqual(["this-computer", "page"]);
+});
+
 test("each paired machine is a row — its name, its version, where that stands against the minor the app pins (0.20) — and opens its own page; an offline one says Offline and the version it was last seen running", async () => {
   localStorage.setItem("sidevoice.service-last-seen", JSON.stringify({ "fp-offline": "0.19.9" }));
   const offline: PairingSummary = { ...lab, fp: "fp-offline", host: "Attic", device_id: "d-attic" };
@@ -225,7 +254,7 @@ test("in a browser, a machine out of date: Updates lists only the machines — n
   await settle();
   expect(entry()).toHaveTextContent(/^Updates$/);
   expect(updates().getByText("Sidevoice on your machines: their versions, and which are out of date.")).toBeInTheDocument();
-  expect(groups()).toEqual(["Machines"]);
+  expect(groups()).toEqual(["Sidevoice service on your machines"]);
   expect(pane("updates").querySelector(".app-update-settings, .svc-app-row")).toBeNull();
   expect(machineRows()).toEqual([["Lab box", "Version 0.19.2", "Out of date"], ["NUC", "Version 0.20.0", "Up to date"]]);
   // Updated: none out of date, no section, and Settings is back where the person can be.
@@ -257,6 +286,7 @@ test("a computer listed among the machines (a host that is not the app: no secti
   await waitFor(() => expect(machineRows()).toEqual([["MacBook", "Version 0.9.0", "Out of date"], ["Lab box", "Version 0.20.1", "Up to date"]]));
   const row = pane("updates").querySelector<HTMLElement>("[data-machine-row=local]")!;
   expect(row.querySelector("svg")).toHaveClass("lucide-laptop");
+  expect(thisDeviceRows()).toEqual(["MacBook"]);
   // It opens its page among the machines'.
   await act(async () => { fireEvent.click(row); });
   const facts = store.getState().facts;
@@ -314,7 +344,9 @@ test("in Spanish: Actualizaciones, the app's row, the machines' rows with their 
     updater: { mode: "manual", status: { state: "idle" } } });
   await settle();
   expect(entry()).toHaveTextContent(/^Actualizaciones$/);
-  expect(groups()).toEqual(["Máquinas"]);
+  expect(groups()).toEqual(["Servicio de Sidevoice en tus máquinas"]);
+  expect(pane("updates").querySelectorAll("[data-machine-row] .ui-row-label > .ui-badge")).toHaveLength(1);
+  expect(pane("updates").querySelector("[data-machine-row=local] .ui-row-label > .ui-badge")).toHaveTextContent(/^Este dispositivo$/);
   expect(updates().getByText("Sidevoice en este dispositivo y en tus máquinas: sus versiones y en qué punto está cada una.")).toBeInTheDocument();
   expect(installedLine()!.querySelector(".ui-row-label")).toHaveTextContent(/^App de Sidevoice$/);
   await waitFor(() => expect(installed()).toHaveTextContent(/^Versión 0\.9\.0 · Al día$/));

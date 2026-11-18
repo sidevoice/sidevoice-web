@@ -818,6 +818,7 @@ export const messages: Messages = {
   "settings.section.updates": "更新",
   "settings.updates.description": "此设备和你的计算机上的 Sidevoice：各自的版本和状态。",
   "settings.updates.descriptionMachines": "你的计算机上的 Sidevoice：各自的版本，以及哪些已过时。",
+  "settings.updates.machines": "你的计算机上的 Sidevoice 服务",
   "settings.updates.one": "Sidevoice 应用",
   "settings.updates.version": "版本 {version}",
   "settings.updates.upToDate": "已是最新",

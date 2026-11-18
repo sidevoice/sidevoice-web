@@ -13,14 +13,14 @@ import { ServiceBadge, useLocalService, useRemoteService } from "./service-versi
  * service's version, then, at the right, where that stands (up to date, out of date, newer than the app supports, or that
  * the machine does not answer) and a chevron. The same row in both places; its page has the card and the notices. */
 
-/** The row: `icon`, `name` over `description`, `badge`, a chevron. A button: the whole row opens the page. */
-function LinkRow({ icon, name, spoken, description, badge, isNew = 0, onOpen, ...data }: {
-  icon: ReactNode; name: string; spoken?: string | null; description: string | null; badge: ReactNode; isNew?: number; onOpen: () => void;
+/** The row: `icon`, `name` (and its `tag`, beside it) over `description`, `badge`, a chevron. A button: the whole row opens the page. */
+function LinkRow({ icon, name, tag, spoken, description, badge, isNew = 0, onOpen, ...data }: {
+  icon: ReactNode; name: string; tag?: ReactNode; spoken?: string | null; description: string | null; badge: ReactNode; isNew?: number; onOpen: () => void;
 } & Record<`data-${string}`, string | undefined>) {
   return <button type="button" className="ui-row svc-link-row" onClick={onOpen} {...data}>
     <span className="svc-machine-icon" aria-hidden="true"><NewOnIcon icon={icon} isNew={isNew} /></span>
     <span className="ui-row-text">
-      <span className="ui-row-label"><span className="svc-link-name">{name}</span>{spoken && <span className="sr-only">{", " + spoken}</span>}</span>
+      <span className="ui-row-label" data-tagged={tag ? "" : undefined}><span className="svc-link-name">{name}</span>{tag && <>{" "}{tag}</>}{spoken && <span className="sr-only">{", " + spoken}</span>}</span>
       {description && <>{" "}<span className="ui-row-description">{description}</span></>}
     </span>
     {" "}
@@ -29,12 +29,15 @@ function LinkRow({ icon, name, spoken, description, badge, isNew = 0, onOpen, ..
 }
 
 /** This device's row: its name, its service's version and where the app says it stands; the green dot on its icon while its
- *  service runs. Where this computer is listed among the machines (it has no section of its own), it is this row there too. */
-export function LocalMachineRow({ machine, name, isNew = 0, onOpen }: { machine: MachineView | null; name: string; isNew?: number; onOpen: () => void }) {
+ *  service runs. Where this computer is listed among the machines (it has no section of its own), it is this row there too.
+ *  `thisDevice` says so beside its name, with the badge the device list of a machine's page uses: Updates asks for it,
+ *  for its list is of services on several machines; Machines' list, where every row is a machine, does not. */
+export function LocalMachineRow({ machine, name, thisDevice = false, isNew = 0, onOpen }: { machine: MachineView | null; name: string; thisDevice?: boolean; isNew?: number; onOpen: () => void }) {
   const t = translator();
   const service = useLocalService();
   const local = useRoomStore((state) => state.facts.localHostStatus);
-  return <LinkRow icon={<StateOnIcon icon={<ThisComputerIcon size={20} />} status={machineStatus(machine, local, true, t)} />} name={name} isNew={isNew} onOpen={onOpen} data-machine-row="local" data-machine={machine?.id}
+  return <LinkRow icon={<StateOnIcon icon={<ThisComputerIcon size={20} />} status={machineStatus(machine, local, true, t)} />} name={name}
+    tag={thisDevice ? <Badge tone="accent">{t("hosts.devices.thisDevice")}</Badge> : undefined} isNew={isNew} onOpen={onOpen} data-machine-row="local" data-machine={machine?.id}
     description={service.version ? t("settings.updates.version", { version: service.version }) : null}
     badge={service.kind === "unknown" ? null : <ServiceBadge kind={service.kind} t={t} />} />;
 }
