@@ -71,10 +71,13 @@ function ConnectedRow({ provider, name, catalog, inUse, onDisconnected }: Provid
   const focusBack = useFocusBack(() => (opener.current?.isConnected ? opener.current : null) ?? row.current);
   const show = (next: "replace" | "disconnect", from: HTMLElement) => { opener.current = from; setOpen(next); };
   const close = () => { setOpen(null); focusBack(); };
+  const checking = useRoomStore((s) => !!s.facts.voiceCatalogue.checking);
   const state = keyState(kept, catalog);
+  // A provider still unreachable while its first listing is awaited (re-read in the background) is being checked, not failing.
+  const waiting = checking && state === "unreachable" && !testing;
   // The page's note of the key, read as drawn: the dialog writes it once the key is kept, after this row appears.
   const last4 = readHint(provider)?.last4 ?? null;
-  const problem = state !== "connected" && state !== "unknown";
+  const problem = state !== "connected" && state !== "unknown" && !waiting;
   // The provider's own words follow its reason; anything else there is to know (a reason this page has no words for, what
   // the engine said) is behind Details.
   const detail = catalog?.status.detail ?? "";
@@ -89,7 +92,7 @@ function ConnectedRow({ provider, name, catalog, inUse, onDisconnected }: Provid
     if (after === "connected") { setNote(t("keys.tested")); row.current?.focus(); }
     else setNote(t(("keys.why." + after) as MessageKey, { provider: name, last4: last4 ?? "" }));
   }
-  const pill = testing ? <Badge tag tone="neutral">{t("keys.state.checking")}</Badge>
+  const pill = testing || waiting ? <Badge tag tone="neutral">{t("keys.state.checking")}</Badge>
     : state === "connected" ? <Badge tag tone="positive">{t("keys.state.connected")}</Badge>
     : <Badge tag tone={TONE[state]} dot>{t(("keys.state." + state) as MessageKey)}</Badge>;
   return (

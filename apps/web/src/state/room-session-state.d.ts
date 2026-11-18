@@ -79,7 +79,7 @@ export interface SessionFacts {
  /** The voice settings this device keeps, the ones the settings pane is editing, the engine's catalogues, and whether a
   *  key is kept for each remote provider. */
  voiceSettings: import('../services/voice-settings.js').DeviceVoiceSettings | null; voiceDraft: import('../services/voice-settings.js').DeviceVoiceSettings | null;
- voiceCatalogue: {state: 'idle' | 'loading' | 'ready' | 'failed'; catalogs: import('../services/model-catalogs.js').CatalogView[]; error: string; details?: string};
+ voiceCatalogue: {state: 'idle' | 'loading' | 'ready' | 'failed'; catalogs: import('../services/model-catalogs.js').CatalogView[]; error: string; details?: string; checking?: boolean};
  /** What the engine recommends here (its local catalogue's `recommend`), for the language in use; null where the engine
   *  cannot say (the page's engine today) or before it has. */
  voiceRecommendation: import('../services/model-catalogs.js').Recommendation | null;

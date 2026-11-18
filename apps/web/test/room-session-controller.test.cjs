@@ -5403,3 +5403,19 @@ test('The text retry waits 1 s, 2 s, 5 s, 10 s and then 15 s each time, and a ne
  assert.equal(s.run('textDue')-now,1000,'a new socket starts again at 1 s');
  s.run('disconnect()');
 });
+
+test('A provider with a key that is unreachable only until its first listing lands is read again in the background',async()=>{
+ const {s,engine}=settingsPage();
+ await engine.setCredential('elevenlabs','xi-1');
+ const listed=CATALOGS.find(c=>c.id==='elevenlabs');let reads=0;
+ const cold=CATALOGS.map(c=>c.id==='elevenlabs'?{...c,status:{stale:false,reason:{code:'provider-unreachable',params:{}}},models:[]}:c);
+ engine.catalogs=async()=>CATALOGS.length&&(++reads<3?cold:[...CATALOGS.filter(c=>c.id!=='elevenlabs'),{...listed,status:{stale:false},models:[{id:'eleven_flash_v2_5',family:'eleven',capabilities:['tts'],languages:['es'],voices:[],installed:true,builds:[]}]}]);
+ const waits=[],due=[];const realSetTimeout=s.context.setTimeout;s.context.setTimeout=(fn,ms,...rest)=>{if(ms>2000||ms<1000)return realSetTimeout(fn,ms,...rest);waits.push(ms);due.push(fn);return due.length};
+ s.run("$('settings-open').onclick()");
+ await settleSoon();
+ assert.equal(s.run('roomStore.getState().facts.voiceCatalogue.checking'),true,'the transient state is shown as checking');
+ for(let i=0;i<2;i++){due.shift()();await settleSoon()}
+ assert.equal(s.run('roomStore.getState().facts.voiceCatalogue.checking'),false);
+ assert.deepEqual(plain(s.run("voiceCatalogue.catalogs.find(c=>c.id==='elevenlabs').models.map(m=>m.id)")),['eleven_flash_v2_5']);
+ assert.deepEqual(waits,[1000,2000],'the pause grows');
+});
