@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.34.0](https://github.com/sidevoice/sidevoice-web/compare/v0.33.1...v0.34.0) (2026-11-18)
+
+
+### Features
+
+* **settings:** crash reports section, logs viewer and first-run notice ([#615](https://github.com/sidevoice/sidevoice-web/issues/615)) ([ceb5bf3](https://github.com/sidevoice/sidevoice-web/commit/ceb5bf3afb28bf740d2265c12816f76a9b37e792))
+
+
+### Bug Fixes
+
+* **settings:** say the machine list in Updates is the Sidevoice service and mark this device ([#619](https://github.com/sidevoice/sidevoice-web/issues/619)) ([a18d274](https://github.com/sidevoice/sidevoice-web/commit/a18d274eb2be5b5859dc18e8e0262a063fc160eb))
+* **voice:** don't wait for provider catalogues to join a call ([#618](https://github.com/sidevoice/sidevoice-web/issues/618)) ([9637bb7](https://github.com/sidevoice/sidevoice-web/commit/9637bb7ff09dd02fb1fa374476853d366c656764))
+
 ## [0.33.1](https://github.com/sidevoice/sidevoice-web/compare/v0.33.0...v0.33.1) (2026-11-13)
 
 
