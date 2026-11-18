@@ -811,6 +811,7 @@ export const messages: Messages = {
   "settings.section.updates": "अपडेट",
   "settings.updates.description": "इस डिवाइस और आपकी मशीनों पर Sidevoice: उनके वर्शन, और हर एक की स्थिति।",
   "settings.updates.descriptionMachines": "आपकी मशीनों पर Sidevoice: उनके वर्शन, और किन मशीनों पर वह पुराना है।",
+  "settings.updates.machines": "आपकी मशीनों पर Sidevoice सेवा",
   "settings.updates.one": "Sidevoice ऐप",
   "settings.updates.version": "वर्शन {version}",
   "settings.updates.upToDate": "अप-टू-डेट",

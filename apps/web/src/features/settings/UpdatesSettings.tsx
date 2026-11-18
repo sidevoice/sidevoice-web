@@ -19,7 +19,8 @@ import "./updates-settings.css";
  * action (AppUpdateSettings: Download, its progress, Restart to update). Then the machines (sidevoice-desktop#67, U3): one
  * row each — this device's and every paired machine's — with its name, its Sidevoice service's version and where that
  * stands (up to date, out of date, newer than the app supports, offline), a chevron to its page, where the card and the
- * notices are; none in this view. This device's service updates itself, in the background, never during a call.
+ * notices are; none in this view. The list is headed as the Sidevoice service on the machines — all it is about, the app
+ * being the row above — and this device's row says it is this device, beside its name. This device's service updates itself, in the background, never during a call.
  * In the desktop app always; in a browser or on a phone only while a machine is out of date, with the machines alone. */
 
 /** Whether Settings has Updates: in the desktop app (its build or its updater), or wherever a machine is out of date. */
@@ -60,11 +61,11 @@ export function UpdatesSettings() {
       // A landing lights the update's own line (its row with its button), never the whole card.
       ? <Group><div className="updates-settings"><AppUpdateSettings />{noted && <DesktopBuildNote build={build} updater={updater} t={t} />}</div></Group>
       : <><AppRow t={t} />{noted && <DesktopBuildNote build={build} updater={updater} t={t} />}</>)}
-    {(own || listed.length > 0) && <Group title={t("hosts.title")}>
-      {own && <LocalMachineRow machine={thisDevice} name={currentDeviceName()}
+    {(own || listed.length > 0) && <Group title={t("settings.updates.machines")}>
+      {own && <LocalMachineRow machine={thisDevice} name={currentDeviceName()} thisDevice
         onOpen={() => store?.patch({ settingsSection: "this-computer", settingsLevel: "page" })} />}
       {listed.map((machine) => machine.local
-        ? <LocalMachineRow key={machine.id} machine={machine} name={machineName(machine, t)} onOpen={() => open(machine)} />
+        ? <LocalMachineRow key={machine.id} machine={machine} name={machineName(machine, t)} thisDevice onOpen={() => open(machine)} />
         : <RemoteMachineRow key={machine.id} machine={machine} name={machineName(machine, t)} onOpen={() => open(machine)} />)}
     </Group>}
   </Section>;

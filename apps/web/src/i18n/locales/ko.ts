@@ -811,6 +811,7 @@ export const messages: Messages = {
   "settings.section.updates": "업데이트",
   "settings.updates.description": "이 기기와 내 컴퓨터의 Sidevoice: 버전과 각각의 상태예요.",
   "settings.updates.descriptionMachines": "내 컴퓨터의 Sidevoice: 버전과 최신 여부예요.",
+  "settings.updates.machines": "내 컴퓨터의 Sidevoice 서비스",
   "settings.updates.one": "Sidevoice 앱",
   "settings.updates.version": "버전 {version}",
   "settings.updates.upToDate": "최신 버전",

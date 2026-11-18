@@ -22,6 +22,10 @@
 .ui-row.svc-link-row .ui-row-text { flex: 1; min-width: 0; }
 .svc-link-row .ui-row-description { display: block; }
 .svc-link-name { overflow-wrap: anywhere; }
+/* A tag beside the name (This device): both wrap onto lines of their own where the row is narrow (320px, a long word in
+ * another language); the tag keeps its pill and gives way only when it is wider than the row's text. */
+.svc-link-row .ui-row-label[data-tagged] { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-1) var(--sv-space-2); }
+.svc-link-row .ui-row-label[data-tagged] > .ui-badge { flex: 0 1 auto; min-width: 0; max-width: 100%; padding-block: 2px; line-height: 1.2; white-space: normal; text-align: center; }
 .ui-row.svc-link-row .ui-row-control { display: flex; align-items: center; flex: 0 1 auto; max-width: 55%; flex-wrap: wrap; justify-content: flex-end; gap: var(--sv-space-2) var(--sv-space-3); }
 .svc-link-row:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
 @media (hover: hover) { .svc-link-row:hover { background: var(--sv-hover); } }

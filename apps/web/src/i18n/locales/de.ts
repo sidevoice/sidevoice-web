@@ -821,6 +821,7 @@ export const messages: Messages = {
   "settings.section.updates": "Updates",
   "settings.updates.description": "Sidevoice auf diesem Gerät und auf deinen Rechnern: ihre Versionen und wie aktuell jede ist.",
   "settings.updates.descriptionMachines": "Sidevoice auf deinen Rechnern: ihre Versionen und welche veraltet sind.",
+  "settings.updates.machines": "Sidevoice-Dienst auf deinen Rechnern",
   "settings.updates.one": "Sidevoice-App",
   "settings.updates.version": "Version {version}",
   "settings.updates.upToDate": "Aktuell",
