@@ -2554,8 +2554,10 @@ async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){d
  // Nothing to join without a machine this device is paired with: the tap asks for a code instead.
  if(!pairings.list.some(p=>!p.revoked)){openPairing(pairings.list.length?reachNote(state):'');return}
  personSignal();primeNowPlaying();primeBreath();state.callEnded=null;state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();sayCallError=null;setRoomError('');joinStatus('voice');
- // Whether Smart's model is on disk is the catalogue's to say (voiceSettingsToLoad): read while the machine is looked for.
- const catalogue=state.voiceCatalogue.state==='ready'?null:loadVoiceCatalogue();
+ // Whether Smart's model is on disk is the catalogue's to say (voiceSettingsToLoad): read in the background, never waited
+ // for (a remote provider's listing can take minutes). The call starts with the last catalogue known, and the settings
+ // are corrected (`applyVoiceSettings`) once it has been read.
+ if(state.voiceCatalogue.state!=='ready')void loadVoiceCatalogue();
  try{
   const fp=await callMachine(epoch);if(epoch!==connectEpoch)return;
   // From here the call is this machine's: what the voice reports is kept for it, and its reach is the one said. A machine this
@@ -2564,7 +2566,7 @@ async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){d
   const pairing=pairings.list.find(p=>p.fp===fp);
   if(!pairing||pairing.revoked){const text=reachNote(state)||NO_MACHINE;reachFailure={text,node:fp};throw worded(text)}
   const owner=await voiceHost();if(epoch!==connectEpoch)return;voiceOwner=owner;
-  await catalogue;handed=voiceSettingsToLoad(state.voiceSettings,state.voiceCatalogue.catalogs);
+  handed=voiceSettingsToLoad(state.voiceSettings,state.voiceCatalogue.catalogs);
   if(epoch!==connectEpoch)return;
   if(rememberedOn(fp))await prepareConversationCall(fp,rememberedOn(fp),null);
   if(epoch!==connectEpoch)return;
@@ -2787,14 +2789,31 @@ function voiceHost(){return voiceHostOpening??=pageHost().voice.host().then(host
 async function trialVoiceHost(ms){const opening=voiceHost();try{return await within(opening,ms,'trial-preparation-timeout')}catch(error){if(error?.code==='trial-preparation-timeout'&&voiceHostOpening===opening)voiceHostOpening=null;throw error}}
 function modelCatalogs(){return catalogsOpening??=pageHost().voice.catalogs().catch(error=>{catalogsOpening=null;throw error})}
 async function keptProviderKeys(models,catalogs){return Object.fromEntries(await Promise.all(remoteProviders(catalogs).map(async({id})=>[id,await models.hasCredential(id).catch(()=>null)])))}
-async function loadVoiceCatalogue(){
- roomStore.patch({voiceCatalogue:{...state.voiceCatalogue,state:'loading',error:''}});
- try{const models=await modelCatalogs();const catalogs=await models.catalogs();roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},modelsRemovable:typeof models.uninstall==='function',providerKeys:await keptProviderKeys(models,catalogs)});
+// The engine answers a catalogue from its cache and lists in the background (sidevoice-engine#176): on a cold start a provider
+// with a key comes back with no models and `provider-unreachable` until its first listing lands, and nothing says when. Such a
+// catalogue is read again quietly, with a growing pause (1 s, 2 s, 4 s ... up to 30 s) for as long as REPOLL_MS; the pane
+// shows that provider as checking meanwhile (`voiceCatalogue.checking`). Reading it by hand starts the wait again.
+const REPOLL_FIRST_MS=1000,REPOLL_MAX_MS=30000,REPOLL_MS=5*60*1000;
+let repollTimer=null,repollDelay=REPOLL_FIRST_MS,repollUntil=0;
+function stopRepoll(){if(repollTimer!=null)clearTimeout(repollTimer);repollTimer=null}
+function listingPending(catalogs,keys){return remoteProviders(catalogs).some(({id})=>keys[id]===true&&catalogs.find(c=>c.id===id)?.models.length===0&&catalogs.find(c=>c.id===id)?.status?.reason?.code==='provider-unreachable')}
+function planRepoll(pending,quiet){
+ stopRepoll();
+ if(pending&&!quiet){repollDelay=REPOLL_FIRST_MS;repollUntil=Date.now()+REPOLL_MS}
+ const again=pending&&Date.now()<repollUntil;
+ if(again){repollTimer=setTimeout(()=>{repollTimer=null;void loadVoiceCatalogue({quiet:true})},repollDelay);repollDelay=Math.min(repollDelay*2,REPOLL_MAX_MS)}
+ return again;
+}
+async function loadVoiceCatalogue({quiet=false}={}){
+ if(!quiet)roomStore.patch({voiceCatalogue:{...state.voiceCatalogue,state:'loading',error:''}});
+ try{const models=await modelCatalogs();const catalogs=await models.catalogs();const providerKeys=await keptProviderKeys(models,catalogs);
+  const checking=planRepoll(listingPending(catalogs,providerKeys),quiet);
+  roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:'',checking},modelsRemovable:typeof models.uninstall==='function',providerKeys});
   // A model chosen while it was not here yet is put in use once it is; Smart's too, kept from before (`handed`).
   void applyVoiceSettings();
   void recommendModels(models);
   void deleteUnusedModels(models,catalogs)}
- catch(error){const words=voiceError(error,'models');roomStore.patch({voiceCatalogue:{state:'failed',catalogs:[],error:errorLine(words),details:words.details||''}})}
+ catch(error){if(quiet)return;stopRepoll();const words=voiceError(error,'models');roomStore.patch({voiceCatalogue:{state:'failed',catalogs:[],error:errorLine(words),details:words.details||''}})}
 }
 // What the engine recommends here, for the language in use (sidevoice-engine#124): said with «Recomendado» where a model
 // is chosen. A device that keeps no voice settings yet starts on it, once a session: preselected in the draft, never

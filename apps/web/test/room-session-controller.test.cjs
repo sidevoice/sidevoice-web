@@ -1608,7 +1608,7 @@ function joining(s,{admission={admitted:true,reason:null,message:null,clients:1,
  return {sockets,voice,tap:()=>s.run('toggleCall')()};
 }
 // `microphone`: what the platform says of the microphone when the call is joined (microphone-access.ts), where a test says.
-async function callOnRoom({timers=null,clearTimers=null,indexedDB=null,outboxScope=null,stored=undefined,readingMode=false,microphone=null,voice:given=null}={}){
+async function callOnRoom({timers=null,clearTimers=null,indexedDB=null,outboxScope=null,stored=undefined,readingMode=false,microphone=null,voice:given=null,engine=null}={}){
  const s=setup({indexedDB,outboxScope,readingMode,...(stored?{stored}:{})});const sockets=socketsOf(s);let ids=0;
  if(microphone)s.run(`microphone.getSnapshot=()=>({state:'${microphone}'})`);
  s.context.crypto={randomUUID:()=>'id-'+(++ids)};
@@ -1616,7 +1616,7 @@ async function callOnRoom({timers=null,clearTimers=null,indexedDB=null,outboxSco
  const store={'sidevoice.selected':'fp-mac|a'};s.context.sessionStorage=storageOf(store);
  if(timers)s.context.setTimeout=timers;
  if(clearTimers)s.context.clearTimeout=handle=>{if(!clearTimers.delete(handle))clearTimeout(handle)};
- const voice=withVoice(s,given??fakeVoice());
+ const voice=withVoice(s,given??fakeVoice(),engine);
  s.context.fetch=async path=>({ok:true,status:200,json:async()=>path.includes('/participants')
   ?{participants:[{thread_id:'a',title:'A',available:true,reach:{state:'listening'},epoch:0}]}
   :{binding:{thread_id:'a',title:'A',binding_id:'b'},room:{revision:0},clients:[],call:null,messages:[]}});
@@ -1641,6 +1641,15 @@ const started=(turn_id,at=1)=>({turn_id,phase:'started',started_at:at});
 const finished=(turn_id,text)=>({turn_id,phase:'finished',text,started_at:1,ended_at:2,merged:false,timings:{audio_ms:900,endpoint_silence_ms:400,recognition_ms:600}});
 // The message the page sent for a turn's phase.
 const turnSent=(c,socket,turn_id,phase)=>sentOf(c,socket,'voice-user-turn').filter(d=>d.turn_id===turn_id&&d.phase===phase);
+
+test('A call joins the room while a provider\'s catalogue never answers',async()=>{
+ const engine={...fakeEngine([]),catalogs:()=>new Promise(()=>{})};
+ const c=await callOnRoom({engine});
+ assert.equal(c.sockets.length,1);
+ assert.equal(c.s.run('state.connecting'),false,'the join finished');
+ assert.equal(c.s.run('state.voiceCatalogue.state'),'loading','the catalogue is still being read in the background');
+ assert.equal(c.voice.calls[0][0],'start');
+});
 
 test('A call starts its voice with the halves of the settings, and only then joins the room with the hello the room takes',async()=>{
  const c=await callOnRoom();const {voice,firstHello}=c;
@@ -5393,4 +5402,20 @@ test('The text retry waits 1 s, 2 s, 5 s, 10 s and then 15 s each time, and a ne
  await tick();
  assert.equal(s.run('textDue')-now,1000,'a new socket starts again at 1 s');
  s.run('disconnect()');
+});
+
+test('A provider with a key that is unreachable only until its first listing lands is read again in the background',async()=>{
+ const {s,engine}=settingsPage();
+ await engine.setCredential('elevenlabs','xi-1');
+ const listed=CATALOGS.find(c=>c.id==='elevenlabs');let reads=0;
+ const cold=CATALOGS.map(c=>c.id==='elevenlabs'?{...c,status:{stale:false,reason:{code:'provider-unreachable',params:{}}},models:[]}:c);
+ engine.catalogs=async()=>CATALOGS.length&&(++reads<3?cold:[...CATALOGS.filter(c=>c.id!=='elevenlabs'),{...listed,status:{stale:false},models:[{id:'eleven_flash_v2_5',family:'eleven',capabilities:['tts'],languages:['es'],voices:[],installed:true,builds:[]}]}]);
+ const waits=[],due=[];const realSetTimeout=s.context.setTimeout;s.context.setTimeout=(fn,ms,...rest)=>{if(ms>2000||ms<1000)return realSetTimeout(fn,ms,...rest);waits.push(ms);due.push(fn);return due.length};
+ s.run("$('settings-open').onclick()");
+ await settleSoon();
+ assert.equal(s.run('roomStore.getState().facts.voiceCatalogue.checking'),true,'the transient state is shown as checking');
+ for(let i=0;i<2;i++){due.shift()();await settleSoon()}
+ assert.equal(s.run('roomStore.getState().facts.voiceCatalogue.checking'),false);
+ assert.deepEqual(plain(s.run("voiceCatalogue.catalogs.find(c=>c.id==='elevenlabs').models.map(m=>m.id)")),['eleven_flash_v2_5']);
+ assert.deepEqual(waits,[1000,2000],'the pause grows');
 });
