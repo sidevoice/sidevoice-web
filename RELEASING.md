@@ -52,7 +52,7 @@ Release itself.
 
 ## The Sidevoice service minor this web works with
 
-`apps/web/public/service.pin.json` (`{ "minor": "0.20" }`) declares the one minor of the Sidevoice service this web speaks
+`apps/web/public/service.pin.json` (`{ "minor": "0.21" }`) declares the one minor of the Sidevoice service this web speaks
 the contract of. It ships in the build (`voice/service.pin.json`); the page judges every machine against it, and the
 desktop app reads it from the web it bundles (`web.pin.json`), updating this device's service to the newest patch of that
 minor and never to the next one. A service release that is a minor (`feat` in the service) arrives with the web (and so the
