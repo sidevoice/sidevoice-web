@@ -9,6 +9,7 @@ import {currentDeviceName} from '../state/device-name.ts';
 import {translator,setUiLanguage,onUiLanguage,uiLanguage,UI_LANGUAGES} from '../i18n/translator.ts';
 import {voiceFailure,roomFailure,worded,errorLine} from '../features/settings/error-message.ts';
 import {failureCode} from './failure-code.js';
+import {logCallEnd,logCallParked} from './call-end.js';
 import {probeSiteStorage} from './site-storage.js';
 import {tryTranscription,tryVoice,tryEndOfTurn} from './voice-trial.js';
 import {systemLanguage,SPEECH_LANGUAGES} from './system-language.js';
@@ -1520,6 +1521,7 @@ function closePairing(){roomStore.patch({pairingOpen:false,pairingNote:''})}
 // on that machine — the call, or an action on its page (`asked`): one the page met while merely watching it says so in
 // its row, and asks nothing of a person who may be busy with another.
 // `token`: the credential that was refused — one a pairing made since has replaced is not this pairing's to lose.
+// Resolves true when it ended the call, false when it left the call alone (the caller of a refused call then ends it).
 async function pairingRefused(fp,{call=false,token=null,asked=false}={}){
  const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing||pairing.revoked||token!=null&&pairing.token!==token)return;
  let revoked=false;
@@ -1534,8 +1536,9 @@ async function pairingRefused(fp,{call=false,token=null,asked=false}={}){
  if(!onCall&&!asked)return;
  // Said of the machine that refused, whichever one the call is on.
  const text=reachNote({...roomStore.getState().facts,callNode:fp});
- if(onCall){callEndedBy('failed',text);disconnect();reachFailure={text,node:fp};failJoin({text})}
+ if(onCall){callEndedBy('failed',text);disconnect('pairing_revoked');reachFailure={text,node:fp};failJoin({text})}
  openPairing(text);
+ return onCall;
 }
 // A code, redeemed where the machine proves it is itself: from then on one more machine, live at once, call or not.
 async function pairDevice(code,name,address='',{insecure=false}={}){
@@ -1560,7 +1563,7 @@ async function forgetMachine(fp){
  const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing)return;
  const known=linkBase(fp);
  // The call ends only when it is with the machine forgotten.
- if(fp===state.callNode&&inCallNow())disconnect();
+ if(fp===state.callNode&&inCallNow())disconnect('forgotten');
  await keepPairings(current=>withoutPairing(current,fp));
  if(pairing.revoked)return;
  // Gone from here at once; the machine is told now if it answers, else whenever it does (pendingRevokes).
@@ -2376,7 +2379,9 @@ function openSession(socket,hello={},fp=state.callNode,token=null){return new Pr
   timer=setTimeout(()=>fail(bundled('room.failure.rejected')),3000);
   roomRefusal().then(admission=>fail(admissionFailure(admission,broken),admission?.admitted===false))};
  socket.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type!=='voice-session'){if(m.type==='error'){refusal=m.data?refusalError(m.data):refusal;refused=m.data?.reason||refused}message(e.data,socket);return}state.roomInfo=m.data?.room||state.roomInfo;clearTimeout(timer);resolve(m.data)}})}
-function disconnect() {
+// `reason` is why the call ends, one of CALL_END_REASONS (call-end.js): one log line per end, whichever path it took.
+function disconnect(reason='unknown') {
+    logCallEnd(reason);
     audioLog.callEnded();
     clearLeaving();
     // A deliberate hang-up is this app's not-heard choice for replies still pending. Offer the
@@ -2550,7 +2555,7 @@ async function callMachine(epoch){
  if(pick()==null)await Promise.all(live.map(fp=>locate(fp,{move:true,fresh:true})));
  return epoch===connectEpoch?pick()??wanted??live[0]??null:null;
 }
-async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){disconnect();return}
+async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){disconnect('user');return}
  // Nothing to join without a machine this device is paired with: the tap asks for a code instead.
  if(!pairings.list.some(p=>!p.revoked)){openPairing(pairings.list.length?reachNote(state):'');return}
  personSignal();primeNowPlaying();primeBreath();state.callEnded=null;state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();sayCallError=null;setRoomError('');joinStatus('voice');
@@ -2582,7 +2587,7 @@ async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){d
   const remembered=rememberedThread();if(rememberedOn(fp))joinStatus('conversation',{subject:conversationTitle(remembered)});
   await refresh();await refreshPeople(fp);
   if(epoch===connectEpoch){clearJoinStatus();flushOutbox()}
- }catch(e){if(epoch===connectEpoch){const failed=state.joinStep;disconnect();failJoin(joinError(failed,e))}}
+ }catch(e){if(epoch===connectEpoch){const failed=state.joinStep;disconnect('join_failed');failJoin(joinError(failed,e))}}
  finally{if(epoch===connectEpoch){state.connecting=false;applyMicState()}}
 }
 // ----- the socket: opened on join, reopened by itself when the room goes away -----
@@ -2650,8 +2655,14 @@ async function lostConnection(event,epoch,token=null){
  // Nothing the call is doing stops with its socket: the voice goes on hearing and speaking — a reply already here plays
  // to its end however long the room is away (#220) — and what it reports waits in the outbox. The room parks the
  // session meanwhile, so its turn and its history stay as they are here too.
- if(event?.code===4401){void pairingRefused(state.callNode,{call:true,token}).catch(()=>{});return}
- if(!shouldReconnect(event)){const message=bundled('room.failure.closed');callEndedBy('failed',message.text);disconnect();failJoin(message);return}
+ if(event?.code===4401){
+  // A refusal pairingRefused does not act on (a token a newer pairing replaced, a pairing already revoked or gone) would leave
+  // a call with no socket and no reconnect: it ends here, with the same reason.
+  void pairingRefused(state.callNode,{call:true,token}).catch(()=>false).then(ended=>{
+   if(ended||epoch!==connectEpoch||state.ws||state.reconnecting)return;
+   const message=bundled('room.failure.closed');callEndedBy('failed',message.text);disconnect('pairing_revoked');failJoin(message)});
+  return}
+ if(!shouldReconnect(event)){const message=bundled('room.failure.closed');callEndedBy('failed',message.text);disconnect(event?.code===1013?'room_full':'refused');failJoin(message);return}
  state.reconnecting=true;
  // The first seconds of a drop are the network's, not the person's: no line, no control held. One that outlasts the
  // grace is said.
@@ -2668,7 +2679,7 @@ async function lostConnection(event,epoch,token=null){
    catch(e){
     if(epoch!==connectEpoch)return;
     ++current;const pending=state.ws;state.ws=null;try{pending?.close()}catch{}
-    if(refusedForGood(e)){const message=roomError(e,'room',bundled('room.failure.refused').text);callEndedBy('failed',message.text);disconnect();failJoin(message);return}
+    if(refusedForGood(e)){const message=roomError(e,'room',bundled('room.failure.refused').text);callEndedBy('failed',message.text);disconnect('refused');failJoin(message);return}
     continue;
    }
    if(epoch!==connectEpoch||!session)return;
@@ -2726,7 +2737,7 @@ async function moveCall(fp,thread){
   void settleRejoin(epoch,null);
  }catch(e){
   if(epoch!==connectEpoch)return;
-  const message=joinError('room',e),gone=reachFailure?.node===fp;callEndedBy(gone?'offline':'failed',gone?conversationTitle(conversationKey(fp,thread)):message.text);disconnect();failJoin(message)
+  const message=joinError('room',e),gone=reachFailure?.node===fp;callEndedBy(gone?'offline':'failed',gone?conversationTitle(conversationKey(fp,thread)):message.text);disconnect(gone?'unreachable':'move_failed');failJoin(message)
  }
  finally{if(epoch===connectEpoch){state.switching=false;moving=false;state.movingTo=null;applyMicState()}}
 }
@@ -3154,7 +3165,7 @@ window.sidevoiceActions={
   // Only a machine that has proved where it is: one being looked for again is not reachable until it answers. An agent that
   // is away does not keep the call from its conversation: what is sent to it waits there until it is back.
   const hears=state.machineLinks?.[to?.node]?.reach==='ok'&&linkBase(to?.node)!=null;
-  if(state.connecting&&!state.sessionId&&to&&to.node!==state.callNode){if(hears){disconnect();state.viewedThread=key;void toggleCall()}}
+  if(state.connecting&&!state.sessionId&&to&&to.node!==state.callNode){if(hears){disconnect('switch_machine');state.viewedThread=key;void toggleCall()}}
   else if(hears)void select(key);
   updateComposer();
  },
@@ -3220,7 +3231,7 @@ function syncNowPlaying(){
 function remoteCommand(command){
  if(command.type==='set-muted')setMic(!command.muted);
  else if(command.type==='toggle-muted')setMic(!micLive());
- else if(command.type==='hang-up'&&(state.ws||state.connecting||state.reconnecting))disconnect();
+ else if(command.type==='hang-up'&&(state.ws||state.connecting||state.reconnecting))disconnect('user');
 }
 function applyLockScreen(on){
  lockScreenOn=on;
@@ -3253,7 +3264,7 @@ window.addEventListener('keyup',e=>{if(spaceDown&&e.code===heldKey){e.preventDef
 window.addEventListener('blur',()=>{if(!hostHold)releaseHold()});document.addEventListener('visibilitychange',()=>{if(document.hidden&&!hostHold)releaseHold()});
 // A page going away is not a hang-up: its call is parked, and the ticket kept here lets the next load take it back.
 window.addEventListener('pagehide',()=>keepTicket(true));
-window.addEventListener('beforeunload',()=>{keepTicket(true);state.ws?.close();void voice?.stop().catch(()=>{})});updateMic();
+window.addEventListener('beforeunload',()=>{if(state.ws||state.connecting||state.reconnecting)logCallParked();keepTicket(true);state.ws?.close();void voice?.stop().catch(()=>{})});updateMic();
 // Discover the desktop-owned host first: it is one more machine, listed first. Pairing remains an explicit action:
 // an unpaired browser shows setup guidance, and an unpaired desktop does not open a modal by itself.
 setUiLanguage(devicePreferences().ui_language);
@@ -3306,7 +3317,7 @@ function checkIdle(){
  if(!state.ws){idleWarned=false;return}
  const quiet=Date.now()-lastPersonSignal;
  if(quiet>=IDLE_MS){
-  idleWarned=false;callEndedBy('idle','');disconnect();
+  idleWarned=false;callEndedBy('idle','');disconnect('idle');
   failJoin(bundled('room.failure.idle',{minutes:Math.round(IDLE_MS/60000)}));
   return;
  }
