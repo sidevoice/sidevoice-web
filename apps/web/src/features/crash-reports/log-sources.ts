@@ -3,9 +3,9 @@ import type { LogEvent } from "./log-model";
 /* Where the viewer gets log lines from. Logs live on the machine that wrote them and are kept nowhere else: the app does
  * not cache them, so a machine that is not connected has none to show.
  *
- * No log is readable from the page yet: the app's own log has a bridge that opens its folder (`host().localHost.revealLog`)
- * and none that reads it, and no machine's core serves its log lines. Until they do, no source is installed and every tab says
- * so. The seam is this file: whatever reads a log is a `LogSource`, given by `installLogSources`; the viewer asks for a place
+ * The app's own log is read through `host().appLog` and a paired machine's core log over its pairing (install-log-sources.ts);
+ * where neither is offered (a browser's own device tab, the connector's log) no source is installed and the tab says so. The
+ * seam is this file: whatever reads a log is a `LogSource`, given by `installLogSources`; the viewer asks for a place
  * and draws what it is given. */
 
 /** A place whose logs there are: the device the app runs on (the app's own log, and its connector's and core's when it
