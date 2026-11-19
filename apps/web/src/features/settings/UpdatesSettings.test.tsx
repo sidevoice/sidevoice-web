@@ -36,10 +36,10 @@ const running: LocalHostStatus = { state: "running", reachable: true, installed:
 const RELEASE = { channel: "release", version: "0.9.0", commit: "abcdef0123456789", date: "2026-10-13T08:00:00Z" };
 const NIGHTLY = { channel: "nightly", version: "0.10.0-nightly", commit: "abcdef0123456789", date: "2026-10-13T08:00:00Z" };
 const DEV = { channel: "dev", version: "0.10.0-dev" };
-/** What a remote machine says of its Sidevoice (loadMachineInfo): its version. The app pins 0.20 (public/service.pin.json). */
+/** What a remote machine says of its Sidevoice (loadMachineInfo): its version. The app pins 0.21 (public/service.pin.json). */
 const says = (version: string | null) => ({ state: "connected", checkedAt: 1, version });
 /** This computer's service as the bridge reports it. */
-const SERVICE_CURRENT: LocalHostVersion = { bridge: 3, bundled: { minor: "0.20" }, installed: { version: "0.9.0" }, core_api: 1, update: "current", latest: null, progress: null };
+const SERVICE_CURRENT: LocalHostVersion = { bridge: 3, bundled: { minor: "0.21" }, installed: { version: "0.9.0" }, core_api: 1, update: "current", latest: null, progress: null };
 
 interface Open {
   /** The app's build; null, a browser. */
@@ -193,7 +193,7 @@ test("This device's row says no badge where the app reports nothing it knows: no
 });
 
 test("the machines' list says it is the Sidevoice service, and this device's row says it is this device: beside its name, with the badge the device list uses, never on another machine's row", async () => {
-  const { store } = open({ section: "updates", machines: [lab, nuc], service: { ...SERVICE_CURRENT, update: "available" }, remote: { "fp-lab": says("0.19.2"), "fp-nuc": says("0.20.0") } });
+  const { store } = open({ section: "updates", machines: [lab, nuc], service: { ...SERVICE_CURRENT, update: "available" }, remote: { "fp-lab": says("0.20.2"), "fp-nuc": says("0.21.0") } });
   await waitFor(() => expect(machineRows()[0][2]).toBe("Out of date"));
   // The heading is the service's, over the machines; the app's row is above it, never in it.
   expect(groups()).toEqual(["Sidevoice service on your machines"]);
@@ -218,18 +218,18 @@ test("the machines' list says it is the Sidevoice service, and this device's row
   expect([store.getState().facts.settingsSection, store.getState().facts.settingsLevel]).toEqual(["this-computer", "page"]);
 });
 
-test("each paired machine is a row — its name, its version, where that stands against the minor the app pins (0.20) — and opens its own page; an offline one says Offline and the version it was last seen running", async () => {
-  localStorage.setItem("sidevoice.service-last-seen", JSON.stringify({ "fp-offline": "0.19.9" }));
+test("each paired machine is a row — its name, its version, where that stands against the minor the app pins (0.21) — and opens its own page; an offline one says Offline and the version it was last seen running", async () => {
+  localStorage.setItem("sidevoice.service-last-seen", JSON.stringify({ "fp-offline": "0.20.9" }));
   const offline: PairingSummary = { ...lab, fp: "fp-offline", host: "Attic", device_id: "d-attic" };
   const mac: PairingSummary = { ...lab, fp: "fp-mac", host: "Mac mini", device_id: "d-mac" };
   const { store } = open({ section: "updates", machines: [lab, nuc, mac, offline], reach: { "fp-offline": "offline" },
-    remote: { "fp-lab": says("0.19.2"), "fp-nuc": says("0.20.3"), "fp-mac": says("0.21.0") } });
+    remote: { "fp-lab": says("0.20.2"), "fp-nuc": says("0.21.3"), "fp-mac": says("0.22.0") } });
   await settle();
   expect(machineRows().slice(1)).toEqual([
-    ["Lab box", "Version 0.19.2", "Out of date"],
-    ["NUC", "Version 0.20.3", "Up to date"],
-    ["Mac mini", "Version 0.21.0", "Newer"],
-    ["Attic", "Version 0.19.9", "Offline"],
+    ["Lab box", "Version 0.20.2", "Out of date"],
+    ["NUC", "Version 0.21.3", "Up to date"],
+    ["Mac mini", "Version 0.22.0", "Newer"],
+    ["Attic", "Version 0.20.9", "Offline"],
   ]);
   // No notice in this view: the machine's page says what to do.
   expect(pane("updates").querySelector(".ui-alert, .ui-snippet")).toBeNull();
@@ -239,51 +239,51 @@ test("each paired machine is a row — its name, its version, where that stands 
 });
 
 test("a machine is out of date also by a patch, where this device's service knows the newest of the pinned minor", async () => {
-  open({ section: "updates", machines: [lab, nuc], service: { ...SERVICE_CURRENT, latest: "0.20.2" }, remote: { "fp-lab": says("0.20.1"), "fp-nuc": says("0.20.2") } });
-  await waitFor(() => expect(machineRows().slice(1)).toEqual([["Lab box", "Version 0.20.1", "Out of date"], ["NUC", "Version 0.20.2", "Up to date"]]));
+  open({ section: "updates", machines: [lab, nuc], service: { ...SERVICE_CURRENT, latest: "0.21.2" }, remote: { "fp-lab": says("0.21.1"), "fp-nuc": says("0.21.2") } });
+  await waitFor(() => expect(machineRows().slice(1)).toEqual([["Lab box", "Version 0.21.1", "Out of date"], ["NUC", "Version 0.21.2", "Up to date"]]));
 });
 
 test("in a browser: no Updates section while no machine is out of date", () => {
-  open({ build: null, section: "general", machines: [lab], remote: { "fp-lab": says("0.20.4") } });
+  open({ build: null, section: "general", machines: [lab], remote: { "fp-lab": says("0.21.4") } });
   expect(entry()).toBeNull();
   expect(document.getElementById("pane-updates")).toBeNull();
 });
 
 test("in a browser, a machine out of date: Updates lists only the machines — no app, no service — and goes as the machine is updated", async () => {
-  const { store } = open({ build: null, section: "updates", machines: [lab, nuc], remote: { "fp-lab": says("0.19.2"), "fp-nuc": says("0.20.0") } });
+  const { store } = open({ build: null, section: "updates", machines: [lab, nuc], remote: { "fp-lab": says("0.20.2"), "fp-nuc": says("0.21.0") } });
   await settle();
   expect(entry()).toHaveTextContent(/^Updates$/);
   expect(updates().getByText("Sidevoice on your machines: their versions, and which are out of date.")).toBeInTheDocument();
   expect(groups()).toEqual(["Sidevoice service on your machines"]);
   expect(pane("updates").querySelector(".app-update-settings, .svc-app-row")).toBeNull();
-  expect(machineRows()).toEqual([["Lab box", "Version 0.19.2", "Out of date"], ["NUC", "Version 0.20.0", "Up to date"]]);
+  expect(machineRows()).toEqual([["Lab box", "Version 0.20.2", "Out of date"], ["NUC", "Version 0.21.0", "Up to date"]]);
   // Updated: none out of date, no section, and Settings is back where the person can be.
-  act(() => { store.patch({ remoteHostStatus: { "fp-lab": says("0.20.0"), "fp-nuc": says("0.20.0") } } as never); });
+  act(() => { store.patch({ remoteHostStatus: { "fp-lab": says("0.21.0"), "fp-nuc": says("0.21.0") } } as never); });
   expect(entry()).toBeNull();
   expect(document.getElementById("pane-updates")).toBeNull();
   expect(store.getState().facts.settingsSection).toBe("general");
 });
 
 test("a machine forgotten while it was out of date: no longer listed, and in a browser no section for it", async () => {
-  open({ build: null, section: "general", machines: [], remote: { "fp-lab": says("0.19.2") } });
+  open({ build: null, section: "general", machines: [], remote: { "fp-lab": says("0.20.2") } });
   await settle();
   expect(entry()).toBeNull();
 });
 
 test("a remote machine out of date: the room's notice says nothing of it; Updates has its row", async () => {
-  open({ section: "general", machines: [lab], remote: { "fp-lab": says("0.19.2") }, notice: true });
+  open({ section: "general", machines: [lab], remote: { "fp-lab": says("0.20.2") }, notice: true });
   await settle();
   expect(document.querySelector(".update-notice")).toBeNull();
   expect(screen.queryByRole("button", { name: "See updates" })).toBeNull();
-  expect(machineRows().slice(1)).toEqual([["Lab box", "Version 0.19.2", "Out of date"]]);
+  expect(machineRows().slice(1)).toEqual([["Lab box", "Version 0.20.2", "Out of date"]]);
 });
 
 test("a computer listed among the machines (a host that is not the app: no section of its own) has This device's row, as the app says it stands, in Updates; one out of date is why a browser has Updates", async () => {
-  const { store } = open({ build: null, own: false, section: "general", machines: [lab], remote: { "fp-lab": says("0.20.1") }, service: { ...SERVICE_CURRENT, update: "available" } });
+  const { store } = open({ build: null, own: false, section: "general", machines: [lab], remote: { "fp-lab": says("0.21.1") }, service: { ...SERVICE_CURRENT, update: "available" } });
   // No app, and the machines up to date: but this computer's service is behind, as its bridge says.
   await waitFor(() => expect(entry()).not.toBeNull());
   act(() => { store.patch({ settingsSection: "updates" }); });
-  await waitFor(() => expect(machineRows()).toEqual([["MacBook", "Version 0.9.0", "Out of date"], ["Lab box", "Version 0.20.1", "Up to date"]]));
+  await waitFor(() => expect(machineRows()).toEqual([["MacBook", "Version 0.9.0", "Out of date"], ["Lab box", "Version 0.21.1", "Up to date"]]));
   const row = pane("updates").querySelector<HTMLElement>("[data-machine-row=local]")!;
   expect(row.querySelector("svg")).toHaveClass("lucide-laptop");
   expect(thisDeviceRows()).toEqual(["MacBook"]);
@@ -293,7 +293,7 @@ test("a computer listed among the machines (a host that is not the app: no secti
   expect([facts.settingsSection, facts.machinesView.machine]).toEqual(["machines", "local-host"]);
   cleanup();
   // Current, there is no Updates in a browser, and this computer is not one that is out of date.
-  open({ build: null, own: false, section: "general", machines: [lab], remote: { "fp-lab": says("0.20.1") }, service: SERVICE_CURRENT });
+  open({ build: null, own: false, section: "general", machines: [lab], remote: { "fp-lab": says("0.21.1") }, service: SERVICE_CURRENT });
   await settle();
   expect(entry()).toBeNull();
 });
@@ -340,7 +340,7 @@ test("a development build: Development build under its version, no updater's con
 test("in Spanish: Actualizaciones, the app's row, the machines' rows with their badges", async () => {
   inSpanish();
   localStorage.setItem(CHECKED, String(Date.parse("2026-10-12T09:30:00Z")));
-  open({ section: "updates", machines: [lab, nuc], service: { ...SERVICE_CURRENT, update: "waiting-call" }, remote: { "fp-lab": says("0.19.2"), "fp-nuc": says("0.21.0") },
+  open({ section: "updates", machines: [lab, nuc], service: { ...SERVICE_CURRENT, update: "waiting-call" }, remote: { "fp-lab": says("0.20.2"), "fp-nuc": says("0.22.0") },
     updater: { mode: "manual", status: { state: "idle" } } });
   await settle();
   expect(entry()).toHaveTextContent(/^Actualizaciones$/);
@@ -351,7 +351,7 @@ test("in Spanish: Actualizaciones, the app's row, the machines' rows with their 
   expect(installedLine()!.querySelector(".ui-row-label")).toHaveTextContent(/^App de Sidevoice$/);
   await waitFor(() => expect(installed()).toHaveTextContent(/^Versión 0\.9\.0 · Al día$/));
   expect(updates().getByRole("button", { name: "Buscar actualizaciones" })).toBeInTheDocument();
-  await waitFor(() => expect(machineRows()).toEqual([[expect.any(String), "Versión 0.9.0", "Tras la llamada"], ["Lab box", "Versión 0.19.2", "Desactualizada"], ["NUC", "Versión 0.21.0", "Más nueva"]]));
+  await waitFor(() => expect(machineRows()).toEqual([[expect.any(String), "Versión 0.9.0", "Tras la llamada"], ["Lab box", "Versión 0.20.2", "Desactualizada"], ["NUC", "Versión 0.22.0", "Más nueva"]]));
 });
 
 test("in Spanish: Automáticas (recomendado) | Manuales, Buscar actualizaciones (which tries a failed check again), each failure — never Al día beside one — and a nightly que se actualiza a mano", async () => {
