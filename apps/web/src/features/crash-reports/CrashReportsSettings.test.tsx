@@ -177,9 +177,13 @@ describe("what is sent, and the logs", () => {
     // The row it opens under holds the setting too: the panel is a child of the row, across its whole width.
     expect(panel.parentElement).toContainElement(pane().getByRole("radiogroup"));
     const fields = [...panel.querySelectorAll("dt")].map((term) => term.textContent);
-    expect(fields).toEqual(["Version", "Operating system", "Error code", "Installation ID", "Stack trace", "Modules with code in the failure", "Log lines"]);
+    expect(fields).toEqual(["Version", "Operating system", "Error type and location", "Message", "Installation ID", "Stack trace", "Loaded modules (file names)", "Log lines"]);
     expect(within(panel).getByText(/^This is an example/)).toBeInTheDocument();
     expect(within(panel).getByText("Never sent:")).toBeInTheDocument();
+    expect(panel).toHaveTextContent("Each part of Sidevoice sends its own reports");
+    expect(panel).toHaveTextContent("at most one a day per kind, with the same switch");
+    expect(panel).toHaveTextContent("<formatted panic message omitted>");
+    expect(panel).toHaveTextContent("-12.4s WARN");
     expect(panel).toHaveTextContent("the content of your conversations, tokens or keys, pairing codes or the names of your devices");
     fireEvent.click(toggle);
     expect(pane().queryByText("Stack trace")).toBeNull();
@@ -248,7 +252,7 @@ describe("in Spanish, as the design has it", () => {
     expect(pane().getByText("Cuando Sidevoice falla, enviamos un informe para poder arreglarlo. No incluye lo que hablas con tu agente. Puedes dejar de enviarlos.")).toBeInTheDocument();
     fireEvent.click(pane().getByRole("button", { name: "Ver qué se envía" }));
     expect([...document.querySelectorAll("#pane-crash-reports dt")].map((term) => term.textContent)).toEqual(
-      ["Versión", "Sistema operativo", "Código de error", "ID de instalación", "Traza del fallo", "Módulos con código en el fallo", "Líneas del registro"]);
+      ["Versión", "Sistema operativo", "Tipo de error y lugar", "Mensaje", "ID de instalación", "Traza del fallo", "Módulos cargados (nombres de archivo)", "Líneas del registro"]);
     expect(pane().getByText("Registros")).toBeInTheDocument();
     expect(pane().getByText("¿Algo no va? Pregúntale a tu agente: puede revisar el estado de Sidevoice. Si necesita los registros de esta app, cópialos y pégaselos.")).toBeInTheDocument();
     expect(pane().getByRole("button", { name: "Ver registros" })).toBeInTheDocument();
