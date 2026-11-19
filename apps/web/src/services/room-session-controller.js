@@ -13,7 +13,7 @@ import {probeSiteStorage} from './site-storage.js';
 import {tryTranscription,tryVoice,tryEndOfTurn} from './voice-trial.js';
 import {systemLanguage,SPEECH_LANGUAGES} from './system-language.js';
 import {createOutbox,resendDelay} from './outbox.js';
-import {readCallPreferences} from './call-preferences.ts';
+import {readCallPreferences,withSpeakingStyle} from './call-preferences.ts';
 import {primeThinkingSound} from './thinking-sound.ts';
 import {clampDeviceName,deviceNameProblem} from './device-name-rules.js';
 import {readDeleteUnused,writeDeleteUnused,staleModels} from './model-housekeeping.js';
@@ -768,7 +768,7 @@ function flushOutbox(socket=state.ws){
     data=route.send;
     if(data.offline)nameOfflineRow(data.turn_id,state.sessionId+':user-turn:'+data.turn_id);
    }
-   try{socket.send(JSON.stringify({type:entry.payload.type,data:{...data,session_id:state.sessionId,client_msg_id:entry.id}}))}catch{return}
+   try{socket.send(JSON.stringify({type:entry.payload.type,data:{...(entry.kind==='user-turn'?withSpeakingStyle(data):data),session_id:state.sessionId,client_msg_id:entry.id}}))}catch{return}
    // Said again on the same socket: the relay knows it already, and a start it held was said as a message of its own.
    const again_=entry.sentOn===socket;
    entry.sentOn=socket;gone.add(entry.id);
@@ -1021,7 +1021,7 @@ async function deliverText(entry){
   // A request that hangs is stopped after DIRECT_TEXT_MS and tried again under the same id (the room takes each once).
   const abort=new AbortController(),timer=setTimeout(()=>{try{abort.abort()}catch{}},DIRECT_TEXT_MS);
   try{
-   const r=await request('/api/presentation/text',{method:'POST',headers:{'Content-Type':'application/json'},signal:abort.signal,body:JSON.stringify({text,thread_id:thread,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:entry.id})},entry.node);
+   const r=await request('/api/presentation/text',{method:'POST',headers:{'Content-Type':'application/json'},signal:abort.signal,body:JSON.stringify(withSpeakingStyle({text,thread_id:thread,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:entry.id}))},entry.node);
    return r.ok?'sent':r.status>=500||[408,409,429].includes(r.status)?'later':'refused';
   }finally{clearTimeout(timer)}
  }catch{return 'later'}
@@ -1065,7 +1065,7 @@ const kept=keepMessage('text','text',{thread:conversationOf(viewed).thread,text}
 if(!kept){state.textSending=false;updateComposer();setRoomError(bundled('room.failure.textNotSent').text);return}
 const direct={id:attempt.id,abort:new AbortController()};directBarrier.add(direct);direct.timer=setTimeout(()=>{direct.timedOut=true;try{direct.abort.abort()}catch{}
  // Should the request ignore the abort, the barrier is let go all the same a moment later.
- direct.fallback=setTimeout(()=>{if(directBarrier.delete(direct))flushOutbox()},DIRECT_ABORT_GRACE_MS)},DIRECT_TEXT_MS);updateComposer();setRoomError('');try{await post('/api/presentation/text',{text,thread_id:destination,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:attempt.id},state.callNode,direct.abort.signal);if(input.value===text)input.value='';outbox.remove(attempt.id);if(textAttempt===attempt)textAttempt=null;await refreshHistory(state.callNode)}catch(e){
+ direct.fallback=setTimeout(()=>{if(directBarrier.delete(direct))flushOutbox()},DIRECT_ABORT_GRACE_MS)},DIRECT_TEXT_MS);updateComposer();setRoomError('');try{await post('/api/presentation/text',withSpeakingStyle({text,thread_id:destination,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:attempt.id}),state.callNode,direct.abort.signal);if(input.value===text)input.value='';outbox.remove(attempt.id);if(textAttempt===attempt)textAttempt=null;await refreshHistory(state.callNode)}catch(e){
  // A request that hung past its time is stopped and the text kept: it goes from the queue under the very id it had (the room
  // takes each once), in its place, and its bubble waits as a queued text's does.
  if(direct.timedOut&&outbox.get(attempt.id)){add('user',text,null,viewed,{history_id:'queued:'+attempt.id,draft:false,delivery:'pending'});if(textAttempt===attempt)textAttempt=null;if(input.value===text)input.value=''}

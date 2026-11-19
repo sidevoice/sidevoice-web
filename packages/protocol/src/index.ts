@@ -45,6 +45,8 @@ export interface VoiceUserTurn {
   text?: string;
   offline?: boolean;
   merged?: boolean;
+  /** How the agent should speak to this device: `brief`, `normal` or `detailed`. */
+  speaking_style?: "brief" | "normal" | "detailed";
   [key: string]: unknown;
 }
 
