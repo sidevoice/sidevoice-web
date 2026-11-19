@@ -167,6 +167,6 @@ test("the notice's Download acts in place, its download said in Updates only; a 
   await expect(machine).toContainText("Version 0.19.2");
   await expect(machine).toContainText("Out of date");
   await machine.click();
-  await expect(page.locator("#pane-machines .host-status-card .ui-alert")).toContainText("npx sidevoice@0.20 install");
+  await expect(page.locator("#pane-machines .host-status-card .ui-alert")).toContainText("npx sidevoice@0.21 install");
   await expect(page.locator(".update-notice")).not.toContainText("npx sidevoice@");
 });
