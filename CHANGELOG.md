@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.34.1](https://github.com/sidevoice/sidevoice-web/compare/v0.34.0...v0.34.1) (2026-11-19)
+
+
+### Bug Fixes
+
+* **service:** install the Sidevoice service 0.21 ([#621](https://github.com/sidevoice/sidevoice-web/issues/621)) ([b66bda3](https://github.com/sidevoice/sidevoice-web/commit/b66bda3c8e191d517c675632b503422cc9b3955a))
+
 ## [0.34.0](https://github.com/sidevoice/sidevoice-web/compare/v0.33.1...v0.34.0) (2026-11-18)
 
 
