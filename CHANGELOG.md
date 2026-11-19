@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.34.2](https://github.com/sidevoice/sidevoice-web/compare/v0.34.1...v0.34.2) (2026-11-19)
+
+
+### Bug Fixes
+
+* **call:** log why every call ends ([#626](https://github.com/sidevoice/sidevoice-web/issues/626)) ([4ccb11c](https://github.com/sidevoice/sidevoice-web/commit/4ccb11c086ee80149c0d6ab14a071d0486ccf640))
+
 ## [0.34.1](https://github.com/sidevoice/sidevoice-web/compare/v0.34.0...v0.34.1) (2026-11-19)
 
 
