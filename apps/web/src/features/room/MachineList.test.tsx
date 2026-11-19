@@ -637,8 +637,8 @@ test("Remote machines opens its overview: each machine a row — name, version, 
   // This computer is This device's, not a row here.
   expect(overviewRows()).toEqual([["NUC", "Version 0.21.4", "Up to date"], ["Lab box", "Version 0.20.2", "Out of date"], ["Attic", "Version 0.20.9", "Offline"]]);
   // A button, whole row: its name says its machine, its version, where it stands, and — connected — that it is online.
-  expect(within(section).getByRole("button", { name: /^NUC ?, Online Version 0\.20\.4 Up to date$/ })).toBeInTheDocument();
-  expect(within(section).getByRole("button", { name: /^Attic Version 0\.19\.9 Offline$/ })).toBeInTheDocument();
+  expect(within(section).getByRole("button", { name: /^NUC ?, Online Version 0\.21\.4 Up to date$/ })).toBeInTheDocument();
+  expect(within(section).getByRole("button", { name: /^Attic Version 0\.20\.9 Offline$/ })).toBeInTheDocument();
   // The green dot on a connected machine's icon, nothing on one that does not answer.
   expect(section.querySelector('[data-machine="fp-nuc"] .state-on-icon-dot')).not.toBeNull();
   expect(section.querySelector('[data-machine="fp-away"] .state-on-icon-dot')).toBeNull();
@@ -1031,8 +1031,8 @@ test("a remote machine newer than the app supports: the notice says it may misbe
   expect(cardFacts(card.parentElement!)[0]).toEqual(["Version", "0.22.0", "Newer"]);
   expect(JSON.parse(localStorage.getItem("sidevoice.service-notice-dismissed")!)).toEqual(["fp-nuc:0.22.0"]);
   // Another version of it, or another machine: not closed.
-  act(() => { store.patch({ remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 2, version: "0.22.0" } } } as never); });
-  await waitFor(() => expect(card.querySelector(".ui-alert")).toHaveTextContent("Sidevoice 0.22.0 is newer"));
+  act(() => { store.patch({ remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 2, version: "0.23.0" } } } as never); });
+  await waitFor(() => expect(card.querySelector(".ui-alert")).toHaveTextContent("Sidevoice 0.23.0 is newer"));
 });
 
 test("a remote machine that does not answer: the same card, Offline at the right, what was last seen of it — its version, its port — and nothing else", async () => {
