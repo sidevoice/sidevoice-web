@@ -15,7 +15,11 @@ export function appLogSource(bridge: AppLogBridge): LogSource {
     async read(options, signal) {
       if (signal.aborted) throw new DOMException("aborted", "AbortError");
       // The bridge cannot be cancelled: an abort ends the wait for it, and its answer is dropped.
-      const aborted = new Promise<never>((_, reject) => signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true }));
+      let onAbort = () => {};
+      const aborted = new Promise<never>((_, reject) => {
+        onAbort = () => reject(new DOMException("aborted", "AbortError"));
+        signal.addEventListener("abort", onAbort, { once: true });
+      });
       try {
         return asPage(await Promise.race([bridge.read(options), aborted]));
       } catch (error) {
@@ -23,6 +27,9 @@ export function appLogSource(bridge: AppLogBridge): LogSource {
         const key = (error as { key?: unknown } | null)?.key;
         if (key === "log.cursor_expired") throw new LogCursorExpired();
         throw new LogUnreadable(typeof key === "string" ? key : "failed");
+      } finally {
+        // A follow reads again and again under one signal: a listener left per read would pile up.
+        signal.removeEventListener("abort", onAbort);
       }
     },
   });

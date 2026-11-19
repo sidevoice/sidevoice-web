@@ -4,6 +4,7 @@ import {projectPairings,withPairing,withoutPairing,revokedPairing,pairingSummary
 import {normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
 import {host as pageHost} from '../host/index.ts';
 import {createHostAgentsController} from './host-agents.ts';
+import {isHostPath} from './host-path.ts';
 import {withoutLost} from './audio-choice.ts';
 import {currentDeviceName} from '../state/device-name.ts';
 import {translator,setUiLanguage,onUiLanguage,uiLanguage,UI_LANGUAGES} from '../i18n/translator.ts';
@@ -1641,6 +1642,8 @@ async function hostPlace(fp){
 // A request to a paired machine with its token, as the machine answered it. The caller owns the timeout: a long poll holds
 // for longer than hostApi waits.
 async function hostFetch(fp,path,options={}){
+ // The token goes to the machine named by the base: a path that could name another host is never sent with it.
+ if(!isHostPath(path))throw Object.assign(Error('request_invalid'),{key:'request_invalid'});
  const {pairing,base}=await hostPlace(fp);
  let response;
  try{response=await fetch(base+path,withToken({...options,redirect:'error'},pairing.token))}

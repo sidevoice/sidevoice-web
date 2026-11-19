@@ -136,4 +136,14 @@ describe("the app's own log", () => {
     controller.abort();
     await expect(tail).rejects.toMatchObject({ name: "AbortError" });
   });
+
+  test("a read leaves no abort listener behind on the signal it was given", async () => {
+    const controller = new AbortController();
+    const add = vi.spyOn(controller.signal, "addEventListener");
+    const remove = vi.spyOn(controller.signal, "removeEventListener");
+    const source = appLogSource({ read: async () => page(["a"], "c1") });
+    for (let i = 0; i < 3; i++) await source.tail({ limit: 5 }, controller.signal);
+    expect(add).toHaveBeenCalledTimes(3);
+    expect(remove).toHaveBeenCalledTimes(3);
+  });
 });

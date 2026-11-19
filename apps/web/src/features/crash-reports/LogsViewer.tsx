@@ -100,7 +100,10 @@ const RESUME_AFTER_MS = [1000, 3000, 9000];
 function useLogEvents(source: LogSource) {
   const [read, setRead] = useState<Read>(LOADING);
   const [attempt, setAttempt] = useState(0);
+  // Cursors the log refused in a row, with no batch between: what holds a restart to the same 1/3/9 s schedule as a broken follow.
+  const expiries = useRef({ source, n: 0 });
   useEffect(() => {
+    if (expiries.current.source !== source) expiries.current = { source, n: 0 };
     const controller = new AbortController();
     let alive = true;
     let stop: (() => void) | undefined;
@@ -125,14 +128,20 @@ function useLogEvents(source: LogSource) {
       stop = source.follow?.({ sinceCursor: cursor }, (batch) => {
         cursor = batch.cursor;
         resumed = 0;
+        expiries.current.n = 0;
         for (const line of batch.lines) pending.push(line);
         if (pending.length && !scheduled) { scheduled = true; (globalThis.requestAnimationFrame ?? ((run: () => void) => setTimeout(run, 16)))(flush); }
       }, (error) => {
         stop = undefined;
         if (!alive) return;
-        // The cursor is gone from the log: what came after it cannot be told, so read the log again.
-        if (error instanceof LogCursorExpired) setAttempt((n) => n + 1);
-        else if (resumed < RESUME_AFTER_MS.length) resumeTimer = setTimeout(follow, RESUME_AFTER_MS[resumed++]);
+        // The cursor is gone from the log: what came after it cannot be told, so read the log again. The first time at once; a log
+        // that keeps refusing its cursor is not asked again in a loop, but a little later each time, and at last not at all.
+        if (error instanceof LogCursorExpired) {
+          const run = expiries.current.n++;
+          if (run === 0) setAttempt((n) => n + 1);
+          else if (run <= RESUME_AFTER_MS.length) resumeTimer = setTimeout(() => setAttempt((n) => n + 1), RESUME_AFTER_MS[run - 1]);
+          else setRead((before) => ({ ...before, stalled: true }));
+        } else if (resumed < RESUME_AFTER_MS.length) resumeTimer = setTimeout(follow, RESUME_AFTER_MS[resumed++]);
         else setRead((before) => ({ ...before, stalled: true }));
       }, () => { stop = undefined; });
     };
@@ -144,7 +153,7 @@ function useLogEvents(source: LogSource) {
     }, () => { if (alive) setRead({ ...LOADING, status: "failed" }); });
     return () => { alive = false; controller.abort(); stop?.(); clearTimeout(resumeTimer); };
   }, [source, attempt]);
-  return { read, retry: () => setAttempt((n) => n + 1) };
+  return { read, retry: () => { expiries.current.n = 0; setAttempt((n) => n + 1); } };
 }
 
 function LogReader({ source, place, name }: { source: LogSource; place: LogPlace; name: string }) {
