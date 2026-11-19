@@ -907,7 +907,6 @@ export const messages: Messages = {
   "settings.call.description": "통화 방식이에요. 발화가 끝나는 시점, 에이전트가 작업하는 동안 들리는 소리, 화면을 정해요.",
   "settings.call.turn": "내 발화",
   "settings.call.working": "에이전트가 작업하는 동안",
-  "settings.call.speaking.group": "On this device",
   "settings.call.speaking": "How your agent speaks",
   "settings.call.speaking.brief": "Brief",
   "settings.call.speaking.brief.hint": "Just the answer",

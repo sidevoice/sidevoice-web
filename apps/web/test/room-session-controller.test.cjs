@@ -316,7 +316,7 @@ test('Text submission freezes its destination and clears only the submitted draf
  s.run("outboxReady=true;ws={};$('text-message').value='Un mensaje escrito';roomBinding.binding_id='binding-a'");
  s.context.fetch=async(path,options)=>{if(options){sent.push(JSON.parse(options.body));s.run("$('text-message').value='Ya escribiendo el siguiente'");return {ok:true,json:async()=>({accepted:true})}}return {ok:true,json:async()=>({messages:[]})}};
  await s.dispatch('submit',{target:s.run("$('text-composer')")});
- assert.equal(sent[0].thread_id,'a');assert.equal(sent[0].text,'Un mensaje escrito');
+ assert.equal(sent[0].thread_id,'a');assert.equal(sent[0].text,'Un mensaje escrito');assert.equal(sent[0].speaking_style,'normal','the typed message says how the agent should speak');
  assert.equal(s.run("$('text-message').value"),'Ya escribiendo el siguiente');
 });
 
@@ -335,7 +335,7 @@ test('A text box mounted after the page loaded sends what is typed in it',async(
  assert.equal(submitted,1,'Enter in the new box submits it');
  s.context.fetch=async(path,options)=>{if(options){sent.push(JSON.parse(options.body));return {ok:true,json:async()=>({accepted:true})}}return {ok:true,json:async()=>({messages:[]})}};
  await s.dispatch('submit',{target:form});
- assert.equal(sent.length,1);assert.equal(sent[0].text,'Escrito tras emparejar');assert.equal(sent[0].thread_id,'a');
+ assert.equal(sent.length,1);assert.equal(sent[0].text,'Escrito tras emparejar');assert.equal(sent[0].thread_id,'a');assert.equal(sent[0].speaking_style,'normal');
  assert.equal(input.value,'','the sent draft is cleared');
  await s.dispatch('submit',{target:new s.Element()});
  assert.equal(sent.length,1,'another form on the page sends nothing');
@@ -3235,6 +3235,24 @@ test('A start of a replaced session is not sent again: its words go as said whil
  assert.equal(s.run("outbox.list().some(entry=>entry.payload.data.phase==='started')"),false);
 });
 
+test('Speaking style: a voice turn sent by flushOutbox and a text delivered by deliverText both carry what was chosen',async()=>{
+ const c=await callOnRoom();const {s,voice,first}=c,posted=[];
+ s.saved['sidevoice.call-preferences']=JSON.stringify({speakingStyle:'brief'});
+ voice.emit('turn',started('t'));voice.emit('turn',finished('t','spoken'));
+ const turns=plain(sentOf(c,first,'voice-user-turn'));
+ assert.deepEqual(turns.map(d=>d.phase),['started','finished'],'the turn went over the socket');
+ for(const d of turns)assert.equal(d.speaking_style,'brief','the voice turn payload carries the style');
+ const room=s.context.fetch;
+ s.context.fetch=async(path,options)=>{if(options&&String(path).includes('/presentation/text')){posted.push(JSON.parse(options.body));return {ok:true,status:200,json:async()=>({accepted:true})}}return room(path,options)};
+ s.run("refreshHistory=async()=>{}");
+ for(const d of turns)c.push(first,{type:'voice-ack',data:{client_msg_id:d.client_msg_id}});
+ await settleSoon();
+ s.run("keepMessage('text','text',{thread:'a',text:'queued words'});flushOutbox()");
+ await settleSoon();await settleSoon();
+ assert.equal(posted.length,1,'the queued text was delivered');
+ assert.equal(posted[0].text,'queued words');assert.equal(posted[0].speaking_style,'brief','deliverText carries the style');
+ s.run('disconnect()');
+});
 test('A turn the room has no room for yet keeps its words and starts again, as a new message, when another turn ends',async()=>{
  const c=await callOnRoom();const {voice,first,s}=c;
  voice.emit('turn',started('open'));

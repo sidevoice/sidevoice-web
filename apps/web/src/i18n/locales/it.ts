@@ -928,7 +928,6 @@ export const messages: Messages = {
   "settings.call.description": "Come si comporta una chiamata: quando finisce il tuo turno, il suono mentre l’agente lavora e lo schermo.",
   "settings.call.turn": "Il tuo turno",
   "settings.call.working": "Mentre l’agente lavora",
-  "settings.call.speaking.group": "On this device",
   "settings.call.speaking": "How your agent speaks",
   "settings.call.speaking.brief": "Brief",
   "settings.call.speaking.brief.hint": "Just the answer",

@@ -915,7 +915,6 @@ export const messages: Messages = {
   "settings.call.description": "通話中の動作です。ターンの終わり方、エージェントの作業中に流れる音、画面について設定します。",
   "settings.call.turn": "あなたのターン",
   "settings.call.working": "エージェントの作業中",
-  "settings.call.speaking.group": "On this device",
   "settings.call.speaking": "How your agent speaks",
   "settings.call.speaking.brief": "Brief",
   "settings.call.speaking.brief.hint": "Just the answer",

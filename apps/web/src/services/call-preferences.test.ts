@@ -3,7 +3,7 @@ import { CALL_PREFERENCES_KEY, DEFAULT_CALL_PREFERENCES, readCallPreferences, wi
 
 beforeEach(() => globalThis.localStorage.clear());
 
-test("how the agent speaks is step by step until the person chooses another", () => {
+test("how the agent speaks is normal until the person chooses another", () => {
   expect(DEFAULT_CALL_PREFERENCES.speakingStyle).toBe("normal");
   expect(readCallPreferences().speakingStyle).toBe("normal");
 });

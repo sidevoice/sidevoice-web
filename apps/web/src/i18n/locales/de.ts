@@ -917,7 +917,6 @@ export const messages: Messages = {
   "settings.call.description": "Wie sich ein Anruf verhält: wann dein Redebeitrag endet, der Ton, während der Agent arbeitet, und der Bildschirm.",
   "settings.call.turn": "Dein Redebeitrag",
   "settings.call.working": "Während der Agent arbeitet",
-  "settings.call.speaking.group": "On this device",
   "settings.call.speaking": "How your agent speaks",
   "settings.call.speaking.brief": "Brief",
   "settings.call.speaking.brief.hint": "Just the answer",

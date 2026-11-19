@@ -907,7 +907,6 @@ export const messages: Messages = {
   "settings.call.description": "कॉल कैसे चलती है: आपकी बारी कब खत्म होती है, एजेंट के काम करते समय की आवाज़, और स्क्रीन।",
   "settings.call.turn": "आपकी बारी",
   "settings.call.working": "जब एजेंट काम करता है",
-  "settings.call.speaking.group": "On this device",
   "settings.call.speaking": "How your agent speaks",
   "settings.call.speaking.brief": "Brief",
   "settings.call.speaking.brief.hint": "Just the answer",

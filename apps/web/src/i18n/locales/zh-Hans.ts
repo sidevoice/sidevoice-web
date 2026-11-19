@@ -914,7 +914,6 @@ export const messages: Messages = {
   "settings.call.description": "通话的行为：何时结束你的发言、智能体工作时的声音，以及屏幕。",
   "settings.call.turn": "你的发言",
   "settings.call.working": "智能体工作时",
-  "settings.call.speaking.group": "On this device",
   "settings.call.speaking": "How your agent speaks",
   "settings.call.speaking.brief": "Brief",
   "settings.call.speaking.brief.hint": "Just the answer",
