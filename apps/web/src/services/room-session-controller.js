@@ -9,7 +9,7 @@ import {currentDeviceName} from '../state/device-name.ts';
 import {translator,setUiLanguage,onUiLanguage,uiLanguage,UI_LANGUAGES} from '../i18n/translator.ts';
 import {voiceFailure,roomFailure,worded,errorLine} from '../features/settings/error-message.ts';
 import {failureCode} from './failure-code.js';
-import {logCallEnd} from './call-end.js';
+import {logCallEnd,logCallParked} from './call-end.js';
 import {probeSiteStorage} from './site-storage.js';
 import {tryTranscription,tryVoice,tryEndOfTurn} from './voice-trial.js';
 import {systemLanguage,SPEECH_LANGUAGES} from './system-language.js';
@@ -1521,6 +1521,7 @@ function closePairing(){roomStore.patch({pairingOpen:false,pairingNote:''})}
 // on that machine — the call, or an action on its page (`asked`): one the page met while merely watching it says so in
 // its row, and asks nothing of a person who may be busy with another.
 // `token`: the credential that was refused — one a pairing made since has replaced is not this pairing's to lose.
+// Resolves true when it ended the call, false when it left the call alone (the caller of a refused call then ends it).
 async function pairingRefused(fp,{call=false,token=null,asked=false}={}){
  const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing||pairing.revoked||token!=null&&pairing.token!==token)return;
  let revoked=false;
@@ -1537,6 +1538,7 @@ async function pairingRefused(fp,{call=false,token=null,asked=false}={}){
  const text=reachNote({...roomStore.getState().facts,callNode:fp});
  if(onCall){callEndedBy('failed',text);disconnect('pairing_revoked');reachFailure={text,node:fp};failJoin({text})}
  openPairing(text);
+ return onCall;
 }
 // A code, redeemed where the machine proves it is itself: from then on one more machine, live at once, call or not.
 async function pairDevice(code,name,address='',{insecure=false}={}){
@@ -2653,7 +2655,13 @@ async function lostConnection(event,epoch,token=null){
  // Nothing the call is doing stops with its socket: the voice goes on hearing and speaking — a reply already here plays
  // to its end however long the room is away (#220) — and what it reports waits in the outbox. The room parks the
  // session meanwhile, so its turn and its history stay as they are here too.
- if(event?.code===4401){void pairingRefused(state.callNode,{call:true,token}).catch(()=>{});return}
+ if(event?.code===4401){
+  // A refusal pairingRefused does not act on (a token a newer pairing replaced, a pairing already revoked or gone) would leave
+  // a call with no socket and no reconnect: it ends here, with the same reason.
+  void pairingRefused(state.callNode,{call:true,token}).catch(()=>false).then(ended=>{
+   if(ended||epoch!==connectEpoch||state.ws||state.reconnecting)return;
+   const message=bundled('room.failure.closed');callEndedBy('failed',message.text);disconnect('pairing_revoked');failJoin(message)});
+  return}
  if(!shouldReconnect(event)){const message=bundled('room.failure.closed');callEndedBy('failed',message.text);disconnect(event?.code===1013?'room_full':'refused');failJoin(message);return}
  state.reconnecting=true;
  // The first seconds of a drop are the network's, not the person's: no line, no control held. One that outlasts the
@@ -3157,7 +3165,7 @@ window.sidevoiceActions={
   // Only a machine that has proved where it is: one being looked for again is not reachable until it answers. An agent that
   // is away does not keep the call from its conversation: what is sent to it waits there until it is back.
   const hears=state.machineLinks?.[to?.node]?.reach==='ok'&&linkBase(to?.node)!=null;
-  if(state.connecting&&!state.sessionId&&to&&to.node!==state.callNode){if(hears){disconnect('user');state.viewedThread=key;void toggleCall()}}
+  if(state.connecting&&!state.sessionId&&to&&to.node!==state.callNode){if(hears){disconnect('switch_machine');state.viewedThread=key;void toggleCall()}}
   else if(hears)void select(key);
   updateComposer();
  },
@@ -3256,7 +3264,7 @@ window.addEventListener('keyup',e=>{if(spaceDown&&e.code===heldKey){e.preventDef
 window.addEventListener('blur',()=>{if(!hostHold)releaseHold()});document.addEventListener('visibilitychange',()=>{if(document.hidden&&!hostHold)releaseHold()});
 // A page going away is not a hang-up: its call is parked, and the ticket kept here lets the next load take it back.
 window.addEventListener('pagehide',()=>keepTicket(true));
-window.addEventListener('beforeunload',()=>{if(state.ws||state.connecting||state.reconnecting)logCallEnd('page_unload');keepTicket(true);state.ws?.close();void voice?.stop().catch(()=>{})});updateMic();
+window.addEventListener('beforeunload',()=>{if(state.ws||state.connecting||state.reconnecting)logCallParked();keepTicket(true);state.ws?.close();void voice?.stop().catch(()=>{})});updateMic();
 // Discover the desktop-owned host first: it is one more machine, listed first. Pairing remains an explicit action:
 // an unpaired browser shows setup guidance, and an unpaired desktop does not open a modal by itself.
 setUiLanguage(devicePreferences().ui_language);
