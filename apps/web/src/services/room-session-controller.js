@@ -2624,11 +2624,20 @@ function dropCarriedTurns(){
  if(!pendingCarried)return;
  const count=pendingCarried.carried.length;pendingCarried=null;logCallRejoin('turns_lost',count);
 }
+// The join this page is making of a call it lost, if one is under way: aborted by the app when the person hangs up meanwhile.
+let activeRejoin=null;
+function abortRejoin(){
+ const rejoin=activeRejoin;if(!rejoin||rejoin.aborted)return;
+ rejoin.aborted=true;
+ dropCarriedTurns();
+ if(state.ws||state.connecting||state.reconnecting)disconnect('user');
+}
 async function rejoinCall({threadId=null,turns=[]}={}){
  const carried=carriedTurnEvents(turns);
  logCallRejoin('started',carried.length);
  // A call that is on already (the person joined by themselves meanwhile) is never touched. The turns are for the conversation
  // they were said to: merged into the call when it is on that one, dropped (and counted) when it is not.
+ const mine={aborted:false};const aborted=()=>mine.aborted;
  const merge=()=>{
   if(!(state.ws||state.connecting||state.reconnecting))return false;
   const on=state.callNode&&targetThread()?conversationKey(state.callNode,targetThread()):null;
@@ -2636,12 +2645,15 @@ async function rejoinCall({threadId=null,turns=[]}={}){
   holdCarriedTurns(carried,threadId);flushCarriedTurns();return true;
  };
  if(merge())return;
+ activeRejoin=mine;
  // A phone reads its pairings from the app before the page knows any machine: a join before then would ask for a code.
  for(let waited=0;nativeData&&!nativePairingsReady&&waited<REJOIN_PAIRINGS_WAIT_MS;waited+=100)await new Promise(resolve=>setTimeout(resolve,100));
  if(merge())return;
+ if(aborted())return;
  if(typeof threadId==='string'&&threadId){rememberThread(threadId);state.viewedThread=threadId}
  holdCarriedTurns(carried,threadId);
  await toggleCall({rejoin:true});
+ if(aborted())return;
  if(state.ws&&state.sessionId){logCallRejoin('joined',carried.length);flushCarriedTurns();return}
  // A join whose room is away goes on as a reconnection: the turns wait for it (`lostConnection`), and are dropped if the call ends.
  if(state.reconnecting||state.connecting){logCallRejoin('joined',carried.length);return}
@@ -3193,7 +3205,10 @@ function saveLanguage(chosen){
 $('language-form').onsubmit=e=>e.preventDefault();
 window.sidevoiceActions={
  // The app gave up the call its page lost (the page kept going): it ended, as any call the room cannot keep.
- callLost:()=>{callEndedBy('failed',bundled('room.failure.deviceAbsent').text);logCallRejoin('failed')},
+ callLost:()=>{callEndedBy('failed',bundled('room.failure.callNotResumed').text);logCallRejoin('failed')},
+ // The person ended the call (or the app gave it up) while this page was joining it again: the join stops, and a report of it
+ // that comes late is none (`abortRejoin`).
+ abortRejoin,
  cancelInput:cancelCurrentInput,
  skipReply,
  setSpeechOutput,

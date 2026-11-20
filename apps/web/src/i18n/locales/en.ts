@@ -1535,6 +1535,7 @@ export const messages = {
   "room.failure.inputBacklogFull": "Too many messages are waiting. Try again shortly.",
   "room.failure.deviceAbsent": "This device is no longer in the call. Tap to join again.",
   "room.failure.deviceAbsentRejoining": "This device is no longer in the call. Joining again…",
+  "room.failure.callNotResumed": "The call couldn't be resumed.",
   "settings.developer.systemCall": "Treat calls as system calls (CallKit / Telecom)",
   "settings.developer.systemCall.hint": "On: the call uses the system's calling features, with its lock screen card, in-call screen and headset or car buttons. Off: the app's own call, with its own notification. Takes effect on the next call.",
   "settings.developer.group.calls": "Calls",

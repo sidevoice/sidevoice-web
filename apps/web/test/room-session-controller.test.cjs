@@ -5499,8 +5499,22 @@ test('A carried turn whose start the old page had told goes as its end only, nev
  assert.equal(turnSent(c,first,'t1','finished')[0].offline,true,'words said while away');
  await s.run('toggleCall')();
 });
-test('The app giving a lost call up ends it on the page with the words of a device no longer in the call',async()=>{
+test('The app giving a lost call up ends it on the page with the words of a call that could not be resumed',async()=>{
  const s=setup({strictDOM:true});
  s.run('window.sidevoiceActions.callLost()');
- assert.equal(s.run('roomStore.getState().callEnded?.detail??state.callEnded?.detail'),'This device is no longer in the call. Tap to join again.');
+ assert.equal(s.run('roomStore.getState().callEnded?.detail??state.callEnded?.detail'),"The call couldn't be resumed.");
+});
+test('The app aborting a rejoin (the person hung up meanwhile) ends the join and a late joined report starts nothing',async()=>{
+ const turns=[{turn_id:'c1',text:'Hola',started_at:1,ended_at:2}];
+ const next=setup({strictDOM:true});
+ const room=joining(next);
+ const done=next.run('window.sidevoiceActions.rejoinCall')({threadId:'fp-mac|t-1',turns});
+ const socket=await firstSocket(room.sockets);socket.readyState=1;socket.onopen();
+ next.run('window.sidevoiceActions.abortRejoin()');
+ socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'s1',resume:{token:'tok-b',seconds:60},resumed:false}})});
+ await done;
+ assert.equal(next.run('state.ws'),null,'no call is on');
+ assert.equal(next.run('pendingCarried'),null,'nothing carried is said');
+ // With no rejoin under way it does nothing.
+ next.run('window.sidevoiceActions.abortRejoin()');
 });

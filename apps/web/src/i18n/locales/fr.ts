@@ -1491,6 +1491,7 @@ export const messages: Messages = {
   "room.failure.inputBacklogFull": "Trop de messages sont en attente. Réessayez dans un instant.",
   "room.failure.deviceAbsent": "Cet appareil n’est plus dans l’appel. Touchez pour rejoindre à nouveau.",
   "room.failure.deviceAbsentRejoining": "Cet appareil n’est plus dans l’appel. Reconnexion en cours…",
+  "room.failure.callNotResumed": "The call couldn't be resumed.",
   "settings.developer.systemCall": "Traiter les appels comme des appels système (CallKit / Telecom)",
   "settings.developer.systemCall.hint": "Activé : l’appel utilise les fonctions d’appel du système, avec sa carte sur l’écran de verrouillage, son écran d’appel et les boutons du casque ou de la voiture. Désactivé : l’appel propre à l’app, avec sa propre notification. Pris en compte à l’appel suivant.",
   "settings.developer.group.calls": "Appels",

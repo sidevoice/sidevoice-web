@@ -1512,6 +1512,7 @@ export const messages: Messages = {
   "room.failure.inputBacklogFull": "Hay demasiados mensajes pendientes. Vuelve a intentarlo en un momento.",
   "room.failure.deviceAbsent": "Este dispositivo ya no está en la llamada. Pulsa para volver a entrar.",
   "room.failure.deviceAbsentRejoining": "Este dispositivo ya no está en la llamada. Entrando de nuevo…",
+  "room.failure.callNotResumed": "No se pudo retomar la llamada.",
   "settings.developer.systemCall": "Tratar las llamadas como llamadas del sistema (CallKit / Telecom)",
   "settings.developer.systemCall.hint": "Activado: la llamada utiliza las funciones de llamada del sistema, con su tarjeta en la pantalla de bloqueo, su pantalla de llamada y los botones de los auriculares o del coche. Desactivado: la llamada propia de la app, con su propia notificación. Se aplica en la próxima llamada.",
   "settings.developer.group.calls": "Llamadas",
