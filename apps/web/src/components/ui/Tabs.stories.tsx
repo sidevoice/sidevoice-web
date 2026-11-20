@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { GeneralIcon, ShortcutsIcon, VoicesIcon } from "./Icons";
+import { GeneralIcon, OtherMachineIcon, ShortcutsIcon, ThisComputerIcon, VoicesIcon } from "./Icons";
 import { Segmented, Tabs } from "./Tabs";
 
-/* Tabs switch which panel shows (no product use yet: an open question in web#530); Segmented picks one of a few. */
+/* Tabs switch which panel shows (the logs' devices, in Settings › Crash reports, is their first product use: a machine's mark in each tab, and a row that scrolls sideways when the machines do not fit); Segmented picks one of a few. */
 const meta = {
   title: "Primitives/Tabs",
   component: Segmented,
@@ -23,6 +23,20 @@ function TabsDemo() {
   );
 }
 export const TabsPanels: Story = { name: "Tabs", render: () => <TabsDemo /> };
+
+/** More machines than the row holds: it scrolls sideways (no scrollbar), as the logs' devices do. */
+function ScrollingDemo() {
+  const names = ["This device", "NUC", "Workstation", "Old laptop", "Office desktop", "Build server"];
+  const [tab, setTab] = useState(names[0]);
+  return (
+    <div style={{ width: 340 }}>
+      <Tabs label="Devices" idPrefix="ds-tabs-scroll" value={tab} onChange={setTab}
+        items={names.map((name, index) => ({ value: name, label: name, icon: index === 0 ? <ThisComputerIcon size={16} /> : <OtherMachineIcon size={16} /> }))} />
+      <div id={`ds-tabs-scroll-panel-${tab}`} role="tabpanel" style={{ paddingTop: 12 }}>Panel: {tab}</div>
+    </div>
+  );
+}
+export const TabsScrolling: Story = { name: "Tabs, scrolling", render: () => <ScrollingDemo /> };
 
 function SegmentedDemo({ size }: { size: "sm" | "md" }) {
   const [theme, setTheme] = useState("system");

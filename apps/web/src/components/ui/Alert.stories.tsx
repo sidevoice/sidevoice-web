@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Alert } from "./Alert";
 import { Button } from "./Button";
+import { CloseIcon } from "./Icons";
+import { Snippet } from "./Snippet";
 
 const meta = {
   title: "Primitives/Alert",
@@ -29,3 +31,16 @@ export const WithActionAndDetails: Story = {
 };
 
 export const BodyOnly: Story = { args: { title: undefined, children: "A single line, without a title." } };
+
+/** A notice the person puts away: a ghost icon Button with a × as the action (the room's crash and failure strips), pinned to the
+ *  top when the notice is taller than a line (`.crash-notice .ui-alert-action`, a rule of the crash reports' CSS: web#530 asks for it as a prop). */
+export const Dismissible: Story = {
+  args: { tone: "accent", title: "Sidevoice sends crash reports. Turn this off in Settings.", children: undefined,
+    action: <Button variant="ghost" tone="neutral" size="icon-sm" aria-label="Close"><CloseIcon size={16} /></Button> },
+};
+
+/** What goes under the words, in the message's own column: a command to copy. */
+export const WithFooter: Story = {
+  args: { tone: "warning", title: "This machine has no agent connected", children: "Run this where your agent lives, then ask it to connect.",
+    footer: <Snippet text="claude mcp add sidevoice -- /opt/sidevoice/bin/connector mcp --stdio" /> },
+};
