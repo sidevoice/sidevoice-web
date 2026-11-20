@@ -15,8 +15,8 @@ function setup({readThrows=null,strictDOM=false,paired=true,stored=paired?{pairi
  if(outboxScope)context.sessionStorage={getItem:key=>key==='sidevoice.outbox-scope'?outboxScope:null,setItem(){}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. A TypeScript module is transpiled here.
- const modules={'./call-surface.js':'CallSurface','../services/failure-code.js':'FailureCode','./call-end.js':'CallEnd','../services/model-catalogs.js':'ModelCatalogs','../services/voice-source.ts':'VoiceSource','../services/audio-diagnostics.ts':'AudioDiagnostics','./browser-voice.js':'HostVoice','./browser-storage':'HostStorage','./browser-keyboard':'HostKeyboard','./browser-reach':'HostReach','./browser-presence':'HostPresence','./browser-microphone':'HostMicrophone','../services/system-language.js':'SystemLanguage','./locales/en':'LocaleEn','./locales/es':'LocaleEs','./locales/fr':'LocaleFr','./locales/it':'LocaleIt','./locales/de':'LocaleDe','./locales/ja':'LocaleJa','./locales/zh-Hans':'LocaleZhHans','./locales/pl':'LocalePl','./locales/pt-BR':'LocalePtBR','./locales/ko':'LocaleKo','./locales/hi':'LocaleHi','../i18n/translator':'Translator','../i18n/translator.ts':'Translator','./identity':'HostIdentity','./viewport':'HostViewport','./browser-microphone-help':'HostMicrophoneHelp','./native':'HostNative','../host':'Host','../host/index.ts':'Host','./audio-diagnostics.ts':'AudioDiagnostics','./audio-choice.ts':'AudioChoice','./device-name-rules.js':'DeviceNameRules','../services/device-name-rules.js':'DeviceNameRules','./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','./desktop-host':'DesktopHost','./microphone-access':'MicrophoneAccess','./microphone-access.ts':'MicrophoneAccess','./audio-device-refresh.ts':'AudioDeviceRefresh','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./locales/en':'LocaleEn','../../i18n/locales/en':'LocaleEn','./locales/es':'LocaleEs','../../i18n/locales/es':'LocaleEs','./locales/fr':'LocaleFr','../../i18n/locales/fr':'LocaleFr','./locales/it':'LocaleIt','../../i18n/locales/it':'LocaleIt','./locales/de':'LocaleDe','../../i18n/locales/de':'LocaleDe','./locales/ja':'LocaleJa','../../i18n/locales/ja':'LocaleJa','./locales/zh-Hans':'LocaleZhHans','../../i18n/locales/zh-Hans':'LocaleZhHans','./locales/pl':'LocalePl','./locales/pt-BR':'LocalePtBR','./locales/ko':'LocaleKo','./locales/hi':'LocaleHi','../../i18n/locales/pl':'LocalePl','../../i18n/locales/pt-BR':'LocalePtBR','../../i18n/locales/ko':'LocaleKo','../../i18n/locales/hi':'LocaleHi','../../i18n/translator':'Translator','../i18n/translator.ts':'Translator','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./reply-eligibility.js':'ReplyEligibility','./reply-hearing-policy.js':'HearingPolicy','./voice-settings.js':'VoiceSettings','./voice-trial.js':'VoiceTrial','./thinking-sounds':'ThinkingSounds','./call-preferences.ts':'CallPreferences','./thinking-sound.ts':'ThinkingSound','./model-housekeeping.js':'ModelHousekeeping','../features/settings/error-message.ts':'ErrorMessage','../../services/failure-code.js':'FailureCode','./working-clock.ts':'WorkingClock','../state/shortcuts.ts':'Shortcuts','./service-version.ts':'ServiceVersion'};
- const files={CallSurface:sourceRoot+'/state/call-surface.js',HostVoice:sourceRoot+'/host/browser-voice.js',HostStorage:sourceRoot+'/host/browser-storage.ts',HostKeyboard:sourceRoot+'/host/browser-keyboard.ts',HostReach:sourceRoot+'/host/browser-reach.ts',HostPresence:sourceRoot+'/host/browser-presence.ts',HostMicrophone:sourceRoot+'/host/browser-microphone.ts',HostIdentity:sourceRoot+'/host/identity.ts',HostViewport:sourceRoot+'/host/viewport.ts',HostMicrophoneHelp:sourceRoot+'/host/browser-microphone-help.ts',HostNative:sourceRoot+'/host/native.ts',Host:sourceRoot+'/host/index.ts',AudioDiagnostics:sourceRoot+'/services/audio-diagnostics.ts',AudioChoice:sourceRoot+'/services/audio-choice.ts',MicrophoneAccess:sourceRoot+'/services/microphone-access.ts',AudioDeviceRefresh:sourceRoot+'/services/audio-device-refresh.ts',Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',LocaleEn:sourceRoot+'/i18n/locales/en.ts',LocaleEs:sourceRoot+'/i18n/locales/es.ts',LocaleFr:sourceRoot+'/i18n/locales/fr.ts',LocaleIt:sourceRoot+'/i18n/locales/it.ts',LocaleDe:sourceRoot+'/i18n/locales/de.ts',LocaleJa:sourceRoot+'/i18n/locales/ja.ts',LocaleZhHans:sourceRoot+'/i18n/locales/zh-Hans.ts',LocalePl:sourceRoot+'/i18n/locales/pl.ts',LocalePtBR:sourceRoot+'/i18n/locales/pt-BR.ts',LocaleKo:sourceRoot+'/i18n/locales/ko.ts',LocaleHi:sourceRoot+'/i18n/locales/hi.ts',Translator:sourceRoot+'/i18n/translator.ts',FailureCode:sourceRoot+'/services/failure-code.js',CallEnd:sourceRoot+'/services/call-end.js',SiteStorage:sourceRoot+'/services/site-storage.js',VoiceTrial:sourceRoot+'/services/voice-trial.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',ReplyEligibility:sourceRoot+'/services/reply-eligibility.js',HearingPolicy:sourceRoot+'/services/reply-hearing-policy.js',VoiceSettings:sourceRoot+'/services/voice-settings.js',ThinkingSounds:sourceRoot+'/services/thinking-sounds.ts',CallPreferences:sourceRoot+'/services/call-preferences.ts',ThinkingSound:sourceRoot+'/services/thinking-sound.ts',ModelHousekeeping:sourceRoot+'/services/model-housekeeping.js',DeviceNameRules:sourceRoot+'/services/device-name-rules.js',ErrorMessage:sourceRoot+'/features/settings/error-message.ts',WorkingClock:sourceRoot+'/services/working-clock.ts',Shortcuts:sourceRoot+'/state/shortcuts.ts',ServiceVersion:sourceRoot+'/services/service-version.ts'};
+ const modules={'./call-surface.js':'CallSurface','../services/failure-code.js':'FailureCode','./call-end.js':'CallEnd','./carried-turns.js':'CarriedTurns','../services/model-catalogs.js':'ModelCatalogs','../services/voice-source.ts':'VoiceSource','../services/audio-diagnostics.ts':'AudioDiagnostics','./browser-voice.js':'HostVoice','./browser-storage':'HostStorage','./browser-keyboard':'HostKeyboard','./browser-reach':'HostReach','./browser-presence':'HostPresence','./browser-microphone':'HostMicrophone','../services/system-language.js':'SystemLanguage','./locales/en':'LocaleEn','./locales/es':'LocaleEs','./locales/fr':'LocaleFr','./locales/it':'LocaleIt','./locales/de':'LocaleDe','./locales/ja':'LocaleJa','./locales/zh-Hans':'LocaleZhHans','./locales/pl':'LocalePl','./locales/pt-BR':'LocalePtBR','./locales/ko':'LocaleKo','./locales/hi':'LocaleHi','../i18n/translator':'Translator','../i18n/translator.ts':'Translator','./identity':'HostIdentity','./viewport':'HostViewport','./browser-microphone-help':'HostMicrophoneHelp','./native':'HostNative','../host':'Host','../host/index.ts':'Host','./audio-diagnostics.ts':'AudioDiagnostics','./audio-choice.ts':'AudioChoice','./device-name-rules.js':'DeviceNameRules','../services/device-name-rules.js':'DeviceNameRules','./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','./desktop-host':'DesktopHost','./microphone-access':'MicrophoneAccess','./microphone-access.ts':'MicrophoneAccess','./audio-device-refresh.ts':'AudioDeviceRefresh','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./locales/en':'LocaleEn','../../i18n/locales/en':'LocaleEn','./locales/es':'LocaleEs','../../i18n/locales/es':'LocaleEs','./locales/fr':'LocaleFr','../../i18n/locales/fr':'LocaleFr','./locales/it':'LocaleIt','../../i18n/locales/it':'LocaleIt','./locales/de':'LocaleDe','../../i18n/locales/de':'LocaleDe','./locales/ja':'LocaleJa','../../i18n/locales/ja':'LocaleJa','./locales/zh-Hans':'LocaleZhHans','../../i18n/locales/zh-Hans':'LocaleZhHans','./locales/pl':'LocalePl','./locales/pt-BR':'LocalePtBR','./locales/ko':'LocaleKo','./locales/hi':'LocaleHi','../../i18n/locales/pl':'LocalePl','../../i18n/locales/pt-BR':'LocalePtBR','../../i18n/locales/ko':'LocaleKo','../../i18n/locales/hi':'LocaleHi','../../i18n/translator':'Translator','../i18n/translator.ts':'Translator','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./reply-eligibility.js':'ReplyEligibility','./reply-hearing-policy.js':'HearingPolicy','./voice-settings.js':'VoiceSettings','./voice-trial.js':'VoiceTrial','./thinking-sounds':'ThinkingSounds','./call-preferences.ts':'CallPreferences','./thinking-sound.ts':'ThinkingSound','./model-housekeeping.js':'ModelHousekeeping','../features/settings/error-message.ts':'ErrorMessage','../../services/failure-code.js':'FailureCode','./working-clock.ts':'WorkingClock','../state/shortcuts.ts':'Shortcuts','./service-version.ts':'ServiceVersion'};
+ const files={CallSurface:sourceRoot+'/state/call-surface.js',HostVoice:sourceRoot+'/host/browser-voice.js',HostStorage:sourceRoot+'/host/browser-storage.ts',HostKeyboard:sourceRoot+'/host/browser-keyboard.ts',HostReach:sourceRoot+'/host/browser-reach.ts',HostPresence:sourceRoot+'/host/browser-presence.ts',HostMicrophone:sourceRoot+'/host/browser-microphone.ts',HostIdentity:sourceRoot+'/host/identity.ts',HostViewport:sourceRoot+'/host/viewport.ts',HostMicrophoneHelp:sourceRoot+'/host/browser-microphone-help.ts',HostNative:sourceRoot+'/host/native.ts',Host:sourceRoot+'/host/index.ts',AudioDiagnostics:sourceRoot+'/services/audio-diagnostics.ts',AudioChoice:sourceRoot+'/services/audio-choice.ts',MicrophoneAccess:sourceRoot+'/services/microphone-access.ts',AudioDeviceRefresh:sourceRoot+'/services/audio-device-refresh.ts',Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',LocaleEn:sourceRoot+'/i18n/locales/en.ts',LocaleEs:sourceRoot+'/i18n/locales/es.ts',LocaleFr:sourceRoot+'/i18n/locales/fr.ts',LocaleIt:sourceRoot+'/i18n/locales/it.ts',LocaleDe:sourceRoot+'/i18n/locales/de.ts',LocaleJa:sourceRoot+'/i18n/locales/ja.ts',LocaleZhHans:sourceRoot+'/i18n/locales/zh-Hans.ts',LocalePl:sourceRoot+'/i18n/locales/pl.ts',LocalePtBR:sourceRoot+'/i18n/locales/pt-BR.ts',LocaleKo:sourceRoot+'/i18n/locales/ko.ts',LocaleHi:sourceRoot+'/i18n/locales/hi.ts',Translator:sourceRoot+'/i18n/translator.ts',FailureCode:sourceRoot+'/services/failure-code.js',CallEnd:sourceRoot+'/services/call-end.js',CarriedTurns:sourceRoot+'/services/carried-turns.js',SiteStorage:sourceRoot+'/services/site-storage.js',VoiceTrial:sourceRoot+'/services/voice-trial.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',ReplyEligibility:sourceRoot+'/services/reply-eligibility.js',HearingPolicy:sourceRoot+'/services/reply-hearing-policy.js',VoiceSettings:sourceRoot+'/services/voice-settings.js',ThinkingSounds:sourceRoot+'/services/thinking-sounds.ts',CallPreferences:sourceRoot+'/services/call-preferences.ts',ThinkingSound:sourceRoot+'/services/thinking-sound.ts',ModelHousekeeping:sourceRoot+'/services/model-housekeeping.js',DeviceNameRules:sourceRoot+'/services/device-name-rules.js',ErrorMessage:sourceRoot+'/features/settings/error-message.ts',WorkingClock:sourceRoot+'/services/working-clock.ts',Shortcuts:sourceRoot+'/state/shortcuts.ts',ServiceVersion:sourceRoot+'/services/service-version.ts'};
  const imports=(source,dir)=>source.replace(/^import (\w+) from ['"](.*\.json)['"][^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
   .replace(/^import \{(.*)\} from ['"](.*)['"];\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
@@ -5418,4 +5418,103 @@ test('A provider with a key that is unreachable only until its first listing lan
  assert.equal(s.run('roomStore.getState().facts.voiceCatalogue.checking'),false);
  assert.deepEqual(plain(s.run("voiceCatalogue.catalogs.find(c=>c.id==='elevenlabs').models.map(m=>m.id)")),['eleven_flash_v2_5']);
  assert.deepEqual(waits,[1000,2000],'the pause grows');
+});
+
+// ----- a call the page lost is joined again by itself (sidevoice-desktop's `rejoin` command) -----
+test('The turns the app carried over are said to the room as turns of the call, once it is joined again',async()=>{
+ const c=await callOnRoom();const {s,first}=c;
+ s.run("sayCarriedTurns(carriedTurnEvents([{turn_id:'c1',text:'Hola de nuevo',language:'es',started_at:5,ended_at:9},{turn_id:'c2',text:'  '}]),'fp-mac|a')");
+ assert.deepEqual(plain(sentOf(c,first,'voice-user-turn').map(d=>[d.phase,d.turn_id,d.offline,d.session_id])),[['started','c1',null,'s1'],['finished','c1',null,'s1']],'a normal start and end, none for what had no words');
+ assert.equal(turnSent(c,first,'c1','finished')[0].text,'Hola de nuevo');
+ assert.equal(s.run('history.at(-1).text'),'Hola de nuevo');
+ // Said to another conversation than the one the call is on, they are not said here.
+ s.run("people=[...people,{node:'fp-mac',thread_id:'z',title:'Z',available:true,reach:{state:'listening'}}]");
+ s.run("sayCarriedTurns(carriedTurnEvents([{turn_id:'c3',text:'Otra'}]),'fp-mac|z')");
+ assert.equal(turnSent(c,first,'c3','finished').length,0);
+ await s.run('toggleCall')();
+});
+test('A rejoin never touches a call that is on already',async()=>{
+ const c=await callOnRoom();const {s,sockets}=c;
+ await s.run('window.sidevoiceActions.rejoinCall')({threadId:'fp-mac|a',turns:[{turn_id:'c1',text:'Hola'}]});
+ assert.equal(sockets.length,1,'no second join');
+ assert.equal(s.run('state.sessionId'),'s1');
+ await s.run('toggleCall')();
+});
+test('A rejoin joins the call as a join does, saying «reconnecting» the whole way',async()=>{
+ const next=setup(),{sockets}=joining(next);
+ const lines=[];
+ next.run("roomStore.subscribe(()=>{})");
+ const done=next.run('window.sidevoiceActions.rejoinCall')({threadId:'fp-mac|t-1',turns:[]});
+ const socket=await firstSocket(sockets);socket.readyState=1;socket.onopen();
+ lines.push(next.run('state.joinStep'));
+ socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'s1',resume:{token:'tok-b',seconds:60},resumed:false}})});
+ await done;
+ assert.deepEqual(lines,['reconnect']);
+ assert.equal(next.run('sessionId'),'s1','the call is on again');
+ assert.equal(next.run('state.connecting'),false);
+});
+
+// ----- a call the page lost: the turns follow the call, not the page -----
+test('A rejoin the room refuses is a failed join: the call is over and the turns are not kept for later',async()=>{
+ const next=setup({strictDOM:true});
+ const room=joining(next,{admission:{admitted:false,reason:'room_is_full',message:'full',clients:8,max:8}});
+ const done=next.run('window.sidevoiceActions.rejoinCall')({threadId:'fp-mac|t-1',turns:[{turn_id:'c1',text:'Hola'}]});
+ const socket=await firstSocket(room.sockets);socket.onerror();socket.onclose({code:1006});
+ await done;
+ assert.equal(next.run('state.ws'),null);
+ assert.equal(next.run('pendingCarried'),null,'nothing waits for a call that is over');
+ assert.notEqual(next.run('state.joinFailure'),'');
+});
+test('A rejoin whose room is away keeps the turns until the call reconnects, and drops them if the person hangs up',async()=>{
+ const turns=[{turn_id:'c1',text:'Hola',started_at:1,ended_at:2}];
+ const gone=setup({strictDOM:true});
+ const away=joining(gone,{admission:'unreachable'});
+ const done=gone.run('window.sidevoiceActions.rejoinCall')({threadId:'fp-mac|t-1',turns});
+ const lost=await firstSocket(away.sockets);lost.onerror();lost.onclose({code:1006});
+ await done;
+ assert.equal(gone.run('state.reconnecting'),true);
+ assert.equal(gone.run('pendingCarried.carried.length'),1,'kept while the call reconnects');
+ await gone.run('toggleCall')();
+ assert.equal(gone.run('pendingCarried'),null,'a hang-up ends them');
+});
+test('A rejoin never opens the pairing dialog by itself',async()=>{
+ const s=setup({paired:false});
+ await s.run('window.sidevoiceActions.rejoinCall')({threadId:'fp-mac|a',turns:[{turn_id:'c1',text:'Hola'}]});
+ assert.equal(s.run('roomStore.getState().facts?.pairingOpen??state.pairingOpen'),false);
+ assert.equal(s.run('pendingCarried'),null);
+});
+test('A rejoin on a call the person joined by themselves merges the turns on the same conversation and drops them on another',async()=>{
+ const c=await callOnRoom();const {s,first}=c;
+ await s.run('window.sidevoiceActions.rejoinCall')({threadId:'fp-mac|a',turns:[{turn_id:'m1',text:'Merged'}]});
+ assert.equal(turnSent(c,first,'m1','finished')[0].text,'Merged');
+ await s.run('window.sidevoiceActions.rejoinCall')({threadId:'fp-mac|z',turns:[{turn_id:'m2',text:'Elsewhere'}]});
+ assert.equal(turnSent(c,first,'m2','finished').length,0);
+ assert.equal(s.run('pendingCarried'),null);
+ await s.run('toggleCall')();
+});
+test('A carried turn whose start the old page had told goes as its end only, never a second start',async()=>{
+ const c=await callOnRoom();const {s,first}=c;
+ s.run("sayCarriedTurns(carriedTurnEvents([{turn_id:'t1',text:'Hola',started_at:5,ended_at:9,started_told:true}]),'fp-mac|a')");
+ assert.equal(turnSent(c,first,'t1','started').length,0);
+ assert.equal(turnSent(c,first,'t1','finished')[0].offline,true,'words said while away');
+ await s.run('toggleCall')();
+});
+test('The app giving a lost call up ends it on the page with the words of a call that could not be resumed',async()=>{
+ const s=setup({strictDOM:true});
+ s.run('window.sidevoiceActions.callLost()');
+ assert.equal(s.run('roomStore.getState().callEnded?.detail??state.callEnded?.detail'),"The call couldn't be resumed.");
+});
+test('The app aborting a rejoin (the person hung up meanwhile) ends the join and a late joined report starts nothing',async()=>{
+ const turns=[{turn_id:'c1',text:'Hola',started_at:1,ended_at:2}];
+ const next=setup({strictDOM:true});
+ const room=joining(next);
+ const done=next.run('window.sidevoiceActions.rejoinCall')({threadId:'fp-mac|t-1',turns});
+ const socket=await firstSocket(room.sockets);socket.readyState=1;socket.onopen();
+ next.run('window.sidevoiceActions.abortRejoin()');
+ socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'s1',resume:{token:'tok-b',seconds:60},resumed:false}})});
+ await done;
+ assert.equal(next.run('state.ws'),null,'no call is on');
+ assert.equal(next.run('pendingCarried'),null,'nothing carried is said');
+ // With no rejoin under way it does nothing.
+ next.run('window.sidevoiceActions.abortRejoin()');
 });

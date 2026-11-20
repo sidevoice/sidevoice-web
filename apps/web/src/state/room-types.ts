@@ -204,6 +204,10 @@ export interface SidevoiceActions {
   /** A key tried with the provider and kept only when it takes it; a refusal throws its `code` and `detail`. */
   connectProviderKey?(provider: string, key: string): Promise<void>;
   interfaceLanguage?(): string;
+  /** The app joins the call again after the page that held it was lost (a reload, or the phone's web view ending), with the turns the person said meanwhile. */
+  rejoinCall?(call: { threadId: string | null; turns: unknown[] }): Promise<void>;
+  /** The person ended the call, or the app gave it up, while the page was joining it again: the join stops. */
+  abortRejoin?(): void;
   reloadToUpdate?(): void;
   setAudioDevices?(choice: { input?: string | null; output?: string | null }): Promise<unknown>;
   refreshAudioDevices?(): Promise<void>;

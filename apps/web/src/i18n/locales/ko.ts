@@ -1483,6 +1483,7 @@ export const messages: Messages = {
   "room.failure.inputBacklogFull": "대기 중인 메시지가 너무 많아요. 잠시 후 다시 시도하세요.",
   "room.failure.deviceAbsent": "이 기기는 더 이상 통화에 없어요. 눌러서 다시 참여하세요.",
   "room.failure.deviceAbsentRejoining": "이 기기는 더 이상 통화에 없어요. 다시 참여하는 중…",
+  "room.failure.callNotResumed": "통화를 재개하지 못했어요.",
   "settings.developer.systemCall": "통화를 시스템 통화로 처리(CallKit / Telecom)",
   "settings.developer.systemCall.hint": "켬: 통화가 시스템의 통화 기능을 사용해서 잠금 화면 카드, 통화 화면, 헤드셋이나 차량 버튼을 쓸 수 있어요. 끔: 앱 자체 통화로, 자체 알림을 사용해요. 다음 통화부터 적용돼요.",
   "settings.developer.group.calls": "통화",

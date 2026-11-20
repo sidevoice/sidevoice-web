@@ -24,3 +24,17 @@ export function logCallEnd(reason,warn=(...args)=>console.warn(...args)){
 export function logCallParked(warn=(...args)=>console.warn(...args)){
  try{warn('The page is going away; the call is parked.',{code:'call.parked.page_unload'})}catch{/* the log never ends a call */}
 }
+
+/** The steps of a call the page joins again by itself after it was lost (a reload, or the system ending the web view). */
+export const CALL_REJOIN_STEPS=Object.freeze(['started','joined','failed','turns_lost']);
+
+/**
+ * The line for a step of a rejoin: `call.rejoin.<step>`, with how many turns the app carried over (a number, never their words).
+ * @param {string} step one of CALL_REJOIN_STEPS
+ * @param {number} [turns]
+ * @param {(...args: unknown[]) => void} [warn]
+ */
+export function logCallRejoin(step,turns=0,warn=(...args)=>console.warn(...args)){
+ const code='call.rejoin.'+(CALL_REJOIN_STEPS.includes(step)?step:'failed');
+ try{warn('The call is joined again after its page was lost.',{code,turns:Number.isInteger(turns)&&turns>=0?turns:0})}catch{/* the log never ends a call */}
+}
