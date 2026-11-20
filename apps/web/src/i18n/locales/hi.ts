@@ -1483,7 +1483,7 @@ export const messages: Messages = {
   "room.failure.inputBacklogFull": "बहुत ज़्यादा संदेश इंतज़ार में हैं। थोड़ी देर में फिर कोशिश करें।",
   "room.failure.deviceAbsent": "यह डिवाइस अब कॉल में नहीं है। फिर शामिल होने के लिए टैप करें।",
   "room.failure.deviceAbsentRejoining": "यह डिवाइस अब कॉल में नहीं है। फिर शामिल हो रहा है…",
-  "room.failure.callNotResumed": "The call couldn't be resumed.",
+  "room.failure.callNotResumed": "कॉल फिर से शुरू नहीं की जा सकी।",
   "settings.developer.systemCall": "कॉल को सिस्टम कॉल की तरह मानें (CallKit / Telecom)",
   "settings.developer.systemCall.hint": "चालू: कॉल सिस्टम की कॉलिंग सुविधाओं का इस्तेमाल करती है, जिनमें लॉक स्क्रीन कार्ड, कॉल स्क्रीन और हेडसेट या कार के बटन शामिल हैं। बंद: ऐप की अपनी कॉल, अपनी सूचना के साथ। अगली कॉल से लागू होगा।",
   "settings.developer.group.calls": "कॉल",

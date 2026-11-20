@@ -1512,7 +1512,7 @@ export const messages: Messages = {
   "room.failure.inputBacklogFull": "Zbyt wiele wiadomości czeka. Spróbuj ponownie za chwilę.",
   "room.failure.deviceAbsent": "To urządzenie nie jest już w połączeniu. Dotknij, aby dołączyć ponownie.",
   "room.failure.deviceAbsentRejoining": "To urządzenie nie jest już w połączeniu. Dołączanie ponownie…",
-  "room.failure.callNotResumed": "The call couldn't be resumed.",
+  "room.failure.callNotResumed": "Nie udało się wznowić połączenia.",
   "settings.developer.systemCall": "Traktuj połączenia jako połączenia systemowe (CallKit / Telecom)",
   "settings.developer.systemCall.hint": "Włączone: połączenie korzysta z systemowych funkcji obsługi połączeń, z kartą na ekranie blokady, ekranem rozmowy i przyciskami zestawu słuchawkowego lub samochodu. Wyłączone: własne połączenie aplikacji z własnym powiadomieniem. Zadziała przy następnym połączeniu.",
   "settings.developer.group.calls": "Połączenia",
