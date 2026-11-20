@@ -2255,6 +2255,9 @@ function voiceTurn(event,entry=null){
    add('user',turn.text,null,thread,{history_id:segment,turn_id:turn.turn_id,draft:false,time:Date.now(),delivery:takeReceipt(segment)||'pending'});
   }
  });
+ // A carried turn whose start the page that went had told (or that is older than the room's resume window) is only a local
+ // start: its end goes as words said while away, never a second start of the same turn.
+ if(turn.phase==='started'&&turn.local_only)return;
  const payload=turnMessage(turn,target);
  // A final turn frame cannot outrun the terminal playback evidence it caused. A turn that came to nothing caused none
  // to a reply held for it (no words, cancelled, or merged into the next): that reply goes on, and the frame goes now.
@@ -2383,6 +2386,7 @@ function openSession(socket,hello={},fp=state.callNode,token=null){return new Pr
 // `reason` is why the call ends, one of CALL_END_REASONS (call-end.js): one log line per end, whichever path it took.
 function disconnect(reason='unknown') {
     logCallEnd(reason);
+    dropCarriedTurns();
     audioLog.callEnded();
     clearLeaving();
     // A deliberate hang-up is this app's not-heard choice for replies still pending. Offer the
@@ -2561,7 +2565,7 @@ async function callMachine(epoch){
 async function toggleCall(options={}){const rejoin=options?.rejoin===true;if(state.ws||state.connecting||state.reconnecting){if(!rejoin)disconnect('user');return}
  const step=(name,more)=>rejoin?joinStatus('reconnect'):joinStatus(name,more);
  // Nothing to join without a machine this device is paired with: the tap asks for a code instead.
- if(!pairings.list.some(p=>!p.revoked)){openPairing(pairings.list.length?reachNote(state):'');return}
+ if(!pairings.list.some(p=>!p.revoked)){if(rejoin){logCallRejoin('failed');return}openPairing(pairings.list.length?reachNote(state):'');return}
  personSignal();primeNowPlaying();primeBreath();state.callEnded=null;state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();sayCallError=null;setRoomError('');step('voice');
  // Whether Smart's model is on disk is the catalogue's to say (voiceSettingsToLoad): read in the background, never waited
  // for (a remote provider's listing can take minutes). The call starts with the last catalogue known, and the settings
@@ -2590,7 +2594,7 @@ async function toggleCall(options={}){const rejoin=options?.rejoin===true;if(sta
   updateMic();
   const remembered=rememberedThread();if(rememberedOn(fp))step('conversation',{subject:conversationTitle(remembered)});
   await refresh();await refreshPeople(fp);
-  if(epoch===connectEpoch){clearJoinStatus();flushOutbox()}
+  if(epoch===connectEpoch){clearJoinStatus();flushCarriedTurns();flushOutbox()}
  }catch(e){if(epoch===connectEpoch){const failed=state.joinStep;disconnect('join_failed');failJoin(joinError(failed,e))}}
  finally{if(epoch===connectEpoch){state.connecting=false;applyMicState()}}
 }
@@ -2603,18 +2607,45 @@ async function toggleCall(options={}){const rejoin=options?.rejoin===true;if(sta
  * for the conversation they were said to. If the join fails the call is over as any failed join is, and the turns are not
  * said (the log says how many, never what). */
 const REJOIN_PAIRINGS_WAIT_MS=10000;
+// The turns the app carried over that wait for the call to be on: handed over by `rejoinCall`, said once the join worked
+// (`flushCarriedTurns`, before anything new goes out) or, if the call is reconnecting, once it is back. Any end of the call
+// without it drops them, with their count in the log.
+let pendingCarried=null;
+function holdCarriedTurns(carried,threadId){
+ if(!carried.length)return;
+ const known=new Set((pendingCarried?.carried||[]).map(([started])=>started.turn_id));
+ pendingCarried={threadId:pendingCarried?.threadId??threadId,carried:[...(pendingCarried?.carried||[]),...carried.filter(([started])=>!known.has(started.turn_id))]};
+}
+function flushCarriedTurns(){
+ if(!pendingCarried||!state.ws||!state.sessionId)return;
+ const {carried,threadId}=pendingCarried;pendingCarried=null;sayCarriedTurns(carried,threadId);
+}
+function dropCarriedTurns(){
+ if(!pendingCarried)return;
+ const count=pendingCarried.carried.length;pendingCarried=null;logCallRejoin('turns_lost',count);
+}
 async function rejoinCall({threadId=null,turns=[]}={}){
- if(state.ws||state.connecting||state.reconnecting)return;
  const carried=carriedTurnEvents(turns);
  logCallRejoin('started',carried.length);
+ // A call that is on already (the person joined by themselves meanwhile) is never touched. The turns are for the conversation
+ // they were said to: merged into the call when it is on that one, dropped (and counted) when it is not.
+ const merge=()=>{
+  if(!(state.ws||state.connecting||state.reconnecting))return false;
+  const on=state.callNode&&targetThread()?conversationKey(state.callNode,targetThread()):null;
+  if(threadId&&on&&on!==threadId){if(carried.length)logCallRejoin('turns_lost',carried.length);return true}
+  holdCarriedTurns(carried,threadId);flushCarriedTurns();return true;
+ };
+ if(merge())return;
  // A phone reads its pairings from the app before the page knows any machine: a join before then would ask for a code.
  for(let waited=0;nativeData&&!nativePairingsReady&&waited<REJOIN_PAIRINGS_WAIT_MS;waited+=100)await new Promise(resolve=>setTimeout(resolve,100));
- if(state.ws||state.connecting||state.reconnecting)return;
+ if(merge())return;
  if(typeof threadId==='string'&&threadId){rememberThread(threadId);state.viewedThread=threadId}
+ holdCarriedTurns(carried,threadId);
  await toggleCall({rejoin:true});
- if(!state.ws||!state.sessionId){logCallRejoin('failed',carried.length);if(carried.length)logCallRejoin('turns_lost',carried.length);return}
- logCallRejoin('joined',carried.length);
- sayCarriedTurns(carried,threadId);
+ if(state.ws&&state.sessionId){logCallRejoin('joined',carried.length);flushCarriedTurns();return}
+ // A join whose room is away goes on as a reconnection: the turns wait for it (`lostConnection`), and are dropped if the call ends.
+ if(state.reconnecting||state.connecting){logCallRejoin('joined',carried.length);return}
+ logCallRejoin('failed',carried.length);dropCarriedTurns();
 }
 // The turns, as the call's own: a start and an end each, for the conversation the call is on now, when it is the one they were said to.
 function sayCarriedTurns(carried,threadId){
@@ -2725,6 +2756,7 @@ async function lostConnection(event,epoch,token=null){
     hold=outboxHold={};
    }
    // The same session again: what waited in the outbox goes now, not at the next thing the voice says.
+   flushCarriedTurns();
    if(!hold)flushOutbox();
    void settleRejoin(epoch,hold);
    // Time spent in a tunnel is not time spent away: the idle clock starts again with the call.
@@ -3160,6 +3192,8 @@ function saveLanguage(chosen){
 // Nothing to submit: every setting applies as it changes. Enter in a field submits nothing.
 $('language-form').onsubmit=e=>e.preventDefault();
 window.sidevoiceActions={
+ // The app gave up the call its page lost (the page kept going): it ended, as any call the room cannot keep.
+ callLost:()=>{callEndedBy('failed',bundled('room.failure.deviceAbsent').text);logCallRejoin('failed')},
  cancelInput:cancelCurrentInput,
  skipReply,
  setSpeechOutput,

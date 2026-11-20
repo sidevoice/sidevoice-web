@@ -5453,3 +5453,54 @@ test('A rejoin joins the call as a join does, saying «reconnecting» the whole 
  assert.equal(next.run('sessionId'),'s1','the call is on again');
  assert.equal(next.run('state.connecting'),false);
 });
+
+// ----- a call the page lost: the turns follow the call, not the page -----
+test('A rejoin the room refuses is a failed join: the call is over and the turns are not kept for later',async()=>{
+ const next=setup({strictDOM:true});
+ const room=joining(next,{admission:{admitted:false,reason:'room_is_full',message:'full',clients:8,max:8}});
+ const done=next.run('window.sidevoiceActions.rejoinCall')({threadId:'fp-mac|t-1',turns:[{turn_id:'c1',text:'Hola'}]});
+ const socket=await firstSocket(room.sockets);socket.onerror();socket.onclose({code:1006});
+ await done;
+ assert.equal(next.run('state.ws'),null);
+ assert.equal(next.run('pendingCarried'),null,'nothing waits for a call that is over');
+ assert.notEqual(next.run('state.joinFailure'),'');
+});
+test('A rejoin whose room is away keeps the turns until the call reconnects, and drops them if the person hangs up',async()=>{
+ const turns=[{turn_id:'c1',text:'Hola',started_at:1,ended_at:2}];
+ const gone=setup({strictDOM:true});
+ const away=joining(gone,{admission:'unreachable'});
+ const done=gone.run('window.sidevoiceActions.rejoinCall')({threadId:'fp-mac|t-1',turns});
+ const lost=await firstSocket(away.sockets);lost.onerror();lost.onclose({code:1006});
+ await done;
+ assert.equal(gone.run('state.reconnecting'),true);
+ assert.equal(gone.run('pendingCarried.carried.length'),1,'kept while the call reconnects');
+ await gone.run('toggleCall')();
+ assert.equal(gone.run('pendingCarried'),null,'a hang-up ends them');
+});
+test('A rejoin never opens the pairing dialog by itself',async()=>{
+ const s=setup({paired:false});
+ await s.run('window.sidevoiceActions.rejoinCall')({threadId:'fp-mac|a',turns:[{turn_id:'c1',text:'Hola'}]});
+ assert.equal(s.run('roomStore.getState().facts?.pairingOpen??state.pairingOpen'),false);
+ assert.equal(s.run('pendingCarried'),null);
+});
+test('A rejoin on a call the person joined by themselves merges the turns on the same conversation and drops them on another',async()=>{
+ const c=await callOnRoom();const {s,first}=c;
+ await s.run('window.sidevoiceActions.rejoinCall')({threadId:'fp-mac|a',turns:[{turn_id:'m1',text:'Merged'}]});
+ assert.equal(turnSent(c,first,'m1','finished')[0].text,'Merged');
+ await s.run('window.sidevoiceActions.rejoinCall')({threadId:'fp-mac|z',turns:[{turn_id:'m2',text:'Elsewhere'}]});
+ assert.equal(turnSent(c,first,'m2','finished').length,0);
+ assert.equal(s.run('pendingCarried'),null);
+ await s.run('toggleCall')();
+});
+test('A carried turn whose start the old page had told goes as its end only, never a second start',async()=>{
+ const c=await callOnRoom();const {s,first}=c;
+ s.run("sayCarriedTurns(carriedTurnEvents([{turn_id:'t1',text:'Hola',started_at:5,ended_at:9,started_told:true}]),'fp-mac|a')");
+ assert.equal(turnSent(c,first,'t1','started').length,0);
+ assert.equal(turnSent(c,first,'t1','finished')[0].offline,true,'words said while away');
+ await s.run('toggleCall')();
+});
+test('The app giving a lost call up ends it on the page with the words of a device no longer in the call',async()=>{
+ const s=setup({strictDOM:true});
+ s.run('window.sidevoiceActions.callLost()');
+ assert.equal(s.run('roomStore.getState().callEnded?.detail??state.callEnded?.detail'),'This device is no longer in the call. Tap to join again.');
+});
