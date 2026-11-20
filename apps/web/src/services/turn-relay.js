@@ -54,14 +54,16 @@ export function createTurnRelay() {
     reset() { sent.clear(); starts.clear(); held.clear(); ends.clear(); },
     /**
      * How a turn message `data` goes to the room now: `{send}` with what to send, `{hold: true}` while its start is held
-     * (it stays, and goes after the start), or `{drop: true}`.
+     * (it stays, and goes after the start), or `{drop: true}`. Words said while away carry `age_ms`, from `age`: the
+     * milliseconds since the turn was captured, so the room can say how long ago they were said.
      */
-    route(data) {
+    route(data, age) {
+      const aged = (sent) => (sent.offline && Number.isFinite(age) ? { ...sent, age_ms: Math.max(0, Math.round(age)) } : sent);
       if (data.phase === 'started') return { send: data };
       if (held.has(data.turn_id)) return { hold: true };
-      if (data.offline) return data.phase === 'finished' && data.text?.trim() ? { send: data } : { drop: true };
+      if (data.offline) return data.phase === 'finished' && data.text?.trim() ? { send: aged(data) } : { drop: true };
       if (sent.has(data.turn_id)) return { send: data };
-      if (data.phase === 'finished' && data.text?.trim()) return { send: { ...data, offline: true } };
+      if (data.phase === 'finished' && data.text?.trim()) return { send: aged({ ...data, offline: true }) };
       return { drop: true };
     },
   };

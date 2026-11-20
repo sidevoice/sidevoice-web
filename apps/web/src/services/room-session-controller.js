@@ -763,7 +763,7 @@ function flushOutbox(socket=state.ws){
     // A start made for a session the room has replaced is never answered there: the room takes each message once
     // per device, so sent again it is only acknowledged. Its turn's end goes as words said while away.
     if(data.phase==='started'&&entry.session_id!==state.sessionId){outbox.remove(entry.id);continue}
-    const route=relay.route(data);
+    const route=relay.route(data,resendClock()-entry.created);
     if(route.hold)continue;
     if(route.drop){outbox.remove(entry.id);continue}
     data=route.send;
