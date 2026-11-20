@@ -37,6 +37,17 @@
 .ui-button--ghost.ui-button--danger-text:not(:disabled, [aria-disabled="true"]):active { background: var(--sv-danger-soft); }
 .ui-button--danger:not(:disabled, [aria-disabled="true"]):active { background: var(--sv-danger-fill-hover); }
 @media (prefers-reduced-motion: reduce) { .ui-button:active { transform: none !important; } }
+
+/* ----- States: one hover, one press, one focus for every control (operator, 2026-11-07: "every button changes colour a
+ * little on hover"). Button's fills step to their own tokens (above: --sv-accent-hover, --sv-button-secondary-hover…);
+ * every other control — a feature's own round button, a heading that opens something, a radio drawn as a picture — wears
+ * `ui-state`, which lays the theme's wash over whatever it is: --sv-hover on hover, --sv-pressed on press, as a background
+ * image, so it tints any fill or none, in light and in dark. Focus is the 2px --sv-focus ring. Hover only where there is a
+ * pointer, so it never sticks on touch; under reduced motion the colours change at once. */
+@media (hover: hover) { .ui-state:not(:disabled, [aria-disabled="true"]):hover { background-image: linear-gradient(var(--sv-hover), var(--sv-hover)); } }
+.ui-state:not(:disabled, [aria-disabled="true"]):active { background-image: linear-gradient(var(--sv-pressed), var(--sv-pressed)); }
+.ui-state:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { :is(.ui-button, .ui-state, .ui-switch, .ui-switch-thumb, .ui-nav-item) { transition-duration: 0s !important; } }
 /* On touch a small icon button reaches 44px, further than it shows (36px there, theme.css; the inset counts from inside
  * its 1px border). */
 @media (pointer: coarse) { .ui-button--icon.ui-button--sm::after { content: ""; position: absolute; inset: -5px; } }
@@ -152,7 +163,7 @@
 .ui-error-text > p { margin: 0; }
 .ui-error-said { color: var(--sv-text-muted); }
 .ui-error-details { margin-top: var(--sv-space-1); font-size: var(--sv-font-xs); line-height: calc(1rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
-.ui-error-details > summary { width: fit-content; cursor: pointer; border-radius: var(--sv-radius-sm); }
+.ui-error-details > summary { width: fit-content; padding-inline: var(--sv-space-1); margin-inline: calc(-1 * var(--sv-space-1)); cursor: pointer; border-radius: var(--sv-radius-sm); }
 .ui-error-details > pre { margin: var(--sv-space-1) 0 0; max-height: 8rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--sv-text-muted); }
 
 /* ----- Tabs (views of one thing) and Segmented (one value of a few). */
@@ -198,6 +209,8 @@
 .ui-nav-item > .ui-badge { flex: none; }
 @media (hover: hover) { .ui-nav-item:hover { background: var(--sv-hover); color: var(--sv-text); } }
 .ui-nav-item[aria-current="page"] { background: var(--sv-accent-soft); color: var(--sv-accent-text); font-weight: var(--sv-weight-semibold); }
+/* The current one answers the pointer too, a step deeper in its own colour. */
+@media (hover: hover) { .ui-nav-item[aria-current="page"]:hover { background: var(--sv-accent-soft-hover); } }
 .ui-nav-item:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
 .ui-nav-dirty { width: 6px; height: 6px; margin-inline-start: auto; border-radius: 50%; background: var(--sv-accent); }
 
@@ -225,6 +238,12 @@
 .ui-switch[aria-checked="true"] { background: var(--sv-accent); border-color: var(--sv-accent); }
 .ui-switch[aria-checked="true"] .ui-switch-thumb { transform: translateX(16px); background: var(--sv-on-accent); }
 .ui-switch:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+@media (hover: hover) {
+  .ui-switch:not(:disabled):hover { border-color: var(--sv-text-subtle); background-image: linear-gradient(var(--sv-hover), var(--sv-hover)); }
+  .ui-switch[aria-checked="true"]:not(:disabled):hover { border-color: var(--sv-accent-hover); background: var(--sv-accent-hover); }
+}
+.ui-switch:not(:disabled):active { background-image: linear-gradient(var(--sv-pressed), var(--sv-pressed)); }
+.ui-switch[aria-checked="true"]:not(:disabled):active { background: var(--sv-accent-active); }
 .ui-switch:disabled { background: var(--sv-disabled-bg); border-color: var(--sv-border); cursor: not-allowed; }
 .ui-switch:disabled .ui-switch-thumb { background: var(--sv-disabled-text); }
 

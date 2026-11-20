@@ -213,7 +213,7 @@ function LogReader({ source, place, name }: { source: LogSource; place: LogPlace
 
 /** One event as the file has it, in monospace: its first line and, under it, the lines of its backtrace. Only the piece sits
  *  outside the text. Drawn again only when what it shows changes. */
-const LogRow = memo(function LogRow({ event, query, label }: { event: LogEvent; query: string; label: string }) {
+export const LogRow = memo(function LogRow({ event, query, label }: { event: LogEvent; query: string; label: string }) {
   const level = /^\s*\S+\s+(WARN|ERROR)\s/.exec(event.text)?.[1];
   return (
     <div className="logs-line" data-level={level}>
@@ -230,7 +230,7 @@ const LogRow = memo(function LogRow({ event, query, label }: { event: LogEvent; 
 
 /** The lines, in a box that follows the end while the reader is at it; scrolled up, it keeps its place and the way back to the
  *  end shows, with a dot once something new has come. */
-function LogView({ rows, query, name, arrived, none, onClear }: { rows: LogEvent[]; query: string; name: string; arrived: number; none: boolean; onClear: () => void }) {
+export function LogView({ rows, query, name, arrived, none, onClear }: { rows: LogEvent[]; query: string; name: string; arrived: number; none: boolean; onClear: () => void }) {
   const t = translator();
   const view = useRef<HTMLDivElement>(null);
   const following = useRef(true);

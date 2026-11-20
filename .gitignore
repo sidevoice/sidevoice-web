@@ -25,3 +25,5 @@ packages/connector/core/
 .playwright-static-web/
 apps/web/test-results/
 apps/web/playwright-report/
+# The catalogue as built (npm run catalogue:build -w @sidevoice/web).
+apps/web/storybook-static/

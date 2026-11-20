@@ -6,6 +6,6 @@ import { translator } from "../../i18n/translator";
  *  never-played reply's once it is opened (T56). */
 export function ListenAgain({ message }: { message: ChatMessage }) {
   const t = translator();
-  return <button type="button" className="listen-again" aria-label={t("messages.listenAgain")} title={t("messages.listenAgain")}
+  return <button type="button" className="listen-again ui-state" aria-label={t("messages.listenAgain")} title={t("messages.listenAgain")}
     onClick={() => void window.sidevoiceActions?.replayReply(message.segment)}><ReplayIcon /></button>;
 }

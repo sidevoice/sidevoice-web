@@ -382,7 +382,6 @@
   border-radius: var(--sv-radius-md); background: none; color: inherit; font: inherit; letter-spacing: inherit; text-align: start; cursor: pointer;
   transition: background-color var(--sv-dur-fast) var(--sv-ease); }
 .stage-heading:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
-.stage-heading:active { background-image: linear-gradient(var(--sv-pressed), var(--sv-pressed)); }
 .stage-heading[aria-expanded="true"] { background: var(--sv-accent-soft); }
 /* On a phone the heading sits inside the name's frosted frame: the wash goes on that one surface, the frame itself, and
  * not on the heading inside it (two layers, one inset in the other). */
