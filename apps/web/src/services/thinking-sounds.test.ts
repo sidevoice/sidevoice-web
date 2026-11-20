@@ -117,7 +117,7 @@ test("by default the soft heartbeat at its own level and cadence; the choice is 
   expect(readCallPreferences()).toMatchObject({ presence: "always", sound: "soft-heartbeat", soundGainDb: 10 });
   // What was kept before the sounds (when and the screen) reads as it was, the sound the default.
   localStorage.setItem(CALL_PREFERENCES_KEY, JSON.stringify({ presence: "off", keepAwake: true }));
-  expect(readCallPreferences()).toEqual({ presence: "off", sound: "soft-heartbeat", soundGainDb: 0, soundIntervalScale: 1, keepAwake: true });
+  expect(readCallPreferences()).toEqual({ presence: "off", sound: "soft-heartbeat", soundGainDb: 0, soundIntervalScale: 1, keepAwake: true, speakingStyle: "normal" });
 });
 
 test("the frequency is kept beside the volume, and comes back as it was set; one it cannot be is the nearest, or the default", () => {

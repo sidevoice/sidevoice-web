@@ -34,7 +34,7 @@ import { MachineEntryCopy, MachineEntryState, StateOnIcon, machineEntryName } fr
 import { Alert } from "../../components/ui/Alert";
 import { ErrorText } from "../../components/ui/ErrorText";
 import { Switch } from "../../components/ui/Switch";
-import { readCallPreferences, subscribeCallPreferences, writeCallPreferences, type CallPreferences, type PresenceSound } from "../../services/call-preferences";
+import { readCallPreferences, subscribeCallPreferences, writeCallPreferences, SPEAKING_STYLE_OPTIONS, type CallPreferences, type PresenceSound } from "../../services/call-preferences";
 import { languageName, translator, uiLanguage, UI_LANGUAGES, type MessageKey, type Translate } from "../../i18n/translator";
 import { ErrorBoundary } from "../../app/ErrorBoundary";
 import { remoteProviders } from "../../services/voice-settings.js";
@@ -144,11 +144,15 @@ function CallSettings({ t, microphone }: { t: Translate; microphone: MicrophoneS
     </Group>
     <MediaDuckRow t={t} openPermissions={() => store?.patch({ settingsSection: "permissions", settingsLevel: "page" })} />
     {/* The desktop app keeps its computer awake as any app does; holding the screen on is for a browser or a phone. */}
-    {awake && host().identity.build === null && <Group title={t("settings.call.device")}>
-      <Row label={t("settings.call.keepAwake")} description={awake.supported ? t("settings.call.keepAwakeHint") : t("settings.call.keepAwakeUnsupported")}>
-        <Switch checked={prefs.keepAwake && awake.supported} disabled={!awake.supported} onChange={(keepAwake) => set({ keepAwake })} aria-label={t("settings.call.keepAwake")} />
+    <Group title={t("settings.call.device")}>
+      <Row label={t("settings.call.speaking")} description={t(SPEAKING_STYLE_OPTIONS.find((option) => option.value === prefs.speakingStyle)!.description)}>
+        <Segmented size="sm" label={t("settings.call.speaking")} value={prefs.speakingStyle} onChange={(speakingStyle) => set({ speakingStyle })}
+          items={SPEAKING_STYLE_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))} />
       </Row>
-    </Group>}
+      {awake && host().identity.build === null && <Row label={t("settings.call.keepAwake")} description={awake.supported ? t("settings.call.keepAwakeHint") : t("settings.call.keepAwakeUnsupported")}>
+        <Switch checked={prefs.keepAwake && awake.supported} disabled={!awake.supported} onChange={(keepAwake) => set({ keepAwake })} aria-label={t("settings.call.keepAwake")} />
+      </Row>}
+    </Group>
   </Section>;
 }
 
