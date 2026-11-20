@@ -61,7 +61,7 @@ export function LogControls({ filters, onChange, events, shown }: Props) {
 }
 
 /** The popover's content: drawn only while it is open, so the counts are made only then. */
-function FiltersPanel({ filters, onChange, events, shown, pieces }: Props & { pieces: LogPiece[] }) {
+export function FiltersPanel({ filters, onChange, events, shown, pieces }: Props & { pieces: LogPiece[] }) {
   const t = translator();
   const levelLabel = useId();
   const piecesLabel = useId();

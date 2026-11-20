@@ -13,3 +13,5 @@ body { margin: 0; -webkit-user-select: text; user-select: text; }
 /* A dialog's frame shown in the page, over the scrim, as a modal would draw it. */
 .catalogue-dialog-preview { display: grid; max-width: 560px; padding: 24px; border-radius: var(--sv-radius-xl); background: var(--sv-scrim); }
 .catalogue-dialog-preview .ui-dialog-surface { border: 1px solid var(--sv-border); border-radius: var(--sv-radius-2xl); background: var(--sv-surface); box-shadow: var(--sv-shadow-lg); }
+/* The logs' box is 540px tall in the app; a story that shows several states of it shortens it. */
+.catalogue-log-short .logview, .catalogue-log-short .logs-status-box { height: 400px; }
