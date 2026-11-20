@@ -4,6 +4,7 @@ import {projectPairings,withPairing,withoutPairing,revokedPairing,pairingSummary
 import {normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
 import {host as pageHost} from '../host/index.ts';
 import {createHostAgentsController} from './host-agents.ts';
+import {isHostPath} from './host-path.ts';
 import {withoutLost} from './audio-choice.ts';
 import {currentDeviceName} from '../state/device-name.ts';
 import {translator,setUiLanguage,onUiLanguage,uiLanguage,UI_LANGUAGES} from '../i18n/translator.ts';
@@ -1619,7 +1620,8 @@ async function localHostApi(path,options={}){
  if(!response.ok)throw Error('local-host-request-failed');
  return response;
 }
-async function hostApi(fp,path,options={}){
+// Where a paired machine is reached now, proved: its pairing and the base its requests go to.
+async function hostPlace(fp){
  const pairing=pairings.list.find(item=>item.fp===fp);
  if(!pairing||pairing.revoked)throw Object.assign(Error('unreachable'),{key:'unreachable'});
  let base=pairing.local?pairing.urls[0]:hostAgentBases.get(fp);
@@ -1638,6 +1640,22 @@ async function hostApi(fp,path,options={}){
  // The page's own origin is a valid, empty prefix. Keep it distinct from a missing base so a node
  // served by this page can be proved and its authenticated API can use root-relative paths.
  if(typeof base!=='string')throw Object.assign(Error('unreachable'),{key:'unreachable'});
+ return {pairing,base};
+}
+// A request to a paired machine with its token, as the machine answered it. The caller owns the timeout: a long poll holds
+// for longer than hostApi waits.
+async function hostFetch(fp,path,options={}){
+ // The token goes to the machine named by the base: a path that could name another host is never sent with it.
+ if(!isHostPath(path))throw Object.assign(Error('request_invalid'),{key:'request_invalid'});
+ const {pairing,base}=await hostPlace(fp);
+ let response;
+ try{response=await fetch(base+path,withToken({...options,redirect:'error'},pairing.token))}
+ catch(error){if(error?.name==='AbortError')throw error;throw Object.assign(Error('unreachable'),{key:'unreachable'})}
+ if(response.status===401)void pairingRefused(fp,{token:pairing.token,asked:true}).catch(()=>{});
+ return response;
+}
+async function hostApi(fp,path,options={}){
+ const {pairing,base}=await hostPlace(fp);
  const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),23000);
  let response;
  try{response=await fetch(base+path,withToken({...options,signal:abort.signal,redirect:'error'},pairing.token))}
@@ -3187,6 +3205,7 @@ window.sidevoiceActions={
  uninstallVoiceModel,
  setDeleteUnusedModels,
  loadHostAgents:(fp,options={})=>hostAgentsController.load(fp,options),
+ hostFetch,
  hostAgentAction:(fp,id,action)=>hostAgentsController.act(fp,id,action),
  openAgentSettings,
  showSettingsSection:settingsSection,

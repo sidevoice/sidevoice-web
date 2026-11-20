@@ -384,6 +384,28 @@ describe("from the read to the follow", () => {
       expect(lines()).toHaveLength(2);
     });
 
+    test("a log that keeps refusing its cursor is read again a little later each time, then not at all", async () => {
+      fakeClock();
+      withApp();
+      const served = serving(first);
+      renderInRoom(<LogsViewer />, roomWith([[THIS, "ok"]]));
+      await tick(0);
+      await served.fail(new LogCursorExpired());
+      await tick(0);
+      expect(served.reads).toHaveLength(2);
+      for (const [i, wait] of [1000, 3000, 9000].entries()) {
+        await served.fail(new LogCursorExpired());
+        await tick(wait - 1);
+        expect(served.reads).toHaveLength(2 + i);
+        await tick(1);
+        expect(served.reads).toHaveLength(3 + i);
+      }
+      await served.fail(new LogCursorExpired());
+      await tick(60000);
+      expect(served.reads).toHaveLength(5);
+      expect(screen.getByText("The log could not be read.")).toBeInTheDocument();
+    });
+
     test("a log that ended is not followed again", async () => {
       fakeClock();
       withApp();
