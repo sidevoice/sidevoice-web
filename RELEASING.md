@@ -1,6 +1,6 @@
 # Releasing
 
-The release rules (nightlies during development, the release-please PR, release day, pins) are the organisation's, in the [releasing guideline](https://github.com/sidevoice/.github-private/blob/main/docs/releasing.md). This file is only this repository's own steps.
+This file is self-sufficient: it holds what anyone needs to build, release and download this repository. The maintainers also follow an internal release guideline shared by all Sidevoice repositories ([releasing guideline](https://github.com/sidevoice/.github-private/blob/main/docs/releasing.md), maintainers only; nothing here depends on it).
 
 One version for the whole web, tagged `vX.Y.Z`. It lives in the root `package.json`, the two workspaces'
 `package.json` (`apps/web`, `packages/protocol`), the web's pin of
@@ -48,22 +48,42 @@ gh attestation verify oci://ghcr.io/sidevoice/sidevoice-web:v0.2.1 --repo sidevo
   --cert-identity 'https://github.com/sidevoice/sidevoice-web/.github/workflows/release.yml@refs/heads/main'
 ```
 
+The changelog is written from the squashed PR titles. To change it, edit `CHANGELOG.md` in the release PR right
+before merging it: any later merge into `main` regenerates the PR. After the release, fix the notes on the
+Release itself.
+
 ## The Sidevoice service minor this web works with
 
 `apps/web/public/service.pin.json` (`{ "minor": "0.21" }`) declares the one minor of the Sidevoice service this web speaks
 the contract of. It ships in the build (`voice/service.pin.json`); the page judges every machine against it, and the
 desktop app reads it from the web it bundles (`web.pin.json`), updating this device's service to the newest patch of that
 minor and never to the next one. A service release that is a minor (`feat` in the service) arrives with the web (and so the
-desktop app) that bumps this file; a patch (`fix`) needs nothing here. This file is the only place the minor is written. On release day, after the connector's minor release is published, a `feat(deps)` PR updates it (guideline, sections 1 and 5); the same applies to a pin of `@sidevoice/engine` or `@sidevoice/voice` (`fix(deps)`).
+desktop app) that bumps this file; a patch (`fix`) needs nothing here. This file is the only place the minor is written. A PR that moves it is a change of the web and is titled `feat(deps): ...` (guideline, section 1).
 
-## Versions
+## Which version comes next
+
+`fix:` → patch, `feat:` → minor. While the version is 0.x a breaking change (`feat!:` or a `BREAKING CHANGE:`
+footer) bumps the minor, not the major. `docs:`, `chore:`, `ci:`, `test:`, `refactor:` alone make no release. `@sidevoice/engine` and `@sidevoice/voice` are compiled into the build (exact versions in `apps/web/package.json`): a PR that moves one of them is a change of the web and is titled `fix(deps): ...`, not `chore` (guideline, section 1).
 
 Nothing is tagged by release-please yet: the manifest starts at 0.1.0 (the version the packages carry), and
 release-please reads the history from the commit where this repository became the web alone (`bootstrap-sha`).
-The first release PR proposes 0.2.0 if there is a `feat`.
+The first release PR proposes 0.2.0 if there is a `feat`. To publish another version, use `Release-As` (below).
 
 The `v0.4.3`, `v0.5.0` and `v0.6.0` tags in this repository come from the history before the web had a
 repository of its own; they are not releases of the web. A web version that reaches one of them would collide with it.
+
+## A release candidate, or any explicit version
+
+Put the footer as the **last line of a PR's description** (the squash commit takes the description as its body):
+
+```
+Release-As: 0.3.0-rc.1
+```
+
+The release PR then proposes exactly that version. A version with a `-` suffix is published as a **pre-release
+and never as latest**. The next candidate is `Release-As: 0.3.0-rc.2`; the final one is `Release-As: 0.3.0`
+(say it: after a candidate, do not leave the next version to the computation). With nothing else to merge, a PR
+with one empty commit (`git commit --allow-empty`) carries the footer.
 
 ## Nightly
 
@@ -85,7 +105,9 @@ Build artifacts on Actions runs are kept 7 days, for debugging only. Download fr
 
 ## What this needs from the repository settings
 
-- The settings every repository needs (squash merging, "Allow GitHub Actions to create and approve pull requests", `ci` and the PR title check as required checks in a ruleset) are in the guideline, section 7.
+- Settings → Actions → General → **Allow GitHub Actions to create and approve pull requests**: without it
+  release-please cannot open its PR.
+- Squash merging, with the PR title as the commit message.
 - The container package `sidevoice-web` public: the first push creates it private, and its visibility can only be
   changed by an owner, once, in the package's settings (Package settings → Danger zone → Change visibility). The
   workflow's `GITHUB_TOKEN` writes it (`packages: write`); the image's source label links it to this repository.
