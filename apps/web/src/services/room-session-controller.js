@@ -9,6 +9,7 @@ import {currentDeviceName} from '../state/device-name.ts';
 import {translator,setUiLanguage,onUiLanguage,uiLanguage,UI_LANGUAGES} from '../i18n/translator.ts';
 import {voiceFailure,roomFailure,worded,errorLine} from '../features/settings/error-message.ts';
 import {failureCode} from './failure-code.js';
+import {createReachLog,reachOutcome} from './reach-log.js';
 import {logCallEnd,logCallParked} from './call-end.js';
 import {probeSiteStorage} from './site-storage.js';
 import {tryTranscription,tryVoice,tryEndOfTurn} from './voice-trial.js';
@@ -515,7 +516,7 @@ function leaveGoneViewed(){
  * proved itself is trusted for a few minutes. The call's machine is never moved by it while the call is on — only
  * its reconnection moves it (`move`). A reconnecting call (`hold`) keeps the address it had while that one's proof is
  * recent: the machine may be restarting, and the socket is the better probe. */
-const verified=new Map(),hostAgentBases=new Map();
+const verified=new Map(),hostAgentBases=new Map(),reachLog=createReachLog();
 let settingsAgentRequestId=0;
 let targetAbout=null,reachFailure=null;
 const inCallNow=()=>!!(state.ws||state.connecting||state.reconnecting);
@@ -534,19 +535,21 @@ async function locate(fp,{move=!(fp===state.callNode&&inCallNow()),fresh=false,h
  const link=linkOf(fp),recent=base=>base!=null&&Date.now()-(verified.get(base)||0)<VERIFIED_FOR_MS;
  if(!fresh&&link.reach==='ok'&&recent(link.base)&&link.doubted!==link.base)return;
  const asked=++link.asked,deps={get:fetch},started=new Map();
- let found=null,reach='away';
+ let found=null,reach='away',searchFailed=false;
+ const outcomes=[];
  try{
   // The pairing's own addresses are asked while the target says what it is: its answer can only add one more.
   void firstProven(candidateBases(pairing,{origin:location.origin}),pairing,deps,started).catch(()=>{});
   const about=await describeTarget();
   if(about)targetAbout=about;
-  found=await firstProven(candidateBases(pairing,{target,about,origin:location.origin}),pairing,deps,started);
- }catch{}
+  found=await firstProven(candidateBases(pairing,{target,about,origin:location.origin}),pairing,{...deps,observe:(candidate,proof)=>{if(!proof.ok)outcomes.push(reachOutcome(candidate,proof))}},started);
+ }catch{searchFailed=true}
  if(asked<link.applied||links.get(fp)!==link||pairings.list.find(p=>p.fp===fp)!==pairing)return;
  link.applied=asked;
  // The page follows the build of whoever serves it: a server of a kind this
  // version does not know yet serving this page says which, when it says it.
  if(target===''&&targetAbout?.kind==='unknown')followServedBuild(targetAbout.build);
+ if(found)reachLog.recovered(fp);else reachLog.located(fp,outcomes,searchFailed);
  if(found){
   verified.set(found.base,Date.now());hostAgentBases.set(fp,found.base);if(link.doubted===found.base)link.doubted=null;
   // A call keeps the address its socket is on.
@@ -1544,7 +1547,11 @@ async function pairingRefused(fp,{call=false,token=null,asked=false}={}){
 async function pairDevice(code,name,address='',{insecure=false}={}){
  const about=await describeTarget();if(about)targetAbout=about;
  const defaultName=currentDeviceName();
- const {pairing,base}=await redeemPairingCode(code,{name:name||defaultName,address,target,about,origin:location.origin,reach:pageHost().reach,get:fetch,insecure});
+ const outcomes=[];
+ let redeemed;
+ try{redeemed=await redeemPairingCode(code,{name:name||defaultName,address,target,about,origin:location.origin,reach:pageHost().reach,get:fetch,insecure,observe:(candidate,proof)=>{if(!proof.ok)outcomes.push(reachOutcome(candidate,proof))}})}
+ catch(error){reachLog.pairing(outcomes,error);throw error}
+ const {pairing,base}=redeemed;
  if(localPairing?.fp===pairing.fp){
   try{await fetch(base.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token))}catch{}
   closePairing();return {host:localPairing.host};

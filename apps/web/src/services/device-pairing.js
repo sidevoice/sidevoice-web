@@ -240,20 +240,21 @@ export async function verifyIdentitySignature({ publicKey, nonce, signature }, s
 export async function proveIdentity(base, expected, { get = globalThis.fetch, subtle, nonce = newNonce(), timeoutMs = IDENTITY_TIMEOUT_MS } = {}) {
     const crypto = webCrypto(subtle);
     let answer;
+    // `why` says what went wrong, for the log alone (reach-log.js): nothing decides on it, and none of it carries a secret.
     try {
         const response = await patiently(get(base + '/api/device/identity?nonce=' + encodeURIComponent(nonce), { headers: { accept: 'application/json' }, cache: 'no-store', redirect: 'error' }), timeoutMs);
-        if (!response.ok) return { ok: false, reason: 'unreachable' };
-        answer = await response.json();
-    } catch { return { ok: false, reason: 'unreachable' }; }
-    if (!answer || typeof answer.public_key !== 'string' || typeof answer.signature !== 'string') return { ok: false, reason: 'unreachable' };
+        if (!response.ok) return { ok: false, reason: 'unreachable', why: 'http_status', status: response.status };
+        try { answer = await response.json(); } catch { return { ok: false, reason: 'unreachable', why: 'bad_json' }; }
+    } catch (error) { return { ok: false, reason: 'unreachable', ...(error?.message === 'timeout' ? { why: 'timeout' } : { why: 'fetch_failed', errorName: typeof error?.name === 'string' ? error.name : 'Error' }) }; }
+    if (!answer || typeof answer.public_key !== 'string' || typeof answer.signature !== 'string') return { ok: false, reason: 'unreachable', why: 'missing_fields' };
     let publicKey = expected.public_key || null;
     if (!publicKey) {
         try { if (await fingerprintOf(base64ToBytes(answer.public_key), crypto) === expected.fp) publicKey = answer.public_key; }
         catch { /* not a key */ }
-        if (!publicKey) return { ok: false, reason: 'impostor' };
+        if (!publicKey) return { ok: false, reason: 'impostor', why: 'fingerprint_mismatch' };
     }
     return await verifyIdentitySignature({ publicKey, nonce, signature: answer.signature }, crypto)
-        ? { ok: true, publicKey } : { ok: false, reason: 'impostor' };
+        ? { ok: true, publicKey } : { ok: false, reason: 'impostor', why: 'bad_signature' };
 }
 /** Where a pairing (or a code) can be reached, in the contract's order: the target this page was pointed at when
  *  it is that node, then each direct URL. Each says how: `direct`. `about` is the target's own `/api/rendezvous` answer, `null` if it gave none.
@@ -284,6 +285,8 @@ export async function firstProven(candidates, expected, deps = {}, started = new
     let failure = null;
     for (const candidate of candidates) {
         const proof = await ask(candidate);
+        // A caller that wants to say why an address failed is told, per candidate and in order (`observe`): it changes nothing.
+        try { deps.observe?.(candidate, proof); } catch { /* a log never decides */ }
         if (proof.ok) return { ...candidate, publicKey: proof.publicKey };
         failure ??= proof.error || null;
     }
@@ -295,7 +298,7 @@ export async function firstProven(candidates, expected, deps = {}, started = new
 // ----- redeeming a code -----
 /** Pair this device with the node a code names, at the address the person typed if any: find an address that proves it is that node, hand it the
  *  one-time secret there and nowhere else, and keep the token only if the key it returns is the code's. */
-export async function redeemPairingCode(code, { name = '', address = '', target = '', about = null, origin = '', reach, get = globalThis.fetch, subtle, now = Date.now(), insecure = false } = {}) {
+export async function redeemPairingCode(code, { name = '', address = '', target = '', about = null, origin = '', reach, get = globalThis.fetch, subtle, now = Date.now(), insecure = false, observe } = {}) {
     // The address the person typed comes first, and is kept with the pairing: it is where they know the machine is.
     // It is trusted no more than the code's own: the machine there proves it is the code's before the secret goes.
     // Agreed to (`insecure`), a private address is reached over plain http instead, and the pairing says so for good.
@@ -306,7 +309,7 @@ export async function redeemPairingCode(code, { name = '', address = '', target 
     const decoded = decodePairingCode(code, now, { address: typed });
     const payload = { ...(typed ? { ...decoded, urls: [typed, ...decoded.urls.filter(url => url !== typed)] } : decoded), ...(plain ? { insecure: true } : {}) };
     const crypto = webCrypto(subtle);
-    const place = await firstProven(candidateBases(payload, { target, about, origin }), { fp: payload.fp }, { get, subtle: crypto });
+    const place = await firstProven(candidateBases(payload, { target, about, origin }), { fp: payload.fp }, { get, subtle: crypto, observe });
     const called = payload.host ? '«' + payload.host + '»' : 'la máquina';
     if (!place && written && !plain) {
         const privateAddress = privateHost(new URL(written).hostname);
