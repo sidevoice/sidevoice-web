@@ -1,6 +1,6 @@
 import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,noMachine,reachNote,unreached,conversationKey,conversationOf,personKey,displayTitle,focusedThread,viewedThread as viewedOf,reachOf,NO_VIEW} from '../state/room-session-state.js';
 import {pageTarget,targetAnswers,routeUrl,callSocketUrl,isNodePath,askTarget} from './rendezvous.js';
-import {projectPairings,withPairing,withoutPairing,revokedPairing,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
+import {projectPairings,withPairing,withoutPairing,revokedPairing,restoredPairing,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
 import {host as pageHost} from '../host/index.ts';
 import {createHostAgentsController} from './host-agents.ts';
@@ -1504,8 +1504,39 @@ function locateOnBeat(fp){
  const pending=Promise.resolve().then(()=>locate(fp)).finally(()=>{if(beatLocates.get(fp)===pending)beatLocates.delete(fp)});
  beatLocates.set(fp,pending);
 }
+// Asks the machine, at an address that proves it is that machine, whether it still accepts this pairing's token:
+// 'refused' (401 again), 'ok', or 'unknown' (unreachable, unproven, any other answer): only 'refused' says anything.
+async function probeToken(pairing){
+ try{
+  let base=pairing.local?pairing.urls[0]:null;
+  if(!pairing.local){
+   const place=await firstProven(candidateBases(pairing,{target,about:targetAbout,origin:location.origin}),pairing,{get:fetch});
+   if(!place)return 'unknown';base=place.base;
+  }
+  if(typeof base!=='string')return 'unknown';
+  const response=await fetch(base+'/api/presentation/participants',withToken({signal:AbortSignal.timeout(8000)},pairing.token));
+  return response.status===401?'refused':response.ok?'ok':'unknown';
+ }catch{return 'unknown'}
+}
+// A pairing marked revoked is asked again now and then: a refusal that was wrong heals by itself, a real one stays.
+const REVOKED_RECHECK_MS=5*60*1000,revokedChecks=new Map();
+async function recheckRevoked(){
+ for(const pairing of pairings.list){
+  if(!pairing.revoked||!pairing.token||Date.now()-(revokedChecks.get(pairing.fp)||0)<REVOKED_RECHECK_MS)continue;
+  revokedChecks.set(pairing.fp,Date.now());
+  if(await probeToken(pairing)!=='ok')continue;
+  let restored=false;
+  await keepPairings(current=>{
+   const latest=current.list.find(p=>p.fp===pairing.fp);
+   if(!latest||!latest.revoked||latest.token!==pairing.token)return current;
+   restored=true;return restoredPairing(current,pairing.fp);
+  }).catch(()=>{});
+  if(restored){console.warn('[pairing] revoked pairing accepted again, restored',{fp:pairing.fp});locateOnBeat(pairing.fp)}
+ }
+}
 function machinesBeat(){
  roomStore.patch({machinesAt:Date.now()});
+ void recheckRevoked();
  for(const fp of liveMachines()){
   const link=links.get(fp),fresh=link?.base!=null&&Date.now()-(verified.get(link.base)||0)<VERIFIED_FOR_MS&&link.doubted!==link.base;
   if(!link||link.base==null||!fresh&&!pairings.list.find(p=>p.fp===fp)?.local)locateOnBeat(fp);
@@ -1524,6 +1555,10 @@ function closePairing(){roomStore.patch({pairingOpen:false,pairingNote:''})}
 // Resolves true when it ended the call, false when it left the call alone (the caller of a refused call then ends it).
 async function pairingRefused(fp,{call=false,token=null,asked=false}={}){
  const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing||pairing.revoked||token!=null&&pairing.token!==token)return;
+ // One refusal is not a revocation (a core restarting, a proxy glitch): it is kept only when the machine, proven to be
+ // itself, refuses the same token again. Anything else leaves the pairing as it was, and the beat looks again.
+ const verdict=await probeToken(pairing);
+ if(verdict!=='refused'){console.warn('[pairing] refusal not confirmed, pairing kept',{fp,verdict});return}
  let revoked=false;
  await keepPairings(current=>{
   const latest=current.list.find(p=>p.fp===fp);

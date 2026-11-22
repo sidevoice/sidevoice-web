@@ -97,4 +97,5 @@ export function projectPairings(stored: Pairings, localPairing: Pairing | null):
 export function withPairing(pairings: Pairings, pairing: Pairing): Pairings;
 export function withoutPairing(pairings: Pairings, fp: string): Pairings;
 export function revokedPairing(pairings: Pairings, fp: string): Pairings;
+export function restoredPairing(pairings: Pairings, fp: string): Pairings;
 export function pairingSummary(pairing: Pairing): PairingSummary;

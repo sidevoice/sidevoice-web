@@ -3622,6 +3622,7 @@ test('A conversation of a machine that does not answer is only looked at: the ca
 });
 test('A machine that refuses this device while merely watched says so in its row; the call on another goes on',async()=>{
  const c=await callWithTwoMachines();const {s}=c;
+ s.run("probeToken=async()=>'refused'");
  s.context.fetch=async url=>String(url).startsWith('https://pc.example')?{ok:false,status:401,json:async()=>({detail:'no'})}:{ok:true,status:200,json:async()=>({participants:[],messages:[]})};
  await s.run("refreshPeople('fp-pc')");
  assert.equal(s.run('roomStore.getState().machines.find(m=>m.id===\'fp-pc\').state'),'revoked');
@@ -3699,15 +3700,30 @@ test('A move given up leaves the next call\'s debts alone, and takes over a join
  s.run('disconnect()');
 });
 test('A refusal of a credential a new pairing has replaced does not revoke the new one',async()=>{
- const s=setup();
+ const s=setup();s.run("probeToken=async()=>'refused'");
  await s.run("pairingRefused('fp-mac',{token:'tok-old'})");
  assert.equal(s.run("pairings.list[0].revoked"),undefined);
  await s.run("pairingRefused('fp-mac',{token:'tok-1'})");
  assert.equal(s.run("pairings.list[0].revoked"),true);
 });
+test('One refusal does not unpair a machine for good: only a second one, from the machine itself, does; a wrong one heals',async()=>{
+ const s=setup();
+ for(const verdict of ['unknown','ok']){
+  s.run(`probeToken=async()=>'${verdict}'`);
+  await s.run("pairingRefused('fp-mac',{token:'tok-1'})");
+  assert.equal(s.run("pairings.list[0].revoked"),undefined,'a refusal the machine does not repeat revokes nothing: '+verdict);
+ }
+ s.run("probeToken=async()=>'refused'");
+ await s.run("pairingRefused('fp-mac',{token:'tok-1'})");
+ assert.equal(s.run("pairings.list[0].revoked"),true);
+ s.run("probeToken=async()=>'unknown'");await s.run('recheckRevoked()');
+ assert.equal(s.run("pairings.list[0].revoked"),true,'still refused or unreachable: stays revoked');
+ s.run("revokedChecks.clear();probeToken=async()=>'ok'");await s.run('recheckRevoked()');
+ assert.equal(s.run("pairings.list[0].revoked"),false,'accepted again: the revocation is lifted');
+});
 test('No more machines are watched than the bound, and the call\'s always is',async()=>{
  const many=Array.from({length:9},(_,i)=>({...PAIRED,fp:'fp-'+i,device_id:'d'+i}));
- const s=setup({stored:{pairings:many}});
+ const s=setup({stored:{pairings:many}});s.run("probeToken=async()=>'refused'");
  assert.equal(s.run('liveMachines().length'),s.run('MAX_LINKS'));
  s.run("callNode='fp-8'");
  assert.ok(s.run("liveMachines().includes('fp-8')"));

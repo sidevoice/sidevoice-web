@@ -1,7 +1,7 @@
 import { expect, test, vi } from "vitest";
 import {
   base64ToBytes, bytesToBase64url, machineAddress, candidateBases, decodePairingCode, fingerprintOf, firstProven,
-  pairingSummary, proveIdentity, projectPairings, redeemPairingCode, revokedPairing, secureBase, verifyIdentitySignature,
+  pairingSummary, proveIdentity, projectPairings, redeemPairingCode, revokedPairing, restoredPairing, secureBase, verifyIdentitySignature,
   withPairing, withoutPairing, NO_WEBCRYPTO, type Pairing,
   listeningPort, privateHost, previewPairingCode, PAIRING_HTTP_PRIVATE, PAIRING_HTTP_ONLY, PAIRING_HTTP_BLOCKED,
 } from "./device-pairing.js";
@@ -378,6 +378,8 @@ test("several pairings, all of them kept across reloads, newest first", () => {
   // Pairing the same machine again replaces it, and a revoked one comes back to life that way.
   book = revokedPairing(book, "a");
   expect(book.list.find((p) => p.fp === "a")?.revoked).toBe(true);
+  // A revocation that was wrong heals: the node accepting the token again lifts it, for that node only.
+  expect(restoredPairing(book, "a").list.map((p) => [p.fp, !!p.revoked])).toEqual([["b", false], ["a", false]]);
   book = withPairing(book, pairing("a", { token: "t-new" }));
   expect(book.list.map((p) => [p.fp, p.token, !!p.revoked])).toEqual([["a", "t-new", false], ["b", "t-b", false]]);
   pairingsIn(storage).write(book);
