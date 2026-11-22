@@ -8,8 +8,9 @@ import type { SessionFacts } from "../../state/room-session-state.js";
  * parent, never to wherever the person was before, so the system's back agrees with it. Each level is one entry in the
  * browser's history — the system's back (an edge swipe, the browser's Back) goes up a level, and from the list closes
  * Settings rather than leaving the room; Escape and Android's back come as the dialog's `cancel`, and do the same. Every
- * way up goes through history.back(), and `popstate` alone shows the level its entry names; every close takes the
- * entries left back off. A jump inside Settings (This device's rename to General), an opening at a page, an agent's
+ * way up goes through history.back(), and `popstate` shows the level its entry names, but for Settings' own Back: it
+ * shows the level above at once and takes its entry off after, since the history answers late (a phone's webview took
+ * up to a second); every close takes the entries left back off. A jump inside Settings (This device's rename to General), an opening at a page, an agent's
  * request and a crossing of the breakpoint rebuild the entries without a slide. A desktop pushes nothing.
  *
  * The levels slide (the next one in from the inline end, the one left a quarter of the way out; back is the mirror),
@@ -131,8 +132,6 @@ export function useSettingsLevelsOf(dialog: HTMLDialogElement | null, { nav, con
     entries: [] as Stack,
     /** Entries being taken off (a close, a rebuild one level up): the `popstate` that ends it is ours, not a back. */
     unwinding: null as { depth: number; then?: () => void } | null,
-    /** How the next `popstate` up is shown, when it was asked for here. */
-    backAs: null as { instantly?: boolean; focus?: "title" } | null,
     timer: 0, navScroll: 0, listScroll: 0, agentsFocused: -1,
     /** What to do once the level shown is drawn: its scroll, and where focus goes. */
     after: null as (() => void) | null,
@@ -178,9 +177,10 @@ export function useSettingsLevelsOf(dialog: HTMLDialogElement | null, { nav, con
    *  the first machine, else Add a machine, when that one is gone. */
   const focusRow = (left: Stack) => {
     if (left.length === 2) { document.getElementById("settings-" + left[1])?.focus({ preventScroll: true }); return; }
-    const page = content.current;
+    // Machines' own rows (Updates lists the machines too, in a page not shown).
+    const page = content.current?.querySelector<HTMLElement>("#pane-machines");
     const row = [...page?.querySelectorAll<HTMLElement>("[data-machine]") ?? []].find((entry) => entry.dataset.machine === left[2])
-      ?? page?.querySelector<HTMLElement>(".machines-menu .settings-menu-row") ?? document.getElementById("pair-device-open");
+      ?? page?.querySelector<HTMLElement>("[data-machine]") ?? page?.querySelector<HTMLElement>(".machines-add button") ?? document.getElementById("pair-device-open");
     row?.focus({ preventScroll: true });
   };
 
@@ -219,6 +219,26 @@ export function useSettingsLevelsOf(dialog: HTMLDialogElement | null, { nav, con
     rendered();
   };
 
+  /** `then` now, or once the entries being taken off are off. */
+  const afterUnwind = (then: () => void) => {
+    const pending = live.current.unwinding;
+    if (!pending) { then(); return; }
+    const before = pending.then;
+    pending.then = () => { before?.(); then(); };
+  };
+  /** Up a level from Settings' own Back: shown at once, its entry taken off after. history.back() answers a moment later
+   *  (a phone's webview took up to a second), and the `popstate` that ends it is ours. */
+  const up = (options: { instantly?: boolean; focus?: "title" }) => {
+    const now = live.current;
+    if (!now.phone || now.entries.length < 2 || (now.motion && !options.instantly)) return;
+    const from = now.entries;
+    const to = from.slice(0, -1);
+    now.entries = to;
+    afterUnwind(() => unwind(1));
+    finishMotion();
+    step(from, to, "back", options);
+  };
+
   const levels: SettingsLevels = {
     phone, level, motion,
     open: (to, at) => {
@@ -228,15 +248,11 @@ export function useSettingsLevelsOf(dialog: HTMLDialogElement | null, { nav, con
       const next = at ? ["list", to, at] : ["list", to];
       if (next.length !== from.length + 1) return;
       now.entries = next;
-      write(next, "push");
+      // Its entry once the history is where Settings shows: an entry taken off by Back may not be off yet.
+      afterUnwind(() => write(next, "push"));
       step(from, next, "forward");
     },
-    back: (options = {}) => {
-      const now = live.current;
-      if (!now.phone || now.entries.length < 2 || (now.motion && !options.instantly)) return;
-      now.backAs = options;
-      history.back();
-    },
+    back: (options = {}) => up(options),
     say: (text) => { setSaid(""); window.setTimeout(() => setSaid(text), 50); },
   };
 
@@ -282,15 +298,13 @@ export function useSettingsLevelsOf(dialog: HTMLDialogElement | null, { nav, con
       // Closed (a reload left its entries behind), Settings stays closed.
       if (!now.open || !now.phone) return;
       const layer = [...document.querySelectorAll<HTMLElement>(LAYERS)].pop();
-      if (layer) { closeLayer(layer); write(now.entries, "push"); now.backAs = null; return; }
-      const as = now.backAs ?? {};
-      now.backAs = null;
+      if (layer) { closeLayer(layer); write(now.entries, "push"); return; }
       if (!stack.length) { now.entries = []; if (dialog) closeDialog(dialog); return; }
       const from = now.entries;
       now.entries = stack;
       // A slide under way ends where it was going, then this one starts.
       finishMotion();
-      step(from, stack, stack.length < from.length ? "back" : "forward", as);
+      step(from, stack, stack.length < from.length ? "back" : "forward");
     };
     window.addEventListener("popstate", popped);
     return () => window.removeEventListener("popstate", popped);

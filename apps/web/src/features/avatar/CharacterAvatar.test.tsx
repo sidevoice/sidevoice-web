@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { act, render } from "@testing-library/react";
 import { playbackLevel } from "../../state/playback-level";
-import { avatarFor, type AvatarMood } from "./avatar-spec";
+import { PERSON_AVATAR, type AvatarMood } from "./avatar-spec";
 import { createAvatarStates, type AvatarStates } from "./avatar-state";
 import { CharacterAvatar } from "./CharacterAvatar";
 import { smoothPlaybackLevel } from "./playback-mouth";
@@ -13,7 +13,9 @@ const motion = (how: "gpu" | "still") => { localStorage.setItem(MOTION_KEY, how)
 beforeEach(() => { states = createAvatarStates(); motion("gpu"); });
 afterEach(() => { motion("still"); localStorage.clear(); states.clear(); playbackLevel.clear(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
-const spec = avatarFor("fp|one");
+// The engine's drawings (the person, the mascot) move their mouths in CSS; a conversation's creature is drawn by its rig
+// (CreatureAvatar.test.tsx).
+const spec = PERSON_AVATAR;
 const speaker = (mood: AvatarMood, voice = "fp|one") => act(() => states.set("one", { spec, mood, voice }));
 /** One copy of the figure "one", drawn from its state. */
 /** The mouth a copy moves: the one `.m-open` that is not a layered drawing's still clone. */

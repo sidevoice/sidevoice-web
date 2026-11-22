@@ -12,13 +12,14 @@ export function useRoomShortcuts() {
   useEffect(() => {
     const act: Record<Exclude<ShortcutId, "holdToTalk">, () => void> = {
       mute: () => window.sidevoiceActions?.toggleMic(),
+      oneTurn: () => window.sidevoiceActions?.oneTurn?.(),
       skip: () => window.sidevoiceActions?.skipReply(),
     };
     const press = (event: KeyboardEvent) => {
       const target = event.target instanceof Element ? event.target : null;
       const typing = !!target?.closest(TYPING);
       const found = shortcutOf(event, { typing: false });
-      if (!found || found.hold) return;
+      if (!found) return;
       // Save is the browser's whether or not a field has focus; every other key waits for the field.
       if (typing && found.id !== "skip") return;
       event.preventDefault();

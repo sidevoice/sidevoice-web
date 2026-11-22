@@ -1,5 +1,5 @@
 import { Button } from "../../components/ui/Button";
-import { TranscriptIcon } from "../../components/ui/Icons";
+import { TranscriptLinesIcon } from "../../components/ui/Icons";
 import { useCallLayout } from "../../state/call-layout";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { translator } from "../../i18n/translator";
@@ -16,7 +16,7 @@ export function TranscriptEntry() {
     <Tooltip action content={label}>
       <Button id="transcript-toggle" variant="secondary" size="icon" className="transcript-entry" aria-controls="transcript" aria-expanded={open}
         aria-haspopup="dialog" aria-label={label} onClick={toggle}>
-        <TranscriptIcon size={20} />
+        <TranscriptLinesIcon size={20} />
       </Button>
     </Tooltip>
   );

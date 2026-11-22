@@ -68,15 +68,22 @@ export function Select({ id, value, defaultValue, onValueChange, options, size =
   const [open, setOpen] = useState(false);
   const [own, setOwn] = useState(defaultValue ?? "");
   const trigger = useRef<HTMLButtonElement>(null);
+  // A key pressed on the closed box, for as long as its keydown lasts: typing a name there jumps to its option, as on a native select.
+  const typing = useRef(false);
   const current = value ?? own;
   const flat = options.flatMap((item) => isGroup(item) ? item.options : [item]);
   const chosen = flat.find((option) => option.value === current);
   const hasEmpty = flat.some((option) => option.value === "");
   const inner = (external: string) => external === "" && hasEmpty ? EMPTY : external;
   const choose = (next: string) => {
-    // Only an option is a choice. In a form, Radix keeps a hidden native select that it sets to a new value before the
-    // options that hold it are drawn in it, and reports what it then holds: "", no option. Taken, that clears the value
-    // it echoes, and whatever gives the value again (a slot with no model takes its first) loops until React gives up.
+    // Only what the person picked is a choice: an option of the open list, or the one a key typed on the box jumps to. In a
+    // form (every Settings select is in one), Radix keeps a hidden native select that reports values nobody picked: it echoes
+    // each new value back, and a reset of the form puts back the value the box was first drawn with (a headset's double press
+    // read Nothing again after another setting changed, desktop#464). Taken, each is written to wherever the value is kept.
+    if (!open && !typing.current) return;
+    // Only an option is a choice. That hidden select is set to a new value before the options that hold it are drawn in it,
+    // and reports what it then holds: "", no option. Taken, that clears the value it echoes, and whatever gives the value again
+    // (a slot with no model takes its first) loops until React gives up.
     if (!flat.some((option) => inner(option.value) === next)) return;
     const external = next === EMPTY ? "" : next;
     setOwn(external);
@@ -87,6 +94,7 @@ export function Select({ id, value, defaultValue, onValueChange, options, size =
   return (
     <SelectPrimitive.Root value={inner(current)} onValueChange={choose} open={open} onOpenChange={setOpen} disabled={disabled}>
       <SelectPrimitive.Trigger ref={trigger} id={id} className={cn("ui-select", size === "sm" && "ui-control--sm", className)} style={style}
+        onKeyDown={() => { typing.current = true; queueMicrotask(() => { typing.current = false; }); }}
         aria-label={aria["aria-label"]} aria-labelledby={aria["aria-labelledby"]} aria-describedby={aria["aria-describedby"]}
         aria-invalid={invalid || aria["aria-invalid"] || undefined}
         // Its value as data, for whatever reads the page rather than looks at it: a test, the runtime.

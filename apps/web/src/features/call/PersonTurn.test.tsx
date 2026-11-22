@@ -196,3 +196,105 @@ test("sent while the one before still leaves: the new one shows at once on its o
   expect(saying(LONG)).toBeNull();
   staysThenGoes(PAGE_MS - (SENT_LEAVING_MS - 200), () => saying(SHORT));
 });
+
+/* The stage's look (look="card", the design reference's T36 without streamed words, T27): the icon pill where the words
+ * will come, "Transcribing" in it while it is, the × to take the turn back on it; then what was sent pops out of it, a
+ * white card cut to three lines, for PAGE_MS, and lifts away. The same clocks as the balloon's. */
+function cardTurn(text = LONG, view: ConversationView = listening()) {
+  const t = translator();
+  const shown = render(<PersonTurn conversation={view} t={t} look="card" />);
+  const to = (conversation: ConversationView, cut = false) => shown.rerender(<PersonTurn conversation={conversation} t={t} look="card" cut={cut} />);
+  return { to, sent: () => to(settled([said("u-1", text)])), unmount: shown.unmount };
+}
+const pill = () => document.querySelector<HTMLElement>(".vcap.card.person.pill");
+const sentCard = () => document.querySelector<HTMLElement>(".vcap.card.person.sent");
+
+test("card look: while they speak, the icon pill (the microphone, the voice's bars) and the × to take it back", () => {
+  cardTurn();
+  expect(pill()).toHaveAttribute("data-phase", "listening");
+  expect(pill()!.querySelector("svg")).not.toBeNull();
+  expect(pill()!.querySelector(".turn-bars")).not.toBeNull();
+  // The microphone: five bars of the voice mark are transcribing's, not listening's.
+  expect(pill()!.querySelector(".ui-pill-lead > svg rect")).not.toBeNull();
+  expect(pill()).not.toHaveTextContent(LONG.slice(0, 10));
+  const cancel = pill()!.querySelector("button.cancel")!;
+  expect(cancel).toHaveAccessibleName("Cancel sending");
+  // Nothing balloon-shaped on the card look.
+  expect(document.querySelector(".person-bubble, .balloon-tail")).toBeNull();
+});
+
+test("card look: transcribing keeps the pill's bars, pulsing and wordless, announced once, the × still on it", () => {
+  const { to } = cardTurn();
+  to(listening());
+  const bars = pill()!.querySelector(".turn-bars")!;
+  // The announcer is there, empty, while they speak: it is the same node whose text then changes (a live region announces that).
+  const before = pill()!.querySelector("[role=status]")!;
+  expect(before).toHaveTextContent("");
+  to({ ...listening(), pendingPhase: "transcribing" });
+  expect(pill()!.querySelector("[role=status]")).toBe(before);
+  expect(pill()).toHaveAttribute("data-phase", "transcribing");
+  // The same waveform, not a new one: it keeps the turn's last frame.
+  expect(pill()!.querySelector(".turn-bars")).toBe(bars);
+  expect(bars).toHaveAttribute("data-phase", "transcribing");
+  expect(pill()!.querySelector(".tlabel, .ell")).toBeNull();
+  // No visible word: the only text is the announcer's, hidden, and it is the one live region (the bars are labelled, not live).
+  const announcer = pill()!.querySelector("[role=status]")!;
+  expect(pill()!.querySelectorAll("[role=status]")).toHaveLength(1);
+  expect(announcer).toHaveAttribute("data-turn-announcer");
+  expect(announcer).toHaveTextContent("Transcribing what you said");
+  expect(pill()!.textContent).toBe(announcer.textContent);
+  expect(bars).toHaveAttribute("role", "img");
+  expect(bars).toHaveAccessibleName("Transcribing what you said");
+  expect(pill()!.querySelector(".ui-pill-lead > svg")).toBeNull();
+  expect(pill()!.querySelector("button.cancel")).toHaveAccessibleName("Cancel sending");
+});
+
+test("card look: the × takes the turn back (the room's cancel) and the pill lifts away, gone SENT_LEAVING_MS later", () => {
+  const cancelInput = vi.fn(async () => {});
+  (window as unknown as { sidevoiceActions: unknown }).sidevoiceActions = { cancelInput };
+  const { to } = cardTurn();
+  act(() => { pill()!.querySelector<HTMLButtonElement>("button.cancel")!.click(); });
+  expect(cancelInput).toHaveBeenCalledOnce();
+  expect(pill()).toHaveAttribute("data-leaving");
+  // The room drops the turn meanwhile: the pill keeps lifting away for its time.
+  to(settled([]));
+  tick(SENT_LEAVING_MS - 1);
+  expect(pill()).toHaveAttribute("data-leaving");
+  tick(1);
+  expect(pill()).toBeNull();
+  delete (window as unknown as { sidevoiceActions?: unknown }).sidevoiceActions;
+});
+
+test("card look: what was sent pops out where the pill was, cut to three lines, PAGE_MS, then lifts away and is gone", () => {
+  const { sent } = cardTurn();
+  sent();
+  expect(pill()).toBeNull();
+  expect(sentCard()).toHaveTextContent(LONG);
+  expect(sentCard()!.querySelector(".vcap-said > span")).not.toBeNull();
+  // No delivery known yet: no mark.
+  expect(sentCard()!.querySelector(".vcap-receipt")).toBeNull();
+  staysThenGoes(PAGE_MS, sentCard);
+});
+
+test("card look: speaking again, or the agent's reply taking the place under the creature, sends what was sent away at once", () => {
+  const first = cardTurn();
+  first.sent();
+  first.to(listening([said("u-1", LONG)]));
+  expect(sentCard()).toHaveAttribute("data-leaving");
+  expect(pill()).not.toBeNull();
+  first.unmount();
+  const second = cardTurn();
+  second.sent();
+  expect(sentCard()).not.toHaveAttribute("data-leaving");
+  second.to(settled([said("u-1", LONG)]), true);
+  expect(sentCard()).toHaveAttribute("data-leaving");
+});
+
+test.each(["delivered", "read", "not_sent"])("card look: a %s message wears the transcript's delivery mark (operator, 2026-11-05)", (state) => {
+  const { to } = cardTurn();
+  to(settled([withDelivery(state)]));
+  const mark = sentCard()!.querySelector<HTMLElement>(".vcap-receipt")
+  expect(mark).not.toBeNull();
+  expect(mark).toHaveAttribute("data-state", state);
+  expect(mark!.getAttribute("aria-label")).toBeTruthy();
+});

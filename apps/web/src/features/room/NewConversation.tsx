@@ -5,10 +5,12 @@ import { Popover } from "../../components/ui/Popover";
 import { CallLayoutContext } from "../../state/call-layout";
 import { translator } from "../../i18n/translator";
 import { ConnectYourAgent } from "./ConnectYourAgent";
+import "./new-conversation.css";
 
 /* A new conversation, from the foot of the conversations: a button, a "+" in the rail, or, in a phone's header, a slot
  * of its row after the avatars — an empty avatar's dashed circle, never the chevron's "+3". The page cannot start one
- * yet — an agent joins the room when asked to in its own session — so it says that, and what to tell the agent. */
+ * yet — an agent joins the room when asked to in its own session — so it says that, and what to tell the agent, in a panel
+ * wider than a popover, so the phrase to copy has room. */
 export function NewConversation({ rail = false, header = false }: { rail?: boolean; header?: boolean }) {
   const t = translator();
   // From the header with the list down, the list goes first.
@@ -19,7 +21,7 @@ export function NewConversation({ rail = false, header = false }: { rail?: boole
     ? <Button variant="ghost" tone="neutral" size="icon" className="new-conversation" aria-label={t("sidebar.new")} title={t("sidebar.new")}><AddIcon /></Button>
     : <Button variant="secondary" block className="new-conversation"><AddIcon />{t("sidebar.new")}</Button>;
   return (
-    <Popover trigger={trigger} label={t("sidebar.new")} side={header ? "bottom" : rail ? "right" : "top"} align={rail ? "end" : "start"}>
+    <Popover trigger={trigger} label={t("sidebar.new")} side={header ? "bottom" : rail ? "right" : "top"} align={rail ? "end" : "start"} className="connect-popover">
       <ConnectYourAgent why />
     </Popover>
   );

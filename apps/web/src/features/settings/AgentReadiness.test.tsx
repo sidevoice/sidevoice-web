@@ -73,8 +73,8 @@ test("multiple reasons render in order; an unknown code uses its message", () =>
   expect(group).not.toHaveTextContent("future.secret_code");
 });
 
-test("all eight catalogues contain only the final readiness keys", () => {
-  expect(UI_LANGUAGES).toHaveLength(8);
+test("all eleven catalogues contain only the final readiness keys", () => {
+  expect(UI_LANGUAGES).toHaveLength(11);
   const keys = ["agents.readiness.needs_attention", "agents.readiness.unsupported",
     "agents.readiness.unknown_reason", "agents.readiness.cursor.bridge_not_running", "agents.readiness.cursor.unsupported"] as const;
   for (const language of UI_LANGUAGES) {

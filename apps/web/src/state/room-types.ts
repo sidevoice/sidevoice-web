@@ -73,7 +73,7 @@ export interface ParticipantView {
   machineId?: string | null;
   /** The harness the conversation runs in ("claude", "codex"), shown as its icon; null when unknown. */
   harness?: string | null;
-  /** The agent's model ("claude-opus-5-5") and its thinking effort ("xhigh"), exactly as the harness reports them; null when not. */
+  /** The agent's model (the connector's label when it sends one, else the harness's id) and its effort, unformatted; null when not. */
   model?: string | null;
   effort?: string | null;
   /** How that harness is reached, when the room says it (Cursor: its editor card, its CLI under persist, or
@@ -156,7 +156,8 @@ export interface HostAgentsState {
   value: HostAgentsListing | null;
   error: HostAgentError | null;
   busy: Record<string, "connect" | "disconnect" | "dismiss">;
-  actionErrors: Record<string, { key: string; params?: Record<string, string | number> }>;
+  /** What went wrong with an agent's last action, and which action it was (absent: set before it was recorded). */
+  actionErrors: Record<string, { key: string; params?: Record<string, string | number>; action?: "connect" | "disconnect" | "dismiss" }>;
 }
 
 export interface SettingsAgentRequest {
@@ -213,6 +214,15 @@ export interface SidevoiceActions {
   loadVoiceCatalogue(): Promise<void>;
   replayReply(historyId: string | null): Promise<void>;
   toggleMic(): void;
+  /** The host's global hold to talk begins: the effect of holding the hold key in the page, but not let go of when the page loses
+   *  focus or is hidden (the person is in another app). No effect outside a call. */
+  holdStart?(): void;
+  /** The host's global hold to talk ends: the microphone mutes again, as on releasing the key. */
+  holdEnd?(): void;
+  /** Say one thing, from the global shortcut, the headset or any other trigger: the microphone opens for one turn and mutes
+   *  again when that turn is sent or taken back; pressed again while open it ends the turn (sending what was said). With the
+   *  microphone already open it does nothing. No effect outside a call. */
+  oneTurn?(): void;
   toggleCall(): Promise<void>;
   /** A sign of the person: the desktop card's Keep on the idle warning (its `keep-alive`, FLOATING-CARD-SPEC FC6),
    *  which keeps the call on. */

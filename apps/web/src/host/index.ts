@@ -4,19 +4,26 @@ import { browserMicrophoneHelp } from "./browser-microphone-help";
 import { browserRemote, browserScreenAwake } from "./browser-presence";
 import { beginBrowserAudioActivation, pageVoice } from "./browser-voice.js";
 import { browserReach, reachOfOrigin as reachOfPage } from "./browser-reach";
-import { browserStorage } from "./browser-storage";
-import { browserDeviceName, browserShortcutModifier } from "./identity";
-import { messageOverlay, nativeCardSeam, nativeHost } from "./native";
+import { browserStorage, exclusively } from "./browser-storage";
+import { followKeyboardLayout } from "./browser-keyboard";
+import { browserDeviceName, browserShortcutModifier, iosBodyProbe } from "./identity";
+import { applyViewport as applyViewportOf } from "./viewport";
+import { messageOverlay, nativeCardSeam, nativeHost, watchHostMember } from "./native";
 import { setMessageOverlay } from "../i18n/translator";
 
 export type * from "./types";
 export type { PageAnswer, PageMicrophone, PermissionView } from "./browser-microphone";
+/** Sets the page's viewport for this host and system (viewport.ts). */
+export const applyViewport = applyViewportOf;
 
 /** The browser's side of the microphone: the mechanisms only, for `MicrophoneAccess` to build the states a person sees on. */
 export const pageMicrophone = microphoneOfPage;
 
 /** The transport of a page served from an origin: what a pairing judged against that origin may do. */
 export const reachOfOrigin = reachOfPage;
+
+/** Be told once the app offers a member it did not at first (native.ts `watchHostMember`): one it offers after a reply. */
+export const onHostMember = watchHostMember;
 
 /* The host's wording of the texts its place changes is applied by the translator over the web's catalogue. */
 setMessageOverlay(messageOverlay);
@@ -56,11 +63,14 @@ export function host(): Host {
     ...app,
     // The app's when it keeps them; else this browser's own storage.
     storage: app.storage ?? browserStorage(),
+    exclusive: exclusively,
+    systemTextSize: iosBodyProbe,
     identity: {
       build: app.identity.build,
       // The app's name for the computer; else what this browser is.
       deviceName: () => app.identity.deviceName() ?? browserDeviceName(),
       get shortcutModifier() { return app.identity.shortcutModifier ?? browserShortcutModifier(); },
+      followKeyboardLayout: (onMap) => followKeyboardLayout(onMap),
     },
     microphone: hostMicrophone(app.microphone),
     reach: app.reach ?? browserReach(),
@@ -75,7 +85,6 @@ export function host(): Host {
       get remote() { return app.presence.media === "page" ? browserRemote() : null; },
       // The app's when it holds the screen itself (a phone); else this browser's Screen Wake Lock.
       get screenAwake() { return app.presence.screenAwake ?? browserScreenAwake(); },
-      screenAwakeBy: app.presence.screenAwake ? "app" : "page",
     },
   };
 }

@@ -33,13 +33,13 @@
  * window width's. */
 .stage-tile { --stage-ref: 600; --u: calc(var(--k, 1) * 440px / var(--stage-ref));
   --stage-inset: calc(16 * var(--u)); --entry: clamp(36px, calc(44 * var(--u)), 56px);
-  --chip-fs: clamp(11px, calc(12 * var(--u)), 15px); --name-fs: clamp(14px, calc(20 * var(--u)), 26px);
-  --bubble-fs: clamp(18px, calc(25.6 * var(--u)), 34px); --bubble-lh: 1.375; --bubble-pad: 24; --peek: 20; --tail-w: calc(72 * var(--u)); --tail-h: calc(40 * var(--u));
-  --person-fs: clamp(16px, calc(22.4 * var(--u)), 28px); --person-lh: 1.4286; --person-pad-b: 12; --person-pad-i: 20; --person-live-w: 272;
-  --fig-px: min(calc(var(--stage-avatar-share, .56) * 440px * var(--k, 1)), var(--stage-avatar-max, 420px)); --person-lift: 0px; }
+  --chip-fs: calc(clamp(11px, calc(12 * var(--u)), 15px) * var(--sv-stage-text-scale, 1)); --name-fs: calc(clamp(14px, calc(20 * var(--u)), 26px) * var(--sv-stage-text-scale, 1));
+  --bubble-fs: calc(clamp(18px, calc(25.6 * var(--u)), 34px) * var(--sv-stage-text-scale, 1)); --bubble-lh: 1.375; --bubble-pad: 24; --peek: 20; --tail-w: calc(72 * var(--u)); --tail-h: calc(40 * var(--u));
+  --person-fs: calc(clamp(16px, calc(22.4 * var(--u)), 28px) * var(--sv-stage-text-scale, 1)); --person-lh: 1.4286; --person-pad-b: 12; --person-pad-i: 20; --person-live-w: 272;
+  --fig-px: min(calc(var(--stage-avatar-share, .56) * 440px * var(--k, 1)), var(--stage-avatar-max, 420px)); }
 /* The person's balloon's height: three of its whole-pixel lines, its margins and padding. Where the balloons are laid (the
- * tile; the desktop card's avatar balloons, call-card.css), from that place's own sizes. */
-:is(.stage-tile, .avatar-balloons) { --person-live-h: calc(3 * round(nearest, calc(var(--person-fs) * var(--person-lh)), 1px) + 16 * var(--u) + 2 * var(--person-pad-b) * var(--u)); }
+ * tile), from that place's own sizes. */
+.stage-tile { --person-live-h: calc(3 * round(nearest, calc(var(--person-fs) * var(--person-lh)), 1px) + 16 * var(--u) + 2 * var(--person-pad-b) * var(--u)); }
 /* No conversation: the tile fills the stage rather than keeping a shape; its words keep the interface's size. */
 .stage-tile.stage-empty { --u: 1px; }
 /* The canvas the agent is drawn on keeps one shape per form factor (--stage-ratio, width over height), never whatever
@@ -49,25 +49,23 @@
  * around it (useSceneScale fits it); the canvas fills the tile. Until it is fitted it fills the slot. */
 .stage-slot { flex: 1; min-width: 0; min-height: 0; display: grid; place-items: center; }
 .stage-slot > .stage-tile { width: 100%; height: 100%; flex: none; }
-.stage-tile[data-mood] { --stage-ratio: 16 / 9; }
-@media (min-width: 900px), (min-width: 560px) and (pointer: fine) { .stage-tile[data-mood][data-app] { --stage-ratio: 3 / 2; --stage-ref: 560; } }
+/* Web (2026-11-05): any shape from a phone's portrait to 21:9, as large as the slot allows: the room there is, never a strip. */
+.stage-tile[data-mood] { --stage-ratio: 9 / 16, 21 / 9; }
+@media (min-width: 900px), (min-width: 560px) and (pointer: fine) { .stage-tile[data-mood][data-app] { --stage-ratio: 9 / 16, 21 / 9; --stage-ref: 560; } }
 @media (max-width: 559px), (max-width: 899px) and (pointer: coarse) {
-  .stage-tile[data-mood] { --stage-ratio: 1; --stage-ref: 360; }
+  /* The phone's tile fills the stage in portrait, as the design reference's phone stage (its framing is made for that
+   * room: a square left the creature a few dozen px tall under a card); its chrome keeps the sizes the square gave it,
+   * from the tile's width (--kw, its width over 440). */
+  .stage-tile[data-mood] { --stage-ratio: fill; --stage-ref: 360; --u: calc(var(--kw, var(--k, 1)) * 440px / var(--stage-ref)); }
   /* The phone's slide: a tighter inset, smaller balloons and a smaller tail. */
   .stage-tile { --stage-inset: calc(12 * var(--u));
-    --bubble-fs: clamp(18px, calc(22.4 * var(--u)), 34px); --bubble-lh: 1.4286; --bubble-pad: 20; --peek: 16; --tail-w: calc(58 * var(--u)); --tail-h: calc(32 * var(--u));
-    --person-fs: clamp(16px, calc(19.2 * var(--u)), 28px); --person-lh: 1.5; --person-pad-b: 8; --person-pad-i: 16; --person-live-w: 240; }
-  /* The square leaves no room beside the agent for the person's balloon at its foot: the balloon would stand over its
-   * face. While one is up (the bars, then what was sent) the agent steps up out of its way, by as much as it covers of
-   * the face (its chin, 85 of the figure's 120, that far over the tile's foot) and a margin; the agent's own balloon
-   * follows it (.stage-top). The tile's own height is the room: nothing here moves a desktop's stage. */
-  .stage-tile:has(.person-turns .person-bubble) { --person-lift: max(0px, calc(var(--person-live-h) + var(--stage-inset) + 12 * var(--u) - 83px * var(--k, 1) - var(--fig-px) * 21 / 120)); }
-  .stage-tile .stage-agent { translate: 0 calc(var(--person-lift) / var(--k, 1) * -1); }
+    --bubble-fs: calc(clamp(18px, calc(22.4 * var(--u)), 34px) * var(--sv-stage-text-scale, 1)); --bubble-lh: 1.4286; --bubble-pad: 20; --peek: 16; --tail-w: calc(58 * var(--u)); --tail-h: calc(32 * var(--u));
+    --person-fs: calc(clamp(16px, calc(19.2 * var(--u)), 28px) * var(--sv-stage-text-scale, 1)); --person-lh: 1.5; --person-pad-b: 8; --person-pad-i: 16; --person-live-w: 240; }
 }
 .stage-canvas { position: absolute; inset: 0; overflow: hidden;
   background: radial-gradient(circle at 50% 55%, color-mix(in srgb, var(--av-color, var(--sv-accent)) 18%, transparent), transparent 60%), var(--sv-stage-bg); }
-/* Speaking: a quiet ring in the accent around the whole tile. */
-.stage-tile[data-mood="speaking"] { border-color: color-mix(in srgb, var(--sv-accent) 45%, var(--sv-border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-accent) 20%, transparent); }
+/* Speaking: a quiet ring in speaking's blue (the state tokens, tokens.css) around the whole tile. */
+.stage-tile[data-mood="speaking"] { border-color: color-mix(in srgb, var(--sv-state-speaking) 45%, var(--sv-border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-state-speaking) 20%, transparent); }
 
 /* The conversation's name and its machine, in the tile's top corner as a call names whoever is on screen. */
 .stage-name { position: absolute; z-index: 2; top: var(--stage-inset); left: calc(var(--stage-inset) + 4 * var(--u)); display: grid; max-width: min(60%, calc(100% - 2 * var(--stage-inset)));
@@ -81,11 +79,10 @@
  * near 20 of it (--stage-head-y: a reference, not every bicho's exact bound); idle, it grows 1.1 from 93.5. The
  * balloon's foot, its tail below it besides, sits there; from the tile's top inset down, it is laid at the bottom of
  * that room, and a balloon taller than the room starts at the top instead of leaving the tile (safe end). */
-.stage-top { --idle-rise: 0px;
+.stage-top {
   position: absolute; z-index: 2; top: var(--stage-inset); left: var(--stage-inset); right: var(--stage-inset);
-  bottom: calc(83px * var(--k, 1) + var(--fig-px) * (106 - var(--stage-head-y, 20)) / 120 + var(--idle-rise) + var(--person-lift) + var(--tail-h) + 8 * var(--u));
+  bottom: calc(83px * var(--k, 1) + var(--fig-px) * (106 - var(--stage-head-y, 20)) / 120 + var(--tail-h) + 8 * var(--u));
   display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); justify-items: center; pointer-events: none; }
-.stage-tile[data-mood="idle"] .stage-top { --idle-rise: calc(var(--fig-px) * (var(--stage-avatar-idle, 1.1) - 1) * (93.504 - var(--stage-head-y, 20)) / 120); }
 .stage-top > * { grid-area: 1 / 1; align-self: safe end; }
 /* What is said on the stage, the agent's and the person's alike: big and clear, read at a glance (2026-10-14): 22.4/32 on the
  * slide, 19.2/28.8 on a phone's, within 16–28px (the tile's --person-fs). The brand's DM Sans as everywhere, bundled and variable, so its optical size
@@ -137,10 +134,6 @@
   overflow: visible; pointer-events: none; }
 .balloon-tail .tail-fill { fill: var(--balloon-fill); }
 .balloon-tail .tail-ink { fill: none; stroke: var(--balloon-ink); stroke-width: var(--balloon-line); stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-/* A balloon drawn under whoever speaks (the desktop card's avatar, its balloons opening below it): its tail leaves the
- * top edge and points up at them, the same tail turned over (sidevoice-web#240). On the balloon or on what holds it. */
-.balloon--tail-up .balloon-tail { top: auto; bottom: calc(100% - var(--balloon-line) - 1px); transform: scaleY(-1); }
-.balloon--tail-up .stage-bubble .balloon-tail, .stage-bubble.balloon--tail-up .balloon-tail { transform: scale(-1, -1); }
 .balloon-shine { position: absolute; z-index: -1; left: calc(14 * var(--u)); top: calc(8 * var(--u)); width: calc(40 * var(--u)); height: calc(20 * var(--u)); overflow: visible; pointer-events: none; }
 .balloon-shine path { fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; opacity: .75; }
 
@@ -168,7 +161,7 @@
 /* The same balloon in the transcript's message list (MessageList): capped like the final chat bubble at 86% or 34rem,
  * drawn as the stage's for a tile of about 590px (--u); no corner to sit in, so it flows, its tail hung below it. */
 .person-turns[data-inline] { --u: .75px; --peek: 20; --tail-w: calc(72 * var(--u)); --tail-h: calc(40 * var(--u));
-  --person-fs: clamp(16px, calc(22.4 * var(--u)), 28px); --person-lh: 1.4286; --person-pad-b: 12; --person-pad-i: 20;
+  --person-fs: calc(clamp(16px, calc(22.4 * var(--u)), 28px) * var(--sv-stage-text-scale, 1)); --person-lh: 1.4286; --person-pad-b: 12; --person-pad-i: 20;
   --live-w: min(86%, 34rem); --live-h: auto; position: relative; inset: auto; align-items: flex-end; width: 100%; margin-bottom: var(--tail-h); }
 .person-turns[data-inline] .person-bubble { max-width: min(86%, 34rem); }
 .person-bubble { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: calc(4 * var(--u)) calc(8 * var(--u));
@@ -178,7 +171,7 @@
   isolation: isolate; border: 0; background: none; box-shadow: none; }
 .person-turns .balloon-tail { left: auto; right: calc(6 * var(--u)); }
 /* Taking the turn back, said as clearly as the bars over it: on the slide too, never under 24px to touch. */
-.person-bubble .ui-button.cancel-input { flex: none; height: max(28px, 2.1333em); padding: 0 .6em; gap: .4em; font-size: clamp(13px, calc(15 * var(--u)), 18px); }
+.person-bubble .ui-button.cancel-input { flex: none; height: max(28px, 2.1333em); padding: 0 .6em; gap: .4em; font-size: calc(clamp(13px, calc(15 * var(--u)), 18px) * var(--sv-stage-text-scale, 1)); }
 .person-bubble .ui-button.cancel-input svg { width: 1.0667em; height: 1.0667em; }
 /* Speaking again: the sent one lifts away from the very place the bars come in, under them. */
 .person-turns > .person-bubble[data-under] { position: absolute; right: 0; bottom: 0; }
@@ -218,7 +211,7 @@
   @keyframes person-sent-fade { to { opacity: 0; } }
 }
 /* The waveform elsewhere (transcript.css, shared with the transcript's open turn) is sized here. */
-.person-bubble .voice-wave { display: block; flex: none; width: calc(160 * var(--u)); height: calc(28 * var(--u)); color: var(--sv-accent); }
+.person-bubble .voice-wave { display: block; flex: none; width: calc(160 * var(--u)); height: calc(28 * var(--u)); color: var(--sv-state-listening); }
 /* The bars stand in for the waveform where the device asks for less motion: still, at rest heights. */
 .person-bubble .voice-bars { display: inline-flex; flex: none; align-items: center; gap: calc(3 * var(--u)); height: calc(20 * var(--u)); }
 .person-bubble .voice-bars i { display: block; width: calc(3 * var(--u)); height: calc(12 * var(--u)); border-radius: calc(2 * var(--u)); background: currentColor; }
@@ -244,7 +237,7 @@
 .call-bar-end .transcript-entry { position: relative; width: var(--sv-call-button); height: var(--sv-call-button); }
 
 /* Centred, its mark inline with the first line however many lines it takes. */
-.join-status { grid-row: 1; align-self: end; max-width: min(100%, 30rem); font-size: var(--sv-font-xs); line-height: 1rem; font-weight: var(--sv-weight-semibold); text-align: center; color: var(--sv-text-muted); }
+.join-status { grid-row: 1; align-self: end; max-width: min(100%, 30rem); font-size: var(--sv-font-xs); line-height: calc(1rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-semibold); text-align: center; color: var(--sv-text-muted); }
 .join-status > svg { display: inline-block; margin-inline-end: var(--sv-space-1-5); vertical-align: -3px; }
 .join-status[data-state="failed"] { color: var(--sv-danger); }
 .join-status-dot { display: inline-block; width: 8px; height: 8px; margin-inline-end: var(--sv-space-1-5); vertical-align: 0; border-radius: 50%; background: var(--sv-accent); animation: call-join-pulse 1.4s ease-in-out infinite; }
@@ -270,8 +263,8 @@
  * (room-session-controller.js voiceLevel); each bar scales from it, so the wave draws itself with no render. The bars
  * scale (transform) instead of changing height: a height per reading laid out and repainted the call bar about 30 times a
  * second while the person spoke, which cost the page and WebKit's GPU process about 45 % of a core (desktop#149). On hover, on
- * focus, with the bar open or muted, the bars give way to the chevron. Muted, the pill turns danger; held to talk while
- * muted, it turns positive. */
+ * focus, with the bar open or muted, the bars give way to the chevron. The bars are listening's green; muted, the pill's
+ * microphone turns the muted red (the state tokens, tokens.css); held to talk while muted, it turns listening's green. */
 #call-controls .mic-control { display: flex; align-items: center; gap: 0; border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken); isolation: isolate; }
 #call-controls #mute { border-radius: var(--sv-radius-pill); }
 .mic-wave { display: flex; align-items: center; gap: 2.4px; height: 22px; transition: opacity var(--sv-dur-fast) var(--sv-ease); }
@@ -290,10 +283,10 @@
 .mic-wave i:nth-child(4) { --bar: .7; }
 .mic-wave i:nth-child(5) { --bar: .4; }
 #mic-control[data-muted="true"] { background: var(--sv-danger-soft); }
-#mic-control[data-muted="true"] #mute { background: var(--sv-danger-soft); color: var(--sv-danger); }
+#mic-control[data-muted="true"] #mute { background: var(--sv-danger-soft); color: var(--sv-state-muted); }
 @media (hover: hover) { #mic-control[data-muted="true"] #mute:not(:disabled):hover { background: color-mix(in srgb, var(--sv-danger) 14%, var(--sv-danger-soft)); } }
 #mic-control[data-muted] #mute:disabled { background: var(--sv-bg-sunken); color: var(--sv-disabled-text); }
-#mic-control #mute.holding { background: var(--sv-positive-soft); color: var(--sv-positive); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-positive) 25%, transparent); }
+#mic-control #mute.holding { background: color-mix(in srgb, var(--sv-state-listening) 16%, var(--sv-surface)); color: var(--sv-state-listening); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-state-listening) 25%, transparent); }
 
 #call-controls #connect { width: 64px; background: var(--sv-positive); color: var(--sv-positive-soft); }
 #call-controls #connect:not(.joined) svg { transform: rotate(-135deg); }
@@ -366,7 +359,9 @@
 
 /* Over the bicho's backdrop (dark or light, whatever its seed rolled) the tile's words sit on a frosted surface of the
  * theme, so they read on any of them: the conversation's name on a phone and the agent's badge. */
-.stage-name { padding: .3em .6em; border-radius: var(--sv-radius-lg); background: color-mix(in srgb, var(--sv-surface) 84%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+/* (2026-11-05) A plain card of the theme with a hairline edge rather than a frosted haze: it sits on the scene as the
+ * stage's other cards do, without a blur bleeding round it. */
+.stage-name { padding: .35em .65em; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: color-mix(in srgb, var(--sv-surface) 62%, transparent); }
 
 /* The conversation's name and its machine, over the stage (CallStage StageName; 2026-10-15): the name in a display
  * weight, one line cut with an ellipsis; the machine a small chip with its icon, under it. The same on a desktop, above
@@ -398,7 +393,7 @@
 .stage-heading-name > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .stage-heading-chevron { flex: none; width: .7em; height: .7em; color: var(--sv-text-muted); transition: transform var(--sv-dur-fast) var(--sv-ease); }
 .stage-heading[aria-expanded="true"] .stage-heading-chevron { transform: rotate(180deg); }
-.stage-attention { flex: none; width: .42em; height: .42em; border-radius: 50%; background: var(--sv-warning); box-shadow: 0 0 0 2px var(--sv-surface); }
+.stage-attention { flex: none; width: .42em; height: .42em; border-radius: 50%; background: var(--sv-state-attention); box-shadow: 0 0 0 2px var(--sv-surface); }
 @media (prefers-reduced-motion: reduce) { .stage-name, .stage-heading, .stage-heading-chevron { transition: none; } }
 @media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
   .room-shell .stage-title { display: grid; justify-items: start; align-content: center; gap: var(--sv-space-2); }
@@ -412,10 +407,10 @@
  * action under its words. In a popover under the title. */
 .call-details { display: grid; gap: var(--sv-space-4); min-width: 0; }
 .call-details-group { display: grid; gap: var(--sv-space-1-5); min-width: 0; }
-.call-details-group h3 { margin: 0; font-size: var(--sv-font-xs); line-height: 1rem; font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
-.call-details-machine { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; margin: 0; font-size: var(--sv-font-md); line-height: 1.375rem;
+.call-details-group h3 { margin: 0; font-size: var(--sv-font-xs); line-height: calc(1rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
+.call-details-machine { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; margin: 0; font-size: var(--sv-font-md); line-height: calc(1.375rem * var(--sv-line-k, 1));
   font-weight: var(--sv-weight-semibold); color: var(--sv-text); overflow-wrap: anywhere; }
-.call-details-agent { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sv-space-1) var(--sv-space-3); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.call-details-agent { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sv-space-1) var(--sv-space-3); margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); }
 .call-details-agent > div { display: contents; }
 .call-details-agent dt { color: var(--sv-text-muted); }
 .call-details-agent dd { display: flex; align-items: center; gap: var(--sv-space-1-5); min-width: 0; margin: 0; font-weight: var(--sv-weight-semibold); color: var(--sv-text); overflow-wrap: anywhere; }
@@ -428,8 +423,8 @@
 .voice-model-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--sv-surface); color: var(--sv-text-muted); }
 .voice-model[data-attention] .voice-model-icon { color: var(--sv-warning); }
 .voice-model-copy { display: grid; min-width: 0; }
-.voice-model-task, .voice-model-where { font-size: var(--sv-font-xs); line-height: 1rem; color: var(--sv-text-muted); }
-.voice-model-id { overflow: hidden; font-size: var(--sv-font-sm); line-height: 1.25rem; font-weight: var(--sv-weight-semibold); white-space: nowrap; text-overflow: ellipsis; color: var(--sv-text); }
+.voice-model-task, .voice-model-where { font-size: var(--sv-font-xs); line-height: calc(1rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
+.voice-model-id { overflow: hidden; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-semibold); white-space: nowrap; text-overflow: ellipsis; color: var(--sv-text); }
 .voice-model-state::before { content: "·"; margin-inline: .35em; }
 .voice-model[data-attention] .voice-model-state { font-weight: var(--sv-weight-semibold); color: var(--sv-text); }
 .voice-model-action { grid-column: 2; justify-self: start; }
@@ -459,7 +454,7 @@
  * screen above the call's controls, as the bar did. */
 .ui-popover.audio-devices { width: min(18rem, calc(100vw - 24px)); padding: var(--sv-space-3) var(--sv-space-4) var(--sv-space-4); border-radius: var(--sv-radius-xl); }
 @media (max-width: 559px), (max-width: 899px) and (pointer: coarse) { .ui-popover.audio-devices { width: calc(100vw - 24px); } }
-.audio-devices-note, .audio-devices-lost, .audio-devices-error { display: flex; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.audio-devices-note, .audio-devices-lost, .audio-devices-error { display: flex; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
 .audio-devices-choice { display: grid; gap: var(--sv-space-1); min-width: 0; }
 .audio-devices-lost { color: var(--sv-text); }
 .audio-devices-error { flex-direction: column; align-items: flex-start; gap: 0; color: var(--sv-danger); }
@@ -475,8 +470,8 @@
 .call-bar .controls .call-listen-note { bottom: calc(var(--sv-call-button) + 3 * var(--sv-space-2)); }
 :is(.mic-silent-note, .call-listen-note) { position: absolute; z-index: 4; left: 50%; bottom: calc(100% + var(--sv-space-2)); transform: translateX(-50%); display: inline-flex; align-items: center; gap: var(--sv-space-1-5);
   width: max-content; max-width: min(320px, calc(100vw - 2 * var(--sv-space-4))); padding: var(--sv-space-1-5) var(--sv-space-3); border: 1px solid color-mix(in srgb, var(--sv-warning) 45%, transparent);
-  border-radius: var(--sv-radius-lg); background: var(--sv-warning-soft); color: var(--sv-text); font-size: var(--sv-font-sm); line-height: 1.25rem; box-shadow: var(--sv-shadow-sm); }
-:is(.mic-silent-note, .call-listen-note) svg { flex: none; color: var(--sv-warning); }
+  border-radius: var(--sv-radius-lg); background: var(--sv-warning-soft); color: var(--sv-text); font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); box-shadow: var(--sv-shadow-sm); }
+:is(.mic-silent-note, .call-listen-note) svg { flex: none; color: var(--sv-state-attention); }
 /* Listen only is no warning: the same note, quiet. */
 .call-listen-note { border-color: var(--sv-border); background: var(--sv-bg-sunken); }
 .call-listen-note svg { color: var(--sv-text-muted); }
@@ -499,7 +494,17 @@
   border: 1px solid var(--sv-border); border-radius: var(--sv-radius-2xl); background: var(--sv-stage-bg); text-align: center;
 }
 .voice-setup-mark { display: grid; place-items: center; width: 56px; height: 56px; border-radius: var(--sv-radius-xl); background: var(--sv-accent-soft); color: var(--sv-accent-text); }
-.voice-setup-card h1 { margin: var(--sv-space-2) 0 0; font-size: var(--sv-font-xl); line-height: 1.625rem; font-weight: var(--sv-weight-bold); letter-spacing: -.015em; color: var(--sv-text); }
-.voice-setup-card > p { max-width: 42ch; margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
+.voice-setup-card h1 { margin: var(--sv-space-2) 0 0; font-size: var(--sv-font-xl); line-height: calc(1.625rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-bold); letter-spacing: -.015em; color: var(--sv-text); }
+.voice-setup-card > p { max-width: 42ch; margin: 0; line-height: calc(1.5rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
 .voice-setup-card > .voice-models { justify-self: stretch; margin-top: var(--sv-space-3); text-align: start; }
 .voice-model-progress { grid-column: 1 / -1; width: 100%; height: 4px; accent-color: var(--sv-accent); }
+
+/* Can't receive (reach holding): its own look, never the resting one: the slashed tray in the mustard of the state tokens and a wash of it
+ * behind the words, which stay in the ink. */
+/* Laid in the title block, under the name and its machine (the name's frame on a phone, the title band on a desktop), in
+ * flow: it covers neither the name nor the balloons. */
+.stage-holding { display: grid; justify-items: start; gap: .25em; justify-self: start; max-width: min(100%, 32em); margin: .3em 0 0; padding: .35em .7em; border-radius: var(--sv-radius-lg, 14px);
+  background: color-mix(in srgb, var(--sv-state-attention) 16%, var(--sv-surface)); color: var(--sv-text); font-size: .6em; line-height: 1.3333em; font-weight: var(--sv-weight-semibold); text-align: start; }
+.stage-holding-line { display: inline-flex; align-items: center; gap: .4em; }
+.stage-holding-why { font-size: 1em; font-weight: var(--sv-weight-normal, 400); color: var(--sv-text-muted); overflow-wrap: anywhere; }
+.call-details-holding h3 { display: flex; align-items: center; gap: var(--sv-space-1-5); }

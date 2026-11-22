@@ -116,6 +116,26 @@ test("the avatar shows only the agent, the wave only you: muted crosses the wave
   expect(document.querySelector(".card-state")).toHaveAttribute("data-mood", "muted");
 });
 
+test("the state line leads with the state's icon, in the state's colour; its words are never tinted (scheme E)", () => {
+  const host = fakeHost();
+  render(<Card host={host} />);
+  const line = () => document.querySelector(".card-state")!;
+  const glyph = () => line().querySelector("svg.state-glyph");
+  const cases: [Partial<CallSnapshot>, string | null][] = [
+    [{ mood: "listening" }, "listening"], [{ mood: "speaking" }, "speaking"], [{ mood: "working" }, "working"], [{ mood: "holding" }, "holding"],
+    [{ mood: "offline" }, "offline"], [{ mood: "listening", micEnabled: false }, "muted"], [{ mood: "idle" }, null], [{ mood: "listening", busy: true }, null],
+  ];
+  for (const [change, kind] of cases) {
+    host.push({ call: snapshot(change) });
+    if (kind) expect(glyph(), JSON.stringify(change)).toHaveClass("state-glyph-" + kind);
+    else { expect(glyph(), JSON.stringify(change)).toBeNull(); expect(line().querySelector("i")).not.toBeNull(); }
+  }
+  // Can't receive is the slashed tray with its words beside it, in the one ink: the icon is the only thing coloured.
+  host.push({ call: snapshot({ mood: "holding" }) });
+  expect(line()).toHaveTextContent("Can't receive");
+  expect(glyph()!.querySelector("mask")).not.toBeNull();
+});
+
 test("a mood this version does not know reads as resting, never a raw key (core#112)", () => {
   const host = fakeHost();
   render(<Card host={host} />);
@@ -374,15 +394,32 @@ test("the card speaks the language this device's settings chose, else the system
   expect(cardLanguage(["es-ES"])).toBe("es");
   expect(cardLanguage(["de-DE"])).toBe("de");
   expect(cardLanguage(["zh-CN"])).toBe("zh-Hans");
-  expect(cardLanguage(["ko-KR"])).toBe("en");
+  expect(cardLanguage(["ko-KR"])).toBe("ko");
+  expect(cardLanguage(["pt-PT"])).toBe("pt-BR");
+  expect(cardLanguage(["vi-VN"])).toBe("en");
   expect(translator("es")("card.hangUp")).toBe("Colgar");
-  expect(translator("ko")("card.hangUp")).toBe("Hang up");
+  expect(translator("vi")("card.hangUp")).toBe("Hang up");
   localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "pl" }));
   try {
     expect(cardLanguage()).toBe("pl");
   } finally {
     localStorage.removeItem("sidevoice.settings");
   }
+});
+
+test("just the avatar: muted puts a crossed-out mic at the creature's feet, without dimming it; unmuted takes it away", () => {
+  localStorage.setItem(FLOATING_CARD_KEY, JSON.stringify({ format: "avatar", size: "m" }));
+  const host = fakeHost();
+  render(<Card host={host} />);
+  const mark = () => document.querySelector(".avatar-figure > .avatar-muted");
+  expect(mark()).toBeNull();
+  host.push({ call: snapshot({ micEnabled: false }) });
+  expect(mark()).not.toBeNull();
+  expect(mark()).toHaveAttribute("aria-hidden", "true");
+  expect(mark()!.querySelector("svg")).not.toBeNull();
+  expect(document.querySelector(".avatar-figure .sv-avatar")?.getAttribute("style") ?? "").not.toMatch(/filter|opacity/);
+  host.push({ call: snapshot({ micEnabled: true }) });
+  expect(mark()).toBeNull();
 });
 
 test("the call's duration reads like a clock", () => {

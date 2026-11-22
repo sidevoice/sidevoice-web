@@ -1,16 +1,16 @@
-import { nextIdle, type Idle, type IdleStep } from "./engine/bichos/idle";
-import { nextWork, workTurn, type Work } from "./engine/bichos/work";
+import { nextRest, nextWork, spellOf, type RestStep } from "./creature/schedule";
 
-/* What a bicho does with its hands is the client's, not the bicho's: a working style while it works (work.ts), an idle
- * step while it rests (idle.ts). Which one is showing is a PURE FUNCTION of (seed, time since the sequence began): the
- * steps are drawn from a seeded generator, so every window that asks the same question gets the same answer, with no
- * owner window and nothing relayed (web#334). The caller says where the sequence began (the figure's `restStart`) and the
- * engine reads the current pick from the root (`data-work`, `data-idle`).
+/* What a creature has on the go is the client's, not the rig's: a working style while it works, a resting step while it
+ * rests, by the design reference's rules (creature/schedule.ts: its lists, its timings, its turn-taking). Which one is
+ * showing is a PURE FUNCTION of (seed, time since the sequence began): the steps are drawn from a seeded generator, so
+ * every window that asks the same question gets the same answer, with no owner window and nothing relayed (web#334). The
+ * caller says where the sequence began (the figure's `restStart`); the creature acts out the current pick (the state's
+ * `work` and `idle`, as its base act: creature/host.ts).
  *
- *   work  a tool when work starts, swapped for another after that tool's own spell (hammering comes in short bursts,
- *         reading goes on: WORK_DURATION)
- *   idle  steps: quiet for a few seconds, then one pastime for its own spell, then quiet again, then another pastime
- *         (never the last one), and so on (nextIdle)
+ *   work  a style when work starts, swapped for another after that style's own spell (hammering comes in short bursts,
+ *         reading files goes on: WORK_DURATION), never the same one twice in a row (nextWork)
+ *   idle  steps: quiet for a few seconds, then one pastime for its own spell (IDLE_DEFS), then quiet again, then another
+ *         pastime (never the last one; the nap half as likely), and so on (nextRest)
  *
  * A sequence is generated up to CYCLE_MS and then repeats: a figure that rests for hours costs the same as one that has
  * rested for ten minutes (`t` is reduced by whole cycles, arithmetically). */
@@ -21,16 +21,18 @@ interface Kind<S> {
   first(pool: readonly string[], random: () => number): Step<S>;
   next(state: S, pool: readonly string[], random: () => number): Step<S>;
 }
-const work: Kind<Work> = {
-  first: (pool, random) => workStep(nextWork(null, pool as readonly Work[], random), random),
-  next: (prev, pool, random) => workStep(nextWork(prev, pool as readonly Work[], random), random),
+/** A spell in whole ms (the reference keeps seconds). */
+const toMs = (seconds: number) => Math.round(seconds * 1000);
+const work: Kind<string> = {
+  first: (pool, random) => workStep(nextWork(null, pool, random), random),
+  next: (prev, pool, random) => workStep(nextWork(prev, pool, random), random),
 };
-const workStep = (value: Work, random: () => number): Step<Work> => ({ value, ms: Math.round(workTurn(value, random)), state: value });
-const idle: Kind<IdleStep> = {
-  first: (pool, random) => idleStep(nextIdle(null, pool as readonly Idle[], random)),
-  next: (prev, pool, random) => idleStep(nextIdle(prev, pool as readonly Idle[], random)),
+const workStep = (value: string, random: () => number): Step<string> => ({ value, ms: toMs(spellOf("work", value, random)), state: value });
+const idle: Kind<RestStep> = {
+  first: (pool, random) => restStep(nextRest(null, pool, random), random),
+  next: (prev, pool, random) => restStep(nextRest(prev, pool, random), random),
 };
-const idleStep = (step: IdleStep): Step<IdleStep> => ({ value: step.idle, ms: step.ms, state: step });
+const restStep = (step: RestStep, random: () => number): Step<RestStep> => ({ value: step.rest, ms: toMs(spellOf("rest", step.rest, random)), state: step });
 const KINDS = { work, idle } as Record<"work" | "idle", Kind<unknown>>;
 export type RotationKind = keyof typeof KINDS;
 
@@ -51,9 +53,9 @@ export function seededRandom(seed: string): () => number {
 }
 
 /* The sequence repeats, so its end meets its start: a cycle ends on a pastime (never mid-quiet), and if its last pastime or
- * tool is the same as its first, the last step (with the quiet before it) is dropped, so the cycle ends on the one before
+ * style is the same as its first, the last step (with the quiet before it) is dropped, so the cycle ends on the one before
  * it, which differs from it and so from the first: never the same twice in a row, whatever the pool, wrap included. Only
- * a pool with a single pastime (or tool) has nothing else to play, and repeats it, as nextIdle does within a cycle. */
+ * a pool with a single pastime (or style) has nothing else to play, and repeats it, as nextRest does within a cycle. */
 interface Cycle { values: string[]; ends: number[]; length: number }
 const cycles = new Map<string, Cycle>();
 

@@ -37,7 +37,7 @@ export function RoomProvider({ children, store: suppliedStore, runtime = true }:
   }, [store]);
 
   useEffect(() => {
-    installRoomBridge(store);
+    installRoomBridge(store, layoutRef.current);
     // Without the runtime (the journeys' storyboard) the store is only what was seeded.
     if (started.current || !runtime) return;
     started.current = true;

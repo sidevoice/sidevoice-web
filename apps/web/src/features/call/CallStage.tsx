@@ -1,24 +1,26 @@
-import { useCallback, useContext, useEffect, useRef, type CSSProperties, type RefObject } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { UpdateNotice } from "../updates/UpdateNotice";
 import { Button } from "../../components/ui/Button";
-import { CloseIcon, HarnessIcon, MachinesIcon } from "../../components/ui/Icons";
+import { CloseIcon, HarnessIcon, MachinesIcon, StateGlyph } from "../../components/ui/Icons";
 import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
-import type { ChatMessage } from "../../state/room-types";
+import type { ChatMessage, ConversationView } from "../../state/room-types";
 import { avatarFor, avatarTone } from "../avatar/avatar-spec";
 import { avatarColor } from "../avatar/bicho-draw";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
-import { StageBackdrop, StageDesk, useSceneScale, WantedPoster, type PosterWords } from "../avatar/StageScene";
+import { StageBackdrop, useSceneScale, type PosterWords } from "../avatar/StageScene";
+import type { MouthLevel } from "../avatar/avatar-state";
 import { uiLanguage, translator, type Translate } from "../../i18n/translator";
 import { moodText } from "./conversation-state";
-import { useAgentTurns, useReadingClock, useSpokenFrom, type AgentTurn } from "./speech-reading";
+import { SENT_LEAVING_MS, useAgentTurns, useReadingClock, useSpokenFrom, type AgentTurn } from "./speech-reading";
 import type { Reading } from "./speech-chunks";
 import { LitText } from "./LitText";
 import { PagedText } from "./PagedText";
 import { useStageConversation, type StageConversation } from "./stage-view";
 import { BalloonTail } from "./BalloonTail";
 import { PersonTurn } from "./PersonTurn";
+import { StageVoice, useStageFrame } from "./StageVoice";
 import { TranscriptEntry } from "./TranscriptEntry";
 import { useVoiceModels } from "./VoiceModels";
 import { harnessName, StageHeading } from "./CallDetails";
@@ -37,16 +39,56 @@ import "./call-view.css";
  * while they speak. One agent: the call talks to one conversation at a time. The whole transcript is a button away
  * (TranscriptPanel). Its look is call-view.css.
  *
- * The agent is the conversation's bicho, on the scene its seed rolls (features/avatar/StageScene.tsx): a backdrop, a
- * desk that slides in while it works, and a wanted poster in its place while the room cannot reach it. */
+ * The agent is the conversation's creature (features/avatar/creature/), on the scene its seed rolls (features/avatar/
+ * StageScene.tsx): a backdrop, and a wanted poster in its place while the room cannot reach it. The desk it used to work
+ * at is off, as the design reference has it (sidevoice-web#476). */
 
 /* The balloon, decided 2026-10-15: made of the agent's own skin (its colour, pale, its ink and its gloss), pushed left of
  * the agent with its tail out of its bottom-right corner toward it, three lines tall, a page at a time (the last page
  * turning only as far as its last line: PagedText fixed). */
 
-/** One reply on the stage, in a speech balloon whose tail points down at the agent (call-view.css): a few lines at a
- *  time (PagedText), lit as the voice says them, moving on with the words heard. */
-function AgentBubble({ turn }: { turn: AgentTurn }) {
+/* The stage's look (decided 2026-11-04, the design reference's `.vcap.card`, T24–T36): the reply in a white card under
+ * the creature, never over it (StageVoice places it), always three lines tall, a page at a time, lit as the voice says it.
+ * Where the stage is not a tile (the desktop card's title card and avatar) the same cards dock over or under the card
+ * (DockedVoice). */
+export type AgentLook = "balloon" | "card";
+
+/** `on`, once it has held for `ms`; off as soon as it lets go. */
+function useHeldFor(on: boolean, ms: number): boolean {
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    if (!on) { setHeld(false); return; }
+    const timer = window.setTimeout(() => setHeld(true), ms);
+    return () => window.clearTimeout(timer);
+  }, [on, ms]);
+  return on && held;
+}
+
+/** A card the person's turn cut in on (`cut`), as it goes: `away` (lifting) from the first moment of the cut, `gone` once it has lifted
+ *  away. It stays away when the turn closes, until its reply sounds again (`sounding`: the voice took it up where it held it), not until
+ *  the turn closes: a turn with words has the room withdraw the reply after those words are sent, so the card of a reply that will
+ *  never sound again would come back for the seconds it lingers. */
+function useCutAway(cut: boolean, sounding: boolean): { away: boolean; gone: boolean } {
+  const [away, setAway] = useState(cut);
+  const now = cut ? true : sounding ? false : away;
+  if (now !== away) setAway(now);
+  return { away: now, gone: useHeldFor(now, SENT_LEAVING_MS) };
+}
+
+/** One reply on the stage, in a speech balloon whose tail points down at the agent (call-view.css), or the stage's card:
+ *  a few lines at a time (PagedText), lit as the voice says them, moving on with the words heard. `cut`: the person's
+ *  turn took its place under the creature, so it lifts away, and is gone once it has (useCutAway): faded, it would still hold its
+ *  room in the docked column's one cell (call-card.css), and the person's pill beside it would be as tall and as wide as the reply.
+ *  `sounding`: the voice is saying this reply now; the card comes back, popping in, when it is. */
+function AgentBubble({ turn, look = "balloon", cut = false, sounding = false }: { turn: AgentTurn; look?: AgentLook; cut?: boolean; sounding?: boolean }) {
+  const { away, gone } = useCutAway(cut, sounding);
+  if (look === "card") return gone ? null : (
+    <div className="vcap card agent" data-leaving={turn.leaving || away || undefined} aria-hidden="true" translate="no">
+      <PagedText measure={turn.text} follow=".lit-heard" lines={3} turn="page" fixed>
+        <LitText text={turn.text} spoken={turn.spoken} />
+      </PagedText>
+    </div>
+  );
   return (
     <div className="speech-bubble stage-bubble" data-visible="" data-leaving={turn.leaving || undefined} aria-hidden="true" translate="no">
       <PagedText measure={turn.text} follow=".lit-heard" lines={3} turn="page" fixed>
@@ -83,6 +125,7 @@ function StageName({ stage, className, tone, voice }: { stage: StageConversation
     // Its own tint: above the tile on a desktop, outside the tile that carries it.
     <Tag className={className} translate="no" style={avatarTone(tone) as CSSProperties}>
       <StageHeading stage={stage} voice={voice} />
+      {stage.mood === "holding" && <StageHolding stage={stage} t={translator()} />}
     </Tag>
   );
 }
@@ -92,15 +135,39 @@ function StageName({ stage, className, tone, voice }: { stage: StageConversation
  *
  *  The words go on five times a second while the voice says them: that draws the balloons and nothing around them, so the
  *  clock is here and not in the tile (its caller keeps `reading`, so captions turned on mid-reply pick it up where it is). */
-function AgentBubbles({ reading, reply, sounding, messages, onUp }: { reading: RefObject<Reading | null>; reply: ChatMessage | null;
-  sounding: boolean; messages: ChatMessage[]; onUp: (up: boolean) => void }) {
+function AgentBubbles({ reading, reply, sounding, messages, onUp, look, cut }: { reading: RefObject<Reading | null>; reply: ChatMessage | null;
+  sounding: boolean; messages: ChatMessage[]; onUp: (up: boolean) => void; look?: AgentLook; cut?: boolean }) {
   const spokenTo = useSpokenFrom(reading, reply, sounding, messages);
   const turns = useAgentTurns(reply, spokenTo);
   // Whether a balloon is on the stage, for the agent to hold still under it (no idle pastime until it has gone).
   const up = turns.length > 0;
   useEffect(() => { onUp(up); }, [up, onUp]);
   useEffect(() => () => onUp(false), [onUp]);
-  return <>{turns.map((turn) => <AgentBubble key={turn.key} turn={turn} />)}</>;
+  // Only the reply on the stage now can be the one sounding: an older one leaving is not made to come back by it.
+  const now = reply ? reply.segment ?? String(reply.time) : null;
+  return <>{turns.map((turn) => <AgentBubble key={turn.key} turn={turn} look={look} cut={cut} sounding={sounding && turn.key === now} />)}</>;
+}
+
+/** What is said, as the stage's cards: the agent's reply and the person's turn (the pill where their words will come, then
+ *  what was sent), one turn's card at a time: the person's turn coming in lifts the agent's reply away, and a reply
+ *  starting lifts away what was sent. The stage lays them under the creature (StageVoice); the desktop card docks them
+ *  (DockedVoice). `reading`: the reply's clock, kept by the caller; `onUp`: told whether a reply's card is up. */
+function VoiceCards({ stage, conversation, reply, reading, onUp, t }: { stage: StageConversation; conversation: ConversationView; reply: ChatMessage | null;
+  reading: RefObject<Reading | null>; onUp: (up: boolean) => void; t: Translate }) {
+  const pending = !!conversation.pendingText || !!conversation.pendingPhase;
+  return <>
+    <AgentBubbles key={stage.threadId} reading={reading} reply={reply} sounding={stage.speaking} messages={conversation.messages} onUp={onUp}
+      look="card" cut={pending} />
+    <PersonTurn conversation={conversation} t={t} look="card" cut={!!reply && stage.speaking} />
+  </>;
+}
+
+/** The agent cannot receive what the person says: the words, and why and what to do when the core says (ParticipantView.detail
+ *  carries the reason and its remedy). Not the resting look: the slashed tray in the state's mustard, with the words in the
+ *  ink's colour, laid in the title block under the name and machine (StageName), so it never covers the name nor the balloons. */
+function StageHolding({ stage, t }: { stage: StageConversation; t: Translate }) {
+  return <p className="stage-holding" role="status"><span className="stage-holding-line"><StateGlyph kind="holding" size={14} />{t("state.holding")}</span>
+    {stage.row?.detail && <span className="stage-holding-why" translate="no">{stage.row.detail}</span>}</p>;
 }
 
 /** The room's errors (#error is the runtime's id), as people read them: what was raw about one is behind its Details.
@@ -183,6 +250,16 @@ export function StageTile({ card = false }: { card?: boolean }) {
   const captions = useCaptions();
   // The room's stage, for the desktop app's floating card (stage-visibility.ts): not the card's own picture of it.
   const stageRef = useStageRef<HTMLDivElement>(!card);
+  // The voice it hears while it listens: the person's microphone, as the room measures it (0–100).
+  const hearLevel = useMemo<MouthLevel | undefined>(() => {
+    const mic = typeof window === "undefined" ? undefined : window.sidevoiceUI?.micLevel;
+    return mic ? (paint) => mic.subscribe((value) => paint(value / 100)) : undefined;
+  }, []);
+  // The stage's framing: the voice text asks for room under the creature, the creature drawn there answers (StageVoice).
+  const frame = useStageFrame();
+  // Where its feet stand (a share of the scene's height) once the framing settles: the backdrop's ground line is painted there.
+  const [ground, setGround] = useState<number | undefined>();
+  const onGround = useCallback((share: number | null) => setGround(share ?? undefined), []);
   if (!stage.threadId) return null;
   const spec = avatarFor(stage.threadId);
   const tone = avatarColor(spec);
@@ -194,35 +271,34 @@ export function StageTile({ card = false }: { card?: boolean }) {
       <div ref={stageRef} className="stage-tile" data-mood={avatar.mood} data-app={host().identity.build ? "" : undefined} data-card={card || undefined} style={avatarTone(tone) as CSSProperties}>
         <div className="stage-canvas">
           <div className="stage-scene">
-            <StageBackdrop seed={stage.threadId} tone={tone} live />
-            {avatar.mood === "offline" && <WantedPoster spec={spec} seed={stage.threadId} words={posterWords(t)} language={uiLanguage()} />}
-            <CharacterAvatar className="stage-agent" spec={spec} state={avatar} size="stage" desk={avatar.mood === "working"} live
-              mouth="playback" mouthLevel={avatars.mouth(stage.threadId)} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
-            <StageDesk seed={stage.threadId} live />
+            <StageBackdrop seed={stage.threadId} tone={tone} live feet={avatar.mood === "offline" ? undefined : ground} poster={avatar.mood === "offline" ? { words: posterWords(t), language: uiLanguage() } : undefined} />
+            <CharacterAvatar className="stage-agent" spec={spec} state={avatar} size="stage" scene live frame={frame}
+              mouth="playback" mouthLevel={avatars.mouth(stage.threadId)} hearLevel={hearLevel} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
           </div>
         </div>
         {!card && <StageName stage={stage} className="stage-name" tone={tone} voice={voice} />}
-        <div className="stage-top">
-          {/* Its own conversation's: another one on the stage starts with none of the replies before it. */}
-          {captions && <AgentBubbles key={stage.threadId} reading={reading} reply={reply} sounding={stage.speaking} messages={conversation.messages} onUp={holdStill} />}
-          {/* Working is said only to assistive tech here: the sidebar shows it. Not in the floating card (FLOATING-CARD-SPEC, "What
-              the card leaves out"): its page has no .sr-only rule, so it would show over the creature; its figure label and state
-              line carry it. */}
-          {!card && stage.mood === "working" && <p className="sr-only" role="status">{t("stage.working")}</p>}
-        </div>
+        {/* Working is said only to assistive tech here: the sidebar shows it. Not in the floating card (FLOATING-CARD-SPEC, "What
+            the card leaves out"): its page has no .sr-only rule, so it would show over the creature; its figure label and state
+            line carry it. */}
+        {!card && stage.mood === "working" && <p className="sr-only" role="status">{t("stage.working")}</p>}
         {/* The agent's harness, model and effort, at the tile's foot (it gives the stage its touch: operator, 2026-10-15). */}
         <div className="stage-tags"><AgentBadge stage={stage} /></div>
-        {captions && <PersonTurn conversation={conversation} t={t} />}
+        {/* What is said, under the creature: one turn's card at a time there, the newer sending the older away. Its own
+            conversation's: another one on the stage starts with none of the replies before it. */}
+        <StageVoice frame={frame} turn={avatar.mood === "speaking" || avatar.mood === "listening" ? avatar.mood : null} phone={narrow && !card} onGround={onGround}>
+          {captions && <VoiceCards stage={stage} conversation={conversation} reply={reply} reading={reading} onUp={holdStill} t={t} />}
+        </StageVoice>
         {narrow && !card && <TranscriptEntry />}
       </div>
       </div>
   );
 }
 
-/** The call's conversation's balloons, the stage's own, apart from a tile: the desktop card's avatar format lays them
- *  above or below the creature. The agent's (the reply sounding, followed as it is heard) and the person's (the voice's
- *  bars and the room's Cancel sending, then what was sent). */
-export function StageBalloons() {
+/** The call's conversation's voice text, apart from a tile: the stage's own cards (the agent's reply, the person's pill and
+ *  what was sent) docked in a column over or under the desktop card's title card and avatar, as the design reference docks
+ *  them (T23), where the stage lays them under a creature by its framing. Nothing is measured or placed here: the caller's
+ *  column is their place (call-card.css). */
+export function DockedVoice() {
   const t = translator();
   const stage = useStageConversation();
   const avatars = useConversationAvatars();
@@ -232,8 +308,5 @@ export function StageBalloons() {
   const reading = useRef<Reading | null>(null);
   useReadingClock(reading, reply, stage.speaking, conversation.messages);
   if (!stage.threadId) return null;
-  return <>
-    <div className="stage-top"><AgentBubbles key={stage.threadId} reading={reading} reply={reply} sounding={stage.speaking} messages={conversation.messages} onUp={holdStill} /></div>
-    <PersonTurn conversation={conversation} t={t} />
-  </>;
+  return <VoiceCards stage={stage} conversation={conversation} reply={reply} reading={reading} onUp={holdStill} t={t} />;
 }

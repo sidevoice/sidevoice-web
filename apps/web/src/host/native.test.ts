@@ -1,8 +1,8 @@
-import { describe, expect, onTestFinished, test } from "vitest";
+import { describe, expect, onTestFinished, test, vi } from "vitest";
 import { cardSeam, host, reachOfOrigin } from ".";
 import { browserDeviceName, browserShortcutModifier } from "./identity";
 import { translator } from "../i18n/translator";
-import { nativeHost } from "./native";
+import { nativeHost, watchHostMember } from "./native";
 
 const withHost = (members: Record<string, unknown> | undefined) => {
   Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: members && { host: members } });
@@ -18,8 +18,8 @@ describe("a page outside an app", () => {
     expect(outside.presence.media).toBe("page");
     expect(outside.voice.runs).toBe("page");
     expect(nativeHost().storage).toBeNull();
-    for (const member of [nativeHost().microphone, outside.localHost, outside.reset, outside.muteShortcut,
-      outside.callControls, outside.updater, outside.debug]) expect(member).toBeNull();
+    for (const member of [nativeHost().microphone, outside.localHost, outside.reset, outside.muteShortcut, outside.mediaDuck, outside.textScale,
+      outside.callControls, outside.callSurface, outside.cue, outside.audioRoute, outside.screen, outside.updater, outside.debug, outside.crashReports]) expect(member).toBeNull();
     expect(cardSeam()).toBeNull();
   });
 
@@ -202,12 +202,22 @@ describe("the members an app calls through", () => {
       localHost: { state: async () => ({}), subscribe: () => () => {} },
       muteShortcut: { get: async () => ({}) },
       callControls: { settings: async () => ({}) },
+      callSurface: { active: () => true },
+      cue: { start() {} },
+      audioRoute: { open: async () => {}, current: async () => null },
+      screen: {},
       updater: { cancel: async () => {} },
+      crashReports: { set: async () => {} },
     });
+    expect(host().screen).toBeNull();
     expect(host().localHost).toBeNull();
     expect(host().muteShortcut).toBeNull();
     expect(host().callControls).toBeNull();
+    expect(host().callSurface).toBeNull();
+    expect(host().cue).toBeNull();
+    expect(host().audioRoute).toBeNull();
     expect(host().updater).toBeNull();
+    expect(host().crashReports).toBeNull();
   });
 
   test("a complete member is the app's own object", () => {
@@ -215,11 +225,21 @@ describe("the members an app calls through", () => {
     const muteShortcut = { get: async () => ({}), set: async () => ({}) };
     const callControls = { settings: async () => ({}), setAlwaysShown: async () => ({}) };
     const updater = { status: async () => ({}), cancel: async () => {} };
-    withHost({ localHost, muteShortcut, callControls, updater });
+    const callSurface = { active: () => true, still() {}, forget() {} };
+    const cue = { start() {}, stop() {} };
+    const audioRoute = { open: async () => {}, current: async () => null, subscribe: () => () => {} };
+    const screen = { locked: async () => false };
+    const crashReports = { get: async () => "auto", set: async () => {}, subscribe: () => () => {} };
+    withHost({ localHost, muteShortcut, callControls, callSurface, cue, audioRoute, screen, updater, crashReports });
+    expect(host().screen).toBe(screen);
+    expect(host().callSurface).toBe(callSurface);
+    expect(host().cue).toBe(cue);
+    expect(host().audioRoute).toBe(audioRoute);
     expect(host().localHost).toBe(localHost);
     expect(host().muteShortcut).toBe(muteShortcut);
     expect(host().callControls).toBe(callControls);
     expect(host().updater).toBe(updater);
+    expect(host().crashReports).toBe(crashReports);
   });
 
   test("the microphone is whatever the app says, a settings link alone included, and its help is always there", () => {
@@ -349,14 +369,53 @@ describe("the screen kept on", () => {
     const awake = host().presence.screenAwake!;
     expect(awake.supported).toBe(true);
     expect(await awake.acquire()).toBe("held");
-    expect(host().presence.screenAwakeBy).toBe("app");
   });
   test("an app without one, or with half of one, leaves it to the browser's", () => {
     for (const presence of [{ media: "app" }, { media: "app", screenAwake: { acquire: held.acquire } }, { media: "app", screenAwake: "yes" }]) {
       withHost({ presence });
       expect(host().presence.screenAwake).not.toBe(held);
-      expect(host().presence.screenAwakeBy).toBe("page");
       expect(host().presence.screenAwake?.supported).toBe(typeof navigator !== "undefined" && "wakeLock" in navigator);
     }
   });
+});
+
+test("a member the app offers late is watched for a while, told once it is there, and never in a browser", () => {
+  vi.useFakeTimers();
+  try {
+    // A browser: nothing to watch.
+    Reflect.deleteProperty(window, "__sidevoiceHost");
+    const timers = vi.getTimerCount();
+    const none = vi.fn();
+    watchHostMember("cue", none)();
+    expect(vi.getTimerCount()).toBe(timers);
+    // An app whose cue comes after a reply: told once it is there, and no more looking after.
+    let cue: object | null = null;
+    Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { get cue() { return cue; } } } });
+    const arrived = vi.fn();
+    watchHostMember("cue", arrived);
+    vi.advanceTimersByTime(1000);
+    expect(arrived).not.toHaveBeenCalled();
+    cue = {};
+    vi.advanceTimersByTime(250);
+    expect(arrived).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(60_000);
+    expect(arrived).toHaveBeenCalledTimes(1);
+    // One that never comes is given up on after half a minute.
+    cue = null;
+    const never = vi.fn();
+    watchHostMember("cue", never);
+    vi.advanceTimersByTime(30_000);
+    expect(vi.getTimerCount()).toBe(timers);
+    expect(never).not.toHaveBeenCalled();
+    // Already there when the watch begins (it came between the caller's look and its subscription): told at once, and
+    // nothing left to look for.
+    cue = {};
+    const there = vi.fn();
+    watchHostMember("cue", there);
+    expect(there).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(timers);
+  } finally {
+    vi.useRealTimers();
+    Reflect.deleteProperty(window, "__sidevoiceHost");
+  }
 });

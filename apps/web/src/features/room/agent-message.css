@@ -1,0 +1,19 @@
+/* The phrase to say to an agent (AgentMessage): the landing's message for the agent at the app's tokens — a raised box with
+ * a lila edge, the soft ring round it and a low shadow (--sv-quote-*), the mark at its start, the phrase in the text colour, a
+ * step above the body, and the copy button at its end, vertically centred. About 480px at most. One line where it fits; where
+ * it does not (a phone, a long language), it wraps balanced, the mark and the button centred on the lines. */
+.agent-message { position: relative; width: min(100%, 32rem); min-width: 0; }
+.agent-message-box { display: flex; align-items: center; gap: var(--sv-space-2); margin: 0; padding: var(--sv-space-3) var(--sv-space-12) var(--sv-space-3) var(--sv-space-4);
+  border: 1.5px solid var(--sv-quote-edge); border-radius: var(--sv-radius-lg); background: var(--sv-surface-raised); box-shadow: var(--sv-quote-shadow); text-align: start; }
+.agent-message-mark { flex: none; color: var(--sv-accent); }
+/* A step above the body: the card titles' size on a desktop, the phone's body where that is larger; the text colour
+ * wherever it sits, a popover's muted paragraphs (ui.css .ui-popover p) included. */
+.agent-message .agent-message-text { min-width: 0; margin: 0; color: var(--sv-text); font-family: var(--sv-font-sans); font-size: max(var(--sv-font-lg), var(--sv-font-md)); font-weight: var(--sv-weight-medium);
+  line-height: calc(1.5rem * var(--sv-line-k, 1)); letter-spacing: -.01em; text-wrap: balance; overflow-wrap: anywhere; cursor: text; user-select: all; -webkit-user-select: all; }
+.agent-message .ui-copy-button { position: absolute; top: 50%; inset-inline-end: var(--sv-space-2); transform: translateY(-50%); }
+/* Quiet until the line is pointed at or the button has the keyboard's focus: no fill, its icon in the muted border token,
+ * which still meets 3:1 against the box in both themes (a control must be seen); then the copy button's own look and hover
+ * (ui.css). Solid too while it says how a copy went. A touch screen points at nothing: there it always has its own look. */
+@media (hover: hover) {
+  .agent-message:not(:hover) .ui-copy-button:not(:focus-visible, [data-state]) { background-color: transparent; color: var(--sv-border-strong); }
+}

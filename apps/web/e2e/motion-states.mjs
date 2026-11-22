@@ -1,4 +1,4 @@
-import { installHarness } from "./harness.mjs";
+import { installHarness, stageFramed } from "./harness.mjs";
 import { probe } from "./motion-audit.mjs";
 
 /* The states the room and its floating card can be put in, for the motion guard (motion-guard.spec.mjs) and the animation
@@ -127,7 +127,14 @@ export async function openRoom(page, { people = MIXED, state = "not-in-call", mo
     // The transcription's try keeps the microphone's level in view: a waveform that is flat until it listens.
     if (section === "transcription") await page.locator(".model-try-wave").first().scrollIntoViewIfNeeded();
   }
+  // The stage's framing is solved on the pixels, a frame at a time, for as long as a software GL takes: what the room does
+  // then (frames asked for, the cards' place written) is that solve, not the state, which is what is watched. Not where the
+  // poster stands in for the creature: there is nothing to solve.
+  if (!POSTER.has(state)) await stageFramed(page, 20_000);
 }
+
+/** The states in which no creature is drawn: the agent's poster stands in for it (its machine, or its own conversation, is offline). */
+const POSTER = new Set(["offline-machine", "own-offline"]);
 
 /** The desktop app's floating card (call-controls.html) in `state`, in `format` (card | pip | avatar) at `size`: the room's
  *  own projection of the call (its `callCard` snapshot) handed to the card through a host of its own, as the app hands it.
@@ -140,8 +147,9 @@ export async function openCard(context, { state = "listening", format = "pip", s
   await installHarness(room, { participants: { first: people } });
   await room.goto("/voice/");
   await choose(room);
-  await room.evaluate(applyState, { id: state });
-  const call = await room.evaluate(() => window.sidevoiceUI.store.getState().callCard);
+  // The state is set and read in one go: some of them end on the room's own timers (the person's turn, the reply), so a read in a
+  // second round trip, on a busy machine, could find the state already over.
+  const call = await room.evaluate(`(${applyState})({ id: ${JSON.stringify(state)} }), window.sidevoiceUI.store.getState().callCard`);
   await room.close();
   const page = await context.newPage();
   await page.addInitScript(probe);
@@ -153,7 +161,8 @@ export async function openCard(context, { state = "listening", format = "pip", s
     window.__cardState = state;
     window.__sidevoiceHost = { host: { callControls: {
       subscribe(listener) { window.__cardListener = listener; listener(window.__cardState); return () => {}; },
-      run() {}, layout() {}, drag() {}, resize() {},
+      // What the card asks of its window, as the app would size and place it (window.__layouts, the latest last).
+      run() {}, layout(size) { (window.__layouts ??= []).push(size); }, drag() {}, resize() {},
     } } };
   }, { call, format, size, mode, level, expanded });
   await page.goto("/voice/call-controls.html");
@@ -172,3 +181,13 @@ export async function openCard(context, { state = "listening", format = "pip", s
   }, { level, playback });
   return page;
 }
+
+/** The reply held sounding. The card's first state is a snapshot of the room taken while the room's own timers run the reply to its
+ *  end (a slow machine can take it after the reply is over); the card here is told the reply as sounding and not yet said, and
+ *  nothing moves it on, so the balloon stays for as long as the case measures it. */
+export const holdReply = (page) => page.evaluate(() => {
+  const call = window.__cardState.call, facts = call.facts, reply = facts.history[facts.history.length - 1];
+  window.__cardState = { ...window.__cardState, call: { ...call, facts: { ...facts, botLive: true, karaokeState: { segment: reply.segment, from: 0, to: reply.text.length },
+    history: [...facts.history.slice(0, -1), { ...reply, audio: "playing" }] } } };
+  window.__cardListener(window.__cardState);
+});

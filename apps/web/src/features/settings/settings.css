@@ -9,7 +9,7 @@
 .settings-content { grid-column: 2; grid-row: 2; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .settings-column { width: 100%; max-width: 760px; padding: var(--sv-space-8) var(--sv-space-10) var(--sv-space-12); }
 .settings-pane { min-width: 0; }
-.settings-note { margin-top: var(--sv-space-4); font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.settings-note { margin-top: var(--sv-space-4); font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); }
 .settings-build { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
 /* The build of a nightly is a button (the way into Developer options): it looks as the text did. */
 button.settings-build-gesture { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: default; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
@@ -41,6 +41,22 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
 .voice-speed { display: flex; align-items: center; gap: var(--sv-space-3); width: 100%; }
 .voice-speed input[type="range"] { flex: 1; min-width: 0; accent-color: var(--sv-accent); }
 .voice-speed output { min-width: 3.5em; font-size: var(--sv-font-sm); font-variant-numeric: tabular-nums; text-align: end; color: var(--sv-text-muted); }
+/* The thinking sound's volume and its frequency, each its value and ↺ (the shortcut field's, here always in place: disabled
+ * at the default); its try, the button, then while it plays how far it has got and the seconds left. The frequency's value
+ * is held wide enough for its longer readings, so that the slider does not resize under the pointer as it is dragged. */
+.thinking-sound-volume, .thinking-sound-frequency, .thinking-sound-try { display: flex; align-items: center; gap: var(--sv-space-3); width: 100%; }
+.ui-row-control:has(> .thinking-sound-volume), .ui-row-control:has(> .thinking-sound-frequency), .ui-row-control:has(> .thinking-sound-try) { width: 280px; }
+:is(.thinking-sound-volume, .thinking-sound-frequency) input[type="range"] { flex: 1; min-width: 0; accent-color: var(--sv-accent); }
+:is(.thinking-sound-volume, .thinking-sound-frequency) input[type="range"]:disabled { accent-color: var(--sv-disabled-text); cursor: not-allowed; }
+:is(.thinking-sound-volume, .thinking-sound-frequency) output, .thinking-sound-left { font-size: var(--sv-font-sm); font-variant-numeric: tabular-nums; text-align: end; color: var(--sv-text-muted); }
+.thinking-sound-volume output { min-width: 4.2em; }
+.thinking-sound-frequency output { min-width: 8.2em; white-space: nowrap; }
+.thinking-sound-left { min-width: 2.6em; }
+.ui-row[data-disabled] :is(.thinking-sound-volume, .thinking-sound-frequency) output { color: var(--sv-disabled-text); }
+:is(.thinking-sound-volume, .thinking-sound-frequency) .thinking-sound-restore { margin: 0; opacity: 1; }
+:is(.thinking-sound-volume, .thinking-sound-frequency) .thinking-sound-restore:disabled { opacity: .4; cursor: not-allowed; background: color-mix(in srgb, var(--sv-text) 9%, transparent); color: var(--sv-text-muted); }
+.thinking-sound-try .ui-progress { flex: 1; min-width: 0; }
+.thinking-sound-try .ui-progress-fill { transition: none; }
 
 
 .provider-remove { margin: 0 0 0 48px; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
@@ -50,7 +66,7 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
 .provider-key-input { position: relative; display: flex; align-items: center; }
 .provider-key-input .ui-input { flex: 1; padding-inline-end: 40px; }
 .provider-key-reveal { position: absolute; inset-inline-end: 4px; }
-.provider-key-cost, .provider-key-replacing { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.provider-key-cost, .provider-key-replacing { margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
 .provider-remove p { margin: 0 0 var(--sv-space-3); font-size: var(--sv-font-sm); }
 @media (max-width: 767px) {
   .provider-remove { margin-inline-start: 0; }
@@ -64,7 +80,7 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
    phone's menu says it on its row's line (settings-levels.tsx). */
 .ui-nav-item.this-device-entry { height: auto; min-height: 40px; padding-block: 6px; }
 .ui-nav-item.this-device-entry:has(.machine-state) { min-height: 52px; }
-.this-device-entry .machine-nav-name { font-size: var(--sv-font-md); line-height: 1.375rem; }
+.this-device-entry .machine-nav-name { font-size: var(--sv-font-md); line-height: calc(1.375rem * var(--sv-line-k, 1)); }
 
 /* Advanced → Downloaded models: one line each, its size, and Delete asking in place. */
 .downloaded-models { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sv-space-2); margin-top: var(--sv-space-2); }
@@ -81,11 +97,11 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
  * provider": a search at its head and the rest as cards in a grid, three across, each its own height, one across on a
  * phone. Connect and Disconnect weigh the same. */
 .providers { display: grid; gap: var(--sv-space-5); }
-.provider-keys-where { display: flex; align-items: flex-start; gap: var(--sv-space-1-5); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.provider-keys-where { display: flex; align-items: flex-start; gap: var(--sv-space-1-5); margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
 .provider-keys-where svg { flex: none; margin-top: 3px; color: var(--sv-warning); }
 .providers-card { display: grid; gap: var(--sv-space-4); padding: var(--sv-space-5); }
 .providers-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sv-space-4); }
-.providers-card-head h3 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); line-height: 1.375rem; color: var(--sv-text); }
+.providers-card-head h3 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); line-height: calc(1.375rem * var(--sv-line-k, 1)); color: var(--sv-text); }
 .providers-card-head { align-items: center; min-height: 32px; }
 .providers-card > .muted { margin: 0; font-size: var(--sv-font-sm); }
 .provider-row .provider-mark, .provider-card .provider-mark { width: 40px; height: 40px; border-radius: var(--sv-radius-md); }
@@ -93,11 +109,10 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
 .provider-row { display: flex; align-items: flex-start; gap: var(--sv-space-3); min-width: 0; padding: var(--sv-space-3) var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); }
 .provider-row:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
 .provider-row-copy { display: grid; gap: 2px; flex: 1; min-width: 0; min-height: 40px; align-content: center; }
+/* Its pills are Badge tags (ui.css), as an agent's row says where it stands. */
 .provider-row-title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); }
-/* Its pills small and soft: a quiet border in their own colour, as a tag rather than a button. */
-.provider-row-title .ui-badge { height: 20px; padding: 0 var(--sv-space-2); font-weight: 500; letter-spacing: .01em; border: 1px solid color-mix(in srgb, currentColor 24%, transparent); }
-.provider-row-line, .provider-card-purpose { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
-.provider-row-problem { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); margin-top: var(--sv-space-2); font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text); }
+.provider-row-line, .provider-card-purpose { font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); }
+.provider-row-problem { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); margin-top: var(--sv-space-2); font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text); }
 .provider-row-problem > svg { flex: none; color: var(--sv-warning); }
 .provider-row-problem p { flex: 1 1 14rem; margin: 0; }
 .provider-row-why { flex: 1 1 14rem; min-width: 0; }
@@ -119,7 +134,7 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
  * words after a refusal, muted. */
 .provider-key-help { display: grid; justify-items: start; gap: 2px; }
 .provider-key-help .provider-key-link { display: inline-flex; align-items: center; gap: var(--sv-space-1); }
-.provider-key-error { display: flex; align-items: flex-start; gap: var(--sv-space-1-5); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-danger); }
+.provider-key-error { display: flex; align-items: flex-start; gap: var(--sv-space-1-5); margin: 0; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-danger); }
 .provider-key-error svg { flex: none; margin-top: 2px; }
 .provider-key-dialog .ui-dialog-reason:empty, .provider-disconnect-dialog .ui-dialog-reason:empty { flex: 0 0 0; }
 .provider-disconnect-dialog p { margin: 0 0 var(--sv-space-3); }
@@ -151,7 +166,7 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
 .downloaded-model-copy { flex: 1 1 auto; justify-content: space-between; gap: var(--sv-space-3); }
 .downloaded-model-title { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); min-width: 0; }
 .downloaded-model-size { margin-inline-start: auto; }
-.model-purpose { display: inline-flex; align-items: center; gap: 4px; padding: 1px var(--sv-space-2); border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken); color: var(--sv-text-muted); font-size: var(--sv-font-xs); line-height: 1.125rem; white-space: nowrap; }
+.model-purpose { display: inline-flex; align-items: center; gap: 4px; padding: 1px var(--sv-space-2); border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken); color: var(--sv-text-muted); font-size: var(--sv-font-xs); line-height: calc(1.125rem * var(--sv-line-k, 1)); white-space: nowrap; }
 .model-purpose svg { width: 13px; height: 13px; }
 .downloaded-remove-all { display: grid; gap: var(--sv-space-2); justify-items: start; margin-top: var(--sv-space-2); }
 .downloaded-models .downloaded-model + .downloaded-model { padding-top: var(--sv-space-2); border-top: 1px solid var(--sv-border); }
@@ -196,16 +211,12 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
   .settings-menu-icon { display: inline-grid; place-items: center; flex: none; width: 20px; height: 20px; color: var(--sv-text-muted); }
   .settings-menu-icon .new-on-icon { --new-ground: var(--sv-surface); }
   .settings-menu-text { display: grid; flex: 1; min-width: 0; }
-  .settings-menu-label { font-size: var(--sv-font-md); line-height: 1.375rem; font-weight: var(--sv-weight-medium); color: var(--sv-text); overflow-wrap: anywhere; }
-  .settings-menu-summary { min-height: 1.25rem; overflow: hidden; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); white-space: nowrap; text-overflow: ellipsis; }
-  .settings-menu-summary .machine-state { font-size: var(--sv-font-sm); line-height: 1.25rem; }
+  .settings-menu-label { font-size: var(--sv-font-md); line-height: calc(1.375rem * var(--sv-line-k, 1)); font-weight: var(--sv-weight-medium); color: var(--sv-text); overflow-wrap: anywhere; }
+  .settings-menu-summary { min-height: 1.25rem; overflow: hidden; font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); color: var(--sv-text-muted); white-space: nowrap; text-overflow: ellipsis; }
+  .settings-menu-summary .machine-state { font-size: var(--sv-font-sm); line-height: calc(1.25rem * var(--sv-line-k, 1)); }
   .settings-menu-row > .ui-badge { flex: none; }
   .settings-menu-chevron { display: inline-grid; flex: none; color: var(--sv-text-subtle); }
   .settings-menu-chevron svg:dir(rtl) { transform: scaleX(-1); }
-  /* Add a machine opens a dialog, not a page: the accent's words, no chevron. A machine's name, unlike a label, is cut. */
-  .settings-menu-row--add .settings-menu-icon, .settings-menu-row--add .settings-menu-label { color: var(--sv-accent-text); }
-  .machines-menu .settings-menu-label { display: flex; align-items: center; gap: var(--sv-space-1); min-width: 0; }
-  .machines-menu .settings-menu-label .machine-nav-name { min-width: 0; overflow: hidden; font-size: var(--sv-font-md); line-height: 1.375rem; white-space: nowrap; text-overflow: ellipsis; }
 
   /* Machines' list and a machine's page, in the one place of the page they share. */
   .settings-sublevels { display: grid; min-width: 0; }
@@ -239,8 +250,8 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
 /* Each key its own cap, as macOS menus and keyboards draw them: a small raised tile (a thicker bottom edge), the
    system font, centred; the caps of one shortcut side by side. */
 .shortcut-keys { display: inline-flex; align-items: center; gap: 4px; font: inherit; }
-.shortcut-key { display: inline-grid; place-items: center; min-width: 1.75rem; height: 1.75rem; padding: 0 var(--sv-space-2); border: 1px solid var(--sv-border); border-bottom-width: 2px; border-radius: 6px; background: var(--sv-surface-raised); font: 500 var(--sv-font-sm) / 1 var(--sv-font-sans, inherit); color: var(--sv-text); white-space: nowrap; }
-.shortcut-keys[data-state="refused"] .shortcut-key { border-color: var(--sv-warning); }
+.shortcut-key { display: inline-grid; place-items: center; min-width: 26px; min-height: 26px; padding: 0 7px; border: 1px solid var(--sv-border-strong); border-bottom-width: 2px; border-radius: 7px; background: var(--sv-surface); font: 600 calc(12.5px * var(--sv-text-scale, 1)) / 1 var(--sv-font-sans); color: var(--sv-text); white-space: nowrap; }
+
 .desktop-shortcut-refused { display: grid; gap: var(--sv-space-2); color: var(--sv-text); }
 .desktop-shortcut-alternatives { display: flex; flex-wrap: wrap; gap: var(--sv-space-2); }
 .desktop-shortcut-note { color: var(--sv-text-muted); }
@@ -294,16 +305,22 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
   /* and a tag too long for a narrow phone ends in an ellipsis inside the row, never past it. */
   .downloaded-model-title > :not(.downloaded-model-name):not(.ui-infotip) { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
-/* A tooltip that says its shortcut: the label, then its key caps, small, on the tooltip's own ground. */
-.shortcut-tip { display: inline-flex; align-items: center; gap: var(--sv-space-2); }
-.ui-tooltip .shortcut-key { min-width: 1.25rem; height: 1.25rem; padding: 0 var(--sv-space-1); font-size: var(--sv-font-xs, 0.75rem); background: transparent; color: inherit; border-color: currentColor; opacity: 0.85; }
+/* A tooltip that says its shortcut: the label, then its key caps, on the tooltip's own ground. The caps are the Shortcuts
+   screen's, adapted to the lavender tooltip. The mic's has a second, lighter line: what holding a key does. */
+.shortcut-tip { display: inline-flex; align-items: center; gap: 8px; }
+.shortcut-tip-stack { display: grid; gap: 2px; }
+.shortcut-tip-label { font-weight: var(--sv-weight-semibold); }
+.shortcut-tip-hint { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; opacity: .8; }
+.shortcut-tip-hint .shortcut-keys { vertical-align: middle; }
+.ui-tooltip .shortcut-keys { gap: 3px; }
+.ui-tooltip .shortcut-key { min-width: 20px; min-height: 20px; padding: 0 5px; border: 1px solid color-mix(in srgb, var(--sv-accent) 35%, transparent); border-bottom-width: 2px; border-radius: 6px; background: var(--sv-surface); color: var(--sv-accent-text); font: 600 calc(11.5px * var(--sv-text-scale, 1)) / 1 var(--sv-font-sans); opacity: 1; }
 
 /* Settings → Floating card (FloatingCardSettings.tsx): the three styles, each with a still, simplified picture of it on
  * a corner of a screen in the page's theme; the four corners a card first appears in. */
 .floating-card-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sv-space-3); width: 100%; }
 @media (max-width: 559px) { .floating-card-choices { grid-template-columns: 1fr; } }
 .floating-card-choice { position: relative; display: grid; gap: 4px; justify-items: start; align-content: start; text-align: start; font: inherit; color: inherit; }
-.floating-card-choice small { color: var(--sv-text-muted); font-size: var(--sv-font-xs); line-height: 1rem; }
+.floating-card-choice small { color: var(--sv-text-muted); font-size: var(--sv-font-xs); line-height: calc(1rem * var(--sv-line-k, 1)); }
 .floating-card-choice[data-selected] { border-color: var(--sv-accent); box-shadow: 0 0 0 1px var(--sv-accent); }
 .floating-card-choice[data-selected] strong { color: var(--sv-accent-text); }
 .floating-card-preview { position: relative; display: block; width: 100%; height: 104px; margin-bottom: 6px; overflow: hidden; border-radius: var(--sv-radius-md);
@@ -368,3 +385,54 @@ button.settings-build-gesture:focus-visible { outline: 2px solid var(--sv-focus,
 /* Developer options (DeveloperOptions): a row's how-to, a line each. */
 .developer-howto { display: block; }
 .developer-howto + .developer-howto { margin-top: var(--sv-space-1); }
+
+/* The shortcut field (components/ui/ShortcutField.tsx): the whole field is the button; the keys as caps, a Default button
+   and a round quiet x inside it, a clear margin from its right edge. */
+.shortcut-item + .shortcut-item { border-top: 1px solid var(--sv-border); }
+.shortcut-item > .ui-row { padding-bottom: 14px; }
+.shortcut-item > .ui-row + .ui-row { border-top: 0; }
+.shortcut-note { margin: 0 var(--sv-space-5) 14px; }
+.shortcut-managed { margin: -6px var(--sv-space-5) 12px; font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+.ui-group-card > .shortcut-note { margin-top: 0; }
+.shortcut-tip-note { margin: 0 0 var(--sv-space-1); align-items: center; }
+.shortcut-tip-note .shortcut-key { min-height: 20px; min-width: 20px; padding: 0 5px; font-size: calc(11.5px * var(--sv-text-scale, 1)); vertical-align: 1px; }
+.ui-shortcut-wrap { display: grid; justify-items: end; gap: 5px; min-width: 0; }
+.ui-shortcut { display: inline-flex; align-items: stretch; width: 240px; max-width: 100%; min-height: 34px; border: 1px solid var(--sv-border-strong); border-radius: 10px; background: var(--sv-surface); transition: border-color .15s, box-shadow .15s, background-color .15s; }
+@media (hover: hover) { .ui-shortcut:hover { border-color: var(--sv-accent); } }
+.ui-shortcut[data-state="recording"] { border-color: var(--sv-accent); background: var(--sv-accent-soft); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-accent) 22%, transparent); }
+.ui-shortcut[data-invalid] { border-color: var(--sv-danger); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-danger) 18%, transparent); }
+.ui-shortcut-field { display: inline-flex; flex: 1; min-width: 0; align-items: center; gap: 6px; padding: 0 10px; border: 0; border-radius: 10px 0 0 10px; background: none; color: inherit; font: inherit; cursor: pointer; text-align: start; }
+.ui-shortcut-field:only-child, .ui-shortcut-field:last-child { border-radius: 10px; }
+.ui-shortcut-field:focus-visible, .ui-shortcut-clear:focus-visible, .ui-shortcut-restore:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
+.ui-shortcut .shortcut-key { min-height: 22px; min-width: 22px; padding: 0 6px; font-size: calc(12px * var(--sv-text-scale, 1)); }
+.shortcut-how { margin-left: 2px; font: 600 calc(11.5px * var(--sv-text-scale, 1)) / 1 var(--sv-font-sans); color: var(--sv-text-muted); }
+.ui-shortcut-placeholder { font: 500 calc(13px * var(--sv-text-scale, 1)) var(--sv-font-sans); color: var(--sv-text-subtle); }
+.ui-shortcut-rec { display: inline-flex; align-items: center; gap: 6px; font: 600 calc(13px * var(--sv-text-scale, 1)) var(--sv-font-sans); color: var(--sv-accent-text); white-space: nowrap; }
+.ui-shortcut-rec i { width: 8px; height: 8px; border-radius: 50%; background: var(--sv-danger); }
+.ui-shortcut-esc { margin-left: auto; padding: 2px 5px; border: 1px solid var(--sv-border-strong); border-radius: 5px; font: 600 calc(10.5px * var(--sv-text-scale, 1)) var(--sv-font-sans); color: var(--sv-text-muted); }
+.ui-shortcut-clear { align-self: center; display: grid; place-items: center; flex: none; width: 20px; height: 20px; margin: 0 8px 0 4px; padding: 0; border: 0; border-radius: 50%; background: color-mix(in srgb, var(--sv-text) 9%, transparent); color: var(--sv-text-muted); cursor: pointer; opacity: .75; transition: opacity .15s, background-color .15s; }
+@media (hover: hover) {
+  .ui-shortcut:hover .ui-shortcut-clear { opacity: 1; }
+  .ui-shortcut-clear:hover { background: color-mix(in srgb, var(--sv-text) 16%, transparent); color: var(--sv-text); }
+  .ui-shortcut:hover .ui-shortcut-restore { opacity: 1; }
+  .ui-shortcut-restore:hover { background: color-mix(in srgb, var(--sv-text) 16%, transparent); color: var(--sv-text); }
+}
+/* ↺ is the × 's size and look, beside it; alone (no × without keys) it takes the × 's right margin. */
+.ui-shortcut-restore { align-self: center; display: grid; place-items: center; flex: none; width: 20px; height: 20px; margin: 0 0 0 4px; padding: 0; border: 0; border-radius: 50%; background: color-mix(in srgb, var(--sv-text) 9%, transparent); color: var(--sv-text-muted); cursor: pointer; opacity: .75; transition: opacity .15s, background-color .15s; }
+.ui-shortcut > .ui-shortcut-restore:last-child { margin-right: 8px; }
+.ui-shortcut-error { max-width: 240px; text-align: start; }
+
+/* Call › Other apps' media: what the choice lacks, in the group's card under the row (amber), or, allowed and waiting for a
+ * restart, Restart now (accent). The margins are the rows' own padding. */
+.media-need { display: flex; align-items: center; gap: var(--sv-space-3); margin: 0 var(--sv-space-5) 14px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--sv-state-attention) 12%, transparent); }
+.media-need[data-kind="restart"] { background: color-mix(in srgb, var(--sv-accent) 10%, transparent); }
+.media-need-icon { display: inline-flex; flex: none; color: color-mix(in srgb, var(--sv-state-attention) 70%, #000); }
+.media-need[data-kind="restart"] .media-need-icon { color: var(--sv-accent-text, var(--sv-accent)); }
+.media-need-text { flex: 1; min-width: 0; margin: 0; font-size: var(--sv-font-md); color: var(--sv-text); }
+.media-need-action { flex: none; display: inline-flex; }
+/* A phone's larger text (data-text-large, lib/text-scale.ts) leaves the name no room beside the size and Delete: the name and
+   its tags take the row, and the size and Delete go under it, at the end. */
+:root[data-text-large] .downloaded-model-copy { grid-template-columns: minmax(0, 1fr) auto 32px; }
+:root[data-text-large] .downloaded-model-title { grid-column: 1 / -1; }
+:root[data-text-large] .downloaded-model-size { grid-column: 2; }
+:root[data-text-large] .downloaded-model-action { grid-column: 3; }

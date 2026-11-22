@@ -135,7 +135,11 @@ test("with this computer prepared: This device shows its page; Remote machines l
   addSays("Add a remote machine");
   expect(machinesPane().querySelector('.machine-entry[data-name="MacBook"]')).toBeNull();
   expect(machinesPane().querySelector('.machine-entry[data-name="NUC"]')).not.toBeNull();
-  // NUC's Sidevoice service, to read; this computer's card is This device's alone.
+  // Remote machines opens its overview, a row each: no card there; NUC's page, from its entry, has NUC's Sidevoice service,
+  // to read; this computer's card is This device's alone.
+  expect(machinesPane().querySelector(".host-status-card")).toBeNull();
+  expect(machinesPane().querySelector("[data-machine-row] .svc-link-name")).toHaveTextContent("NUC");
+  await act(async () => { machinesPane().querySelector<HTMLElement>('.machine-entry[data-name="NUC"]')!.click(); });
   expect(within(machinesPane()).getByRole("heading", { name: "Sidevoice service" }).closest(".host-status-card")).toHaveAttribute("data-remote");
   expect(machinesPane().querySelector(".host-status-card:not([data-remote])")).toBeNull();
 });

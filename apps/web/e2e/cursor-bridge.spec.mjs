@@ -24,7 +24,7 @@ async function show(page, { width, height, language = "en", preset }) {
   else await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.locator("#settings-machines").click();
   const cursor = page.locator(".host-agent-row").filter({ has: page.locator(".host-agent-name strong", { hasText: "Cursor" }) });
-  if (!(await cursor.isVisible())) await page.locator(".machines-menu .machine-entry[data-name='E2E Host']").click();
+  if (!(await cursor.isVisible())) await page.locator("#pane-machines [data-machine-row][data-name='E2E Host']").click();
   const codex = page.locator(".host-agent-row").filter({ has: page.locator(".host-agent-name strong", { hasText: "Codex" }) });
   await expect(cursor).toBeVisible();
   await expect(codex.locator(".host-agent-readiness")).toHaveCount(0);

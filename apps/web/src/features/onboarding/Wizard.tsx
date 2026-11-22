@@ -31,6 +31,7 @@ import { useRoomStore } from "../../state/room-store";
 import { voicePreview } from "../../services/voice-preview";
 import { defaultVoiceSettings } from "../../services/voice-settings.js";
 import type { OnboardingStep } from "../../services/onboarding-state";
+import { listsMediaPermissions, useMediaDuck } from "../permissions/media-permissions";
 
 /* The first-run setup, one dialog over the room: of a fixed height, so nothing jumps between steps, and the whole
  * screen on a phone. Its order is the operator's: the basics (appearance, the interface's and the person's
@@ -59,8 +60,8 @@ const TITLES: Record<OnboardingStep, MessageKey> = {
 /** The steps in the order they come, for the side a new one slides in from. */
 const ORDER: OnboardingStep[] = ["W0", "W4m", "W1", "W2", "W2r", "W3", "W4", "W4v", "W5", "W6"];
 
-/** The step Back goes to: the one before it in the order going on walks. `microphone`: whether there is a microphone to
- *  ask for here (else the permissions step is never shown). `remoteReady`: the other machine answers, so going on passes
+/** The step Back goes to: the one before it in the order going on walks. `microphone`: whether there is anything to ask for
+ *  here, a microphone or a media permission (else the permissions step is never shown). `remoteReady`: the other machine answers, so going on passes
  *  its pairing (`permissionsNext`, `choosePath`) and Back passes it too, as it does this computer's preparation. */
 function previous(step: OnboardingStep, path: "agents" | "remote" | null, canHostAgents: boolean, microphone: boolean, remoteReady: boolean): OnboardingStep | null {
   const permissions: OnboardingStep = microphone ? "W4m" : "W0";
@@ -219,6 +220,9 @@ function ModelStepFooter({ waiting: held, reason = "", reasonQuiet, tryReason, r
 export function Wizard() {
   const t = translator();
   const onboarding = useOnboarding();
+  // The permissions step is shown where there is something to ask: the microphone, or what the app's media handling needs.
+  const mediaListed = listsMediaPermissions(useMediaDuck().status);
+  const permissionsAsked = onboarding.microphone.state !== "none" || mediaListed;
   const machines = useRoomStore((state) => state.machines);
   const hostAgents = useRoomStore((state) => state.facts.hostAgents);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -308,7 +312,7 @@ export function Wizard() {
   }
 
   async function finishBasics() {
-    if (await onboarding.markBasicsDone()) onboarding.goTo(onboarding.microphone.state === "none" ? permissionsNext : "W4m");
+    if (await onboarding.markBasicsDone()) onboarding.goTo(permissionsAsked ? "W4m" : permissionsNext);
   }
 
   async function finishStage(task: "stt" | "tts") {
@@ -348,7 +352,7 @@ export function Wizard() {
   }
 
   const current = GROUPS.findIndex((group) => group.steps.includes(step));
-  const before = previous(step, onboarding.path, onboarding.canHostAgents, onboarding.microphone.state !== "none", onboarding.remoteReady);
+  const before = previous(step, onboarding.path, onboarding.canHostAgents, permissionsAsked, onboarding.remoteReady);
   // With this computer passed without (d), Back from the voice goes to preparing it, not to its agents.
   const back = before === "W3" && !onboarding.localReady ? "W2" : before;
   const error = onboarding.error ? t(`wizard.error.${onboarding.error.replace("onboarding.", "")}` as MessageKey) : "";

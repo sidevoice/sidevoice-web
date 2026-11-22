@@ -11,7 +11,6 @@ import { HARNESSES, mascot, type Harness } from "./mascots";
 
 export { renderSpec } from "../bichos/render";
 export { normalizeSpec } from "../bichos/spec";
-export { specFromSeed } from "../bichos/generate";
 export type { Spec } from "../bichos/kit";
 
 /** A mascot's cues go beside its mark the way a bicho's go beside its silhouette: from the mark's hull (mascots.ts). */

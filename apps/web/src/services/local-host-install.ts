@@ -33,6 +33,16 @@ const SAFE_VERIFICATION_CHECKS = new Set([
   "download-size", "archive-path", "archive-link", "archive-size", "archive-type",
 ]);
 const SAFE_NUMERIC_PARAMS = new Set(["attempt", "attempts", "limit", "bytes", "duration_ms"]);
+/** The desktop's closed sets for a local file failure (`where`, `reason`, `root`): a value outside one is passed as
+ *  "other", so a newer desktop's word is still shown as a failure of that kind and never as free text. */
+const SAFE_ENUM_PARAMS: Record<string, ReadonlySet<string>> = {
+  where: new Set(["staging-root", "scratch", "download", "package", "installer"]),
+  reason: new Set([
+    "not-absolute", "not-utf8", "owned-by-other", "others-can-replace", "open-to-others", "unsafe-ancestor", "link",
+    "network", "refused", "not-found", "access-denied", "already-exists", "disk-full", "read-only", "os",
+  ]),
+  root: new Set(["temp", "beside-data"]),
+};
 const SAFE_ERROR_KEYS = new Set([
   "install.network", "install.proxy", "install.disk", "install.checksum", "install.no-bundle",
   "install.authenticity", "install.self-test", "install.rollback", "install.rollback-failed",
@@ -59,6 +69,10 @@ function safeParams(value: unknown) {
     if (key === "check" && typeof entry === "string") {
       const check = entry.trim().toLowerCase();
       if (SAFE_VERIFICATION_CHECKS.has(check)) result.check = check;
+    } else if (Object.hasOwn(SAFE_ENUM_PARAMS, key) && typeof entry === "string") {
+      result[key] = SAFE_ENUM_PARAMS[key].has(entry) ? entry : "other";
+    } else if (key === "os_error" && typeof entry === "number" && Number.isInteger(entry)) {
+      result[key] = entry;
     } else if (SAFE_NUMERIC_PARAMS.has(key) && typeof entry === "number" && Number.isFinite(entry)) {
       result[key] = entry;
     }

@@ -5,6 +5,7 @@ import type { MicrophoneSnapshot } from "../../services/microphone-access";
 import { createMicrophoneAccess } from "../../services/microphone-access";
 import { MicrophoneContinue, PermissionsStep } from "../onboarding/PermissionsStep";
 import { useMicrophoneAccess } from "./permission-view";
+import { createRoomStore, RoomStoreContext } from "../../state/room-store";
 import { PermissionsSettings } from "../settings/PermissionsSettings";
 
 /* What Sidevoice needs allowed, in the setup (the person's bicho) and in Settings › Permissions. */
@@ -67,15 +68,21 @@ test("no Refresh status in the setup; blocked, the footer's action is described 
   expect(screen.queryByRole("button", { name: /Continue without/ })).toBeNull();
 });
 
-test("the bicho is calm in every state and its wrapper follows the permission state", () => {
-  const cases: [MicrophoneSnapshot, string][] = [
-    [snapshot("prompt"), "prompt"], [snapshot("requesting", { from: "prompt" }), "requesting"], [snapshot("granted"), "granted"],
-    [snapshot("denied"), "denied"], [snapshot("requesting", { from: "denied" }), "denied"], [snapshot("missing"), "missing"],
+test("the microphone hero acts out the permission state, greyed a little while blocked or none found", () => {
+  // checking, and nothing to allow here, are the calm of not asked yet (the act's prompt)
+  const cases: [MicrophoneSnapshot, string, string][] = [
+    [snapshot("prompt"), "prompt", "prompt"], [snapshot("requesting", { from: "prompt" }), "requesting", "requesting"], [snapshot("granted"), "granted", "granted"],
+    [snapshot("denied"), "denied", "denied"], [snapshot("requesting", { from: "denied" }), "denied", "denied"], [snapshot("missing"), "missing", "missing"],
+    [snapshot("checking"), "checking", "prompt"], [snapshot("none"), "none", "prompt"],
   ];
-  for (const [microphone, state] of cases) {
+  for (const [microphone, state, acted] of cases) {
     render(<PermissionsStep microphone={microphone} openSettings={null} t={t} />);
-    expect(document.querySelector(".perm-hero-figure .sv-avatar")).toHaveAttribute("data-avatar-state", "present");
-    expect(document.querySelector(".perm-hero-figure")).toHaveAttribute("data-state", state);
+    const hero = document.querySelector(".perm-hero-figure.mic-hero")!;
+    expect(hero).toHaveAttribute("data-state", acted);
+    expect(hero).toHaveAttribute("aria-hidden", "true");
+    expect(hero.hasAttribute("data-greyed")).toBe(acted === "denied" || acted === "missing");
+    // it is its own creature, not the person's drawing
+    expect(hero.querySelector(".sv-avatar")).toBeNull();
     expect(list()).toHaveAttribute("data-state", state);
     cleanup();
   }
@@ -302,4 +309,156 @@ test("not blocked, the host is not asked", () => {
   Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { microphone: { help } } } });
   render(<PermissionsStep microphone={snapshot("granted")} openSettings={null} t={t} />);
   expect(help).not.toHaveBeenCalled();
+});
+
+/* Other apps' media (sidevoice-desktop `host.mediaDuck`): the permissions it needs, one row each, in the setup and in
+ * Settings › Permissions alike (operator, 2026-11-04). */
+const mediaApp = (status: Record<string, unknown>, extra: Record<string, unknown> = {}) => {
+  const media = {
+    get: vi.fn(async () => ({ mode: "lower", lower: "some-apps", pause: "some-apps", ...status })),
+    set: vi.fn(),
+    allow: vi.fn(async (permission: string) => ({ mode: "lower", lower: "per-app", pause: "some-apps", ...status, [permission === "capture" ? "capture" : "access"]: "granted" })),
+    openSettings: vi.fn(async () => ({ mode: "lower", lower: "some-apps", pause: "some-apps", ...status })),
+    ...extra,
+  };
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel: "release", version: "0.3.0" }, microphone: { help: () => WINDOWS_APP_HELP }, mediaDuck: media } } });
+  return media;
+};
+
+test("a browser, or an app that reports no media permission, lists the microphone alone", async () => {
+  render(<PermissionsStep microphone={snapshot("granted")} openSettings={null} t={t} />);
+  expect(screen.queryByText("System Audio Recording")).toBeNull();
+  cleanup();
+  const media = mediaApp({ lower: "per-app", pause: "media-controls" });
+  render(<PermissionsStep microphone={snapshot("granted")} openSettings={null} t={t} />);
+  await waitFor(() => expect(media.get).toHaveBeenCalled());
+  await act(async () => {});
+  expect(screen.queryByText("System Audio Recording")).toBeNull();
+  expect(screen.queryByText("Control Music and Spotify")).toBeNull();
+});
+
+test("the setup lists System Audio Recording and Music and Spotify; Allow asks for that one only, and the badge follows", async () => {
+  const media = mediaApp({ capture: "undetermined", access: "undetermined" });
+  render(<PermissionsStep microphone={snapshot("granted")} openSettings={null} t={t} />);
+  expect(await screen.findByText("System Audio Recording")).toBeInTheDocument();
+  expect(screen.getByText("Control Music and Spotify")).toBeInTheDocument();
+  expect(media.allow).not.toHaveBeenCalled();
+  const [capture] = screen.getAllByRole("button", { name: "Allow" });
+  fireEvent.click(capture);
+  expect(media.allow).toHaveBeenCalledWith("capture");
+  await waitFor(() => expect(screen.getAllByRole("button", { name: "Allow" })).toHaveLength(1));
+  await waitFor(() => expect(document.activeElement?.textContent).toBe("Allowed"));
+});
+
+test("Settings › Permissions: refused, the line says where and Open System Settings opens that permission's page; Music and Spotify closed, the line says to open one", async () => {
+  const media = mediaApp({ capture: "denied", access: "unknown" });
+  render(<PermissionsSettings t={t} access={null} microphone={snapshot("granted")} />);
+  expect(await screen.findByText(/Screen & System Audio Recording/)).toBeInTheDocument();
+  expect(screen.getByText(/Open Music or Spotify, then come back here/)).toBeInTheDocument();
+  const buttons = screen.getAllByRole("button", { name: "Open System Settings" });
+  expect(buttons).toHaveLength(1);
+  fireEvent.click(buttons[0]);
+  expect(media.openSettings).toHaveBeenCalledWith("capture");
+  cleanup();
+  const refused = mediaApp({ capture: "granted", access: "denied" });
+  render(<PermissionsSettings t={t} access={null} microphone={snapshot("granted")} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Open System Settings" }));
+  expect(refused.openSettings).toHaveBeenCalledWith("automation");
+  expect(screen.getByText(/Privacy & Security › Automation/)).toBeInTheDocument();
+});
+
+test("no microphone to ask (none, or not read yet): Settings › Permissions still lists the media permissions", async () => {
+  mediaApp({ capture: "undetermined", access: "granted" });
+  for (const microphone of [null, snapshot("none")]) {
+    render(<PermissionsSettings t={t} access={null} microphone={microphone} />);
+    expect(await screen.findByText("System Audio Recording")).toBeInTheDocument();
+    expect(screen.queryByText("Microphone")).toBeNull();
+    expect(screen.queryByText("Nothing to allow here")).toBeNull();
+    cleanup();
+  }
+});
+
+test("each row's Allow waits for its own question only; refused, focus moves to Open System Settings and the live region says so", async () => {
+  let answer: (value: unknown) => void = () => undefined;
+  const media = mediaApp({ capture: "undetermined", access: "undetermined" }, {});
+  media.allow.mockImplementationOnce(() => new Promise((resolve) => { answer = resolve; }) as never);
+  render(<PermissionsStep microphone={snapshot("granted")} openSettings={null} t={t} />);
+  await screen.findByText("System Audio Recording");
+  const [capture, automation] = screen.getAllByRole("button", { name: "Allow" });
+  capture.focus();
+  fireEvent.click(capture);
+  await waitFor(() => expect(capture).toHaveAttribute("data-loading"));
+  expect(automation).not.toHaveAttribute("data-loading");
+  await act(async () => { answer({ mode: "lower", lower: "some-apps", pause: "some-apps", capture: "denied", access: "undetermined" }); });
+  const settings = await screen.findByRole("button", { name: "Open System Settings" });
+  await waitFor(() => expect(document.activeElement).toBe(settings));
+  const [mic, media2] = screen.getAllByRole("status");
+  expect(media2).toHaveTextContent(/Screen & System Audio Recording/);
+  expect(mic).not.toHaveTextContent(/Screen/);
+});
+
+test("two Allows answered in any order are both kept", async () => {
+  const answers: ((value: unknown) => void)[] = [];
+  const base = { mode: "lower", lower: "some-apps", pause: "some-apps" };
+  const media = mediaApp({ capture: "undetermined", access: "undetermined" });
+  media.allow.mockImplementation(() => new Promise((resolve) => { answers.push(resolve); }) as never);
+  render(<PermissionsStep microphone={snapshot("granted")} openSettings={null} t={t} />);
+  await screen.findByText("System Audio Recording");
+  const [capture, automation] = screen.getAllByRole("button", { name: "Allow" });
+  fireEvent.click(capture);
+  fireEvent.click(automation);
+  await act(async () => { answers[1]({ ...base, capture: "undetermined", access: "granted" }); });
+  await act(async () => { answers[0]({ ...base, lower: "per-app", capture: "granted", access: "granted" }); });
+  expect(screen.getAllByText("Allowed")).toHaveLength(3);
+});
+
+/* System Audio Recording allowed while the app still reads it as not (macOS answers a process only as it was at its start):
+ * the app says `restart`, and the row offers to restart it. */
+test("capture allowed but waiting for a restart: the row says so and Restart now asks the app to restart", async () => {
+  const media = mediaApp({ capture: "restart", access: "granted" }, { restart: vi.fn(async () => ({ mode: "lower", lower: "some-apps", pause: "some-apps", capture: "restart" })) });
+  render(<PermissionsSettings t={t} access={null} microphone={snapshot("granted")} />);
+  expect(await screen.findByText("Allowed. Restart Sidevoice to apply it")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Open System Settings" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Restart now" }));
+  expect((media as { restart?: unknown }).restart).toHaveBeenCalledTimes(1);
+  expect(media.allow).not.toHaveBeenCalled();
+});
+
+test("a restart the app refuses during a call is said, and the button waits while a call is joined", async () => {
+  const refuse = vi.fn(async () => { throw { key: "media_duck.restart-in-call" }; });
+  mediaApp({ capture: "restart", access: "granted" }, { restart: refuse });
+  render(<PermissionsSettings t={t} access={null} microphone={snapshot("granted")} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Restart now" }));
+  // Said in the row and in the live region.
+  expect((await screen.findAllByText("Allowed. The restart waits until the call ends")).length).toBeGreaterThan(0);
+  cleanup();
+  const failing = vi.fn(async () => { throw new Error("nope"); });
+  mediaApp({ capture: "restart", access: "granted" }, { restart: failing });
+  render(<PermissionsSettings t={t} access={null} microphone={snapshot("granted")} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Restart now" }));
+  expect((await screen.findAllByText(/could not restart/)).length).toBeGreaterThan(0);
+});
+
+test("while a call is joined the Restart button is disabled and says it waits", async () => {
+  const restart = vi.fn(async () => ({ mode: "lower", lower: "some-apps", pause: "some-apps" }));
+  mediaApp({ capture: "restart", access: "granted" }, { restart });
+  const store = createRoomStore();
+  const inCall = vi.spyOn(store, "getState").mockReturnValue({ call: { joined: true } } as never);
+  render(<RoomStoreContext.Provider value={store}><PermissionsSettings t={t} access={null} microphone={snapshot("granted")} /></RoomStoreContext.Provider>);
+  expect(await screen.findByText("Allowed. The restart waits until the call ends")).toBeInTheDocument();
+  const button = screen.getByRole("button", { name: "Restart now" });
+  expect(button).toBeDisabled();
+  fireEvent.click(button);
+  expect(restart).not.toHaveBeenCalled();
+  inCall.mockRestore();
+});
+
+test("an app without the restart action falls back to Open System Settings with the same line", async () => {
+  const media = mediaApp({ capture: "restart", access: "granted" });
+  render(<PermissionsSettings t={t} access={null} microphone={snapshot("granted")} />);
+  expect(await screen.findByText("Allowed. Restart Sidevoice to apply it")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Open System Settings" }));
+  expect(media.openSettings).toHaveBeenCalledWith("capture");
+  expect(screen.queryByRole("button", { name: "Restart now" })).toBeNull();
 });

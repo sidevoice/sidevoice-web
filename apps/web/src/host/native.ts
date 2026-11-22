@@ -1,6 +1,6 @@
 import type {
-  AppBuild, AppUpdater, AppVoice, CallControlsBridge, Host, HostDebugBridge, HostIdentity, HostPresence, HostStorage, LocalHostBridge,
-  MessageOverlay, MicrophoneBridge, MuteShortcutBridge, PairingsStore, ReachTransport, ResetBridge, ScreenAwake,
+  AppBuild, AppUpdater, AppVoice, CallControlsBridge, AudioRouteBridge, CallSurfaceBridge, CrashReportsBridge, CueBridge, Host, HostDebugBridge, HostIdentity, HostPresence, HostStorage, LocalHostBridge,
+  MediaDuckBridge, MessageOverlay, MicrophoneBridge, MuteShortcutBridge, PairingsStore, ReachTransport, ResetBridge, ScreenAwake, ScreenBridge, ShortcutsBridge, TextScaleBridge,
 } from "./types";
 
 /* What an app injects into its page: `window.__sidevoiceHost`, the object the desktop and mobile apps share
@@ -41,8 +41,8 @@ const named = (value: unknown) => typeof value === "string" && value.trim() ? va
 
 /** The members an app offers through the global it injects, `null` for the rest; the identity here is what the app says
  *  (its build, its computer's name, its shortcut modifier), the browser's to tell where it does not. */
-export type NativeHost = Omit<Host, "identity" | "microphone" | "presence" | "reach" | "storage" | "voice"> & {
-  identity: Omit<HostIdentity, "deviceName" | "shortcutModifier"> & { deviceName(): string | null; shortcutModifier: string | null };
+export type NativeHost = Omit<Host, "exclusive" | "systemTextSize" | "identity" | "microphone" | "presence" | "reach" | "storage" | "voice"> & {
+  identity: Omit<HostIdentity, "deviceName" | "shortcutModifier" | "followKeyboardLayout"> & { deviceName(): string | null; shortcutModifier: string | null };
   /** The app's permission bridge, and its help for a blocked one when it words it. */
   microphone: Partial<MicrophoneBridge> | null;
   presence: Pick<HostPresence, "media"> & { /** The app's own hold on the screen, where it has one (a phone's webview has no Screen Wake Lock that holds); null leaves it to the browser's. */ screenAwake: ScreenAwake | null };
@@ -100,10 +100,39 @@ export function nativeHost(): NativeHost {
     localHost: member<LocalHostBridge>(app, "localHost", ["state", "subscribe", "pairing"]),
     reset: member<ResetBridge>(app, "reset", ["deleteAll", "resetReport"]),
     muteShortcut: member<MuteShortcutBridge>(app, "muteShortcut", ["get", "set"]),
+    shortcuts: member<ShortcutsBridge>(app, "shortcuts", ["get"]),
+    mediaDuck: member<MediaDuckBridge>(app, "mediaDuck", ["get", "set"]),
+    textScale: member<TextScaleBridge>(app, "textScale", ["get"]),
     callControls: member<CallControlsBridge>(app, "callControls", ["settings", "setAlwaysShown"]),
+    callSurface: member<CallSurfaceBridge>(app, "callSurface", ["active", "still", "forget"]),
+    cue: member<CueBridge>(app, "cue", ["start", "stop"]),
+    audioRoute: member<AudioRouteBridge>(app, "audioRoute", ["open", "current", "subscribe"]),
+    screen: member<ScreenBridge>(app, "screen", ["locked"]),
+    crashReports: member<CrashReportsBridge>(app, "crashReports", ["get", "set"]),
     updater: updater && typeof updater.status === "function" ? updater : null,
     debug: debug && Array.isArray(debug.available) && typeof debug.set === "function" ? debug as HostDebugBridge : null,
   };
+}
+
+/** How often, and how many times, a member an app offers late is looked for (`watchHostMember`): every quarter of a second
+ *  for the first half minute of the watch. */
+const LATE_MEMBER = { everyMs: 250, looks: 120 } as const;
+
+/** Calls `arrived` once the app's host offers `name`: at once if it already does (it may have come since the caller last
+ *  looked), else when it does. An app may offer a member only after a reply of its own, soon after the page loads (iOS's
+ *  `cue`: whether the phone has a player is asked once, as the page loads), and says nothing when it does, so the member is
+ *  looked for again, a while: never in a browser (no app to offer it), never once it is there. Returns the unsubscription. */
+export function watchHostMember(name: string, arrived: () => void): () => void {
+  if (!(globalThis.window as Window | undefined)?.__sidevoiceHost) return () => undefined;
+  if (injected()?.[name]) { arrived(); return () => undefined; }
+  let left: number = LATE_MEMBER.looks;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const look = () => {
+    if (injected()?.[name]) { arrived(); return; }
+    if (--left > 0) timer = setTimeout(look, LATE_MEMBER.everyMs);
+  };
+  timer = setTimeout(look, LATE_MEMBER.everyMs);
+  return () => clearTimeout(timer);
 }
 
 /** The seam of the app's call controls card, in the card's own window: its contract is the card's (call-controls/host.ts),

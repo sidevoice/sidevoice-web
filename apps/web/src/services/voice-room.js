@@ -5,7 +5,7 @@
  * offsets into the reply's text. Nothing here keeps state: the page holds the replies and the outbox. */
 
 /** The reasons the room takes on a playback report. */
-export const ROOM_PLAYBACK_REASONS = ['user_interrupted', 'newer_turn', 'focus_changed', 'call_ended', 'unheard', 'agents_muted', 'voice_off', 'connector_disconnected', 'heard_elsewhere'];
+export const ROOM_PLAYBACK_REASONS = ['user_interrupted', 'newer_turn', 'focus_changed', 'call_ended', 'unheard', 'agents_muted', 'voice_off', 'connector_disconnected', 'heard_elsewhere', 'closed'];
 
 /**
  * A turn event of the voice as the room's `voice-user-turn` data (the page adds the session and the message id).

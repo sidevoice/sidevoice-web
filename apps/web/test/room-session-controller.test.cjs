@@ -2,21 +2,21 @@ const fs=require('node:fs'),vm=require('node:vm'),test=require('node:test'),{moc
 // This device's pairing, as the page keeps it, for every test that does not say otherwise: the machine proved itself
 // at the page's own origin a moment ago, so requests go where they always went and carry its token.
 const PAIRED={fp:'fp-mac',public_key:'pk',host:'macbook',urls:['http://127.0.0.1:8768'],device_id:'dev-1',token:'tok-1',paired_at:1};
-function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,siteData=null,localHost=null,nativeData=null,indexedDB=null,outboxScope=null,readingMode=false}={}){
+function setup({readThrows=null,strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,siteData=null,localHost=null,nativeData=null,indexedDB=null,outboxScope=null,readingMode=false,session=null}={}){
  const sourceRoot=__dirname+'/../src'; const uiSource=fs.readdirSync(sourceRoot,{recursive:true}).filter(file=>String(file).endsWith('.tsx')).map(file=>fs.readFileSync(sourceRoot+'/'+file,'utf8')).join('\n');
  class Element{constructor(id){this.id=id;this.children=[];this.dataset={};this.style={setProperty(){}};this.classList={add(){},remove(){}};this.parentElement=this;this.listeners={};this.attributes={}}addEventListener(name,fn){this.listeners[name]=fn}showModal(){this.open=true}close(){this.open=false;this.listeners.close?.()}contains(node){return node===this||this.children.includes(node)}removeAttribute(){}closest(){return null}querySelector(){return null}append(...children){this.children.push(...children)}replaceChildren(...children){this.children=[...children]}remove(){}setAttribute(name,value){this.attributes[name]=value}getAttribute(name){return this.attributes[name]}click(){this.onclick?.()}}
  const elements=new Map(),handlers={},documentHandlers={},observers=[];
  if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element(match[1]));for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','stats-recognition','stats-response'])elements.set(id,new Element(id))}
  const saved=siteData??(stored?{'sidevoice.pairings':JSON.stringify(stored)}:{});
- const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element(id))}return elements.get(id)},body:new Element('body'),createElement:()=>new Element(),addEventListener:(name,fn)=>(documentHandlers[name]??=[]).push(fn)},window:{addEventListener:(name,fn)=>handlers[name]=fn},MutationObserver:class{constructor(fn){observers.push(fn)}observe(){}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
+ const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>{if(readThrows&&key===readThrows)throw new Error('blocked');return saved[key]??null},setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:session?storageOf(session):{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element(id))}return elements.get(id)},body:new Element('body'),createElement:()=>new Element(),addEventListener:(name,fn)=>(documentHandlers[name]??=[]).push(fn)},window:{addEventListener:(name,fn)=>handlers[name]=fn},MutationObserver:class{constructor(fn){observers.push(fn)}observe(){}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
  if(localHost||nativeData)context.window.__sidevoiceHost={host:{...(localHost?{localHost}:{}),...(nativeData?{pairings:nativeData.pairings}:{})}};
  // The outbox's storage across reloads, and this tab's scope in it.
  if(indexedDB)context.indexedDB=indexedDB;
  if(outboxScope)context.sessionStorage={getItem:key=>key==='sidevoice.outbox-scope'?outboxScope:null,setItem(){}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. A TypeScript module is transpiled here.
- const modules={'../services/failure-code.js':'FailureCode','../services/model-catalogs.js':'ModelCatalogs','../services/voice-source.ts':'VoiceSource','../services/audio-diagnostics.ts':'AudioDiagnostics','./browser-voice.js':'HostVoice','./browser-storage':'HostStorage','./browser-reach':'HostReach','./browser-presence':'HostPresence','./browser-microphone':'HostMicrophone','../services/system-language.js':'SystemLanguage','./locales/en':'LocaleEn','./locales/es':'LocaleEs','./locales/fr':'LocaleFr','./locales/it':'LocaleIt','./locales/de':'LocaleDe','./locales/ja':'LocaleJa','./locales/zh-Hans':'LocaleZhHans','./locales/pl':'LocalePl','../i18n/translator':'Translator','../i18n/translator.ts':'Translator','./identity':'HostIdentity','./browser-microphone-help':'HostMicrophoneHelp','./native':'HostNative','../host':'Host','../host/index.ts':'Host','./audio-diagnostics.ts':'AudioDiagnostics','./audio-choice.ts':'AudioChoice','./device-name-rules.js':'DeviceNameRules','../services/device-name-rules.js':'DeviceNameRules','./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','./desktop-host':'DesktopHost','./microphone-access':'MicrophoneAccess','./microphone-access.ts':'MicrophoneAccess','./audio-device-refresh.ts':'AudioDeviceRefresh','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./locales/en':'LocaleEn','../../i18n/locales/en':'LocaleEn','./locales/es':'LocaleEs','../../i18n/locales/es':'LocaleEs','./locales/fr':'LocaleFr','../../i18n/locales/fr':'LocaleFr','./locales/it':'LocaleIt','../../i18n/locales/it':'LocaleIt','./locales/de':'LocaleDe','../../i18n/locales/de':'LocaleDe','./locales/ja':'LocaleJa','../../i18n/locales/ja':'LocaleJa','./locales/zh-Hans':'LocaleZhHans','../../i18n/locales/zh-Hans':'LocaleZhHans','./locales/pl':'LocalePl','../../i18n/locales/pl':'LocalePl','../../i18n/translator':'Translator','../i18n/translator.ts':'Translator','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./reply-eligibility.js':'ReplyEligibility','./reply-hearing-policy.js':'HearingPolicy','./voice-settings.js':'VoiceSettings','./voice-trial.js':'VoiceTrial','./call-preferences.ts':'CallPreferences','./thinking-sound.ts':'ThinkingSound','./model-housekeeping.js':'ModelHousekeeping','../features/settings/error-message.ts':'ErrorMessage','../../services/failure-code.js':'FailureCode','./working-clock.ts':'WorkingClock','../state/shortcuts.ts':'Shortcuts'};
- const files={HostVoice:sourceRoot+'/host/browser-voice.js',HostStorage:sourceRoot+'/host/browser-storage.ts',HostReach:sourceRoot+'/host/browser-reach.ts',HostPresence:sourceRoot+'/host/browser-presence.ts',HostMicrophone:sourceRoot+'/host/browser-microphone.ts',HostIdentity:sourceRoot+'/host/identity.ts',HostMicrophoneHelp:sourceRoot+'/host/browser-microphone-help.ts',HostNative:sourceRoot+'/host/native.ts',Host:sourceRoot+'/host/index.ts',AudioDiagnostics:sourceRoot+'/services/audio-diagnostics.ts',AudioChoice:sourceRoot+'/services/audio-choice.ts',MicrophoneAccess:sourceRoot+'/services/microphone-access.ts',AudioDeviceRefresh:sourceRoot+'/services/audio-device-refresh.ts',Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',LocaleEn:sourceRoot+'/i18n/locales/en.ts',LocaleEs:sourceRoot+'/i18n/locales/es.ts',LocaleFr:sourceRoot+'/i18n/locales/fr.ts',LocaleIt:sourceRoot+'/i18n/locales/it.ts',LocaleDe:sourceRoot+'/i18n/locales/de.ts',LocaleJa:sourceRoot+'/i18n/locales/ja.ts',LocaleZhHans:sourceRoot+'/i18n/locales/zh-Hans.ts',LocalePl:sourceRoot+'/i18n/locales/pl.ts',Translator:sourceRoot+'/i18n/translator.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',VoiceTrial:sourceRoot+'/services/voice-trial.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',ReplyEligibility:sourceRoot+'/services/reply-eligibility.js',HearingPolicy:sourceRoot+'/services/reply-hearing-policy.js',VoiceSettings:sourceRoot+'/services/voice-settings.js',CallPreferences:sourceRoot+'/services/call-preferences.ts',ThinkingSound:sourceRoot+'/services/thinking-sound.ts',ModelHousekeeping:sourceRoot+'/services/model-housekeeping.js',DeviceNameRules:sourceRoot+'/services/device-name-rules.js',ErrorMessage:sourceRoot+'/features/settings/error-message.ts',WorkingClock:sourceRoot+'/services/working-clock.ts',Shortcuts:sourceRoot+'/state/shortcuts.ts'};
+ const modules={'./call-surface.js':'CallSurface','../services/failure-code.js':'FailureCode','./call-end.js':'CallEnd','../services/model-catalogs.js':'ModelCatalogs','../services/voice-source.ts':'VoiceSource','../services/audio-diagnostics.ts':'AudioDiagnostics','./browser-voice.js':'HostVoice','./browser-storage':'HostStorage','./browser-keyboard':'HostKeyboard','./browser-reach':'HostReach','./browser-presence':'HostPresence','./browser-microphone':'HostMicrophone','../services/system-language.js':'SystemLanguage','./locales/en':'LocaleEn','./locales/es':'LocaleEs','./locales/fr':'LocaleFr','./locales/it':'LocaleIt','./locales/de':'LocaleDe','./locales/ja':'LocaleJa','./locales/zh-Hans':'LocaleZhHans','./locales/pl':'LocalePl','./locales/pt-BR':'LocalePtBR','./locales/ko':'LocaleKo','./locales/hi':'LocaleHi','../i18n/translator':'Translator','../i18n/translator.ts':'Translator','./identity':'HostIdentity','./viewport':'HostViewport','./browser-microphone-help':'HostMicrophoneHelp','./native':'HostNative','../host':'Host','../host/index.ts':'Host','./audio-diagnostics.ts':'AudioDiagnostics','./audio-choice.ts':'AudioChoice','./device-name-rules.js':'DeviceNameRules','../services/device-name-rules.js':'DeviceNameRules','./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','./desktop-host':'DesktopHost','./microphone-access':'MicrophoneAccess','./microphone-access.ts':'MicrophoneAccess','./audio-device-refresh.ts':'AudioDeviceRefresh','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./locales/en':'LocaleEn','../../i18n/locales/en':'LocaleEn','./locales/es':'LocaleEs','../../i18n/locales/es':'LocaleEs','./locales/fr':'LocaleFr','../../i18n/locales/fr':'LocaleFr','./locales/it':'LocaleIt','../../i18n/locales/it':'LocaleIt','./locales/de':'LocaleDe','../../i18n/locales/de':'LocaleDe','./locales/ja':'LocaleJa','../../i18n/locales/ja':'LocaleJa','./locales/zh-Hans':'LocaleZhHans','../../i18n/locales/zh-Hans':'LocaleZhHans','./locales/pl':'LocalePl','./locales/pt-BR':'LocalePtBR','./locales/ko':'LocaleKo','./locales/hi':'LocaleHi','../../i18n/locales/pl':'LocalePl','../../i18n/locales/pt-BR':'LocalePtBR','../../i18n/locales/ko':'LocaleKo','../../i18n/locales/hi':'LocaleHi','../../i18n/translator':'Translator','../i18n/translator.ts':'Translator','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./reply-eligibility.js':'ReplyEligibility','./reply-hearing-policy.js':'HearingPolicy','./voice-settings.js':'VoiceSettings','./voice-trial.js':'VoiceTrial','./thinking-sounds':'ThinkingSounds','./call-preferences.ts':'CallPreferences','./thinking-sound.ts':'ThinkingSound','./model-housekeeping.js':'ModelHousekeeping','../features/settings/error-message.ts':'ErrorMessage','../../services/failure-code.js':'FailureCode','./working-clock.ts':'WorkingClock','../state/shortcuts.ts':'Shortcuts','./service-version.ts':'ServiceVersion'};
+ const files={CallSurface:sourceRoot+'/state/call-surface.js',HostVoice:sourceRoot+'/host/browser-voice.js',HostStorage:sourceRoot+'/host/browser-storage.ts',HostKeyboard:sourceRoot+'/host/browser-keyboard.ts',HostReach:sourceRoot+'/host/browser-reach.ts',HostPresence:sourceRoot+'/host/browser-presence.ts',HostMicrophone:sourceRoot+'/host/browser-microphone.ts',HostIdentity:sourceRoot+'/host/identity.ts',HostViewport:sourceRoot+'/host/viewport.ts',HostMicrophoneHelp:sourceRoot+'/host/browser-microphone-help.ts',HostNative:sourceRoot+'/host/native.ts',Host:sourceRoot+'/host/index.ts',AudioDiagnostics:sourceRoot+'/services/audio-diagnostics.ts',AudioChoice:sourceRoot+'/services/audio-choice.ts',MicrophoneAccess:sourceRoot+'/services/microphone-access.ts',AudioDeviceRefresh:sourceRoot+'/services/audio-device-refresh.ts',Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',LocaleEn:sourceRoot+'/i18n/locales/en.ts',LocaleEs:sourceRoot+'/i18n/locales/es.ts',LocaleFr:sourceRoot+'/i18n/locales/fr.ts',LocaleIt:sourceRoot+'/i18n/locales/it.ts',LocaleDe:sourceRoot+'/i18n/locales/de.ts',LocaleJa:sourceRoot+'/i18n/locales/ja.ts',LocaleZhHans:sourceRoot+'/i18n/locales/zh-Hans.ts',LocalePl:sourceRoot+'/i18n/locales/pl.ts',LocalePtBR:sourceRoot+'/i18n/locales/pt-BR.ts',LocaleKo:sourceRoot+'/i18n/locales/ko.ts',LocaleHi:sourceRoot+'/i18n/locales/hi.ts',Translator:sourceRoot+'/i18n/translator.ts',FailureCode:sourceRoot+'/services/failure-code.js',CallEnd:sourceRoot+'/services/call-end.js',SiteStorage:sourceRoot+'/services/site-storage.js',VoiceTrial:sourceRoot+'/services/voice-trial.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',ReplyEligibility:sourceRoot+'/services/reply-eligibility.js',HearingPolicy:sourceRoot+'/services/reply-hearing-policy.js',VoiceSettings:sourceRoot+'/services/voice-settings.js',ThinkingSounds:sourceRoot+'/services/thinking-sounds.ts',CallPreferences:sourceRoot+'/services/call-preferences.ts',ThinkingSound:sourceRoot+'/services/thinking-sound.ts',ModelHousekeeping:sourceRoot+'/services/model-housekeeping.js',DeviceNameRules:sourceRoot+'/services/device-name-rules.js',ErrorMessage:sourceRoot+'/features/settings/error-message.ts',WorkingClock:sourceRoot+'/services/working-clock.ts',Shortcuts:sourceRoot+'/state/shortcuts.ts',ServiceVersion:sourceRoot+'/services/service-version.ts'};
  const imports=(source,dir)=>source.replace(/^import (\w+) from ['"](.*\.json)['"][^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
   .replace(/^import \{(.*)\} from ['"](.*)['"];\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
@@ -313,7 +313,7 @@ test('Final messages use send timestamps, even when answering an older turn',()=
 
 test('Text submission freezes its destination and clears only the submitted draft',async()=>{
  const s=setup(),sent=[];s.context.crypto={randomUUID:()=> 'test-message'};
- s.run("ws={};$('text-message').value='Un mensaje escrito';roomBinding.binding_id='binding-a'");
+ s.run("outboxReady=true;ws={};$('text-message').value='Un mensaje escrito';roomBinding.binding_id='binding-a'");
  s.context.fetch=async(path,options)=>{if(options){sent.push(JSON.parse(options.body));s.run("$('text-message').value='Ya escribiendo el siguiente'");return {ok:true,json:async()=>({accepted:true})}}return {ok:true,json:async()=>({messages:[]})}};
  await s.dispatch('submit',{target:s.run("$('text-composer')")});
  assert.equal(sent[0].thread_id,'a');assert.equal(sent[0].text,'Un mensaje escrito');
@@ -1332,17 +1332,22 @@ test('An explicit agent leave retires the card across restart; a new explicit jo
   [[node.fp+'|old','Rejoined']]);
 });
 
-test('A failed user close leaves the remembered card until Core accepts explicit leave',async()=>{
+test('A refused removal is not retried, and the next answer that still lists the conversation shows it again (web#375)',async()=>{
  const node=await fakeNode();node.tokens.add('tok-1');node.people=[{thread_id:'old',title:'Old conversation',available:true}];
  const s=setup({paired:false,stored:{pairings:[pairingOf(node,{})]}});s.context.__fp=node.fp;
  s.run("const link=linkOf(__fp);link.base='http://127.0.0.1:8768';link.reach='ok';publishLinks()");
  const net=network({at:{'http://127.0.0.1:8768':node}});s.context.fetch=net.get;
  await s.run('refreshPeople(__fp)');
- s.context.fetch=(url,init)=>url.endsWith('/api/presentation/close')?Promise.resolve({ok:false,status:409,json:async()=>({detail:'No se encuentra'})}):net.get(url,init);
- await assert.rejects(s.run('window.sidevoiceActions.closeParticipant')(node.fp+'|old'));
- assert.deepEqual(plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')),[node.fp+'|old']);
- const restarted=setup({paired:false,siteData:s.saved});
- assert.deepEqual(plain(restarted.run('roomStore.getState().participants.map(p=>p.threadId)')),[node.fp+'|old']);
+ let removals=0;
+ s.context.fetch=(url,init)=>url.endsWith('/api/presentation/remove')?(removals++,Promise.resolve({ok:false,status:409,json:async()=>({detail:'No se encuentra'})})):net.get(url,init);
+ const bn=bannerOf(s);
+ await s.run('window.sidevoiceActions.closeParticipant')(node.fp+'|old');
+ assert.equal(removals,1);assert.ok(bn.all().length>2,'the refusal is said');
+ assert.equal(removals,1,'sent once, not retried');
+ await s.run('refreshPeople(__fp)');
+ assert.equal(removals,1);
+ assert.deepEqual(plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')),[node.fp+'|old'],'the machine still lists it');
+ assert.equal(s.run('readRemovals().length'),0,'and the removal is let go of');
 });
 
 test('Olvidar forgets the machine here at once, and asks it to revoke this device only where it proves itself',async()=>{
@@ -1578,7 +1583,7 @@ function fakeVoice({start=async()=>{},update=async()=>{}}={}){
   },
   async routeInput(call){if(call&&!call.active)throw new TypeError('a started call');routes.push(call?.id??null);this.routed=call},
   async preload(settings){calls.push(['preload',settings])},
-  say,mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),
+  say,mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),endInput:async()=>{calls.push(['endInput'])},
  };
  return owner;
 }
@@ -1603,14 +1608,15 @@ function joining(s,{admission={admitted:true,reason:null,message:null,clients:1,
  return {sockets,voice,tap:()=>s.run('toggleCall')()};
 }
 // `microphone`: what the platform says of the microphone when the call is joined (microphone-access.ts), where a test says.
-async function callOnRoom({timers=null,indexedDB=null,outboxScope=null,stored=undefined,readingMode=false,microphone=null,voice:given=null}={}){
+async function callOnRoom({timers=null,clearTimers=null,indexedDB=null,outboxScope=null,stored=undefined,readingMode=false,microphone=null,voice:given=null,engine=null}={}){
  const s=setup({indexedDB,outboxScope,readingMode,...(stored?{stored}:{})});const sockets=socketsOf(s);let ids=0;
  if(microphone)s.run(`microphone.getSnapshot=()=>({state:'${microphone}'})`);
  s.context.crypto={randomUUID:()=>'id-'+(++ids)};
  s.context.window.sidevoiceUI=new Proxy({},{get:()=>()=>{}});
  const store={'sidevoice.selected':'fp-mac|a'};s.context.sessionStorage=storageOf(store);
  if(timers)s.context.setTimeout=timers;
- const voice=withVoice(s,given??fakeVoice());
+ if(clearTimers)s.context.clearTimeout=handle=>{if(!clearTimers.delete(handle))clearTimeout(handle)};
+ const voice=withVoice(s,given??fakeVoice(),engine);
  s.context.fetch=async path=>({ok:true,status:200,json:async()=>path.includes('/participants')
   ?{participants:[{thread_id:'a',title:'A',available:true,reach:{state:'listening'},epoch:0}]}
   :{binding:{thread_id:'a',title:'A',binding_id:'b'},room:{revision:0},clients:[],call:null,messages:[]}});
@@ -1635,6 +1641,15 @@ const started=(turn_id,at=1)=>({turn_id,phase:'started',started_at:at});
 const finished=(turn_id,text)=>({turn_id,phase:'finished',text,started_at:1,ended_at:2,merged:false,timings:{audio_ms:900,endpoint_silence_ms:400,recognition_ms:600}});
 // The message the page sent for a turn's phase.
 const turnSent=(c,socket,turn_id,phase)=>sentOf(c,socket,'voice-user-turn').filter(d=>d.turn_id===turn_id&&d.phase===phase);
+
+test('A call joins the room while a provider\'s catalogue never answers',async()=>{
+ const engine={...fakeEngine([]),catalogs:()=>new Promise(()=>{})};
+ const c=await callOnRoom({engine});
+ assert.equal(c.sockets.length,1);
+ assert.equal(c.s.run('state.connecting'),false,'the join finished');
+ assert.equal(c.s.run('state.voiceCatalogue.state'),'loading','the catalogue is still being read in the background');
+ assert.equal(c.voice.calls[0][0],'start');
+});
 
 test('A call starts its voice with the halves of the settings, and only then joins the room with the hello the room takes',async()=>{
  const c=await callOnRoom();const {voice,firstHello}=c;
@@ -1746,13 +1761,24 @@ test('The room\'s withdrawals cancel what it names, and each reply\'s end goes t
  c.push(first,{type:'voice-reply-withdrawn',data:{session_id:'other',utterance_ids:['r-6'],reason:'newer_turn'}});
  s.run('disconnect()');
 });
-test('T03 stale reply is written but never handed to either voice host',async()=>{
+test('T03 a reply the room withdrew is written but never handed to either voice host',async()=>{
  const c=await callOnRoom();
  c.s.run("threadEpochs.set('a',2)");
+ const turn=started('busy');c.voice.emit('turn',turn);
  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'stale',thread_id:'a',revision:2,reply_revision:1,epoch:1,history_id:'stale-row',text:'Old answer'}});
+ c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['stale'],reason:'newer_turn'}});
+ c.voice.emit('turn',{turn_id:'busy',phase:'cancelled',merged:false});
  assert.equal(c.voice.said.length,0);
  assert.equal(c.s.run('history.at(-1).text'),'Old answer');
  assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').map(d=>[d.utterance_id,d.status,d.reason])),[['stale','unplayed','newer_turn']]);
+ c.s.run('disconnect()');
+});
+test('T03 an older epoch alone does not make a reply late: only the room withdraws it (sidevoice-core#248)',async()=>{
+ const c=await callOnRoom();
+ c.s.run("threadEpochs.set('a',2)");
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'older',thread_id:'a',revision:2,reply_revision:1,epoch:1,history_id:'older-row',text:'Older answer'}});
+ assert.deepEqual(c.voice.said.map(s=>s.text),['Older answer']);
+ assert.equal(sentOf(c,c.first,'voice-playback').length,0);
  c.s.run('disconnect()');
 });
 test('T03/T11 a reply from another device waits for the newer room epoch, never discarded against a cached one',async()=>{
@@ -1813,6 +1839,7 @@ test('T01 and T02 map played-zero barge-in to physical and semantic receipts bef
  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'core-reply',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'row',text:'é🐙ab'}});
  const handle=c.voice.said[0];handle.step({type:'playing'});
  c.voice.emit('turn',started('spoken'));
+ handle.step({type:'held',heard_chars:0});
  handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:0,reason:'barge-in'}});
  c.voice.emit('turn',finished('spoken','New words'));
  const frames=c.frames(c.first).filter(f=>['voice-playback','reply-hearing','voice-user-turn'].includes(f.type));
@@ -1869,31 +1896,95 @@ test('Listening again to a reply names no utterance: the machine mints a fresh o
  assert.deepEqual(posts,[{session_id:'s1',history_id:'s1:voice:original'},{session_id:'s1',history_id:'s1:voice:original'}]);
  c.s.run('disconnect()');
 });
-test('T01 empty turn retires queued replies before its terminal frame, including requested replay',async()=>{
+test('T01 a turn that comes to nothing resumes the reply it held, telling the room nothing of the pause, and every later reply plays after it (sidevoice-core#248)',async()=>{
+ for(const ending of ['cancelled','no words','merged']){
+  const c=await callOnRoom();
+  const reply=(id,requested=false)=>c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:id,text:id,requested}});
+  reply('playing');reply('queued');reply('replay',true);
+  const handle=c.voice.said[0];handle.step({type:'playing'});
+  c.voice.emit('turn',started('empty'));
+  handle.step({type:'held',heard_chars:1});
+  assert.deepEqual(plain(c.s.run('karaokeState')),{segment:'playing',from:1,to:1},'held, lit up to what was heard');
+  // The room advances the epoch at the start, whatever the turn comes to.
+  c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'empty',thread_id:'a',revision:2,epoch:1}});
+  assert.equal(sentOf(c,c.first,'voice-playback').some(d=>d.status!=='playing'),false,'nothing is retired while the turn is open');
+  c.voice.emit('turn',ending==='cancelled'?{turn_id:'empty',phase:'cancelled',merged:false}:ending==='merged'?{...finished('empty','Half'),merged:true}:finished('empty','  '));
+  const end=c.frames(c.first).find(f=>f.type==='voice-user-turn'&&f.data.turn_id==='empty'&&f.data.phase!=='started');
+  assert.ok(end,'the terminal frame does not wait for the held reply: '+ending);
+  const ofHeld=()=>c.frames(c.first).filter(f=>['voice-playback','reply-hearing'].includes(f.type)&&f.data.utterance_id==='playing'&&f.data.status!=='playing');
+  assert.deepEqual(ofHeld(),[],'nothing of the held reply reaches the room');
+  assert.equal(handle.cancelled,false);
+  handle.step({type:'progress',sounding:[1,7],heard_chars:1});
+  handle.step({type:'done',outcome:{status:'heard'}});
+  assert.deepEqual(plain(ofHeld().map(f=>[f.type,f.data.status??f.data.outcome])),[['voice-playback','heard'],['reply-hearing','heard']],'it went on and was heard');
+  assert.deepEqual(c.voice.said.map(s=>s.text),['playing'],'what waited holds until the room has taken the turn\'s end');
+  // The room withdraws nothing for a turn that came to nothing: its acknowledgement lets the rest play, in order.
+  c.push(c.first,{type:'voice-ack',data:{client_msg_id:end.data.client_msg_id}});
+  assert.deepEqual(c.voice.said.map(s=>s.text),['playing','queued'],ending);
+  c.voice.said[1].step({type:'done',outcome:{status:'heard'}});
+  assert.deepEqual(c.voice.said.map(s=>s.text),['playing','queued','replay'],ending);
+  // The agent's next reply, admitted by the room at the current epoch, plays after them.
+  c.voice.said[2].step({type:'done',outcome:{status:'heard'}});
+  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'next',thread_id:'a',revision:2,reply_revision:2,epoch:1,history_id:'next',text:'next'}});
+  assert.equal(c.voice.said.at(-1).text,'next');
+  assert.equal(sentOf(c,c.first,'voice-playback').some(d=>d.reason==='newer_turn'),false,ending);
+  c.s.run('disconnect()');
+ }
+});
+test('T01 after words, what waited is held until the room takes them, and only its withdrawal drops a reply',async()=>{
  const c=await callOnRoom();
- const reply=(id,requested=false)=>c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:id,text:id,requested}});
- reply('playing');reply('queued');reply('replay',true);
+ const reply=(id,epoch=0)=>c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:'a',revision:1,reply_revision:1,epoch,history_id:id,text:id}});
+ reply('playing');reply('queued');reply('kept');
  const handle=c.voice.said[0];handle.step({type:'playing'});
- c.voice.emit('turn',started('empty'));
+ c.voice.emit('turn',started('words'));
+ c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'words',thread_id:'a',revision:2,epoch:1}});
+ handle.step({type:'held',heard_chars:1});
  handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:1,reason:'barge-in'}});
- c.voice.emit('turn',{turn_id:'empty',phase:'cancelled',merged:false});
- const frames=c.frames(c.first),end=frames.findIndex(f=>f.type==='voice-user-turn'&&f.data.turn_id==='empty'&&f.data.phase==='cancelled');
- assert.ok(end>0);
- for(const id of ['queued','replay'])assert.ok(frames.findIndex(f=>f.type==='voice-playback'&&f.data.utterance_id===id&&f.data.reason==='newer_turn')<end);
+ c.voice.emit('turn',finished('words','Some words'));
+ await c.until(()=>turnSent(c,c.first,'words','finished').length===1,'the words');
+ assert.deepEqual(c.voice.said.map(s=>s.text),['playing'],'nothing starts before the room has taken the words');
+ assert.equal(sentOf(c,c.first,'voice-playback').some(d=>d.utterance_id==='queued'||d.utterance_id==='kept'),false,'and nothing is dropped on its own');
+ // The room says what the words made late before it acknowledges them.
+ c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['queued'],reason:'newer_turn'}});
  assert.deepEqual(c.voice.said.map(s=>s.text),['playing']);
+ c.push(c.first,{type:'voice-ack',data:{client_msg_id:turnSent(c,c.first,'words','finished')[0].client_msg_id}});
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.utterance_id==='queued').map(d=>[d.status,d.reason])),[['unplayed','newer_turn']]);
+ assert.deepEqual(c.voice.said.map(s=>s.text),['playing','kept'],'what the room did not withdraw plays');
  c.s.run('disconnect()');
 });
-test('T05 a checkpoint cut reports every queued successor before final words and allows a fresh replay',async()=>{
+test('T01 words over a held reply wait for its end before they go',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'held',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'held',text:'Hello there'}});
+ const handle=c.voice.said[0];handle.step({type:'playing'});
+ c.voice.emit('turn',started('words'));
+ handle.step({type:'held',heard_chars:2});
+ c.voice.emit('turn',finished('words','New words'));
+ assert.equal(turnSent(c,c.first,'words','finished').length,0,"the words wait for the held reply's end");
+ handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'barge-in'}});
+ await c.until(()=>turnSent(c,c.first,'words','finished').length===1,'words after the cut');
+ const frames=c.frames(c.first);
+ assert.ok(frames.findIndex(f=>f.type==='voice-playback'&&f.data.status==='interrupted')<frames.findIndex(f=>f.data.phase==='finished'));
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.reason,d.heard_chars])),[['user_interrupted',2]]);
+ c.s.run('disconnect()');
+});
+test('T05 a checkpoint cut: the room withdraws the queued successor before taking the words; a manual replay it keeps plays after them',async()=>{
  const c=await callOnRoom(),reply=(id,requested=false)=>c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:id,text:id,requested}});
  reply('first');reply('successor');reply('old-replay',true);
  const handle=c.voice.said[0];handle.step({type:'playing'});
  c.voice.emit('turn',started('checkpoint'));
+ c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'checkpoint',revision:2,thread_id:'a',epoch:1}});
+ handle.step({type:'held',heard_chars:2});
  handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'barge-in'}});
  c.voice.emit('turn',finished('checkpoint','New words'));
  const frames=c.frames(c.first),end=frames.findIndex(f=>f.type==='voice-user-turn'&&f.data.turn_id==='checkpoint'&&f.data.phase==='finished');
- for(const id of ['first','successor','old-replay'])assert.ok(frames.findIndex(f=>f.type==='voice-playback'&&f.data.utterance_id===id&&f.data.status!=='playing')<end);
+ assert.ok(end>0);
+ assert.ok(frames.findIndex(f=>f.type==='voice-playback'&&f.data.utterance_id==='first'&&f.data.status!=='playing')<end,'the cut goes ahead of the words');
  assert.deepEqual(c.voice.said.map(s=>s.text),['first']);
- c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'checkpoint',revision:2,thread_id:'a',epoch:1}});
+ c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['successor'],reason:'newer_turn'}});
+ c.push(c.first,{type:'voice-ack',data:{client_msg_id:frames[end].data.client_msg_id}});
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.utterance_id==='successor').map(d=>[d.status,d.reason])),[['unplayed','newer_turn']]);
+ assert.deepEqual(c.voice.said.map(s=>s.text),['first','old-replay'],'the room never withdraws a requested replay by epoch');
+ c.voice.said[1].step({type:'done',outcome:{status:'heard'}});
  reply('new-replay',true);assert.equal(c.voice.said.at(-1).text,'new-replay');
  c.s.run('disconnect()');
 });
@@ -1926,13 +2017,16 @@ test('T07 deferred final words keep their captured node through a replacement se
  assert.equal(turnSent(c,socket,'during-drop','finished')[0].thread_id,'a');
  c.s.run('disconnect()');
 });
-test('T04b a spoken turn retires several locally queued replies at the old epoch',async()=>{
+test('T04b the room withdrawing several queued replies for a turn with words drops each, and a fresh reply plays',async()=>{
  const c=await callOnRoom(),reply=(id,epoch=0)=>c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:'a',revision:1,reply_revision:1,epoch,history_id:id,text:id}});
  reply('one');reply('two');reply('three');const handle=c.voice.said[0];handle.step({type:'playing'});
  c.voice.emit('turn',started('new-spoken'));handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:1,reason:'barge-in'}});
  c.voice.emit('turn',finished('new-spoken','New question'));
  c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'new-spoken',thread_id:'a',revision:2,epoch:1}});
- assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.utterance_id,d.reason])),[['two','newer_turn'],['three','newer_turn'],['one','user_interrupted']]);
+ await c.until(()=>turnSent(c,c.first,'new-spoken','finished').length===1,'the words');
+ c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['two','three'],reason:'newer_turn'}});
+ c.push(c.first,{type:'voice-ack',data:{client_msg_id:turnSent(c,c.first,'new-spoken','finished')[0].client_msg_id}});
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.utterance_id,d.reason])),[['one','user_interrupted'],['two','newer_turn'],['three','newer_turn']]);
  reply('fresh',1);assert.equal(c.voice.said.at(-1).text,'fresh');
  c.s.run('disconnect()');
 });
@@ -1946,7 +2040,7 @@ test('T08 typed context leaves queued playback and an open spoken turn untouched
  c.s.run("$('text-message').value='Typed context'");
  c.s.context.fetch=async()=>({ok:true,status:200,json:async()=>({accepted:true,messages:[]})});await c.s.run('sendText()');
  assert.equal(handle.cancelled,false);assert.equal(c.s.run("openVoiceTurns.has('open')"),true);
- assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.utterance_id==='two').map(d=>[d.status,d.reason])),[['unplayed','newer_turn']],'the spoken start, not typing, retired the queued old reply');
+ assert.equal(sentOf(c,c.first,'voice-playback').some(d=>d.utterance_id==='two'),false,'neither typing nor the spoken start retires the queued old reply: only words would');
  assert.equal(sentOf(c,c.first,'voice-playback').some(d=>d.utterance_id==='three'),false,'typing does not retire a new held reply');
  c.s.run('disconnect()');
 });
@@ -2720,6 +2814,10 @@ test('T02 an accepted reply cannot start while a voice turn or its start acknowl
  c.voice.emit('turn',finished('new-turn','New question'));
  assert.equal(c.voice.said.length,0,'the final transcript does not clear the unacknowledged start');
  c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'new-turn',revision:2,thread_id:'a',epoch:1}});
+ assert.equal(c.voice.said.length,0,'nor does the start\'s answer: the words are not taken yet');
+ assert.equal(sentOf(c,c.first,'voice-playback').some(d=>d.utterance_id==='waiting'),false,'and the page drops nothing on its own');
+ c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['waiting'],reason:'newer_turn'}});
+ c.push(c.first,{type:'voice-ack',data:{client_msg_id:turnSent(c,c.first,'new-turn','finished')[0].client_msg_id}});
  assert.equal(c.voice.said.length,0);
  assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.utterance_id==='waiting').map(d=>[d.status,d.reason])),[['unplayed','newer_turn']]);
  c.s.run('disconnect()');
@@ -2888,7 +2986,7 @@ test('A refusal after its acknowledgement still finds the start it refuses, and 
  const id=turnSent(c,c.first,'turn','started')[0].client_msg_id;
  // The room acknowledges a message before it answers or refuses it.
  c.push(c.first,{type:'voice-ack',data:{client_msg_id:id}});
- c.push(c.first,{type:'error',data:{client_msg_id:id,key:'room.browser_absent'}});
+ c.push(c.first,{type:'error',data:{client_msg_id:id,key:'room.start_refused'}});
  voice.emit('turn',finished('turn','words'));
  assert.equal(turnSent(c,c.first,'turn','finished')[0].offline,true,'its words go as said while away');
  s.run('disconnect()');
@@ -3132,7 +3230,7 @@ test('Nothing goes on a new socket before the room answers its hello, and then i
 });
 test('A start of a replaced session is not sent again: its words go as said while away',()=>{
  const s=setup();
- s.run("var __sent=[];ws={readyState:1,session:'s',send(m){__sent.push(JSON.parse(m))}};voiceTurn({turn_id:'a',phase:'started',started_at:1});voiceTurn({turn_id:'a',phase:'finished',text:'words',started_at:1,ended_at:2,merged:false,timings:{}});__sent.length=0;sessionId='new';relay.reset();ws={readyState:1,session:'new',send(m){__sent.push(JSON.parse(m))}};flushOutbox()");
+ s.run("outboxReady=true;var __sent=[];ws={readyState:1,session:'s',send(m){__sent.push(JSON.parse(m))}};voiceTurn({turn_id:'a',phase:'started',started_at:1});voiceTurn({turn_id:'a',phase:'finished',text:'words',started_at:1,ended_at:2,merged:false,timings:{}});__sent.length=0;sessionId='new';relay.reset();ws={readyState:1,session:'new',send(m){__sent.push(JSON.parse(m))}};flushOutbox()");
  assert.deepEqual(plain(s.run("__sent.map(m=>[m.data.phase,m.data.offline,m.data.session_id])")),[['finished',true,'new']]);
  assert.equal(s.run("outbox.list().some(entry=>entry.payload.data.phase==='started')"),false);
 });
@@ -3660,6 +3758,14 @@ test('Refreshing devices never opens the voice host, and an opened host fills th
  assert.equal(s.run('voiceHostOpening'),opening,'later refreshes reuse the host');
  assert.equal(s.run('audioDevices.outputs.length'),1);
 });
+test('In an app the list is the app\'s own from the first read, never the webview\'s (its speaker can be chosen)',async()=>{
+ const s=setup();
+ s.context.navigator={mediaDevices:{enumerateDevices:async()=>[{kind:'audioinput',deviceId:'browser-mic',label:'Browser microphone'}]}};
+ withVoice(s,voiceWithDevices());
+ await s.run('refreshAudioDevices')();
+ assert.equal(s.run('audioDevices.inputs.length'),2,'the app\'s devices, not the browser\'s');
+ assert.equal(s.run('audioDevices.outputSelectable'),true);
+});
 test('This device\'s microphone and speaker are given to the voice when it is made, kept as chosen, and a lost one is said once',async()=>{
  const s=setup();const voice=withVoice(s,voiceWithDevices());
  s.context.localStorage.setItem('sidevoice.audio-devices',JSON.stringify({input:'mic-b'}));
@@ -3679,37 +3785,35 @@ test('This device\'s microphone and speaker are given to the voice when it is ma
  assert.deepEqual(JSON.parse(s.run("localStorage.getItem('sidevoice.audio-devices')")),{});
 });
 
-// ----- a paired machine's Sidevoice: its version, and whether it is behind (contract gap #57) -----
-test('A paired machine that says it is behind says how to update it there; anything less is no update, and one question is out at a time',async()=>{
+// ----- a paired machine's Sidevoice: its version, kept to say again when it does not answer -----
+test('A paired machine says its version, which is kept for when it does not answer; what is not a version is none, and one question is out at a time',async()=>{
  const s=setup();
  s.run("hostAgentBases.set('fp-mac','https://mac.example');verified.set('https://mac.example',Date.now())");
  let says={version:'0.4.0',update:{latest:'0.5.0',command:'curl -fsSL https://sidevoice.app/install | sh'}};const asked=[];
  s.context.fetch=async(url,init={})=>{asked.push([String(url),init.headers?.Authorization]);return {ok:true,status:200,json:async()=>says}};
  const status=()=>plain(s.run("roomStore.getState().facts.remoteHostStatus['fp-mac']"));
+ const kept=()=>JSON.parse(s.run("localStorage.getItem('sidevoice.service-last-seen')")||'null');
  await s.run("loadMachineInfo('fp-mac')");
  assert.deepEqual(asked,[['https://mac.example/api/host/status','Bearer tok-1']],'asked of the machine itself, with this device\'s token');
- assert.deepEqual(status(),{version:'0.4.0',update:{latest:'0.5.0',command:'curl -fsSL https://sidevoice.app/install | sh'}});
- // A latest version with no command, or a blank one, is behind all the same, its command unknown (Updates says the
- // documented one); what is not a latest version is not an update: a number, none, a word.
- for(const update of [{latest:'0.5.0'},{latest:'0.5.0',command:'  '},{latest:'0.5.0',command:7}]){
-  says={version:'0.4.0',update};
+ // Whether it is out of date is the page's to judge against the minor it pins: what the machine says of a newer one is not kept.
+ assert.deepEqual(status(),{version:'0.4.0'});
+ assert.deepEqual(kept(),{'fp-mac':'0.4.0'},'the version it said, kept under its pairing');
+ // What is not a version is none: a number, none, a word. The one kept stays, to say when it does not answer.
+ for(const version of [5,null,'v0.5','latest']){
+  says={version};
   await s.run("loadMachineInfo('fp-mac')");
-  assert.deepEqual(status(),{version:'0.4.0',update:{latest:'0.5.0',command:null}},JSON.stringify(update));
+  assert.deepEqual(status(),{version:null},JSON.stringify(version));
+  assert.deepEqual(kept(),{'fp-mac':'0.4.0'},JSON.stringify(version));
  }
- for(const update of [{latest:5,command:'x'},{latest:' ',command:'x'},{command:'x'},'yes',null]){
-  says={version:'0.4.0',update};
-  await s.run("loadMachineInfo('fp-mac')");
-  assert.deepEqual(status(),{version:'0.4.0',update:null},JSON.stringify(update));
- }
- // Up to date once more: no update; a version that is not one is unknown.
- says={version:'0.4.0',update:{latest:'0.5.0',command:'npx sidevoice@latest install'}};await s.run("loadMachineInfo('fp-mac')");
- says={version:'v0.5'};await s.run("loadMachineInfo('fp-mac')");
- assert.deepEqual(status(),{version:null,update:null});
  // A machine that cannot be asked keeps what it last said.
- says={version:'0.4.0',update:{latest:'0.5.0',command:'npx sidevoice@latest install'}};await s.run("loadMachineInfo('fp-mac')");
+ says={version:'0.4.0'};await s.run("loadMachineInfo('fp-mac')");
  s.context.fetch=async()=>{throw new TypeError('Failed to fetch')};
  await s.run("loadMachineInfo('fp-mac')");
- assert.deepEqual(status(),{version:'0.4.0',update:{latest:'0.5.0',command:'npx sidevoice@latest install'}});
+ assert.deepEqual(status(),{version:'0.4.0'});
+ // A newer version it says is kept in its place.
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({version:'0.5.1'})});
+ await s.run("loadMachineInfo('fp-mac')");
+ assert.deepEqual(kept(),{'fp-mac':'0.5.1'});
  // Asked from several places at once (its page's card, each place the updates show): one request, one answer for all.
  let answer;asked.length=0;
  s.context.fetch=async url=>{asked.push([String(url)]);return new Promise(resolve=>{answer=()=>resolve({ok:true,status:200,json:async()=>({version:'0.5.0'})})})};
@@ -3717,7 +3821,7 @@ test('A paired machine that says it is behind says how to update it there; anyth
  await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(asked.length,1);
  answer();await Promise.all(loads);
- assert.deepEqual(status(),{version:'0.5.0',update:null});
+ assert.deepEqual(status(),{version:'0.5.0'});
  // Once answered, the next question goes out again.
  await Promise.all([s.run("loadMachineInfo('fp-mac')"),new Promise(resolve=>setTimeout(()=>{answer();resolve()},0))]);
  assert.equal(asked.length,2);
@@ -3805,9 +3909,10 @@ function coreRoom({active=[],live=active,closed=[]}={}){
  return room;
 }
 // A call joined on `room`, this tab having picked `selected` before; `cards`, the conversations this device remembers.
-async function callOnCoreRoom(room,{selected='fp-mac|a',cards=null}={}){
+// `saved`: the storage of a tab already open on this device, for another tab of it; `sid`, the session its call gets.
+async function callOnCoreRoom(room,{selected='fp-mac|a',cards=null,saved=null,sid='s1'}={}){
  const stored={pairings:[PAIRED]};
- const s=setup({stored,siteData:{'sidevoice.pairings':JSON.stringify(stored),...(cards?{'sidevoice.conversation-cards.v1':JSON.stringify(cards)}:{})}});
+ const s=setup({stored,siteData:saved??{'sidevoice.pairings':JSON.stringify(stored),...(cards?{'sidevoice.conversation-cards.v1':JSON.stringify(cards)}:{})}});
  const sockets=socketsOf(s);let ids=0;
  s.context.crypto={randomUUID:()=>'id-'+(++ids)};
  s.context.window.sidevoiceUI=new Proxy({},{get:()=>()=>{}});
@@ -3817,8 +3922,8 @@ async function callOnCoreRoom(room,{selected='fp-mac|a',cards=null}={}){
  s.run("keepScreenAwake=()=>{};roomBinding=null;sessionId=null");
  const joined=s.run('toggleCall')();
  for(let i=0;i<500&&!sockets.length;i++)await settleSoon();
- const socket=sockets[0];socket.readyState=1;socket.onopen();room.hello(JSON.parse(socket.sent[0]).data);
- socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'s1',resume:{token:'tok-a',seconds:60},resumed:false}})});
+ const socket=sockets[0];socket.readyState=1;socket.onopen();room.hello(JSON.parse(socket.sent[0]).data,sid);
+ socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:sid,resume:{token:sid==='s1'?'tok-a':'tok-'+sid,seconds:60},resumed:false}})});
  await joined;await settleSoon();await s.run('refreshPeople()');await settleSoon();
  const turns=()=>socket.sent.filter(m=>typeof m==='string').map(m=>JSON.parse(m)).filter(m=>m.type==='voice-user-turn').map(m=>m.data);
  return {s,voice,socket,store,turns};
@@ -3990,7 +4095,7 @@ test('A conversation closed is not gone back to by the refresh that follows the 
  const c=await callOnCoreRoom(room,{selected:'fp-mac|a'});
  c.s.context.fetch=async(path,options)=>{
   // Core's close: the binding goes, the call's focus with it, and A is among the closed conversations.
-  if(options?.method==='POST'&&path.includes('/presentation/close')){
+  if(options?.method==='POST'&&path.includes('/presentation/remove')){
    room.active.delete('a');room.live.delete('a');room.closed.add('a');room.targets.clear();
    return {ok:true,status:200,json:async()=>({status:'closed'})};
   }
@@ -4002,6 +4107,175 @@ test('A conversation closed is not gone back to by the refresh that follows the 
  const selects=plain(room.selects.slice(before));
  c.s.run('disconnect()');
  assert.ok(!selects.includes('a'),JSON.stringify(selects));
+});
+// Core's removal while another device still shows the conversation (rust/control/room/channel.rs `remove_for_device`):
+// it is left out of this device's list, stays open for the others, and nothing moves this device's call off it.
+function showingElsewhere(room){
+ room.hiddenHere=new Set();
+ const rows=room.rows,fetch=room.fetch;
+ room.rows=()=>rows().filter(row=>!room.hiddenHere.has(row.thread_id));
+ room.fetch=async(path,options)=>{
+  if(options?.method!=='POST'||!path.includes('/presentation/remove'))return fetch(path,options);
+  room.hiddenHere.add(JSON.parse(options.body).thread_id);
+  return {ok:true,status:200,json:async()=>({status:'removed',closed:false})};
+ };
+ return room;
+}
+const listedRows=c=>plain(c.s.run('roomStore.getState().participants.map(p=>p.threadId)'));
+const beats=async(c,n=4)=>{for(let i=0;i<n;i++){c.s.run('pick.leftAt-=LEAVE_EVERY_MS');await c.s.run('refresh()');await settleSoon();await c.s.run('refreshPeople()');await settleSoon()}};
+test('Removing the conversation the call is on, while another device still shows it, takes the call off it for good',async()=>{
+ const room=showingElsewhere(coreRoom({active:['a','b']}));
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|a'});
+ const before=room.selects.length;
+ await c.s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");await settleSoon();
+ await beats(c);
+ const seen={rows:listedRows(c),target:c.s.run('targetId()'),core:room.targets.get('s1')?.thread_id,selects:plain(room.selects.slice(before)),
+  remembered:c.store['sidevoice.selected'],removals:c.s.run('readRemovals().length')};
+ c.s.run('disconnect()');
+ assert.deepEqual(seen.rows,['fp-mac|b'],JSON.stringify(seen));
+ assert.notEqual(seen.target,'fp-mac|a',JSON.stringify(seen));
+ assert.notEqual(seen.core,'a','the room\'s call left it too');
+ assert.ok(!seen.selects.includes('a'),'and was never put back on it: '+JSON.stringify(seen.selects));
+ assert.notEqual(seen.remembered,'fp-mac|a','nor is it the pick to go back to');
+ assert.equal(seen.removals,0,'the machine took the removal');
+});
+test('A conversation removed here stays off this device past its removal settling, until the machine lists it again',async()=>{
+ const room=showingElsewhere(coreRoom({active:['a']}));
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|a'});
+ await c.s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");await settleSoon();
+ await beats(c);
+ const removed={rows:listedRows(c),target:c.s.run('targetId()'),core:room.targets.get('s1')?.thread_id,remembered:c.store['sidevoice.selected'],removals:c.s.run('readRemovals().length')};
+ // Its agent connects anew: core undoes the removals, and the conversation is this device's again.
+ room.hiddenHere.delete('a');
+ await beats(c);
+ const revived=listedRows(c);
+ c.s.run('disconnect()');
+ assert.deepEqual(removed,{rows:[],target:null,core:undefined,remembered:undefined,removals:0},JSON.stringify(removed));
+ assert.deepEqual(revived,['fp-mac|a']);
+});
+// A tab loading on this device's storage (`saved`) with its own session storage (`tab`), whose call takes back session `sid`
+// with the ticket that storage holds, wherever the room's focus for that session still is.
+async function resumeTab(room,saved,tab,sid){
+ const s=setup({stored:{pairings:[PAIRED]},siteData:saved,session:tab}),sockets=socketsOf(s);let ids=0;
+ s.context.crypto={randomUUID:()=>sid+'-id-'+(++ids)};s.context.window.sidevoiceUI=new Proxy({},{get:()=>()=>{}});
+ withVoice(s,fakeVoice());s.context.fetch=room.fetch;
+ s.run("keepScreenAwake=()=>{};roomBinding=null;sessionId=null");
+ const joined=s.run('toggleCall')();
+ for(let i=0;i<500&&!sockets.length;i++)await settleSoon();
+ const socket=sockets[0];socket.readyState=1;socket.onopen();
+ const hello=JSON.parse(socket.sent[0]).data;room.hello(hello,sid);
+ socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:sid,resume:{token:sid+'-next',seconds:60},resumed:true}})});
+ await joined;await settleSoon();
+ const c={s,store:tab};await beats(c);
+ const seen={resumed:hello.resume?.session_id,rows:listedRows(c),target:s.run('targetId()'),core:room.targets.get(sid)?.thread_id};
+ s.run('disconnect()');
+ return seen;
+}
+test('A reload that takes the call back while the room is still on a conversation removed here leaves it, and does not go back to it',async()=>{
+ const room=showingElsewhere(coreRoom({active:['a','b']}));
+ const fetch=room.fetch;let parked=true;
+ // The first page's leave never lands: the page goes away before it does.
+ room.fetch=async(path,options)=>options?.method==='POST'&&path.includes('/presentation/leave')&&parked?new Promise(()=>{}):fetch(path,options);
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|a'});
+ await c.s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");await settleSoon();
+ await beats(c,2);
+ assert.equal(c.s.run('readRemovals().length'),0,'the removal is settled');
+ assert.equal(room.targets.get('s1')?.thread_id,'a','and the room\'s call is still on it');
+ c.socket.close=function(){this.readyState=3};c.s.handlers.beforeunload();
+ // The same tab loads again: nothing in memory, the removal settled, and the ticket takes the call back as it was.
+ parked=false;
+ const seen=await resumeTab(room,c.s.saved,c.store,'s1');
+ assert.equal(seen.resumed,'s1',JSON.stringify(seen));
+ assert.ok(!seen.rows.includes('fp-mac|a'),JSON.stringify(seen));
+ assert.notEqual(seen.target,'fp-mac|a',JSON.stringify(seen));
+ assert.notEqual(seen.core,'a','the room\'s call left it: '+JSON.stringify(seen));
+ assert.notEqual(c.store['sidevoice.selected'],'fp-mac|a');
+});
+test('A tab that reloads after another tab removed and settled a conversation leaves it, its call taken back still on it',async()=>{
+ const room=showingElsewhere(coreRoom({active:['a','b']}));
+ const a=await callOnCoreRoom(room,{selected:'fp-mac|b'});
+ // Tab B's call is on A in the room, parked by a reload; B never heard of the removal (no storage event reached it).
+ room.sessions.add('s2');room.targets.set('s2',{thread_id:'a',binding_id:'focus-b'});
+ const tabB={'sidevoice.selected':'fp-mac|a','sidevoice.resume':JSON.stringify({session_id:'s2',token:'tok-s2',last_seq:0,node:'fp-mac'})};
+ await a.s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");await settleSoon();
+ await beats(a,2);
+ assert.equal(a.s.run('readRemovals().length'),0,'tab A settled the removal: the shared row is gone');
+ a.s.run('disconnect()');
+ const seen=await resumeTab(room,a.s.saved,tabB,'s2');
+ assert.equal(seen.resumed,'s2',JSON.stringify(seen));
+ assert.ok(!seen.rows.includes('fp-mac|a'),JSON.stringify(seen));
+ assert.notEqual(seen.target,'fp-mac|a',JSON.stringify(seen));
+ assert.notEqual(seen.core,'a','the room\'s call left it: '+JSON.stringify(seen));
+});
+test('Two live tabs: a conversation one removes and settles takes the other\'s call off it, with its storage event or without',async()=>{
+ for(const event of [true,false]){
+  const room=showingElsewhere(coreRoom({active:['a','b']}));
+  const a=await callOnCoreRoom(room,{selected:'fp-mac|b'});
+  const b=await callOnCoreRoom(room,{selected:'fp-mac|a',saved:a.s.saved,sid:'s2'});
+  assert.equal(room.targets.get('s2')?.thread_id,'a');
+  await a.s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");await settleSoon();
+  await beats(a,2);
+  assert.equal(a.s.run('readRemovals().length'),0,'tab A settled it: the shared row is gone');
+  if(event){
+   b.s.handlers.storage({key:'sidevoice.removed-here.v1'});
+   assert.equal(b.s.run("links.get('fp-mac').closed.has('a')"),true,'the event closes it at once');
+   b.s.run('pick.leftAt-=LEAVE_EVERY_MS');await b.s.run('refresh()');await settleSoon();await settleSoon();
+  }else await beats(b);
+  const seen={event,rows:listedRows(b),target:b.s.run('targetId()'),core:room.targets.get('s2')?.thread_id};
+  a.s.run('disconnect()');b.s.run('disconnect()');
+  assert.notEqual(seen.core,'a',JSON.stringify(seen));
+  assert.notEqual(seen.target,'fp-mac|a',JSON.stringify(seen));
+  assert.ok(!seen.rows.includes('fp-mac|a'),JSON.stringify(seen));
+ }
+});
+test('A removal is not let go of while what keeps it closed afterwards cannot be stored',async()=>{
+ const c=await callOnCoreRoom(showingElsewhere(coreRoom({active:['a','b']})),{selected:'fp-mac|b'});
+ const store=c.s.context.localStorage,setItem=store.setItem;let blocked=true;
+ store.setItem=(key,value)=>{if(blocked&&key==='sidevoice.removed-here.v1')throw new Error('QuotaExceededError');return setItem.call(store,key,value)};
+ await c.s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");await settleSoon();
+ await beats(c,2);
+ assert.equal(c.s.run('readRemovals().length'),1,'its row stays: it is what protects it');
+ assert.ok(!listedRows(c).includes('fp-mac|a'));
+ blocked=false;await beats(c,2);
+ assert.equal(c.s.run('readRemovals().length'),0,'let go of once the rest is stored');
+ assert.ok('a' in JSON.parse(c.s.saved['sidevoice.removed-here.v1'])['fp-mac']);
+ c.s.run('disconnect()');
+});
+test('An answer asked before a conversation was removed again does not let go of that removal',async()=>{
+ const room=showingElsewhere(coreRoom({active:['b']}));
+ const c=await callOnCoreRoom(room,{selected:'fp-mac|b'});const {s}=c;
+ const kept=()=>Object.keys(JSON.parse(s.saved['sidevoice.removed-here.v1']||'{}')['fp-mac']||{});
+ const listing={ok:true,status:200,json:async()=>({participants:[{thread_id:'x',title:'X',available:true}],closed_threads:[]})};
+ let release;s.context.fetch=async(path,options)=>path.includes('/participants')?new Promise(resolve=>{release=()=>resolve(listing)}):room.fetch(path,options);
+ const asking=s.run("refreshPeople('fp-mac')");await settleSoon();
+ // Another tab of this device removes X while that answer is on its way.
+ await s.run("changeRemovedHere('fp-mac',['x'],[])");
+ release();await asking;await settleSoon();
+ assert.ok(kept().includes('x'),'asked before the removal: it says nothing of it');
+ assert.ok(!listedRows(c).includes('fp-mac|x'));
+ s.context.fetch=async(path,options)=>path.includes('/participants')?listing:room.fetch(path,options);
+ await s.run("refreshPeople('fp-mac')");await settleSoon();
+ assert.ok(!kept().includes('x'),'asked after, and listing it for this device: it is back');
+ s.run('disconnect()');
+});
+test('What this device keeps closed for itself is shared, bounded, and lets go of a conversation its machine closed for everyone',async()=>{
+ const c=await callOnCoreRoom(showingElsewhere(coreRoom({active:['b']})),{selected:'fp-mac|b'});const {s}=c;
+ const kept=()=>Object.keys(JSON.parse(s.saved['sidevoice.removed-here.v1']||'{}')['fp-mac']||{});
+ await s.run("changeRemovedHere('fp-mac',Array.from({length:MAX_REMOVED_HERE+10},(_,i)=>'old'+i),[])");
+ assert.equal(kept().length,s.run('MAX_REMOVED_HERE'));
+ assert.equal(kept()[0],'old10','the newest are kept');
+ // Another tab's change is taken at once.
+ s.handlers.storage({key:'sidevoice.removed-here.v1'});
+ assert.equal(s.run("linkOf('fp-mac').closed.has('old40')"),true);
+ assert.equal(s.run("linkOf('fp-mac').removed.size"),s.run('MAX_REMOVED_HERE'));
+ await settleSoon();
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({participants:[{thread_id:'old30',title:'Back',available:true}],closed_threads:['old20']})});
+ await s.run("refreshPeople('fp-mac')");await settleSoon();
+ assert.ok(!kept().includes('old20'),'closed for every device: nothing to keep');
+ assert.ok(!kept().includes('old30'),'listed for this device again: nothing to keep');
+ assert.equal(kept().length,s.run('MAX_REMOVED_HERE')-2);
+ assert.equal(s.run("linkOf('fp-mac').closed.has('old20')"),true,'and still closed, as the machine says');
+ s.run('disconnect()');
 });
 test('A pick the room said yes to is not asked for again on every beat when its binding does not follow',async()=>{
  const room=coreRoom({active:['a','b']});
@@ -4047,7 +4321,7 @@ test('A conversation closed while a select of it is on its way is not where the 
  let release;const gate=new Promise(resolve=>{release=resolve});
  c.s.context.fetch=async(path,options)=>{
   if(options?.method==='POST'&&path.includes('/presentation/select'))await gate;
-  if(options?.method==='POST'&&path.includes('/presentation/close')){
+  if(options?.method==='POST'&&path.includes('/presentation/remove')){
    room.active.delete('a');room.live.delete('a');room.closed.add('a');
    for(const [session,target]of room.targets)if(target?.thread_id==='a')room.targets.delete(session);
    return {ok:true,status:200,json:async()=>({status:'closed'})};
@@ -4113,7 +4387,7 @@ test('A leave of a closed conversation\'s late focus that lands after the person
  c.s.context.fetch=async(path,options)=>{
   if(options?.method==='POST'&&path.includes('/presentation/select')&&first){first=false;await selectGate}
   if(options?.method==='POST'&&path.includes('/presentation/leave')){leaveStarted=true;await leaveGate}
-  if(options?.method==='POST'&&path.includes('/presentation/close')){
+  if(options?.method==='POST'&&path.includes('/presentation/remove')){
    room.active.delete('a');room.live.delete('a');room.closed.add('a');
    for(const [sid,target]of room.targets)if(target?.thread_id==='a')room.targets.delete(sid);
    return {ok:true,status:200,json:async()=>({status:'closed'})};
@@ -4142,7 +4416,7 @@ test('A late select of a closed conversation leaves the call on the newer pick',
  let release,first=true;const gate=new Promise(resolve=>{release=resolve});
  c.s.context.fetch=async(path,options)=>{
   if(options?.method==='POST'&&path.includes('/presentation/select')&&first){first=false;await gate}
-  if(options?.method==='POST'&&path.includes('/presentation/close')){
+  if(options?.method==='POST'&&path.includes('/presentation/remove')){
    room.active.delete('a');room.live.delete('a');room.closed.add('a');
    for(const [sid,target]of room.targets)if(target?.thread_id==='a')room.targets.delete(sid);
    return {ok:true,status:200,json:async()=>({status:'closed'})};
@@ -4235,7 +4509,7 @@ test('A refused pick falls back to an open conversation, never to the closed foc
    if(thread==='b'){await newGate;return {ok:false,status:429,json:async()=>({detail:{key:'room.input_backlog_full',message:'full'}})}}
   }
   if(options?.method==='POST'&&path.includes('/presentation/leave'))leaves++;
-  if(options?.method==='POST'&&path.includes('/presentation/close')){
+  if(options?.method==='POST'&&path.includes('/presentation/remove')){
    room.active.delete('a');room.live.delete('a');room.closed.add('a');
    for(const [sid,target]of room.targets)if(target?.thread_id==='a')room.targets.delete(sid);
    return {ok:true,status:200,json:async()=>({status:'closed'})};
@@ -4338,20 +4612,175 @@ test('A leave that keeps failing is tried at most once a call beat, and a newer 
 // What the room shows as its top line, as the page sets it.
 function bannerOf(s){const seen=[];s.context.window.sidevoiceUI={...s.context.window.sidevoiceUI,setBootError:value=>seen.push(value)};return {now:()=>JSON.stringify(seen.at(-1)??null),all:()=>JSON.stringify(seen)}}
 const awayPc="{const link=linkOf('fp-pc');link.base=null;link.reach='away';link.via='';publishLinks()}";
-test('Closing a conversation of an away machine, the call on another, refuses by that machine\'s name and closes nothing',async()=>{
- const c=await callWithTwoMachines();const {s}=c,fetched=[],bn=bannerOf(c.s);
+test('Removing a conversation of an away machine hides it at once, keeps the removal, and cancels its queued texts (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,fetched=[];
  const room=s.context.fetch;s.context.fetch=async(path,options)=>{fetched.push(String(path));return room(path,options)};
  s.run(awayPc);s.run("viewedThread='fp-mac|a'");
- const before=plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')),pick=s.run('rememberedThread()');
+ s.run("keepMessage('text','text',{thread:'p',text:'hello'});state.callNode='fp-pc'");s.run("state.callNode='fp-mac'");
+ const queued=s.run("queuedTexts().length");
  await s.run("window.sidevoiceActions.closeParticipant('fp-pc|p')");await settleSoon();
- const banner=bn.all();
- assert.match(banner,/“pc” cannot be reached by any route/);
- assert.ok(!fetched.some(path=>path.includes('/presentation/close')),'nothing asked of any machine');
- assert.doesNotMatch(banner,/No machine available/);
- assert.deepEqual(plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')),before,'the row stays');
- assert.equal(s.run('rememberedThread()'),pick);
+ assert.ok(!fetched.some(path=>path.includes('/presentation/remove')),'nothing asked of an away machine');
+ assert.ok(!plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')).includes('fp-pc|p'),'the row leaves');
+ assert.deepEqual(plain(s.run('readRemovals()')).map(({node,thread_id})=>({node,thread_id})),[{node:'fp-pc',thread_id:'p'}],'the removal is kept');
+ assert.ok(s.saved['sidevoice.pending-removals.v1'].includes('"p"'),'in storage');
+ assert.ok(s.run('queuedTexts().length')<=queued,'its queued texts are not sent later');
  assert.ok(s.run('state.ws'),'the call on the Mac goes on');
  s.run('disconnect()');
+});
+test('A pending removal is sent when its machine answers again, retried with backoff on a healthy link, and dropped once taken (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,sent=[];let answer=503;
+ s.run(awayPc);
+ await s.run("window.sidevoiceActions.closeParticipant('fp-pc|p')");
+ const room=s.context.fetch;
+ s.context.fetch=async(path,options)=>{if(String(path).includes('/presentation/remove')){sent.push(options.body);return {ok:answer===200,status:answer,json:async()=>({detail:'x'})}}return room(path,options)};
+ s.run("{const link=linkOf('fp-pc');link.base='https://pc.example';link.reach='ok';link.via='node'}");
+ await s.run("flushRemovals('fp-pc')");
+ assert.equal(sent.length,1,'a retryable failure keeps it');
+ assert.equal(s.run('readRemovals().length'),1);
+ await s.run("flushRemovals('fp-pc')");
+ assert.equal(sent.length,1,'and waits out its backoff');
+ s.run("removalBackoff.clear()");answer=200;
+ await s.run("flushRemovals('fp-pc')");
+ assert.equal(sent.length,2);
+ assert.equal(s.run('readRemovals()[0].taken'),true,'taken: not sent again, kept until an answer settles it');
+ await s.run("refreshPeople('fp-pc')");
+ assert.equal(s.run('readRemovals().length'),0,'an answer asked after it lets it go');
+ s.run('disconnect()');
+});
+test('A removal is refused, and the row stays, when it cannot be kept: a full store never evicts an older one (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,bn=bannerOf(s);
+ s.run(awayPc);
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify(Array.from({length:256},(_,i)=>({node:'fp-pc',thread_id:'old'+i})));
+ await s.run("window.sidevoiceActions.closeParticipant('fp-pc|p')");
+ assert.equal(s.run('readRemovals().length'),256);
+ assert.ok(!s.run('readRemovals()').some(row=>row.thread_id==='p'));
+ assert.ok(plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')).includes('fp-pc|p'),'the row stays');
+ assert.match(bn.now(),/removals are waiting/);
+ s.run('disconnect()');
+});
+test('Removing is local first even when the machine is on: hidden and kept before the send answers, and the send has a timeout (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c;let signal=null;
+ const room=s.context.fetch;
+ s.context.fetch=(path,options)=>String(path).includes('/presentation/remove')?(signal=options.signal,new Promise(()=>{})):room(path,options);
+ s.run("{const link=linkOf('fp-pc');link.base='https://pc.example';link.reach='ok';link.via='node'}");
+ s.run("keepMessage('text','text',{thread:'p',text:'hello'});state.callNode;queuedTexts()[0].node='fp-pc'");
+ void s.run("window.sidevoiceActions.closeParticipant('fp-pc|p')");await settleSoon();
+ assert.ok(signal&&typeof signal.aborted==='boolean','the send can be abandoned');
+ assert.ok(!plain(s.run('roomStore.getState().participants.map(p=>p.threadId)')).includes('fp-pc|p'),'hidden before the machine answered');
+ assert.equal(s.run('readRemovals().length'),1,'kept before it too');
+ assert.equal(s.run('queuedTexts().length'),0,'its queued texts are cancelled');
+ s.run('disconnect()');
+});
+test('A removal made in another tab is applied here: its queued text is cancelled and its row stays hidden when the machine omits it (web#375)',async()=>{
+ const s=setup();await settleSoon();
+ s.run("queueText('fp-mac|a','must not send')");
+ assert.equal(s.run('queuedTexts().length'),1);
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'a',taken:true}]);
+ s.handlers.storage({key:'sidevoice.pending-removals.v1'});
+ assert.equal(s.run('queuedTexts().length'),0);
+ s.run("linkOf('fp-mac').people=[{thread_id:'a',available:true}]");
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({participants:[],closed_threads:[]})});
+ await s.run("refreshPeople('fp-mac')");
+ assert.equal(s.run("linkOf('fp-mac').people.length"),0,'the omitted conversation does not linger as an offline row');
+});
+test('A thread in the durable removal set cannot be picked or written to in any tab, whatever the round is doing (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,fetched=[];
+ const room=s.context.fetch;s.context.fetch=async(path,options)=>{fetched.push(String(path));return room(path,options)};
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'p'}]);
+ s.run("keepMessage('text','text',{thread:'p',text:'late'})");
+ await s.run("select('fp-mac|p')");
+ assert.ok(!fetched.some(path=>path.includes('/presentation/select')),'no pick');
+ s.run("state.callNode='fp-mac'");await s.run('flushTexts()');
+ assert.equal(s.run('queuedTexts().length'),0);
+ assert.ok(!fetched.some(path=>path.includes('/presentation/text')),'nothing written');
+ s.run('disconnect()');
+});
+test('A tab that was suspended applies every change it missed, even one another tab already settled and deleted (web#375)',async()=>{
+ const s=setup();await settleSoon();s.run("queueText('fp-mac|a','must not send')");
+ const queued=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1'}]);
+ const taken=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1',taken:true,ack:1}]);
+ delete s.saved['sidevoice.pending-removals.v1'];
+ s.handlers.storage({key:'sidevoice.pending-removals.v1',oldValue:taken,newValue:null});
+ assert.equal(s.run('queuedTexts().length'),0,'the last event alone says enough');
+});
+test('An inventory that predates another tab\'s acknowledgement does not revive the removal, nor delete it (web#375)',async()=>{
+ const s=setup();await settleSoon();let release;
+ s.context.fetch=()=>new Promise(resolve=>{release=resolve});
+ const poll=s.run("refreshPeople('fp-mac')");
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1',taken:true,ack:Date.now()+1000}]);
+ release({ok:true,status:200,json:async()=>({participants:[{thread_id:'a',available:true}],closed_threads:[]})});
+ await poll;await settleSoon();
+ assert.equal(s.run("linkOf('fp-mac').people.length"),0);
+ assert.equal(s.run('readRemovals().length'),1);
+});
+test('A removal made again since is a removal of its own: acknowledging the earlier one leaves it (web#375)',async()=>{
+ const s=setup();await settleSoon();
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'old'},{node:'fp-mac',thread_id:'a',id:'new'}]);
+ await s.run("takeRemoval('fp-mac','a','old')");
+ assert.deepEqual(plain(s.run('readRemovals()')),[{node:'fp-mac',thread_id:'a',id:'old',taken:true},{node:'fp-mac',thread_id:'a',id:'new'}]);
+});
+test('Sends and picks go through the shared gate: the machine\'s round lock is entered when removals are open (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,locks=[];
+ s.context.navigator={locks:{request:async(name,a,b)=>{locks.push(name);const cb=b||a;return cb(a&&a.ifAvailable?{}:undefined)}}};
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'gone',id:'r'}]);
+ s.run("keepMessage('text','text',{thread:'a',text:'hi'})");
+ await s.run('flushTexts()');
+ assert.ok(locks.some(name=>name.includes('flush.fp-mac')),'the text waited at the gate');
+ s.run('disconnect()');
+});
+test('A pick enters the shared gate of its machine when removals are open (web#375)',async()=>{
+ const c=await callWithTwoMachines();const {s}=c,locks=[];
+ s.context.navigator={locks:{request:async(name,a,b)=>{locks.push(name);const cb=b||a;return cb(a&&a.ifAvailable?{}:undefined)}}};
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-pc',thread_id:'gone',id:'r'}]);
+ void s.run("select('fp-pc|p')").catch(()=>{});await settleSoon();
+ assert.ok(locks.some(name=>name.includes('flush.fp-pc')),'the pick waited at the gate');
+ s.run('disconnect()');
+});
+test('A text typed while another tab is telling the machine its removals waits at the shared gate, then goes (web#375)',async()=>{
+ const s=setup(),sent=[];await settleSoon();s.context.crypto={randomUUID:()=> 'test-message'};
+ let open;const held=new Promise(resolve=>{open=resolve});
+ s.context.navigator={locks:{request:async(name,a,b)=>{const cb=b||a;if(name.includes('flush.'))await held;return cb(a&&a.ifAvailable?{}:undefined)}}};
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'z',id:'r'}]);
+ s.run("ws={};$('text-message').value='hola';roomBinding.binding_id='binding-a'");
+ s.context.fetch=async(path,options)=>{if(options){sent.push(JSON.parse(options.body));return {ok:true,json:async()=>({accepted:true})}}return {ok:true,json:async()=>({messages:[]})}};
+ const sending=s.dispatch('submit',{target:s.run("$('text-composer')")});
+ await settleSoon();
+ assert.equal(sent.length,0,'nothing goes during the other tab\'s round');
+ open();await sending;
+ assert.equal(sent.length,1);assert.equal(sent[0].thread_id,'a');
+});
+test('A delayed event about a removal this tab applied, settled and saw revived, changes nothing (web#375)',async()=>{
+ const s=setup();await settleSoon();s.run("queueText('fp-mac|a','first')");
+ const queued=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1'}]);
+ const taken=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1',taken:true}]);
+ delete s.saved['sidevoice.pending-removals.v1'];
+ s.handlers.storage({key:'sidevoice.pending-removals.v1',oldValue:null,newValue:queued});
+ assert.equal(s.run('queuedTexts().length'),0);
+ s.run("queueText('fp-mac|a','after the revival')");
+ s.handlers.storage({key:'sidevoice.pending-removals.v1',oldValue:taken,newValue:null});
+ assert.equal(s.run('queuedTexts().length'),1,'the text written after is not cancelled by the old removal');
+ s.saved['sidevoice.pending-removals.v1']=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r2'}]);
+ s.handlers.storage({key:'sidevoice.pending-removals.v1',oldValue:null,newValue:s.saved['sidevoice.pending-removals.v1']});
+ assert.equal(s.run('queuedTexts().length'),0,'a removal made again is another and applies');
+});
+test('A removal settled and revived here is applied for good: a delayed event about it cancels nothing written since (web#375)',async()=>{
+ const s=setup();await settleSoon();
+ const taken=JSON.stringify([{node:'fp-mac',thread_id:'a',id:'r1',taken:true}]);
+ s.saved['sidevoice.pending-removals.v1']=taken;
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({participants:[{thread_id:'a',available:true}],closed_threads:[]})});
+ await s.run("refreshPeople('fp-mac')");await settleSoon();
+ assert.equal(s.run("linkOf('fp-mac').people.length"),1,'the machine lists it again');
+ s.run("queueText('fp-mac|a','written after the revival')");
+ s.handlers.storage({key:'sidevoice.pending-removals.v1',oldValue:taken,newValue:null});
+ assert.equal(s.run('queuedTexts().length'),1);
+});
+test('A store that cannot be read does not stop the page, and keeps no removal (web#375)',async()=>{
+ const s=setup({readThrows:'sidevoice.pending-removals.v1'});
+ assert.deepEqual(plain(s.run('readRemovals()')),[]);
+ const bn=bannerOf(s);
+ await s.run("window.sidevoiceActions.closeParticipant('fp-mac|a')");
+ assert.match(bn.now(),/could not be saved/);
+ assert.equal(s.run('pendingRemovals.length'),0,'and nothing is hidden for it');
 });
 test('Choosing a conversation of an away machine leaves the call where it is and shows no "No machine available"',async()=>{
  const c=await callWithTwoMachines();const {s}=c,bn=bannerOf(s);
@@ -4363,20 +4792,6 @@ test('Choosing a conversation of an away machine leaves the call where it is and
  assert.doesNotMatch(JSON.stringify(plain(s.run('roomStore.getState().joinView||null'))),/No machine available/);
  s.run('disconnect()');
 });
-test('A machine refusing the token on a close says it no longer recognises this device, even before the pairing is saved as revoked',async()=>{
- const c=await callWithTwoMachines();const {s}=c,bn=bannerOf(s);
- s.context.fetch=async url=>String(url).startsWith('https://pc.example')?{ok:false,status:401,json:async()=>({detail:'no'})}:{ok:true,status:200,json:async()=>({participants:[],messages:[]})};
- let release;const held=new Promise(resolve=>{release=resolve});
- s.context.__held=held;s.run("writePairingProjection=async()=>{await __held}");
- const closing=s.run("window.sidevoiceActions.closeParticipant('fp-pc|p')").catch(()=>{});
- await settleSoon();
- const banner=bn.now;
- assert.match(banner(),/“pc” no longer recognises this device/);
- release();await closing;await settleSoon();
- assert.match(banner(),/“pc” no longer recognises this device/,'and still once it is saved');
- s.run('disconnect()');
-});
-
 test('A conversation closed while on screen leaves the screen: the next one that listens, or none (sidevoice-web#351)',()=>{
  const s=setup();
  s.run("roomBinding=null;callNode='fp-mac';const link=linkOf('fp-mac');link.peopleAnswered=true;link.people=[{node:'fp-mac',thread_id:'a',title:'A',available:true,reach:{state:'listening'}},{node:'fp-mac',thread_id:'b',title:'B',available:true,reach:{state:'listening'}}];mergePeople();viewedThread='fp-mac|a'");
@@ -4438,4 +4853,569 @@ test('The call moving to another conversation through a binding gap leaves the e
  await refreshWith({thread_id:'c',title:'C',binding_id:'b9'});
  assert.equal(s.run('SessionState.viewedThread(state)'),'fp-mac|c');
  assert.equal(s.run('focusedThread(state)'),'fp-mac|c','and foreground focus follows');
+});
+
+/* ----- an agent that leaves while its last reply sounds (sidevoice-web#462) ----- */
+// The room after core closed A: no binding, no row, A among the closed conversations.
+function agentLeaves(c){
+ c.s.context.fetch=async path=>({ok:true,status:200,json:async()=>path.includes('/participants')
+  ?{participants:[],closed_threads:['a']}:{binding:null,room:{revision:0},clients:[],call:null,messages:[]}});
+}
+const peopleOf=c=>plain(c.s.run('state.people.map(p=>[p.thread_id,p.available])'));
+const reply=(c,id)=>c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:id,text:id}});
+test('An agent that leaves while its reply plays: it is heard to the end, kept 5 s more, then the conversation goes',async()=>{
+ const c=await callOnRoom();
+ c.s.run('LEAVE_GRACE_MS=40');
+ reply(c,'last');reply(c,'queued');
+ c.voice.said[0].step({type:'playing'});
+ agentLeaves(c);
+ await c.s.run('refresh()');await settleSoon();await c.s.run('refreshPeople()');await settleSoon();
+ assert.equal(c.voice.said[0].cancelled,false,'the reply is not cut');
+ assert.deepEqual(c.voice.stopped,[],'its call is not stopped');
+ assert.deepEqual(peopleOf(c),[['a',false]],'still on screen, as gone');
+ c.voice.said[0].step({type:'done',outcome:{status:'heard'}});
+ assert.deepEqual(c.voice.said.map(s=>s.text),['last','queued'],'the queued reply follows');
+ c.voice.said[1].step({type:'playing'});c.voice.said[1].step({type:'done',outcome:{status:'heard'}});
+ await settleSoon();
+ assert.deepEqual(peopleOf(c),[['a',false]],'kept after the playback ended');
+ await new Promise(resolve=>setTimeout(resolve,80));await settleSoon();
+ assert.deepEqual(peopleOf(c),[],'then removed');
+ assert.equal(c.s.run("links.get(callNode).closed.has('a')"),true);
+ c.s.run('disconnect()');
+});
+test('An agent that leaves when nothing of its sounds or waits: the conversation closes at once',async()=>{
+ const c=await callOnRoom();
+ agentLeaves(c);
+ await c.s.run('refresh()');await settleSoon();await c.s.run('refreshPeople()');await settleSoon();
+ assert.deepEqual(peopleOf(c),[]);
+ c.s.run('disconnect()');
+});
+test('Nothing can be sent to a conversation in its leave grace',async()=>{
+ const c=await callOnRoom();
+ c.s.run('LEAVE_GRACE_MS=40');
+ reply(c,'last');c.voice.said[0].step({type:'playing'});
+ c.s.run("viewedThread='fp-mac|a'");
+ assert.equal(c.s.run('composerFor()'),'fp-mac|a','it can be written to while its agent is there');
+ agentLeaves(c);
+ await c.s.run('refreshPeople()');await settleSoon();
+ assert.equal(c.s.run('isLeaving("a")'),true);
+ assert.equal(c.s.run('composerFor()'),null,'no text box for it');
+ c.s.run('disconnect()');
+});
+const withdrawn=(c,reason,ids=['last'])=>c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:ids,reason}});
+test('A person closing the conversation they are in (the room withdraws as closed) cuts the playing reply',async()=>{
+ const c=await callOnRoom();
+ reply(c,'last');c.voice.said[0].step({type:'playing'});
+ withdrawn(c,'closed');
+ assert.equal(c.voice.said[0].cancelled,true);
+ c.s.run('disconnect()');
+});
+test('Hanging up in a hold ends it: no timer is left to refresh the conversations',async()=>{
+ const c=await callOnRoom();
+ c.s.run('LEAVE_GRACE_MS=20');
+ reply(c,'last');c.voice.said[0].step({type:'playing'});
+ agentLeaves(c);
+ await c.s.run('refresh()');await settleSoon();await c.s.run('refreshPeople()');await settleSoon();
+ assert.equal(c.s.run('isLeaving("a")'),true);
+ c.s.run('disconnect()');
+ assert.equal(c.s.run("links.get('fp-mac').leaving.size"),0);
+ c.s.run('refreshPeople=async()=>{globalThis.__refreshed=true}');
+ c.voice.said[0].step({type:'done',outcome:{status:'heard'}});
+ await new Promise(resolve=>setTimeout(resolve,60));
+ assert.equal(c.s.run('globalThis.__refreshed'),undefined);
+});
+test('A conversation whose replies are still pending 60 s after the close is closed anyway',async()=>{
+ const c=await callOnRoom();
+ c.s.run('LEAVE_GRACE_MS=40;LEAVE_HOLD_MAX_MS=60');
+ reply(c,'last');c.voice.said[0].step({type:'playing'});
+ agentLeaves(c);
+ await c.s.run('refresh()');await settleSoon();await c.s.run('refreshPeople()');await settleSoon();
+ assert.deepEqual(peopleOf(c),[['a',false]]);
+ await new Promise(resolve=>setTimeout(resolve,120));await settleSoon();
+ assert.deepEqual(peopleOf(c),[],'the reply never ended, the conversation goes');
+ c.s.run('disconnect()');
+});
+
+// ----- Say one thing, and the host's global hold to talk -----
+function inCall(){
+ const s=setup();const voice=fakeVoice();s.context.__voice=voice;
+ s.run("voice=__voice;ws={};micEnabled=false;conversationCalls.set('test',{call:__voice})");
+ const mutes=()=>voice.calls.filter(call=>call[0]==='mute').map(call=>call[1]);
+ const turn=phase=>s.run("voiceTurn({turn_id:'t1',phase:'"+phase+"',started_at:1,text:'hi',ended_at:2})");
+ return {s,voice,mutes,turn};
+}
+test('Say one thing opens the microphone for one turn and mutes again when that turn is sent',()=>{
+ const {s,mutes,turn}=inCall();
+ s.run('window.sidevoiceActions.oneTurn()');
+ assert.equal(s.run('micEnabled'),true);assert.deepEqual(mutes().at(-1),false);
+ // Nothing said yet: the microphone stays open for the turn.
+ assert.equal(s.run('micEnabled'),true);
+ turn('started');assert.equal(s.run('micEnabled'),true,'open while the person speaks');
+ turn('finished');assert.equal(s.run('micEnabled'),false,'muted again once the turn is sent');
+ assert.equal(mutes().at(-1),true);
+ turn('started');turn('finished');assert.equal(s.run('micEnabled'),false,'the next turn is not the one turn');
+});
+test('Say one thing mutes again when the turn is cancelled',()=>{
+ const {s,turn}=inCall();
+ s.run('window.sidevoiceActions.oneTurn()');turn('started');turn('cancelled');
+ assert.equal(s.run('micEnabled'),false);
+});
+test('Say one thing pressed while open ends the turn, which sends what was said; with nothing said it mutes at once',()=>{
+ const {s,voice,turn}=inCall();
+ s.run('window.sidevoiceActions.oneTurn()');turn('started');
+ s.run("userTurn={id:'t1',segment:'s',thread:'test'}");
+ s.run('window.sidevoiceActions.oneTurn()');
+ assert.deepEqual(voice.calls.at(-1),['endInput']);assert.equal(s.run('micEnabled'),true,'muted when the turn is told, not before');
+ turn('finished');assert.equal(s.run('micEnabled'),false);
+ s.run('window.sidevoiceActions.oneTurn()');s.run('userTurn=null');
+ s.run('window.sidevoiceActions.oneTurn()');
+ assert.equal(s.run('micEnabled'),false,'nothing said: the second press closes it');
+});
+test('Say one thing with the microphone already open changes nothing, and outside a call does nothing',()=>{
+ const {s,mutes,turn}=inCall();
+ s.run('micEnabled=true');s.run('window.sidevoiceActions.oneTurn()');
+ assert.equal(s.run('micEnabled'),true);turn('started');turn('finished');
+ assert.equal(s.run('micEnabled'),true,'opened by the person: left to them');assert.deepEqual(mutes(),[]);
+ const out=setup();out.run('micEnabled=false');out.run('window.sidevoiceActions.oneTurn()');assert.equal(out.run('micEnabled'),false);
+});
+test('Muting by hand during Say one thing leaves the turn alone: it is not muted again, nor opened again',()=>{
+ const {s,turn}=inCall();
+ s.run('window.sidevoiceActions.oneTurn()');s.run('toggleMic()');
+ s.run('toggleMic()');turn('started');turn('finished');
+ assert.equal(s.run('micEnabled'),true,'the person opened it: it stays open');
+});
+test('Say one thing is its conversation\'s turn and its call\'s: another conversation\'s turn, live or late, neither takes it nor ends it',()=>{
+ const {s,mutes,turn}=inCall();
+ s.run('window.sidevoiceActions.oneTurn()');
+ const other=generation=>"{call:{id:'other'},node:null,thread_id:'elsewhere',generation:"+generation+"}";
+ const say=(phase,id,entry)=>s.run("voiceTurn({turn_id:'"+id+"',phase:'"+phase+"',started_at:1,text:'hi',ended_at:2},"+entry+")");
+ // A turn of another conversation starts and ends: the microphone stays open for the person.
+ say('started','o1',other('callGeneration'));say('finished','o1',other('callGeneration'));
+ assert.equal(s.run('micEnabled'),true,'another conversation\'s turn did not end it');
+ // A late turn of an earlier call.
+ say('started','o2',other('callGeneration-1'));say('finished','o2',other('callGeneration-1'));
+ assert.equal(s.run('micEnabled'),true,'a late turn of an older call did not end it');
+ // Its own conversation: a turn that starts is the one; another turn ending in between does not close it.
+ turn('started');say('finished','o1',other('callGeneration'));
+ assert.equal(s.run('micEnabled'),true,'open while its own turn goes on');
+ turn('finished');assert.equal(s.run('micEnabled'),false);assert.equal(mutes().at(-1),true);
+});
+test('Say one thing is tied to the call instance it was pressed on: a late turn of a call replaced by another neither takes it nor ends it',()=>{
+ const {s,voice,mutes}=inCall();
+ s.context.__key=s.run('targetId()');
+ voice.id='b';
+ // Call B is the conversation's call now; call A was replaced without its turns being cleared.
+ s.run("conversationCalls.set(__key,{call:__voice,node:state.callNode,thread_id:targetThread(),generation:callGeneration})");
+ s.run('window.sidevoiceActions.oneTurn()');
+ const say=(phase,id,call)=>s.run("voiceTurn({turn_id:'"+id+"',phase:'"+phase+"',started_at:1,text:'hi',ended_at:2},{call:{id:'"+call+"'},node:state.callNode,thread_id:targetThread(),generation:callGeneration})");
+ say('started','x1','a');say('finished','x1','a');
+ assert.equal(s.run('micEnabled'),true,'a late turn of call A did not end it');
+ say('started','x2','b');say('finished','x1','a');
+ assert.equal(s.run('micEnabled'),true,'nor did A end the turn B took');
+ say('finished','x2','b');
+ assert.equal(s.run('micEnabled'),false);assert.equal(mutes().at(-1),true);
+});
+test('The host holds to talk: it opens like Space, closes on holdEnd, and the page losing focus does not let go',()=>{
+ const {s,mutes}=inCall();
+ s.run('window.sidevoiceActions.holdStart()');assert.equal(s.run('micEnabled'),true);
+ s.handlers.blur();assert.equal(s.run('micEnabled'),true,'blur does not release the host hold');
+ s.run('window.sidevoiceActions.holdEnd()');assert.equal(s.run('micEnabled'),false);assert.equal(mutes().at(-1),true);
+ const out=setup();out.run('micEnabled=false');out.run('window.sidevoiceActions.holdStart()');assert.equal(out.run('micEnabled'),false,'no call: nothing is held');
+});
+test('The in-app hold key is the one in the table, read as it is pressed',()=>{
+ const {s}=inCall();
+ const key=(code,extra={})=>({code,target:new s.Element(),preventDefault(){},...extra});
+ s.run("localStorage.setItem('sidevoice.shortcuts',JSON.stringify({holdToTalk:{code:'KeyT',key:'T'}}))");
+ s.handlers.keydown(key('Space'));assert.equal(s.run('micEnabled'),false,'the old key is no longer it');
+ s.handlers.keydown(key('KeyT'));assert.equal(s.run('micEnabled'),true);
+ s.handlers.keyup(key('KeyT'));assert.equal(s.run('micEnabled'),false);
+ s.run("localStorage.setItem('sidevoice.shortcuts',JSON.stringify({holdToTalk:null}))");
+ s.handlers.keydown(key('Space'));s.handlers.keydown(key('KeyT'));assert.equal(s.run('micEnabled'),false,'cleared: no key holds');
+});
+
+// ----- the room no longer has this device in the call (core `room.browser_absent`) -----
+const absentAnswer=()=>({ok:false,status:409,json:async()=>({detail:{key:'room.browser_absent',message:'That browser is not in the call.'}})});
+test('Refused as absent from the call, the page rejoins on a new session, saying its own words and never the machine\'s',async()=>{
+ const c=await callOnRoom();const {s}=c,shown=[];
+ s.context.window.sidevoiceUI=new Proxy({setBootError:value=>shown.push(value)},{get:(ui,name)=>name in ui?ui[name]:()=>{}});
+ s.context.fetch=async()=>absentAnswer();
+ const error=await s.run("post('/api/presentation/text',{text:'hi'})").then(()=>null,e=>e);
+ assert.equal(error.message,'This device is no longer in the call. Joining again…');
+ assert.doesNotMatch(JSON.stringify(s.run('roomError')(error)),/browser/i);
+ assert.equal(s.run('state.reconnecting'),true,'the existing reconnect path is taken');
+ await c.until(()=>c.sockets.length===2,'a new socket');
+ assert.equal(c.frames(c.sockets[1]).find(f=>f.type==='client-ready')?.data.resume,undefined,'nothing of the lost session is resumed');
+ s.context.fetch=async path=>({ok:true,status:200,json:async()=>path.includes('/participants')?{participants:[{thread_id:'a',title:'A',available:true,reach:{state:'listening'},epoch:0}]}:{binding:{thread_id:'a',title:'A',binding_id:'b'},room:{revision:0},clients:[],call:null,messages:[]}});
+ await c.answer({session_id:'s2',resume:{token:'tok-b',seconds:60},resumed:false});
+ await c.until(()=>!s.run('state.reconnecting'),'back in the call');
+ assert.equal(s.run('state.sessionId'),'s2');
+ assert.equal(c.sockets.length,2,'one rejoin, no loop');
+ s.run('disconnect()');
+});
+test('A refusal of a request made under an earlier session, or while already rejoining, starts no rejoin',async()=>{
+ const c=await callOnRoom();const {s}=c;
+ s.context.fetch=async()=>absentAnswer();
+ const late=s.run("(()=>{const p=post('/api/presentation/text',{});sessionId='s-newer';return p})()");
+ const error=await late.then(()=>null,e=>e);
+ assert.equal(error.key,'room.browser_absent');
+ assert.equal(s.run('state.reconnecting'),false);
+ assert.equal(c.sockets.length,1);
+ s.run("sessionId='s1'");
+ await s.run("post('/api/presentation/text',{})").then(()=>null,()=>null);
+ assert.equal(s.run('state.reconnecting'),true);
+ await s.run("post('/api/presentation/text',{})").then(()=>null,()=>null);
+ await settleSoon();
+ assert.equal(c.sockets.length<=2,true,'a second refusal while rejoining adds no second rejoin');
+ s.run('disconnect()');
+});
+test('A rejoin that is itself refused for good ends the call with a failure in this page\'s words',async()=>{
+ const c=await callOnRoom();const {s}=c;
+ s.context.fetch=async()=>absentAnswer();
+ await s.run("post('/api/presentation/text',{})").then(()=>null,()=>null);
+ await c.until(()=>c.sockets.length===2,'a new socket');
+ const socket=c.sockets[1];socket.readyState=1;socket.onopen();
+ socket.onmessage({data:JSON.stringify({type:'error',data:{key:'room.browser_absent',message:'That browser is not in the call.'},seq:1,trace:{id:'t'}})});
+ socket.onclose({code:1008});
+ await c.until(()=>!s.run('state.reconnecting'),'rejoin over');
+ const view=s.run('roomStore.getState()');
+ assert.equal(view.facts?.joinFailure??s.run('state.joinFailure'),'This device is no longer in the call. Tap to join again.');
+ assert.equal(s.run('state.joinFailureDetails'),'','the machine\'s sentence is not shown, not even behind Details');
+ assert.equal(c.sockets.length,2,'no loop');
+ assert.equal(s.run('state.ws'),null);
+ s.run('disconnect()');
+});
+test('Absent-from-call refusals rejoin only for a page in a call, on its own session, and not twice',()=>{
+ const s=setup();const {shouldRejoin}=s.run('Refusals');
+ const page={inCall:true,sameSession:true,reconnecting:false};
+ assert.equal(shouldRejoin({key:'room.browser_absent'},page),true);
+ assert.equal(shouldRejoin({detail:'x',key:'room.turns_full'},page),false);
+ assert.equal(shouldRejoin('That browser is not in the call.',page),false,'a sentence with no key is no decision');
+ for(const off of ['inCall','sameSession'])assert.equal(shouldRejoin({key:'room.browser_absent'},{...page,[off]:false}),false,off);
+ assert.equal(shouldRejoin({key:'room.browser_absent'},{...page,reconnecting:true}),false);
+});
+test('A message refused as absent from the call rejoins, keeping its words for the new session instead of failing the call',async()=>{
+ const c=await callOnRoom();const {s,voice}=c;
+ voice.emit('turn',started('turn'));
+ const id=turnSent(c,c.first,'turn','started')[0].client_msg_id;
+ c.push(c.first,{type:'error',data:{client_msg_id:id,key:'room.browser_absent',message:'That browser is not in the call.'}});
+ assert.equal(s.run('state.reconnecting'),true);
+ await c.until(()=>c.sockets.length===2,'a new socket');
+ voice.emit('turn',finished('turn','words'));
+ const {socket}=await c.answer({session_id:'s2',resume:{token:'tok-b',seconds:60},resumed:false});
+ await c.until(()=>turnSent(c,socket,'turn','finished').length===1,'its words on the new session');
+ assert.equal(s.run('state.joinFailure'),'');
+ s.run('disconnect()');
+});
+
+// ----- ordered delivery with a backoff (web#534): the person's words reach the machine in order, all of them -----
+const said=(c,socket)=>sentOf(c,socket,'voice-user-turn').filter(d=>d.phase==='finished').map(d=>d.text);
+test('Turns said with no signal reach the machine in the order said, all of them, once the signal is back',async()=>{
+ const c=await callOnRoom();const {s,voice}=c;
+ c.drop(c.first);
+ await c.until(()=>c.sockets.length===2,'a reconnection socket');
+ // The garage: three turns, the last started after the second ended, none of them can go anywhere.
+ for(const [id,text] of [['g1','one'],['g2','two'],['g3','three']]){voice.emit('turn',started(id));voice.emit('turn',finished(id,text))}
+ assert.equal(s.run('outbox.list().length'),6,'all of them wait');
+ const {socket}=await c.answer({session_id:'s1',resume:{token:'new'},resumed:true});
+ await c.until(()=>!s.run('state.reconnecting'),'resumed');await settleSoon();
+ assert.deepEqual(plain(said(c,socket)),['one','two','three'],'in the order said');
+ assert.deepEqual(plain(sentOf(c,socket,'voice-user-turn').map(d=>d.phase[0]+d.turn_id)),['sg1','fg1','sg2','fg2','sg3','fg3'],'each start before its end, none overtaking');
+ for(const d of sentOf(c,socket,'voice-user-turn'))c.push(socket,{type:'voice-ack',data:{client_msg_id:d.client_msg_id}});
+ assert.equal(s.run('outbox.size'),0);
+ s.run('disconnect()');
+});
+test('A message nobody acknowledges is said again on the same socket after 1 s, 2 s, 5 s, 10 s and then every 15 s, oldest first',async()=>{
+ const fake=new Map();
+ const c=await callOnRoom({timers:(fn,ms,...rest)=>{if(ms>60000)return setTimeout(fn,ms,...rest);const handle={ms};fake.set(handle,fn);return handle},clearTimers:fake});
+ const {s,voice,first}=c;
+ let now=1_000_000;s.run('resendClock=()=>'+now);
+ const at=ms=>{now+=ms;s.run('resendClock=()=>'+now)};
+ const wake=()=>{const handle=s.run('resendTimer');assert.ok(handle,'a timer is armed');const fn=fake.get(handle);fake.delete(handle);fn()};
+ const baseline=fake.size;
+ voice.emit('turn',started('t1'));voice.emit('turn',finished('t1','first'));
+ const armed=()=>s.run('resendTimer')?.ms;
+ assert.equal(armed(),1000,'the first wait');
+ voice.emit('turn',started('t2'));voice.emit('turn',finished('t2','second'));
+ const count=()=>sentOf(c,first,'voice-user-turn').length;
+ assert.equal(count(),4);
+ // The timer is not early: woken before the delay is up, nothing is said again.
+ at(999);s.run('flushOutbox()');assert.equal(count(),4,'not before its time');
+ assert.equal(fake.size-baseline,1,'one timer for the whole outbox, however many entries wait');
+ at(1);wake();assert.equal(count(),8,'1 s: said again, the four of them');
+ assert.equal(fake.size-baseline,1,'and still one');
+ // The wait the page armed after each time it said them again: the schedule.
+ const waits=[];
+ for(let i=0;i<5;i++){const wait=armed();waits.push(wait);at(wait);wake()}
+ assert.deepEqual(plain(waits),[2000,5000,10000,15000,15000],'then 2 s, 5 s, 10 s, and every 15 s');
+ assert.equal(count(),28,'each time the four of them');
+ const sent=sentOf(c,first,'voice-user-turn').map(d=>d.phase[0]+d.turn_id);
+ assert.deepEqual(plain(sent.slice(0,4)),['st1','ft1','st2','ft2']);
+ assert.deepEqual(plain(sent.slice(4,8)),['st1','ft1','st2','ft2'],'said again from the oldest, in order');
+ assert.deepEqual(plain(sent.slice(24,28)),['st1','ft1','st2','ft2'],'and still in order at the end');
+ assert.equal(new Set(sentOf(c,first,'voice-user-turn').map(d=>d.client_msg_id)).size,4,'the same four messages, so the machine takes each once');
+ // An acknowledgement of the oldest lets go of it alone; the other keeps its turn.
+ const ids=sentOf(c,first,'voice-user-turn').slice(0,4).map(d=>d.client_msg_id);
+ c.push(first,{type:'voice-ack',data:{client_msg_id:ids[0]}});c.push(first,{type:'voice-ack',data:{client_msg_id:ids[1]}});
+ const before=count();at(60000);wake();
+ assert.deepEqual(plain(sentOf(c,first,'voice-user-turn').slice(before).map(d=>d.phase[0]+d.turn_id)),['st2','ft2'],'only what is still owed');
+ for(const id of ids.slice(2))c.push(first,{type:'voice-ack',data:{client_msg_id:id}});
+ assert.equal(s.run('outbox.size'),0);
+ assert.equal(s.run('resendTimer'),null,'nothing left to wake for');
+ assert.equal(fake.size-baseline,0,'and none left armed');
+ s.run('disconnect()');
+});
+test('A new socket sends what waits at once, without any backoff, and starts the count again',async()=>{
+ const c=await callOnRoom();const {s,voice,first}=c;
+ let now=5_000_000;s.run('resendClock=()=>'+now);
+ voice.emit('turn',started('h1'));voice.emit('turn',finished('h1','words'));
+ c.drop(first);
+ await c.until(()=>c.sockets.length===2,'a reconnection socket');
+ const {socket}=await c.answer({session_id:'s1',resume:{token:'new'},resumed:true});
+ await c.until(()=>!s.run('state.reconnecting'),'resumed');await settleSoon();
+ assert.equal(turnSent(c,socket,'h1','started').length,1,'at once on the new socket, without waiting for any backoff');
+ assert.equal(s.run('outbox.get(outbox.list()[0].id).sends'),1,'the count started again');
+ s.run('disconnect()');
+});
+test('A reload in the middle keeps what was said and sends it in order once the call is back',async()=>{
+ const rows=['k1','k2','k3'].map((id,i)=>({id:'kept-'+id,scope:'tab-1',kind:'user-turn',session_id:'old',node:PAIRED.fp,created:10+i,order:1+i,
+  payload:{type:'voice-user-turn',data:{turn_id:id,phase:'finished',text:'said '+id,started_at:1,ended_at:2,merged:false,timings_ms:{}}}}));
+ // Stored out of order: the outbox puts them back in the order said.
+ const kept=[rows[2],rows[0],rows[1]];
+ const store={put(){},delete(){},getAll(){const request={};setTimeout(()=>{request.result=kept;request.onsuccess?.()},0);return request}};
+ const db={createObjectStore(){},transaction:()=>({objectStore:()=>store})};
+ const indexedDB={open(){const request={};setTimeout(()=>{request.result=db;request.onsuccess?.()},0);return request}};
+ const c=await callOnRoom({indexedDB,outboxScope:'tab-1'});
+ await settleSoon();await settleSoon();
+ const turns=sentOf(c,c.first,'voice-user-turn');
+ assert.deepEqual(plain(turns.map(d=>d.text)),['said k1','said k2','said k3'],'in the order said, all of them');
+ assert.ok(turns.every(d=>d.offline===true),'as words said while away, the call that heard them being gone');
+ c.s.run('disconnect()');
+});
+
+test('An entry still held at the head does not keep a later one that was said from its retry',async()=>{
+ const fake=new Map();
+ const c=await callOnRoom({timers:(fn,ms,...rest)=>{if(ms>60000)return setTimeout(fn,ms,...rest);const handle={ms};fake.set(handle,fn);return handle},clearTimers:fake});
+ const {s,voice,first}=c;
+ let now=2_000_000;s.run('resendClock=()=>'+now);
+ s.run("relay.route=d=>d.turn_id==='held'&&d.phase==='finished'?{hold:true}:{send:d}");
+ voice.emit('turn',started('held'));voice.emit('turn',finished('held','words'));
+ voice.emit('turn',started('later'));
+ assert.equal(turnSent(c,first,'held','finished').length,0,'held, unsent');
+ assert.equal(turnSent(c,first,'later','started').length,1);
+ const handle=s.run('resendTimer');assert.ok(handle,'a timer is armed for the one that was said');
+ now+=5000;s.run('resendClock=()=>'+now);fake.get(handle)();
+ assert.equal(turnSent(c,first,'later','started').length,2,'and it is said again');
+ s.run('disconnect()');
+});
+test('A text and the turns are one order: a turn said after a text waits for it, and a text after a turn waits for its acknowledgement',async()=>{
+ const c=await callOnRoom();const {s,voice,first}=c;
+ const delivered=[];let release=null;
+ s.context.__deliver=entry=>{delivered.push(entry.payload.data.text);return new Promise(resolve=>{release=()=>resolve('sent')})};
+ s.run("deliverText=__deliver;refreshHistory=async()=>{}");
+ // A text first, still on its way (in flight); a turn said after it must not go over the socket meanwhile.
+ s.run("keepMessage('text','text',{thread:'a',text:'one'});flushOutbox()");
+ await settleSoon();
+ assert.deepEqual(plain(delivered),['one']);
+ voice.emit('turn',started('after'));voice.emit('turn',finished('after','spoken'));
+ assert.equal(sentOf(c,first,'voice-user-turn').length,0,'the turn waits behind the text');
+ release();await settleSoon();await settleSoon();
+ assert.deepEqual(plain(sentOf(c,first,'voice-user-turn').map(d=>d.phase)),['started','finished'],'once the text is taken, the turn goes');
+ // A text written after a turn that has not been acknowledged waits for the acknowledgement.
+ s.run("keepMessage('text','text',{thread:'a',text:'two'});flushOutbox()");
+ await settleSoon();
+ assert.deepEqual(plain(delivered),['one'],'not yet');
+ for(const d of sentOf(c,first,'voice-user-turn'))c.push(first,{type:'voice-ack',data:{client_msg_id:d.client_msg_id}});
+ await settleSoon();
+ assert.deepEqual(plain(delivered),['one','two'],'after the turns it follows');
+ release();await settleSoon();
+ s.run('disconnect()');
+});
+test('Nothing goes before the outbox is back from the reload: what was said now follows what was kept',async()=>{
+ let release=()=>{};
+ const kept={id:'kept-1',scope:'tab-1',kind:'user-turn',session_id:'old',node:PAIRED.fp,created:1,order:1,
+  payload:{type:'voice-user-turn',data:{turn_id:'k',phase:'finished',text:'before the reload',started_at:1,ended_at:2,merged:false,timings_ms:{}}}};
+ const store={put(){},delete(){},getAll(){const request={};release=()=>{request.result=[kept];request.onsuccess?.()};return request}};
+ const db={createObjectStore(){},transaction:()=>({objectStore:()=>store})};
+ const indexedDB={open(){const request={};setTimeout(()=>{request.result=db;request.onsuccess?.()},0);return request}};
+ const c=await callOnRoom({indexedDB,outboxScope:'tab-1'});
+ c.voice.emit('turn',started('now'));c.voice.emit('turn',finished('now','after the reload'));
+ assert.equal(sentOf(c,c.first,'voice-user-turn').length,0,'held until the kept ones are back');
+ release();await settleSoon();await settleSoon();
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-user-turn').filter(d=>d.phase==='finished').map(d=>d.text)),['before the reload','after the reload'],'in the order said');
+ c.s.run('disconnect()');
+});
+test('A text posted straight to the room, still on its way, is ahead of a turn said meanwhile',async()=>{
+ const c=await callOnRoom();const {s,voice,first}=c;
+ let finish=null;
+  s.context.fetch=async(path,options)=>{if(options?.method==='POST'&&path.includes('/api/presentation/text'))await new Promise(resolve=>{finish=resolve});return {ok:true,status:200,json:async()=>({messages:[],participants:[]})}};
+ s.run("outboxReady=true");
+ s.run("$('text-message').value='hello'");
+ const sending=s.dispatch('submit',{target:s.run("$('text-composer')")});
+ await settleSoon();
+ assert.ok(finish,'the text is on its way');
+ voice.emit('turn',started('meanwhile'));voice.emit('turn',finished('meanwhile','spoken'));
+ assert.equal(sentOf(c,first,'voice-user-turn').length,0,'the turn waits behind it');
+ finish();await sending;await settleSoon();
+ assert.deepEqual(plain(sentOf(c,first,'voice-user-turn').map(d=>d.phase)),['started','finished'],'and goes once the text is taken');
+ s.run('disconnect()');
+});
+test('A text the room refuses lets the turns behind it go at once',async()=>{
+ const c=await callOnRoom();const {s,voice,first}=c;
+ s.run("deliverText=async()=>'refused'");
+ s.run("keepMessage('text','text',{thread:'a',text:'no'})");
+ voice.emit('turn',started('behind'));voice.emit('turn',finished('behind','spoken'));
+ assert.equal(sentOf(c,first,'voice-user-turn').length,0,'behind the text');
+ s.run('flushOutbox()');await settleSoon();await settleSoon();
+ assert.deepEqual(plain(sentOf(c,first,'voice-user-turn').map(d=>d.phase)),['started','finished'],'the refused text is not a barrier any more');
+ s.run('disconnect()');
+});
+test('A turn let go of an older one that waited for another machine lets the text behind it go',async()=>{
+ const c=await callOnRoom();const {s}=c;
+ const delivered=[];
+ s.context.__deliver=async entry=>{delivered.push(entry.payload.data.text);return 'sent'};
+ s.run("deliverText=__deliver;refreshHistory=async()=>{}");
+ s.run("keepMessage('user-turn','voice-user-turn',{turn_id:'old',phase:'finished',text:'x',started_at:1,ended_at:2,merged:false,timings_ms:{}});outbox.list()[0].node='another-machine'");
+ s.run("keepMessage('text','text',{thread:'a',text:'after'})");
+ s.run('flushOutbox()');await settleSoon();await settleSoon();
+ assert.equal(s.run('outbox.list().some(e=>e.kind===\'user-turn\')'),false,'the stale turn is let go');
+ assert.deepEqual(plain(delivered),['after'],'and the text is not stuck behind it');
+ s.run('disconnect()');
+});
+test('A text posted straight to the room that hangs is stopped and retried from the queue, ahead of what was said after it; a hang-up lets go of it',async()=>{
+ const fake=new Map();
+ const c=await callOnRoom({timers:(fn,ms,...rest)=>{if(ms>60000)return setTimeout(fn,ms,...rest);const handle={ms};fake.set(handle,fn);return handle},clearTimers:fake});
+ const {s,voice,first}=c;
+ s.context.fetch=async(path,options)=>{if(options?.method==='POST'&&path.includes('/api/presentation/text'))await new Promise(()=>{});return {ok:true,status:200,json:async()=>({messages:[],participants:[]})}};
+ s.run("outboxReady=true");
+ s.run("$('text-message').value='hello'");
+ void s.dispatch('submit',{target:s.run("$('text-composer')")});
+ await settleSoon();
+ assert.equal(s.run('directBarrier.size'),1);
+ voice.emit('turn',started('w'));voice.emit('turn',finished('w','spoken'));
+ assert.equal(sentOf(c,first,'voice-user-turn').length,0,'behind the text');
+ const limit=s.run('DIRECT_TEXT_MS'),grace=s.run('DIRECT_ABORT_GRACE_MS');
+ const [handle,fn]=[...fake].find(([h])=>h.ms===limit);fake.delete(handle);fn();
+ // A request that ignores the abort: the barrier is let go a moment later all the same.
+ const [again,release]=[...fake].find(([h])=>h.ms===grace);fake.delete(again);release();
+ assert.equal(s.run('directBarrier.size'),0,'its request is let go');
+ assert.equal(sentOf(c,first,'voice-user-turn').length,0,'the turn still waits behind the text, which is the older message');
+ assert.equal(s.run("queuedTexts().length"),1,'and the text is kept to be tried again');
+ s.run("directBarrier.add({})");
+ s.run('disconnect()');
+ assert.equal(s.run('directBarrier.size'),0,'a hang-up lets go of them all');
+});
+test('A text the room did not take waits for its backoff, and an answer of an earlier socket arms nothing',async()=>{
+ const c=await callOnRoom();const {s}=c;
+ let calls=0,answer='later',hold=null;
+ s.context.__deliver=entry=>{calls++;return hold?new Promise(resolve=>{hold=resolve}):Promise.resolve(answer)};
+ s.run("deliverText=__deliver;refreshHistory=async()=>{}");
+ let now=9_000_000;s.run('resendClock=()=>'+now);
+ s.run("keepMessage('text','text',{thread:'a',text:'later'});flushOutbox()");
+ await settleSoon();await settleSoon();
+ assert.equal(calls,1);
+ s.run('flushOutbox()');s.run('flushOutbox()');await settleSoon();
+ assert.equal(calls,1,'any other flush before the backoff is up does not try again');
+ now+=5000;s.run('resendClock=()=>'+now);
+ s.run('flushOutbox()');await settleSoon();await settleSoon();
+ assert.equal(calls,2,'once it is up, it does');
+ // An answer that arrives after a new socket (or a leave) arms no timer of the old call.
+ s.run('resetTextBackoff()');hold=true;now+=60000;s.run('resendClock=()=>'+now);
+ s.run('flushOutbox()');await settleSoon();
+ assert.equal(calls,3,'in flight');
+ s.run('resetTextBackoff()');
+ hold("later");hold=null;
+ await settleSoon();
+ assert.equal(s.run('textTimer'),null,'nothing armed by the old answer');
+ s.run('disconnect()');
+});
+test('An entry that is due again but held behind its start does not make the retry timer spin',async()=>{
+ const fake=new Map();
+ const c=await callOnRoom({timers:(fn,ms,...rest)=>{if(ms>60000)return setTimeout(fn,ms,...rest);const handle={ms};fake.set(handle,fn);return handle},clearTimers:fake});
+ const {s,voice}=c;
+ let now=3_000_000;s.run('resendClock=()=>'+now);
+ voice.emit('turn',started('held'));voice.emit('turn',finished('held','words'));
+ // Said once; its start is then held by the room, so a resend cannot say its end.
+ s.run("relay.route=d=>d.turn_id==='held'&&d.phase==='finished'?{hold:true}:{send:d}");
+ now+=5000;s.run('resendClock=()=>'+now);
+ const handle=s.run('resendTimer');fake.get(handle)();
+ const next=s.run('resendTimer');
+ assert.ok(next&&next.ms>=100,'armed, and not for nothing at once');
+ assert.ok(s.run('outbox.list().every(e=>e.resendAt>'+now+')'),'every entry waits its next backoff');
+ s.run('disconnect()');
+});
+// ----- web#539: nothing silently lost, nothing left pending for ever -----
+test('A hang-up marks the rows of the turns it could not deliver as not sent, and a full outbox refuses the newest with the same mark',async()=>{
+ const c=await callOnRoom();const {s,voice}=c;
+ voice.emit('turn',started('gone'));voice.emit('turn',finished('gone','never arrived'));
+ assert.equal(s.run("history.find(r=>r.turn_id==='gone').delivery"),'pending');
+ // The outbox is full: a new text is refused, not an older message let go; its bubble says so.
+ s.run("for(let i=0;i<OUTBOX_LIMIT_FOR_TEST;i++)outbox.add({id:'fill'+i,kind:'playback',session_id:'s1',node:state.callNode,payload:{type:'voice-playback',data:{}}})".replace('OUTBOX_LIMIT_FOR_TEST',String(2000-s.run('outbox.size'))));
+ assert.equal(s.run('outbox.size'),2000);
+ const oldest=s.run('outbox.list()[0].id');
+ s.run("queueText('fp-mac|a','refused text')");
+ assert.equal(s.run("history.find(r=>r.text==='refused text').delivery"),'not_sent');
+ assert.equal(s.run('outbox.size'),2000,'nothing was let go to make room');
+ assert.equal(s.run('outbox.list()[0].id'),oldest);
+ s.run('disconnect()');
+ assert.equal(s.run("history.find(r=>r.turn_id==='gone').delivery"),'uncertain','said on a socket and never acknowledged: the room may have it');
+});
+test('A direct text that hangs is stopped after its time and kept in the queue under the id it had',async()=>{
+ const fake=new Map();
+ const c=await callOnRoom({timers:(fn,ms,...rest)=>{if(ms>60000)return setTimeout(fn,ms,...rest);const handle={ms};fake.set(handle,fn);return handle},clearTimers:fake});
+ const {s}=c;
+ let posted=null,aborted=false;
+ s.context.fetch=(path,options)=>{
+  if(options?.method==='POST'&&path.includes('/api/presentation/text')){posted=JSON.parse(options.body);return new Promise((_,reject)=>options.signal?.addEventListener('abort',()=>{aborted=true;reject(Object.assign(new Error('aborted'),{name:'AbortError'}))}))}
+  return Promise.resolve({ok:true,status:200,json:async()=>({messages:[],participants:[]})});
+ };
+ s.run("outboxReady=true");
+ s.run("$('text-message').value='slow words'");
+ const sending=s.dispatch('submit',{target:s.run("$('text-composer')")});
+ await settleSoon();
+ assert.ok(posted,'on its way');
+ const limit=s.run('DIRECT_TEXT_MS');
+ const [handle,fn]=[...fake].find(([h])=>h.ms===limit);fake.delete(handle);fn();
+ await sending;await settleSoon();
+ assert.equal(aborted,true,'the request was stopped');
+ assert.deepEqual(plain(s.run('queuedTexts().map(e=>[e.id,e.payload.data.text])')),[[posted.message_id,'slow words']],'queued under the same id, which the room takes once');
+ s.run('disconnect()');
+});
+test('The text retry waits 1 s, 2 s, 5 s, 10 s and then 15 s each time, and a new socket starts it again at 1 s',async()=>{
+ const c=await callOnRoom();const {s}=c;
+ let calls=0;
+ s.context.__deliver=()=>{calls++;return Promise.resolve('later')};
+ s.run("deliverText=__deliver;refreshHistory=async()=>{}");
+ let now=7_000_000;const clock=()=>s.run('resendClock=()=>'+now);clock();
+ const tick=async()=>{s.run('flushOutbox()');await settleSoon();await settleSoon()};
+ s.run("keepMessage('text','text',{thread:'a',text:'later'})");
+ const waits=[];
+ for(let i=0;i<6;i++){
+  await tick();
+  assert.equal(calls,i+1,'tried');
+  const wait=s.run('textDue')-now;waits.push(wait);
+  now+=wait-1;clock();await tick();
+  assert.equal(calls,i+1,'not a millisecond early');
+  now+=1;clock();
+ }
+ assert.deepEqual(plain(waits),[1000,2000,5000,10000,15000,15000]);
+ s.run('resetTextBackoff()');
+ await tick();
+ assert.equal(s.run('textDue')-now,1000,'a new socket starts again at 1 s');
+ s.run('disconnect()');
+});
+
+test('A provider with a key that is unreachable only until its first listing lands is read again in the background',async()=>{
+ const {s,engine}=settingsPage();
+ await engine.setCredential('elevenlabs','xi-1');
+ const listed=CATALOGS.find(c=>c.id==='elevenlabs');let reads=0;
+ const cold=CATALOGS.map(c=>c.id==='elevenlabs'?{...c,status:{stale:false,reason:{code:'provider-unreachable',params:{}}},models:[]}:c);
+ engine.catalogs=async()=>CATALOGS.length&&(++reads<3?cold:[...CATALOGS.filter(c=>c.id!=='elevenlabs'),{...listed,status:{stale:false},models:[{id:'eleven_flash_v2_5',family:'eleven',capabilities:['tts'],languages:['es'],voices:[],installed:true,builds:[]}]}]);
+ const waits=[],due=[];const realSetTimeout=s.context.setTimeout;s.context.setTimeout=(fn,ms,...rest)=>{if(ms>2000||ms<1000)return realSetTimeout(fn,ms,...rest);waits.push(ms);due.push(fn);return due.length};
+ s.run("$('settings-open').onclick()");
+ await settleSoon();
+ assert.equal(s.run('roomStore.getState().facts.voiceCatalogue.checking'),true,'the transient state is shown as checking');
+ for(let i=0;i<2;i++){due.shift()();await settleSoon()}
+ assert.equal(s.run('roomStore.getState().facts.voiceCatalogue.checking'),false);
+ assert.deepEqual(plain(s.run("voiceCatalogue.catalogs.find(c=>c.id==='elevenlabs').models.map(m=>m.id)")),['eleven_flash_v2_5']);
+ assert.deepEqual(waits,[1000,2000],'the pause grows');
 });

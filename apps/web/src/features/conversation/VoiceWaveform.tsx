@@ -22,8 +22,8 @@ const CELL = 5; // column pitch in CSS pixels
 const BAR = 3;
 const FLOOR = 2; // a silent column is still a line, never a gap
 
-/** The person's balloon on the stage draws long rows of fine bars, as a voice note (2026-10-15); the transcript's open
- *  turn wider, rounder bars on its pill (the soft cards, 2026-10-14); a settings try the fine ones its row is sized for. */
+/** The person's balloon draws long rows of bars, as a voice note (2026-10-15); a settings try the fine ones its row is sized for.
+ *  (The person's pill, wherever it shows, is TurnPill's five bars.) */
 export function waveformBrush(node: HTMLElement): { pitch: number; width: number } {
   if (node.closest(".person-turns")) return { pitch: 6, width: 3 };
   return node.closest(".call-layout") ? { pitch: 8, width: 5 } : { pitch: CELL, width: BAR };
@@ -71,7 +71,7 @@ function motionQuery(): MediaQueryList | null {
   return window.matchMedia?.("(prefers-reduced-motion: reduce)") ?? null;
 }
 
-function usePrefersReducedMotion(): boolean {
+export function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(() => !!motionQuery()?.matches);
   useEffect(() => {
     const query = motionQuery();
@@ -84,7 +84,9 @@ function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
-export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: () => number }) {
+/** `announce`: whether the bars are a live region of their own (the default). A caller that announces the turn itself
+ *  (TurnAnnouncer) passes false: the bars keep their label (an image's) and are no longer live. */
+export function VoiceWaveform({ phase, level, announce = true }: { phase: WaveformPhase; level?: () => number; announce?: boolean }) {
   const reduced = usePrefersReducedMotion();
   const bars = useRef<HTMLSpanElement>(null);
   const columns = useRef<number[]>([]);
@@ -119,7 +121,7 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
       if (longest !== middle) { middle = longest; node.style.setProperty("--mid", String(middle)); drawn.fill(NaN); }
       while (slots.length > capacity) { slots.pop()!.forEach((part) => part.remove()); drawn.pop(); }
       while (slots.length < capacity) {
-        // The ends are <i>, the middle a <u>: never a <b>, which the card's captions colour (call-card.css .caption-line b).
+        // The ends are <i>, the middle a <u>.
         const parts = [document.createElement("i"), document.createElement("i"), document.createElement("u")];
         node.append(...parts);
         slots.push(parts);
@@ -194,6 +196,7 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
 
   const t = translator();
   const label = { aria: t(LABELS[phase].aria), title: t(LABELS[phase].title) };
-  if (reduced) return <span className="voice-bars" data-phase={phase} role="status" aria-label={label.aria} title={label.title}><i /><i /><i /><i /><i /></span>;
-  return <span className="voice-wave" data-phase={phase} role="status" aria-label={label.aria} title={label.title}><span ref={bars} className="voice-wave-bars" aria-hidden="true" /></span>;
+  const role = announce ? "status" : "img";
+  if (reduced) return <span className="voice-bars" data-phase={phase} role={role} aria-label={label.aria} title={label.title}><i /><i /><i /><i /><i /></span>;
+  return <span className="voice-wave" data-phase={phase} role={role} aria-label={label.aria} title={label.title}><span ref={bars} className="voice-wave-bars" aria-hidden="true" /></span>;
 }

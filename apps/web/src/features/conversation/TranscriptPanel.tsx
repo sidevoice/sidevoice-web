@@ -3,8 +3,7 @@ import { useRoomStore } from "../../state/room-store";
 import { COMPACT_QUERY, NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { useSurface } from "../../lib/use-surface";
 import { useSheetDrag } from "../../lib/use-sheet-drag";
-import { Button } from "../../components/ui/Button";
-import { CloseIcon } from "../../components/ui/Icons";
+import { TranscriptCloseIcon, TranscriptLinesIcon } from "../../components/ui/Icons";
 import { Composer } from "./Composer";
 import { translator } from "../../i18n/translator";
 import { MessageList } from "./MessageList";
@@ -15,13 +14,13 @@ import "./transcript.css";
  * call that holds focus until it closes; a compact desktop window, with no room to dock it, opens it over the call from
  * the right, a dialog too (2026-10-15). It opens on the latest message, with the text box always under it. It stays
  * mounted while closed — the runtime binds the text box by its ids — and is inert then. On a phone the sheet is put
- * away by dragging it down too, by its grabber and title or by the messages scrolled to the top (lib/use-sheet-drag). */
+ * away by dragging it down too, by its grabber and title or by the messages scrolled to the top (lib/use-sheet-drag).
+ * Its head says only "Transcript", after the transcript's three lines (T58, T59): the conversation's name is the call's. */
 export function TranscriptPanel() {
   const t = translator();
   const conversation = useRoomStore((state) => state.conversation);
   // Admitted to the room (or getting the call back), not merely joining: selectInCall is true from the socket on.
   const inCall = useRoomStore((state) => !!(state.facts.sessionId || state.facts.reconnecting));
-  const title = useRoomStore((state) => state.title);
   const open = useCallLayout((state) => state.transcriptOpen);
   const close = useCallLayout((state) => state.closeTranscript);
   const narrow = useMedia(NARROW_QUERY);
@@ -41,8 +40,8 @@ export function TranscriptPanel() {
         role={modal ? "dialog" : undefined} aria-modal={modal || undefined} aria-label={t("transcript.title")}>
         <div className="transcript-grab" aria-hidden="true" />
         <header className="transcript-head">
-          <div className="transcript-heading"><strong>{t("transcript.title")}</strong><span id="transcript-title" title={title} translate="no">{title}</span></div>
-          <Button variant="ghost" tone="neutral" size="icon-sm" className="transcript-close" aria-label={t("transcript.close")} title={t("transcript.close")} onClick={close}><CloseIcon /></Button>
+          <h2 className="transcript-heading"><span className="transcript-title"><span className="transcript-icon" aria-hidden="true"><TranscriptLinesIcon /></span>{t("transcript.title")}</span></h2>
+          <button type="button" className="transcript-close" aria-label={t("transcript.close")} title={t("transcript.close")} onClick={close}><TranscriptCloseIcon /></button>
         </header>
         <MessageList conversation={conversation} visible={open} inCall={inCall} />
         <Composer narrow={narrow} />

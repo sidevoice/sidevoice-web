@@ -45,6 +45,7 @@ export function PagedText({ children, measure, onPages, follow, lines = 3, turn 
   const run = useRef<HTMLSpanElement>(null);
   const [layout, setLayout] = useState<Layout | null>(null);
   const [top, setTop] = useState(0);
+  const [, reflowed] = useState(0);
   // Once laid out: how many lines, and so how many pages.
   useLayoutEffect(() => {
     const node = box.current, inner = run.current;
@@ -75,6 +76,15 @@ export function PagedText({ children, measure, onPages, follow, lines = 3, turn 
     const next = window.setTimeout(() => setTop((now) => now + (turn === "page" ? lines : 1)), turn === "page" ? PAGE_MS : PAGE_MS / lines);
     return () => window.clearTimeout(next);
   }, [follow, top, layout, lines, turn]);
+  // The mark followed can move without a render here (LitText places it again when its words reflow: the stage's face
+  // arriving, a resize, a card popping in): the line is found again whenever it moves.
+  useLayoutEffect(() => {
+    const mark = follow && layout?.line ? run.current?.querySelector(follow) : null;
+    if (!mark || typeof MutationObserver === "undefined") return;
+    const moved = new MutationObserver(() => reflowed((n) => n + 1));
+    moved.observe(mark, { attributes: true, attributeFilter: ["style", "hidden", "data-line"] });
+    return () => moved.disconnect();
+  }, [follow, layout?.line, measure]);
   // With the voice: where the last word heard ends — back to the start when it is heard again from the start.
   useLayoutEffect(() => {
     if (!follow || !run.current || !layout?.line) return;
@@ -82,8 +92,13 @@ export function PagedText({ children, measure, onPages, follow, lines = 3, turn 
     if (!mark) return;
     const rects = mark.getClientRects();
     const last = (mark.textContent || mark.hasAttribute("data-mark")) && rects.length ? rects[rects.length - 1] : null;
-    // Measured from the run's own top: the transform moves the run and the words in it alike, mid-turn too.
-    const current = !last ? 0 : Math.floor((last.bottom - run.current.getBoundingClientRect().top - 1) / layout.line);
+    // Measured from the run's own top: the transform moves the run and the words in it alike, mid-turn too; divided by
+    // whatever scales the box on screen (a card popping in from .6: the design reference's turnPage), so the line is the
+    // same whenever it is measured.
+    // A mark that says its line (LitText's, measured on the words' client rects) is taken at its word.
+    const box = run.current.getBoundingClientRect(), scale = run.current.offsetHeight ? box.height / run.current.offsetHeight : 1;
+    const said = (mark as HTMLElement).dataset.line, own = said != null && said !== "" ? Number(said) : NaN;
+    const current = Number.isFinite(own) ? own : !last || !(scale > 0) ? 0 : Math.floor(((last.bottom - box.top) / scale - 1) / layout.line);
     const at = topFor(Math.max(0, Math.min(layout.total - 1, current)), layout.total, lines, turn, fixed);
     if (at !== top) setTop(at);
   });

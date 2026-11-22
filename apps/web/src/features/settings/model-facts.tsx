@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { ModelBuild } from "@sidevoice/engine";
 import type { Translate } from "../../i18n/translator";
 import { Badge } from "../../components/ui/Badge";
+import { WarningIcon } from "../../components/ui/Icons";
 import type { SelectOption } from "../../components/ui/Select";
 import { sizeText } from "./ModelSetup";
 
@@ -82,6 +83,18 @@ export function HardwareChip({ build, t }: { build: ModelBuild; t: Translate }) 
   return <Badge tone="accent" className="model-hardware"><HardwareText label={label} /></Badge>;
 }
 
+/** Whether `build` stops working once the app is in the background: the engine's word (`stopsInBackground`: it runs
+ *  here on a GPU the system stops serving to an app in the background — iOS — until sidevoice-engine#154 moves a model
+ *  to the CPU there). The page never asks which system it runs on; a page's own engine does not say, and nothing shows. */
+export const stopsInBackground = (build: ModelBuild) => (build as ModelBuild & { stopsInBackground?: boolean }).stopsInBackground === true;
+
+/** That `build` works only while the app is open, and that the CPU is what keeps working in the background
+ *  (sidevoice-web#572): beside where it runs in the spec sheet. Nothing for a build that keeps working. */
+export function BackgroundNotice({ build, t }: { build: ModelBuild; t: Translate }) {
+  if (!stopsInBackground(build)) return null;
+  return <span className="model-prepare-notice"><WarningIcon size={16} /><span>{t("runtime.stopsInBackground")}</span></span>;
+}
+
 /** Its engine and precision. */
 export const engineOf = (build: ModelBuild) => [ENGINES[build.backend] ?? build.backend, build.precision].filter(Boolean).join(" · ");
 
@@ -142,7 +155,7 @@ export function ModelSheet({ build, languages, notice, installed, state, footer,
   return <div className="model-prepare-sheet">
     <dl className="model-sheet">
       {languages && <><dt>{t("runtime.fact.languages")}</dt><dd className="model-sheet-languages"><span>{languages}</span>{notice}</dd></>}
-      {hardwareLabel(build, t) && <><dt>{t("runtime.fact.runsOn")}</dt><dd><HardwareChip build={build} t={t} /></dd></>}
+      {hardwareLabel(build, t) && <><dt>{t("runtime.fact.runsOn")}</dt><dd className="model-sheet-runs"><HardwareChip build={build} t={t} /><BackgroundNotice build={build} t={t} /></dd></>}
       {sizes && <><dt>{t("runtime.fact.size")}</dt><dd className="model-sheet-size">{sizes}</dd></>}
       <dt>{t("runtime.fact.status")}</dt>
       <dd><div className="model-sheet-state" role="status" aria-live="polite">{state}</div></dd>

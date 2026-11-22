@@ -8,7 +8,7 @@ import { RoomStoreContext } from "../../state/room-store";
 import { updaterFailure } from "../settings/error-message";
 import { translator, type Translate } from "../../i18n/translator";
 import { openSettings } from "../settings/open-settings";
-import { continueAfterRestart, UPDATE_PLACE, useUpdates } from "./useUpdates";
+import { UPDATE_PLACE, useUpdates } from "./useUpdates";
 import type { UpdaterStatus } from "../../host";
 import "./updates.css";
 
@@ -18,8 +18,8 @@ import "./updates.css";
  * computer's most pressing update and its action, then × — the desktop app's (manual: Version 0.4.0 available · Download once a check found one;
  * either mode, while it downloads: Sidevoice 0.4.0 · Downloading… · Cancel; automatic: nothing otherwise, it downloads by itself; once downloaded: Sidevoice 0.4.0 is ready · Restart to
  * update; nothing while the person's own check runs: appUpdateShown), the page's (Reload). Only this computer's: a
- * machine elsewhere that is behind is its row's in Settings › Updates, never the room's. This computer's service is
- * folded into the app's update (Updates' one Sidevoice row): it has no notice of its own. Restarting is only ever the
+ * machine elsewhere that is out of date has its page's notice in Settings, never the room's. This computer's service is
+ * updated by the app itself, in the background: it has no notice of its own. Restarting is only ever the
  * person's press. × hides it until a newer version, until the app says none waits, or until the app restarts. Never the
  * voice's colour, which is the agents' waiting. */
 
@@ -65,9 +65,7 @@ function noticeAction(notice: Notice, data: Notices, store: Parameters<typeof op
     const { state, error } = notice.status;
     if (state === "downloading") return { label: t("updates.action.cancelDownload"), run: () => appUpdate.cancel() };
     const downloadFailed = error?.code === "update-download-failed";
-    if (state === "ready" && appUpdate.can.restart) return { label: t("updates.notice.restart"),
-      // Sidevoice as one: its service follows the app's restart (continueAfterRestart).
-      run: async () => { continueAfterRestart(); await appUpdate.restart(); } };
+    if (state === "ready" && appUpdate.can.restart) return { label: t("updates.notice.restart"), run: () => appUpdate.restart() };
     if (state === "available" && appUpdate.can.download && (appUpdate.mode === "manual" || downloadFailed || appUpdate.cancelled)) return {
       label: t(downloadFailed ? "updates.action.retryDownload" : "updates.action.download"), run: () => appUpdate.download() };
   } else if (notice.kind === "web") return { label: t("updates.reload"), aria: t("updates.reloadNamed"), run: () => window.sidevoiceActions?.reloadToUpdate?.() };

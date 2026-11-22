@@ -19,6 +19,8 @@ export interface AppBuild {
   version: string;
   commit?: string | null;
   date?: string | null;
+  /** false: this host has no keys of the page's own to offer (a phone). Absent: it has, as ever. */
+  inApp?: boolean;
 }
 
 /* The page never asks which system it runs on (sidevoice-desktop#289, D-HOST-OS). What a system decides about the page's
@@ -33,6 +35,9 @@ export interface HostIdentity {
   deviceName(): string;
   /** The label of the modifier a shortcut is written with on this host: `⌘` or `Ctrl`. */
   readonly shortcutModifier: string;
+  /** Hands `onMap` what the keyboard layout types on each physical key (`BracketRight` → `+` on a Spanish layout) now and when
+   *  the layout changes, where the browser says (Chromium); nothing elsewhere. Answers how to stop. */
+  followKeyboardLayout(onMap: (map: { get(code: string): string | undefined }) => void): () => void;
 }
 
 /** The page's own microphone and Web Audio, begun in the Join gesture before models or chunks are awaited. */
@@ -105,8 +110,6 @@ export interface HostPresence {
   /** The app's own where it holds the screen itself (the mobile app: a phone's webview has no Screen Wake Lock that holds), else the
    *  page's. Null would be a host that decides for itself; none says so yet. */
   screenAwake: ScreenAwake | null;
-  /** Who holds it: the app (the desktop and mobile apps, through the platform), or the page (the browser's Screen Wake Lock). */
-  readonly screenAwakeBy: "app" | "page";
 }
 
 /** What a person is told when the microphone is blocked, as this host words it: for where the page runs (a browser's site
@@ -177,7 +180,8 @@ export interface LocalHostStatus {
   state: LocalHostStatusName;
   service?: "launchd" | "systemd" | "none";
   installed?: boolean;
-  core?: { pid?: number; version?: string; api?: number; launch_id?: string } | null;
+  /** `port`: the service's own TCP port, from its core's ready file — never the app's proxy's, which is another each launch. */
+  core?: { pid?: number; version?: string; api?: number; launch_id?: string; port?: number } | null;
   /** The installed Sidevoice's version — the `sidevoice` package, which bundles the core — as the person knows it.
    *  The one version the UI shows. */
   product_version?: string | null;
@@ -228,19 +232,23 @@ export interface LocalHostInstallOperation extends Promise<LocalHostStatus> {
   job: string;
 }
 
-export type LocalHostUpdateState = "available" | "current" | "newer-installed" | "incompatible" | "unknown";
+/** Where this device's service stands against the minor the app pins (`public/service.pin.json`): `available` an older
+ *  patch or minor, which the app updates in the background; `updating` while it does (`progress`); `waiting-call` held
+ *  until the call ends; `newer-installed` a minor above the pinned one, which the app never touches. */
+export type LocalHostUpdateState = "current" | "available" | "updating" | "waiting-call" | "newer-installed" | "incompatible" | "unknown";
 
-/** Build metadata stays opaque until desktop publishes the finalized R4-c metadata fields. */
-export interface LocalHostBuildMetadata {
-  [key: string]: unknown;
-}
-
+/** What `version()` says (sidevoice-desktop#67): `bundled.minor` the minor this page's build pins (none, `{}`, where the
+ *  bundled web has no `service.pin.json`); `installed.version` the installed service's `product_version`, none where
+ *  nothing is installed; `latest` the newest npm patch of the pinned minor, where known; `progress` 0 to 1 while
+ *  `update` is `updating`. A bridge may leave `latest` and `progress` out: nothing is said of them. */
 export interface LocalHostVersion {
   bridge: number;
-  bundled: LocalHostBuildMetadata;
-  installed: LocalHostBuildMetadata | null;
+  bundled: { minor?: string };
+  installed: { version: string } | null;
   core_api: number | null;
   update: LocalHostUpdateState;
+  latest?: string | null;
+  progress?: number | null;
 }
 
 export interface LocalHostBridge {
@@ -283,11 +291,14 @@ export interface ResetBridge {
 
 /** The app's global shortcut to mute the microphone (sidevoice-desktop, after #56): the accelerator set, how it reads,
  *  whether the system took it (`refused`: another app has it), others to pick instead, and whether it clashes with
- *  VoiceOver. `set` rejects `{ key: "shortcut_invalid" }` for one the app cannot register. */
+ *  VoiceOver. `set` rejects `{ key: "shortcut_invalid" }` for one the app cannot read, and `{ key: "shortcut_unsupported" }` for a key
+ *  this system cannot register as itself (the ISO `<>` key; the keypad's `=` and Enter on Windows and Linux). */
 export interface MuteShortcut {
   accelerator: string | null;
   label: string | null;
-  state: "on" | "off" | "refused";
+  /** `refused`: another app has it; `needsPermission`: it waits for a permission the system has not given (a single key
+   *  on macOS: Input Monitoring); `unavailable`: this system cannot take it. */
+  state: "on" | "off" | "refused" | "needsPermission" | "unavailable";
   alternatives: string[];
   voiceOver: boolean;
 }
@@ -295,6 +306,119 @@ export interface MuteShortcutBridge {
   get(): Promise<MuteShortcut>;
   set(accelerator: string | null): Promise<MuteShortcut>;
   subscribe?(listener: (shortcut: MuteShortcut) => void): () => void;
+}
+
+/** A global shortcut of the new `host.shortcuts` (desktop#447, GLOBAL_SHORTCUTS.md §7): today's mute shortcut, plus whether
+ *  the system itself owns it (`managedBySystem`: a Wayland portal) and what it clashes with, by name. A single key is an
+ *  accelerator too, with the trigger as a suffix: `"Fn:hold"`, `"RightAlt:tap"`, `"F13:double"`; the key is one of `Fn`,
+ *  `RightAlt`, `RightCommand`, `RightControl`, `F13`..., the trigger `:hold`, `:tap` or `:double`. */
+export interface GlobalShortcut extends MuteShortcut {
+  managedBySystem?: boolean;
+  conflictWith?: string;
+  /** Linux (X11): the key registers by the character the layout types on it, not by its position, so under a non-US layout it
+   *  may be another key, or none. A warning, not a refusal. */
+  layoutBound?: boolean;
+  /** Never chosen (or restored): it follows this system's default. Absent on an older host. */
+  isDefault?: boolean;
+  /** This system's default accelerator for the action; null: it has none. Absent on an older host. */
+  default?: string | null;
+  /** `state: "refused"`: another Sidevoice action holds the keys, or the system or another app does. Absent on an older host. */
+  refusal?: { reason: "duplicate"; action: ShortcutAction } | { reason: "taken" } | null;
+}
+/** Why a key pressed while recording was not taken: a left-hand modifier alone (macOS), or a modifier or Fn alone (Windows, Linux). */
+export type RecordHint = "leftModifier" | "loneModifier";
+export type ShortcutAction = "mute" | "holdToTalk" | "oneTurn";
+export type HeadsetPress = "mute" | "oneTurn" | "skip" | "none";
+export interface HeadsetStatus {
+  press: HeadsetPress;
+  /** null: this headset cannot send a double press. */
+  doublePress: HeadsetPress | null;
+  outsideCall: "leave" | "join";
+  /** The system's call holds the headset (CallKit, Telecom): the system mutes, and the choices are not the app's to make; the page
+   *  shows the rows read-only. Absent: they are. */
+  managedBySystem?: boolean;
+  /** Choosing anything but the defaults adds a playback card to the lock screen (iOS, beside the Live Activity); the page says so.
+   *  Reported by older iOS builds only. */
+  nonDefaultAddsCard?: boolean;
+  /** What each press can do on this host: the page offers only these, and a press with one action is a line, not a choice (an
+   *  iPhone: the system's mute alone). Absent, or a press absent from it: every action, as an older host reports. Whether the double
+   *  press reaches the app at all is `doublePress` (`null`: no row). */
+  actions?: { press?: HeadsetPress[]; doublePress?: HeadsetPress[] };
+}
+export interface ShortcutsStatus {
+  /** The global shortcuts this host offers, by action. An action it does not offer is absent, and none at all (`{}`) is no group:
+   *  a phone, whose only shortcuts are the headset's presses. */
+  shortcuts: Partial<Record<ShortcutAction, GlobalShortcut>>;
+  /** What the system must allow for single keys (`inputMonitoring`, macOS) or for the shortcuts at all (`portal`, Linux). */
+  permission: { kind: "inputMonitoring" | "portal"; state: "granted" | "notAsked" | "denied" } | null;
+  /** null: no headset path on this host. */
+  headset: HeadsetStatus | null;
+  /** false: this host has no keys of the page's own to offer (a phone). Absent: it has, as ever. */
+  inApp?: boolean;
+}
+export interface ShortcutsBridge {
+  get(): Promise<ShortcutsStatus>;
+  /** Rejects `{ key: "shortcut_invalid" }` for an accelerator the app cannot register. */
+  set?(action: ShortcutAction, accelerator: string | null): Promise<GlobalShortcut>;
+  /** Back to this system's default, as if never chosen. Absent on an older host. */
+  restore?(action: ShortcutAction): Promise<GlobalShortcut>;
+  subscribe?(listener: (status: ShortcutsStatus) => void): () => void;
+  /** Asks the system for the permission, only now. */
+  request?(permission: "inputMonitoring" | "portal"): Promise<ShortcutsStatus>;
+  setHeadset?(partial: Partial<HeadsetStatus>): Promise<ShortcutsStatus>;
+  /** The app captures the next key itself (Fn included, which a page cannot see): resolves with the accelerator, null on Esc;
+   *  rejects `{ key: "record_timeout" }` after 15 s with no key. `onHint` says why a key was ignored while it goes on. */
+  record?(action: ShortcutAction, onHint?: (hint: RecordHint) => void): Promise<string | null>;
+}
+
+/** What the app does to other apps' media while the microphone is open or the agent is speaking in a call (sidevoice-desktop
+ *  `host.mediaDuck`): the person's choice, and how far this system can carry it out. `lower`: `per-app` (any app, one by
+ *  one), `some-apps` (only named apps: Music and Spotify on a Mac without System Audio Recording) or `none`; `pause`:
+ *  `media-controls`, `some-apps` or `none`. The app restores only what it took. */
+export type MediaDuckMode = "lower" | "pause" | "off";
+/** How far Lower goes: `half` (50 % of the app's volume), `quarter` (25 %, the default) or `mute` (silent). */
+export type MediaDuckLevel = "half" | "quarter" | "mute";
+/** The permissions the status reports, as the page asks for one: `capture` (macOS System Audio Recording, lowering any
+ *  app) and `automation` (macOS Automation, controlling Music and Spotify). */
+export type MediaDuckPermission = "capture" | "automation";
+/** `restart` (System Audio Recording only): allowed, but the running app cannot see it until it is restarted. */
+export type MediaDuckAccess = "granted" | "denied" | "undetermined" | "unknown" | "restart";
+export interface MediaDuckStatus {
+  mode: MediaDuckMode;
+  /** How far Lower goes; absent from an app that has no level to choose. */
+  level?: MediaDuckLevel;
+  lower: "per-app" | "some-apps" | "none";
+  pause: "media-controls" | "some-apps" | "none";
+  /** Whether the system lets the app control the named apps it lowers or pauses (macOS Automation of Music and Spotify);
+   *  absent where nothing has to be allowed for that. `denied` is the person's no; `unknown`: the system answers only with
+   *  one of the apps open, and none is. */
+  access?: MediaDuckAccess;
+  /** Whether the system lets the app lower any app on its own (macOS 14.4 and later: System Audio Recording); absent where
+   *  there is no such permission. `unknown`: the app could not ask. `restart`: allowed, applied by `restart()`. */
+  capture?: MediaDuckAccess;
+}
+/** The phone's text size, as a multiple of its default (sidevoice-desktop `host.textScale`: iOS Dynamic Type, Android font
+ *  scale; 1 is the default). Only an app whose WebView does not follow it by itself offers this (an Android WebView keeps
+ *  `textZoom` at 100); the page clamps the value (lib/text-scale.ts). `subscribe` calls back when the person changes it. */
+export interface TextScaleBridge {
+  get(): number;
+  subscribe?(listener: (scale: number) => void): () => void;
+}
+
+export interface MediaDuckBridge {
+  get(): Promise<MediaDuckStatus>;
+  /** The person's own request, from the list of permissions, to let the app do what `permission` names: the system may
+   *  ask now. Never called by the page on its own. */
+  allow?(permission: MediaDuckPermission): Promise<MediaDuckStatus>;
+  /** The system's page where the person turns `permission` back on (macOS). */
+  openSettings?(permission: MediaDuckPermission): Promise<MediaDuckStatus>;
+  /** Quits and reopens the app so an allowed permission applies (`capture` is `restart`). Rejects with the key
+   *  `media_duck.restart-in-call` while a call is joined, `media_duck.restart-not-needed` when none is due. Absent from
+   *  an app that cannot: the page then only says to restart. */
+  restart?(): Promise<MediaDuckStatus>;
+  set(mode: MediaDuckMode): Promise<MediaDuckStatus>;
+  /** How far Lower goes; applied at once while lowered. Absent from an app that has no level to choose. */
+  setLevel?(level: MediaDuckLevel): Promise<MediaDuckStatus>;
 }
 
 /** The app's floating card, as the app keeps it: whether it shows always or only while the app is minimised; and
@@ -344,17 +468,20 @@ export interface AppUpdater {
 }
 
 /** What the app's debugging seam can switch: Safari's Web Inspector on its web views, WebKit's compositing borders (each
- *  layer the GPU draws) and its repaint counters (how often the CPU repainted each layer). */
-export type DebugSwitch = "inspectable" | "compositingBorders" | "repaintCounters";
+ *  layer the GPU draws) and its repaint counters (how often the CPU repainted each layer) on the desktop; on a phone,
+ *  whether the call is a call of the system's (CallKit, Telecom: sidevoice-desktop #393). */
+export type DebugSwitch = "inspectable" | "compositingBorders" | "repaintCounters" | "systemCall";
 /** The app's debugging seam (`host.debug`, sidevoice-desktop #168), present only in a nightly or a development build.
  *  `available` is the switches this platform has (all three on macOS, none elsewhere): the page shows only those. Each
  *  switch is a live getter, so it is read when it is needed, and again once `set` resolves, for what took. A rejection
  *  means the app did not change it. */
 export interface HostDebugBridge {
   readonly available: readonly DebugSwitch[];
-  readonly inspectable: boolean;
-  readonly compositingBorders: boolean;
-  readonly repaintCounters: boolean;
+  /** Each switch is read only when `available` lists it: the desktop has the first three, a phone `systemCall`. */
+  readonly inspectable?: boolean;
+  readonly compositingBorders?: boolean;
+  readonly repaintCounters?: boolean;
+  readonly systemCall?: boolean;
   set(name: DebugSwitch, on: boolean): Promise<void>;
 }
 
@@ -363,6 +490,88 @@ export interface HostDebugBridge {
  *  (i18n/translator.ts); a key the catalogue no longer has is simply never read. */
 export type MessageOverlay = Readonly<Record<string, string>>;
 /* A value of the host's table that is not a non-empty string is not a text: the translator skips it. */
+
+/** A creature's PNG, handed to the host once per `id` (state/call-surface.d.ts SurfaceStillRef): `png` is base64 with no
+ *  prefix, `px` its width and height. */
+export interface CallSurfaceStill { id: string; png: string; px: number }
+
+/** The app's native call surface (the phone's Lock Screen card, Dynamic Island, ongoing notification): it reads the
+ *  room's `callSurface` (state/call-surface.d.ts) from the store, and the page publishes what costs it work only while
+ *  `active()`. The creatures' stills go by reference: the snapshot carries `{ id, k }`, and the bytes cross here, once per
+ *  id and always before the snapshot that names it; the host keeps them by id until `forget`. An app without a surface
+ *  offers none, and the page does none of that. */
+export interface CallSurfaceBridge {
+  active(): boolean;
+  still(still: CallSurfaceStill): void;
+  /** Ids the page no longer shows (a conversation removed, or left the faces) or every id when the surface closes. */
+  forget(ids: string[]): void;
+}
+
+/** The system's own picker for where the call's audio plays (`host.audioRoute`; iOS's route sheet: speaker, car, AirPods, AirPlay).
+ *  An app cannot choose an arbitrary output there, only the system can, so where the app can open that sheet it offers this and
+ *  the page shows a button of its own that calls `open()`. The sheet is the system's (its look, its choice): the call's audio
+ *  follows the route. Rejects with the app's refusal (`{key, code}`) when it cannot be shown. The button is labelled with where the
+ *  audio plays now: `current()` is that output's name as the system gives it (`null` when it names none; never rejects) and
+ *  `subscribe` is told each new name as the route changes (it says nothing on subscribing) and returns the unsubscribe.
+ *  Offered after a reply of the app's own, so a page looks again for a while (`onHostMember("audioRoute", …)`). */
+export interface AudioRouteBridge {
+  open(): Promise<void>;
+  current(): Promise<string | null>;
+  subscribe(listener: (name: string | null) => void): () => void;
+}
+
+/** The app's own sound for the cues the page decides on (`host.cue`): the page says when, the app plays it through the
+ *  audio session its call already owns, where a webview's Web Audio is not sure to come out (a phone's native call session,
+ *  sidevoice-web#439). `thinking` is the sound that says the agent works. `start` and `stop` are idempotent. An app
+ *  without it leaves the page to play the cue in its own Web Audio. */
+export type CueName = "thinking";
+/** Which thinking sound a start plays, how loud and how often (services/thinking-sounds.ts): `sound`, an id of the manifest
+ *  the app bundles with the web; `gainDb`, the person's offset from its level; `intervalScale`, the person's frequency, a
+ *  factor from 0.5 to 3 on the silence after each play (drawn in the sound's `interval`; 1: its own cadence). Without them,
+ *  the default sound at its level and cadence; an app before the frequency plays the sound's own cadence. `whileLocked`:
+ *  the app holds the cue and plays it only while the screen is locked, starting and stopping it itself at lock and unlock
+ *  (a page may be suspended once the screen locks, and could not start it then); none, it plays at once. */
+export interface CueOptions { sound?: string; gainDb?: number; intervalScale?: number; whileLocked?: boolean }
+export interface CueBridge {
+  /** A start while the cue plays changes nothing with the same options, and plays the new ones instead with others. */
+  start(cue: CueName, options?: CueOptions): void;
+  stop(cue: CueName): void;
+  /** The options `start` honours, by name (`sound`, `gainDb`, `intervalScale`, `whileLocked`). An app before them has
+   *  none: its start plays a sound of its own, whatever is asked, and the page plays the chosen one itself instead. The
+   *  frequency is sent whether or not it is listed: an app before it plays the sound's own cadence, which the page has
+   *  nothing better than. `whileLocked` is sent only to an app that lists it: one before it would play at once. */
+  readonly options?: readonly string[];
+}
+
+/** What the app says of the person's screen (`host.screen`), where the system tells it: whether it is locked now. A page
+ *  without it reads the screen as the browser says it (the page shown or not), except in an app that shows the call in a
+ *  card of its own (`callControls`), where a hidden page is not a screen off. */
+export interface ScreenBridge {
+  locked(): Promise<boolean>;
+}
+
+/** What happens when something fails (Settings → Crash reports): send a crash report automatically, the default, or never. */
+export type CrashReportsMode = "auto" | "never";
+/** The app's crash reports (Sentry), offered only by an app that sends them. The setting is the app's, not the page's: the app
+ *  keeps the choice, holds to it before any page has loaded and sends nothing after `never`, queued reports included; the page
+ *  keeps no copy and never tells the app a value it did not just get from the person (a page that lost its own storage must
+ *  not turn sending back on).
+ *  - `get` is what the app holds now (`auto` until the person says otherwise); the page reads it whenever Settings or the
+ *    notice shows, and shows only what it answers.
+ *  - `set` is the person's choice, idempotent; a rejection means the app did not take it: the page puts the choice back as it
+ *    was and says so.
+ *  - `subscribe`, where the choice can change elsewhere (the app's own menu), is told each new mode as it changes (nothing on
+ *    subscribing) and returns the unsubscribe; without it the page reads again each time Settings or the notice mounts.
+ *  A browser sends no crash reports and offers none, so neither the section nor the notice about them is there. An app may
+ *  offer it only after a reply of its own: the page looks again for a while (`onHostMember("crashReports", …)`). */
+export interface CrashReportsBridge {
+  get(): Promise<CrashReportsMode> | CrashReportsMode;
+  set(mode: CrashReportsMode): Promise<void>;
+  subscribe?(listener: (mode: CrashReportsMode) => void): () => void;
+  /** The id this install reports under, for the preview of what a report holds: null under `never` (none is created, and a
+   *  created one is forgotten). Optional: an app before it has none, and the preview then shows a placeholder. */
+  installId?(): Promise<{ installId: string } | null>;
+}
 
 export interface Host {
   identity: HostIdentity;
@@ -374,11 +583,30 @@ export interface Host {
   voice: VoiceMember;
   presence: HostPresence;
   storage: HostStorage;
+  /** One tab at a time for a named piece of work across this site's tabs (the browser's Web Locks); see `exclusively`. */
+  /** The size in px of the platform's body text where it follows the person's text size and the page can measure it (iOS
+   *  WebKit's `-apple-system-body`: 17 at the default size); null elsewhere. lib/text-scale.ts turns it into a scale. */
+  systemTextSize(): number | null;
+  exclusive<T>(name: string, run: () => T | Promise<T>, options?: { ifAvailable?: boolean }): Promise<T | undefined>;
   reach: ReachTransport;
   localHost: LocalHostBridge | null;
   reset: ResetBridge | null;
   muteShortcut: MuteShortcutBridge | null;
+  /** The global shortcuts and the headset's buttons (supersedes `muteShortcut`, which stays for an app without it). */
+  shortcuts: ShortcutsBridge | null;
+  mediaDuck: MediaDuckBridge | null;
+  /** The phone's text scale, when the app reports it; null where the page reads it itself (lib/text-scale.ts) or there is none. */
+  textScale: TextScaleBridge | null;
   callControls: CallControlsBridge | null;
+  callSurface: CallSurfaceBridge | null;
+  /** The app's own player for the page's cues; null where the page plays them itself. */
+  cue: CueBridge | null;
+  /** The system's output picker, opened from the page's own button; null where the host has none (a browser, Android). */
+  audioRoute: AudioRouteBridge | null;
+  /** Whether the person's screen is locked, from the app; null where it does not say. */
+  screen: ScreenBridge | null;
   updater: AppUpdater | null;
   debug: HostDebugBridge | null;
+  /** The app's crash reports setting (the app owns it); null where the host sends none (a browser). */
+  crashReports: CrashReportsBridge | null;
 }

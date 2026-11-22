@@ -15,7 +15,7 @@ import type { LocalHostStatus, LocalHostVersion } from "../../host";
 vi.mock("../../services/room-session-controller.js", () => ({}));
 afterEach(() => {
   cleanup();
-  for (const key of ["sidevoice.variants", "sidevoice.settings", "sidevoice.updates-checked-at", "sidevoice.update-continue"]) localStorage.removeItem(key);
+  for (const key of ["sidevoice.variants", "sidevoice.settings", "sidevoice.updates-checked-at"]) localStorage.removeItem(key);
   // What × hid is this test's window's.
   sessionStorage.removeItem("sidevoice.update-notice-hidden");
   delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost;
@@ -35,8 +35,8 @@ afterEach(() => {
 const local: PairingSummary = { fp: "fp-local", host: "MacBook", local: true, urls: ["http://127.0.0.1:45781"], device_id: "d-local", paired_at: 1_700_000_000, revoked: false };
 const lab: PairingSummary = { fp: "fp-lab", host: "Lab box", urls: ["https://lab.example"], device_id: "d-lab", paired_at: 1_700_000_100, revoked: false };
 const running: LocalHostStatus = { state: "running", reachable: true, installed: true, service: "launchd", core: { version: "0.8.1", api: 1 }, calls: 0, product_version: "0.8.1" };
-const BEHIND: LocalHostVersion = { bridge: 3, bundled: { version: "0.9.0" }, installed: { version: "0.8.1" }, core_api: 1, update: "available" };
-const CURRENT: LocalHostVersion = { ...BEHIND, bundled: { version: "0.8.1" }, update: "current" };
+const BEHIND: LocalHostVersion = { bridge: 3, bundled: { minor: "0.20" }, installed: { version: "0.8.1" }, core_api: 1, update: "available", latest: "0.20.2", progress: null };
+const CURRENT: LocalHostVersion = { ...BEHIND, update: "current" };
 const FOUND: UpdaterStatus = { state: "available", version: "0.4.0" };
 const READY: UpdaterStatus = { state: "ready", version: "0.4.0" };
 /** What a page may still have stored for the update-notice variant, now gone: none of it changes anything. */
@@ -127,7 +127,7 @@ test("manual, whatever update-notice value is stored: nothing by itself; once a 
   }
 });
 
-test("automatic, whatever update-notice value is stored: nothing while the app's update is found, Cancel while it downloads by itself; once downloaded, Sidevoice 0.4.0 is ready · Restart to update, which restarts and has the service follow", async () => {
+test("automatic, whatever update-notice value is stored: nothing while the app's update is found, Cancel while it downloads by itself; once downloaded, Sidevoice 0.4.0 is ready · Restart to update, which restarts", async () => {
   for (const picked of STALE) {
     const { fake } = room({ updater: { mode: "automatic", status: FOUND }, notice: picked });
     await settle();
@@ -139,8 +139,6 @@ test("automatic, whatever update-notice value is stored: nothing while the app's
     expect(where()).toBe("title");
     await act(async () => { fireEvent.click(action()); });
     expect(fake.updater.restart).toHaveBeenCalledTimes(1);
-    // Sidevoice as one: the app's restart asks its service to follow.
-    expect(Number(localStorage.getItem("sidevoice.update-continue"))).toBeGreaterThan(0);
     cleanup();
   }
 });
@@ -199,7 +197,7 @@ test("×: hidden until a newer version, not as the same one moves on; focus goes
 
 test("× hides the update it says; the next one waiting shows in its place — the page's Reload; a remote machine's never", async () => {
   const { reloadToUpdate } = room({ updater: { mode: "manual", status: READY }, facts: { webUpdate: "b2" },
-    remote: { [lab.fp]: { state: "connected", checkedAt: 1, version: "0.4.0", update: { latest: "0.5.0", command: "x" } } } });
+    remote: { [lab.fp]: { state: "connected", checkedAt: 1, version: "0.19.2" } } });
   await waitFor(() => expect(said()).toBe("Sidevoice 0.4.0 is ready · Restart to update"));
   await act(async () => { fireEvent.click(hide()); });
   await waitFor(() => expect(said()).toBe("A new version of Sidevoice is ready · Reload"));
@@ -213,35 +211,35 @@ test("× hides the update it says; the next one waiting shows in its place — t
   expect(document.querySelector(".update-notice")).toBeNull();
 });
 
-test("a remote machine behind, alone: no notice, with or without a conversation on the stage — its row in Settings › Updates says it, with its command", async () => {
+test("a remote machine out of date, alone: no notice, with or without a conversation on the stage — its row in Settings › Updates says it", async () => {
   for (const picked of STALE) for (const stage of [true, false]) {
     room({ notice: picked, stage, facts: { settingsSection: "updates" },
-      remote: { [lab.fp]: { state: "connected", checkedAt: 1, version: "0.4.0", update: { latest: "0.5.0", command: "npx sidevoice@latest install" } } } });
-    const row = await waitFor(() => { const found = document.getElementById("updates-machine-fp-lab"); expect(found).not.toBeNull(); return found!; });
+      remote: { [lab.fp]: { state: "connected", checkedAt: 1, version: "0.19.2" } } });
+    const row = await waitFor(() => { const found = document.querySelector<HTMLElement>("#pane-updates [data-machine-row]:not([data-machine-row=local])"); expect(found).not.toBeNull(); return found!; });
     expect(row).toHaveTextContent("Lab box");
-    expect(row).toHaveTextContent("npx sidevoice@latest install");
+    expect(row).toHaveTextContent("Out of date");
     await settle();
     expect(document.querySelector(".update-notice")).toBeNull();
     cleanup();
   }
 });
 
-test("this computer's service behind the one the app bundles: no notice of its own — folded into Sidevoice's row in Settings › Updates; with a remote machine behind too, still none", async () => {
+test("this computer's service out of date: no notice of its own — the app updates it by itself, and its card says where it stands; with a remote machine out of date too, still none", async () => {
   for (const picked of STALE) {
     room({ service: BEHIND, notice: picked, facts: { settingsSection: "updates" } });
-    await waitFor(() => expect(within(document.getElementById("pane-updates")!).getByRole("button", { name: "Update Sidevoice", hidden: true })).toBeInTheDocument());
+    await waitFor(() => expect(document.querySelector("#pane-updates [data-machine-row=local]")).toHaveTextContent("Out of date"));
     await settle();
     expect(document.querySelector(".update-notice")).toBeNull();
+    expect(within(document.getElementById("pane-updates")!).queryByRole("button", { name: /Update Sidevoice/, hidden: true })).toBeNull();
     cleanup();
   }
-  room({ service: BEHIND, remote: { [lab.fp]: { state: "connected", checkedAt: 1, version: "0.4.0", update: { latest: "0.5.0", command: "x" } } } });
-  await waitFor(() => expect(document.getElementById("updates-machine-fp-lab") ?? document.querySelector(".call-stage")).not.toBeNull());
+  room({ service: BEHIND, remote: { [lab.fp]: { state: "connected", checkedAt: 1, version: "0.19.2" } } });
   await settle();
   expect(document.querySelector(".update-notice")).toBeNull();
 });
 
 test("this computer's app update shows next to a remote machine behind: the app's, never the machine's", async () => {
-  room({ updater: { mode: "manual", status: FOUND }, service: BEHIND, remote: { [lab.fp]: { state: "connected", checkedAt: 1, version: "0.4.0", update: { latest: "0.5.0", command: "x" } } } });
+  room({ updater: { mode: "manual", status: FOUND }, service: BEHIND, remote: { [lab.fp]: { state: "connected", checkedAt: 1, version: "0.19.2" } } });
   await waitFor(() => expect(said()).toBe("Version 0.4.0 available · Download"));
   await act(async () => { fireEvent.click(hide()); });
   await gone();

@@ -180,19 +180,20 @@ export function DownloadedModels() {
   );
 }
 
-/** How long a downloaded model nobody uses is kept before it is deleted: never by default — downloads are costly. */
+/** How long a downloaded model nobody uses is kept before it is deleted: a week by default, so a model switched away from does not stay for good. */
 export function DeleteUnusedChoice() {
   const t = translator();
   const days = useRoomStore((state) => state.facts.deleteUnusedDays);
   const removable = useRoomStore((state) => state.facts.modelsRemovable);
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
   const saved = useRoomStore((state) => state.facts.voiceSettings);
+  const draft = useRoomStore((state) => state.facts.voiceDraft);
   const models = useDownloaded();
   // Turning it on deletes at once what is already past it: that is asked first, with what it frees.
   const [pending, setPending] = useState<{ days: number; ids: string[] } | null>(null);
   if (!removable) return null;
   const choose = (next: number | null) => {
-    const ids = next == null ? [] : staleModels(catalogs, saved, next, Date.now());
+    const ids = next == null ? [] : staleModels(catalogs, saved, next, Date.now(), draft);
     if (ids.length) setPending({ days: next!, ids });
     else void window.sidevoiceActions?.setDeleteUnusedModels?.(next);
   };

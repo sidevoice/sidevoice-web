@@ -42,9 +42,12 @@ const thisDevice = () => document.getElementById("this-computer")!;
 const Panes = () => <><ThisComputerSettings /><MachineList /></>;
 
 
+/** Settings' Machines, drawn with `facts`. A machine's page is open — the first remote one — unless the facts say `machinesView`
+ *  (`{ machine: null }`: the overview, which is what Remote machines opens first). */
 function room(pairings: PairingSummary[], facts: Record<string, unknown> = {}) {
   const store = createRoomStore();
-  act(() => { store.patch({ pairings, machinesAt: 1_700_086_400_000,
+  const first = pairings.find((item) => !item.local)?.fp ?? null;
+  act(() => { store.patch({ pairings, machinesAt: 1_700_086_400_000, machinesView: { machine: first },
     machinesReady: true, localHostAvailable: pairings.some((item) => item.local), inApp: pairings.some((item) => item.local), localHostStatus: running, ...facts }); });
   render(<RoomProvider store={store}><Panes /></RoomProvider>);
   return store;
@@ -392,7 +395,7 @@ test("an in-flight device list cannot repopulate Devices after reachability is l
 
 test("in a browser (this device can't host) it is plain Machines, Add a machine, with no This device", async () => {
   actions();
-  const store = room([paired()], { machineLinks: { "fp-nuc": { reach: "ok", via: "node" } } });
+  const store = room([paired()], { machinesView: { machine: null }, machineLinks: { "fp-nuc": { reach: "ok", via: "node" } } });
   expect(store.getState().facts.inApp).toBeFalsy();
   const machines = document.getElementById("machines")!;
   expect(within(machines).getByRole("heading", { level: 2 })).toHaveTextContent(/^Machines$/);
@@ -410,7 +413,7 @@ test("in a browser (this device can't host) it is plain Machines, Add a machine,
   expect(document.getElementById("pair-device-open")).toHaveAttribute("title", "Add a machine");
   cleanup();
   // Not even a browser talking to a local Sidevoice: that one is a machine among the others.
-  room([local, paired()], { localHostAvailable: true, inApp: false });
+  room([local, paired()], { localHostAvailable: true, inApp: false, machinesView: { machine: null } });
   expect(within(document.getElementById("machines")!).getByRole("heading", { level: 2 })).toHaveTextContent(/^Machines$/);
   expect([...document.querySelectorAll(".machine-nav button")].map((button) => button.textContent)).toEqual([expect.stringMatching(/MacBook/), expect.stringMatching(/^NUC/), "Add"]);
   expect(document.querySelector(".machine-nav-add")).toHaveAccessibleName("Add a machine");
@@ -585,8 +588,8 @@ test("the remote machines are entries under Remote machines, Add a remote machin
   const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), loadHostAgents: vi.fn() };
   window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
   const other = paired({ fp: "fp-other", host: "Other PC" });
-  const store = room([local, paired(), other], { machineLinks: { "fp-nuc": { reach: "ok", via: "node" }, "fp-other": { reach: "ok", via: "node" } } });
-  const machines = document.getElementById("machines")!;
+  const store = room([local, paired(), other], { machinesView: { machine: null }, machineLinks: { "fp-nuc": { reach: "ok", via: "node" }, "fp-other": { reach: "ok", via: "node" } } });
+  let machines = document.getElementById("machines")!;
   const nav = machines.querySelector(".machines-inline .machine-nav")!;
   expect(within(machines).getByRole("heading", { level: 2 })).toHaveTextContent("Remote machines");
   expect([...nav.querySelectorAll("button")].map((button) => button.textContent)).toEqual([expect.stringMatching(/^NUC/), expect.stringMatching(/^Other PC/), "Add"]);
@@ -594,22 +597,128 @@ test("the remote machines are entries under Remote machines, Add a remote machin
   expect(entry("NUC")).toHaveAccessibleName("NUC, Online");
   // Each a server, as Remote machines' own icon is: in its entry and in its page's header.
   expect(entry("NUC").querySelector("svg")).toHaveClass("lucide-server");
-  expect(machines.querySelector('.host-detail[aria-label="NUC"] .machine-icon svg')).toHaveClass("lucide-server");
-  // Remote machines alone is the first remote machine; this computer's page is This device's.
-  // Each card is the Sidevoice service: the remote machine's, to read, there; this computer's, with its controls, here.
-  expect(within(machines).getByRole("heading", { name: "Sidevoice service" }).closest(".host-status-card")).toHaveAttribute("data-remote");
-  expect(machines.querySelector(".host-status-card:not([data-remote])")).toBeNull();
+  // Remote machines alone is their overview, no machine's page; this computer's page is This device's.
+  // Each card is the Sidevoice service: the remote machine's, to read, on its page; this computer's, with its controls, here.
+  expect(machines.querySelector(".host-status-card")).toBeNull();
+  expect(entry("NUC")).not.toHaveAttribute("aria-current");
   expect(within(thisDevice()).getByRole("heading", { name: "Sidevoice service" }).closest(".host-status-card")).not.toHaveAttribute("data-remote");
   await act(async () => { entry("Other PC").click(); });
-  expect(store.getState().facts.machinesView.machine).not.toBeNull();
+  expect(store.getState().facts.machinesView.machine).toBe("fp-other");
+  // Its page replaces the overview in the pane.
+  machines = document.getElementById("machines")!;
   // Every machine's page has its Sidevoice service's card: another machine's, to read.
   const page = (name: string) => within(machines).queryByRole("region", { name });
   expect(page("NUC")).toBeNull();
   expect(within(page("Other PC")!).getByRole("heading", { name: "Sidevoice service" }).closest(".host-status-card")).toHaveAttribute("data-remote");
   await act(async () => { entry("NUC").click(); });
   expect(within(page("NUC")!).getByRole("heading", { name: "Sidevoice service" }).closest(".host-status-card")).toHaveAttribute("data-remote");
+  expect(machines.querySelector('.host-detail[aria-label="NUC"] .machine-icon svg')).toHaveClass("lucide-server");
   expect(within(machines).getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
   expect(entry("NUC")).toHaveAttribute("aria-current", "page");
+});
+
+/* Remote machines is a page of its own (sidevoice-web#593): the machines as rows, the same rows as Settings › Updates'; a
+ * machine's page shows that machine and nothing about the section. */
+/** The overview's rows: each machine's name, its version line and its badge. */
+const overviewRows = () => [...document.querySelectorAll<HTMLElement>("#machines [data-machine-row]")].map((row) => [
+  row.querySelector(".svc-link-name")?.textContent, row.querySelector(".ui-row-description")?.textContent ?? null, row.querySelector(".ui-badge")?.textContent ?? null]);
+
+test("Remote machines opens its overview: each machine a row — name, version, where it stands — and Add a remote machine; no machine's page, no card", async () => {
+  onTestFinished(() => localStorage.removeItem("sidevoice.service-last-seen"));
+  localStorage.setItem("sidevoice.service-last-seen", JSON.stringify({ "fp-away": "0.20.9" }));
+  const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), loadHostAgents: vi.fn(), loadMachineInfo: vi.fn() };
+  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
+  const lab = paired({ fp: "fp-lab", host: "Lab box" }), away = paired({ fp: "fp-away", host: "Attic" });
+  const store = room([local, paired(), lab, away], { machinesView: { machine: null }, machineLinks: { "fp-nuc": { reach: "ok", via: "node" }, "fp-lab": { reach: "ok", via: "node" }, "fp-away": { reach: "offline", via: "" } },
+    remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 1, version: "0.21.4" }, "fp-lab": { state: "connected", checkedAt: 1, version: "0.20.2" } } });
+  const section = document.getElementById("machines")!;
+  expect(within(section).getByRole("heading", { level: 2 })).toHaveTextContent(/^Remote machines$/);
+  expect(section.querySelector(".ui-section-description")).toHaveTextContent("The computers where your agents run.");
+  // This computer is This device's, not a row here.
+  expect(overviewRows()).toEqual([["NUC", "Version 0.21.4", "Up to date"], ["Lab box", "Version 0.20.2", "Out of date"], ["Attic", "Version 0.20.9", "Offline"]]);
+  // A button, whole row: its name says its machine, its version, where it stands, and — connected — that it is online.
+  expect(within(section).getByRole("button", { name: /^NUC ?, Online Version 0\.21\.4 Up to date$/ })).toBeInTheDocument();
+  expect(within(section).getByRole("button", { name: /^Attic Version 0\.20\.9 Offline$/ })).toBeInTheDocument();
+  // The green dot on a connected machine's icon, nothing on one that does not answer.
+  expect(section.querySelector('[data-machine="fp-nuc"] .state-on-icon-dot')).not.toBeNull();
+  expect(section.querySelector('[data-machine="fp-away"] .state-on-icon-dot')).toBeNull();
+  // No machine's page, no card, no notice: the rows only; and Add a remote machine after them.
+  expect(section.querySelector(".host-detail, .host-status-card, .ui-alert")).toBeNull();
+  const add = section.querySelector<HTMLElement>(".machines-add button")!;
+  expect(add).toHaveAccessibleName("Add a remote machine");
+  await act(async () => { add.click(); });
+  expect(done.openPairing).toHaveBeenCalledTimes(1);
+  // Each machine is asked for its version, once connected.
+  expect(done.loadMachineInfo.mock.calls.map(([fp]) => fp).sort()).toEqual(["fp-lab", "fp-nuc"]);
+  // The row opens the machine's page, in the pane: Remote machines (in the nav) is the way back.
+  await act(async () => { section.querySelector<HTMLElement>("[data-machine-row=fp-lab]")!.click(); });
+  expect(store.getState().facts.machinesView.machine).toBe("fp-lab");
+  expect(document.querySelector("#machines .host-detail")).toHaveAttribute("aria-label", "Lab box");
+  expect(entry("Lab box")).toHaveAttribute("aria-current", "page");
+  act(() => { store.patch({ machinesView: { machine: null } }); });
+  expect(overviewRows()).toHaveLength(3);
+  expect(entry("Lab box")).not.toHaveAttribute("aria-current");
+});
+
+test("a machine's page has no section above it — no Remote machines, no 'The computers where your agents run' — only that machine, its name the page's heading", async () => {
+  const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), loadHostAgents: vi.fn(), loadMachineInfo: vi.fn() };
+  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
+  room([local, paired()], { machineLinks: { "fp-nuc": { reach: "ok", via: "node" } } });
+  const section = document.getElementById("machines")!;
+  expect(section.querySelector(".ui-section-head, .ui-section-title, .ui-section-description")).toBeNull();
+  expect(within(section).queryByText("Remote machines")).toBeNull();
+  expect(within(section).queryByText(/The computers where your agents run/)).toBeNull();
+  expect(within(section).getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual(["NUC"]);
+  // That machine: its state, its card, its agents, its devices, Forget.
+  expect(within(section).getByRole("region", { name: "NUC" })).toBeInTheDocument();
+  expect(within(section).getByRole("heading", { name: "Sidevoice service" })).toBeInTheDocument();
+  expect(within(section).getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
+  expect(within(section).getByRole("button", { name: "Forget NUC" })).toBeInTheDocument();
+});
+
+test("a machine forgotten from its page leaves the overview, not the page of another; focus, which went with its Forget, is on the overview's first row", async () => {
+  const forget = vi.fn();
+  const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), loadHostAgents: vi.fn(), loadMachineInfo: vi.fn(), forgetMachine: forget };
+  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
+  const lab = paired({ fp: "fp-lab", host: "Lab box" });
+  const store = room([paired(), lab], { machineLinks: { "fp-nuc": { reach: "ok", via: "node" }, "fp-lab": { reach: "ok", via: "node" } } });
+  expect(document.querySelector('#machines .host-detail')).toHaveAttribute("aria-label", "NUC");
+  within(forgetFoot()!).getByRole("button", { name: "Forget NUC" }).focus();
+  act(() => { store.patch({ pairings: [lab] }); });
+  // NUC is gone: no page for it, so the overview, with the one left, and nothing of NUC selected any more.
+  expect(document.querySelector("#machines .host-detail")).toBeNull();
+  expect(overviewRows()).toEqual([["Lab box", null, null]]);
+  expect(store.getState().facts.machinesView.machine).toBeNull();
+  await waitFor(() => expect(document.activeElement).toBe(document.querySelector("#machines [data-machine-row=fp-lab]")));
+});
+
+test("a machine that goes while focus is elsewhere does not take it; with no machine left, focus is on Add a machine", async () => {
+  const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), loadHostAgents: vi.fn(), loadMachineInfo: vi.fn() };
+  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
+  const lab = paired({ fp: "fp-lab", host: "Lab box" });
+  const store = room([paired(), lab], { machineLinks: { "fp-nuc": { reach: "ok", via: "node" }, "fp-lab": { reach: "ok", via: "node" } } });
+  const elsewhere = document.createElement("button");
+  document.body.append(elsewhere);
+  elsewhere.focus();
+  act(() => { store.patch({ pairings: [lab] }); });
+  await act(async () => { await new Promise((resolve) => requestAnimationFrame(() => resolve(null))); });
+  expect(document.activeElement).toBe(elsewhere);
+  elsewhere.remove();
+  // The last one goes from its own page: the empty overview's Add.
+  act(() => { store.patch({ machinesView: { machine: "fp-lab" } }); });
+  within(forgetFoot()!).getByRole("button", { name: "Forget Lab box" }).focus();
+  act(() => { store.patch({ pairings: [] }); });
+  await waitFor(() => expect(document.activeElement).toBe(document.getElementById("pair-device-open")));
+});
+
+test("this computer, listed among the machines where it has no section of its own, is This device's row there too: its icon, its version as the app says it stands", async () => {
+  buildBridge(undefined, { update: "available" });
+  actions();
+  room([local, paired()], { localHostAvailable: true, inApp: false, machinesView: { machine: null }, localHostStatus: { ...running, product_version: "0.21.1" },
+    machineLinks: { "fp-nuc": { reach: "ok", via: "node" } }, remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 1, version: "0.21.4" } } });
+  await waitFor(() => expect(overviewRows()).toEqual([["MacBook", "Version 0.21.1", "Out of date"], ["NUC", "Version 0.21.4", "Up to date"]]));
+  expect(document.querySelector("#machines [data-machine-row=local] svg")).toHaveClass("lucide-laptop");
+  expect(document.querySelector("#machines [data-machine-row=fp-nuc] svg")).toHaveClass("lucide-server");
 });
 
 test("asked for a machine's agents, Machines shows that machine once, without feeding the store back into itself", () => {
@@ -668,9 +777,9 @@ test("a machine's page says the port its Core listens on, as its pairing adverti
   room([lab, paired()], { remoteHostStatus: { "fp-lab": { state: "connected", checkedAt: 1_700_000_000_000 } },
     machineLinks: { "fp-lab": { reach: "ok", via: "node" }, "fp-nuc": { reach: "ok", via: "node" } } });
   await act(async () => { entry("Lab box").click(); });
-  expect(within(screen.getByRole("region", { name: "Lab box" })).getByText("Port 9000")).toBeInTheDocument();
+  expect(cardFacts(screen.getByRole("region", { name: "Lab box" }))).toEqual([["Port", "9000", null]]);
   await act(async () => { entry("NUC").click(); });
-  expect(within(screen.getByRole("region", { name: "NUC" })).queryByText(/^Port /)).toBeNull();
+  expect(cardFacts(screen.getByRole("region", { name: "NUC" }))).toEqual([]);
 });
 
 /** The devices list on a remote machine's page, and the action at that page's foot. */
@@ -750,44 +859,223 @@ test("Cancel closes Forget's question without forgetting, and the focus goes bac
   expect(done.forgetMachine).not.toHaveBeenCalled();
 });
 
-/** This device's app, with its build (sidevoice-desktop #56), its service behind what it bundles, and maybe its updater. */
-function buildBridge(build: Record<string, unknown> | undefined, withUpdater = false) {
-  const version: LocalHostVersion = { bridge: 3, bundled: { version: "0.9.1" }, installed: {}, core_api: 2, update: "available" };
-  setBridge({ version: vi.fn(async () => version), update: vi.fn().mockResolvedValue(running) });
+/** The facts a service card says under its title: each one's name, its value and its badge. */
+function cardFacts(root: ParentNode) {
+  return [...root.querySelectorAll(".host-status-card .svc-strip > div")].map((fact) => [fact.querySelector("dt")?.textContent, fact.querySelector(".svc-number")?.textContent, fact.querySelector(".ui-badge")?.textContent ?? null]);
+}
+const cardOf = (root: ParentNode = document) => root.querySelector<HTMLElement>(".host-status-card")!;
+/** This device's app, with its build (sidevoice-desktop #56), and this computer's service as the bridge reports it. */
+function buildBridge(build: Record<string, unknown> | undefined, report: Partial<LocalHostVersion> | null = { update: "current" }) {
+  const version: LocalHostVersion = { bridge: 3, bundled: { minor: "0.21" }, installed: null, core_api: 2, update: "current", latest: null, progress: null, ...report };
+  setBridge({ restart: vi.fn(), stop: vi.fn(), ...(report ? { version: vi.fn(async () => version), update: vi.fn().mockResolvedValue(running) } : {}) });
   const desktop = (window as unknown as { __sidevoiceHost: { host: Record<string, unknown> } }).__sidevoiceHost;
   desktop.host.build = build;
-  if (withUpdater) desktop.host.updater = fakeUpdater({ mode: "manual", status: { state: "available", version: "0.5.0" } }).updater;
   actions();
 }
-const versionLine = () => document.querySelector(".host-status-product");
 
-/* Everything that updates is in Settings › Updates (UpdatesSettings.test.tsx): This device's card says its version — the
- * app's, the Sidevoice the person installed — and, where the app updates something here, Update available, a link to
- * its row in Updates; never a vague "See updates", never an action of its own. */
-test("This device's card: the app's version and Update available, a link to Updates, where the app updates something; no Update, no Automatic/Manual, no Check, no build note", async () => {
-  for (const [build, withUpdater, line] of [
-    [{ channel: "release", version: "0.4.0" }, true, "Sidevoice 0.4.0 · Update available"],
-    [{ channel: "nightly", version: "0.5.0-nightly", commit: "abcdef0123456789" }, true, "Sidevoice 0.5.0-nightly · Update available"],
-    // Updated by hand, or a development build: nothing here updates it, so nothing is said of updates.
-    [{ channel: "nightly", version: "0.5.0-nightly" }, false, "Sidevoice 0.5.0-nightly"], [{ channel: "dev", version: "0.5.0-dev" }, false, "Sidevoice 0.5.0-dev"],
-  ] as [Record<string, unknown>, boolean, string][]) {
-    buildBridge(build, withUpdater);
-    room([local], { localHostStatus: { ...running, product_version: "0.8.1" } });
-    await act(async () => {});
-    const card = thisDevice();
-    await waitFor(() => expect(versionLine()).toHaveTextContent(new RegExp("^" + line.replaceAll(".", "\\.") + "$")));
-    expect(within(card).queryAllByRole("button", { name: "Update available, see it in Updates" })).toHaveLength(withUpdater ? 1 : 0);
-    expect(within(card).queryByRole("button", { name: /See updates|Update the service|Update the app|Check for updates/ })).toBeNull();
-    expect(within(card).queryByRole("radiogroup", { name: "Updates" })).toBeNull();
-    expect(card.querySelector(".host-status-build, .host-update-control, .app-update-settings")).toBeNull();
-    cleanup();
+/* The service card (sidevoice-desktop#67): the same on This device and on a remote machine — its state at the top right,
+ * Version with a badge on the left, Port at the right edge — with the app's own version a row of its own above it, on
+ * This device only. */
+test("This device's page: the app's own row — its icon, its name, its version — above the service card, whose version is the service's: with where it stands and its port", async () => {
+  buildBridge({ channel: "release", version: "0.4.0" });
+  // The port is the service's own, from its core: this computer's pairing says another (the app's proxy, new each launch).
+  room([local], { localHostStatus: { ...running, product_version: "0.8.1", core: { ...running.core, port: 10829 } } });
+  await waitFor(() => expect(cardFacts(thisDevice())).toEqual([["Version", "0.8.1", "Up to date"], ["Port", "10829", null]]));
+  const row = thisDevice().querySelector(".svc-app-row")!;
+  expect(row.querySelector("img.svc-app-icon")).not.toBeNull();
+  expect(row.querySelector(".ui-row-label")).toHaveTextContent(/^Sidevoice app$/);
+  expect(row.querySelector(".ui-row-description")).toHaveTextContent(/^Version 0\.4\.0$/);
+  // The app's version is never the card's; the row comes first.
+  expect(cardOf(thisDevice())).not.toHaveTextContent("0.4.0");
+  expect(row.compareDocumentPosition(cardOf(thisDevice())) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // The card keeps its state at the right and its controls.
+  expect(cardOf(thisDevice()).querySelector(".host-status-head .host-status-state")).toHaveTextContent("Running");
+  expect(within(cardOf(thisDevice())).getByRole("button", { name: "Restart" })).toBeInTheDocument();
+  // One state of the app's own: no row where the host says no build (a browser's page of a local Sidevoice).
+  cleanup();
+  buildBridge(undefined);
+  room([local], { localHostStatus: { ...running, product_version: "0.8.1" } });
+  expect(thisDevice().querySelector(".svc-app-row")).toBeNull();
+});
+
+test("This device's port is the service's own, from its core: never the proxy's in the pairing's address; none said, none shown (sidevoice-connector#351)", async () => {
+  buildBridge({ channel: "release", version: "0.4.0" });
+  const store = room([local], { localHostStatus: { ...running, product_version: "0.8.1" } });
+  await act(async () => {});
+  // The pairing's one address is the app's proxy, on a port new at each launch: not the service's.
+  expect(local.urls).toEqual(["http://127.0.0.1:45781"]);
+  expect(cardFacts(thisDevice())).toEqual([["Version", "0.8.1", "Up to date"]]);
+  expect(thisDevice()).not.toHaveTextContent("45781");
+  act(() => { store.patch({ localHostStatus: { ...running, product_version: "0.8.1", core: { ...running.core, port: 10829 } } }); });
+  expect(cardFacts(thisDevice())).toEqual([["Version", "0.8.1", "Up to date"], ["Port", "10829", null]]);
+  // Not a port: not shown.
+  for (const port of [0, 70000, -1, 1.5, "10829", null]) {
+    act(() => { store.patch({ localHostStatus: { ...running, product_version: "0.8.1", core: { ...running.core, port: port as never } } }); });
+    expect(cardFacts(thisDevice()).map(([name]) => name)).toEqual(["Version"]);
   }
 });
 
-test("where the product does not say its version, the card shows the app's, as it does when it does", () => {
-  buildBridge({ channel: "nightly", version: "0.5.0-nightly" });
-  room([local], { localHostStatus: running });
-  expect(versionLine()).toHaveTextContent("Sidevoice 0.5.0-nightly");
+test("This device's version is the one the app reports with where it stands (version().installed), else the status's own", async () => {
+  buildBridge({ channel: "release", version: "0.4.0" }, { update: "current", installed: { version: "0.21.2" } });
+  const store = room([local], { localHostStatus: { ...running, product_version: "0.21.1" } });
+  await waitFor(() => expect(cardFacts(thisDevice())[0]).toEqual(["Version", "0.21.2", "Up to date"]));
+  // What is not a version is not used.
+  cleanup();
+  buildBridge({ channel: "release", version: "0.4.0" }, { update: "current", installed: { version: "latest" } });
+  room([local], { localHostStatus: { ...running, product_version: "0.21.1" } });
+  await waitFor(() => expect(cardFacts(thisDevice())[0]).toEqual(["Version", "0.21.1", "Up to date"]));
+  expect(store).toBeDefined();
+});
+
+test.each([
+  [{ update: "available" }, "Out of date"], [{ update: "waiting-call" }, "After the call"], [{ update: "newer-installed" }, "Newer"], [{ update: "updating", progress: 0.4 }, "Updating…"],
+] as const)("This device's card says what the app reports of its service: %j, the badge %s", async (report, badge) => {
+  buildBridge({ channel: "release", version: "0.4.0" }, report);
+  room([local], { localHostStatus: { ...running, product_version: "0.21.1" } });
+  await waitFor(() => expect(cardFacts(thisDevice())[0]).toEqual(["Version", "0.21.1", badge]));
+  const bar = cardOf(thisDevice()).querySelector("[role=progressbar]");
+  if (report.update === "updating") {
+    // The bar moves with what the app says; none otherwise. It is the card's, under the facts.
+    expect(bar).toHaveAttribute("aria-valuenow", "40");
+    expect(bar).toHaveAccessibleName("Updating…");
+  } else expect(bar).toBeNull();
+  // Out of date here is updated by the app itself, in the background: no notice, no command, no Update button. (Newer
+  // than the pinned minor is warned about, below.)
+  if (report.update !== "newer-installed") expect(cardOf(thisDevice()).querySelector(".ui-alert, .ui-snippet")).toBeNull();
+  expect(within(cardOf(thisDevice())).queryByRole("button", { name: /^Update/ })).toBeNull();
+});
+
+test("a service newer than the minor the app pins is warned about, once closed (×) it stays closed for that version, and its badge stays", async () => {
+  onTestFinished(() => localStorage.removeItem("sidevoice.service-notice-dismissed"));
+  buildBridge({ channel: "release", version: "0.4.0" }, { update: "newer-installed" });
+  const store = room([local], { localHostStatus: { ...running, product_version: "0.22.0" } });
+  const alert = await waitFor(() => { const found = cardOf(thisDevice()).querySelector<HTMLElement>(".ui-alert"); expect(found).not.toBeNull(); return found!; });
+  expect(alert).toHaveTextContent("Newer than the supported version");
+  expect(alert).toHaveTextContent("This app works with Sidevoice 0.21.x. Version 0.22.0 may misbehave.");
+  // The command is for a machine that is run elsewhere: this one is never told to install anything.
+  expect(alert.querySelector(".ui-snippet")).toBeNull();
+  // The × says which notice it closes; closed, focus is on the card's title rather than lost with it.
+  const close = within(alert).getByRole("button", { name: "Close Newer than the supported version" });
+  close.focus();
+  await act(async () => { fireEvent.click(close); });
+  expect(cardOf(thisDevice()).querySelector(".ui-alert")).toBeNull();
+  expect(document.activeElement).toBe(cardOf(thisDevice()).querySelector("h4"));
+  expect(cardFacts(thisDevice())[0]).toEqual(["Version", "0.22.0", "Newer"]);
+  expect(JSON.parse(localStorage.getItem("sidevoice.service-notice-dismissed")!)).toEqual(["local:0.22.0"]);
+  // A newer one again: warned again.
+  act(() => { store.patch({ localHostStatus: { ...running, product_version: "0.22.1" } }); });
+  await waitFor(() => expect(cardOf(thisDevice()).querySelector(".ui-alert")).toHaveTextContent("Version 0.22.1 may misbehave."));
+});
+
+test("no version() on the bridge (a browser, an older app): the card says the version with no badge, no bar and no notice", async () => {
+  buildBridge({ channel: "release", version: "0.4.0" }, null);
+  room([local], { localHostStatus: { ...running, product_version: "0.22.0", core: { ...running.core, port: 10829 } } });
+  await act(async () => {});
+  expect(cardFacts(thisDevice())).toEqual([["Version", "0.22.0", null], ["Port", "10829", null]]);
+  expect(cardOf(thisDevice()).querySelector(".ui-alert, [role=progressbar]")).toBeNull();
+});
+
+test("a core whose API this app cannot use is said on the card, as it was in Updates", async () => {
+  buildBridge({ channel: "release", version: "0.4.0" }, { update: "incompatible", core_api: 9 });
+  room([local], { localHostStatus: { ...running, product_version: "0.21.1" } });
+  expect(await within(cardOf(thisDevice())).findByText("This machine reports core API 9, which this app cannot use.")).toBeInTheDocument();
+  expect(cardFacts(thisDevice())[0]).toEqual(["Version", "0.21.1", null]);
+});
+
+/** A remote machine's page, with its service as it says it. */
+async function remotePage(version: string | null | undefined, extra: Record<string, unknown> = {}, pairing: PairingSummary = paired({ urls: ["https://nuc.example", "http://192.168.1.20:9000"] })) {
+  const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), loadHostAgents: vi.fn(), loadMachineInfo: vi.fn() };
+  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
+  const store = room([pairing], { remoteHostStatus: version === undefined ? {} : { [pairing.fp]: { state: "connected", checkedAt: 1, version } },
+    machineLinks: { [pairing.fp]: { reach: "ok", via: "node" } }, ...extra });
+  await act(async () => { entry(pairing.host!).click(); });
+  return { store, card: cardOf(screen.getByRole("region", { name: pairing.host! })) };
+}
+
+test("a remote machine's card is the same card, to read: Running at the right, its version with where it stands against the pinned minor, its port", async () => {
+  const { card } = await remotePage("0.21.3");
+  expect(cardFacts(card.parentElement!)).toEqual([["Version", "0.21.3", "Up to date"], ["Port", "9000", null]]);
+  expect(card.querySelector(".host-status-head h4")).toHaveTextContent("Sidevoice service");
+  expect(card.querySelector(".host-status-head .host-status-state")).toHaveTextContent("Running");
+  // To read: no controls, no switch, no notice, no bar; it is run there.
+  expect(card.querySelector("button, .ui-switch, .ui-alert, [role=progressbar]")).toBeNull();
+  // Its page is not This device's: no app row.
+  expect(document.querySelector(".svc-app-row")).toBeNull();
+});
+
+test("a remote machine out of date: the notice, in the permissions notice's alert, says what to do with the command to copy inside — not to be closed", async () => {
+  const { card } = await remotePage("0.20.2");
+  expect(cardFacts(card.parentElement!)[0]).toEqual(["Version", "0.20.2", "Out of date"]);
+  const alert = card.querySelector<HTMLElement>(".ui-alert")!;
+  expect(alert).toHaveAttribute("data-tone", "warning");
+  expect(alert).toHaveTextContent("Sidevoice 0.20.2 is out of date");
+  expect(alert).toHaveTextContent("This app works with 0.21.x. Update it on NUC:");
+  expect(alert.querySelector(".ui-snippet-text")).toHaveTextContent("npx sidevoice@0.21 install");
+  expect(within(alert).getByRole("button", { name: "Copy the command for NUC" })).toBeInTheDocument();
+  expect(within(alert).queryByRole("button", { name: /^Close/ })).toBeNull();
+});
+
+test("a remote machine newer than the app supports: the notice says it may misbehave and can be closed, kept closed for that machine and version; the badge stays", async () => {
+  onTestFinished(() => localStorage.removeItem("sidevoice.service-notice-dismissed"));
+  const { card, store } = await remotePage("0.22.0");
+  const alert = card.querySelector<HTMLElement>(".ui-alert")!;
+  expect(cardFacts(card.parentElement!)[0]).toEqual(["Version", "0.22.0", "Newer"]);
+  expect(alert).toHaveTextContent("Sidevoice 0.22.0 is newer than this app supports");
+  expect(alert).toHaveTextContent("It may misbehave. Update this app, or install 0.21.x on NUC.");
+  expect(alert.querySelector(".ui-snippet")).toBeNull();
+  const close = within(alert).getByRole("button", { name: "Close Sidevoice 0.22.0 is newer than this app supports" });
+  close.focus();
+  await act(async () => { fireEvent.click(close); });
+  expect(card.querySelector(".ui-alert")).toBeNull();
+  expect(document.activeElement).toBe(card.querySelector("h4"));
+  expect(cardFacts(card.parentElement!)[0]).toEqual(["Version", "0.22.0", "Newer"]);
+  expect(JSON.parse(localStorage.getItem("sidevoice.service-notice-dismissed")!)).toEqual(["fp-nuc:0.22.0"]);
+  // Another version of it, or another machine: not closed.
+  act(() => { store.patch({ remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 2, version: "0.23.0" } } } as never); });
+  await waitFor(() => expect(card.querySelector(".ui-alert")).toHaveTextContent("Sidevoice 0.23.0 is newer"));
+});
+
+test("a remote machine that does not answer: the same card, Offline at the right, what was last seen of it — its version, its port — and nothing else", async () => {
+  onTestFinished(() => localStorage.removeItem("sidevoice.service-last-seen"));
+  localStorage.setItem("sidevoice.service-last-seen", JSON.stringify({ "fp-nuc": "0.20.9" }));
+  actions();
+  window.sidevoiceActions = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), loadHostAgents: vi.fn(), loadMachineInfo: vi.fn() } as unknown as typeof window.sidevoiceActions;
+  room([paired({ urls: ["http://192.168.1.20:9000"] })], { machineLinks: { "fp-nuc": { reach: "offline", via: "" } } });
+  await act(async () => { entry("NUC").click(); });
+  const card = cardOf(screen.getByRole("region", { name: "NUC" }));
+  expect(card.querySelector(".host-status-head .host-status-state")).toHaveTextContent("Offline");
+  // The version it was last seen at, with no badge: nothing is known of where it stands now; no notice, to nobody's use.
+  expect(cardFacts(card.parentElement!)).toEqual([["Version", "0.20.9", null], ["Port", "9000", null]]);
+  expect(card.querySelector(".ui-alert")).toBeNull();
+  expect(card).not.toHaveAttribute("data-tone", "positive");
+  // A machine never seen: its port alone.
+  cleanup();
+  localStorage.removeItem("sidevoice.service-last-seen");
+  actions();
+  window.sidevoiceActions = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), loadHostAgents: vi.fn(), loadMachineInfo: vi.fn() } as unknown as typeof window.sidevoiceActions;
+  room([paired({ urls: ["http://192.168.1.20:9000"] })], { machineLinks: { "fp-nuc": { reach: "offline", via: "" } } });
+  await act(async () => { entry("NUC").click(); });
+  expect(cardFacts(screen.getByRole("region", { name: "NUC" }).parentElement!)).toEqual([["Port", "9000", null]]);
+});
+
+test("a machine not yet heard from (its version unknown) says its port alone: no badge, no notice; it is asked for its version once connected", async () => {
+  const { card } = await remotePage(undefined);
+  expect(cardFacts(card.parentElement!)).toEqual([["Port", "9000", null]]);
+  expect(card.querySelector(".ui-alert")).toBeNull();
+  expect(window.sidevoiceActions!.loadMachineInfo).toHaveBeenCalledWith("fp-nuc");
+});
+
+test("a connected machine that says no version shows the last one seen, with its badge judged for that version, on its page and in its row alike", async () => {
+  onTestFinished(() => localStorage.removeItem("sidevoice.service-last-seen"));
+  for (const [seen, badge, alert] of [["0.21.0", "Up to date", false], ["0.20.9", "Out of date", true]] as const) {
+    localStorage.setItem("sidevoice.service-last-seen", JSON.stringify({ "fp-nuc": seen }));
+    const { card, store } = await remotePage(undefined);
+    expect(cardFacts(card.parentElement!)).toEqual([["Version", seen, badge], ["Port", "9000", null]]);
+    expect(card.querySelector(".ui-alert") !== null).toBe(alert);
+    act(() => { store.patch({ machinesView: { machine: null } }); });
+    expect(overviewRows()).toEqual([["NUC", "Version " + seen, badge]]);
+    cleanup();
+  }
 });
 
 test("This device's title follows a rename made while the page is mounted", async () => {

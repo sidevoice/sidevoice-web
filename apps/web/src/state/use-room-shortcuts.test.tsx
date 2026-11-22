@@ -42,3 +42,31 @@ test("Skip's key never opens the browser's Save, in a text box too; the text box
   expect(actions.skipReply).toHaveBeenCalledTimes(2);
   expect(actions.toggleMic).not.toHaveBeenCalled();
 });
+
+test("the handler follows the shortcuts table at once: a changed key acts, the old one does not, a cleared one does nothing", async () => {
+  const { setBinding, resetBinding } = await import("./shortcuts");
+  setup();
+  setBinding("mute", { code: "KeyM", key: "M", ctrl: true, alt: true });
+  fireEvent.keyDown(document.body, { code: "KeyD", ctrlKey: true });
+  expect(actions.toggleMic).not.toHaveBeenCalled();
+  fireEvent.keyDown(document.body, { code: "KeyM", ctrlKey: true, altKey: true });
+  expect(actions.toggleMic).toHaveBeenCalledTimes(1);
+  setBinding("skip", null);
+  fireEvent.keyDown(document.body, { code: "KeyS", ctrlKey: true });
+  expect(actions.skipReply).not.toHaveBeenCalled();
+  resetBinding("mute"); resetBinding("skip");
+});
+
+test("Say one thing has no key until a person chooses one; then its key does the same page action as the global key", async () => {
+  const { setBinding, resetBinding } = await import("./shortcuts");
+  const oneTurn = vi.fn();
+  (window as unknown as { sidevoiceActions: unknown }).sidevoiceActions = { ...actions, oneTurn };
+  render(<Room />);
+  fireEvent.keyDown(document.body, { code: "KeyJ", ctrlKey: true, shiftKey: true });
+  expect(oneTurn).not.toHaveBeenCalled();
+  setBinding("oneTurn", { code: "KeyJ", key: "J", mod: true, shift: true });
+  fireEvent.keyDown(document.body, { code: "KeyJ", ctrlKey: true, shiftKey: true });
+  fireEvent.keyDown(document.body, { code: "KeyJ", ctrlKey: true, shiftKey: true, repeat: true });
+  expect(oneTurn).toHaveBeenCalledTimes(1);
+  resetBinding("oneTurn");
+});

@@ -1,5 +1,318 @@
 # Changelog
 
+## [0.34.1](https://github.com/sidevoice/sidevoice-web/compare/v0.34.0...v0.34.1) (2026-11-19)
+
+
+### Bug Fixes
+
+* **service:** install the Sidevoice service 0.21 ([#621](https://github.com/sidevoice/sidevoice-web/issues/621)) ([b66bda3](https://github.com/sidevoice/sidevoice-web/commit/b66bda3c8e191d517c675632b503422cc9b3955a))
+
+## [0.34.0](https://github.com/sidevoice/sidevoice-web/compare/v0.33.1...v0.34.0) (2026-11-18)
+
+
+### Features
+
+* **settings:** crash reports section, logs viewer and first-run notice ([#615](https://github.com/sidevoice/sidevoice-web/issues/615)) ([ceb5bf3](https://github.com/sidevoice/sidevoice-web/commit/ceb5bf3afb28bf740d2265c12816f76a9b37e792))
+
+
+### Bug Fixes
+
+* **settings:** say the machine list in Updates is the Sidevoice service and mark this device ([#619](https://github.com/sidevoice/sidevoice-web/issues/619)) ([a18d274](https://github.com/sidevoice/sidevoice-web/commit/a18d274eb2be5b5859dc18e8e0262a063fc160eb))
+* **voice:** don't wait for provider catalogues to join a call ([#618](https://github.com/sidevoice/sidevoice-web/issues/618)) ([9637bb7](https://github.com/sidevoice/sidevoice-web/commit/9637bb7ff09dd02fb1fa374476853d366c656764))
+
+## [0.33.1](https://github.com/sidevoice/sidevoice-web/compare/v0.33.0...v0.33.1) (2026-11-13)
+
+
+### Bug Fixes
+
+* **settings:** remove the call audio mode developer option ([#612](https://github.com/sidevoice/sidevoice-web/issues/612)) ([359c826](https://github.com/sidevoice/sidevoice-web/commit/359c826ee644f5422bf7213135c06eb9e4f038e5))
+
+## [0.33.0](https://github.com/sidevoice/sidevoice-web/compare/v0.32.4...v0.33.0) (2026-11-13)
+
+
+### Features
+
+* **settings:** call audio mode test choice in Developer options ([#609](https://github.com/sidevoice/sidevoice-web/issues/609)) ([e71f57a](https://github.com/sidevoice/sidevoice-web/commit/e71f57a24484a8215877cc7bc92f4eeacea67e78))
+
+## [0.32.4](https://github.com/sidevoice/sidevoice-web/compare/v0.32.3...v0.32.4) (2026-11-13)
+
+
+### Bug Fixes
+
+* **creature:** the eye patch's strap is one band, with no second one over the head ([#607](https://github.com/sidevoice/sidevoice-web/issues/607)) ([b9a52fa](https://github.com/sidevoice/sidevoice-web/commit/b9a52fa69c4242a1d4ac9d2d558f02e10e873577))
+
+## [0.32.3](https://github.com/sidevoice/sidevoice-web/compare/v0.32.2...v0.32.3) (2026-11-12)
+
+
+### Bug Fixes
+
+* **card:** the person's pill is a pill beside the reply it cut in on ([#603](https://github.com/sidevoice/sidevoice-web/issues/603)) ([7f13135](https://github.com/sidevoice/sidevoice-web/commit/7f131355f15d62eecee6c78a02a0d8ed95a38cf0))
+
+## [0.32.2](https://github.com/sidevoice/sidevoice-web/compare/v0.32.1...v0.32.2) (2026-11-12)
+
+
+### Bug Fixes
+
+* **creature:** a creature built again on the stage's canvas does not keep the last one's crop ([#601](https://github.com/sidevoice/sidevoice-web/issues/601)) ([51e672f](https://github.com/sidevoice/sidevoice-web/commit/51e672fbdbac82feb8692f5d52f3251749111902))
+
+## [0.32.1](https://github.com/sidevoice/sidevoice-web/compare/v0.32.0...v0.32.1) (2026-11-12)
+
+
+### Bug Fixes
+
+* **devices:** in an app, read the speaker list from the app's host, not the webview ([#598](https://github.com/sidevoice/sidevoice-web/issues/598)) ([6a71794](https://github.com/sidevoice/sidevoice-web/commit/6a71794e85e40072ee898f454c5b6b031b9d4bda))
+* **settings:** a machine that says no version shows its last seen one, with its badge ([#599](https://github.com/sidevoice/sidevoice-web/issues/599)) ([744fc97](https://github.com/sidevoice/sidevoice-web/commit/744fc978fea234abce9cd157ee53540dccc29c6d))
+
+## [0.32.0](https://github.com/sidevoice/sidevoice-web/compare/v0.31.0...v0.32.0) (2026-11-12)
+
+
+### Features
+
+* **settings:** one service card with its version and where it stands, for this device and every machine ([#595](https://github.com/sidevoice/sidevoice-web/issues/595)) ([0ad0738](https://github.com/sidevoice/sidevoice-web/commit/0ad0738521d00eb1df8bed71293666024ef9a309))
+* **settings:** Remote machines opens an overview of its machines, and a machine's page has no section above it ([#596](https://github.com/sidevoice/sidevoice-web/issues/596)) ([fde14dd](https://github.com/sidevoice/sidevoice-web/commit/fde14ddf33db805a6539d6e174b131d3795bbda2))
+
+## [0.31.0](https://github.com/sidevoice/sidevoice-web/compare/v0.30.1...v0.31.0) (2026-11-11)
+
+
+### Features
+
+* **call:** open the system's output picker from the speaker control where the host can ([#585](https://github.com/sidevoice/sidevoice-web/issues/585)) ([39a5e8f](https://github.com/sidevoice/sidevoice-web/commit/39a5e8f6e259b473a8e2aa6df0de15d19b46ff81))
+* **settings:** say that a GPU build on a phone works only while the app is open ([#588](https://github.com/sidevoice/sidevoice-web/issues/588)) ([e5abc9e](https://github.com/sidevoice/sidevoice-web/commit/e5abc9efcbbde6dfef27d6b49221d3a2d0c76021))
+* **settings:** the engine's recommended model, preselected and marked «Recomendado» ([#587](https://github.com/sidevoice/sidevoice-web/issues/587)) ([99dd1da](https://github.com/sidevoice/sidevoice-web/commit/99dd1da8d996130e96707fde9386a1b9b35c42c7))
+
+
+### Bug Fixes
+
+* **avatar:** creature framing follow-ups, held startle hop and stale data-reach ([#576](https://github.com/sidevoice/sidevoice-web/issues/576)) ([b5535e1](https://github.com/sidevoice/sidevoice-web/commit/b5535e193062326dafb6eef5087a3df29f138533))
+* **call:** let a reply the person spoke over resume when their turn comes to nothing ([#590](https://github.com/sidevoice/sidevoice-web/issues/590)) ([f59e07e](https://github.com/sidevoice/sidevoice-web/commit/f59e07ea8325639a4d49479e7904f6e1a570fdad))
+* **call:** replies drop only on the room's withdrawal, so all of them play after a turn that comes to nothing ([#591](https://github.com/sidevoice/sidevoice-web/issues/591)) ([d5b4695](https://github.com/sidevoice/sidevoice-web/commit/d5b4695588393c838fbee3372a62a4876e0e26a4))
+* **creature:** do not draw into a canvas whose room the page skips (Settings over a call) ([#589](https://github.com/sidevoice/sidevoice-web/issues/589)) ([7e3b15e](https://github.com/sidevoice/sidevoice-web/commit/7e3b15e11583183649fe0db99da8406265a7b626))
+* **creature:** the stage takes back the resolution a passing burst took ([#577](https://github.com/sidevoice/sidevoice-web/issues/577)) ([debd4a2](https://github.com/sidevoice/sidevoice-web/commit/debd4a21517c5161797fe231b124fb9ed16b1aa0))
+* **install:** show where/reason/root/os_error of a local install failure in Copy details ([#575](https://github.com/sidevoice/sidevoice-web/issues/575)) ([b0661ca](https://github.com/sidevoice/sidevoice-web/commit/b0661ca4f3406357e2dc6f9a67d1f661780fc541))
+* **stage:** centre the reply card's three lines between its top and bottom edge ([#579](https://github.com/sidevoice/sidevoice-web/issues/579)) ([d569e5c](https://github.com/sidevoice/sidevoice-web/commit/d569e5cebf2493463533e9c7ac2c6c33a6c1b606))
+* **stage:** keep room under a live creature for its breathing once the framing settles ([#583](https://github.com/sidevoice/sidevoice-web/issues/583)) ([612492b](https://github.com/sidevoice/sidevoice-web/commit/612492b3359db0758f42c9bde8386056a91128c6))
+
+## [0.30.1](https://github.com/sidevoice/sidevoice-web/compare/v0.30.0...v0.30.1) (2026-11-10)
+
+
+### Bug Fixes
+
+* **avatar:** a creature is never clipped by the box it is drawn in ([#568](https://github.com/sidevoice/sidevoice-web/issues/568)) ([c3c2747](https://github.com/sidevoice/sidevoice-web/commit/c3c2747018e65d6e005bb6bc2f8129a1a044f984))
+
+## [0.30.0](https://github.com/sidevoice/sidevoice-web/compare/v0.29.0...v0.30.0) (2026-11-09)
+
+
+### Features
+
+* **call:** soft heartbeat every 7–10 s and 5 dB lower; a frequency setting ([#565](https://github.com/sidevoice/sidevoice-web/issues/565)) ([2ab460f](https://github.com/sidevoice/sidevoice-web/commit/2ab460f2db116d0230cc13e899f2f14c62dd7ec0))
+
+
+### Bug Fixes
+
+* **conversations:** a conversation removed from this device does not come back while the call is on it ([#566](https://github.com/sidevoice/sidevoice-web/issues/566)) ([6c55b1d](https://github.com/sidevoice/sidevoice-web/commit/6c55b1dfdb2386a73238ff5891c39b0b1fe55a78))
+
+## [0.29.0](https://github.com/sidevoice/sidevoice-web/compare/v0.28.0...v0.29.0) (2026-11-09)
+
+
+### Features
+
+* **agents:** Connect, Disconnect and the agent's state as in Providers ([#562](https://github.com/sidevoice/sidevoice-web/issues/562)) ([bc95cfa](https://github.com/sidevoice/sidevoice-web/commit/bc95cfa2103620243be21080c63cbb5d916f15cb))
+* **call:** a muted mic at the creature's feet in the floating card's avatar format ([#564](https://github.com/sidevoice/sidevoice-web/issues/564)) ([6545c30](https://github.com/sidevoice/sidevoice-web/commit/6545c3077add13b7c542768f1d55c0a733814d03))
+* **conversation:** the new-conversation panel with the one-line agent message ([#558](https://github.com/sidevoice/sidevoice-web/issues/558)) ([6aa97b3](https://github.com/sidevoice/sidevoice-web/commit/6aa97b39adf5763fbf21f7fca6208c8622b34fc7))
+
+
+### Bug Fixes
+
+* **call:** the desktop app's hidden window is not the screen off for the thinking sound ([#561](https://github.com/sidevoice/sidevoice-web/issues/561)) ([33150ba](https://github.com/sidevoice/sidevoice-web/commit/33150ba239e5518f33040f13804b7e6fd1c3135f))
+
+## [0.28.0](https://github.com/sidevoice/sidevoice-web/compare/v0.27.1...v0.28.0) (2026-11-08)
+
+
+### Features
+
+* **call:** the chosen thinking sound, its volume and a try, in Settings › Call ([#559](https://github.com/sidevoice/sidevoice-web/issues/559)) ([49172e9](https://github.com/sidevoice/sidevoice-web/commit/49172e9e29c2cca7f558ef5c3267c427f2d6e02b))
+
+
+### Bug Fixes
+
+* **card:** the body sits at whole pixels in its window, so it never moves by a fraction ([#560](https://github.com/sidevoice/sidevoice-web/issues/560)) ([25e1de1](https://github.com/sidevoice/sidevoice-web/commit/25e1de1fcc7d73572fac75ff0bf6e670904ef58e))
+* **outbox:** nothing dropped silently, hang-up marks, durable entries, hung direct text stopped ([#555](https://github.com/sidevoice/sidevoice-web/issues/555)) ([2ec3400](https://github.com/sidevoice/sidevoice-web/commit/2ec3400ab632653cdb720e3035eec7a7507a0fec))
+
+## [0.27.1](https://github.com/sidevoice/sidevoice-web/compare/v0.27.0...v0.27.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **call:** the pill's bars move on their own while listening ([#546](https://github.com/sidevoice/sidevoice-web/issues/546)) ([7253f32](https://github.com/sidevoice/sidevoice-web/commit/7253f328318bfbdaaf959d43f243a31ec199f51d))
+* **card:** the avatar's creature stays where it rests; no act cut at its box's edge ([#554](https://github.com/sidevoice/sidevoice-web/issues/554)) ([152b1f0](https://github.com/sidevoice/sidevoice-web/commit/152b1f0565f178c818df998d642b7b9fe7322af9))
+* **outbox:** resend fast at first, then every 15 s ([#552](https://github.com/sidevoice/sidevoice-web/issues/552)) ([5d263c5](https://github.com/sidevoice/sidevoice-web/commit/5d263c5efcdfc694a50b5a4abbba025882aa19cf))
+* **settings:** an iPhone's single press is the usual headset row, disabled, with a note why ([#547](https://github.com/sidevoice/sidevoice-web/issues/547)) ([fea67fd](https://github.com/sidevoice/sidevoice-web/commit/fea67fd72daa8db780b9f342452ba25dda511bdb))
+* **shortcuts:** an F-key recorded alone for hold to talk is held, as a right-hand modifier is ([#553](https://github.com/sidevoice/sidevoice-web/issues/553)) ([de1f718](https://github.com/sidevoice/sidevoice-web/commit/de1f718efc0466b73c372e041f748bea4c8801fd))
+* **transcript:** a message folds past 25 lines, not 10 ([#549](https://github.com/sidevoice/sidevoice-web/issues/549)) ([b4c6928](https://github.com/sidevoice/sidevoice-web/commit/b4c69280aba5df1a5b048acc3002fa8570cc2854))
+* **transcript:** the Working row is led by the status dot, with one static ellipsis ([#551](https://github.com/sidevoice/sidevoice-web/issues/551)) ([b6b02f9](https://github.com/sidevoice/sidevoice-web/commit/b6b02f931d2113f45789b61cc1f839572f131469))
+
+## [0.27.0](https://github.com/sidevoice/sidevoice-web/compare/v0.26.0...v0.27.0) (2026-11-07)
+
+
+### Features
+
+* **i18n:** Portuguese (Brazil), Korean and Hindi interface languages ([#543](https://github.com/sidevoice/sidevoice-web/issues/543)) ([ec017bf](https://github.com/sidevoice/sidevoice-web/commit/ec017bf6c8307167387f61e94e664d9651a5069a))
+* **outbox:** resend unacknowledged messages on a backoff, oldest first ([#538](https://github.com/sidevoice/sidevoice-web/issues/538)) ([ac627cd](https://github.com/sidevoice/sidevoice-web/commit/ac627cd8e2d917375da5ebbd9166d84e6ef6b220))
+
+## [0.26.0](https://github.com/sidevoice/sidevoice-web/compare/v0.25.1...v0.26.0) (2026-11-07)
+
+
+### Features
+
+* **call:** one transcribing pill, five bars always, blinking while transcribing ([#537](https://github.com/sidevoice/sidevoice-web/issues/537)) ([1d07d5d](https://github.com/sidevoice/sidevoice-web/commit/1d07d5d1d0bb9811492fc79be0825ff783896766))
+
+
+### Bug Fixes
+
+* **call:** the thinking sound plays through the app's own player when the host has one ([#439](https://github.com/sidevoice/sidevoice-web/issues/439)) ([#540](https://github.com/sidevoice/sidevoice-web/issues/540)) ([5d8e919](https://github.com/sidevoice/sidevoice-web/commit/5d8e91969cf0410fdcdd417986558bbe4212e054))
+* **settings:** headset rows show only what the host's presses can do; a pick, not the form, writes the choice ([#541](https://github.com/sidevoice/sidevoice-web/issues/541)) ([2b786b6](https://github.com/sidevoice/sidevoice-web/commit/2b786b65e971e1301978f1bb6a094c92e220de50))
+
+## [0.25.1](https://github.com/sidevoice/sidevoice-web/compare/v0.25.0...v0.25.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* **settings:** a phone's Shortcuts section shows (the host's shortcuts need no global set) ([#532](https://github.com/sidevoice/sidevoice-web/issues/532)) ([524a93a](https://github.com/sidevoice/sidevoice-web/commit/524a93a29f08fdf0cc3acce63320d02e31fc4f72))
+
+## [0.25.0](https://github.com/sidevoice/sidevoice-web/compare/v0.24.0...v0.25.0) (2026-11-06)
+
+
+### Features
+
+* **shortcuts:** restore-default icon, host-reported defaults, named duplicates, recording warnings, Say one thing in the app ([#523](https://github.com/sidevoice/sidevoice-web/issues/523)) ([e6474bb](https://github.com/sidevoice/sidevoice-web/commit/e6474bb212d56377e501fa2f5a937638f00e2bb5))
+* **shortcuts:** Settings &gt; Shortcuts renders what the host reports; a phone shows the headset rows alone ([#526](https://github.com/sidevoice/sidevoice-web/issues/526)) ([e08c19c](https://github.com/sidevoice/sidevoice-web/commit/e08c19cbbd2f384bcb9c96545fe42cb267fda0ee))
+* **web:** type follows the phone's text size; +2px type on phones ([#525](https://github.com/sidevoice/sidevoice-web/issues/525)) ([2b61237](https://github.com/sidevoice/sidevoice-web/commit/2b612372f65d5537da5b34a57e958b5e7be0e142))
+
+
+### Bug Fixes
+
+* **call:** the transcribing pill shows pulsing bars, not the word ([#528](https://github.com/sidevoice/sidevoice-web/issues/528)) ([012d64d](https://github.com/sidevoice/sidevoice-web/commit/012d64d1b76de508b271f2e9954bbafd324c7c18))
+* **card:** offline agent's creature and state; centre the avatar's voice text ([#516](https://github.com/sidevoice/sidevoice-web/issues/516)) ([fdb08c7](https://github.com/sidevoice/sidevoice-web/commit/fdb08c73229017851c173c10f5c5b0374592f621))
+* **creature:** phone with a mouse is not a desktop; Governor sums drawn scenes ([#513](https://github.com/sidevoice/sidevoice-web/issues/513)) ([#529](https://github.com/sidevoice/sidevoice-web/issues/529)) ([e600447](https://github.com/sidevoice/sidevoice-web/commit/e600447d4d3f7ca3b98384df17cd87513253bc03))
+* **creature:** the creature at rest is as large as during a turn ([#521](https://github.com/sidevoice/sidevoice-web/issues/521)) ([c6df930](https://github.com/sidevoice/sidevoice-web/commit/c6df9305ea0e146a5ef6be34c3243e0e0f1d0f50))
+* **shortcuts:** name keys by the physical key, not the character they type ([#514](https://github.com/sidevoice/sidevoice-web/issues/514)) ([5539f8d](https://github.com/sidevoice/sidevoice-web/commit/5539f8d8bdac0ee5cb94f666398305e0d4ef0630))
+* **transcript:** messages show ten lines before See more ([#520](https://github.com/sidevoice/sidevoice-web/issues/520)) ([4107c01](https://github.com/sidevoice/sidevoice-web/commit/4107c0177629d7137b5b1a7dd9e911b95a326920))
+* **ui:** the person's voice bars back to the brand purple ([#518](https://github.com/sidevoice/sidevoice-web/issues/518)) ([e0ab3bc](https://github.com/sidevoice/sidevoice-web/commit/e0ab3bcdfb60250489fd569e449e23682613a0f3))
+* **viewport:** no pinch-zoom in the native phone app; no focus zoom in iOS Safari ([#522](https://github.com/sidevoice/sidevoice-web/issues/522)) ([8476f1d](https://github.com/sidevoice/sidevoice-web/commit/8476f1d8c6c7dcc744365874942c2996199970da))
+
+
+### Performance Improvements
+
+* **stage:** the creature on a canvas of its own, as wide as it reaches ([#524](https://github.com/sidevoice/sidevoice-web/issues/524)) ([19af779](https://github.com/sidevoice/sidevoice-web/commit/19af779ee5c2bb8049e30f1216ce4b5583ff25fa))
+
+## [0.24.0](https://github.com/sidevoice/sidevoice-web/compare/v0.23.0...v0.24.0) (2026-11-06)
+
+
+### Features
+
+* **permissions:** Restart now when System Audio Recording is allowed but needs a restart ([#502](https://github.com/sidevoice/sidevoice-web/issues/502)) ([d6cad84](https://github.com/sidevoice/sidevoice-web/commit/d6cad84f597de8bd83175ebaa563b38bfa01c63f))
+* **settings:** Shortcuts section, configurable keys, Say one thing, tooltip restyle ([#510](https://github.com/sidevoice/sidevoice-web/issues/510)) ([a285871](https://github.com/sidevoice/sidevoice-web/commit/a2858718f8c4dc4fac4cd4b3b3b7c082e6270867))
+* **sidebar:** compact conversation cards, the creature smaller than the title ([#501](https://github.com/sidevoice/sidevoice-web/issues/501)) ([f02d3c7](https://github.com/sidevoice/sidevoice-web/commit/f02d3c73c5981aa00469389436347f687c77e706))
+* **stage:** delivery ticks on the sent card, a sliding transcript, a lighter title card ([#504](https://github.com/sidevoice/sidevoice-web/issues/504)) ([088236f](https://github.com/sidevoice/sidevoice-web/commit/088236f31c6f515ab2bc590dee23ae84d6457a87))
+* **stage:** the stage takes the room there is, and a smaller creature ([#503](https://github.com/sidevoice/sidevoice-web/issues/503)) ([3bf32c4](https://github.com/sidevoice/sidevoice-web/commit/3bf32c4ba94bac3c9cb009fbbdfddb0a2bcdd501))
+* **ui:** scheme E and the hand-drawn icons across the app ([#498](https://github.com/sidevoice/sidevoice-web/issues/498)) ([6c66ca2](https://github.com/sidevoice/sidevoice-web/commit/6c66ca2b65858fdceb7e6e8e668b298682464651))
+
+
+### Bug Fixes
+
+* **room:** rejoin when the machine no longer has this device in the call ([#505](https://github.com/sidevoice/sidevoice-web/issues/505)) ([711d23f](https://github.com/sidevoice/sidevoice-web/commit/711d23f80a7764ad1fa36fbf84dae4650e189af5))
+* **stage:** draw the creature at the screen's pixels on a desktop stage ([#512](https://github.com/sidevoice/sidevoice-web/issues/512)) ([6922d8c](https://github.com/sidevoice/sidevoice-web/commit/6922d8cc9cb9fb7baf393e630a7a540908965a60))
+* **stage:** no card on the creature in a short tile; e2e green again after the redesign ([#500](https://github.com/sidevoice/sidevoice-web/issues/500)) ([730083b](https://github.com/sidevoice/sidevoice-web/commit/730083beb91b45995dedde3053e9e4d705dd29a4))
+
+## [0.23.0](https://github.com/sidevoice/sidevoice-web/compare/v0.22.1...v0.23.0) (2026-11-05)
+
+
+### Features
+
+* **card:** the floating card's voice text in the new style ([#497](https://github.com/sidevoice/sidevoice-web/issues/497)) ([531febf](https://github.com/sidevoice/sidevoice-web/commit/531febf11f81a51ba9660078f073e25f180441a6))
+* **conversations:** the creature pops out of its card; state colours, menu and icons ([#490](https://github.com/sidevoice/sidevoice-web/issues/490)) ([3acf8eb](https://github.com/sidevoice/sidevoice-web/commit/3acf8eb2a370693d8a884a8ee0ba6bf81cde7a16))
+* **media:** choose what happens to other apps' media while the microphone is open ([#468](https://github.com/sidevoice/sidevoice-web/issues/468)) ([07c76f4](https://github.com/sidevoice/sidevoice-web/commit/07c76f496ec1d8ac959afec9874f4b227a50a27b))
+
+
+### Bug Fixes
+
+* **call-surface:** your words win over the state line, and the reply goes as one page ([#485](https://github.com/sidevoice/sidevoice-web/issues/485)) ([b2354e3](https://github.com/sidevoice/sidevoice-web/commit/b2354e34c22f67c189cddfc8d25f279def1489cd))
+* **ui:** drop the not-in-call subtitle, unselectable creatures ([#495](https://github.com/sidevoice/sidevoice-web/issues/495)) ([a78a88a](https://github.com/sidevoice/sidevoice-web/commit/a78a88ae8ff5a0826044442d67af21341ee216dd))
+
+
+### Performance Improvements
+
+* **avatar:** the creature runs smoothly on phones ([#491](https://github.com/sidevoice/sidevoice-web/issues/491)) ([7a0b278](https://github.com/sidevoice/sidevoice-web/commit/7a0b27883edccb8c77f66f30dd763f2f5ed92ae7))
+
+## [0.22.1](https://github.com/sidevoice/sidevoice-web/compare/v0.22.0...v0.22.1) (2026-11-05)
+
+
+### Bug Fixes
+
+* **call-card:** the floating card's creature moves and is sharp ([#488](https://github.com/sidevoice/sidevoice-web/issues/488)) ([2b6aaed](https://github.com/sidevoice/sidevoice-web/commit/2b6aaed8eda4d77060e619b22925664ba296575b))
+
+## [0.22.0](https://github.com/sidevoice/sidevoice-web/compare/v0.21.0...v0.22.0) (2026-11-05)
+
+
+### Features
+
+* **avatar:** the creature's moods, working styles and pastimes, with the reference's turn-taking ([#480](https://github.com/sidevoice/sidevoice-web/issues/480)) ([f3ad154](https://github.com/sidevoice/sidevoice-web/commit/f3ad154fd87fa87e96c8ab926f8ff47c154f39e0))
+* **avatar:** the toon backdrops, the offline wanted poster and the mic permission hero from the design reference ([#483](https://github.com/sidevoice/sidevoice-web/issues/483)) ([3265ae1](https://github.com/sidevoice/sidevoice-web/commit/3265ae1c0f52e650478809660ffad4dc139ccd1c))
+* **call:** stage framing and voice text cards from the creature design reference ([#482](https://github.com/sidevoice/sidevoice-web/issues/482)) ([f1c9bc0](https://github.com/sidevoice/sidevoice-web/commit/f1c9bc00a6def597b44519d62bddc067c9f28b60))
+* **conversation:** the transcript in the creature redesign's closed look ([#484](https://github.com/sidevoice/sidevoice-web/issues/484)) ([4cc9aa2](https://github.com/sidevoice/sidevoice-web/commit/4cc9aa281fe30a9d8f3226d67e2852327c32ee2f))
+
+## [0.21.0](https://github.com/sidevoice/sidevoice-web/compare/v0.20.0...v0.21.0) (2026-11-05)
+
+
+### Features
+
+* **avatar:** the agent is a 3D creature, ported from the design reference ([#479](https://github.com/sidevoice/sidevoice-web/issues/479)) ([a7f9ceb](https://github.com/sidevoice/sidevoice-web/commit/a7f9ceb7eb28562ac3a9594494c191ad75e7e194))
+
+## [0.20.0](https://github.com/sidevoice/sidevoice-web/compare/v0.19.0...v0.20.0) (2026-11-04)
+
+
+### Features
+
+* **models:** delete unused models after 7 days by default ([#473](https://github.com/sidevoice/sidevoice-web/issues/473)) ([de98f0d](https://github.com/sidevoice/sidevoice-web/commit/de98f0d2a60f543dc23a90984faf8e4a25b0822f))
+
+
+### Bug Fixes
+
+* **call-surface:** say why a creature still fails, and test it in WebKit ([#478](https://github.com/sidevoice/sidevoice-web/issues/478)) ([2a559c8](https://github.com/sidevoice/sidevoice-web/commit/2a559c83dbefca0a0ad0b13b879dad17d085ee42))
+* **conversations:** finish the leaving agent's reply before the conversation goes ([#465](https://github.com/sidevoice/sidevoice-web/issues/465)) ([d93c3b6](https://github.com/sidevoice/sidevoice-web/commit/d93c3b6a8052b013d2e5b1043d25d21673205072))
+* **mobile:** the native call surface says working, with its timer, while the person's words show ([#474](https://github.com/sidevoice/sidevoice-web/issues/474)) ([bf6c56c](https://github.com/sidevoice/sidevoice-web/commit/bf6c56cee7f8c42100f34ddee86f740abad0e4a4))
+
+## [0.19.0](https://github.com/sidevoice/sidevoice-web/compare/v0.18.0...v0.19.0) (2026-11-03)
+
+
+### Features
+
+* **call:** show "can't receive" on the stage, call card and header ([#459](https://github.com/sidevoice/sidevoice-web/issues/459)) ([b6210b4](https://github.com/sidevoice/sidevoice-web/commit/b6210b412fdc32c2ba6eb29c4dafd183b4bb51f8))
+
+## [0.18.0](https://github.com/sidevoice/sidevoice-web/compare/v0.17.2...v0.18.0) (2026-11-03)
+
+
+### Features
+
+* **call:** project the call surface for native hosts ([#458](https://github.com/sidevoice/sidevoice-web/issues/458)) ([7f9a7d3](https://github.com/sidevoice/sidevoice-web/commit/7f9a7d36718c9ec0cb769a11eddf5fe75c02f61a))
+* **conversations:** remove a conversation locally while its machine is away ([#452](https://github.com/sidevoice/sidevoice-web/issues/452)) ([7bbafd6](https://github.com/sidevoice/sidevoice-web/commit/7bbafd6a85a24d8ce7345ea484402657968bde24))
+* **room:** let a phone app's call surface open the conversations ([#460](https://github.com/sidevoice/sidevoice-web/issues/460)) ([e51f315](https://github.com/sidevoice/sidevoice-web/commit/e51f3157377752bbb3aad3ab9f122b144fb6ae34))
+* **settings:** developer option to treat phone calls as system calls ([#457](https://github.com/sidevoice/sidevoice-web/issues/457)) ([b6fb6f4](https://github.com/sidevoice/sidevoice-web/commit/b6fb6f45e7d2cfffcd378e519b27ef8880d1d12c))
+
+## [0.17.2](https://github.com/sidevoice/sidevoice-web/compare/v0.17.1...v0.17.2) (2026-11-03)
+
+
+### Bug Fixes
+
+* **settings:** Automatic follows the current recommended build ([#450](https://github.com/sidevoice/sidevoice-web/issues/450)) ([4e7b789](https://github.com/sidevoice/sidevoice-web/commit/4e7b789e6a3aab680f99f123124710169b9512eb))
+
+## [0.17.1](https://github.com/sidevoice/sidevoice-web/compare/v0.17.0...v0.17.1) (2026-11-02)
+
+
+### Performance Improvements
+
+* **settings:** skip the room behind Settings, and Back without waiting on history ([#447](https://github.com/sidevoice/sidevoice-web/issues/447)) ([58b1945](https://github.com/sidevoice/sidevoice-web/commit/58b194577c0237d9bf47b4580a563fde303f3453))
+
 ## [0.17.0](https://github.com/sidevoice/sidevoice-web/compare/v0.16.1...v0.17.0) (2026-11-02)
 
 

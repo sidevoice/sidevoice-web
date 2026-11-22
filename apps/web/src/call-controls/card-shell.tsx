@@ -2,7 +2,7 @@
  * nearness, the click guard, the drag, the window's size, and the two panels — the conversation picker and the
  * devices. */
 import { useCallback, useEffect, useRef, useState, type ReactNode, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
-import { ChevronIcon, HarnessIcon, MachinesIcon, MicrophoneIcon, SpeakerIcon } from "../components/ui/Icons";
+import { ChevronIcon, HarnessIcon, MachinesIcon, MicrophoneIcon, SpeakerIcon, StateGlyph } from "../components/ui/Icons";
 import { ConversationRows } from "../features/room/ConversationRows";
 import { hasUnread } from "../features/call/conversation-state";
 import type { ParticipantView } from "../state/room-types";
@@ -106,6 +106,9 @@ export interface CardShell {
   zone: { aim(zone: "none" | "creature" | "card"): void; fold(): void; focusWithin(within: boolean): void };
   /** Runs a command unless the click guard holds it. */
   run(command: CallCommand): void;
+  /** Tells the app again what the card shows, if that changed: for a body that moved inside a window that kept its size (the avatar's
+   *  creature, placed across its column), which no size observer sees. */
+  relayout(): void;
   handlers: {
     onPointerEnter(): void; onPointerLeave(): void;
     onPointerDown(event: ReactPointerEvent<HTMLDivElement>): void; onPointerMove(event: ReactPointerEvent<HTMLDivElement>): void;
@@ -185,14 +188,27 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState, r
 
   // The window is the card's size, margin included: the app sizes (and may move) it to what is shown, so every change
   // of size re-arms the click guard.
+  const relayout = useRef<() => void>(() => {});
   useEffect(() => {
     const element = card.current;
     if (!element) return;
     let last = "";
     const report = () => {
-      const box = element.getBoundingClientRect();
+      let box = element.getBoundingClientRect();
       if (!box.width || !box.height) return;
-      const inner = body.current?.getBoundingClientRect();
+      let inner = body.current?.getBoundingClientRect();
+      // The body sits at whole pixels in its window: what opens over it (a voice text, captions) is rarely whole pixels tall, and the
+      // app places the window so that the body's box, in whole pixels, stays where it rests. A fraction left over would move the body on
+      // the screen by it each time what is over it came or went; the card is padded by the rest of the pixel instead.
+      if (inner && inner.width && inner.height) {
+        const snap = (name: string, offset: number) => {
+          const was = parseFloat(element.style.getPropertyValue(name)) || 0, raw = offset - was;
+          const pad = Math.ceil(raw - 1e-3) - raw;
+          return Math.abs(pad - was) > 1e-3 ? (element.style.setProperty(name, pad > 1e-3 ? pad + "px" : "0px"), true) : false;
+        };
+        const moved = [snap("--body-snap-x", inner.left - box.left), snap("--body-snap-y", inner.top - box.top)].some(Boolean);
+        if (moved) { box = element.getBoundingClientRect(); inner = body.current!.getBoundingClientRect(); }
+      }
       const cardBox = inner && inner.width && inner.height
         ? { x: Math.round(inner.left - box.left) + CARD_MARGIN, y: Math.round(inner.top - box.top) + CARD_MARGIN, width: Math.ceil(inner.width), height: Math.ceil(inner.height) }
         : undefined;
@@ -204,10 +220,11 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState, r
       host.layout({ ...size, ...(cardBox ? { card: cardBox } : {}), ...(resizable ? { resizable } : {}) });
     };
     report();
+    relayout.current = report;
     const observer = new ResizeObserver(report);
     observer.observe(element);
     if (body.current && body.current !== element) observer.observe(body.current);
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); relayout.current = () => {}; };
   }, [host, resizeRule]); // eslint-disable-line react-hooks/exhaustive-deps
   // Appearing is a change too (the pointer may have just come onto the card).
   useEffect(() => { if (expanded) guardUntil.current = Math.max(guardUntil.current, Date.now() + CLICK_GUARD_MS); }, [expanded]);
@@ -237,8 +254,8 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState, r
       // A press anywhere in the card but in an open panel or on what opens it closes the panel.
       if (panel && !target.closest(".card-panel, .card-title, .card-devices, .card-conversations-button")) setPanel(null);
       // Dragging from anywhere but a button (the title counts as card): past the threshold it moves the window.
-      // The avatar's balloons are inert, as the room's are: a press on one moves nothing (its button acts).
-      if (event.button > 0 || target.closest("button:not(.card-title), .card-panel, .card-grip, .ui-popover, .avatar-balloons .speech-bubble")) return;
+      // The avatar's voice text is inert, as the room's are: a press on it moves nothing (its button acts).
+      if (event.button > 0 || target.closest("button:not(.card-title), .card-panel, .card-grip, .ui-popover, .avatar-voice")) return;
       drag.current = { x: event.screenX, y: event.screenY, moving: false, id: event.pointerId };
     },
     onPointerMove(event) {
@@ -262,9 +279,9 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState, r
     onPointerCancel: (event) => endDrag(event),
     onClickCapture(event) {
       keyboardClick.current = event.detail === 0;
-      // After "Cancel sending" (its balloon goes with it) nothing of the card keeps focus, which would hold the controls out; from the
+      // After "Cancel sending" (its pill goes with it) nothing of the card keeps focus, which would hold the controls out; from the
       // keyboard, focus goes to the microphone, the call's nearest control.
-      if ((event.target as Element).closest(".cancel-input")) {
+      if ((event.target as Element).closest(".cancel-input, .vcap .cancel")) {
         const keyboard = event.detail === 0;
         setTimeout(() => { if (keyboard) card.current?.querySelector<HTMLElement>(".card-mute")?.focus(); else (document.activeElement as HTMLElement | null)?.blur(); });
       }
@@ -272,7 +289,8 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState, r
       if (dragged.current) { event.stopPropagation(); event.preventDefault(); dragged.current = false; }
     },
   };
-  return { card, body, panel, setPanel, expanded, flow, dragging, zone, run, handlers };
+  const relayoutNow = useCallback(() => relayout.current(), []);
+  return { card, body, panel, setPanel, expanded, flow, dragging, zone, run, relayout: relayoutNow, handlers };
 }
 
 /** A device as the card words it: a real device keeps its own name; the system's choice, an unnamed device and a
@@ -337,14 +355,15 @@ export function DevicePicker({ call, run, onDone, t }: { call: CallSnapshot; run
   );
 }
 
-/** One row's line in the card's words: where it runs, and a reach that is not normal (the dot says the rest). */
+/** One row's line in the card's words: where it runs, and a reach that is not normal (the dot says the rest; can't receive leads with
+ *  its slashed tray). */
 function conversationSub(row: ParticipantView, t: Translate) {
   const reach = row.reach === "holding" ? t("card.reach.holding") : row.reach === "offline" || !row.available ? t("card.reach.offline") : null;
   return (
     <>
       {row.machine && <span className="person-machine"><MachinesIcon size={11} /> {row.machine}</span>}
       {(row.harness || row.model) && <span className="person-harness">{row.harness && <HarnessIcon harness={row.harness} size={11} />} {[row.model, row.effort].filter(Boolean).join(" · ")}</span>}
-      {reach && <span className="person-reach"> · {reach}</span>}
+      {reach && <span className="person-reach"> · {row.reach === "holding" && <StateGlyph kind="holding" size={12} />}{reach}</span>}
     </>
   );
 }

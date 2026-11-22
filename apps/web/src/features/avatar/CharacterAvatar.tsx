@@ -1,12 +1,41 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type Ref } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type Ref } from "react";
 import { cn } from "../../lib/cn";
 import { useMotion } from "../../lib/motion";
 import { avatarKey, avatarTone, type AvatarSpec } from "./avatar-spec";
 import { ENGINE_MOOD, toTimeline, type AvatarState, type MouthLevel } from "./avatar-state";
-import { drawAvatar, engineSize, type AvatarSize } from "./bicho-draw";
+import { avatarColor, drawAvatar, engineSize, type AvatarSize, type DrawnSpec } from "./bicho-draw";
 import { useLayers } from "./layers";
+import { ATTENTION_EXPR, STILL_EXPR } from "./creature/faces";
+import { FALLBACK_PATH } from "./creature/fallback";
+import type { CreatureStep, FaceBox, LiveCreature, Slot } from "./creature/host";
+import { popFit } from "./fit-pop";
+import { creatureHostNow, loadCreatureHost, watchCreatureHost, type CreatureHost, type CreatureHostLoading } from "./creature-loader";
+import type { StageFrame } from "./creature/stage-frame";
 
-/* An avatar is a drawing and a state. The drawing is the bichos engine's SVG, made once per figure and size; the state
+/** The creature host once it has loaded (null until then) and whether its last load failed (creature-loader.ts). A
+ *  component that mounts asks for it, and asks again if the last load failed. */
+function useCreatureHost(): CreatureHostLoading {
+  const loading = useSyncExternalStore(watchCreatureHost, creatureHostNow);
+  useEffect(() => { if (!creatureHostNow().host) loadCreatureHost().catch(() => {}); }, []);
+  return loading;
+}
+
+const noWatch = () => () => {};
+const pct = (fraction: number) => Math.round(fraction * 10000) / 100 + "%";
+/** Whether the page can draw creatures now on the stage for `framing` (creature/host.ts: the stage's creature and the
+ *  still faces have a renderer each). It is read again each time that changes: a context lost and not given back, or
+ *  given back. */
+function useDrawable(host: CreatureHost | null, framing: Slot): boolean {
+  return useSyncExternalStore(host?.onCreaturesChange ?? noWatch, () => host?.creaturesDrawable(framing) ?? true);
+}
+
+/* A conversation's agent is its creature (creature/: a real-time 3D rig, CreatureAvatar below): one canvas, drawn by the
+ * page's creature stages: on the stage's scene, live (moving where the GPU moves the drawings, else in its state's key
+ * pose); everywhere else, a still face in its state's expression. Where no creature can be drawn (no WebGL, its context
+ * lost and not given back, its code not loaded), its fallback stands in (creature/fallback.ts), so the agent is never an
+ * empty box. The person and the Sidevoice mascot are still the bichos engine's drawings (the rest of this comment).
+ *
+ * An avatar is a drawing and a state. The drawing is the bichos engine's SVG, made once per figure and size; the state
  * (avatar-state.ts) is a handful of attributes on its root that CSS keys on (src/styles/bichos.css, the engine's;
  * styles/call.css, the app's), so React touches it once per state and never per frame. This component only draws: the
  * state is one object per figure, worked out and moved on in avatar-state.ts, so every copy of a figure (the stage, a
@@ -25,7 +54,8 @@ import { useLayers } from "./layers";
  *                      had in hand still on so it can drop away
  *   data-unread        it said something this browser has not seen yet: the "!" cue
  *   data-desk          a desk stands in front of it (the stage scene), so its working props rest on the desk top
- *   data-offline       the room cannot reach it: it sleeps (and the stage shows its wanted poster instead) */
+ *   data-offline       the room cannot reach it: it sleeps (and the stage shows its wanted poster instead)
+ *   data-fallback      a creature that cannot be drawn: its fallback (creature/fallback.ts) stands in for the canvas */
 
 export type { AvatarSize } from "./bicho-draw";
 
@@ -44,6 +74,28 @@ export interface CharacterAvatarProps {
   desk?: boolean;
   /** It moves, where the GPU moves it (the stage's agent, the card's creature); every other copy holds still. */
   live?: boolean;
+  /** The creature is drawn live and sharp even as a small face (the floating card's): one canvas of its box's size in device
+   *  pixels, on the page's card stage (creature/host.ts `sharp`), moving with `live` and in its key pose when it holds
+   *  still. Every other small copy is a still face. "whole": a creature on nothing (the floating card's avatar), framed so that
+   *  everything it acts out (a prop beside it, its antics overhead, their shadows) is inside its box, as the stage's crop holds it;
+   *  true frames it as a portrait (the title card's face, in its chip). Either way it is stepped back as far as everything it acts out
+   *  needs to stay inside its box (creature/extent.ts): a creature is never cut at its box's edge. */
+  liveFace?: boolean | "whole";
+  /** Drawn on the stage's scene (a creature): the canvas is the whole tile, the creature standing on its ground, its eyes
+   *  following the pointer over the tile. */
+  scene?: boolean;
+  /** A creature listening: the level of the voice it hears (the person's microphone), 0..1. */
+  hearLevel?: MouthLevel;
+  /** A still face that must never show blank (the transcript's, T40): rendered at once when it is not yet, and its
+   *  fallback outline stands in until its canvas is painted (while the creature's code loads too). Once painted, it keeps
+   *  its image until the next one is drawn over it. */
+  immediate?: boolean;
+  /** A still face that stands out of its square (a conversation's card): the whole creature, fitted from the extent of what is
+   *  drawn (fit-pop.ts) and standing on the square's foot, its head and its hat free to go over the square's edge. It is
+   *  hidden until its extent is known, so it never shows in a place it then leaves. */
+  pop?: boolean;
+  /** The stage's framing (creature/stage-frame.ts): the creature on the scene stands where the stage's voice text needs it. */
+  frame?: StageFrame;
   /** Said for the avatar; without one it is decoration. */
   label?: string;
   className?: string;
@@ -61,7 +113,116 @@ function useBeat(key: string | number | undefined): "a" | "b" | undefined {
   return key === undefined ? undefined : beat;
 }
 
-export function CharacterAvatar({ spec, state, size, mouth: asked = "voice", mouthKey, mouthLevel, desk, live, label, className, ref }: CharacterAvatarProps) {
+export function CharacterAvatar(props: CharacterAvatarProps) {
+  return props.spec.kind === "bicho" ? <CreatureAvatar {...props} seed={props.spec.seed} /> : <DrawnAvatar {...props} spec={props.spec} />;
+}
+
+/** The stage's figure box (styles/call.css .stage-agent, call-view.css --stage-head-y): its feet at 106 and the top of
+ *  its head at 20 of its 120. The creature stands in it, so what is laid out round the figure (the balloons, the
+ *  person's lift on a phone) stays where it was. */
+const FIGURE = { feet: 106 / 120, crown: 20 / 120 };
+
+/** A conversation's creature (creature/host.ts): live on the stage's scene, a still face elsewhere. */
+function CreatureAvatar({ spec, seed, state, size, mouth = "voice", mouthLevel, hearLevel, live, liveFace = false, scene, frame, immediate = false, pop = false, label, className, ref }: CharacterAvatarProps & { seed: string }) {
+  const root = useRef<HTMLSpanElement | null>(null);
+  const canvas = useRef<HTMLCanvasElement | null>(null);
+  const creature = useRef<LiveCreature | null>(null);
+  const motion = useMotion();
+  const moving = motion === "gpu" && !!live;
+  // The stage's creature is drawn live, moving or not (held still: its key pose, drawn again on each change). Every other
+  // copy is a still face in its state's expression, even one asked to move (the animated thumbnails): the reference animates
+  // no small face, and a page drawing a few creatures thirty times a second on a GPU-less machine stalls. The one small face
+  // that moves is the floating card's (liveFace): live, and sharp at its box's device pixels (host.ts, framing "face").
+  // The floating card's creature is the one small face that is drawn live, and sharp (liveFace).
+  const drawn = !!scene || (liveFace && state.mood !== "offline");
+  const framing = scene ? "scene" : "face";
+  const sharp = !!liveFace && !scene;
+  const whole = sharp && liveFace === "whole";
+  const slot: Slot = sharp ? "card" : framing;
+  const voice = useRef(0), heard = useRef(0);
+  useEffect(() => {
+    if (!moving || mouth !== "playback" || !mouthLevel) { voice.current = 0; return; }
+    // The rig reads the level each frame; the root says whether a voice is heard (data-mouth-active), as a drawing's does.
+    let active = false;
+    const stop = mouthLevel((level) => {
+      voice.current = level;
+      if ((level > 0) === active) return;
+      active = level > 0;
+      root.current?.toggleAttribute("data-mouth-active", active);
+    });
+    return () => { stop(); voice.current = 0; root.current?.removeAttribute("data-mouth-active"); };
+  }, [moving, mouth, mouthLevel]);
+  useEffect(() => {
+    if (!moving || !hearLevel) { heard.current = 0; return; }
+    return hearLevel((level) => { heard.current = level; });
+  }, [moving, hearLevel]);
+  const mood = state.mood;
+  // The host (three.js and the rig) loads the first time a creature is drawn; the room does not wait for it.
+  const { host, failed } = useCreatureHost();
+  const canDraw = useDrawable(host, slot);
+  // What it has on the go (its working style or pastime: creature/host.ts plays it as the rig's base act). A copy that holds
+  // still shows it at rest, quiet, never a pastime frozen mid-way; a working style it shows in its key pose (the creator
+  // under reduced motion).
+  const idle = moving || state.idle === undefined ? state.idle : "quiet";
+  const step = useMemo<CreatureStep>(() => ({ work: state.work, idle, since: state.since, until: state.until, entered: state.enteredAt }), [state.work, idle, state.since, state.until, state.enteredAt]);
+  // A face asked for at once (immediate): painted yet? Until it is, its fallback stands in, so it is never an empty box.
+  const [painted, setPainted] = useState(false);
+  // Where a popping face's creature stands in its render, once painted (the face's own extent).
+  const [extent, setExtent] = useState<FaceBox | null>(null);
+  const waiting = immediate && !drawn && !painted;
+  // Nothing to draw it with: the fallback stands in. While the host is loading for the first time, nothing does yet,
+  // but for a face asked for at once.
+  const fallback = host ? !canDraw || waiting : failed || waiting;
+  // What it shows when its host has loaded, whatever changed in the meantime.
+  const now = useRef({ mood, moving, step });
+  now.current = { mood, moving, step };
+  useEffect(() => {
+    const element = canvas.current;
+    if (!drawn || !element || !host) return;
+    // Mounted even where the page last found it could not draw: a mount is what tries again (null until it can).
+    const live = host.mountCreature({ seed, canvas: element, framing, sharp, whole, mood: now.current.mood, step: now.current.step, moving: now.current.moving, scene: () => {
+      // its feet on the figure's, the top of its body at the figure's crown, in the scene's own pixels
+      const figure = root.current, sceneBox = figure?.parentElement;
+      if (!figure || !sceneBox?.offsetHeight || !figure.offsetHeight) return null;
+      const H = sceneBox.offsetHeight, top = figure.offsetTop, size = figure.offsetHeight;
+      return { ground: (top + size * FIGURE.feet) / H, crown: (top + size * FIGURE.crown) / H };
+    },
+      gazeFrom: scene ? element.closest<HTMLElement>(".stage-tile") ?? element : null, frame: scene ? frame : undefined,
+      level: (acting) => (acting === "speaking" ? voice.current : heard.current) });
+    creature.current = live;
+    return () => { live?.dispose(); creature.current = null; };
+    // Its mood, what it has on the go and whether it moves are applied below without building the creature again. It is
+    // built again when the page can draw creatures again (canDraw).
+  }, [drawn, seed, framing, sharp, whole, scene, host, canDraw, frame]);
+  useEffect(() => { creature.current?.setMood(mood, { step }); }, [mood, step, drawn, seed, framing, sharp]);
+  useEffect(() => { creature.current?.setMoving(moving); }, [moving, drawn, seed, framing, sharp]);
+  // A still face: its state's expression (the card's states row, T34), surprised while it has something unread.
+  const expr = state.unread ? ATTENTION_EXPR : STILL_EXPR[mood];
+  // Before paint: a face already rendered is put at once (drawFace), so a face newly mounted never shows blank for a
+  // frame; one asked for at once (immediate) is rendered then if it is not yet, and says when it is painted.
+  useLayoutEffect(() => {
+    const element = canvas.current;
+    if (drawn || !element || !host) return;
+    const drawing = immediate || pop ? { now: immediate, drawn: (face: HTMLCanvasElement) => { if (immediate) setPainted(true); if (pop) setExtent(host.faceBox(face)); } } : undefined;
+    return host.drawFace(element, seed, expr, undefined, drawing);
+  }, [drawn, seed, expr, host, canDraw, immediate, pop]);
+  const fit = pop && !drawn && extent ? popFit(extent) : null;
+  // The state as the root says it, the same words as the engine's drawings (what it acts out, what it has on the go, its
+  // entrance).
+  return (
+    <span ref={(element) => { root.current = element; if (typeof ref === "function") ref(element); else if (ref) ref.current = element; }} className={cn("sv-avatar", className)}
+      data-style="creature" data-framing={framing} data-pop={pop && !drawn ? (fit ? "fitted" : "fitting") : undefined} data-avatar-state={mood} data-mood={ENGINE_MOOD[mood]} data-size={engineSize(size)}
+      data-mouth={mouth === "playback" && motion === "still" ? "still" : mouth} data-work={state.work} data-idle={idle} data-enter={state.enter}
+      data-unread={state.unread || undefined} data-offline={mood === "offline" || undefined} data-fallback={fallback || undefined}
+      style={avatarTone(avatarColor(spec)) as CSSProperties} role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true}>
+      <canvas ref={canvas} style={fit ? { width: pct(fit.width), height: pct(fit.height), left: pct(fit.left), bottom: pct(fit.bottom) } : undefined} />
+      {fallback && <svg className="creature-fallback" viewBox="0 0 100 100" aria-hidden="true"><path d={FALLBACK_PATH} /></svg>}
+    </span>
+  );
+}
+
+/** The person, the mascot: the bichos engine's drawing. */
+function DrawnAvatar({ spec, state, size, mouth: asked = "voice", mouthKey, mouthLevel, desk, live, label, className, ref }: CharacterAvatarProps & { spec: DrawnSpec }) {
   const avatar = useRef<HTMLSpanElement | null>(null);
   const motion = useMotion();
   // Held still means still (operator, 2026-10-21): where the drawings do not move as GPU layers, the mouth does not follow the

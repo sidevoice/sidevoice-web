@@ -1,0 +1,203 @@
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { act, cleanup, render } from "@testing-library/react";
+import { PresenceSound } from "./PresenceSound";
+import { RoomProvider } from "../../app/RoomProvider";
+import { createRoomStore } from "../../state/room-store";
+import { writeCallPreferences, type PresenceSound as PresenceChoice } from "../../services/call-preferences";
+import { resetThinkingSoundForTests } from "../../services/thinking-sound";
+
+/* The thinking sound through the app's own player (host.cue, iOS), with the real player: "only with the screen off" holds the
+ * app's cue for as long as the agent works, locked or not, with `whileLocked`, and the app plays it only while the screen is
+ * locked (a page may be suspended once it locks, and could not start it then). "Always" asks for it at once, as before. */
+
+vi.mock("../../services/room-session-controller.js", () => ({}));
+
+const KEY = "node|t1";
+const person = { thread_id: "t1", node: "node", title: "sidevoice-web", available: true, reach: { state: "listening" } };
+const ALL = ["sound", "gainDb", "intervalScale", "whileLocked"];
+
+/** A phone app with the cue's player (its options as given) and a screen that is not locked. */
+function asPhone(options: string[]) {
+  const cue = { start: vi.fn(), stop: vi.fn(), options };
+  const screen = { locked: vi.fn(async () => false) };
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { cue, screen } } });
+  return { cue, screen };
+}
+
+/** The page in a call on the conversation, the person's choice set first (in act: a page already drawn hears of it). */
+function inCall(presence: PresenceChoice) {
+  act(() => { writeCallPreferences({ presence }); });
+  const store = createRoomStore();
+  const { unmount } = render(<RoomProvider store={store}><PresenceSound /></RoomProvider>);
+  act(() => store.patch({ ws: {}, people: [person], callNode: "node", roomBinding: { thread_id: "t1" }, sessionId: "s" } as never));
+  const work = (busy: boolean) => act(() => store.patch((busy
+    ? { harness: { [KEY]: true }, workingSince: { [KEY]: 0 }, now: 60_000 } : { harness: { [KEY]: false }, workingSince: {} }) as never));
+  return { store, work, unmount };
+}
+
+beforeEach(() => { localStorage.clear(); });
+afterEach(() => { cleanup(); Reflect.deleteProperty(window, "__sidevoiceHost"); resetThinkingSoundForTests(); vi.unstubAllGlobals(); });
+
+test("screen off: while the agent works, the app's cue is held with whileLocked, the screen unlocked, and stopped when the work ends", async () => {
+  const { cue, screen } = asPhone(ALL);
+  const { work } = inCall("hidden");
+  expect(cue.start).not.toHaveBeenCalled();
+  work(true);
+  expect(cue.start).toHaveBeenCalledTimes(1);
+  expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "soft-heartbeat", gainDb: 0, intervalScale: 1, whileLocked: true });
+  // The app decides by the lock: the page does not ask the screen for it.
+  await act(async () => { await Promise.resolve(); });
+  expect(screen.locked).not.toHaveBeenCalled();
+  // A volume or a frequency changed while it is held keeps it held for the lock.
+  act(() => { writeCallPreferences({ soundIntervalScale: 2 }); });
+  expect(cue.start).toHaveBeenLastCalledWith("thinking", { sound: "soft-heartbeat", gainDb: 0, intervalScale: 2, whileLocked: true });
+  work(false);
+  expect(cue.stop).toHaveBeenCalledWith("thinking");
+});
+
+test("screen off: the call ended, or the setting changed, stops the held cue; Always asks for it at once, with no whileLocked", () => {
+  const { cue } = asPhone(ALL);
+  const { store, work, unmount } = inCall("hidden");
+  work(true);
+  act(() => store.patch({ ws: null, reconnecting: false } as never));
+  expect(cue.stop).toHaveBeenCalledTimes(1);
+  unmount();
+
+  const again = inCall("hidden");
+  again.work(true);
+  expect(cue.start).toHaveBeenCalledTimes(2);
+  act(() => { writeCallPreferences({ presence: "always" }); });
+  expect(cue.stop).toHaveBeenCalledTimes(2);
+  expect(cue.start).toHaveBeenCalledTimes(3);
+  expect(cue.start.mock.calls.at(-1)).toEqual(["thinking", { sound: "soft-heartbeat", gainDb: 0, intervalScale: 1 }]);
+  act(() => { writeCallPreferences({ presence: "off" }); });
+  expect(cue.stop).toHaveBeenCalledTimes(3);
+});
+
+test("always: the app's cue at once, never whileLocked", () => {
+  const { cue } = asPhone(ALL);
+  const { work } = inCall("always");
+  work(true);
+  expect(cue.start).toHaveBeenCalledTimes(1);
+  expect(cue.start.mock.calls[0][1]).not.toHaveProperty("whileLocked");
+  work(false);
+  expect(cue.stop).toHaveBeenCalledTimes(1);
+});
+
+test("an app whose cue does not hold for the lock (before whileLocked): screen off waits for the screen, as before", async () => {
+  vi.useFakeTimers();
+  try {
+    const { cue, screen } = asPhone(["sound", "gainDb", "intervalScale"]);
+    const { work } = inCall("hidden");
+    work(true);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(screen.locked).toHaveBeenCalled();
+    expect(cue.start).not.toHaveBeenCalled();
+    screen.locked.mockImplementation(async () => true);
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "soft-heartbeat", gainDb: 0, intervalScale: 1 });
+  } finally { vi.useRealTimers(); }
+});
+
+/** The page's Web Audio, enough to see its copy of the sound start and fade out: each play, when its stop takes effect on the
+ *  audio clock, and its `ended` then. The audio clock runs at half the page's pace (iOS holding the audio back): a page's
+ *  timer would say the fade is through long before it is. */
+function fakeWebAudio() {
+  const plays: { stops: number; until: number }[] = [];
+  const contexts: { currentTime: number }[] = [];
+  const origin = Date.now();
+  const clock = () => (Date.now() - origin) / 2000;
+  const param = () => ({ value: 1, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() });
+  class Source extends EventTarget {
+    buffer = null;
+    onended: (() => void) | null = null;
+    play = { stops: 0, until: Infinity };
+    private end: ReturnType<typeof setTimeout> | undefined;
+    connect() { return undefined; }
+    disconnect() { return undefined; }
+    start() { plays.push(this.play); }
+    stop(when = 0) {
+      this.play.stops++;
+      this.play.until = Math.min(this.play.until, when);
+      clearTimeout(this.end);
+      this.end = setTimeout(() => { this.onended?.(); this.dispatchEvent(new Event("ended")); }, Math.max(0, (this.play.until - clock()) * 2000));
+    }
+  }
+  class Context extends EventTarget {
+    constructor() { super(); contexts.push(this); }
+    state = "running";
+    get currentTime() { return clock(); }
+    destination = {};
+    resume = async () => undefined;
+    suspend = async () => undefined;
+    close = async () => undefined;
+    createGain() { return { gain: param(), connect: (next: unknown) => next, disconnect: () => undefined }; }
+    createDynamicsCompressor() {
+      return { threshold: param(), knee: param(), ratio: param(), attack: param(), release: param(), connect: (next: unknown) => next, disconnect: () => undefined };
+    }
+    createBufferSource() { return new Source(); }
+    async decodeAudioData() { return { duration: 0.6 }; }
+  }
+  vi.stubGlobal("AudioContext", Context);
+  vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) })));
+  return { plays, now: () => contexts[0].currentTime };
+}
+
+test("the app's cue offered after a working call is back: the page's copy stops and the cue is held for the lock", async () => {
+  vi.useFakeTimers();
+  try {
+    const { plays, now } = fakeWebAudio();
+    // An iPhone whose bridge has not had the app's answer yet: no cue, a screen that is locked.
+    let cue: { start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn>; options: string[] } | null = null;
+    const screen = { locked: vi.fn(async () => true) };
+    Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { screen, get cue() { return cue; } } } });
+    const { work } = inCall("hidden");
+    work(true);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    // Until then, the screen decides and the page plays its own copy.
+    expect(screen.locked).toHaveBeenCalled();
+    expect(plays.length).toBeGreaterThan(0);
+    expect(plays.some((play) => play.stops === 0)).toBe(true);
+    // The app answers mid-pulse: its cue is offered, and the page hands the sound over to it. The page's copy fades out
+    // first; the app's cue starts once the pulse has ended on the audio clock, never over it: not when a page's timer of
+    // the fade's length would have said so (150 ms; 300 ms here, the audio clock at half pace).
+    let startedAt = -1;
+    cue = { start: vi.fn(() => { startedAt = now(); }), stop: vi.fn(), options: ALL };
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+    expect(plays.every((play) => play.stops > 0)).toBe(true);
+    const faded = Math.max(...plays.map((play) => play.until));
+    expect(faded).toBeGreaterThan(now());
+    await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+    expect(cue.start).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(120); });
+    expect(cue.start).toHaveBeenCalledTimes(1);
+    expect(cue.start).toHaveBeenCalledWith("thinking", { sound: "soft-heartbeat", gainDb: 0, intervalScale: 1, whileLocked: true });
+    expect(startedAt).toBeGreaterThanOrEqual(faded - 1e-9);
+    // From then on the app decides by the lock: the screen is not asked, and the page plays nothing of its own.
+    const asked = screen.locked.mock.calls.length;
+    const played = plays.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    expect(screen.locked).toHaveBeenCalledTimes(asked);
+    expect(plays).toHaveLength(played);
+    work(false);
+    expect(cue.stop).toHaveBeenCalledWith("thinking");
+  } finally { vi.useRealTimers(); }
+});
+
+test("the desktop app (its call controls) is not watched for a cue: only the phone app grows one", () => {
+  const timers = vi.spyOn(globalThis, "setTimeout");
+  const callControls = { settings: async () => ({ alwaysShown: false }), setAlwaysShown: async () => ({ alwaysShown: false }) };
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { callControls } } });
+  const { work } = inCall("hidden");
+  work(true);
+  expect(timers.mock.calls.filter(([, ms]) => ms === 250)).toHaveLength(0);
+  timers.mockRestore();
+});
+
+test("in a browser nothing is watched for: no app, no cue to come", () => {
+  const timers = vi.spyOn(globalThis, "setTimeout");
+  const { work } = inCall("hidden");
+  work(true);
+  expect(timers.mock.calls.filter(([, ms]) => ms === 250)).toHaveLength(0);
+  timers.mockRestore();
+});

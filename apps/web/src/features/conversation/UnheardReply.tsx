@@ -1,5 +1,3 @@
-import { useState } from "react";
-import { CutIcon, CutMoreIcon } from "../../components/ui/Icons";
 import { translator } from "../../i18n/translator";
 import { uiLocale } from "../../i18n/locale";
 import type { ChatMessage } from "../../state/room-types";
@@ -7,7 +5,7 @@ import { wordEnd } from "./KaraokeText";
 
 /* How a reply settles once it has played (issue #182): heard whole, cut part-way, or never played. While it plays the
  * bubble is the karaoke's, whole, so nothing here applies until playback is over. A cut reply is drawn here; a reply
- * that never played is UnheardMark's row. */
+ * that never played is UnheardMark's folded bubble. */
 
 /** The cut, carried to the end of the word it falls in: the language's own word boundaries where the platform has them
  *  (CJK has no spaces), whitespace otherwise. */
@@ -39,18 +37,13 @@ export function hearingOf(message: ChatMessage): Hearing {
   return rest ? { kind: "cut", heard: message.text.slice(0, at).trimEnd(), rest } : { kind: "whole" };
 }
 
-/** The text of a cut reply: what was heard, the landing's marker (the pause bars and an arrow; its word shows on hover or
- *  focus), and the rest folded until asked for. */
+/** The text of a cut reply ('tag', T44–T48): what was heard, then the rest it never got to, quiet (it gains on hover), a
+ *  2px accent mark where it was cut (on hover), and the "Interrupted" tag. The rest is always there to read: the tag
+ *  says what it is, and the message's name says it to a screen reader (MessageBubble). */
 export function CutText({ heard, rest }: { heard: string; rest: string }) {
   const t = translator();
-  const [open, setOpen] = useState(false);
-  const name = t("messages.cut.interrupted");
-  const action = t(open ? "messages.cut.hide" : "messages.cut.show");
-  return <span className="cut-text" data-open={open || undefined}>
-    <span className="cut-heard">{heard}</span>{" "}
-    <button type="button" className="cut-marker" aria-expanded={open} aria-label={`${name} · ${action}`} onClick={() => setOpen(!open)}>
-      <span className="cut-icon" aria-hidden="true"><CutIcon className="cut-pause" /><CutMoreIcon className="cut-chevron" /></span><span className="cut-label" aria-hidden="true">{name}</span>
-    </button>
-    {open && <>{" "}<span className="cut-rest">{rest}</span></>}
+  return <span className="cut-text">
+    <span className="cut-heard">{heard}</span><span className="cut-point" aria-hidden="true" /><span className="cut-rest">{" " + rest}</span>
+    <span className="cut-tag">{t("messages.cut.interrupted")}</span>
   </span>;
 }

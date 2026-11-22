@@ -3,7 +3,9 @@ import { defaultVoiceSettings } from "../services/voice-settings.js";
 import { WORKING_SHOWN_AFTER_MS } from "../state/room-session-state.js";
 import { emptyOnboardingRecord, type OnboardingRecord, type OnboardingStep } from "../services/onboarding-state";
 import type { PairingSummary } from "../services/device-pairing.js";
-import type { UpdateMode, UpdaterStatus } from "../host";
+import type { CrashReportsMode, UpdateMode, UpdaterStatus } from "../host";
+import type { ServiceFailure } from "../features/crash-reports/service-failures";
+import type { FixtureOptions } from "./log-fixtures";
 import type { AgentReadinessStatus, TrialProgress } from "../state/room-types";
 
 /* Every screen the storyboard shows (journeys.html): each a state of the real app, seeded — the room's facts, the
@@ -30,8 +32,14 @@ export interface Shot {
   variants?: Record<string, string>;
   /** The desktop app's updater (a release's), where it has one: its status and its mode. */
   updater?: { status: UpdaterStatus; mode?: UpdateMode };
+  /** The desktop app's global shortcuts and headset (`host.shortcuts`'s status), where the shot shows them. */
+  shortcuts?: Record<string, unknown>;
   /** The desktop app's floating card settings (CallControlsBridge), where the shot shows them. */
   floatingCard?: boolean;
+  /** An app that sends crash reports (`host.crashReports`), with the choice and the first-run notice's flag it starts with; the
+   *  service failures it has been told of; and the logs the places can be read from (`sample`, with how they behave; none: no
+   *  place can be read, as is the case today). Absent: a browser, which has none of it. */
+  crashReports?: { mode?: CrashReportsMode; noticeSeen?: boolean; failures?: ServiceFailure[]; logs?: { sample: FixtureOptions } | "none" };
   /** A pairing code's redemption, for the pairing shots: its refusal, in the controller's words; the addresses the code
    *  lists (its https one when absent); and an address typed in the machine's address. */
   pairRefusal?: string;
@@ -126,6 +134,14 @@ const openSettings = (section: string) => (doc: Document) => {
   if (dialog && !dialog.open) dialog.showModal();
 };
 const press = (id: string) => (doc: Document) => { doc.getElementById(id)?.click(); };
+/** New conversation pressed, where it shows: at the list's foot on a desktop, in a phone's header. */
+const openNewConversation = (doc: Document) => {
+  const shown = [...doc.querySelectorAll<HTMLElement>(".sidebar-new button, .room-header .header-new")].find((button) => {
+    const box = button.getBoundingClientRect();
+    return box.width > 0 && box.top >= 0 && box.bottom <= (doc.defaultView?.innerHeight ?? 0);
+  });
+  shown?.click();
+};
 /** A reply of the agent's arriving once the page is drawn, after the transcript has marked the rest seen. */
 const arrives = (text: string) => (doc: Document) => {
   const history = BASE_FACTS.history as Record<string, unknown>[];
@@ -163,6 +179,38 @@ const TURN_TRIES = {
     return new Promise((_, reject) => setTimeout(() => reject({ code: "trial-cancelled" }), 0));
   } },
 };
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/** Settings at Crash reports, its rows opened as asked (the setting's preview, the logs). */
+const crashReportsOpen = (...open: ("report" | "logs")[]) => async (doc: Document) => {
+  openSettings("crash-reports")(doc);
+  await wait(100);
+  const toggles = doc.querySelectorAll<HTMLElement>(".crash-disclosure");
+  if (open.includes("report")) toggles[0]?.click();
+  if (open.includes("logs")) toggles[1]?.click();
+  // The lines (or what says there are none) drawn: the places are read, not at once on a busy machine.
+  for (let tries = 0; open.includes("logs") && tries < 60 && !doc.querySelector("#pane-crash-reports .logview, #pane-crash-reports .logs-status-box, #pane-crash-reports .logs-offline"); tries++) await wait(50);
+  await wait(150);
+  // The viewer at the top of the page, where the log is to be seen whole.
+  doc.querySelector<HTMLElement>("#pane-crash-reports .logs-viewer")?.scrollIntoView({ block: "start" });
+};
+/** A text typed into a field, as React hears it. */
+const typeInto = (field: HTMLInputElement, value: string) => {
+  Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), "value")!.set!.call(field, value);
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+};
+/** The logs' places: this device, the NUC (answering) and an old laptop (not). */
+const LOG_MACHINES = { pairings: [NUC, LAPTOP], callNode: NUC.fp, machineLinks: { [NUC.fp]: { reach: "ok", via: "node" }, [LAPTOP.fp]: { reach: "away", via: "" } } };
+const APP_RUNNING = { desktop: localBridge(running), facts: { ...LOG_MACHINES, pairings: [THIS, ...LOG_MACHINES.pairings], localHostStatus: running, localHostAvailable: true,
+  machineLinks: { ...LOG_MACHINES.machineLinks, [THIS.fp]: { reach: "ok", via: "node" } } } };
+const SAMPLE_LOGS = { sample: {} };
+const FAILURES: ServiceFailure[] = [
+  { id: "f-1", piece: "connector", machine: null, code: "connector.process_exited", at: new Date(2026, 10, 14, 14, 32, 4).getTime(), version: "0.21.0", exit: { code: 101 } },
+  { id: "f-2", piece: "core", machine: "fp-nuc", code: "core.panic", at: new Date(2026, 10, 14, 14, 32, 51).getTime(), version: "0.9.3", exit: { code: 101 } },
+  // The connector failed twice more: the same piece, place and code, so one strip with its count.
+  { id: "f-3", piece: "connector", machine: null, code: "connector.process_exited", at: new Date(2026, 10, 14, 14, 33, 40).getTime(), version: "0.21.0", exit: { code: 101 } },
+  { id: "f-4", piece: "connector", machine: null, code: "connector.process_exited", at: new Date(2026, 10, 14, 14, 35, 12).getTime(), version: "0.21.0", exit: { code: 101 } },
+];
 
 export const JOURNEYS: Journey[] = [
   { id: "first-run", title: "First run", note: "The setup, step by step, on a device that has none yet.", shots: [
@@ -230,18 +278,21 @@ export const JOURNEYS: Journey[] = [
         person("t-release", "Codex — release notes for 0.3 (gpt-6-astra)", { harness: "codex", engine: { model: "gpt-6-astra", effort: "medium" } }),
         person("t-review", "\"Review of PR #109: every language and the end-of-turn try\"", { harness: "claude-code" }), person("t-notes", "notes (Cursor)", { harness: "cursor", reach: { state: "holding" } })] } },
     { id: "conversations", caption: "A conversation on the stage; the others beside it (a phone: from the header).", facts: {} },
+    { id: "new-conversation", caption: "New conversation: the page cannot start one, so it says what to tell the agent, the phrase ready to copy.", after: openNewConversation },
     { id: "speaking", caption: "The agent speaking: its words as they are said.", facts: { botLive: true, karaokeState: { segment: "h-2", from: 0, to: 58 }, history: [
       ...(BASE_FACTS.history as unknown[]).slice(0, 1), { ...(BASE_FACTS.history as Record<string, unknown>[])[1], audio: "playing" }] } },
     { id: "speaking-long", caption: "A long reply: three lines at a time, its pages following the voice, the end of the page before fading above.",
       facts: { botLive: true, karaokeState: { segment: "h-3", from: 160, to: 200 }, history: [...(BASE_FACTS.history as unknown[]),
         { segment: "h-3", thread: "fp-nuc|t-web", role: "assistant", text: LONG_REPLY, name: "sidevoice-web", time: Date.now() - 5_000, session: "s1", seq: 3, audio: "playing" }] } },
     { id: "working", caption: "The agent working, for longer than the 3 s Working waits before it shows.", facts: { harness: { "fp-nuc|t-web": true }, workingSince: { "fp-nuc|t-web": 0 }, now: WORKING_SHOWN_AFTER_MS } },
+    { id: "working-transcript", caption: "The agent working, in the transcript: its status dot (purple, blinking), then Working and one static ellipsis.", facts: { harness: { "fp-nuc|t-web": true }, workingSince: { "fp-nuc|t-web": 0 }, now: WORKING_SHOWN_AFTER_MS }, after: press("transcript-toggle") },
     { id: "working-soon", caption: "The agent busy for less than 3 s: nothing says Working yet, so a quick back-and-forth never flashes it.", facts: { harness: { "fp-nuc|t-web": true }, workingSince: { "fp-nuc|t-web": 0 }, now: WORKING_SHOWN_AFTER_MS - 1000 } },
     { id: "listening", caption: "You speaking: your turn, as it is heard.", facts: { userLive: true, userTurn: { id: "u", segment: "u", thread: "fp-nuc|t-web" }, pendingPhase: "listening" } },
+    { id: "transcribing", caption: "Your turn being transcribed: the same five bars blink, no word.", facts: { userLive: false, userTurn: { id: "u", segment: "u", thread: "fp-nuc|t-web" }, pendingPhase: "transcribing" } },
     { id: "transcript", caption: "The transcript open.", after: press("transcript-toggle") },
     { id: "transcript-listening", caption: "You speaking, in the transcript: the stage's balloon at the column's width, its bars as they are heard.",
       facts: { userLive: true, userTurn: { id: "u", segment: "u", thread: "fp-nuc|t-web" }, pendingPhase: "listening" }, after: press("transcript-toggle") },
-    { id: "transcript-transcribing", caption: "Your turn being transcribed, in the transcript: the bars hold their shape and blink.",
+    { id: "transcript-transcribing", caption: "Your turn being transcribed, in the transcript: the same pill, its five bars blinking.",
       facts: { userLive: true, userTurn: { id: "u", segment: "u", thread: "fp-nuc|t-web" }, pendingPhase: "transcribing" }, after: press("transcript-toggle") },
     { id: "turn-manual-heard", caption: "A written reply heard through manual replay keeps its original delivery record without a current not-played mark.",
       facts: { history: [...(BASE_FACTS.history as unknown[]), { segment: "turn-manual-heard", thread: "fp-nuc|t-web", role: "assistant", text: "I found the failing setting and fixed it.", name: "sidevoice-web", time: Date.now(), session: "s1", seq: 3, audio: "text_only", audio_reason: "voice_off", heard_chars: 41, hearing: "heard", globally_heard: true, replayable: false }] },
@@ -265,6 +316,27 @@ export const JOURNEYS: Journey[] = [
     { id: "s-voice", caption: "Voice.", after: openSettings("voice") },
     { id: "s-call", caption: "Call: end of turn and patience (with their timings), the thinking sound, the screen.", after: openSettings("call") },
     { id: "s-floating-card", caption: "Floating card (the desktop app): its style with a still preview of each, its starting size, its first corner, the controls always shown, and a reset.", floatingCard: true, views: ["desktop"], after: openSettings("floating-card") },
+    { id: "s-shortcuts", caption: "Shortcuts in a browser with a keyboard: only the keys inside Sidevoice, each recorded in the same field.", views: ["desktop"], after: openSettings("shortcuts") },
+    { id: "s-shortcuts-desktop", caption: "Shortcuts in the desktop app: anywhere on the computer (with a single key and its permission), the headset's buttons, and inside Sidevoice.", views: ["desktop"],
+      shortcuts: { shortcuts: {
+        holdToTalk: { accelerator: "Fn:hold", label: "Fn", state: "needsPermission", alternatives: [], voiceOver: false },
+        mute: { accelerator: "Ctrl+Alt+Shift+M", label: "Ctrl+Alt+Shift+M", state: "on", alternatives: [], voiceOver: false },
+        oneTurn: { accelerator: null, label: null, state: "off", alternatives: [], voiceOver: false } },
+        permission: { kind: "inputMonitoring", state: "notAsked" }, headset: { press: "mute", doublePress: "skip", outsideCall: "leave" } },
+      after: openSettings("shortcuts") },
+    { id: "s-shortcuts-phone", caption: "Shortcuts on an Android phone: the host (the mobile app) reports the headset alone, both presses with every action, so only Single press and Double press show; no keys of the page's own, whatever the device.", views: ["phone"],
+      shortcuts: { shortcuts: {}, permission: null, inApp: false, headset: { press: "mute", doublePress: "oneTurn", outsideCall: "leave",
+        actions: { press: ["mute", "oneTurn", "skip", "none"], doublePress: ["mute", "oneTurn", "skip", "none"] } } },
+      after: openSettings("shortcuts") },
+    { id: "s-shortcuts-iphone", caption: "Shortcuts on an iPhone (no CallKit): no double press reaches the app, and the single press is the system's Press to Mute alone: its usual row, disabled on Mute, with a note saying why.", views: ["phone"],
+      shortcuts: { shortcuts: {}, permission: null, inApp: false, headset: { press: "mute", doublePress: null, outsideCall: "leave", actions: { press: ["mute"] } } },
+      after: openSettings("shortcuts") },
+    { id: "s-shortcuts-phone-older", caption: "Shortcuts on a phone whose app predates the granular report (iOS TestFlight 61): both rows with every action, and the note on the playback card, as before.", views: ["phone"],
+      shortcuts: { shortcuts: {}, permission: null, inApp: false, headset: { press: "mute", doublePress: "oneTurn", outsideCall: "leave", nonDefaultAddsCard: true } },
+      after: openSettings("shortcuts") },
+    { id: "s-shortcuts-phone-system", caption: "Shortcuts on a phone while the system's call holds the headset: the rows stay, read-only, and say the system mutes.", views: ["phone"],
+      shortcuts: { shortcuts: {}, permission: null, inApp: false, headset: { press: "mute", doublePress: "none", outsideCall: "leave", managedBySystem: true } },
+      after: openSettings("shortcuts") },
     { id: "s-providers-none", caption: "Providers: none connected.", facts: { providerKeys: { elevenlabs: false, openai: false } }, after: openSettings("providers") },
     { id: "s-providers", caption: "Providers: one connected, one to connect.", after: openSettings("providers") },
     { id: "s-providers-error", caption: "Providers: a key the provider refused, in its words.", facts: { voiceCatalogue: { state: "ready", error: "", catalogs: CATALOGS.map((c) => c.id === "elevenlabs" ? { ...c, status: { stale: false, reason: { code: "credential-rejected" }, detail: "invalid_api_key" } } : c) } }, after: openSettings("providers") },
@@ -283,6 +355,52 @@ export const JOURNEYS: Journey[] = [
     { id: "s-machine-offline", caption: "Machines: a remote machine that does not answer.", facts: { pairings: [LAPTOP, NUC], callNode: null, machineLinks: { [LAPTOP.fp]: { reach: "away", via: "" }, [NUC.fp]: { reach: "ok", via: "node" } } }, after: openSettings("machines") },
     { id: "s-machine-revoked", caption: "Machines: a machine that no longer knows this device.", facts: { pairings: [{ ...NUC, revoked: true }], callNode: null, machineLinks: { [NUC.fp]: { reach: "revoked", via: "" } } }, after: openSettings("machines") },
     { id: "s-advanced", caption: "Advanced: memory when idle, the downloaded models, reset, the build.", facts: { modelsRemovable: true }, after: openSettings("advanced") },
+  ] },
+  { id: "crash-reports", title: "Crash reports and logs", note: "Where the app sends them (the desktop and mobile apps; a browser sends none): the one setting, what a report holds, the logs of this device and of each machine, the one-line notice once, and a service that failed told as any failure is.", shots: [
+    { id: "cr-section", caption: "Settings › Crash reports: Send automatically (the default) with See what is sent under its words, then Logs with their advice and See logs; both closed.",
+      crashReports: { logs: "none" }, after: openSettings("crash-reports") },
+    { id: "cr-report", caption: "See what is sent, opened: the fields of a report, an example of each, and what is never sent. Opens with no line above it.",
+      crashReports: { logs: "none" }, after: crashReportsOpen("report") },
+    { id: "cr-never", caption: "Don't send chosen: its words say nothing is sent, and the preview stays one press away.", crashReports: { mode: "never", logs: "none" }, after: crashReportsOpen() },
+    { id: "cr-logs", caption: "See logs, opened on this device: its tabs (this device, then each machine), the search and Filters, the lines as the file has them (a panic with its backtrace in full), how many, how many to ask for, Copy and Open folder.",
+      crashReports: { logs: SAMPLE_LOGS }, ...APP_RUNNING, after: crashReportsOpen("logs") },
+    { id: "cr-logs-filters", caption: "Filters: the level as cards with counts, the pieces as chips with counts, what is left in sight; what is on shows under the search as chips that come off.", views: ["desktop"],
+      crashReports: { logs: SAMPLE_LOGS }, ...APP_RUNNING, after: async (doc) => {
+        await crashReportsOpen("logs")(doc);
+        doc.querySelector<HTMLElement>("#pane-crash-reports .logs-row button")?.click();
+        await wait(150);
+        doc.querySelector<HTMLElement>('.logs-pop [role=radio][data-level=warn]')?.click();
+        await wait(50);
+        [...doc.querySelectorAll<HTMLElement>(".logs-pop .logs-chip")].find((chip) => chip.textContent?.startsWith("Connector"))?.click();
+        await wait(150);
+      } },
+    { id: "cr-logs-search-empty", caption: "A search nothing matches: the log says so, and Clear filters brings the lines back.", views: ["desktop"],
+      crashReports: { logs: SAMPLE_LOGS }, ...APP_RUNNING, after: async (doc) => {
+        await crashReportsOpen("logs")(doc);
+        typeInto(doc.querySelector<HTMLInputElement>("#pane-crash-reports [role=searchbox]")!, "no such text");
+        await wait(250);
+      } },
+    { id: "cr-logs-away", caption: "Scrolled up from the end: the log keeps its place, and the chat's way back to the latest floats over it, with a dot once new lines have come.", views: ["desktop"],
+      crashReports: { logs: { sample: { liveEveryMs: 300 } } }, ...APP_RUNNING, after: async (doc) => {
+        await crashReportsOpen("logs")(doc);
+        const log = doc.querySelector<HTMLElement>("#pane-crash-reports .logview");
+        if (log) { log.scrollTop = Math.max(0, log.scrollHeight / 2); log.dispatchEvent(new Event("scroll")); }
+        await wait(1000);
+      } },
+    { id: "cr-logs-offline", caption: "A machine that is not connected: its tab says so and its logs will appear when it reconnects (the app keeps none of them).", views: ["desktop"],
+      crashReports: { logs: SAMPLE_LOGS }, ...APP_RUNNING, after: async (doc) => {
+        await crashReportsOpen("logs")(doc);
+        [...doc.querySelectorAll<HTMLElement>("#pane-crash-reports [role=tab]")].find((tab) => tab.textContent?.includes("Old laptop"))?.click();
+        await wait(150);
+      } },
+    { id: "cr-logs-unavailable", caption: "Where no log can be read from yet (today: the app and the machines serve no lines), the tab says so.", views: ["desktop"],
+      crashReports: { logs: "none" }, ...APP_RUNNING, after: crashReportsOpen("logs") },
+    { id: "cr-logs-loading", caption: "A place being read: the box keeps its size and says so, so nothing moves when the lines arrive.", views: ["desktop"],
+      crashReports: { logs: { sample: { delayMs: 2 ** 31 - 1 } } }, ...APP_RUNNING, after: crashReportsOpen("logs") },
+    { id: "cr-notice", caption: "The first-run notice, once after the setup (and once on a device that updates): one line under the header, a link to the setting and a ×; it asks nothing and blocks nothing.",
+      crashReports: { noticeSeen: false } },
+    { id: "cr-failure", caption: "A connector or a core that failed and restarted, told as the app tells a failure: the danger strip, its facts behind Details (code, time, version, how it ended), and a × to put it away. A service that keeps failing is one strip with its count.",
+      crashReports: { failures: FAILURES }, after: (doc) => { doc.querySelector<HTMLElement>(".service-failure-notices summary")?.click(); } },
   ] },
   { id: "updates", title: "Updates and what's new", note: "What wants updating, said over the room without moving it; what a release added, shown once, never the setup again.", shots: [
     { id: "u-web", caption: "A new version of the page while in a call: Reload loads it at once, in the call or not.", facts: { webUpdate: "b2" } },

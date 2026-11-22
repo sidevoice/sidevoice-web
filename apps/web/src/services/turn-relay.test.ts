@@ -75,3 +75,11 @@ test("an end the room refused because its start was is handed back, and goes as 
   relay.ended("d", "m-d-end", turn("d", "finished", { text: "x" }));
   expect(relay.refusedMessage("m-d-end", "room.text_too_long")).toBeNull();
 });
+
+test("a start refused long after it went (a hundred turns later) is still held, with its words", () => {
+  const relay = createTurnRelay();
+  relay.sent("slow", "m-slow", { turn_id: "slow", phase: "started" });
+  for (let i = 0; i < 100; i += 1) relay.sent("t" + i, "m" + i, { turn_id: "t" + i, phase: "started" });
+  relay.refusedMessage("m-slow", "room.turns_full");
+  expect(relay.route({ turn_id: "slow", phase: "finished", text: "words" })).toEqual({ hold: true });
+});

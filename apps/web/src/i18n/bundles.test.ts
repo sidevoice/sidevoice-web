@@ -12,16 +12,19 @@ const placeholders = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((mat
 
 test("the interface is offered in exactly the languages that have a catalogue, each in its own name", () => {
   expect([...UI_LANGUAGES].sort()).toEqual([...locales.keys()].sort());
-  expect([...locales.keys()].sort()).toEqual(["de", "en", "es", "fr", "it", "ja", "pl", "zh-Hans"]);
+  expect([...locales.keys()].sort()).toEqual(["de", "en", "es", "fr", "hi", "it", "ja", "ko", "pl", "pt-BR", "zh-Hans"]);
   for (const [language, locale] of locales) {
     expect(locale.name.trim(), language).not.toBe("");
     expect(languageName(language)).toBe(locale.name);
   }
 });
 
-test("a system's language finds its catalogue: Simplified Chinese only, and English for anything else", () => {
+test("a system's language finds its catalogue: Simplified Chinese only, all Portuguese in Brazil's, and English for anything else", () => {
   expect(systemLanguage(UI_LANGUAGES, ["zh-CN"])).toBe("zh-Hans");
-  for (const tag of ["zh-Hant", "zh-TW", "zh-HK", "zh-MO", "ko-KR"]) expect(systemLanguage(UI_LANGUAGES, [tag]), tag).toBe("en");
+  for (const tag of ["pt", "pt-BR", "pt-PT", "pt_PT.UTF-8"]) expect(systemLanguage(UI_LANGUAGES, [tag]), tag).toBe("pt-BR");
+  expect(systemLanguage(UI_LANGUAGES, ["ko-KR"])).toBe("ko");
+  expect(systemLanguage(UI_LANGUAGES, ["hi-IN"])).toBe("hi");
+  for (const tag of ["zh-Hant", "zh-TW", "zh-HK", "zh-MO", "vi-VN"]) expect(systemLanguage(UI_LANGUAGES, [tag]), tag).toBe("en");
   for (const language of UI_LANGUAGES) expect(systemLanguage(UI_LANGUAGES, [language]), language).toBe(language);
 });
 

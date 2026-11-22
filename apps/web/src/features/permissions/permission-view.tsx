@@ -9,7 +9,7 @@ import { uiLanguage, type MessageKey, type Translate } from "../../i18n/translat
 import "./permissions.css";
 
 /* What Sidevoice needs to be allowed on this device, as the setup's permissions step and Settings › Permissions both say
- * it (briefs/plans/permissions-screen.md). Today that is the microphone alone: the global mute shortcut is a Carbon hot
+ * it (briefs/plans/permissions-screen.md). The microphone, and where the app lowers or pauses other apps the permissions that needs (media-permissions.tsx). Not Accessibility: the global mute shortcut is a Carbon hot
  * key and the headset's buttons the Now Playing commands, neither of which needs macOS's Accessibility; nothing pastes,
  * notifies or listens to keys system-wide. Each permission is one row — its name, why in one line, where it stands, and
  * what can be done — so another can join the list without a new screen. */

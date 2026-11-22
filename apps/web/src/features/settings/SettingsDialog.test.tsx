@@ -70,21 +70,21 @@ function inDesktopApp() {
 
 const navLabels = () => [...document.querySelectorAll(".settings-nav > button")].map((button) => button.textContent);
 
-test("Shortcuts is hidden for now (sidevoice-web#148): not with a keyboard, not in the desktop app, and a place asked in it opens General", async () => {
+test("Shortcuts shows where a keyboard is likely, after Permissions, and opens", async () => {
   withKeyboard();
   withMicrophone();
   const store = open("whisper-base");
-  expect(navLabels()).toEqual(["General", "Transcription", "Voice", "Call", "Permissions", "Providers", "Machines", "Advanced"]);
-  expect(document.getElementById("pane-shortcuts")).toBeNull();
+  expect(navLabels()).toEqual(["General", "Transcription", "Voice", "Call", "Permissions", "Shortcuts", "Providers", "Machines", "Advanced"]);
   act(() => store.patch({ settingsSection: "shortcuts" }));
-  expect(store.getState().facts.settingsSection).toBe("general");
-  expect(document.getElementById("pane-general")).not.toHaveAttribute("hidden");
+  expect(store.getState().facts.settingsSection).toBe("shortcuts");
+  expect(document.getElementById("pane-shortcuts")).not.toHaveAttribute("hidden");
+  expect(within(document.getElementById("pane-shortcuts")!).getByText("In Sidevoice")).toBeInTheDocument();
 });
 
-test("in the desktop app Shortcuts is hidden too, and the floating card has its own section after Call", async () => {
+test("in the desktop app Shortcuts shows with its global shortcuts, and the floating card has its own section after Call", async () => {
   inDesktopApp();
   open("whisper-base");
-  expect(navLabels()).not.toContain("Shortcuts");
+  expect(navLabels()).toContain("Shortcuts");
   expect(navLabels().slice(3, 5)).toEqual(["Call", "Floating card"]);
   fireEvent.click(document.getElementById("settings-call")!);
   const call = document.getElementById("pane-call")!;
@@ -197,6 +197,34 @@ test("the thinking sound and the screen are this device's, applied at once", () 
   expect(screen.getByRole("radio", { name: "Screen off" })).toHaveAttribute("aria-checked", "true");
   fireEvent.click(screen.getByRole("radio", { name: "Always" }));
   expect(JSON.parse(localStorage.getItem("sidevoice.call-preferences")!).presence).toBe("always");
+  localStorage.removeItem("sidevoice.call-preferences");
+});
+
+test("while the agent works: when, then which sound, its volume, its frequency and a try, all off with the sound", () => {
+  localStorage.removeItem("sidevoice.call-preferences");
+  open("whisper-base");
+  fireEvent.click(document.getElementById("settings-call")!);
+  const group = screen.getByText("While the agent works").closest(".ui-group")!;
+  expect([...group.querySelectorAll(".ui-row-label")].map((label) => label.textContent))
+    .toEqual(["Thinking sound", "Sound", "Volume", "Frequency", "Try"]);
+  expect(within(group as HTMLElement).getByText("Only with the screen off.")).toBeInTheDocument();
+  expect(document.getElementById("thinking-sound")).toHaveTextContent("Soft heartbeat");
+  expect(within(group as HTMLElement).getByText("0 dB")).toBeInTheDocument();
+  fireEvent.change(screen.getByRole("slider", { name: "Volume" }), { target: { value: "-3" } });
+  expect(JSON.parse(localStorage.getItem("sidevoice.call-preferences")!)).toMatchObject({ sound: "soft-heartbeat", soundGainDb: -3 });
+  expect(within(group as HTMLElement).getByText("every 7–10 s")).toBeInTheDocument();
+  fireEvent.change(screen.getByRole("slider", { name: "Frequency" }), { target: { value: "2" } });
+  expect(JSON.parse(localStorage.getItem("sidevoice.call-preferences")!)).toMatchObject({ soundGainDb: -3, soundIntervalScale: 1.5 });
+  expect(within(group as HTMLElement).getByText("every 10.5–15 s")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("radio", { name: "Off" }));
+  expect(within(group as HTMLElement).getByText("No sound.")).toBeInTheDocument();
+  expect(document.getElementById("thinking-sound")).toBeDisabled();
+  expect(screen.getByRole("slider", { name: "Volume" })).toBeDisabled();
+  expect(screen.getByRole("slider", { name: "Frequency" })).toBeDisabled();
+  expect(document.getElementById("thinking-sound-try")).toBeDisabled();
+  fireEvent.click(screen.getByRole("radio", { name: "Always" }));
+  expect(within(group as HTMLElement).getByText("Whenever the agent works.")).toBeInTheDocument();
+  expect(document.getElementById("thinking-sound-try")).toBeEnabled();
   localStorage.removeItem("sidevoice.call-preferences");
 });
 
@@ -362,6 +390,38 @@ test("Permissions wears the warning dot while the microphone is not allowed, sai
   expect(document.querySelector("#settings-permissions .settings-attention")).toBeNull();
 });
 
+test("Permissions wears the warning dot for a media permission the current choice needs, not for one the system can't say", async () => {
+  const cases: [Record<string, string>, boolean][] = [
+    [{ mode: "lower", lower: "some-apps", pause: "some-apps", capture: "denied", access: "granted" }, true],
+    [{ mode: "pause", lower: "per-app", pause: "some-apps", capture: "granted", access: "undetermined" }, true],
+    [{ mode: "lower", lower: "per-app", pause: "some-apps", capture: "granted", access: "denied" }, false],
+    [{ mode: "off", lower: "some-apps", pause: "some-apps", capture: "denied", access: "denied" }, false],
+    [{ mode: "pause", lower: "some-apps", pause: "some-apps", capture: "unknown", access: "unknown" }, false],
+  ];
+  onTestFinished(() => { delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; });
+  // No microphone to ask: the dot is the media permission's alone.
+  for (const [status, lit] of cases) {
+    Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { mediaDuck: { get: async () => status, set: async () => status } } } });
+    open("whisper-base");
+    await waitFor(() => expect(document.getElementById("settings-permissions")).not.toBeNull());
+    await act(async () => {});
+    const dot = document.querySelector("#settings-permissions .settings-attention");
+    if (lit) expect(dot?.getAttribute("aria-label"), JSON.stringify(status)).toBe("A permission needed for Other apps’ media isn’t allowed yet.");
+    else expect(dot, JSON.stringify(status)).toBeNull();
+    cleanup();
+  }
+});
+
+test("the warning dot follows the choice made in Call at once", async () => {
+  const status = { mode: "off", lower: "some-apps", pause: "some-apps", capture: "denied", access: "granted" };
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { mediaDuck: { get: async () => status, set: async (mode: string) => ({ ...status, mode }) } } } });
+  onTestFinished(() => { delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; });
+  const store = open("whisper-base");
+  act(() => store.patch({ settingsSection: "call" }));
+  fireEvent.click(await within(document.getElementById("pane-call")!).findByRole("radio", { name: "Lower volume" }));
+  await waitFor(() => expect(document.querySelector("#settings-permissions .settings-attention")).not.toBeNull());
+});
+
 /* Developer options (operator, 2026-10-21): a section below Advanced, English only, for a nightly desktop build with
  * developer mode on (turned on from the build in Advanced: developer-mode.test.tsx, and below) — or, for a browser or
  * a playground, with the turn-tuning flag set by hand. It holds the turn tuning panel, no longer Advanced's, and the
@@ -503,4 +563,37 @@ test("a section shown again reads the app's switches as it holds them now, not a
   act(() => { setDeveloperMode(true); });
   fireEvent.click(document.getElementById("settings-developer")!);
   expect(screen.getByRole("switch", { name: "Compositing borders" })).toHaveAttribute("aria-checked", "true");
+});
+
+test("no microphone to ask, but the app reports a media permission: Permissions shows it, and Call's Open Permissions lands there", async () => {
+  const status = { mode: "lower", lower: "some-apps", pause: "some-apps", capture: "undetermined", access: "granted" };
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { mediaDuck: { get: async () => status, set: async () => status } } } });
+  onTestFinished(() => { delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; });
+  const store = open("whisper-base");
+  act(() => store.patch({ settingsSection: "call" }));
+  fireEvent.click(await within(document.getElementById("pane-call")!).findByRole("button", { name: "Open Permissions ›" }));
+  expect(store.getState().facts.settingsSection).toBe("permissions");
+  expect(navLabels()).toContain("Permissions");
+  expect(await within(document.getElementById("pane-permissions")!).findByText("System Audio Recording")).toBeInTheDocument();
+  await act(async () => {});
+  expect(store.getState().facts.settingsSection).toBe("permissions");
+});
+
+test("no microphone to ask and the media status cannot be read: Permissions opens General, never a blank page", async () => {
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { mediaDuck: { get: async () => { throw new Error("no"); }, set: async () => { throw new Error("no"); } } } } });
+  onTestFinished(() => { delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; });
+  const store = open("whisper-base");
+  act(() => store.patch({ settingsSection: "permissions" }));
+  await waitFor(() => expect(store.getState().facts.settingsSection).toBe("general"));
+});
+
+/* "Keep the screen on during a call" is offered on every host (operator, 2026-11-22): a browser holds it with its Screen
+ * Wake Lock, an app with the platform's (host.presence.screenAwake). */
+test.each([["a browser", undefined], ["an app that holds the screen itself", { media: "app", screenAwake: { supported: true, acquire: async () => "held", release: () => {}, onReleased: () => () => {} } }], ["an app that leaves it to the page", { media: "app" }]])("%s shows the keep-the-screen-on row", (_, presence) => {
+  if (presence) Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel: "release", version: "1.0.0" }, presence } } });
+  onTestFinished(() => { localStorage.clear(); delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; });
+  open("whisper-base");
+  fireEvent.click(document.getElementById("settings-call")!);
+  const row = within(document.getElementById("pane-call")!).getByRole("switch", { name: "Keep the screen on during a call" });
+  if (presence && "screenAwake" in presence) expect(row).toBeEnabled();
 });

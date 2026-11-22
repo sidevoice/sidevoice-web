@@ -15,3 +15,19 @@ export function refusalError(refusal){
  }
  return new Error(typeof refusal==='string'?refusal:'');
 }
+
+/** The core's refusal of a request from a session it no longer has registered in the room (dropped, restarted, or the
+ *  call moved to no conversation). */
+export const DEVICE_ABSENT='room.browser_absent';
+
+/**
+ * Whether a refusal means the call's session was lost and the page should join again: the room says this device is
+ * absent, while the page believes it is in a call, on the session the refused request was made under (a request of an
+ * earlier session, refused late, says nothing of the one now), and no rejoin is already under way.
+ * @param {unknown} refusal
+ * @param {{inCall: boolean, sameSession: boolean, reconnecting: boolean}} page
+ * @returns {boolean}
+ */
+export function shouldRejoin(refusal,{inCall,sameSession,reconnecting}){
+ return refusalError(refusal).key===DEVICE_ABSENT&&inCall&&sameSession&&!reconnecting;
+}

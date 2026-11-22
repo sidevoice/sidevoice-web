@@ -225,20 +225,23 @@ test("Machines is a list, each machine's state on its row; a machine is a page o
   await open();
   await tap(row("machines"));
   expect(title()).toHaveTextContent(/^Machines$/);
-  const list = document.querySelector<HTMLElement>(".machines-menu")!;
-  expect([...list.querySelectorAll(".settings-menu-row")].map((entry) => [entry.querySelector(".settings-menu-label")?.textContent, entry.querySelector(".settings-menu-summary")?.textContent ?? null]))
-    .toEqual([["NUC", ""], ["Lab box", ""], ["Add a machine", null]]);
+  // The overview: a row each — its name, and where it stands: a machine that does not answer says so — then Add a machine.
+  const list = document.querySelector<HTMLElement>("#pane-machines .settings-sublevel")!;
+  expect([...list.querySelectorAll("[data-machine-row]")].map((entry) => [entry.querySelector(".svc-link-name")?.textContent, entry.querySelector(".ui-badge")?.textContent ?? null]))
+    .toEqual([["NUC", null], ["Lab box", "Offline"]]);
+  expect(within(list).getByRole("button", { name: "Add a machine" })).toBeInTheDocument();
   // Connected: the green dot on its icon; not connected, nothing — both said in its name.
   expect(list.querySelector('[data-machine="fp-nuc"] .state-on-icon-dot')).not.toBeNull();
   expect(list.querySelector('[data-machine="fp-lab"] .state-on-icon-dot')).toBeNull();
   // Paired without encryption: nothing after its name, and its name as any machine's.
-  expect(list.querySelector('[data-machine="fp-lab"] .settings-menu-label')!.children.length).toBe(1);
   expect(list.querySelector('[data-machine="fp-lab"] svg.lucide-lock-open')).toBeNull();
-  expect(list.querySelector('[data-machine="fp-lab"]')).toHaveAccessibleName("Lab box, Offline");
-  // Add a machine opens a dialog, not a page: no chevron; and no chips at the page's head.
-  expect(list.querySelector(".settings-menu-row--add .settings-menu-chevron")).toBeNull();
+  expect(list.querySelector('[data-machine="fp-lab"]')).toHaveAccessibleName(/^Lab box ?Offline$/);
+  expect(list.querySelector('[data-machine="fp-nuc"]')).toHaveAccessibleName(/^NUC ?, Online$/);
+  // Each row opens a page, so each has its chevron; and no chips at the page's head.
+  expect(list.querySelector('[data-machine="fp-lab"] .svc-chevron')).not.toBeNull();
   expect(document.querySelector(".machines-inline")).toBeNull();
-  await tap(within(list).getByText("Add a machine"));
+  // Add a machine opens a dialog, not a page.
+  await tap(within(list).getByRole("button", { name: "Add a machine" }));
   expect(window.sidevoiceActions!.openPairing).toHaveBeenCalled();
 
   await tap(list.querySelector('[data-machine="fp-lab"]')!);

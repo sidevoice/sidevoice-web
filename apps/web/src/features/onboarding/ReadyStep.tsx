@@ -83,6 +83,6 @@ export function ReadyStep({ path, machineName, title, t, live, microphoneNone = 
       </dl>
       <p className="wizard-recap-note">{t("wizard.recap.note")}</p>
     </div>
-    <div className="wizard-ready-connect"><ConnectYourAgent titleAs="h3" /></div>
+    <div className="wizard-ready-connect"><ConnectYourAgent titleAs="h3" compact /></div>
   </section>;
 }

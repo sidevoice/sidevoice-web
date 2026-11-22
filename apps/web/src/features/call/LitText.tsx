@@ -13,7 +13,8 @@ import "./lit-text.css";
  * of it transform on layers of their own, which the GPU composites without painting. The offsets are whole pixels, so the
  * two layers cancel exactly. A word lights whole (`wordEnd`), as before.
  *
- * `lit-heard` is an empty box at the lit end, one line tall, for PagedText to find the line holding the last word heard. */
+ * `lit-heard` is an empty box at the lit end, one line tall, saying the line it is on (data-line), for PagedText to find the
+ * line holding the last word heard. */
 
 /** The lines of the dim copy and where `end` falls: the line holding the last lit character and the right edge of it, in the
  *  box's own pixels (what an ancestor's transform does to the box is divided out), or null when nothing is lit. */
@@ -57,6 +58,10 @@ export function LitText({ text, spoken }: { text: string; spoken: number }) {
     (row.firstElementChild as HTMLElement).style.transform = `translate(${width - across}px, ${-down}px)`;
     mark.hidden = !at;
     mark.style.transform = `translate(${across}px, ${down}px)`;
+    // The line it is on, for whatever pages these words (PagedText): measured here, on the words' own client rects.
+    // Written when it changes only (a line a few times a second at most, not on every word lit).
+    const said = at ? String(at.line) : "0";
+    if (mark.dataset.line !== said) mark.dataset.line = said;
   };
   // Where the lit end is, whenever it moves or the text is set again (a new window size is the observer's).
   useLayoutEffect(place, [text, end]); // eslint-disable-line react-hooks/exhaustive-deps

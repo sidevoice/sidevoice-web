@@ -123,7 +123,8 @@ export function createHostAgentsController(deps: {
       }
     } catch (reason) {
       if (!current(fp, generation)) return;
-      const error = errorData(reason, action === "connect" ? "connect-failed" : "action-failed");
+      // Which action failed goes with it: the row says Couldn't connect, update or disconnect.
+      const error = { ...errorData(reason, action === "connect" ? "connect-failed" : "action-failed"), action };
       const state = stateFor(fp);
       deps.setState(fp, { ...state, actionErrors: { ...state.actionErrors, [id]: error } });
     } finally {

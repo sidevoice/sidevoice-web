@@ -71,3 +71,13 @@ export function browserStorage(storageOf?: () => Store | null): HostStorage {
     },
   };
 }
+
+/** Runs `run` while no other tab of this site is inside the same `name`: the browser's Web Lock. With `ifAvailable`, a name
+ *  another tab holds is not waited for and `run` does not run (`undefined`). A browser without Web Locks runs it at once. */
+export function exclusively<T>(name: string, run: () => T | Promise<T>, options: { ifAvailable?: boolean } = {}): Promise<T | undefined> {
+  const locks = typeof navigator === "undefined" ? undefined : navigator.locks;
+  const work = async (): Promise<T | undefined> => run();
+  if (!locks || typeof locks.request !== "function") return work();
+  if (!options.ifAvailable) return locks.request(name, work) as unknown as Promise<T | undefined>;
+  return locks.request(name, { ifAvailable: true }, async (lock): Promise<T | undefined> => (lock ? run() : undefined)) as unknown as Promise<T | undefined>;
+}

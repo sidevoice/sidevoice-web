@@ -32,6 +32,8 @@ export interface SessionFacts {
  /** What the room says of each conversation's figure, as one value: its mood, whether it is held still, and when something last
   *  happened with it (wall-clock). Relayed to the card, which acts out exactly that (conversation-avatars.ts). `restRelayed`: this store only receives it. */
  figures: Record<string, { mood: import('../features/avatar/avatar-spec').AvatarMood; still: boolean; restStart: number }>; restRelayed: boolean;
+ /** What the publisher keeps by the clock for a native call surface (call-surface.d.ts SurfaceLive); null until one asks. */
+ surfaceLive: import('./call-surface.js').SurfaceLive | null;
  /** The room's error above the stage, as people read it (error-message.ts). */
  bootError: import('../components/ui/ErrorText').ErrorMessage | null;
  /** The machines this device is paired with (never their tokens), and the clock they were read at. */
@@ -62,11 +64,9 @@ export interface SessionFacts {
    *  on a phone. */
   machinesView: { machine: string | null };
  localHostAvailable: boolean; localHostStatus: import('../host').LocalHostStatus;
- /** Each paired machine's reach, and — where the machine says (core GET /api/host/status: a contract gap) — its
+ /** Each paired machine's reach, and — where the machine says (core GET /api/host/status) — its
   *  Sidevoice version. */
- /** `update`: the machine's Sidevoice is older than the latest, and the command that updates it there where it names one
-  *  (contract gap #57). */
- remoteHostStatus: Record<string, {state: 'checking' | 'connected' | 'offline'; checkedAt: number; version?: string | null; update?: {latest: string; command: string | null} | null}>;
+ remoteHostStatus: Record<string, {state: 'checking' | 'connected' | 'offline'; checkedAt: number; version?: string | null}>;
  /** How each paired machine is reached, by fingerprint (every one of them is live), and the machine the call is with. */
  machineLinks: Record<string, MachineLink>; callNode: string | null;
  /** The pairing dialog, and the sentence it opens with when the page opened it. */
@@ -79,10 +79,13 @@ export interface SessionFacts {
  /** The voice settings this device keeps, the ones the settings pane is editing, the engine's catalogues, and whether a
   *  key is kept for each remote provider. */
  voiceSettings: import('../services/voice-settings.js').DeviceVoiceSettings | null; voiceDraft: import('../services/voice-settings.js').DeviceVoiceSettings | null;
- voiceCatalogue: {state: 'idle' | 'loading' | 'ready' | 'failed'; catalogs: import('../services/model-catalogs.js').CatalogView[]; error: string; details?: string};
+ voiceCatalogue: {state: 'idle' | 'loading' | 'ready' | 'failed'; catalogs: import('../services/model-catalogs.js').CatalogView[]; error: string; details?: string; checking?: boolean};
+ /** What the engine recommends here (its local catalogue's `recommend`), for the language in use; null where the engine
+  *  cannot say (the page's engine today) or before it has. */
+ voiceRecommendation: import('../services/model-catalogs.js').Recommendation | null;
  /** Whether this device's engine can take a model off it (`uninstallVoiceModel`). */
  modelsRemovable: boolean;
- /** How long a downloaded model not used is kept, in days; null: forever (model-housekeeping.js). */
+ /** How long a downloaded model not used is kept, in days; null: never; 7 until chosen (model-housekeeping.js). */
  deleteUnusedDays: number | null;
  /** This device's name as the person set it (General, the setup), for its own row in machines' lists; null until set. */
  deviceName: string | null;
@@ -120,6 +123,8 @@ export interface SessionSnapshot {
  mic: {enabled: boolean; label: string; title: string; pressed: boolean; disabled: boolean; holding: boolean};
  call: {joined: boolean; busy: boolean; label: string}; title: string;
  callCard: CallCardView;
+ /** What a native call surface needs beyond `callCard` (call-surface.d.ts). */
+ callSurface: import('./call-surface.js').CallSurface;
  enginePanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
  screenLock: {state: string; note: string};
  bootError: import('../components/ui/ErrorText').ErrorMessage | null; machines: MachineView[]; pairing: PairingPromptView;
@@ -161,7 +166,7 @@ export interface CallCardView {
  /** FC1: the first setup is finished, its wizard closed. */
  setupDone: boolean;
  /** FC4: what the conversation's avatar acts out, as the stage's would for it; and the person's turn to it, open. */
- mood: import('../features/avatar/avatar-spec').AvatarMood;
+ mood: StageMood;
  turn: 'listening' | 'transcribing' | null;
  /** FC6: the minute before the call ends itself for want of the person. */
  idleWarning: boolean;
@@ -190,6 +195,8 @@ export interface StageFacts {
  /** The conversation on the stage is the one the microphone talks to. */
  isTarget: boolean;
  canHear: boolean;
+ /** The room lists it as available (ParticipantView.available); absent counts as available. */
+ available?: boolean;
  /** How the room reaches it; null while the room has not listed it yet. */
  reach: ParticipantView['reach'] | null;
  /** Its reply is sounding. */
@@ -199,7 +206,11 @@ export interface StageFacts {
  /** Its harness says it is busy, and has been for a while (ParticipantView.working). */
  working: boolean;
 }
-export function stageMood(facts: StageFacts): import('../features/avatar/avatar-spec').AvatarMood;
+/** What a conversation's agent is in, for the words and the notice: the creature's moods and "holding" (can't receive), which the creature never gets (avatarMood). */
+export type StageMood = import('../features/avatar/avatar-spec').AvatarMood | 'holding';
+export function stageMood(facts: StageFacts): StageMood;
+/** The creature's mood for a stage mood: holding rests as idle. */
+export function avatarMood(mood: StageMood): import('../features/avatar/avatar-spec').AvatarMood;
 export interface SessionStore {
  facts: SessionFacts;
  getState(): SessionSnapshot; getInitialState(): SessionSnapshot;

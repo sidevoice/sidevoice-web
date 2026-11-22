@@ -23,9 +23,9 @@
 
 /* The gear's count. */
 .settings-notice[data-mark="count"] {
-  box-sizing: border-box; min-width: 16px; height: 16px; padding: 0 4px; border-radius: var(--sv-radius-pill);
+  box-sizing: border-box; min-width: 16px; min-height: 16px; padding: 0 4px; border-radius: var(--sv-radius-pill);
   background: var(--sv-accent); color: var(--sv-on-accent);
-  font: var(--sv-weight-semibold) var(--sv-font-xs) / 16px var(--sv-font-sans); font-variant-numeric: tabular-nums; text-align: center;
+  font: var(--sv-weight-semibold) var(--sv-font-xs) / calc(16px * var(--sv-line-k, 1)) var(--sv-font-sans); font-variant-numeric: tabular-nums; text-align: center;
 }
 
 /* On the Settings gear (GearNewMark): how many on its top-right corner, ringed in the ground behind the gear (--dot-ring,

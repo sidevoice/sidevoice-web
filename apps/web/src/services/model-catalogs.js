@@ -16,8 +16,15 @@
  *   got: the share of it done (null while unknown), and its bytes when the engine counts them.
  * @typedef {{build?: string | null, engine?: string | null, onProgress?: (progress: InstallProgress) => void, signal?: AbortSignal}} InstallOptions
  *   Which build (its id, and its engine for a native engine), where progress goes, and the signal that cancels it.
+ * @typedef {{model: string, build: string}} RecommendedPick A model of the local catalogue and the build to run it as.
+ * @typedef {{choice?: RecommendedPick, ranked: RecommendedPick[]}} RecommendedSlot What the engine recommends here for
+ *   one capability: the model to start with and its build (`choice`, absent when nothing of its list runs here), and
+ *   its list as it stands here, best first (`ranked`): a family's first entry is that family's best for this device.
+ * @typedef {{stt: RecommendedSlot, tts: RecommendedSlot}} Recommendation What the engine recommends here for speech to
+ *   text and text to speech (sidevoice-engine's `LocalCatalog.recommend`).
  * @typedef {{
  *   catalogs(): Promise<CatalogView[]>,
+ *   recommend?(languages: {stt?: string | null, tts?: string | null}): Promise<Recommendation>,
  *   install(model: string, options?: InstallOptions): Promise<void>,
  *   setCredential(provider: string, key: string | null): Promise<void>,
  *   hasCredential(provider: string): Promise<boolean>,
@@ -29,6 +36,11 @@
  *   (its code, and the provider's own words as `detail` where the host passes them on)
  *   (its catalogue's reason), or null when it took it.
  *   `uninstall`, where the engine has it, takes a model off this device: every build of it.
+ *   `recommend`, where the host has it, says which local model to start with for each capability, for a person whose
+ *   transcription hears `languages.stt` and whose voice says `languages.tts`; nothing is downloaded or chosen for it.
+ *   In the apps it is the bridge's (`host.engine.recommend`). The page's own engine has none here yet: once its
+ *   @sidevoice/engine pin is past 0.5.0, `engineCatalogs` below must add it, mapping `languages` to the engine's
+ *   positional `localCatalog().recommend(sttLanguage, ttsLanguage)`.
  */
 
 /** The id of the catalogue of models that run on this device. */

@@ -74,8 +74,9 @@ function useCopy(text: string, target: React.RefObject<HTMLElement | null>) {
   return [feedback, copy] as const;
 }
 
-/** The copy button, and what it says (politely) to a screen reader, hidden from sight. */
-function CopyButton({ text, label, feedback: pinned, target }: CopyProps & { target: React.RefObject<HTMLElement | null> }) {
+/** The copy button, and what it says (politely) to a screen reader, hidden from sight. Something to copy that is drawn
+ *  its own way wears this one, so a copy goes, and says how it went, the same everywhere. */
+export function CopyButton({ text, label, feedback: pinned, target }: CopyProps & { target: React.RefObject<HTMLElement | null> }) {
   const t = translator();
   const [own, copy] = useCopy(text, target);
   const feedback = pinned ?? own;

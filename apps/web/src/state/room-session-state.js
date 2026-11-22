@@ -1,4 +1,5 @@
 // The session's facts and pure projections. No DOM, storage, audio engine or clock reads here.
+import { callState, callSurfaceView } from './call-surface.js';
 export const PRESENCE_DELIVERED_DELAY_MS = 1500;
 /* How long a conversation works without a break before it shows as working (the operator, 2026-10-14): its words, its
  * light and its avatar's work wait for it, so a plain back-and-forth does not flash Working between turns. */
@@ -32,6 +33,8 @@ export function initialSessionFacts() {
         // fact `now` above, so Working shows WORKING_SHOWN_AFTER_MS later (working).
         workingSince: {},
         figures: {}, restRelayed: false,
+        // What a native call surface reads by the clock (state/call-surface-publisher.ts): the spoken page, the said text, the stills.
+        surfaceLive: null,
         // The machines this device is paired with (never their tokens), and when they were read. Every one of them is live
         // at once (`machineLinks`).
         pairings: [], machinesAt: 0, machinesReady: false, remoteHostStatus: {},
@@ -53,7 +56,7 @@ export function initialSessionFacts() {
         voiceInstall: null,
         // The voice settings this device keeps (`VoiceSettings`), the ones the open settings pane is editing, the engine's
         // catalogues for its choices, and whether this device keeps a key for each remote provider (never the key).
-        voiceSettings: null, voiceDraft: null, voiceCatalogue: { state: 'idle', catalogs: [], error: '' }, modelsRemovable: false, deleteUnusedDays: null, deviceName: null, providerKeys: {},
+        voiceSettings: null, voiceDraft: null, voiceCatalogue: { state: 'idle', catalogs: [], error: '' }, voiceRecommendation: null, modelsRemovable: false, deleteUnusedDays: 7, deviceName: null, providerKeys: {},
         // The conversation a move to another machine is taking the call to.
         movingTo: null,
         // The floating call card (briefs/FLOATING-CARD-SPEC.md): whether the first setup is finished with its wizard
@@ -135,26 +138,26 @@ export function sessionStatus(s) {
 export function canHear(row) {
     return !!row.available && row.reach === 'listening';
 }
-/** The agent on the stage, by priority: offline (the room cannot reach it: the stage shows its wanted poster), then
- *  speaking, listening (the person is talking to it and it can hear them), working, and idle for everything else.
- *  A reply it is saying in the call plays to its end whatever happens to the link, so it speaks until then and only
- *  then shows the poster (#220). Short of offline it neither speaks nor listens whenever it cannot hear the person: out
- *  of the call, not the one the microphone talks to, or holding what it is sent — a conversation that is holding does
- *  not react to the person at all. Working is the conversation's own, whoever it talks to: then it works if its harness
- *  says so, and is idle otherwise. Every copy of a conversation's agent (the stage, its row, the header) acts out this
- *  one mood (#166). */
+/** The agent on the stage (its StageMood), by `callState`'s precedence. Offline is the room cannot reach it: the stage
+ *  shows its wanted poster; a reply it is saying in the call plays to its end whatever happens to the link, so it speaks
+ *  until then and only then shows the poster (#220). It listens and speaks only as the call's own, while it can take
+ *  them: in the call, the one the microphone talks to, and either able to hear the person or holding what it is sent (a
+ *  holding conversation still has the person's turn open and its reply sounding). Working is the conversation's own,
+ *  whoever it talks to. Holding (available, harness not working) is "can't receive"; the creature draws it as idle
+ *  (avatarMood). Every copy of a conversation's agent (the stage, its row, the header) acts out this one mood (#166). */
 export function stageMood(facts) {
     if (facts.reach === 'offline')
         return facts.inCall && facts.isTarget && facts.speaking ? 'speaking' : 'offline';
-    if (!facts.inCall || !facts.isTarget || !facts.canHear)
-        return facts.working ? 'working' : 'idle';
-    if (facts.speaking)
-        return 'speaking';
-    if (facts.personSpeaking && (facts.reach === 'listening' || facts.reach === null))
-        return 'listening';
-    if (facts.working)
-        return 'working';
-    return 'idle';
+    const holding = facts.reach === 'holding';
+    const live = !!facts.inCall && !!facts.isTarget && (!!facts.canHear || holding);
+    const state = callState({ offline: false, turn: live && facts.personSpeaking ? 'listening' : null, speaking: live && !!facts.speaking,
+        working: !!facts.working, holding: holding && facts.available !== false });
+    return state === 'transcribing' ? 'listening' : state;
+}
+/** What the creature acts out for a stage mood: holding is at rest, exactly as idle (the words, the amber and the pause glyph
+ *  carry it; the creature engine never sees it). */
+export function avatarMood(mood) {
+    return mood === 'holding' ? 'idle' : mood;
 }
 /** The voice's devices as the card offers them (call-controls/host.ts AudioDevices): the system's default first, an
  *  option of its own (id ''); a device the system lists without a name said by its place; the speaker chosen only where
@@ -205,7 +208,7 @@ export function callCardView(s, participants = participantsView(s)) {
     const turn = isTarget && s.userTurn?.thread === key && !s.cancelledInput && (s.pendingPhase === 'listening' || s.pendingPhase === 'transcribing') ? s.pendingPhase : null;
     const reach = row?.reach ?? null, hears = row ? canHear(row) : isTarget, speaking = isTarget && !!s.botLive;
     const mood = s.avatarPreview ? s.avatarPreview.mood
-        : stageMood({ inCall: inCall(s), isTarget, canHear: hears, reach, speaking, personSpeaking: !!turn, working: working(s) });
+        : stageMood({ inCall: inCall(s), isTarget, canHear: hears, available: row?.available, reach, speaking, personSpeaking: !!turn, working: working(s) });
     const mic = micView(s);
     const busyReason = s.reconnectShown ? 'reconnecting' : s.switching || s.movingTo ? 'switching' : null;
     const target = busyReason === 'switching' ? s.movingTo || (s.viewedThread && s.viewedThread !== selected ? s.viewedThread : selected) : null;
@@ -247,7 +250,7 @@ export function micView(s) {
         return { enabled, label: say('session.mic.choose'), pressed: !enabled, disabled: true, holding: false,
             title: say('session.mic.chooseTitle') };
     return { enabled, label, pressed: !enabled, disabled: false, holding: !!s.holding,
-        title: say('session.mic.title', { label }) };
+        title: label };
 }
 /** The call button: joining and leaving are the same button, and it says which one it is now. */
 export function callView(s) {
@@ -293,9 +296,9 @@ export function viewedTitle(s) {
 export function enginePanel(s) {
     const rows = [];
     const engine = s.people?.find(person => personKey(person) === selectedThread(s))?.engine;
-    if (engine?.model)
+    if (engine?.label || engine?.model)
         rows.push({ id: 'agent', label: 'LLM',
-            value: [engine.model, engine.effort].filter(Boolean).join(' · '),
+            value: [engine.label || engine.model, engine.effort].filter(Boolean).join(' · '),
             state: 'ok', note: '' });
     return rows;
 }
@@ -400,7 +403,7 @@ export function participantsView(s) {
         return { threadId: key, title: displayTitle(p.title, p), selected: key === selected, available: !!p.available, switching: s.switching,
             unread, unheard: p.unheard?.count ?? 0, reach, working: busy,
             machine: machineName(s, p.node) || p.machine?.host || null, machineId: p.node || p.machine?.id || null, harness: p.harness || null, route: routeLabel(p),
-            model: p.engine?.model || null, effort: p.engine?.effort || null,
+            model: p.engine?.label || p.engine?.model || null, effort: p.engine?.effort || null,
             activityNote: [experimentalNote(p), workingCapabilityNote(p)].filter(Boolean).join(' ') || null, detail: p.reach?.detail ? (p.reach.detail + (p.reach.remedy ? '\n\n' + p.reach.remedy : '')) : undefined };
     });
 }
@@ -520,9 +523,17 @@ export function createRoomSessionStore(seed = {}) {
         const participants = participantsView(facts);
         // The desktop card's whole snapshot, from the same rows.
         const callCard = callCardView(facts, participants);
+        const selected = selectedThread(facts);
+        // A native call surface follows the CALL's conversation, whatever is being browsed.
+        const surface = callSurfaceView(callCard, participants, facts.surfaceLive, say, {
+            pendingCancellable: !!selected && facts.userTurn?.thread === selected && !facts.cancelledInput,
+            workingSince: selected && working(facts, selected) ? facts.workingSince?.[selected] : null,
+            // Since when it has been busy, shown as working yet or not: the person's words just sent say "working" at once.
+            busySince: selected && busy(facts, selected) ? facts.workingSince?.[selected] ?? null : null,
+        }, snapshot?.callSurface);
         const next = { facts, session: sessionStatus(facts), conversation: conversationView(facts), participants,
             join: joinView(facts),
-            mic: micView(facts), call: callView(facts), callCard, title: viewedTitle(facts), screenLock: facts.screenLock,
+            mic: micView(facts), call: callView(facts), callCard, callSurface: surface, title: viewedTitle(facts), screenLock: facts.screenLock,
             enginePanel: enginePanel(facts),
             machines: machinesView(facts), pairing: { open: facts.pairingOpen, note: facts.pairingNote },
             bootError: facts.bootError };

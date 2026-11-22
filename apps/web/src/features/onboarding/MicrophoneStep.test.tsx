@@ -274,3 +274,19 @@ test("nothing to ask: an app that asks for itself when its call opens, or a page
   await setup();
   expect(title()).toHaveTextContent("Set up transcription");
 }, WHOLE_APP_MS);
+
+test("no microphone to ask, but the app reports a media permission: Back from transcription and on from the basics show Permissions with it", async () => {
+  const status = { mode: "lower", lower: "some-apps", pause: "some-apps", capture: "undetermined", access: "granted" };
+  Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { voice: {}, mediaDuck: { get: async () => status, set: async () => status } } } });
+  await setup();
+  expect(title()).toHaveTextContent("Set up transcription");
+  await act(async () => { fireEvent.click(document.querySelector<HTMLButtonElement>("#wizard .wizard-back")!); });
+  expect(title()).toHaveTextContent("Permissions");
+  expect(await wizard().findByText("System Audio Recording")).toBeInTheDocument();
+  await act(async () => { fireEvent.click(document.querySelector<HTMLButtonElement>("#wizard .wizard-back")!); });
+  expect(title()).toHaveTextContent("The basics");
+  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Continue" })); });
+  expect(title()).toHaveTextContent("Permissions");
+  await act(async () => { fireEvent.click(proceed()); });
+  expect(title()).toHaveTextContent("Set up transcription");
+}, WHOLE_APP_MS);

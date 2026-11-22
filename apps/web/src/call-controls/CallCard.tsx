@@ -4,11 +4,11 @@
  * briefs/UX-DECISIONS-2026-10-19.md "Call card: final"):
  *
  * - the title card: the conversation's avatar, its title, machine and model, what is happening, and your
- *   wave; near the pointer, today's call controls. Its captions are plain lines, as a transcript reads.
+ *   wave; near the pointer, today's call controls. Its captions are the stage's voice text, docked over or under it.
  * - the picture-in-picture (default): the room's own stage tile (StageTile) under the room's title block, and the room's call bar
- *   (CardCallBar) under it. Its captions are the stage's balloons.
- * - just the avatar: the conversation's creature, on nothing; the stage's balloons above or below it (their tails toward
- *   it); the pointer on the creature shows, right under it (past its balloons where they open below), a compact card: the
+ *   (CardCallBar) under it. Its captions are the stage's voice text, under its creature.
+ * - just the avatar: the conversation's creature, on nothing; the stage's voice text docked over or under it; the
+ *   pointer on the creature shows, right under it (past the voice text where it opens below), a compact card: the
  *   title card's first row and its controls row, nothing between (sidevoice-playground#131, "C1: the compact card").
  *
  * Every format: the conversations control (their mark, how many, ▾) right after the title, whose list drops from it; ×
@@ -16,10 +16,9 @@
  * (state/captions.ts, shared with the room's call bar). What opens from the card (captions, lists) opens toward the
  * screen's middle (`place`). The room's components draw on the card's own store (card-room.ts); the host's state and the
  * plumbing are card-shell.tsx. */
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { CaptionsIcon, CaptionsOffIcon, ChevronIcon, CloseIcon, ConversationsIcon, HangupIcon, HarnessIcon, MachinesIcon, MicrophoneIcon,
-  MicrophoneOffIcon, OpenAppIcon, SettingsIcon, SkipIcon } from "../components/ui/Icons";
-import { Button } from "../components/ui/Button";
+  MicrophoneOffIcon, OpenAppIcon, SettingsIcon, SkipIcon, StateGlyph, type StateGlyphKind } from "../components/ui/Icons";
 import { ConversationPicker, DevicePicker, useCardShell, useHostState, useWave, type CardShell } from "./card-shell";
 import { hasUnread, moodText } from "../features/call/conversation-state";
 import { ConversationAvatar } from "../features/call/ConversationAvatar";
@@ -27,16 +26,9 @@ import { useConversationAvatar, useConversationAvatars, useMovingCopy } from "..
 import { CharacterAvatar } from "../features/avatar/CharacterAvatar";
 import { avatarFor, avatarTone, SIDEVOICE_MASCOT, type AvatarSpec } from "../features/avatar/avatar-spec";
 import { avatarColor } from "../features/avatar/bicho-draw";
-import { StageBalloons, StageTile } from "../features/call/CallStage";
+import { DockedVoice, StageTile } from "../features/call/CallStage";
 import { CardCallBar } from "../features/call/CallToolbar";
-import { VoiceWaveform } from "../features/conversation/VoiceWaveform";
-import { DeliveryMark } from "../features/conversation/MessageBubble";
-import { LitText } from "../features/call/LitText";
-import { PagedText, PAGE_MS } from "../features/call/PagedText";
-import { SENT_LEAVING_MS, useAgentTurns, useSentTurns, useSpokenTo } from "../features/call/speech-reading";
 import { useStageConversation } from "../features/call/stage-view";
-import { useRoomStore } from "../state/room-store";
-import { receiptView } from "../state/room-session-state.js";
 import { setCaptions, useCaptions } from "../state/captions";
 import { CARD_WIDTHS, PIP_MIN_HEIGHT, PIP_MIN_WIDTH, useFloatingCard, type CardFormat, type CardSize } from "../state/floating-card";
 import type { ParticipantView } from "../state/room-types";
@@ -45,6 +37,7 @@ import type { Translate } from "../i18n/translator";
 
 export { CARD_MARGIN, CLICK_GUARD_MS, DRAG_THRESHOLD_PX, HIDE_DELAY_MS, PANEL_CLOSE_MS, SHOW_DELAY_MS, WAVE_SAMPLE_MS, duration } from "./card-shell";
 import { CARD_MARGIN } from "./card-shell";
+import { avatarColumn, voiceMax } from "./voice-centre";
 
 type Place = NonNullable<CallControlsState["place"]>;
 const UPPER_RIGHT: Place = { vertical: "upper", horizontal: "right" };
@@ -80,7 +73,7 @@ function FloatingCard({ host, state, format, size, t }: { host: CallControlsHost
       {body}
       {shell.panel && format === "card" && <PanelCard state={state} shell={shell} t={t} />}
       {shell.panel && format === "pip" && (!custom || place.vertical === "lower") && <PanelCard state={state} shell={shell} t={t} />}
-      {format === "card" && captions && <CaptionLines state={state} t={t} />}
+      {format === "card" && captions && <div className="docked-voice card-voice"><DockedVoice /></div>}
     </div>
   );
 }
@@ -155,7 +148,9 @@ function CardFigure({ state, size, label }: { state: CallControlsState; size: "s
   const avatars = useConversationAvatars();
   const avatar = useConversationAvatar(agent.threadId);
   useMovingCopy(agent.threadId);
-  return <CharacterAvatar spec={agent.spec} state={avatar} size={size} mouth="playback" label={label} live
+  // The avatar's creature stands on nothing: framed whole, so no act it plays is cut at its box's edge. The title card's is a face in its chip,
+  // stepped back as far as its acts need (creature/extent.ts): never cut at the chip's edge either.
+  return <CharacterAvatar spec={agent.spec} state={avatar} size={size} mouth="playback" label={label} live liveFace={size === "stage" ? "whole" : true}
     mouthLevel={agent.threadId ? avatars.mouth(agent.threadId) : undefined} />;
 }
 
@@ -174,6 +169,25 @@ function YourWave({ level, muted, still, t }: { level: number; muted: boolean; s
   );
 }
 
+/** The icon the state line leads with, in the state's colour (StateGlyph): what the agent acts out, or you muted. Resting, present and
+ *  reconnecting are told by the plain dot. */
+function stateGlyph(mood: CallControlsState["call"]["mood"], muted: boolean, reconnecting: boolean): StateGlyphKind | null {
+  if (reconnecting) return null;
+  if (muted) return "muted";
+  return mood === "listening" || mood === "speaking" || mood === "working" || mood === "holding" || mood === "offline" ? mood : null;
+}
+
+/** What is happening, in one line, with its icon: you muted, the call reconnecting, else what the agent acts out (an offline agent
+ *  says so, in every format). */
+function StateLine({ state, t }: { state: CallControlsState; t: Translate }) {
+  const call = state.call;
+  const muted = !call.micEnabled;
+  const reconnecting = call.busy;
+  const line = reconnecting ? t("card.reconnecting") : muted ? t("card.youAreMuted") : moodText(call.mood, t);
+  const glyph = stateGlyph(call.mood, muted, reconnecting);
+  return <span className="card-state" data-mood={reconnecting ? "reconnecting" : muted ? "muted" : call.mood}>{glyph ? <StateGlyph kind={glyph} size={14} /> : <i aria-hidden="true" />}{line}</span>;
+}
+
 /** A1's two rows; `compact` (just the avatar's card) keeps A1's first row without the face, the machine, the state and your
  *  wave, over A1's controls row, which is always out. */
 function TitleCard({ state, shell, t, compact = false }: { state: CallControlsState; shell: CardShell; t: Translate; compact?: boolean }) {
@@ -185,8 +199,6 @@ function TitleCard({ state, shell, t, compact = false }: { state: CallControlsSt
   const selected = call.participants.find((participant) => participant.selected);
   const agent = useCardAgent(state);
   const muteLabel = muted ? t("card.unmute") : t("card.mute");
-  // What is happening, in one line: you muted, the call reconnecting, else what the agent acts out.
-  const line = reconnecting ? t("card.reconnecting") : muted ? t("card.youAreMuted") : moodText(call.mood, t);
   const tone = agent.threadId ? avatarColor(agent.spec) : undefined;
   return (
     <div ref={compact ? undefined : shell.body} className={"call-card title-card" + (compact ? " compact-card" : "")} data-expanded={expanded || undefined}>
@@ -203,7 +215,7 @@ function TitleCard({ state, shell, t, compact = false }: { state: CallControlsSt
             selected?.machine && <span key="machine" className="card-machine"><MachinesIcon size={11} /> <span>{selected.machine}</span></span>,
             (selected?.harness || selected?.model) && <span key="harness" className="card-harness">{selected?.harness && <HarnessIcon harness={selected.harness} size={11} />} <span>{[selected?.model, selected?.effort].filter(Boolean).join(" · ")}</span></span>,
           ].filter(Boolean).flatMap((part, i) => (i ? [<span key={"dot" + i} aria-hidden="true">·</span>, part] : [part]))}</span>}
-          {!compact && <span className="card-state" data-mood={reconnecting ? "reconnecting" : muted ? "muted" : call.mood}><i aria-hidden="true" />{line}</span>}
+          <StateLine state={state} t={t} />
         </div>
         {!compact && <YourWave level={state.level} muted={muted} still={reconnecting} t={t} />}
       </div>
@@ -238,51 +250,6 @@ function TitleCard({ state, shell, t, compact = false }: { state: CallControlsSt
   );
 }
 
-/** The title card's captions: what is being said, as a transcript reads — a line per speaker, its name over it. The
- *  agent's reply lit as it is heard, a few lines at a time; yours, the voice's bars (and the room's Cancel sending) while
- *  you speak and it is transcribed, then what was sent, for its moment. */
-function CaptionLines({ state, t }: { state: CallControlsState; t: Translate }) {
-  const stage = useStageConversation();
-  const conversation = useRoomStore((store) => store.conversation);
-  const reply = stage.isTarget ? conversation.saying ?? null : null;
-  const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
-  const said = useAgentTurns(reply, spokenTo).filter((turn) => !turn.leaving).at(-1) ?? null;
-  const { turns, done } = useSentTurns(conversation);
-  const sent = turns.filter((turn) => turn.thread === conversation.thread).at(-1) ?? null;
-  useEffect(() => {
-    if (!sent) return;
-    const timer = window.setTimeout(() => done(sent.key), PAGE_MS + SENT_LEAVING_MS);
-    return () => window.clearTimeout(timer);
-  }, [sent, done]);
-  const pending = !!conversation.pendingPhase;
-  const delivery = sent ? conversation.messages.find((message) => message.role === "user" && (message.segment ?? String(message.time)) === sent.key)?.delivery : undefined;
-  const receipt = delivery && receiptView(delivery).label ? delivery : null;
-  const lines: ReactNode[] = [];
-  if (said) lines.push(
-    <p key="agent" className="caption-line" data-role="assistant">
-      <b translate="no">{state.call.title}</b>
-      <PagedText measure={said.text} follow=".lit-heard" lines={2} turn="page" fixed>
-        <LitText text={said.text} spoken={said.spoken} />
-      </PagedText>
-    </p>);
-  if (pending) lines.push(
-    <p key="you" className="caption-line" data-role="user">
-      <b>{t("card.you")}</b>
-      <span className="caption-live">
-        <VoiceWaveform phase={conversation.pendingPhase === "transcribing" ? "transcribing" : "listening"} />
-        {conversation.pendingCancellable && <Button variant="ghost" tone="neutral" size="sm" className="cancel-input"
-          onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("stage.cancelTurn")}</Button>}
-      </span>
-    </p>);
-  else if (sent) lines.push(
-    <p key={sent.key} className="caption-line" data-role="user">
-      <b>{t("card.you")}</b>
-      <span>{sent.text}{receipt && <span className="receipt" data-state={receipt} role="status" aria-label={receiptView(receipt).label}><DeliveryMark state={receipt} /></span>}</span>
-    </p>);
-  if (!lines.length) return null;
-  return <div className="call-card card-captions-lines" aria-live="off">{lines}</div>;
-}
-
 // ---------- B1: the picture-in-picture ----------
 
 /** The room's title block for the call's conversation: its title, then its machine on the line under it (`machine`). */
@@ -297,6 +264,7 @@ function CardHeading({ state, shell, t, panelBelow = false }: { state: CallContr
         <ConversationsButton state={state} shell={shell} t={t} />
       </span>
       {host && <span className="stage-machine"><MachinesIcon size={12} /><span>{host}</span></span>}
+      <StateLine state={state} t={t} />
       <CardActions shell={shell} t={t} />
       {panelBelow && shell.panel && <PanelCard state={state} shell={shell} t={t} />}
     </header>
@@ -366,34 +334,54 @@ function inHull(root: HTMLElement | null, event: { clientX: number; clientY: num
     && event.clientY >= Math.min(...boxes.map((box) => box.top)) - HULL_PX && event.clientY <= Math.max(...boxes.map((box) => box.bottom)) + HULL_PX;
 }
 
+/** A box's laid-out width, its fractions kept (a text is rarely whole pixels wide); its offsetWidth where nothing is laid out (a test's
+ *  DOM). Never a transform's: the voice cards pop in scaled, the boxes round them do not. */
+const widthOf = (element: HTMLElement) => parseFloat(getComputedStyle(element).width) || element.offsetWidth;
+
 function AvatarCard({ state, shell, t }: { state: CallControlsState; shell: CardShell; t: Translate }) {
   const captions = useCaptions();
-  const place = state.place ?? UPPER_RIGHT;
-  const opensDown = place.vertical === "upper";
-  const [balloonsUp, setBalloonsUp] = useState(false);
-  const balloons = useRef<HTMLDivElement>(null);
+  const [voiceUp, setVoiceUp] = useState(false);
+  const voice = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
   const { zone } = shell;
+  const room = state.room;
   // What the pointer is on: inside an open card's hull it is on the card; else what is under it.
   const zoneAt = (event: ReactPointerEvent, under: "none" | "creature" | "card") => (shell.expanded && inHull(root.current, event) ? "card" : under);
-  // Whether a balloon is out, for the stack to take room only then (the window is the creature's box at rest), and, where the
-  // balloons open below, how far they reach (--balloon-reach, from the creature's feet): the card goes just past them while the
-  // window counts their whole room (call-card.css), so a balloon coming or going never moves the creature.
-  useEffect(() => {
-    const node = balloons.current, card = root.current;
-    if (!node || !card) return;
+  // Whether a voice card is out, for the stack to take room only then (the window is the creature's box at rest), and, where
+  // the voice text opens below, how far it reaches (--voice-reach, from the creature's feet): the compact card goes just past
+  // it while the window counts its whole room (call-card.css), so a card coming or going never moves the creature.
+  // And where each piece sits across the column (avatarColumn): the creature where the window reaches no further past it on a side than
+  // the room the app says there is, so the app never has to move the window in, and the creature with it; the voice text and the
+  // compact card centred on it as far as the column allows. Laid out before paint, so no frame shows them elsewhere.
+  const { flow, relayout } = shell;
+  useLayoutEffect(() => {
+    const node = voice.current, card = root.current;
+    const figure = card?.querySelector<HTMLElement>(".avatar-figure"), compact = card?.querySelector<HTMLElement>(".avatar-compact");
+    if (!card || !figure) return;
     const read = () => {
-      const out = !!node.querySelector(".speech-bubble");
-      setBalloonsUp(out);
-      const figure = card.querySelector<HTMLElement>(".avatar-figure");
-      card.style.setProperty("--balloon-reach", out ? node.offsetHeight - 0.1 * (figure?.offsetHeight ?? 0) + "px" : "0px");
+      const out = !!node?.querySelector(".vcap");
+      setVoiceUp(out);
+      card.style.setProperty("--voice-reach", out && node ? node.getBoundingClientRect().bottom - figure.getBoundingClientRect().bottom + "px" : "0px");
+      // Where even the whole room is narrower than the text, the text wraps to it (--voice-max) before it is measured and placed.
+      const limit = out ? voiceMax(figure.offsetWidth, room) : null;
+      if (limit === null) card.style.removeProperty("--voice-max"); else card.style.setProperty("--voice-max", limit + "px");
+      const pieces: Array<[HTMLElement, string]> = [];
+      if (out && node) pieces.push([node, "--voice-x"]);
+      // The compact card counts only while it is in the window's flow (folded, it is clipped inside the creature's box).
+      if (flow && compact) pieces.push([compact, "--compact-x"]);
+      const column = avatarColumn(widthOf(figure), pieces.map(([piece]) => widthOf(piece)), room);
+      card.style.setProperty("--figure-x", column.figure + "px");
+      pieces.forEach(([, name], i) => card.style.setProperty(name, column.pieces[i] + "px"));
+      for (const name of ["--voice-x", "--compact-x"]) if (!pieces.some(([, piece]) => piece === name)) card.style.removeProperty(name);
+      // The creature may have moved across a window that kept its size: the app is told where it is now.
+      relayout();
     };
     read();
     const mutations = new MutationObserver(read), sizes = new ResizeObserver(read);
-    mutations.observe(node, { childList: true, subtree: true });
-    sizes.observe(node);
+    if (node) mutations.observe(node, { childList: true, subtree: true });
+    for (const piece of [node, figure, compact]) if (piece) sizes.observe(piece);
     return () => { mutations.disconnect(); sizes.disconnect(); };
-  }, [captions]);
+  }, [captions, room?.left, room?.right, flow, relayout]);
   // Tab reaching the card (it is there while folded) opens it; Escape, with focus in it or nowhere, folds it and blurs.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -407,15 +395,19 @@ function AvatarCard({ state, shell, t }: { state: CallControlsState; shell: Card
     return () => document.removeEventListener("keydown", onKey);
   }, [shell.panel, shell.expanded, zone]);
   return (
-    // A grid in one column: the creature, its balloons on the side toward the screen's middle (above or below), and under both
+    // A grid in one column: the creature, its voice text on the side toward the screen's middle (above or below), and under both
     // the compact card (call-card.css). The card is in the window's flow only while it shows, so the window holds what shows.
-    <div ref={root} className="avatar-card" data-balloons={balloonsUp || undefined} onPointerLeave={(event) => zone.aim((event.relatedTarget as Element | null)?.closest?.(".floating-card") ? zoneAt(event, "none") : "none")}
+    <div ref={root} className="avatar-card" data-voice={voiceUp || undefined} onPointerLeave={(event) => zone.aim((event.relatedTarget as Element | null)?.closest?.(".floating-card") ? zoneAt(event, "none") : "none")}
       onPointerMove={(event) => { if (shell.expanded && event.pointerType === "mouse") zone.aim(zoneAt(event, "none") === "card" ? "card" : (event.target as Element).closest(".avatar-figure") ? "creature" : (event.target as Element).closest(".avatar-compact") ? "card" : "none"); }}>
       <div ref={shell.body} className="avatar-figure" onPointerOver={(event) => zone.aim(zoneAt(event, "creature"))}>
         <CardFigure state={state} size="stage" label={t("stage.agentState", { title: state.call.title, state: moodText(state.call.mood, t) })} />
+        {/* You muted: the creature on nothing has no state line, so a mic crossed out at its feet says it, without dimming the creature
+            (operator, 2026-11-08). A mark on the creature, never in the window's flow: the creature does not move for it. The compact
+            card's mute button says it to assistive technology; this is for the eye. */}
+        {!state.call.micEnabled && <span className="avatar-muted" aria-hidden="true"><MicrophoneOffIcon size={14} /></span>}
       </div>
-      {captions && <div ref={balloons} className={"avatar-balloons" + (opensDown ? " balloon--tail-up" : "")} onPointerOver={(event) => zone.aim(zoneAt(event, "none"))}>
-        <StageBalloons />
+      {captions && <div ref={voice} className="docked-voice avatar-voice" onPointerOver={(event) => zone.aim(zoneAt(event, "none"))}>
+        <DockedVoice />
       </div>}
       <div className="avatar-compact" onPointerOver={(event) => { if ((event.target as Element).closest(".compact-card, .card-panel-card")) zone.aim("card"); }}
         onFocus={(event) => { if ((event.target as Element).matches(":focus-visible")) zone.focusWithin(true); }}

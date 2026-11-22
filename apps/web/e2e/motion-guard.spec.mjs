@@ -53,10 +53,14 @@ const PAINT_BUDGET = 1;
 
 /** The desktop app's card, by format: the states that move it. */
 const CARDS = {
-  card: ["working", "person-speaking"],
+  card: ["working", "person-speaking", "agent-speaking"],
   pip: ["working", "person-speaking", "agent-speaking", "reconnecting"],
   avatar: ["person-speaking", "agent-speaking"],
 };
+
+/** The room is let settle before it is watched (openRoom waits for the stage's framing, a trial render a frame, which a software GL
+ *  takes seconds over, the live creature's own frames among them), then watched for the better part of five seconds. */
+test.describe.configure({ timeout: 60_000 });
 
 /** A settled page watched for two and a half seconds: enough to tell a loop from a one-off (the CI runs both browsers). */
 const watch = (page) => observe(page, { settle: 1000, duration: 2500, samples: 3 });

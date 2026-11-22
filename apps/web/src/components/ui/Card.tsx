@@ -36,21 +36,24 @@ export function Section({ title, description, actions, id, className, children }
   );
 }
 
-/* A group of rows on one card, with an optional title above it. */
-export function Group({ title, className, children }: { title?: ReactNode; className?: string; children: ReactNode }) {
+/* A group of rows on one card, with an optional title above it, and under the title a `note` (an Alert) that says
+ * something about the whole group. */
+export function Group({ title, note, className, children }: { title?: ReactNode; note?: ReactNode; className?: string; children: ReactNode }) {
   return (
     <div className={cn("ui-group", className)}>
       {title && <h3 className="ui-group-title">{title}</h3>}
+      {note}
       <div className="ui-group-card">{children}</div>
     </div>
   );
 }
 
 /* One row of a group: what it sets (and a line about it) beside its control; stacked when the group is narrow. A
- * `block` row puts a whole block (a model's preparation, a list) under its label. */
-export function Row({ label, description, htmlFor, block = false, children, className }: { label: ReactNode; description?: ReactNode; htmlFor?: string; block?: boolean; children?: ReactNode; className?: string }) {
+ * `block` row puts a whole block (a model's preparation, a list) under its label. A `disabled` row is one that cannot act
+ * now (another setting turns it off): its words in the disabled ink, its control disabled by its owner. */
+export function Row({ label, description, htmlFor, block = false, disabled = false, children, className }: { label: ReactNode; description?: ReactNode; htmlFor?: string; block?: boolean; disabled?: boolean; children?: ReactNode; className?: string }) {
   return (
-    <div className={cn("ui-row", block && "ui-row--block", className)}>
+    <div className={cn("ui-row", block && "ui-row--block", className)} data-disabled={disabled || undefined}>
       <div className="ui-row-text">
         {htmlFor ? <label className="ui-row-label" htmlFor={htmlFor}>{label}</label> : <span className="ui-row-label">{label}</span>}
         {description && <p className="ui-row-description">{description}</p>}

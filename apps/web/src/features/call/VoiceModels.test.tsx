@@ -116,3 +116,12 @@ test("a catalogue read or being read is not read again by the stage", () => {
   }
   expect(loadVoiceCatalogue).not.toHaveBeenCalled();
 });
+
+test("a model chosen and not here yet (the draft: the engine's recommendation on a fresh device) is the row's, as its Download installs it", () => {
+  const store = createRoomStore();
+  const saved = { ...defaultVoiceSettings(), tts: { catalog: "elevenlabs", model: "eleven_flash_v2_5", voice: null, speed: 1 } };
+  const draft = { ...saved, stt: { catalog: "local", model: "whisper-large-v3-turbo", language: null } };
+  act(() => store.patch({ voiceSettings: saved, voiceDraft: draft, voiceCatalogue: { state: "ready", catalogs, error: "" } }));
+  render(<RoomProvider store={store}><TooltipProvider><Shown /></TooltipProvider></RoomProvider>);
+  expect(rows()[0]).toMatchObject({ id: "whisper-large-v3-turbo" });
+});

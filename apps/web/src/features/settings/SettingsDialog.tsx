@@ -1,12 +1,14 @@
-import { Fragment, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, memo, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { OverlayPortalProvider, Tooltip } from "../../components/ui/Tooltip";
-import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, DeveloperIcon, FloatingCardIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ShortcutsIcon, PermissionsIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon, UpdateIcon, WarningIcon } from "../../components/ui/Icons";
+import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, CrashReportsIcon, DeveloperIcon, FloatingCardIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ShortcutsIcon, PermissionsIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon, UpdateIcon, WarningIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { Select } from "../../components/ui/Select";
 import { LanguagePicker } from "../../components/ui/LanguagePicker";
 import { Group, Row, Section } from "../../components/ui/Card";
 import { Segmented } from "../../components/ui/Tabs";
+import { MediaDuckRow } from "./MediaDuckRow";
+import { ThinkingSoundRows } from "./ThinkingSoundRows";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { readThemePreference, setThemePreference, type ThemePreference } from "../../lib/theme";
 import { MachineList, MachineNav, machineName, ThisComputerSettings, useMachinesSummary } from "../room/MachineList";
@@ -22,7 +24,8 @@ import { FloatingCardSettings, useFloatingCardSection } from "./FloatingCardSett
 import { host } from "../../host";
 import { PermissionsSettings } from "./PermissionsSettings";
 import { useMicrophoneAccess } from "../permissions/permission-view";
-import type { MicrophoneSnapshot } from "../../services/microphone-access";
+import { listsMediaPermissions, neededPermission, useMediaDuck } from "../permissions/media-permissions";
+import type { MicrophoneAccess, MicrophoneSnapshot } from "../../services/microphone-access";
 import { ShortcutsSettings, useShortcutsSection } from "./ShortcutsSettings";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
 import { useSeeUpdates, useUpdateMark } from "../updates/update-mark";
@@ -32,7 +35,7 @@ import { Alert } from "../../components/ui/Alert";
 import { ErrorText } from "../../components/ui/ErrorText";
 import { Switch } from "../../components/ui/Switch";
 import { readCallPreferences, subscribeCallPreferences, writeCallPreferences, type CallPreferences, type PresenceSound } from "../../services/call-preferences";
-import { languageName, translator, UI_LANGUAGES, type MessageKey, type Translate } from "../../i18n/translator";
+import { languageName, translator, uiLanguage, UI_LANGUAGES, type MessageKey, type Translate } from "../../i18n/translator";
 import { ErrorBoundary } from "../../app/ErrorBoundary";
 import { remoteProviders } from "../../services/voice-settings.js";
 import { useDialogFocusReturn } from "../../lib/focus-return";
@@ -42,6 +45,7 @@ import { turnTuningDevEnabled } from "./TurnTuningDev";
 import { DEVELOPER_OPTIONS_TITLE, DeveloperOptions } from "./DeveloperOptions";
 import { isNightlyBuild, useDeveloperMode, useDeveloperModeGesture } from "./developer-mode";
 import { UpdatesSettings, useUpdatesSection } from "./UpdatesSettings";
+import { CrashReportsSettings, useCrashReportsSection } from "../crash-reports/CrashReportsSettings";
 import "./settings.css";
 
 /* Settings: a screen of their own, its sections beside its content on a desktop; on a phone a menu of them, each
@@ -67,6 +71,8 @@ const SECTIONS: ({ id: string; icon: (size?: number) => ReactNode } & ({ label: 
   { id: "machines", label: "settings.section.machines", icon: (size) => <MachinesIcon size={size} /> },
   // Everything that updates: in the desktop app, or wherever a machine is behind (UpdatesSettings).
   { id: "updates", label: "settings.section.updates", icon: (size) => <UpdateIcon size={size} /> },
+  // What happens when something fails and the logs, where the app sends crash reports (CrashReportsSettings).
+  { id: "crash-reports", label: "settings.section.crashReports", icon: (size) => <CrashReportsIcon size={size} /> },
   { id: "advanced", label: "settings.section.advanced", icon: (size) => <AdvancedIcon size={size} /> },
   // Below Advanced, English-only and outside the catalogues: for a nightly with developer mode on (DeveloperOptions).
   { id: "developer", text: DEVELOPER_OPTIONS_TITLE, icon: (size) => <DeveloperIcon size={size} /> },
@@ -105,8 +111,8 @@ function SlotSection({ id, t }: { id: "transcription" | "voice"; t: Translate })
   </Section>;
 }
 
-/** The call's own behaviour: when your turn ends (kept on Save), the sound while the agent works and the screen during
- *  a call (this device's, applied at once). */
+/** The call's own behaviour: when your turn ends (kept on Save), the sound while the agent works (when, which, how loud,
+ *  how often, and a try of it) and the screen during a call (this device's, applied at once). */
 function CallSettings({ t, microphone }: { t: Translate; microphone: MicrophoneSnapshot | null }) {
   const store = useContext(RoomStoreContext);
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
@@ -134,9 +140,11 @@ function CallSettings({ t, microphone }: { t: Translate; microphone: MicrophoneS
         <Segmented size="sm" label={t("settings.call.presence")} value={prefs.presence} onChange={(value) => set({ presence: value })}
           items={presence.map((option) => ({ value: option.value, label: t(option.label) }))} />
       </Row>
+      <ThinkingSoundRows t={t} sound={prefs.sound} gainDb={prefs.soundGainDb} intervalScale={prefs.soundIntervalScale} disabled={prefs.presence === "off"} active={shown} onChange={set} />
     </Group>
-    {/* A browser holds it with its Screen Wake Lock, an app with the platform's: an app that offers none (the desktop, for now) keeps its computer awake as any app does. */}
-    {awake && (host().identity.build === null || host().presence.screenAwakeBy === "app") && <Group title={t("settings.call.device")}>
+    <MediaDuckRow t={t} openPermissions={() => store?.patch({ settingsSection: "permissions", settingsLevel: "page" })} />
+    {/* Every host offers it: a browser holds the screen with its Screen Wake Lock, an app with the platform's. */}
+    {awake && <Group title={t("settings.call.device")}>
       <Row label={t("settings.call.keepAwake")} description={awake.supported ? t("settings.call.keepAwakeHint") : t("settings.call.keepAwakeUnsupported")}>
         <Switch checked={prefs.keepAwake && awake.supported} disabled={!awake.supported} onChange={(keepAwake) => set({ keepAwake })} aria-label={t("settings.call.keepAwake")} />
       </Row>
@@ -192,6 +200,32 @@ function Pane({ id, current, children }: { id: string; current: string; children
   // navigation, not tabs; the section in it is named by its own heading.
   return <div id={"pane-" + id} className="settings-pane" hidden={id !== current}><ErrorBoundary area={"settings:" + id}>{children}</ErrorBoundary></div>;
 }
+
+/** Every section's page, one shown. Drawn again only when what they are given changes, not with Settings' header and
+ *  levels: going up a level or opening a list redrew every section of Settings with it (sidevoice-web: a phone's Back
+ *  took a second). */
+const SettingsPanes = memo(function SettingsPanes({ current, language, microphone, access, floatingCardShown, permissionsShown, shortcutsShown, ownComputer, updatesShown, crashReportsShown, developerShown }: {
+  current: string; language: string; microphone: MicrophoneSnapshot | null; access: MicrophoneAccess | null; floatingCardShown: boolean; permissionsShown: boolean;
+  shortcutsShown: boolean; ownComputer: boolean; updatesShown: boolean; crashReportsShown: boolean; developerShown: boolean;
+}) {
+  const t = translator(language);
+  return <div className="settings-column">
+    <Pane id="general" current={current}><GeneralSettings t={t} /></Pane>
+    <Pane id="transcription" current={current}><SlotSection id="transcription" t={t} /></Pane>
+    <Pane id="voice" current={current}><SlotSection id="voice" t={t} /></Pane>
+    <Pane id="call" current={current}><CallSettings t={t} microphone={microphone} /></Pane>
+    {floatingCardShown && <Pane id="floating-card" current={current}><FloatingCardSettings t={t} /></Pane>}
+    {permissionsShown && <Pane id="permissions" current={current}><PermissionsSettings t={t} access={access} microphone={microphone} /></Pane>}
+    {shortcutsShown && <Pane id="shortcuts" current={current}><ShortcutsSettings t={t} /></Pane>}
+    <Pane id="providers" current={current}><ProviderKeys /></Pane>
+    {ownComputer && <Pane id="this-computer" current={current}><ThisComputerSettings /></Pane>}
+    <Pane id="machines" current={current}><MachineList /></Pane>
+    {updatesShown && <Pane id="updates" current={current}><UpdatesSettings /></Pane>}
+    {crashReportsShown && <Pane id="crash-reports" current={current}><CrashReportsSettings t={t} /></Pane>}
+    <Pane id="advanced" current={current}><AdvancedSettings t={t} /></Pane>
+    {developerShown && <Pane id="developer" current={current}><DeveloperOptions t={t} /></Pane>}
+  </div>;
+});
 
 /** What a section's row in a phone's menu says under its name, where the section has one state that says whether it is
  *  set up and working: the model chosen, This device's service (as its entry words it), the providers connected, the
@@ -285,24 +319,31 @@ export function SettingsDialog() {
   const show = (section: string) => store?.patch({ settingsSection: section });
   // Updates: in the desktop app, or wherever a machine is behind.
   const updatesShown = useUpdatesSection();
+  // Crash reports: where the app sends them, never in a browser.
+  const crashReportsShown = useCrashReportsSection();
   // Shortcuts: in the desktop app, or wherever there is a keyboard; never on a phone.
   const shortcutsShown = useShortcutsSection();
   // The microphone's reader, one for Permissions and Call's link to it. Permissions is drawn only where there is
-  // something to ask (not in an app that asks for itself when its call opens, nor a page with no microphone).
+  // something to ask: the microphone (not in an app that asks for itself when its call opens, nor a page with no
+  // microphone), or a permission the app's media handling needs (Call's row links there too).
   const mic = useMicrophoneAccess();
-  const permissionsShown = mic.microphone?.state !== "none";
+  const media = useMediaDuck();
+  const mediaListed = listsMediaPermissions(media.status);
+  const permissionsShown = mic.microphone?.state !== "none" || mediaListed;
+  // Left only once it is known there is nothing to show: the media permissions are read after the dialog opens.
+  const mediaKnown = media.known;
   const floatingCardShown = useFloatingCardSection();
   // Developer options: developer mode on (a nightly), or the turn-tuning flag a browser or a playground sets by hand.
   const developerMode = useDeveloperMode();
   const developerShown = developerMode || turnTuningDevEnabled();
   const sections = SECTIONS.filter((section) => (section.id !== "this-computer" || ownComputer) && (section.id !== "updates" || updatesShown)
     && (section.id !== "shortcuts" || shortcutsShown) && (section.id !== "permissions" || permissionsShown)
-    && (section.id !== "floating-card" || floatingCardShown) && (section.id !== "developer" || developerShown));
+    && (section.id !== "floating-card" || floatingCardShown) && (section.id !== "crash-reports" || crashReportsShown) && (section.id !== "developer" || developerShown));
   // Updates shown as the last machine behind is updated (a browser, a phone), or Shortcuts as the mouse or trackpad
   // goes (a tablet's keyboard taken off): General.
   useEffect(() => {
-    if ((current === "updates" && !updatesShown) || (current === "shortcuts" && !shortcutsShown) || (current === "permissions" && !permissionsShown)) show("general");
-  }, [current, updatesShown, shortcutsShown, permissionsShown]); // eslint-disable-line react-hooks/exhaustive-deps
+    if ((current === "updates" && !updatesShown) || (current === "shortcuts" && !shortcutsShown) || (current === "crash-reports" && !crashReportsShown) || (current === "permissions" && !permissionsShown && mediaKnown)) show("general");
+  }, [current, updatesShown, shortcutsShown, crashReportsShown, permissionsShown, mediaKnown]); // eslint-disable-line react-hooks/exhaustive-deps
   // Developer mode turned off from its own page: General, with the focus on its entry rather than lost with the page.
   useEffect(() => {
     if (current !== "developer" || developerShown) return;
@@ -322,10 +363,13 @@ export function SettingsDialog() {
   // The app's update, unseen: its mark is the Updates entry's, said in words to assistive tech.
   const updated = (id: string) => id === "updates" && updateMark;
   // What needs attention wears the one warning dot the app uses (the stage's title has it too; operator, 2026-10-16):
-  // a model chosen but not ready, or the microphone not allowed; said in words on hover and to assistive tech.
+  // a model chosen but not ready, the microphone not allowed, or a permission the media choice needs not allowed (not one
+  // the system can't say: operator, 2026-11-05); said in words on hover and to assistive tech.
   const micBlocked = ["prompt", "requesting", "denied", "missing"].includes(mic.microphone?.state ?? "");
+  const mediaBlocked = neededPermission(media.status) !== null;
   const attention = (id: string): MessageKey | null => (id === "transcription" && waits.stt) || (id === "voice" && waits.tts) || (id === "call" && waits.turn)
-    ? "settings.section.waiting" : id === "permissions" && micBlocked ? "settings.call.micNotAllowed" : null;
+    ? "settings.section.waiting" : id === "permissions" && micBlocked ? "settings.call.micNotAllowed"
+      : id === "permissions" && mediaBlocked ? (media.status?.capture === "restart" ? "settings.call.mediaRestartPending" : "settings.call.mediaPermissionMissing") : null;
   const badge = (id: string) => { const why = attention(id); return why && <Tooltip content={t(why)}><span className="ui-nav-badge settings-attention" role="img" aria-label={t(why)} /></Tooltip>; };
   // A phone's header says where the person is: Settings on the list, the section on its page, the machine on its own.
   const shownMachine = useRoomStore((state) => state.machines.find((entry) => entry.id === machine) ?? null);
@@ -369,7 +413,7 @@ export function SettingsDialog() {
                   // This device is a machine's entry too: its name, and its service's state under it, said in its name.
                   const device = section.id === "this-computer";
                   return <Fragment key={section.id}><button type="button" id={"settings-" + section.id} className={device ? "ui-nav-item this-device-entry" : "ui-nav-item"} aria-controls={"pane-" + section.id}
-                    aria-current={section.id === current ? section.id === "machines" ? "true" : "page" : undefined} aria-label={device ? machineEntryName(label(section.id), thisDevice, isNew(section.id), t) : undefined}
+                    aria-current={section.id === current ? section.id === "machines" && machine ? "true" : "page" : undefined} aria-label={device ? machineEntryName(label(section.id), thisDevice, isNew(section.id), t) : undefined}
                     onClick={() => section.id === "machines" ? store?.patch({ settingsSection: "machines", machinesView: { machine: null } }) : show(section.id)}>
                     <NewOnIcon icon={icon(section.id)} isNew={isNew(section.id) || updated(section.id)} />
                     {device ? <MachineEntryCopy name={label(section.id)} status={thisDevice} isNew={isNew(section.id)} /> : <span>{label(section.id)}</span>}
@@ -383,21 +427,8 @@ export function SettingsDialog() {
                 })}
             </nav>
             <div className="settings-content" ref={content} hidden={!pageShown} inert={motionOf(across, 2)?.startsWith("out") || undefined} data-motion={motionOf(across, 2)}>
-              <div className="settings-column">
-                <Pane id="general" current={current}><GeneralSettings t={t} /></Pane>
-                <Pane id="transcription" current={current}><SlotSection id="transcription" t={t} /></Pane>
-                <Pane id="voice" current={current}><SlotSection id="voice" t={t} /></Pane>
-                <Pane id="call" current={current}><CallSettings t={t} microphone={mic.microphone} /></Pane>
-                {floatingCardShown && <Pane id="floating-card" current={current}><FloatingCardSettings t={t} /></Pane>}
-                {permissionsShown && <Pane id="permissions" current={current}><PermissionsSettings t={t} access={mic.access} microphone={mic.microphone} /></Pane>}
-                {shortcutsShown && <Pane id="shortcuts" current={current}><ShortcutsSettings t={t} /></Pane>}
-                <Pane id="providers" current={current}><ProviderKeys /></Pane>
-                {ownComputer && <Pane id="this-computer" current={current}><ThisComputerSettings /></Pane>}
-                <Pane id="machines" current={current}><MachineList /></Pane>
-                {updatesShown && <Pane id="updates" current={current}><UpdatesSettings /></Pane>}
-                <Pane id="advanced" current={current}><AdvancedSettings t={t} /></Pane>
-                {developerShown && <Pane id="developer" current={current}><DeveloperOptions /></Pane>}
-              </div>
+              <SettingsPanes current={current} language={uiLanguage()} microphone={mic.microphone} access={mic.access} floatingCardShown={floatingCardShown}
+                permissionsShown={permissionsShown} shortcutsShown={shortcutsShown} ownComputer={ownComputer} updatesShown={updatesShown} crashReportsShown={crashReportsShown} developerShown={developerShown} />
             </div>
             {/* Settings' own polite region (a machine forgotten), never the call's. */}
             <p className="sr-only" role="status">{said}</p>

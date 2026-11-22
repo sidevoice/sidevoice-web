@@ -54,7 +54,7 @@ function room(extra: Partial<SessionFacts> = {}) {
 const patch = (store: RoomStore, facts: Partial<SessionFacts>) => act(() => store.patch(facts));
 const stageAgent = () => document.querySelector(".stage-agent")!;
 /** The stage's "Working…" line over the agent: a status for assistive tech only (the sidebar shows it to the eye). */
-const workingLine = () => document.querySelector<HTMLElement>(".stage-top > p[role='status']");
+const workingLine = () => document.querySelector<HTMLElement>(".stage-tile > p[role='status']");
 const rowOf = (title: string) => [...document.querySelectorAll(".conversation-sidebar .person")].find((button) => button.textContent?.includes(title))!;
 
 let selectParticipant: ReturnType<typeof vi.fn>;
@@ -87,14 +87,14 @@ test("the stage plays what the agent says as a karaoke bubble, the whole reply i
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "speaking");
   expect(stageAgent()).toHaveAttribute("data-mood", "speaking");
   expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "speaking");
-  const bubble = document.querySelector(".stage-bubble")!;
-  expect(bubble).toHaveAttribute("data-visible");
+  const bubble = document.querySelector(".stage-voice .vcap.agent:not(.meas)")!;
+  expect(bubble).toHaveClass("card");
   expect(bubble).not.toHaveAttribute("data-leaving");
   // The whole reply, lit as far as it was heard, in a window of three lines (PagedText): no chunk, nothing dim above.
   expect(bubble.querySelector(".paged-text > .paged-text-run > .lit-text")).not.toBeNull();
   expect(litPart(bubble).played).toBe("Okay. I'll start with the login and then look at the cart");
   expect(litPart(bubble).upcoming).toBe(" tests. I'll tell you as soon as I have something.");
-  expect(document.querySelectorAll(".stage-bubble")).toHaveLength(1);
+  expect(document.querySelectorAll(".stage-voice .vcap.agent:not(.meas)")).toHaveLength(1);
   // Karaoke progress never makes the mouth move without a speaker level.
   expect(stageAgent()).toHaveAttribute("data-mouth", "playback");
   expect(stageAgent()).not.toHaveAttribute("data-beat");
@@ -110,10 +110,10 @@ test("the stage plays what the agent says as a karaoke bubble, the whole reply i
   vi.useFakeTimers();
   patch(store, { botLive: false, karaokeState: null, harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login"),
     history: [{ ...store.getState().facts.history[0], audio: "played" }] } as Partial<SessionFacts>);
-  expect(litPart(document.querySelector(".stage-bubble")!).played).toBe(REPLY);
-  expect(document.querySelector(".stage-bubble")).not.toHaveAttribute("data-leaving");
+  expect(litPart(document.querySelector(".stage-voice .vcap.agent:not(.meas)")!).played).toBe(REPLY);
+  expect(document.querySelector(".stage-voice .vcap.agent:not(.meas)")).not.toHaveAttribute("data-leaving");
   // The balloon is the decided look: its place is the stored one (centre by default), always three lines.
-  expect(document.querySelector(".stage-bubble")).not.toHaveAttribute("data-lines");
+  expect(document.querySelector(".stage-voice .vcap.agent:not(.meas)")).not.toHaveAttribute("data-lines");
   // Said to assistive tech only: no badge over the agent (the sidebar shows it).
   expect(workingLine()).toHaveClass("sr-only");
   expect(workingLine()).toHaveTextContent("Working…");
@@ -121,16 +121,17 @@ test("the stage plays what the agent says as a karaoke bubble, the whole reply i
   // Under its balloon the agent holds still and shows as speaking: the work waits for the balloon to go.
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "speaking");
   expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "speaking");
-  expect(document.querySelector(".stage-desk svg.desk")).toBeInTheDocument();
-  // The balloon gone, it works at the desk that slid in, a tool in hand, the cogs turning.
+  // No desk: the design reference has it off (sidevoice-web#476).
+  expect(document.querySelector(".stage-desk")).toBeNull();
+  // The balloon gone, it works, a tool in hand, the cogs turning (drawn by its rig: creature/acts.js).
   tick(AGENT_LINGER_MS + SENT_LEAVING_MS);
-  expect(document.querySelector(".stage-bubble")).toBeNull();
+  expect(document.querySelector(".stage-voice .vcap.agent:not(.meas)")).toBeNull();
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "working");
   expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "working");
-  expect(document.querySelector(".stage-desk svg.desk")).toBeInTheDocument();
-  expect(stageAgent()).toHaveAttribute("data-desk");
-  expect(stageAgent().getAttribute("data-work")).toMatch(/^(crank|hammer|read|type)$/);
-  expect(stageAgent().querySelector(".cogs")).toBeInTheDocument();
+  expect(document.querySelector(".stage-desk")).toBeNull();
+  expect(stageAgent()).not.toHaveAttribute("data-desk");
+  expect(stageAgent().getAttribute("data-work")).toMatch(/^(crank|hammer|files|type|think)$/);
+  expect(stageAgent()).toHaveAttribute("data-mood", "working");
   expect(stageAgent()).not.toHaveAttribute("data-idle");
 
   // With nothing to do and its turn over, it rests: waiting for you is idle now.
@@ -150,11 +151,11 @@ test("the stage plays what the agent says as a karaoke bubble, the whole reply i
 test("the person has no picture on the stage, only a bubble of their own while they speak", async () => {
   const store = room();
   expect(document.querySelector(".stage-pip")).toBeNull();
-  expect(document.querySelector(".person-bubble")).toBeNull();
+  expect(document.querySelector(".stage-voice .vcap.person:not(.meas)")).toBeNull();
   patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening", pendingUserText: "Split it into two commits." });
   // What they say is not on the stage while they say it: only the voice's bars (the transcript has the words).
-  expect(document.querySelector(".person-bubble")).not.toHaveTextContent("Split it into two commits.");
-  expect(document.querySelector(".person-bubble .voice-wave")).toHaveAttribute("data-phase", "listening");
+  expect(document.querySelector(".stage-voice .vcap.person:not(.meas)")).not.toHaveTextContent("Split it into two commits.");
+  expect(document.querySelector(".stage-voice .vcap.pill:not(.meas) .turn-bars")).toHaveAttribute("data-phase", "listening");
   // The agent listens to the person meanwhile, and goes on listening while it is transcribed.
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "listening");
   expect(stageAgent()).toHaveAttribute("data-mood", "listening");
@@ -170,17 +171,27 @@ test("the person has no picture on the stage, only a bubble of their own while t
 
 const said = (segment: string, text: string, time: number) =>
   ({ segment, thread: "fp-1|t-login", role: "user" as const, text, name: "You", time, session: "s1" });
-const personBubble = () => document.querySelector<HTMLElement>(".person-bubble");
+const personBubble = () => document.querySelector<HTMLElement>(".stage-voice .vcap.person:not(.meas)");
 const tick = (ms: number) => act(() => { vi.advanceTimersByTime(ms); });
 
 test("while the person speaks and while it is transcribed, their bubble holds only the voice's bars", () => {
   const store = room();
   patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening", pendingUserText: "Split it" });
-  expect(personBubble()!.querySelector(".voice-wave")).toHaveAttribute("data-phase", "listening");
+  expect(personBubble()!.querySelector(".turn-bars")).toHaveAttribute("data-phase", "listening");
   expect(personBubble()).not.toHaveTextContent("Split it");
-  expect(personBubble()).not.toHaveAttribute("data-sent");
+  expect(personBubble()).not.toHaveClass("sent");
   patch(store, { userLive: false, pendingPhase: "transcribing" });
-  expect(personBubble()!.querySelector(".voice-wave")).toHaveAttribute("data-phase", "transcribing");
+  expect(personBubble()).toHaveAttribute("data-phase", "transcribing");
+  // Heard once: one announcer for the turn in the whole room (the stage's), the bars on the stage and in the transcript labelled
+  // but not live.
+  const announcers = [...document.querySelectorAll("[data-turn-announcer]")];
+  expect(announcers).toHaveLength(1);
+  expect(announcers[0]).toHaveAttribute("role", "status");
+  expect(announcers[0]).toHaveTextContent("Transcribing what you said");
+  const bars = [...document.querySelectorAll("[data-phase=transcribing]:is(.voice-wave, .voice-bars, .turn-bars)")];
+  expect(bars.length).toBeGreaterThan(0);
+  for (const bar of bars) expect(bar).toHaveAttribute("role", "img");
+  expect(personBubble()!.textContent).toBe("Transcribing what you said");
   expect(personBubble()).not.toHaveTextContent("Split it");
 }, WHOLE_APP_MS);
 
@@ -190,9 +201,9 @@ test("what a spoken turn sent stays a moment, then leaves, then is gone", () => 
   patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening" });
   patch(store, { userLive: false, pendingPhase: "transcribing" });
   patch(store, { pendingPhase: "", userTurn: null, history: [...store.getState().facts.history, said("u-1", "Split it into two commits.", 2)] } as Partial<SessionFacts>);
-  expect(personBubble()).toHaveAttribute("data-sent");
+  expect(personBubble()).toHaveClass("sent");
   expect(personBubble()).toHaveTextContent("Split it into two commits.");
-  expect(personBubble()!.querySelector(".voice-wave")).toBeNull();
+  expect(personBubble()!.querySelector(".turn-bars")).toBeNull();
   expect(personBubble()).not.toHaveAttribute("data-leaving");
   tick(PAGE_MS - 1);
   expect(personBubble()).not.toHaveAttribute("data-leaving");
@@ -225,11 +236,11 @@ test("the person's balloon belongs to the conversation they spoke to: another on
   vi.useFakeTimers();
   // While they speak.
   spokenTo(store, "u-1", "", 2, "speaking");
-  expect(personBubble()!.querySelector(".voice-wave")).not.toBeNull();
+  expect(personBubble()!.querySelector(".turn-bars")).not.toBeNull();
   patch(store, { viewedThread: "fp-2|t-backup" });
   expect(personBubble()).toBeNull();
   patch(store, { viewedThread: "fp-1|t-login" });
-  expect(personBubble()!.querySelector(".voice-wave")).not.toBeNull();
+  expect(personBubble()!.querySelector(".turn-bars")).not.toBeNull();
   // Once sent: its moment is its own, whichever conversation is on the stage.
   spokenTo(store, "u-1", "Split it into two commits.", 2, "sent");
   expect(personBubble()).toHaveTextContent("Split it into two commits.");
@@ -281,12 +292,12 @@ test("a second spoken turn arriving while the first leaves starts over cleanly, 
   // The next turn: the bars while spoken, below the first as it goes on leaving; then what it sent, from the start of
   // its moment.
   patch(store, { userLive: true, userTurn: { id: "u-2", segment: "turn:u-2", thread: "fp-1|t-login" }, pendingPhase: "listening" });
-  const live = () => document.querySelector<HTMLElement>(".person-bubble:not([data-sent])");
-  expect(live()!.querySelector(".voice-wave")).not.toBeNull();
+  const live = () => document.querySelector<HTMLElement>(".stage-voice .vcap.pill:not(.meas)");
+  expect(live()!.querySelector(".turn-bars")).not.toBeNull();
   expect(live()).not.toHaveAttribute("data-leaving");
-  expect(document.querySelector(".person-bubble[data-sent]")).toHaveAttribute("data-leaving");
+  expect(document.querySelector(".stage-voice .vcap.sent:not(.meas)")).toHaveAttribute("data-leaving");
   tick(SENT_LEAVING_MS);
-  expect(document.querySelector(".person-bubble[data-sent]")).toBeNull();
+  expect(document.querySelector(".stage-voice .vcap.sent:not(.meas)")).toBeNull();
   patch(store, { userLive: false, pendingPhase: "" , userTurn: null, history: [...store.getState().facts.history, said("u-2", "Second thing.", 3)] } as Partial<SessionFacts>);
   expect(personBubble()).toHaveTextContent("Second thing.");
   expect(personBubble()).not.toHaveAttribute("data-leaving");
@@ -320,7 +331,7 @@ test("the preview holds the stage avatar in a mood, with something unheard when 
 test("state dots and small avatars follow each conversation's state, grouped by machine", () => {
   // Its reply already played: no balloon holds the agent still here (the stage's own test follows that).
   const store = room({ history: [played] });
-  const dot = (title: string) => rowOf(title).querySelector(".state-dot")!.getAttribute("data-state");
+  const dot = (title: string) => rowOf(title).querySelector(".conversation-avatar")!.getAttribute("data-state");
   const mood = (title: string) => rowOf(title).querySelector(".sv-avatar")!.getAttribute("data-avatar-state");
   // The dot says whether it hears you; the bicho is offline, working or resting.
   expect([dot("Fix the slow login"), mood("Fix the slow login")]).toEqual(["in-call", "idle"]);
@@ -335,11 +346,14 @@ test("state dots and small avatars follow each conversation's state, grouped by 
   expect([...document.querySelectorAll(".sidebar-group-label")].map((label) => label.textContent)).toEqual(["Laptop", "Home server"]);
   expect(rowOf("Migrate the payments API")).toHaveTextContent("Working");
   expect(rowOf("Plan the week")).toHaveTextContent("Offline");
-  // The light is the dot: green while it hears you, blinking while it works (room.css); a card hides the one of a
-  // conversation that cannot hear you, whose words say so. A dot carries no mark of its own.
+  // A card's creature wears nothing but the dot at its foot (room.css): the connected green while its agent is reachable, blinking
+  // in the working colour while it works, none while it is offline; the rest is said by its words and its face. A dot carries no
+  // mark of its own.
   const cardDots = [...document.querySelectorAll(".sidebar-rows .state-dot")];
-  expect(cardDots.map((d) => d.getAttribute("data-state"))).toEqual(["in-call", "working", "waiting", "idle"]);
+  expect(cardDots.map((d) => [d.getAttribute("data-state"), d.getAttribute("data-kind")])).toEqual([["in-call", "idle"], ["working", "working"], ["waiting", "idle"]]);
   expect(cardDots.every((d) => d.childElementCount === 0)).toBe(true);
+  expect(rowOf("Plan the week").querySelector(".state-dot")).toBeNull();
+  expect(document.querySelector(".sidebar-rows .attention-burst")).toBeNull();
   // The call's own conversation at work says Working, on its line and its light (desktop trial, item 11).
   // At work for a minute: past any wait before Working shows (#112).
   patch(store, { harness: { "fp-1|t-pay": true, "fp-1|t-login": true }, workingSince: { "fp-1|t-pay": 0, "fp-1|t-login": 0 }, now: 60_000 } as Partial<SessionFacts>);
@@ -395,7 +409,7 @@ test("the stage's agent and its thumbnails are one creature in one state: rest a
   expect(inStep(login)).toContain("data-enter=null");
   // It works: the same tool in every hand, swapped in every hand.
   patch(store, { userLive: false, userTurn: null, pendingPhase: "", harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login") } as Partial<SessionFacts>);
-  expect(attr("data-work")).toMatch(/^(crank|hammer|read|type)$/);
+  expect(attr("data-work")).toMatch(/^(crank|hammer|files|type|think)$/);
   inStep(login);
   tick(31_000);
   inStep(login);
@@ -439,17 +453,22 @@ test("an offline conversation on the stage is a wanted poster, in the interface'
   expect(stageAgent()).toHaveAttribute("data-mood", "idle");
   expect(stageAgent()).toHaveAccessibleName("Plan the week · Offline");
   const poster = document.querySelector(".wanted")!;
-  expect(poster).toHaveAttribute("aria-hidden", "true");
+  // Decoration: the stage's agent says its state.
+  expect(poster.closest("[aria-hidden=true]")).not.toBeNull();
   expect(poster).toHaveTextContent("WANTED");
   expect(poster).toHaveTextContent("ONLINE OR PAUSED");
   expect(poster).toHaveTextContent("IF SEEN, PLEASE TELL ITS HUMAN.");
   expect(poster.querySelector(".w-bounty")?.textContent).toMatch(/^\d{3},000,000-$/);
-  // Its portrait is the same bicho, laughing.
-  expect(poster.querySelector(".w-photo .sv-avatar")).toHaveAttribute("data-mood", "speaking");
-  expect(document.querySelector(".stage-desk")).toBeInTheDocument();
+  // It is drawn on the scene's canvas (those words are its fallback content), from what the backdrop has to hang it from.
+  const scene = document.querySelector(".stage-backdrop")!;
+  expect(scene).toHaveAttribute("data-poster");
+  expect(poster.closest("canvas")).toBe(scene.querySelector("canvas"));
+  expect(["mount", "pin", "nail", "float"]).toContain(scene.getAttribute("data-hang"));
+  expect(document.querySelector(".stage-desk")).toBeNull();
   // Back within reach, the poster goes.
   patch(store, { viewedThread: "fp-1|t-login" });
   expect(document.querySelector(".wanted")).toBeNull();
+  expect(document.querySelector(".stage-backdrop")).not.toHaveAttribute("data-poster");
 });
 
 test("the poster speaks Spanish on a device set to it", () => {
@@ -460,12 +479,39 @@ test("the poster speaks Spanish on a device set to it", () => {
   expect(stageAgent()).toHaveAccessibleName("Plan the week · Desconectada");
 });
 
-test("a conversation that is holding does not react to the person talking", () => {
+test("a conversation that is holding shows the person's open turn first; the creature draws holding as idle", () => {
   room({
     people: [person("t-login", "Fix the slow login", { reach: { state: "holding" } })],
     userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening",
   });
+  expect(stageAgent()).toHaveAttribute("data-avatar-state", "listening");
+  expect(document.querySelector(".stage-holding")).toBeNull();
+});
+
+test("holding stands in idle's place: the notice is in the title block, the creature is exactly at rest", () => {
+  room({ people: [person("t-login", "Fix the slow login", { reach: { state: "holding", detail: "The editor is closed. Open it." } })] });
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "idle");
+  expect(stageAgent()).toHaveAttribute("data-mood", "idle");
+  expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "idle");
+  const notice = document.querySelector(".stage-holding")!;
+  expect(notice).toHaveTextContent("Can't receive");
+  expect(notice).toHaveTextContent("The editor is closed. Open it.");
+  // Led by the slashed tray in the state's mustard (never the old pause); the words stay in the ink.
+  expect(notice.querySelector(".stage-holding-line svg.state-glyph-holding mask")).not.toBeNull();
+  expect(notice.querySelector(".stage-holding-line")!.textContent).toBe("Can't receive");
+  // Neither over the balloons nor the title: it is in the title block, not in the stage's top cell.
+  expect(notice.closest(".stage-top")).toBeNull();
+  expect(notice.closest(".stage-name, .stage-title")).not.toBeNull();
+  expect(stageAgent()).toHaveAccessibleName("Fix the slow login · Can't receive");
+});
+
+test("working shows as working, and the reason and remedy stay in the title details", async () => {
+  room({ people: [person("t-login", "Fix the slow login", { reach: { state: "holding", detail: "The editor is closed. Open it." } })],
+    harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login") });
+  expect(stageAgent()).toHaveAttribute("data-avatar-state", "working");
+  expect(document.querySelector(".stage-holding")).toBeNull();
+  await act(async () => { fireEvent.click(document.querySelector(".stage-heading")!); });
+  expect(document.querySelector(".call-details-holding")).toHaveTextContent("The editor is closed. Open it.");
 });
 
 test("replies that arrived after leaving put the unread cue on that conversation's avatar, never the one in view", () => {
@@ -557,10 +603,10 @@ test("the header holds Settings, and the call bar's ⋯ the statistics, under th
 
 test("out of a call the room's binding is not a call: no conversation is in call", () => {
   const store = room({ ws: null, sessionId: null });
-  expect(rowOf("Fix the slow login").querySelector(".state-dot")).toHaveAttribute("data-state", "waiting");
+  expect(rowOf("Fix the slow login").querySelector(".conversation-avatar")).toHaveAttribute("data-state", "waiting");
   expect(rowOf("Fix the slow login")).toHaveTextContent("Waiting for you");
   patch(store, { ws: {}, sessionId: "s1" });
-  expect(rowOf("Fix the slow login").querySelector(".state-dot")).toHaveAttribute("data-state", "in-call");
+  expect(rowOf("Fix the slow login").querySelector(".conversation-avatar")).toHaveAttribute("data-state", "in-call");
 });
 
 test("the transcript opens on its latest message, whatever arrived while it was closed", async () => {
@@ -588,8 +634,8 @@ test("two machines with the same name, or none, are two groups, each with its ow
 test("the bubble lights whole words, and its tooltip speaks the interface's language", () => {
   room({ botLive: true, karaokeState: { segment: "h-2", from: 42, to: 42 } });
   // What was heard ends inside "look": the word lights whole.
-  expect(litPart(document.querySelector(".stage-bubble")!).played).toBe("Okay. I'll start with the login and then look");
-  expect(document.querySelector(".stage-bubble .lit-text")).toHaveAttribute("title", "Playing this reply");
+  expect(litPart(document.querySelector(".stage-voice .vcap.agent:not(.meas)")!).played).toBe("Okay. I'll start with the login and then look");
+  expect(document.querySelector(".stage-voice .vcap.agent:not(.meas) .lit-text")).toHaveAttribute("title", "Playing this reply");
 });
 
 test("a whole sentence sounding is read at a speaking pace, never past its end", () => {
@@ -597,17 +643,17 @@ test("a whole sentence sounding is read at a speaking pace, never past its end",
   // The voice's chunk is the reply's first sentence and a half: "Okay. I'll start with the login".
   room({ botLive: true, karaokeState: { segment: "h-2", from: 0, to: 31 } });
   // The sentence has just started: the whole reply is up, nothing lit yet.
-  expect(litPart(document.querySelector(".stage-bubble")!).upcoming).toBe(REPLY);
-  expect(litPart(document.querySelector(".stage-bubble")!).played).toBe("");
+  expect(litPart(document.querySelector(".stage-voice .vcap.agent:not(.meas)")!).upcoming).toBe(REPLY);
+  expect(litPart(document.querySelector(".stage-voice .vcap.agent:not(.meas)")!).played).toBe("");
   act(() => { vi.advanceTimersByTime(1000); });
-  expect(litPart(document.querySelector(".stage-bubble")!).played.length).toBeGreaterThan(0);
+  expect(litPart(document.querySelector(".stage-voice .vcap.agent:not(.meas)")!).played.length).toBeGreaterThan(0);
   // Long after the voice would have got there, the bubble waits at the end of the part sounding.
   act(() => { vi.advanceTimersByTime(20000); });
-  expect(litPart(document.querySelector(".stage-bubble")!).played).toBe("Okay. I'll start with the login");
-  expect(litPart(document.querySelector(".stage-bubble")!).upcoming).toBe(REPLY.slice("Okay. I'll start with the login".length));
+  expect(litPart(document.querySelector(".stage-voice .vcap.agent:not(.meas)")!).played).toBe("Okay. I'll start with the login");
+  expect(litPart(document.querySelector(".stage-voice .vcap.agent:not(.meas)")!).upcoming).toBe(REPLY.slice("Okay. I'll start with the login".length));
 });
 
-const stageBubbles = () => [...document.querySelectorAll<HTMLElement>(".stage-bubble")];
+const stageBubbles = () => [...document.querySelectorAll<HTMLElement>(".stage-voice .vcap.agent:not(.meas)")];
 /** The reply `segment` as the room has it, its voice `audio` ("playing", or "played" once said). */
 const reply = (segment: string, text: string, audio: string, time: number) =>
   ({ segment, thread: "fp-1|t-login", role: "assistant" as const, text, name: "Fix the slow login", time, session: "s1", audio });
@@ -905,7 +951,7 @@ test("the Working… line over the agent is an sr-only status, with no visible b
   vi.useFakeTimers();
   patch(store, { harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login") });
   // While the reply's balloon is up the stage shows speaking; the sr-only status still follows the real mood.
-  expect(document.querySelector(".stage-bubble")).not.toBeNull();
+  expect(document.querySelector(".stage-voice .vcap.agent:not(.meas)")).not.toBeNull();
   expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "speaking");
   expect(stageAgent()).toHaveAttribute("data-mood", "speaking");
   expect(workingLine()).toHaveClass("sr-only");
@@ -914,8 +960,8 @@ test("the Working… line over the agent is an sr-only status, with no visible b
   expect(workingLine()!.querySelector(".ui-spinner")).toBeNull();
   expect(screen.getAllByRole("status")).toContain(workingLine());
   expect(document.querySelector(".stage-activity")).toBeNull();
-  // The desk waits for the balloon to go (the first test follows it out).
-  expect(document.querySelector(".stage-desk svg.desk")).toBeInTheDocument();
+  // No desk comes in (sidevoice-web#476).
+  expect(document.querySelector(".stage-desk")).toBeNull();
   // The work over, the line goes.
   patch(store, { harness: { "fp-1|t-login": false } });
   expect(workingLine()).toBeNull();
@@ -963,13 +1009,13 @@ test("captions off in the call bar takes the balloons off the stage, for this de
   const toggle = () => screen.getByRole("button", { name: /captions$/ });
   expect(toggle()).toHaveAccessibleName("Hide captions");
   expect(toggle()).toHaveAttribute("aria-pressed", "true");
-  expect(document.querySelector(".stage-bubble")).not.toBeNull();
+  expect(document.querySelector(".stage-voice .vcap.agent:not(.meas)")).not.toBeNull();
   act(() => { toggle().click(); });
   expect(toggle()).toHaveAccessibleName("Show captions");
-  expect(document.querySelector(".stage-bubble")).toBeNull();
+  expect(document.querySelector(".stage-voice .vcap.agent:not(.meas)")).toBeNull();
   expect(localStorage.getItem(CAPTIONS_KEY)).toBe("off");
   act(() => { toggle().click(); });
-  expect(document.querySelector(".stage-bubble")).not.toBeNull();
+  expect(document.querySelector(".stage-voice .vcap.agent:not(.meas)")).not.toBeNull();
   expect(localStorage.getItem(CAPTIONS_KEY)).toBeNull();
 });
 
@@ -978,3 +1024,20 @@ test("held still, the stage's mouth does not follow the voice either", () => {
   room({ botLive: true, karaokeState: { segment: "h-2", from: 57, to: 57 } });
   expect(stageAgent()).toHaveAttribute("data-mouth", "still");
 });
+
+/* Under the creature, one turn's card at a time (the design reference's 'place': both turns below it): the person's turn
+ * coming in sends the agent's lingering reply away at once, and the agent's reply sounding sends away what was sent. */
+test("the person's turn coming in lifts the agent's lingering reply away at once; the reply sounding lifts away what was sent", () => {
+  const store = room({ botLive: true, karaokeState: { segment: "h-2", from: 20, to: 20 } });
+  vi.useFakeTimers();
+  patch(store, { botLive: false, karaokeState: null, history: [reply("h-2", REPLY, "played", 1)] } as Partial<SessionFacts>);
+  expect(stageBubbles()[0]).not.toHaveAttribute("data-leaving");
+  patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening" });
+  expect(stageBubbles()[0]).toHaveAttribute("data-leaving");
+  expect(document.querySelector(".stage-voice .vcap.pill:not(.meas)")).not.toBeNull();
+  patch(store, { userLive: false, pendingPhase: "" , userTurn: null, history: [reply("h-2", REPLY, "played", 1), said("u-1", "Split it into two commits.", 2)] } as Partial<SessionFacts>);
+  const sent = () => document.querySelector(".stage-voice .vcap.sent:not(.meas)");
+  expect(sent()).not.toHaveAttribute("data-leaving");
+  patch(store, { botLive: true, karaokeState: { segment: "h-3", from: 0, to: 0 }, history: [reply("h-2", REPLY, "played", 1), said("u-1", "Split it into two commits.", 2), reply("h-3", NEXT, "playing", 3)] } as Partial<SessionFacts>);
+  expect(sent()).toHaveAttribute("data-leaving");
+}, WHOLE_APP_MS);

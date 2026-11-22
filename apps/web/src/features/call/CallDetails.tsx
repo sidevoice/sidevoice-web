@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ChevronIcon, HarnessIcon, MachinesIcon } from "../../components/ui/Icons";
+import { ChevronIcon, HarnessIcon, MachinesIcon, StateGlyph } from "../../components/ui/Icons";
 import { Popover } from "../../components/ui/Popover";
 import { translator, type Translate } from "../../i18n/translator";
 import type { StageConversation } from "./stage-view";
@@ -35,6 +35,10 @@ export function CallDetails({ stage, rows, t }: { stage: StageConversation; rows
       {agent.length > 0 && <section className="call-details-group">
         <h3>{t("titleDetail.agent")}</h3>
         <dl className="call-details-agent">{agent.map(([term, value]) => <div key={term}><dt>{term}</dt><dd translate="no">{value}</dd></div>)}</dl>
+      </section>}
+      {row?.reach === "holding" && row.available !== false && <section className="call-details-group call-details-holding">
+        <h3><StateGlyph kind="holding" size={14} />{t("state.holding")}</h3>
+        {row?.detail && <p translate="no">{row.detail}</p>}
       </section>}
       <section className="call-details-group">
         <h3>{t("titleDetail.voice")}</h3>

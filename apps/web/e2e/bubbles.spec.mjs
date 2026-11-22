@@ -1,27 +1,30 @@
 import { test, expect } from "@playwright/test";
 
-test("a reply cut off draws its cut marker over its heard text, in both themes", async ({ page }) => {
+test("a reply cut off is a balloon like a complete one, the rest quiet after the cut and its Interrupted tag, in both themes", async ({ page }) => {
   await page.goto("/voice/");
   await page.evaluate(() => {
     const host = document.createElement("div");
     host.className = "call-layout";
-    host.innerHTML = `<div class="chat-bubble" data-role="assistant" data-position="only">Complete</div>
-      <div class="chat-bubble" data-role="assistant" data-position="only" data-interrupted="true"><span class="cut-text"><span class="cut-heard">Interrupted</span>
-        <button class="cut-marker" aria-expanded="false">Interrupted</button></span></div>`;
+    host.innerHTML = `<section class="transcript"><div class="message-group" data-role="assistant">
+      <div class="chat-bubble" data-role="assistant" data-position="first">Complete</div>
+      <div class="chat-bubble" data-role="assistant" data-position="last" data-interrupted="true"><span class="cut-text"><span class="cut-heard">Interrupted</span><span class="cut-point"></span><span class="cut-rest"> and the rest</span><span class="cut-tag">Interrupted</span></span></div>
+    </div></section>`;
     document.body.append(host);
   });
   for (const theme of ["light", "dark"]) {
     const paints = await page.evaluate((theme) => {
       document.documentElement.dataset.theme = theme;
       const [complete, interrupted] = document.querySelectorAll(".call-layout .chat-bubble");
-      const marker = getComputedStyle(interrupted.querySelector(".cut-marker"));
-      return { complete: getComputedStyle(complete).boxShadow, interrupted: getComputedStyle(interrupted).boxShadow, edge: marker.borderTopWidth, fill: marker.backgroundColor };
+      const tag = getComputedStyle(interrupted.querySelector(".cut-tag")), rest = getComputedStyle(interrupted.querySelector(".cut-rest"));
+      return { complete: getComputedStyle(complete).boxShadow, interrupted: getComputedStyle(interrupted).boxShadow, fill: tag.backgroundColor, rest: rest.opacity, mark: getComputedStyle(interrupted.querySelector(".cut-point")).opacity };
     }, theme);
     expect(paints.complete, theme).not.toBe("none");
-    // The balloon is the same as a complete one: the cut is the marker's, a pill with its own fill and a 1px edge.
+    // The balloon is the same as a complete one: the cut is its words', the rest quiet, and the tag with its own fill.
     expect(paints.interrupted, theme).toBe(paints.complete);
-    expect(paints.edge, theme).toBe("1px");
     expect(paints.fill, theme).not.toBe("rgba(0, 0, 0, 0)");
+    expect(paints.rest, theme).toBe("0.38");
+    // The mark at the cut shows on hover only.
+    expect(paints.mark, theme).toBe("0");
   }
 });
 

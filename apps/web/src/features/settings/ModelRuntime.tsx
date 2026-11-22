@@ -5,7 +5,7 @@ import { useRoomStore } from "../../state/room-store";
 import type { ModelBuild } from "@sidevoice/engine";
 import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 import type { ModelState } from "./ModelSetup";
-import { buildSizes, describeBuild, engineOf } from "./model-facts";
+import { buildSizes, describeBuild, engineOf, stopsInBackground } from "./model-facts";
 
 /** What a browser tells of this device that lib.dom does not know yet. */
 declare global {
@@ -75,7 +75,7 @@ export function ModelRuntime({ task, state, locked }: { task: "stt" | "tts"; sta
           {builds.map((build) => option(build.id, describe(build), sizes(build), [
             ...(build.id === recommended ? [{ text: t("runtime.recommended"), tone: "accent" as const }] : []),
             ...(build.installed ? [{ text: t("runtime.onDisk"), tone: "positive" as const }] : []),
-          ], build.available, reasons(build)))}
+          ], build.available, reasons(build) || (stopsInBackground(build) ? t("runtime.stopsInBackground") : "")))}
         </fieldset>}
         {locked && <p className="model-runtime-device">{t("voice.prepare.lockedHint")}</p>}
       </div>}
