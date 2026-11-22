@@ -1,5 +1,5 @@
 import type {
-  AppBuild, AppUpdater, AppVoice, CallControlsBridge, AudioRouteBridge, CallSurfaceBridge, CrashReportsBridge, CueBridge, Host, HostDebugBridge, HostIdentity, HostPresence, HostStorage, LocalHostBridge,
+  AppBuild, AppUpdater, AppVoice, CallControlsBridge, CallLinkBridge, AudioRouteBridge, CallSurfaceBridge, CrashReportsBridge, CueBridge, Host, HostDebugBridge, HostIdentity, HostPresence, HostStorage, LocalHostBridge,
   MediaDuckBridge, MessageOverlay, MicrophoneBridge, MuteShortcutBridge, PairingsStore, ReachTransport, ResetBridge, ScreenBridge, ShortcutsBridge, TextScaleBridge,
 } from "./types";
 
@@ -41,7 +41,7 @@ const named = (value: unknown) => typeof value === "string" && value.trim() ? va
 
 /** The members an app offers through the global it injects, `null` for the rest; the identity here is what the app says
  *  (its build, its computer's name, its shortcut modifier), the browser's to tell where it does not. */
-export type NativeHost = Omit<Host, "exclusive" | "systemTextSize" | "identity" | "microphone" | "presence" | "reach" | "storage" | "voice"> & {
+export type NativeHost = Omit<Host, "callLink" | "exclusive" | "systemTextSize" | "identity" | "microphone" | "presence" | "reach" | "storage" | "voice"> & {
   identity: Omit<HostIdentity, "deviceName" | "shortcutModifier" | "followKeyboardLayout"> & { deviceName(): string | null; shortcutModifier: string | null };
   /** The app's permission bridge, and its help for a blocked one when it words it. */
   microphone: Partial<MicrophoneBridge> | null;
@@ -50,6 +50,8 @@ export type NativeHost = Omit<Host, "exclusive" | "systemTextSize" | "identity" 
   reach: ReachTransport | null;
   /** The app's pairings; null where it keeps none for the page. */
   storage: { pairings: PairingsStore } | null;
+  /** The call's link to the room the app holds; null where the page opens its own socket. */
+  callLink: CallLinkBridge | null;
   /** The voice and the models the app runs for the page; null where the page runs them. */
   voice: AppVoice | null;
 };
@@ -92,6 +94,7 @@ export function nativeHost(): NativeHost {
     presence: { media: presence?.media === "app" ? "app" : "page" },
     reach: typeof reach?.plainHttpPrivate === "boolean" ? { plainHttpPrivate: reach.plainHttpPrivate } : null,
     storage,
+    callLink: member<CallLinkBridge>(app, "callLink", ["open"]),
     localHost: member<LocalHostBridge>(app, "localHost", ["state", "subscribe", "pairing"]),
     reset: member<ResetBridge>(app, "reset", ["deleteAll", "resetReport"]),
     muteShortcut: member<MuteShortcutBridge>(app, "muteShortcut", ["get", "set"]),

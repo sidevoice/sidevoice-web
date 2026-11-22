@@ -572,8 +572,49 @@ export interface CrashReportsBridge {
   installId?(): Promise<{ installId: string } | null>;
 }
 
+/** A frame of the room's, as the call's socket hands it on. */
+export interface CallSocketMessage { readonly data: string }
+/** How the call's socket closed: the code and reason the room or the transport gave, and whether the close was clean. */
+export interface CallSocketClose { readonly code: number; readonly reason: string; readonly wasClean: boolean }
+
+/** The call's socket to the room: the part of a browser's `WebSocket` the call uses, with its numbers for `readyState`
+ *  (0 connecting, 1 open, 2 closing, 3 closed). A browser's websocket is one; an app's call link answers another. The call
+ *  may keep its own fields on it. */
+export interface CallSocket {
+  readonly readyState: number;
+  /** Throws before the socket opened, lets the text go once it is closing; sent in the order asked. */
+  send(text: string): void;
+  /** As a browser's: `code` is 1000 (a hang-up) or 3000–4999, else it throws `InvalidAccessError`; a reason past 123
+   *  bytes throws `SyntaxError`. Without a code (or a reason) the close frame carries none and the room parks the call
+   *  for a resume, as when the page unloads; a reason alone is 1000. `onclose` follows. */
+  close(code?: number, reason?: string): void;
+  onopen: ((event: unknown) => void) | null;
+  onmessage: ((event: CallSocketMessage) => void) | null;
+  onerror: ((event: unknown) => void) | null;
+  onclose: ((event: CallSocketClose) => void) | null;
+  [own: string]: unknown;
+}
+
+/** The call's link to the room (sidevoice-desktop `docs/BRIDGE.md` → "The call link"): the socket the call speaks the room's
+ *  call protocol over. In a browser it is the page's own websocket; in an app it is the app's, which answers the room's
+ *  keepalive itself (the call never sees a `voice-ping` then) and keeps what the room sends while the system freezes the page
+ *  (a locked phone), so the call reads every frame once and in order when it runs again. The call drives either the same way. */
+export interface CallLink {
+  /** Who holds the socket: the page, or the app. */
+  readonly runs: "page" | "app";
+  /** Opens the socket to `url` with the subprotocols `protocols`. */
+  open(url: string, protocols: string[]): CallSocket;
+}
+
+/** What an app offers as `host.callLink`. */
+export interface CallLinkBridge {
+  open(url: string, protocols: string[]): CallSocket;
+}
+
 export interface Host {
   identity: HostIdentity;
+  /** The call's socket to the room: the app's where it holds it, else the browser's own. */
+  callLink: CallLink;
   /** The host's overlay for `language` (a tag: `es`, `zh-Hans`) exactly: nothing from its primary subtag or English, which
    *  the translator tries itself. Read as the page draws, so it answers at once. */
   messages(language: string): MessageOverlay;
