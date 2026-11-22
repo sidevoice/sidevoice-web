@@ -402,3 +402,23 @@ test("a member the app offers late is watched for a while, told once it is there
     Reflect.deleteProperty(window, "__sidevoiceHost");
   }
 });
+
+describe("the call link", () => {
+  test("is the page's own socket outside an app, and the app's where it holds the link", () => {
+    withHost(undefined);
+    expect(host().callLink.runs).toBe("page");
+    expect(nativeHost().callLink).toBeNull();
+    const socket = { readyState: 0 };
+    const open = vi.fn(() => socket);
+    withHost({ callLink: { open } });
+    const link = host().callLink;
+    expect(link.runs).toBe("app");
+    expect(link.open("wss://core.example/api/presentation/ws", ["sidevoice", "sidevoice.token.t"])).toBe(socket);
+    expect(open).toHaveBeenCalledWith("wss://core.example/api/presentation/ws", ["sidevoice", "sidevoice.token.t"]);
+  });
+
+  test("an app's member without `open` is no link: the page keeps its own", () => {
+    withHost({ callLink: {} });
+    expect(host().callLink.runs).toBe("page");
+  });
+});

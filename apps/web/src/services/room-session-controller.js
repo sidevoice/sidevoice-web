@@ -30,6 +30,8 @@ import {rememberServiceVersion} from './service-version.ts';
 import {watchAudioDeviceRefresh} from './audio-device-refresh.ts';
 import {createMicrophoneAccess} from './microphone-access.ts';
 import {audioDiagnostics} from './audio-diagnostics.ts';
+// `readyState` of an open call socket, a browser's or an app's (host `CallSocket`).
+const SOCKET_OPEN=1;
 // Always-on audio facts for sidevoice-web#341: it only watches getUserMedia, the audio contexts and devicechange.
 const audioLog=audioDiagnostics();
 let lastMicLevel=0,lastPlaybackLevel=0;
@@ -742,7 +744,7 @@ function keepMessage(kind,type,data,id=crypto.randomUUID()){
  * another machine is let go. */
 function flushOutbox(socket=state.ws){
  // A socket carries nothing until the room has answered its hello with the session it speaks for, nor before the outbox is back.
- if(!outboxReady||outboxHold||!socket||socket.readyState!==WebSocket.OPEN||!state.sessionId||socket.session!==state.sessionId)return;
+ if(!outboxReady||outboxHold||!socket||socket.readyState!==SOCKET_OPEN||!state.sessionId||socket.session!==state.sessionId)return;
  void flushTexts();
  const first=outbox.list().find(entry=>entry.sentOn===socket);
  const redo=!!first&&resendClock()>=first.resendAt,gone=new Set();
@@ -1044,7 +1046,7 @@ async function flushTexts(){
    if(removalFlights.has(entry.node))break;
    // A turn said before this text goes first, and is taken (acknowledged) before the text follows it.
    {const kept=outbox.list();if(kept.some((other,at)=>other.kind==='user-turn'&&at<kept.indexOf(entry)))break}
-   if(outboxHold||!socket||socket.readyState!==WebSocket.OPEN||socket.session!==state.sessionId||state.roomBinding?.thread_id!==entry.payload.data.thread)break;
+   if(outboxHold||!socket||socket.readyState!==SOCKET_OPEN||socket.session!==state.sessionId||state.roomBinding?.thread_id!==entry.payload.data.thread)break;
    const gen=textGen,answer=await deliverText(entry);
    if(answer==='later'){
     // An answer of an earlier session or socket (a hang-up, a move, a new socket meanwhile) arms nothing.
@@ -1881,7 +1883,7 @@ function reportClientError(report){
  const entry={kind:String(report?.kind||'error').slice(0,40),message:String(report?.message||'').slice(0,400),
   stack:String(report?.stack||'').slice(0,2000),component:String(report?.component||'').slice(0,1000),
   build:String(window.sidevoiceBuildId||'').slice(0,40)};
- if(state.ws?.readyState===WebSocket.OPEN&&state.sessionId){
+ if(state.ws?.readyState===SOCKET_OPEN&&state.sessionId){
   try{state.ws.send(JSON.stringify({type:'voice-client-error',data:{session_id:state.sessionId,...entry}}));return}catch{}
  }
  // Before the call exists, or once its socket is gone, a request that outlives the page still reaches the machine.
@@ -2004,6 +2006,8 @@ function recordMessage(raw, socket) {
     // socket up and its seat taken. The page keeps no clock of its own for this: a background
     // tab's timers are throttled, but the frame that arrives still wakes this handler, and a muted
     // browser sends no audio the room could have taken for an answer.
+    // Where an app holds the link (host `callLink`), it answers the ping itself and this page never sees one: it goes on
+    // while the system freezes the page.
     if (t === 'voice-ping') {
         const link = socket || state.ws;
         try { link?.send(JSON.stringify({ type: 'voice-pong', data: { session_id: d.session_id || state.sessionId } })); } catch { }
@@ -2604,7 +2608,9 @@ function refusedForGood(error){return error?.refused===true}
 function rememberedOn(fp){const wanted=conversationOf(rememberedThread());return wanted?.node===fp?wanted.thread:null}
 async function joinRoom(epoch,context){
  const fp=state.callNode,protocols=callProtocols(fp);
- const socket=new WebSocket(roomSocketUrl(fp),protocols);
+ // The host's link to the room: an app's where it holds it (it goes on while the system freezes this page), else this
+ // page's own websocket. Either is driven the same way, and the room sees the same protocol from both.
+ const socket=pageHost().callLink.open(roomSocketUrl(fp),protocols);
  // The credential this socket carries, to tell its refusal from one of a pairing made since.
  socket.token=protocols[1].slice('sidevoice.token.'.length);
  state.ws=socket;
@@ -2616,7 +2622,7 @@ async function joinRoom(epoch,context){
  catch(error){socket.onclose=socket.onmessage=socket.onerror=null;try{socket.close(1000)}catch{}if(state.ws===socket)state.ws=null;throw error}
  if(epoch!==connectEpoch){socket.close(1000);return null}
  socket.onerror=null;
- if(socket.readyState!==WebSocket.OPEN)throw worded(bundled('room.failure.dropped').text);
+ if(socket.readyState!==SOCKET_OPEN)throw worded(bundled('room.failure.dropped').text);
  socket.onclose=event=>{if(state.ws===socket)lostConnection(event,epoch,socket.token)};
  socket.onmessage=e=>{if(state.ws===socket)message(e.data,socket)};
  // Every session and every resume hands over a fresh single-use token: the newest is the one a drop will name.
@@ -2748,7 +2754,7 @@ async function drainOutbox(node,ms,mine){
  const owed=()=>outbox.list().some(entry=>entry.node===node)||replies.size>0;
  const until=Date.now()+ms;
  if(mine())flushOutbox();
- while(mine()&&owed()&&Date.now()<until&&state.ws?.readyState===WebSocket.OPEN){await new Promise(resolve=>setTimeout(resolve,50));if(mine())flushOutbox()}
+ while(mine()&&owed()&&Date.now()<until&&state.ws?.readyState===SOCKET_OPEN){await new Promise(resolve=>setTimeout(resolve,50));if(mine())flushOutbox()}
  if(!mine())return;
  failTexts(entry=>entry.node===node);
  const left=outbox.list().filter(entry=>entry.node===node);
@@ -3120,7 +3126,7 @@ function saveLanguage(chosen){
  // Automatic keeps no language: the system's is read again at each start.
  storePreferences(chosen?{ui_language:chosen}:{});
  const p={ui_language:systemLanguage(UI_LANGUAGES),...(chosen?{ui_language:chosen}:{})};setUiLanguage(p.ui_language);
- if(state.ws&&state.ws.readyState===WebSocket.OPEN&&state.sessionId)state.ws.send(JSON.stringify({type:'voice-settings',data:{session_id:state.sessionId,ui_language:p.ui_language}}));
+ if(state.ws&&state.ws.readyState===SOCKET_OPEN&&state.sessionId)state.ws.send(JSON.stringify({type:'voice-settings',data:{session_id:state.sessionId,ui_language:p.ui_language}}));
  roomStore.patch({uiLanguage:chosen,settingsSavedAt:Date.now()});
 }
 // Nothing to submit: every setting applies as it changes. Enter in a field submits nothing.

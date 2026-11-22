@@ -1,6 +1,7 @@
 import type { Host, HostMicrophone, MicrophoneBridge, MicrophoneHelp } from "./types";
 import { pageMicrophone as microphoneOfPage } from "./browser-microphone";
 import { browserMicrophoneHelp } from "./browser-microphone-help";
+import { browserCallLink } from "./browser-call-link";
 import { browserRemote, browserScreenAwake } from "./browser-presence";
 import { beginBrowserAudioActivation, pageVoice } from "./browser-voice.js";
 import { browserReach, reachOfOrigin as reachOfPage } from "./browser-reach";
@@ -58,6 +59,7 @@ function hostMicrophone(app: Partial<MicrophoneBridge> | null): HostMicrophone {
  *  needed and not kept. The one way into anything the browser or an app offers beyond the page itself. */
 export function host(): Host {
   const app = nativeHost();
+  const appLink = app.callLink;
   // Each member is read when it is asked for, and not before: the user agent is parsed for the caller that wants the system.
   return {
     ...app,
@@ -74,6 +76,8 @@ export function host(): Host {
     },
     microphone: hostMicrophone(app.microphone),
     reach: app.reach ?? browserReach(),
+    // The app's link to the room where it holds it (it goes on while the system freezes the page); else this page's own socket.
+    callLink: appLink ? { runs: "app", open: (url, protocols) => appLink.open(url, protocols) } : browserCallLink(),
     voice: {
       runs: app.voice ? "app" : "page",
       host: () => pageOfVoice().voice(),
