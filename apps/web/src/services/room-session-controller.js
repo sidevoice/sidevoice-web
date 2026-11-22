@@ -1,6 +1,6 @@
 import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,noMachine,reachNote,unreached,conversationKey,conversationOf,personKey,displayTitle,focusedThread,viewedThread as viewedOf,reachOf,NO_VIEW} from '../state/room-session-state.js';
 import {pageTarget,targetAnswers,routeUrl,callSocketUrl,isNodePath,askTarget} from './rendezvous.js';
-import {projectPairings,withPairing,withoutPairing,revokedPairing,restoredPairing,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
+import {projectPairings,withPairing,withoutPairing,revokedPairing,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
 import {host as pageHost} from '../host/index.ts';
 import {createHostAgentsController} from './host-agents.ts';
@@ -566,6 +566,10 @@ function settleLink(fp,found,reach){
 function routed(path,fp){const url=routeUrl(path,target,linkBase(fp));if(url==null)throw worded(unreached(roomStore.getState().facts,fp));return url}
 // A request with the token is never redirected: the node base proved itself, wherever a redirect points did not.
 function withToken(options,token){return {...options,redirect:'error',headers:{...(options?.headers||{}),Authorization:'Bearer '+token}}}
+// The one answer that unpairs: the core says the device was removed, by key (a 401 body, a call socket's close reason).
+// Any other refusal (a restarting core, a proxy, an older core with no key) is a connection problem and keeps the pairing.
+const DEVICE_REMOVED='device.removed';
+const removedAnswer=async response=>(await response.clone().json().catch(()=>null))?.error===DEVICE_REMOVED;
 // Every request to a machine carries the token of that machine's pairing — never another's; one the machine refuses
 // means that pairing is gone. An address that stops answering is looked at again on the next beat.
 const request=async(path,options,fp=state.callNode)=>{
@@ -573,7 +577,7 @@ const request=async(path,options,fp=state.callNode)=>{
  const pairing=pairings.list.find(p=>p.fp===fp),link=links.get(fp),base=link?.base;if(!pairing||pairing.revoked)throw worded(noMachine());
  let response;
  try{response=await fetch(url,withToken(options,pairing.token))}catch(error){if(link&&link.base===base)link.doubted=base;throw error}
- if(response.status===401)void pairingRefused(fp,{token:pairing.token}).catch(()=>{});
+ if(response.status===401&&await removedAnswer(response))void pairingRefused(fp,{token:pairing.token}).catch(()=>{});
  return response;
 };
 // Which conversation this tab talks to is this tab's own state: the room routes, it never chooses for anyone. It is
@@ -674,8 +678,8 @@ function historyThreadId(){return viewedOf(state)}
 // A refusal is a sentence, or a key with its sentence (sidevoice-core's refusals): rejected with both, for `roomError`
 // to say by its key — the sentence, in whatever language it came, only behind Details.
 async function api(path,options,fp=state.callNode){const lived=state.sessionId,token=pairings.list.find(p=>p.fp===fp)?.token,r=await request(path,options,fp);
- // A 401 is the machine refusing this token, said at once, not once the pairing is saved as revoked; a pairing replaced meanwhile is not accused.
- if(r.status===401)throw worded(unreached(roomStore.getState().facts,fp,pairings.list.find(p=>p.fp===fp)?.token===token));const d=await r.json();if(!r.ok)throw refusedRequest(d.detail,fp,lived);return d}
+ // A 401 that says the device was removed is said at once, not once the pairing is saved as revoked (a pairing replaced meanwhile is not accused); any other is a machine that cannot be reached.
+ if(r.status===401)throw worded(unreached(roomStore.getState().facts,fp,pairings.list.find(p=>p.fp===fp)?.token===token&&await removedAnswer(r)));const d=await r.json();if(!r.ok)throw refusedRequest(d.detail,fp,lived);return d}
 // The room no longer has this device in the call (`room.browser_absent`): its session was dropped, the machine restarted
 // or the call moved to no conversation. The call is taken again the way a dropped socket's is, on a new session; what the
 // refused request says meanwhile is this page's own sentence, never the machine's.
@@ -1504,39 +1508,8 @@ function locateOnBeat(fp){
  const pending=Promise.resolve().then(()=>locate(fp)).finally(()=>{if(beatLocates.get(fp)===pending)beatLocates.delete(fp)});
  beatLocates.set(fp,pending);
 }
-// Asks the machine, at an address that proves it is that machine, whether it still accepts this pairing's token:
-// 'refused' (401 again), 'ok', or 'unknown' (unreachable, unproven, any other answer): only 'refused' says anything.
-async function probeToken(pairing){
- try{
-  let base=pairing.local?pairing.urls[0]:null;
-  if(!pairing.local){
-   const place=await firstProven(candidateBases(pairing,{target,about:targetAbout,origin:location.origin}),pairing,{get:fetch});
-   if(!place)return 'unknown';base=place.base;
-  }
-  if(typeof base!=='string')return 'unknown';
-  const response=await fetch(base+'/api/presentation/participants',withToken({signal:AbortSignal.timeout(8000)},pairing.token));
-  return response.status===401?'refused':response.ok?'ok':'unknown';
- }catch{return 'unknown'}
-}
-// A pairing marked revoked is asked again now and then: a refusal that was wrong heals by itself, a real one stays.
-const REVOKED_RECHECK_MS=5*60*1000,revokedChecks=new Map();
-async function recheckRevoked(){
- for(const pairing of pairings.list){
-  if(!pairing.revoked||!pairing.token||Date.now()-(revokedChecks.get(pairing.fp)||0)<REVOKED_RECHECK_MS)continue;
-  revokedChecks.set(pairing.fp,Date.now());
-  if(await probeToken(pairing)!=='ok')continue;
-  let restored=false;
-  await keepPairings(current=>{
-   const latest=current.list.find(p=>p.fp===pairing.fp);
-   if(!latest||!latest.revoked||latest.token!==pairing.token)return current;
-   restored=true;return restoredPairing(current,pairing.fp);
-  }).catch(()=>{});
-  if(restored){console.warn('[pairing] revoked pairing accepted again, restored',{fp:pairing.fp});locateOnBeat(pairing.fp)}
- }
-}
 function machinesBeat(){
  roomStore.patch({machinesAt:Date.now()});
- void recheckRevoked();
  for(const fp of liveMachines()){
   const link=links.get(fp),fresh=link?.base!=null&&Date.now()-(verified.get(link.base)||0)<VERIFIED_FOR_MS&&link.doubted!==link.base;
   if(!link||link.base==null||!fresh&&!pairings.list.find(p=>p.fp===fp)?.local)locateOnBeat(fp);
@@ -1553,12 +1526,9 @@ function closePairing(){roomStore.patch({pairingOpen:false,pairingNote:''})}
 // its row, and asks nothing of a person who may be busy with another.
 // `token`: the credential that was refused — one a pairing made since has replaced is not this pairing's to lose.
 // Resolves true when it ended the call, false when it left the call alone (the caller of a refused call then ends it).
+// Only for the core's own word that the device was removed (DEVICE_REMOVED); callers check it.
 async function pairingRefused(fp,{call=false,token=null,asked=false}={}){
  const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing||pairing.revoked||token!=null&&pairing.token!==token)return;
- // One refusal is not a revocation (a core restarting, a proxy glitch): it is kept only when the machine, proven to be
- // itself, refuses the same token again. Anything else leaves the pairing as it was, and the beat looks again.
- const verdict=await probeToken(pairing);
- if(verdict!=='refused'){console.warn('[pairing] refusal not confirmed, pairing kept',{fp,verdict});return}
  let revoked=false;
  await keepPairings(current=>{
   const latest=current.list.find(p=>p.fp===fp);
@@ -1681,7 +1651,7 @@ async function hostApi(fp,path,options={}){
  let data=null;
  try{data=await response.json()}catch{}
  // Asked of the machine from its page — its agents, its devices, its card: the person's own act on it.
- if(response.status===401){void pairingRefused(fp,{token:pairing.token,asked:true}).catch(()=>{});throw Object.assign(Error('unreachable'),{key:'unreachable'})}
+ if(response.status===401){if(data?.error===DEVICE_REMOVED)void pairingRefused(fp,{token:pairing.token,asked:true}).catch(()=>{});throw Object.assign(Error('unreachable'),{key:'unreachable'})}
  if(!response.ok){
   const failure=data?.error&&typeof data.error==='object'?data.error:data;
   const key=typeof failure?.key==='string'&&/^[a-z0-9._-]+$/.test(failure.key)?failure.key:response.status===503?'no-connector':'request-failed';
@@ -2394,8 +2364,9 @@ function openSession(socket,hello={},fp=state.callNode,token=null){return new Pr
  // why: failing here would answer «no se pudo conectar» to a room that knows it is full.
  socket.onerror=()=>{broken=true};
  socket.onclose=event=>{clearTimeout(timer);timer=null;
-  // The machine no longer knows this device's token: final, and the pairing is what has to change.
-  if(event?.code===4401){void pairingRefused(fp,{call:true,token}).catch(()=>{});return fail({text:reachNote(state)||NO_MACHINE},true)}
+  // The machine refused this device's token: final either way (insisting would not change it). Only its word that the device
+  // was removed unpairs; any other refusal is said as a connection problem and the pairing stays.
+  if(event?.code===4401){const removed=event.reason===DEVICE_REMOVED;if(removed)void pairingRefused(fp,{call:true,token}).catch(()=>{});return fail({text:unreached(roomStore.getState().facts,fp,removed)},true)}
   // However the reason arrived — the close code, the frame's own name for it, the frame's sentence —
   // the person reads one sentence for one reason.
   // A room that answered and said no is not a room that is away: these are the refusals a reconnection
@@ -2632,7 +2603,7 @@ async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){d
 // end the call (2026-09-26, driving). Only the person hanging up, or the room refusing this browser, stops it.
 const RECONNECT_DELAYS_MS=[1000,2000,5000];
 
-function shouldReconnect(event){return ![1008,1013,4401].includes(event?.code)}   // refused by policy, full, or not paired: do not insist
+function shouldReconnect(event){return ![1008,1013].includes(event?.code)}   // refused by policy or full: do not insist
 // A room that answers and refuses this browser is not a room that is away: insisting would never end.
 function refusedForGood(error){return error?.refused===true}
 // The conversation this tab goes back to on a machine, by the room's own name for it: none of another machine's.
@@ -2690,7 +2661,7 @@ async function lostConnection(event,epoch,token=null){
  // Nothing the call is doing stops with its socket: the voice goes on hearing and speaking — a reply already here plays
  // to its end however long the room is away (#220) — and what it reports waits in the outbox. The room parks the
  // session meanwhile, so its turn and its history stay as they are here too.
- if(event?.code===4401){
+ if(event?.code===4401&&event.reason===DEVICE_REMOVED){
   // A refusal pairingRefused does not act on (a token a newer pairing replaced, a pairing already revoked or gone) would leave
   // a call with no socket and no reconnect: it ends here, with the same reason.
   void pairingRefused(state.callNode,{call:true,token}).catch(()=>false).then(ended=>{

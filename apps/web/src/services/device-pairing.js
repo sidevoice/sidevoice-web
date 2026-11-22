@@ -364,10 +364,6 @@ export function withoutPairing(pairings, fp) {
 export function revokedPairing(pairings, fp) {
     return { ...pairings, list: pairings.list.map(p => p.fp === fp ? { ...p, revoked: true } : p) };
 }
-/** The node accepted this token again: a revocation that was wrong is lifted. */
-export function restoredPairing(pairings, fp) {
-    return { ...pairings, list: pairings.list.map(p => p.fp === fp ? { ...p, revoked: false } : p) };
-}
 /** A pairing as the interface may see it: everything but the token. */
 export function pairingSummary(p) {
     return { fp: p.fp, host: p.host || null, urls: [...(p.urls || [])], device_id: p.device_id,
