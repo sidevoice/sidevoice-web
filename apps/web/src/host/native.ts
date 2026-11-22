@@ -47,7 +47,7 @@ export type NativeHost = Omit<Host, "exclusive" | "systemTextSize" | "identity" 
   microphone: Partial<MicrophoneBridge> | null;
   /** An app hosts this page: it injected a host, even an empty one (an old app that says nothing of itself). */
   inApp: boolean;
-  presence: Pick<HostPresence, "media"> & { /** The app's own hold on the screen, where it has one (a phone's webview has no Screen Wake Lock that holds); null leaves it to the browser's. */ screenAwake: ScreenAwake | null };
+  presence: Pick<HostPresence, "media"> & { /** The app's own hold on the screen, where it has one (a phone's webview has no Screen Wake Lock that holds); null where the app has none (the desktop app, or one that predates the member): the page offers no hold there, and the browser's lock is not handed in its place. */ screenAwake: ScreenAwake | null };
   /** What the app says of its transport; null where it says nothing. */
   reach: ReachTransport | null;
   /** The app's pairings; null where it keeps none for the page. */
