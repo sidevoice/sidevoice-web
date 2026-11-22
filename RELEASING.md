@@ -54,7 +54,7 @@ gh attestation verify oci://ghcr.io/sidevoice/sidevoice-web:v0.2.1 --repo sidevo
 the contract of. It ships in the build (`voice/service.pin.json`); the page judges every machine against it, and the
 desktop app reads it from the web it bundles (`web.pin.json`), updating this device's service to the newest patch of that
 minor and never to the next one. A service release that is a minor (`feat` in the service) arrives with the web (and so the
-desktop app) that bumps this file; a patch (`fix`) needs nothing here. This file is the only place the minor is written.
+desktop app) that bumps this file; a patch (`fix`) needs nothing here. This file is the only place the minor is written. On release day, after the connector's minor release is published, a `feat(deps)` PR updates it (guideline, sections 1 and 5); the same applies to a pin of `@sidevoice/engine` or `@sidevoice/voice` (`fix(deps)`).
 
 ## Versions
 
@@ -85,6 +85,7 @@ Build artifacts on Actions runs are kept 7 days, for debugging only. Download fr
 
 ## What this needs from the repository settings
 
+- The settings every repository needs (squash merging, "Allow GitHub Actions to create and approve pull requests", `ci` and the PR title check as required checks in a ruleset) are in the guideline, section 7.
 - The container package `sidevoice-web` public: the first push creates it private, and its visibility can only be
   changed by an owner, once, in the package's settings (Package settings → Danger zone → Change visibility). The
   workflow's `GITHUB_TOKEN` writes it (`packages: write`); the image's source label links it to this repository.
