@@ -120,12 +120,12 @@ describe("the screen's lock", () => {
     return sentinel;
   };
 
-  test("a browser says whether it has one, and an app hosting the page does not change what the page can hold", () => {
+  test("a browser says whether it has one; an app hosting the page has its own or none, never the browser's", () => {
     expect(host().presence.screenAwake?.supported).toBe(false);
     Object.defineProperty(navigator, "wakeLock", { configurable: true, value: { request: vi.fn() } });
     expect(host().presence.screenAwake?.supported).toBe(true);
     Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel: "release", version: "0.3.0" } } } });
-    expect(host().presence.screenAwake?.supported).toBe(true);
+    expect(host().presence.screenAwake).toBeNull();
   });
 
   test("is unsupported without a wake lock, failed when it is refused, and held when it is granted", async () => {

@@ -587,13 +587,24 @@ test("no microphone to ask and the media status cannot be read: Permissions open
   await waitFor(() => expect(store.getState().facts.settingsSection).toBe("general"));
 });
 
-/* "Keep the screen on during a call" is offered on every host (operator, 2026-11-22): a browser holds it with its Screen
- * Wake Lock, an app with the platform's (host.presence.screenAwake). */
-test.each([["a browser", undefined], ["an app that holds the screen itself", { media: "app", screenAwake: { supported: true, acquire: async () => "held", release: () => {}, onReleased: () => () => {} } }], ["an app that leaves it to the page", { media: "app" }]])("%s shows the keep-the-screen-on row", (_, presence) => {
-  if (presence) Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: { build: { channel: "release", version: "1.0.0" }, presence } } });
-  onTestFinished(() => { localStorage.clear(); delete (window as { __sidevoiceHost?: unknown }).__sidevoiceHost; });
+/* "Keep the screen on during a call" is offered only where it can hold (operator, 2026-11-22): a browser with a Screen Wake Lock and
+ * a phone's app (host.presence.screenAwake); not the desktop app (sidevoice-core#267), an app that predates it, nor a browser without one. */
+const held = { supported: true, acquire: async () => "held", release: () => {}, onReleased: () => () => {} };
+const keepAwakeRow = (appHost: Record<string, unknown> | undefined, wakeLock: boolean) => {
+  if (appHost) Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: appHost } });
+  if (wakeLock) Object.defineProperty(navigator, "wakeLock", { configurable: true, value: { request: async () => ({}) } });
+  onTestFinished(() => { localStorage.clear(); Reflect.deleteProperty(window, "__sidevoiceHost"); Reflect.deleteProperty(navigator, "wakeLock"); });
   open("whisper-base");
   fireEvent.click(document.getElementById("settings-call")!);
-  const row = within(document.getElementById("pane-call")!).getByRole("switch", { name: "Keep the screen on during a call" });
-  if (presence && "screenAwake" in presence) expect(row).toBeEnabled();
+  return within(document.getElementById("pane-call")!).queryByRole("switch", { name: "Keep the screen on during a call" });
+};
+test.each([
+  ["a browser with a Screen Wake Lock", undefined, true, true],
+  ["a browser without one", undefined, false, false],
+  ["the phone's app", { build: { channel: "release", version: "1.0.0" }, presence: { media: "app", screenAwake: held } }, false, true],
+  ["the desktop app", { build: { channel: "release", version: "1.0.0" }, presence: { media: "page" } }, true, false],
+  ["an app that predates the member", { presence: { media: "app" } }, true, false],
+])("%s: the keep-the-screen-on row is shown: %s", (_, appHost, wakeLock, shown) => {
+  const row = keepAwakeRow(appHost, wakeLock);
+  if (shown) { expect(row).toBeEnabled(); expect(row).not.toBeChecked(); } else expect(row).toBeNull();
 });

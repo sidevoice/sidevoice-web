@@ -632,14 +632,50 @@ test('A loop made before the app took the lock screen is stopped at hang-up all 
  s.run('applyLockScreen(false)');
  assert.equal(elements[0].paused,true,'whoever owns the lock screen now, the loop that exists is stopped');
 });
-test('The screen is held in the desktop app too, when keeping it on was chosen: hiding the row is not turning it off',async()=>{
+test('The desktop app has no hold on the screen yet, and does not ask the web view for one',async()=>{
  const s=setup();let requests=0;
  s.context.window.__sidevoiceHost={host:{build:{channel:'release',version:'0.3.0'}}};
  s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
  s.context.navigator={wakeLock:{request:async()=>{requests++;return {release:async()=>{},addEventListener(){}}}}};
  s.run('ws={}');
  await s.run('keepScreenAwake()');
- assert.equal(requests,1);assert.equal(s.run('screenLock.state'),'on');
+ assert.equal(requests,0);assert.equal(s.run('screenHeld'),false);
+});
+test('An app that predates the screen member is not offered the browser\'s lock either',async()=>{
+ const s=setup();let requests=0;
+ s.context.window.__sidevoiceHost={host:{presence:{media:'app'}}};
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
+ s.context.navigator={wakeLock:{request:async()=>{requests++;return {release:async()=>{},addEventListener(){}}}}};
+ s.run('ws={}');
+ await s.run('keepScreenAwake()');
+ assert.equal(requests,0);
+});
+test('The phone\'s app holds the screen through its own member, and lets it go at hang-up',async()=>{
+ const s=setup();const calls=[];let released=null;
+ s.context.window.__sidevoiceHost={host:{presence:{media:'app',screenAwake:{supported:true,
+  acquire:async()=>{calls.push('acquire');return 'held'},release:()=>{calls.push('release')},onReleased:fn=>{released=fn;return()=>{}}}}}};
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
+ s.context.navigator={wakeLock:{request:async()=>{calls.push('browser');throw Error('no')}}};
+ s.run('ws={}');
+ await s.run('keepScreenAwake()');
+ assert.deepEqual(calls,['acquire'],'the app\'s, never the browser\'s');
+ assert.equal(s.run('screenHeld'),true);assert.equal(s.run('screenLock.state'),'on');
+ s.run('ws=null;releaseScreenWakeLock()');
+ assert.deepEqual(calls,['acquire','release']);
+ assert.equal(typeof released,'function');
+});
+test('Choosing to keep the screen on in the middle of a call holds it at once, and choosing not to lets it go',async()=>{
+ const s=setup();const calls=[];
+ s.context.window.__sidevoiceHost={host:{presence:{media:'app',screenAwake:{supported:true,
+  acquire:async()=>{calls.push('acquire');return 'held'},release:()=>{calls.push('release')},onReleased:()=>()=>{}}}}};
+ s.run('ws={}');
+ await s.run('keepScreenAwake()');
+ assert.deepEqual(calls,[],'off by default');
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}));callPreferencesChanged()");
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.deepEqual(calls,['acquire']);
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:false}));callPreferencesChanged()");
+ assert.deepEqual(calls,['acquire','release']);
 });
 test('Settings are reached from the header menu',()=>{
  // The ⋯ menu's Settings entry is the very button the runtime opens the dialog from: one entry, nothing relaying to it.

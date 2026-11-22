@@ -370,12 +370,17 @@ describe("the screen kept on", () => {
     expect(awake.supported).toBe(true);
     expect(await awake.acquire()).toBe("held");
   });
-  test("an app without one, or with half of one, leaves it to the browser's", () => {
-    for (const presence of [{ media: "app" }, { media: "app", screenAwake: { acquire: held.acquire } }, { media: "app", screenAwake: "yes" }]) {
+  test("an app without one, or with half of one, has none: the browser's lock does not hold in its web view", () => {
+    for (const presence of [{ media: "app" }, { media: "page" }, { media: "app", screenAwake: { acquire: held.acquire } }, { media: "app", screenAwake: "yes" }]) {
       withHost({ presence });
-      expect(host().presence.screenAwake).not.toBe(held);
-      expect(host().presence.screenAwake?.supported).toBe(typeof navigator !== "undefined" && "wakeLock" in navigator);
+      expect(host().presence.screenAwake).toBeNull();
     }
+    withHost({});
+    expect(host().presence.screenAwake).toBeNull();
+  });
+  test("a browser has its own", () => {
+    withHost(undefined);
+    expect(host().presence.screenAwake).not.toBeNull();
   });
 });
 

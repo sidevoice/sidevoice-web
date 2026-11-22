@@ -14,7 +14,7 @@ import {probeSiteStorage} from './site-storage.js';
 import {tryTranscription,tryVoice,tryEndOfTurn} from './voice-trial.js';
 import {systemLanguage,SPEECH_LANGUAGES} from './system-language.js';
 import {createOutbox,resendDelay} from './outbox.js';
-import {readCallPreferences} from './call-preferences.ts';
+import {readCallPreferences,subscribeCallPreferences} from './call-preferences.ts';
 import {primeThinkingSound} from './thinking-sound.ts';
 import {clampDeviceName,deviceNameProblem} from './device-name-rules.js';
 import {readDeleteUnused,writeDeleteUnused,staleModels} from './model-housekeeping.js';
@@ -3301,6 +3301,16 @@ setInterval(callBeat,1500);setInterval(machinesBeat,6000);
 window.addEventListener('online',machinesBeat);
 window.addEventListener('pageshow',machinesBeat);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){machinesBeat();if(state.ws)keepScreenAwake()}});
+// Choosing to keep the screen on, or not to, in the middle of a call takes effect at once.
+let keepAwakeChosen=readCallPreferences().keepAwake;
+function callPreferencesChanged(){
+ const chosen=readCallPreferences().keepAwake;
+ if(chosen===keepAwakeChosen)return;
+ keepAwakeChosen=chosen;
+ if(!(state.ws||state.connecting))return;
+ if(chosen)keepScreenAwake();else releaseScreenWakeLock();
+}
+subscribeCallPreferences(callPreferencesChanged);
 setupIdleWatch();
 
 // ----- a call nobody is using ends itself, for this browser only -----

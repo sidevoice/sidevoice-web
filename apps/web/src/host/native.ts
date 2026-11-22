@@ -45,6 +45,8 @@ export type NativeHost = Omit<Host, "exclusive" | "systemTextSize" | "identity" 
   identity: Omit<HostIdentity, "deviceName" | "shortcutModifier" | "followKeyboardLayout"> & { deviceName(): string | null; shortcutModifier: string | null };
   /** The app's permission bridge, and its help for a blocked one when it words it. */
   microphone: Partial<MicrophoneBridge> | null;
+  /** An app hosts this page: it injected a host, even an empty one (an old app that says nothing of itself). */
+  inApp: boolean;
   presence: Pick<HostPresence, "media"> & { /** The app's own hold on the screen, where it has one (a phone's webview has no Screen Wake Lock that holds); null leaves it to the browser's. */ screenAwake: ScreenAwake | null };
   /** What the app says of its transport; null where it says nothing. */
   reach: ReachTransport | null;
@@ -82,6 +84,7 @@ export function nativeHost(): NativeHost {
   const microphone = app?.microphone as Partial<MicrophoneBridge> | undefined;
   const updater = app?.updater as AppUpdater | undefined;
   return {
+    inApp: app !== undefined,
     messages: (language) => overlay(app, language),
     identity: {
       build: build(app),
