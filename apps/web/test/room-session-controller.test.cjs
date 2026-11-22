@@ -5422,7 +5422,7 @@ test('A provider with a key that is unreachable only until its first listing lan
 test('In an app that holds the call link, the call opens through it and never opens a websocket of its own',async()=>{
  const s=setup(),opened=[];
  s.context.WebSocket=class{constructor(){throw new Error('the page opened its own socket')}};
- const socket={readyState:0,sent:[],onopen:null,onmessage:null,onerror:null,onclose:null,send(text){this.sent.push(JSON.parse(text))},close(){this.readyState=3}};
+ const socket={readyState:0,sent:[],closes:[],onopen:null,onmessage:null,onerror:null,onclose:null,send(text){this.sent.push(JSON.parse(text))},close(...args){this.closes.push(args);this.readyState=3}};
  s.context.window.__sidevoiceHost={host:{callLink:{open:(url,protocols)=>{opened.push([url,[...protocols]]);return socket}}}};
  const joining=s.run('joinRoom(connectEpoch,{})');
  assert.equal(opened.length,1);
@@ -5438,4 +5438,7 @@ test('In an app that holds the call link, the call opens through it and never op
  // What the outbox sends goes over the app's socket, which the page reads as open.
  s.run("reportClientError({kind:'test',message:'x'})");
  assert.equal(socket.sent.at(-1).type,'voice-client-error');
+ // Leaving the page parks the call: a close without a code, never a hang-up (1000), whoever holds the socket.
+ s.handlers.beforeunload();
+ assert.deepEqual(socket.closes,[[]]);
 });

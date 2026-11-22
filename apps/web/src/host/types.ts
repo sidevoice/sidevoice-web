@@ -584,7 +584,9 @@ export interface CallSocket {
   readonly readyState: number;
   /** Throws before the socket opened, lets the text go once it is closing; sent in the order asked. */
   send(text: string): void;
-  /** 1000 (a hang-up) when no code is given; `onclose` follows. */
+  /** As a browser's: `code` is 1000 (a hang-up) or 3000–4999, else it throws `InvalidAccessError`; a reason past 123
+   *  bytes throws `SyntaxError`. Without a code (or a reason) the close frame carries none and the room parks the call
+   *  for a resume, as when the page unloads; a reason alone is 1000. `onclose` follows. */
   close(code?: number, reason?: string): void;
   onopen: ((event: unknown) => void) | null;
   onmessage: ((event: CallSocketMessage) => void) | null;
