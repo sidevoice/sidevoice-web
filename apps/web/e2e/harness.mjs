@@ -78,7 +78,8 @@ export async function installHarness(page, { onboarding = { version: 1, choice: 
     if (pathname === "/api/presentation/history") return respond(route, { messages: [] });
     if (pathname === "/api/host/agents") {
       fake.authorization.push(request.headers().authorization || "");
-      if (fake.hostMode === "revoked") return respond(route, { detail: "pairing revoked" }, 401);
+      if (fake.hostMode === "plain401") return respond(route, { detail: "not paired" }, 401);
+      if (fake.hostMode === "revoked") return respond(route, { detail: "pairing revoked", error: "device.removed" }, 401);
       fake.scans++;
       return respond(route, agents ?? listing({ actionable: fake.scans >= 2 }));
     }

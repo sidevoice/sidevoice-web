@@ -1027,7 +1027,7 @@ async function deliverText(entry){
   const abort=new AbortController(),timer=setTimeout(()=>{try{abort.abort()}catch{}},DIRECT_TEXT_MS);
   try{
    const r=await request('/api/presentation/text',{method:'POST',headers:{'Content-Type':'application/json'},signal:abort.signal,body:JSON.stringify({text,thread_id:thread,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:entry.id})},entry.node);
-   return r.ok?'sent':r.status>=500||[408,409,429].includes(r.status)?'later':'refused';
+   return r.ok?'sent':r.status>=500||[401,408,409,429].includes(r.status)?'later':'refused';
   }finally{clearTimeout(timer)}
  }catch{return 'later'}
 }
