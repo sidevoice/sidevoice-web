@@ -46,7 +46,12 @@ export interface IdentityDeps {
   subtle?: SubtleCrypto;
   nonce?: string;
   timeoutMs?: number;
+  /** Told each candidate's outcome, in order, as `firstProven` reaches it (for the log; changes nothing). */
+  observe?: (candidate: CandidateBase, proof: IdentityProof) => void;
 }
+export type IdentityWhy = "fetch_failed" | "timeout" | "http_status" | "bad_json" | "missing_fields" | "fingerprint_mismatch" | "bad_signature";
+export type IdentityProof = { ok: true; publicKey: string }
+  | { ok: false; reason: "unreachable" | "impostor" | "error"; why?: IdentityWhy; status?: number; errorName?: string };
 
 export const PAIRING_CODE_PREFIX: string;
 export const IDENTITY_PREFIX: string;
@@ -86,13 +91,13 @@ export function fingerprintOf(spki: Uint8Array | ArrayBuffer, subtle?: SubtleCry
 export function newNonce(random?: (bytes: Uint8Array) => Uint8Array): string;
 export function verifyIdentitySignature(proof: { publicKey: string; nonce: string; signature: string }, subtle?: SubtleCrypto): Promise<boolean>;
 export function proveIdentity(base: string, expected: { fp: string; public_key?: string | null }, deps?: IdentityDeps):
-  Promise<{ ok: true; publicKey: string } | { ok: false; reason: "unreachable" | "impostor" }>;
+  Promise<IdentityProof>;
 export function candidateBases(pairing: { fp: string; urls: string[]; insecure?: boolean },
   context?: { target?: string; about?: TargetAbout | null; origin?: string }): CandidateBase[];
 export function firstProven(candidates: CandidateBase[], expected: { fp: string; public_key?: string | null }, deps?: IdentityDeps,
   started?: Map<string, Promise<unknown>>): Promise<(CandidateBase & { publicKey: string }) | null>;
 export function redeemPairingCode(code: string, options?: { name?: string; address?: string; target?: string; about?: TargetAbout | null; origin?: string; reach?: { plainHttpPrivate: boolean };
-  get?: typeof fetch; subtle?: SubtleCrypto; now?: number ; insecure?: boolean }): Promise<{ pairing: Pairing; base: CandidateBase & { publicKey: string } }>;
+  get?: typeof fetch; subtle?: SubtleCrypto; now?: number ; insecure?: boolean; observe?: IdentityDeps["observe"] }): Promise<{ pairing: Pairing; base: CandidateBase & { publicKey: string } }>;
 export function projectPairings(stored: Pairings, localPairing: Pairing | null): Pairings;
 export function withPairing(pairings: Pairings, pairing: Pairing): Pairings;
 export function withoutPairing(pairings: Pairings, fp: string): Pairings;
