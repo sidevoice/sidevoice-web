@@ -18,10 +18,19 @@ const EXAMPLE_TRACE = [
   "      at desktop/tauri/src/lib.rs:226",
 ].join("\n");
 
-/* The app's own report: the install id is the app's own when it offers `crashReports.installId()` (null: none is kept, as under
- * "never"), else a placeholder (an app before that method), the modules are the ones that hold a frame of the trace, and it carries no log lines. */
+/* The app's own report (docs/logging.md §9-§10, the closed field list): the install id is the app's own when it offers
+ * `crashReports.installId()` (null: none is kept, as under "never"), else a placeholder (an app before that method); the error is
+ * its type and code location; the message is the literal panic text or the fixed marker with its length (formatted text is never
+ * sent); the modules are those holding a frame of the trace, by file name; the log lines are the last WARN/ERROR ones, times relative to the crash
+ * and ids re-keyed. */
 const EXAMPLE_INSTALL_ID = "3f9a1c7e5b2d4086a1e9c0d7b4f25a68";
-const EXAMPLE_MODULES = "sidevoice_desktop, sidevoice_core";
+const EXAMPLE_MODULES = "sidevoice-desktop, libsystem_c.dylib, libc++.1.dylib";
+const EXAMPLE_ERROR = "panic · desktop/tauri/src/lib.rs:226";
+const EXAMPLE_MESSAGE = "<formatted panic message omitted> (len 38)";
+const EXAMPLE_LOGS = [
+  "-12.400s WARN audio_input: input restarted device=d1",
+  "-0.300s ERROR core_link: connection dropped client=c1",
+].join("\n");
 
 /** Code, as it is written: not translated, not wrapped. */
 function Block({ text }: { text: string }) {
@@ -59,16 +68,18 @@ export function ReportPreview({ t = translator(), mode = null }: { t?: Translate
       <p className="crash-report-example">{t("crashReports.report.example")}</p>
       <dl className="crash-report-rows">
         <dt>{t("crashReports.report.version")}</dt><dd translate="no">{versionOf(host().identity.build)}</dd>
-        <dt>{t("crashReports.report.system")}</dt><dd>macOS 15.1 · arm64</dd>
-        <dt>{t("crashReports.report.code")}</dt><dd translate="no">desktop.panic</dd>
+        <dt>{t("crashReports.report.system")}</dt><dd>macOS · arm64</dd>
+        <dt>{t("crashReports.report.code")}</dt><dd translate="no">{EXAMPLE_ERROR}</dd>
+        <dt>{t("crashReports.report.message")}</dt><dd translate="no">{EXAMPLE_MESSAGE}</dd>
         <dt>{t("crashReports.report.installId")}</dt><dd>{installId === "pending" ? null
           : installId === null ? <span className="crash-report-example">{t("crashReports.report.installIdNone")}</span>
           : installId === "unknown" ? <><span translate="no">{EXAMPLE_INSTALL_ID}</span> <span className="crash-report-example">{t("crashReports.report.installIdNote")}</span></>
           : <span translate="no" className="crash-report-id">{installId}</span>}</dd>
         <dt>{t("crashReports.report.trace")}</dt><dd><Block text={EXAMPLE_TRACE} /></dd>
         <dt>{t("crashReports.report.modules")}</dt><dd translate="no">{EXAMPLE_MODULES}</dd>
-        <dt>{t("crashReports.report.logs")}</dt><dd>{t("crashReports.report.logsNote")}</dd>
+        <dt>{t("crashReports.report.logs")}</dt><dd><Block text={EXAMPLE_LOGS} /><span className="crash-report-example">{t("crashReports.report.logsNote")}</span></dd>
       </dl>
+      <p className="crash-report-scope">{t("crashReports.report.scope")}</p>
       <p className="crash-report-never"><b>{t("crashReports.report.neverLead")}</b> {t("crashReports.report.neverBody")}</p>
     </div>
   );
