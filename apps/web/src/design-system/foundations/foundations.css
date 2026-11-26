@@ -1,0 +1,21 @@
+/* The foundations' specimens: catalogue-only layout, painted with the tokens they show. */
+.fd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.fd-group + .fd-group { margin-top: 24px; }
+.fd-group h3 { margin: 0 0 10px; font: 600 var(--sv-font-sm)/1.4 var(--sv-font-sans); color: var(--sv-text-muted); }
+.fd-swatch { display: grid; gap: 6px; min-width: 0; }
+.fd-swatch-chip { height: 44px; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); }
+.fd-name { overflow: hidden; font: 500 var(--sv-font-xs)/1.3 var(--sv-font-mono); color: var(--sv-text); text-overflow: ellipsis; white-space: nowrap; }
+.fd-value { overflow: hidden; font: 400 var(--sv-font-xs)/1.3 var(--sv-font-mono); color: var(--sv-text-subtle); text-overflow: ellipsis; white-space: nowrap; }
+.fd-rows { display: grid; gap: 10px; }
+.fd-row { display: grid; grid-template-columns: 200px 90px 1fr; align-items: center; gap: 12px; min-width: 0; }
+.fd-bar { height: 12px; border-radius: 3px; background: var(--sv-accent); }
+.fd-radius { width: 72px; height: 48px; border: 2px solid var(--sv-accent); background: var(--sv-accent-soft); }
+.fd-shadow { width: 120px; height: 56px; border-radius: var(--sv-radius-md); background: var(--sv-surface); }
+.fd-type-sample { margin: 0; min-width: 0; color: var(--sv-text); }
+.fd-icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.fd-icon { display: grid; justify-items: center; gap: 8px; padding: 12px 6px; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-surface); color: var(--sv-text); }
+.fd-icon .fd-name { max-width: 100%; }
+.fd-icon-art { display: grid; place-items: center; min-height: 32px; }
+.fd-motion-track { position: relative; height: 32px; border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken); }
+.fd-motion-dot { position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: var(--sv-accent); transition-property: left; transition-timing-function: var(--sv-ease); }
+.fd-motion-track[data-on] .fd-motion-dot { left: calc(100% - 28px); }

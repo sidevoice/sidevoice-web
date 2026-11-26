@@ -87,7 +87,7 @@ function CornerRow({ bridge, corner, onChange, t, disabled }: { bridge: CallCont
     <div className="floating-card-corners" role="radiogroup" aria-label={t("settings.floatingCard.corner")}>
       {CARD_CORNERS.map((each) => {
         const label = t(`settings.floatingCard.corner.${each}` as MessageKey);
-        return <button key={each} type="button" role="radio" className="floating-card-corner" data-corner={each} aria-checked={each === corner}
+        return <button key={each} type="button" role="radio" className="floating-card-corner ui-state" data-corner={each} aria-checked={each === corner}
           aria-label={label} title={label} disabled={disabled} onClick={() => { void bridge.setCorner!(each).then((value) => onChange(value.corner)); }} />;
       })}
     </div>

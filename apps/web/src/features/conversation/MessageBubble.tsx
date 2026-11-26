@@ -43,7 +43,7 @@ export function MessageTime({ time }: { time: number }) {
 export function CancelTurn() {
   const t = translator();
   return <Tooltip action content={t("messages.cancel")}>
-    <button type="button" className="turn-cancel" aria-label={t("messages.cancel")} onClick={() => void window.sidevoiceActions?.cancelInput()}><TurnCancelIcon /></button>
+    <button type="button" className="turn-cancel ui-state" aria-label={t("messages.cancel")} onClick={() => void window.sidevoiceActions?.cancelInput()}><TurnCancelIcon /></button>
   </Tooltip>;
 }
 

@@ -20,7 +20,7 @@ export function ErrorDetails({ details, className }: { details?: string; classNa
   const t = translator();
   return (
     <details className={cn("ui-error-details", className)}>
-      <summary>{t("ui.details")}</summary>
+      <summary className="ui-state">{t("ui.details")}</summary>
       <pre translate="no">{details}</pre>
     </details>
   );
