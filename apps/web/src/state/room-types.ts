@@ -262,6 +262,8 @@ export interface SidevoiceActions {
   finishVoiceTry?(): void;
   /** Read a paired machine's host-owned coding agent state. */
   loadHostAgents?(fp: string, options?: { rescan?: boolean; watch?: string }): Promise<void>;
+  /** A request to a paired machine with its pairing's token (path and query only), answered as the machine did; the caller sets its own timeout and aborts with `signal`. */
+  hostFetch?(fp: string, path: string, options?: RequestInit): Promise<Response>;
   /** Connect, disconnect, or dismiss an agent on the identified machine. */
   hostAgentAction?(fp: string, id: string, action: "connect" | "disconnect" | "dismiss"): Promise<void>;
   /** Open Settings → Machines at that machine's agents (all machines when null). */

@@ -19,7 +19,7 @@ describe("a page outside an app", () => {
     expect(outside.voice.runs).toBe("page");
     expect(nativeHost().storage).toBeNull();
     for (const member of [nativeHost().microphone, outside.localHost, outside.reset, outside.muteShortcut, outside.mediaDuck, outside.textScale,
-      outside.callControls, outside.callSurface, outside.cue, outside.audioRoute, outside.screen, outside.updater, outside.debug, outside.crashReports]) expect(member).toBeNull();
+      outside.callControls, outside.callSurface, outside.cue, outside.audioRoute, outside.screen, outside.updater, outside.debug, outside.crashReports, outside.appLog]) expect(member).toBeNull();
     expect(cardSeam()).toBeNull();
   });
 
@@ -208,6 +208,7 @@ describe("the members an app calls through", () => {
       screen: {},
       updater: { cancel: async () => {} },
       crashReports: { set: async () => {} },
+      appLog: {},
     });
     expect(host().screen).toBeNull();
     expect(host().localHost).toBeNull();
@@ -218,6 +219,7 @@ describe("the members an app calls through", () => {
     expect(host().audioRoute).toBeNull();
     expect(host().updater).toBeNull();
     expect(host().crashReports).toBeNull();
+    expect(host().appLog).toBeNull();
   });
 
   test("a complete member is the app's own object", () => {

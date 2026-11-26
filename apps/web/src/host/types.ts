@@ -572,6 +572,14 @@ export interface CrashReportsBridge {
   installId?(): Promise<{ installId: string } | null>;
 }
 
+/** The app's own log in pages (sidevoice-desktop `app_log_read`; docs/BRIDGE.md): the same read as the core's `GET /api/logs`.
+ *  With no `after` the latest `limit` lines (1 to 1000); with the `cursor` of a page, what was written since, oldest first.
+ *  `wait` (seconds; the app holds it to a few) holds the answer until a line is written. Answers `{lines: [{id, text}],
+ *  cursor, more}`; rejects `{key, message}`: `log.cursor_expired`, `log.unreadable`, `log.request_invalid`. */
+export interface AppLogBridge {
+  read(options: { after?: string; limit?: number; wait?: number }): Promise<unknown>;
+}
+
 export interface Host {
   identity: HostIdentity;
   /** The host's overlay for `language` (a tag: `es`, `zh-Hans`) exactly: nothing from its primary subtag or English, which
@@ -608,4 +616,6 @@ export interface Host {
   debug: HostDebugBridge | null;
   /** The app's crash reports setting (the app owns it); null where the host sends none (a browser). */
   crashReports: CrashReportsBridge | null;
+  /** The app's own log, readable in pages; null where the host does not serve it (a browser, an app before it). */
+  appLog: AppLogBridge | null;
 }

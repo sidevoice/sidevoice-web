@@ -1,5 +1,6 @@
 import { useEffect, useRef, type PropsWithChildren } from "react";
 import { createRoomStore, installRoomBridge, RoomStoreContext, type RoomStore } from "../state/room-store";
+import { installWebLogSources } from "../features/crash-reports/install-log-sources";
 import { useRoomShortcuts } from "../state/use-room-shortcuts";
 import { CallLayoutContext, createCallLayoutStore, type CallLayoutStore } from "../state/call-layout";
 import { errorMessage } from "../features/settings/error-message";
@@ -35,6 +36,9 @@ export function RoomProvider({ children, store: suppliedStore, runtime = true }:
     const unsubscribe = onUiLanguage(read);
     return () => { observer.disconnect(); unsubscribe(); };
   }, [store]);
+
+  // The logs the viewer reads: the app's own, and each paired machine's core (features/crash-reports/install-log-sources.ts).
+  useEffect(() => (runtime ? installWebLogSources(() => store.getState().machines) : undefined), [store, runtime]);
 
   useEffect(() => {
     installRoomBridge(store, layoutRef.current);
