@@ -102,3 +102,17 @@ test("a machine that revokes this device loses its Agents actions and asks for p
   await expect(page.locator("#pane-machines [data-machine-row][data-state='revoked']").first()).toHaveAttribute("data-name", "E2E Host");
   await expect(page.getByRole("heading", { name: "Agents", exact: true })).toHaveCount(0);
 });
+
+test("a plain 401 from a machine keeps this device paired and opens no pairing dialog", async ({ page }) => {
+  const fake = await installHarness(page);
+  await page.goto("/voice/");
+  await openMachines(page, 390, 844);
+  await openAgents(page);
+  fake.hostMode = "plain401";
+  await page.getByRole("button", { name: "Search again" }).click();
+
+  await expect.poll(() => fake.authorization.length).toBeGreaterThan(1);
+  await expect(page.getByRole("dialog", { name: "Connect to a machine" })).toHaveCount(0);
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("sidevoice.pairings")));
+  expect(stored.pairings[0].revoked).toBeFalsy();
+});

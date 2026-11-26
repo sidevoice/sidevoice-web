@@ -3620,9 +3620,68 @@ test('A conversation of a machine that does not answer is only looked at: the ca
  assert.match(s.run('SessionState.reachNote(state)'),/“macbook”|^$/,'the note speaks of the call\'s machine');
  s.run('disconnect()');
 });
+const answer=(status,body)=>{const make=()=>({ok:status<400,status,json:async()=>body,clone:make});return make()};
+test('Only the core saying the device was removed unpairs it: any other 401 or 4401 keeps the pairing and reads as a connection problem',async()=>{
+ const s=setup();
+ for(const body of [{detail:'This device is not paired with the core.'},null]){
+  s.context.fetch=async()=>({ok:false,status:401,clone(){return this},json:async()=>{if(body)return body;throw Error('not json')}});
+  const error=await s.run("api('/api/presentation/participants')").then(()=>null,e=>e);
+  await new Promise(resolve=>setTimeout(resolve,0));
+  assert.ok(error,'the request fails');
+  assert.equal(s.run('pairings.list[0].revoked'),undefined,'an older core or a plain 401 keeps the pairing');
+  assert.doesNotMatch(JSON.stringify(error.words||error.message),/revoked|revocó/,'and says nothing about a revocation');
+ }
+ s.context.fetch=async()=>answer(401,{detail:'x',error:'device.removed'});
+ await s.run("api('/api/presentation/participants')").then(()=>null,()=>null);
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(s.run('pairings.list[0].revoked'),true,'the removal key unpairs');
+});
+test('A call socket closed 4401 unpairs only with the device-removed reason',async()=>{
+ const closed=async reason=>{const s=setup();s.context.crypto={randomUUID:()=>'hello-id'};
+  const socket={send(){},close(){}},pending=s.run('openSession')(socket,{},'fp-mac','tok-1');
+  socket.onclose({code:4401,reason});const error=await pending.then(()=>null,e=>e);
+  await new Promise(resolve=>setTimeout(resolve,0));
+  return {error,revoked:s.run('pairings.list[0].revoked')}};
+ const plain4401=await closed('This device is not paired with the core.');
+ assert.equal(plain4401.revoked,undefined,'prose: the pairing stays');
+ assert.equal(plain4401.error.refused,true);
+ assert.equal((await closed(undefined)).revoked,undefined,'no reason (an older core): the pairing stays');
+ const removed=await closed('device.removed');
+ assert.equal(removed.revoked,true);
+ assert.equal(removed.error.refused,true);
+});
+test('hostApi unpairs only on the device-removed key; any other 401 keeps the pairing',async()=>{
+ const run=async body=>{const s=setup();
+  s.run("hostAgentBases.set('fp-mac','https://mac.example');verified.set('https://mac.example',Date.now())");
+  s.context.fetch=async()=>answer(401,body);
+  await assert.rejects(s.run("hostApi('fp-mac','/api/host/agents')"));
+  await new Promise(resolve=>setTimeout(resolve,0));
+  const revoked=s.run('pairings.list[0].revoked');s.run('disconnect()');return revoked};
+ assert.equal(await run({detail:'not paired'}),undefined,'a plain 401 keeps it');
+ assert.equal(await run(null),undefined,'no body keeps it');
+ assert.equal(await run({detail:'x',error:'device.removed'}),true,'the key unpairs');
+});
+test('A call that loses its socket with 4401 unpairs only with the device-removed reason; otherwise it reconnects',async()=>{
+ const lose=async reason=>{
+  const c=await callOnRoom();const {s,first}=c;
+  s.run("RECONNECT_DELAYS_MS.splice(0,RECONNECT_DELAYS_MS.length,1)");
+  first.readyState=3;first.onclose({code:4401,reason});
+  await settleSoon();await settleSoon();
+  const out={revoked:s.run('pairings.list[0].revoked'),reconnecting:s.run('state.reconnecting'),attempts:c.sockets.length};
+  s.run('disconnect()');return out};
+ const plain=await lose('This device is not paired with the core.');
+ assert.equal(plain.revoked,undefined,'prose: the pairing stays');
+ assert.equal(plain.reconnecting,true,'and the call tries again');
+ assert.ok(plain.attempts>=2,'a new attempt was made');
+ const bare=await lose(undefined);
+ assert.equal(bare.revoked,undefined);assert.equal(bare.reconnecting,true);
+ const removed=await lose('device.removed');
+ assert.equal(removed.revoked,true,'the key unpairs');
+ assert.equal(removed.reconnecting,false,'and the call does not try again');
+});
 test('A machine that refuses this device while merely watched says so in its row; the call on another goes on',async()=>{
  const c=await callWithTwoMachines();const {s}=c;
- s.context.fetch=async url=>String(url).startsWith('https://pc.example')?{ok:false,status:401,json:async()=>({detail:'no'})}:{ok:true,status:200,json:async()=>({participants:[],messages:[]})};
+ s.context.fetch=async url=>String(url).startsWith('https://pc.example')?answer(401,{detail:'no',error:'device.removed'}):{ok:true,status:200,json:async()=>({participants:[],messages:[]})};
  await s.run("refreshPeople('fp-pc')");
  assert.equal(s.run('roomStore.getState().machines.find(m=>m.id===\'fp-pc\').state'),'revoked');
  assert.ok(s.run('state.ws'),'the call on the Mac goes on');
