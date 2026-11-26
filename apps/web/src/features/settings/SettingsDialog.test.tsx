@@ -586,3 +586,25 @@ test("no microphone to ask and the media status cannot be read: Permissions open
   act(() => store.patch({ settingsSection: "permissions" }));
   await waitFor(() => expect(store.getState().facts.settingsSection).toBe("general"));
 });
+
+/* "Keep the screen on during a call" is offered only where it can hold (operator, 2026-11-22): a browser with a Screen Wake Lock and
+ * a phone's app (host.presence.screenAwake); not the desktop app (sidevoice-core#267), an app that predates it, nor a browser without one. */
+const held = { supported: true, acquire: async () => "held", release: () => {}, onReleased: () => () => {} };
+const keepAwakeRow = (appHost: Record<string, unknown> | undefined, wakeLock: boolean) => {
+  if (appHost) Object.defineProperty(window, "__sidevoiceHost", { configurable: true, value: { host: appHost } });
+  if (wakeLock) Object.defineProperty(navigator, "wakeLock", { configurable: true, value: { request: async () => ({}) } });
+  onTestFinished(() => { localStorage.clear(); Reflect.deleteProperty(window, "__sidevoiceHost"); Reflect.deleteProperty(navigator, "wakeLock"); });
+  open("whisper-base");
+  fireEvent.click(document.getElementById("settings-call")!);
+  return within(document.getElementById("pane-call")!).queryByRole("switch", { name: "Keep the screen on during a call" });
+};
+test.each([
+  ["a browser with a Screen Wake Lock", undefined, true, true],
+  ["a browser without one", undefined, false, false],
+  ["the phone's app", { build: { channel: "release", version: "1.0.0" }, presence: { media: "app", screenAwake: held } }, false, true],
+  ["the desktop app", { build: { channel: "release", version: "1.0.0" }, presence: { media: "page" } }, true, false],
+  ["an app that predates the member", { presence: { media: "app" } }, true, false],
+])("%s: the keep-the-screen-on row is shown: %s", (_, appHost, wakeLock, shown) => {
+  const row = keepAwakeRow(appHost, wakeLock);
+  if (shown) { expect(row).toBeEnabled(); expect(row).not.toBeChecked(); } else expect(row).toBeNull();
+});

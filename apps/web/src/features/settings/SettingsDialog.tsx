@@ -143,10 +143,10 @@ function CallSettings({ t, microphone }: { t: Translate; microphone: MicrophoneS
       <ThinkingSoundRows t={t} sound={prefs.sound} gainDb={prefs.soundGainDb} intervalScale={prefs.soundIntervalScale} disabled={prefs.presence === "off"} active={shown} onChange={set} />
     </Group>
     <MediaDuckRow t={t} openPermissions={() => store?.patch({ settingsSection: "permissions", settingsLevel: "page" })} />
-    {/* The desktop app keeps its computer awake as any app does; holding the screen on is for a browser or a phone. */}
-    {awake && host().identity.build === null && <Group title={t("settings.call.device")}>
-      <Row label={t("settings.call.keepAwake")} description={awake.supported ? t("settings.call.keepAwakeHint") : t("settings.call.keepAwakeUnsupported")}>
-        <Switch checked={prefs.keepAwake && awake.supported} disabled={!awake.supported} onChange={(keepAwake) => set({ keepAwake })} aria-label={t("settings.call.keepAwake")} />
+    {/* Only where it can hold: a browser with a Screen Wake Lock, or a phone's app; not the desktop app, nor a browser without one. */}
+    {awake?.supported && <Group title={t("settings.call.device")}>
+      <Row label={t("settings.call.keepAwake")} description={t("settings.call.keepAwakeHint")}>
+        <Switch checked={prefs.keepAwake} onChange={(keepAwake) => set({ keepAwake })} aria-label={t("settings.call.keepAwake")} />
       </Row>
     </Group>}
   </Section>;

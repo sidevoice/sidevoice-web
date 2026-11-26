@@ -83,7 +83,10 @@ export function host(): Host {
     presence: {
       media: app.presence.media,
       get remote() { return app.presence.media === "page" ? browserRemote() : null; },
-      get screenAwake() { return browserScreenAwake(); },
+      // In an app, the app's own where it holds the screen (a phone), else none: the desktop app has no hold yet
+      // (sidevoice-core#267), and an app that predates it must not be offered a browser's lock that does not hold. In a browser,
+      // its Screen Wake Lock.
+      get screenAwake() { return app.inApp ? app.presence.screenAwake : browserScreenAwake(); },
     },
   };
 }

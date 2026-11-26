@@ -362,6 +362,28 @@ describe("the host's message overlay", () => {
   });
 });
 
+describe("the screen kept on", () => {
+  const held = { supported: true, acquire: async () => "held", release: () => {}, onReleased: () => () => {} };
+  test("an app that holds the screen itself is the one the page asks", async () => {
+    withHost({ presence: { media: "app", screenAwake: held } });
+    const awake = host().presence.screenAwake!;
+    expect(awake.supported).toBe(true);
+    expect(await awake.acquire()).toBe("held");
+  });
+  test("an app without one, or with half of one, has none: the browser's lock does not hold in its web view", () => {
+    for (const presence of [{ media: "app" }, { media: "page" }, { media: "app", screenAwake: { acquire: held.acquire } }, { media: "app", screenAwake: "yes" }]) {
+      withHost({ presence });
+      expect(host().presence.screenAwake).toBeNull();
+    }
+    withHost({});
+    expect(host().presence.screenAwake).toBeNull();
+  });
+  test("a browser has its own", () => {
+    withHost(undefined);
+    expect(host().presence.screenAwake).not.toBeNull();
+  });
+});
+
 test("a member the app offers late is watched for a while, told once it is there, and never in a browser", () => {
   vi.useFakeTimers();
   try {

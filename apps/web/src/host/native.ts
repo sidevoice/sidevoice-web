@@ -1,6 +1,6 @@
 import type {
   AppBuild, AppUpdater, AppVoice, CallControlsBridge, AudioRouteBridge, CallSurfaceBridge, CrashReportsBridge, CueBridge, Host, HostDebugBridge, HostIdentity, HostPresence, HostStorage, LocalHostBridge,
-  MediaDuckBridge, MessageOverlay, MicrophoneBridge, MuteShortcutBridge, PairingsStore, ReachTransport, ResetBridge, ScreenBridge, ShortcutsBridge, TextScaleBridge,
+  MediaDuckBridge, MessageOverlay, MicrophoneBridge, MuteShortcutBridge, PairingsStore, ReachTransport, ResetBridge, ScreenAwake, ScreenBridge, ShortcutsBridge, TextScaleBridge,
 } from "./types";
 
 /* What an app injects into its page: `window.__sidevoiceHost`, the object the desktop and mobile apps share
@@ -45,7 +45,9 @@ export type NativeHost = Omit<Host, "exclusive" | "systemTextSize" | "identity" 
   identity: Omit<HostIdentity, "deviceName" | "shortcutModifier" | "followKeyboardLayout"> & { deviceName(): string | null; shortcutModifier: string | null };
   /** The app's permission bridge, and its help for a blocked one when it words it. */
   microphone: Partial<MicrophoneBridge> | null;
-  presence: Pick<HostPresence, "media">;
+  /** An app hosts this page: it injected a host, even an empty one (an old app that says nothing of itself). */
+  inApp: boolean;
+  presence: Pick<HostPresence, "media"> & { /** The app's own hold on the screen, where it has one (a phone's webview has no Screen Wake Lock that holds); null where the app has none (the desktop app, or one that predates the member): the page offers no hold there, and the browser's lock is not handed in its place. */ screenAwake: ScreenAwake | null };
   /** What the app says of its transport; null where it says nothing. */
   reach: ReachTransport | null;
   /** The app's pairings; null where it keeps none for the page. */
@@ -76,11 +78,13 @@ export function nativeHost(): NativeHost {
   const pairings = app?.pairings as PairingsStore | undefined;
   const storage: HostStorage | null = pairings && typeof pairings.read === "function" && typeof pairings.write === "function" ? { pairings } : null;
   const reach = app?.reach as Partial<ReachTransport> | undefined;
-  const presence = app?.presence as { media?: unknown } | undefined;
+  const presence = app?.presence as { media?: unknown; screenAwake?: unknown } | undefined;
+  const screenAwake = presence?.screenAwake as Partial<ScreenAwake> | undefined;
   const debug = app?.debug as Partial<HostDebugBridge> | undefined;
   const microphone = app?.microphone as Partial<MicrophoneBridge> | undefined;
   const updater = app?.updater as AppUpdater | undefined;
   return {
+    inApp: app !== undefined,
     messages: (language) => overlay(app, language),
     identity: {
       build: build(app),
@@ -89,7 +93,11 @@ export function nativeHost(): NativeHost {
     },
     microphone: microphone && typeof microphone === "object" ? microphone : null,
     voice: app?.voice ? { voice: app.voice as AppVoice["voice"], engine: app.engine as AppVoice["engine"] } : null,
-    presence: { media: presence?.media === "app" ? "app" : "page" },
+    presence: {
+      media: presence?.media === "app" ? "app" : "page",
+      // Used only when it has the functions the page calls, as every member is.
+      screenAwake: screenAwake && typeof screenAwake.acquire === "function" && typeof screenAwake.release === "function" && typeof screenAwake.onReleased === "function" ? screenAwake as ScreenAwake : null,
+    },
     reach: typeof reach?.plainHttpPrivate === "boolean" ? { plainHttpPrivate: reach.plainHttpPrivate } : null,
     storage,
     localHost: member<LocalHostBridge>(app, "localHost", ["state", "subscribe", "pairing"]),
