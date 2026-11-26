@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.35.0](https://github.com/sidevoice/sidevoice-web/compare/v0.34.1...v0.35.0) (2026-11-26)
+
+
+### Features
+
+* **logs:** read the core's and the app's logs in the viewer ([#629](https://github.com/sidevoice/sidevoice-web/issues/629)) ([8d812f2](https://github.com/sidevoice/sidevoice-web/commit/8d812f2de2d6780f39743133b7f5433b0cd56fa2))
+* **logs:** say why a machine cannot be reached ([#637](https://github.com/sidevoice/sidevoice-web/issues/637)) ([d8040dc](https://github.com/sidevoice/sidevoice-web/commit/d8040dc85bb4011683b47b02ecd420333a5edca5))
+
+
+### Bug Fixes
+
+* **call:** log why every call ends ([#626](https://github.com/sidevoice/sidevoice-web/issues/626)) ([4ccb11c](https://github.com/sidevoice/sidevoice-web/commit/4ccb11c086ee80149c0d6ab14a071d0486ccf640))
+* **crash-reports:** the preview shows what is really sent ([#630](https://github.com/sidevoice/sidevoice-web/issues/630)) ([cbe09aa](https://github.com/sidevoice/sidevoice-web/commit/cbe09aabbf5d7eb4369592b4e0e9daa9ef65f590))
+* **pairing:** unpair only when the core says the device was removed ([#639](https://github.com/sidevoice/sidevoice-web/issues/639)) ([807c891](https://github.com/sidevoice/sidevoice-web/commit/807c8917a9d214dfded28b313276bc99eb6f4ea2))
+* **room:** tell the core how old an offline turn is ([#634](https://github.com/sidevoice/sidevoice-web/issues/634)) ([dde878c](https://github.com/sidevoice/sidevoice-web/commit/dde878c3f4819e3ae293f6f2dfa4e4eb3031470a))
+
 ## [0.34.1](https://github.com/sidevoice/sidevoice-web/compare/v0.34.0...v0.34.1) (2026-11-19)
 
 
