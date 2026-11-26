@@ -230,14 +230,14 @@ test("an address proves it is the pinned node, or it is not used", async () => {
   const get = network({ "http://127.0.0.1:8768": node, "https://room.example/nodes/c-1": squatter });
   const pinned = { fp: node.fp, public_key: node.public_key };
   expect(await proveIdentity("http://127.0.0.1:8768", pinned, { get, subtle })).toMatchObject({ ok: true });
-  expect(await proveIdentity("https://room.example/nodes/c-1", pinned, { get, subtle })).toEqual({ ok: false, reason: "impostor" });
-  expect(await proveIdentity("http://gone:1", pinned, { get, subtle })).toEqual({ ok: false, reason: "unreachable" });
+  expect(await proveIdentity("https://room.example/nodes/c-1", pinned, { get, subtle })).toEqual({ ok: false, reason: "impostor", why: "bad_signature" });
+  expect(await proveIdentity("http://gone:1", pinned, { get, subtle })).toMatchObject({ ok: false, reason: "unreachable", why: "fetch_failed" });
   // With only a code's fingerprint, the key offered must hash to it before its signature counts.
   expect(await proveIdentity("http://127.0.0.1:8768", { fp: node.fp }, { get, subtle })).toEqual({ ok: true, publicKey: node.public_key });
-  expect(await proveIdentity("https://room.example/nodes/c-1", { fp: node.fp }, { get, subtle })).toEqual({ ok: false, reason: "impostor" });
+  expect(await proveIdentity("https://room.example/nodes/c-1", { fp: node.fp }, { get, subtle })).toEqual({ ok: false, reason: "impostor", why: "fingerprint_mismatch" });
   // An address that never answers costs its timeout, not the page.
   const hangs = (() => new Promise(() => {})) as unknown as typeof fetch;
-  expect(await proveIdentity("http://slow:1", pinned, { get: hangs, subtle, timeoutMs: 5 })).toEqual({ ok: false, reason: "unreachable" });
+  expect(await proveIdentity("http://slow:1", pinned, { get: hangs, subtle, timeoutMs: 5 })).toEqual({ ok: false, reason: "unreachable", why: "timeout" });
 });
 
 // ----- where a pairing is reached -----
