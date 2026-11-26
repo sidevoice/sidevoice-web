@@ -83,3 +83,16 @@ test("a start refused long after it went (a hundred turns later) is still held, 
   relay.refusedMessage("m-slow", "room.turns_full");
   expect(relay.route({ turn_id: "slow", phase: "finished", text: "words" })).toEqual({ hold: true });
 });
+
+test("words said while away carry how old the turn is, from the age given at flush time", () => {
+  const relay = createTurnRelay();
+  const words = turn("a", "finished", { text: "hola" });
+  expect(relay.route(words, 4200)).toEqual({ send: { ...words, offline: true, age_ms: 4200 } });
+  expect(relay.route({ ...words, offline: true }, 1234.6)).toEqual({ send: { ...words, offline: true, age_ms: 1235 } });
+  expect(relay.route({ ...words, offline: true }, -5)).toEqual({ send: { ...words, offline: true, age_ms: 0 } });
+  // No age known, or a turn the room already knows: nothing is added.
+  expect(relay.route(words)).toEqual({ send: { ...words, offline: true } });
+  relay.sent("b", "m-b");
+  const known = turn("b", "finished", { text: "hola" });
+  expect(relay.route(known, 9000)).toEqual({ send: known });
+});
