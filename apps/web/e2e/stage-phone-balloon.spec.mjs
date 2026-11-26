@@ -53,7 +53,7 @@ async function settled(page) {
   }
 }
 
-async function onStage(page, theme, state, { held = false } = {}) {
+async function onStage(page, theme, state, { held = false, insets = INSETS } = {}) {
   await installHarness(page, { participants: { first: [conversation] } });
   // The call below is the page's own state, not a room's: the room would answer its binding poll (/api/presentation,
   // on the beat and after the pick) with no binding, and the page would take the call as ended by it and clear the
@@ -77,7 +77,7 @@ async function onStage(page, theme, state, { held = false } = {}) {
   });
   await page.evaluate((insets) => {
     for (const [side, px] of Object.entries(insets)) document.documentElement.style.setProperty(`--sv-inset-${side}`, `calc(${px}px + 0px)`);
-  }, INSETS);
+  }, insets);
   for (const [i, facts] of STATES[state].entries()) {
     if (state.endsWith("sent") && i === STATES[state].length - 1) await settled(page);
     await page.evaluate((facts) => window.sidevoiceUI.store.patch(facts), facts(key));
@@ -260,6 +260,60 @@ test.describe("844x390 landscape", () => {
     });
   }
 });
+
+/* A short, wide stage with a real card up (a phone on its side, a short desktop window): the card is shown, not held unseen, under the
+ * creature and clear of it, and the creature keeps a sensible size beside it. The stage's tile is 160 to 220 px tall on a phone on its
+ * side (its safe areas: 47 px each side, 21 at the foot) and the framing solves it by rising off the optical centre; the band from
+ * 254 to 290 px of tile (a desktop window about 456 to 492 px tall) is where the centre starts to hold the card at its furthest step, and the
+ * creature was 22 px there, a third of what it was a px shorter (2026-11-12). The tile's height is checked against each case's band, so a
+ * layout that moves it says so here. */
+const LANDSCAPE_INSETS = { top: 0, bottom: 21, left: 47, right: 47 }, NO_INSETS = { top: 0, bottom: 0, left: 0, right: 0 };
+const phoneSide = (width, height) => ({ viewport: { width, height }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
+const SHORT_STAGES = [
+  ["a phone on its side, 844 x 390", phoneSide(844, 390), LANDSCAPE_INSETS, [150, 190], 0.13],
+  ["a phone on its side, 932 x 430", phoneSide(932, 430), LANDSCAPE_INSETS, [180, 220], 0.13],
+  ["a phone on its side, 667 x 375", phoneSide(667, 375), LANDSCAPE_INSETS, [140, 185], 0.13],
+  ["a desktop window with a stage 218 px tall (1200 x 420)", { viewport: { width: 1200, height: 420 } }, NO_INSETS, [210, 228], 0.15],
+  ["a desktop window with a stage 254 px tall (1200 x 456)", { viewport: { width: 1200, height: 456 } }, NO_INSETS, [246, 262], 0.2],
+  ["a desktop window with a stage 270 px tall (1200 x 472)", { viewport: { width: 1200, height: 472 } }, NO_INSETS, [262, 278], 0.2],
+  ["a desktop window with a stage 290 px tall (1200 x 492)", { viewport: { width: 1200, height: 492 } }, NO_INSETS, [282, 300], 0.2],
+  ["a wide, short desktop window (1600 x 500)", { viewport: { width: 1600, height: 500 } }, NO_INSETS, [280, 310], 0.2],
+];
+for (const [name, use, insets, band, least] of SHORT_STAGES) {
+  test.describe(name, () => {
+    test.use(use);
+    for (const state of ["listening", "speaking"]) {
+      test(`${state}: its card is shown under the creature and clear of it, and the creature keeps a sensible size`, async ({ page }) => {
+        await onStage(page, "light", state, { insets });
+        const m = await measure(page);
+        expect(m.tileHeight, `the stage is ${band[0]} to ${band[1]} px tall (the case's band)`).toBeGreaterThanOrEqual(band[0]);
+        expect(m.tileHeight, `the stage is ${band[0]} to ${band[1]} px tall (the case's band)`).toBeLessThanOrEqual(band[1]);
+        // the card is shown: not held unseen (the layer says which it holds), and seen
+        const kind = state === "speaking" ? "agent" : "pill", held = (await page.locator(".stage-tile .stage-voice").getAttribute("data-hold")) ?? "";
+        expect(held.split(" "), `the ${kind} card is not held unseen (data-hold: "${held}")`).not.toContain(kind);
+        expect(m.balloons.filter((b) => b.kind.split(" ").includes(kind)).length, `the ${kind} card is on the stage`).toBe(1);
+        for (const balloon of m.balloons) {
+          expect(balloon.left, "inside the tile, left").toBeGreaterThanOrEqual(m.tile.left - 0.5);
+          expect(balloon.right, "inside the tile, right").toBeLessThanOrEqual(m.tile.right + 0.5);
+          expect(balloon.top, "inside the tile, top").toBeGreaterThanOrEqual(m.tile.top - 0.5);
+          expect(balloon.bottom, "inside the tile, bottom").toBeLessThanOrEqual(m.tile.bottom + 0.5);
+        }
+        if (await webgl(page)) {
+          expect(m.drawn, "the creature is drawn under the card").not.toBeNull();
+          expect(m.creature, "the creature is drawn").not.toBeNull();
+          // under the creature, clear of it: its feet over the card's top by the gap, none of its pixels under the card
+          for (const [i, drawn] of m.drawn.entries()) {
+            expect(drawn.over, `${m.balloons[i].kind}: the creature's pixels under it`).toBe(0);
+            if (drawn.gap != null) expect(drawn.gap, `${m.balloons[i].kind}: the gap to the creature`).toBeGreaterThanOrEqual(need(state, m.tileHeight));
+          }
+          for (const balloon of m.balloons) expect(m.creature.bottom, "the creature's feet over the card").toBeLessThanOrEqual(balloon.top + 0.5);
+          const share = (m.creature.bottom - m.creature.top) / m.tileHeight;
+          expect(share, `the creature (${(m.creature.bottom - m.creature.top).toFixed(1)} px) is at least ${least} of the stage's height (${m.tileHeight} px)`).toBeGreaterThanOrEqual(least);
+        }
+      });
+    }
+  });
+}
 
 test.describe("desktop", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
