@@ -1,5 +1,7 @@
 # Releasing
 
+This file is self-sufficient: it holds what anyone needs to build, release and download this repository. The maintainers also follow an internal release guideline shared by all Sidevoice repositories ([releasing guideline](https://github.com/sidevoice/.github-private/blob/main/docs/releasing.md), maintainers only; nothing here depends on it).
+
 One version for the whole web, tagged `vX.Y.Z`. It lives in the root `package.json`, the two workspaces'
 `package.json` (`apps/web`, `packages/protocol`), the web's pin of
 `@sidevoice/protocol`, and `package-lock.json`; release-please moves them together (`release-please-config.json`).
@@ -56,12 +58,12 @@ Release itself.
 the contract of. It ships in the build (`voice/service.pin.json`); the page judges every machine against it, and the
 desktop app reads it from the web it bundles (`web.pin.json`), updating this device's service to the newest patch of that
 minor and never to the next one. A service release that is a minor (`feat` in the service) arrives with the web (and so the
-desktop app) that bumps this file; a patch (`fix`) needs nothing here. This file is the only place the minor is written.
+desktop app) that bumps this file; a patch (`fix`) needs nothing here. This file is the only place the minor is written. A PR that moves it is a change of the web and is titled `feat(deps): ...` (guideline, section 1).
 
 ## Which version comes next
 
 `fix:` → patch, `feat:` → minor. While the version is 0.x a breaking change (`feat!:` or a `BREAKING CHANGE:`
-footer) bumps the minor, not the major. `docs:`, `chore:`, `ci:`, `test:`, `refactor:` alone make no release.
+footer) bumps the minor, not the major. `docs:`, `chore:`, `ci:`, `test:`, `refactor:` alone make no release. `@sidevoice/engine` and `@sidevoice/voice` are compiled into the build (exact versions in `apps/web/package.json`): a PR that moves one of them is a change of the web and is titled `fix(deps): ...`, not `chore` (guideline, section 1).
 
 Nothing is tagged by release-please yet: the manifest starts at 0.1.0 (the version the packages carry), and
 release-please reads the history from the commit where this repository became the web alone (`bootstrap-sha`).
