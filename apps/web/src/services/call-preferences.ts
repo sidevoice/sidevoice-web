@@ -1,3 +1,4 @@
+import type { MessageKey } from "../i18n/translator";
 import { DEFAULT_THINKING_SOUND, thinkingSound, thinkingSoundGain, thinkingSoundIntervalScale } from "./thinking-sounds";
 
 /* How a call behaves on this device, apart from its voice: whether a soft sound says the agent is working (never, only
@@ -5,6 +6,15 @@ import { DEFAULT_THINKING_SOUND, thinkingSound, thinkingSoundGain, thinkingSound
  * this device and applied at once (Settings → Call); the runtime and the page read them here. */
 
 export type PresenceSound = "off" | "hidden" | "always";
+/** How the agent speaks to this device, carried with each message the person sends as `speaking_style` (the connector turns it into the agent's style). */
+export type SpeakingStyle = "brief" | "normal" | "detailed";
+/** The options, in the order the setting lists them: the one place to change a value, its label key or its description key. */
+export const SPEAKING_STYLE_OPTIONS: readonly { value: SpeakingStyle; label: MessageKey; description: MessageKey }[] = [
+  { value: "brief", label: "settings.call.speaking.brief", description: "settings.call.speaking.brief.hint" },
+  { value: "normal", label: "settings.call.speaking.normal", description: "settings.call.speaking.normal.hint" },
+  { value: "detailed", label: "settings.call.speaking.detailed", description: "settings.call.speaking.detailed.hint" },
+];
+const SPEAKING_STYLES: readonly string[] = SPEAKING_STYLE_OPTIONS.map((option) => option.value);
 export interface CallPreferences {
   presence: PresenceSound;
   /** The thinking sound's id (services/thinking-sounds.ts); always one the manifest has. */
@@ -14,6 +24,7 @@ export interface CallPreferences {
   /** Its frequency: a factor on the sound's own gaps between plays (1: its own cadence; services/thinking-sounds.ts). */
   soundIntervalScale: number;
   keepAwake: boolean;
+  speakingStyle: SpeakingStyle;
 }
 
 export const CALL_PREFERENCES_KEY = "sidevoice.call-preferences";
@@ -21,7 +32,7 @@ const CHANGED = "sidevoice-call-preferences";
 /** By default the sound plays when the screen is off — the call goes on in a pocket, a car — as the default sound at its
  *  own level and cadence, and the screen turns off as the device says; it is kept on only when chosen. */
 export const DEFAULT_CALL_PREFERENCES: CallPreferences = {
-  presence: "hidden", sound: DEFAULT_THINKING_SOUND, soundGainDb: 0, soundIntervalScale: 1, keepAwake: false,
+  presence: "hidden", sound: DEFAULT_THINKING_SOUND, soundGainDb: 0, soundIntervalScale: 1, keepAwake: false, speakingStyle: "normal",
 };
 
 export function readCallPreferences(): CallPreferences {
@@ -33,6 +44,7 @@ export function readCallPreferences(): CallPreferences {
       sound: thinkingSound(stored.sound).id,
       soundGainDb: thinkingSoundGain(stored.soundGainDb),
       soundIntervalScale: thinkingSoundIntervalScale(stored.soundIntervalScale),
+      speakingStyle: SPEAKING_STYLES.includes(stored.speakingStyle) ? stored.speakingStyle : DEFAULT_CALL_PREFERENCES.speakingStyle,
       keepAwake: typeof stored.keepAwake === "boolean" ? stored.keepAwake : DEFAULT_CALL_PREFERENCES.keepAwake,
     };
   } catch { return { ...DEFAULT_CALL_PREFERENCES }; }
@@ -50,4 +62,9 @@ export function subscribeCallPreferences(changed: () => void) {
   globalThis.addEventListener?.(CHANGED, changed);
   globalThis.addEventListener?.("storage", onStorage);
   return () => { globalThis.removeEventListener?.(CHANGED, changed); globalThis.removeEventListener?.("storage", onStorage); };
+}
+
+/** A message the person sends, with how they want the agent to speak (the connector reads `speaking_style`). */
+export function withSpeakingStyle<T extends object>(data: T): T & { speaking_style: SpeakingStyle } {
+  return { ...data, speaking_style: readCallPreferences().speakingStyle };
 }
